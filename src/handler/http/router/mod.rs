@@ -630,7 +630,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph", get(alerts::incidents::get_incident_service_graph))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/status", patch(alerts::incidents::update_incident_status))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))

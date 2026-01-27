@@ -175,6 +175,52 @@ pub async fn update_status(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Update incident title
+pub async fn update_title(
+    org_id: &str,
+    id: &str,
+    title: &str,
+) -> Result<alert_incidents::Model, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let incident = get(org_id, id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    let mut active: alert_incidents::ActiveModel = incident.into();
+    active.title = Set(Some(title.to_string()));
+    active.updated_at = Set(now);
+
+    active
+        .update(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Update incident severity
+pub async fn update_severity(
+    org_id: &str,
+    id: &str,
+    severity: &str,
+) -> Result<alert_incidents::Model, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let incident = get(org_id, id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    let mut active: alert_incidents::ActiveModel = incident.into();
+    active.severity = Set(severity.to_string());
+    active.updated_at = Set(now);
+
+    active
+        .update(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// List incidents with optional filters
 pub async fn list(
     org_id: &str,
