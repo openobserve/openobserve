@@ -213,11 +213,9 @@ pub async fn ingest(
 
     // Optimization: Add yield points to prevent task starvation in async runtime
     // This is critical for HA deployments with concurrent multi-tenant ingestion
-    for (idx, ret) in data.iter().enumerate() {
-        // Yield every 1000 records to allow other tasks to make progress
-        if idx % 1000 == 0 && idx > 0 {
-            tokio::task::yield_now().await;
-        }
+    for (_idx, ret) in data.iter().enumerate() {
+        // Let Tokio decide when to yield based on cooperative budget
+        tokio::task::coop::consume_budget().await;
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {

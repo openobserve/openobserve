@@ -209,7 +209,6 @@ pub async fn merge_parquet_files(
     });
 
     // Optimization: Add yield points to prevent task starvation during batch processing
-    let mut batch_count = 0;
     while let Some(batch) = rx.recv().await {
         new_file_meta.records += batch.num_rows() as i64;
         if let Err(e) = writer.write(&batch).await {
@@ -217,11 +216,8 @@ pub async fn merge_parquet_files(
             return Err(e.into());
         }
 
-        // Yield every 100 batches to allow other queries to make progress
-        batch_count += 1;
-        if batch_count % 100 == 0 {
-            tokio::task::yield_now().await;
-        }
+        // Let Tokio decide when to yield based on cooperative budget
+        tokio::task::coop::consume_budget().await;
     }
     task.await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
@@ -315,7 +311,6 @@ pub async fn merge_parquet_files_with_downsampling(
     });
 
     // Optimization: Add yield points to prevent task starvation during batch processing
-    let mut batch_count = 0;
     while let Some(batch) = rx.recv().await {
         if file_meta.max_ts == 0 {
             file_meta.max_ts = get_max_timestamp(&batch);
@@ -324,11 +319,8 @@ pub async fn merge_parquet_files_with_downsampling(
         file_meta.records += batch.num_rows() as i64;
         min_ts = get_min_timestamp(&batch);
 
-        // Yield every 100 batches
-        batch_count += 1;
-        if batch_count % 100 == 0 {
-            tokio::task::yield_now().await;
-        }
+        // Let Tokio decide when to yield based on cooperative budget
+        tokio::task::coop::consume_budget().await;
         if file_meta.original_size > cfg.compact.max_file_size as i64 {
             file_meta.min_ts = min_ts;
             append_metadata(&mut writer, &file_meta)?;
