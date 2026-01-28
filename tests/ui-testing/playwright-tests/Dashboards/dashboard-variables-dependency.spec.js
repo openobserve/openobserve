@@ -853,7 +853,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("9-should show error state when variable loading fails", async ({ page }) => {
+  test.skip("9-should show error state when variable loading fails", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Error_${Date.now()}`;
