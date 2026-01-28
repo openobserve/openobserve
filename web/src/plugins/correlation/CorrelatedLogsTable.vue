@@ -833,6 +833,19 @@ const handleCloseColumn = (columnDef: any) => {
   }
 };
 
+const toggleColumnVisibility = (field: string) => {
+  // Prevent hiding timestamp column
+  if (field === "_timestamp") return;
+
+  if (visibleColumns.value.has(field)) {
+    visibleColumns.value.delete(field);
+  } else {
+    visibleColumns.value.add(field);
+  }
+  // Force reactivity by creating new Set
+  visibleColumns.value = new Set(visibleColumns.value);
+};
+
 const handleExpandRow = (row: any) => {
   const index = expandedRows.value.findIndex((r) => r === row);
   if (index >= 0) {
