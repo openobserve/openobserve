@@ -88,6 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :highlight-query="highlightQuery"
           :selected-stream-fts-keys="ftsFields"
           :selected-stream-fields="selectedFields"
+          :hide-search-term-actions="hideSearchTermActions"
+          :hide-view-related-button="hideViewRelatedButton"
           @click:dataRow="handleRowClick"
           @copy="handleCopy"
           @sendToAiChat="handleSendToAiChat"
@@ -217,6 +219,11 @@ const props = defineProps<CorrelatedLogsProps>();
 // Emits
 const emit = defineEmits<{
   sendToAiChat: [value: any];
+  addSearchTerm: [
+    field: string | number,
+    fieldValue: string | number | boolean,
+    action: string,
+  ];
 }>();
 
 // Composables
@@ -273,6 +280,12 @@ const matchedDimensions = computed(() => props.matchedDimensions);
 const additionalDimensions = computed(() => props.additionalDimensions || {});
 const availableDimensions = computed(() => props.availableDimensions || {});
 const ftsFields = computed(() => props.ftsFields || []);
+const hideViewRelatedButton = computed(
+  () => props.hideViewRelatedButton ?? false,
+);
+const hideSearchTermActions = computed(
+  () => props.hideSearchTermActions ?? false,
+);
 
 // Combined dimensions for DimensionFiltersBar (merges matched and additional)
 const allDimensions = computed(() => ({
@@ -542,8 +555,17 @@ const handleSendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
 
-const handleAddSearchTerm = (data: any) => {
-  console.log("[CorrelatedLogsTable] Add search term:", data);
+const handleAddSearchTerm = (
+  field: string | number,
+  fieldValue: string | number | boolean,
+  action: string,
+) => {
+  console.log("[CorrelatedLogsTable] Add search term:", {
+    field,
+    fieldValue,
+    action,
+  });
+  emit("addSearchTerm", field, fieldValue, action);
 };
 
 const handleAddFieldToTable = (field: string) => {
