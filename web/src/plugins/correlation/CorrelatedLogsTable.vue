@@ -26,17 +26,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
       <template v-if="!isLoading || hasResults">
-        <DimensionFiltersBar
-          :dimensions="pendingFilters"
-          :unstable-dimension-keys="unstableDimensionKeys"
-          :get-dimension-options="getFilterOptions"
-          :has-pending-changes="hasPendingChanges"
-          :show-apply-button="true"
-          :filter-label="t('correlation.logs.filtersLabel')"
-          :unstable-dimension-tooltip="t('correlation.logs.unstableDimension')"
-          @update:dimension="handleDimensionUpdate"
-          @apply="handleApplyFilters"
-        />
+        <div class="tw:flex tw:items-center tw:justify-between tw:gap-3">
+          <div class="tw:flex-1">
+            <DimensionFiltersBar
+              :dimensions="pendingFilters"
+              :unstable-dimension-keys="unstableDimensionKeys"
+              :get-dimension-options="getFilterOptions"
+              :has-pending-changes="hasPendingChanges"
+              :show-apply-button="true"
+              :filter-label="t('correlation.logs.filtersLabel')"
+              :unstable-dimension-tooltip="
+                t('correlation.logs.unstableDimension')
+              "
+              @update:dimension="handleDimensionUpdate"
+              @apply="handleApplyFilters"
+            />
+          </div>
+
+          <!-- Column Visibility Dropdown -->
+          <div class="tw:pr-4">
+            <q-btn-dropdown
+              flat
+              dense
+              no-caps
+              :label="t('search.showHideColumns')"
+              icon="view_column"
+              class="o2-secondary-button"
+              data-test="column-visibility-dropdown"
+              auto-close
+              :disable="!hasResults"
+            >
+              <q-list class="column-visibility-list">
+                <q-item
+                  v-for="field in availableFields"
+                  :key="field"
+                  dense
+                  clickable
+                  @click="toggleColumnVisibility(field)"
+                  :disable="field === '_timestamp'"
+                >
+                  <q-item-section avatar>
+                    <q-checkbox
+                      :model-value="visibleColumns.has(field)"
+                      @update:model-value="toggleColumnVisibility(field)"
+                      :disable="field === '_timestamp'"
+                      dense
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ field }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+          </div>
+        </div>
       </template>
 
       <!-- Show skeleton while loading -->
@@ -609,6 +653,19 @@ const handleCloseColumn = (columnDef: any) => {
     // Force reactivity by creating new Set
     visibleColumns.value = new Set(visibleColumns.value);
   }
+};
+
+const toggleColumnVisibility = (field: string) => {
+  // Prevent hiding timestamp column
+  if (field === "_timestamp") return;
+
+  if (visibleColumns.value.has(field)) {
+    visibleColumns.value.delete(field);
+  } else {
+    visibleColumns.value.add(field);
+  }
+  // Force reactivity by creating new Set
+  visibleColumns.value = new Set(visibleColumns.value);
 };
 
 const handleExpandRow = (row: any) => {
