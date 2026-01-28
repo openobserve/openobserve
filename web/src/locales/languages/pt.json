@@ -1389,7 +1389,14 @@
     "folders": "Pastas",
     "searchFolder": "Pasta de pesquisa",
     "deleteFolder": "Excluir pasta",
-    "deleteFolderMessage": "Tem certeza de que deseja excluir esta pasta?"
+    "deleteFolderMessage": "Tem certeza de que deseja excluir esta pasta?",
+    "columnOrder": "Ordem das colunas",
+    "configureColumnOrder": "Configurar a ordem das colunas",
+    "columnOrderDescription": "Personalize a ordem de exibição das colunas na tabela. Somente colunas visíveis (com base em filtros visíveis/ocultos) podem ser reordenadas. Arraste as colunas para alterar sua ordem.",
+    "noColumnsOrdered": "Nenhuma coluna ordenada",
+    "columnsDefaultOrder": "As colunas serão exibidas em sua ordem padrão",
+    "moveUp": "Mova-se para cima",
+    "moveDown": "Mover para baixo"
   },
   "panel": {
     "header": "Painel",

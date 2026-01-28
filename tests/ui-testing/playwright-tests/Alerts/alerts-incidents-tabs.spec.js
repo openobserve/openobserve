@@ -39,7 +39,8 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
 
         // Navigate directly to alerts page
         await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        // Use domcontentloaded instead of networkidle for more reliable waits
+        await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
         testLogger.info('Navigated to alerts page');
 
         // Wait for any loading overlays to disappear
@@ -47,6 +48,12 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
 
         // Wait for alert list page to be ready
         await pm.alertsPage.waitForAlertListPageReady();
+
+        // Wait for config API to complete - incidents menu depends on service_graph_enabled
+        await page.waitForResponse(
+            response => response.url().includes('/config') && response.status() === 200,
+            { timeout: 10000 }
+        ).catch(() => {}); // Config may already be loaded
         testLogger.info('Alert page loaded successfully');
     });
 
@@ -195,13 +202,14 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         const incidentsUrl = page.url();
         testLogger.info(`Incidents URL: ${incidentsUrl}`);
 
-        // 3.2 Refresh page
-        await page.reload({ waitUntil: 'networkidle', timeout: 30000 });
+        // 3.2 Refresh page - use domcontentloaded instead of networkidle for reliability
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
         testLogger.info('Page refreshed');
 
         // 3.3 Wait for page to stabilize
         await pm.alertsPage.waitForLoadingOverlayToDisappear();
-        await page.waitForTimeout(3000);
+        // Wait for incidents view to be ready after reload
+        await pm.alertsPage.waitForIncidentsToLoad();
 
         // 3.4 Verify still on Incidents page (URL state preserved)
         await pm.alertsPage.expectIncidentsViewElementsVisible();

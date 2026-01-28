@@ -141,6 +141,8 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       visible_columns: [],
       hidden_columns: [],
       sticky_columns: [],
+      sticky_first_column: false,
+      column_order: [],
     },
     htmlContent: "",
     markdownContent: "",
