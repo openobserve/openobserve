@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-stream-fields="selectedFields"
           @click:dataRow="handleRowClick"
           @copy="handleCopy"
+          @sendToAiChat="handleSendToAiChat"
           @addSearchTerm="handleAddSearchTerm"
           @addFieldToTable="handleAddFieldToTable"
           @expandRow="handleExpandRow"
@@ -205,7 +206,7 @@ import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
-import { date } from "quasar";
+import { date, copyToClipboard, useQuasar } from "quasar";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
@@ -213,9 +214,15 @@ import { byString } from "@/utils/json";
 // Props
 const props = defineProps<CorrelatedLogsProps>();
 
+// Emits
+const emit = defineEmits<{
+  sendToAiChat: [value: any];
+}>();
+
 // Composables
 const { t } = useI18n();
 const store = useStore();
+const $q = useQuasar();
 
 // Use correlated logs composable
 const {
@@ -233,6 +240,7 @@ const {
   isEmpty,
   fetchCorrelatedLogs,
   updateFilter,
+  updateFilters,
   resetFilters,
   refresh,
   isMatchedDimension,
@@ -498,10 +506,8 @@ const handleDimensionUpdate = ({
 // Apply pending filter changes
 const handleApplyFilters = () => {
   console.log("[CorrelatedLogsTable] Applying filters:", pendingFilters.value);
-  // Update all filters at once
-  Object.keys(pendingFilters.value).forEach((key) => {
-    updateFilter(key, pendingFilters.value[key]);
-  });
+  // Update all filters at once using batch update (triggers single API call)
+  updateFilters(pendingFilters.value);
 };
 
 const handleRefresh = () => {
@@ -520,8 +526,20 @@ const handleRowClick = (row: any) => {
   console.log("[CorrelatedLogsTable] Row clicked:", row);
 };
 
-const handleCopy = (data: any) => {
-  console.log("[CorrelatedLogsTable] Copy:", data);
+const handleCopy = (log: any, copyAsJson: boolean = true) => {
+  const copyData = copyAsJson ? JSON.stringify(log) : log;
+  copyToClipboard(copyData).then(() =>
+    $q.notify({
+      type: "positive",
+      message: "Content Copied Successfully!",
+      timeout: 1000,
+    })
+  );
+};
+
+const handleSendToAiChat = (value: any) => {
+  console.log("[CorrelatedLogsTable] Send to AI chat:", value);
+  emit("sendToAiChat", value);
 };
 
 const handleAddSearchTerm = (data: any) => {
