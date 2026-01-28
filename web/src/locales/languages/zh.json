@@ -698,7 +698,9 @@
     "license_already_active_title": "许可证已激活",
     "license_already_active_msg": "您的许可证仍然有效。你想用新的许可证密钥对其进行更新吗？",
     "yes_update_license": "是的，更新许可证",
-    "no_keep_current": "不，保持最新状态"
+    "no_keep_current": "不，保持最新状态",
+    "feature_correlation_management": "关联管理",
+    "feature_log_patterns": "日志模式"
   },
   "login": {
     "userid": "账号",

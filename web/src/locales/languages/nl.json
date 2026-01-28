@@ -698,7 +698,9 @@
     "license_already_active_title": "Licentie is al actief",
     "license_already_active_msg": "Je licentie is nog steeds actief. Wil je het updaten met de nieuwe licentiesleutel?",
     "yes_update_license": "Ja, licentie bijwerken",
-    "no_keep_current": "Nee, blijf op de hoogte"
+    "no_keep_current": "Nee, blijf op de hoogte",
+    "feature_correlation_management": "Correlatiebeheer",
+    "feature_log_patterns": "Logpatronen"
   },
   "login": {
     "userid": "Gebruikers-ID",

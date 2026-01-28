@@ -698,7 +698,9 @@
     "license_already_active_title": "Lisans Zaten Aktif",
     "license_already_active_msg": "Lisansınız hala aktif. Yeni lisans anahtarıyla güncellemek ister misiniz?",
     "yes_update_license": "Evet, lisansı güncelle",
-    "no_keep_current": "Hayır, güncel tut"
+    "no_keep_current": "Hayır, güncel tut",
+    "feature_correlation_management": "Korelasyon yönetimi",
+    "feature_log_patterns": "Günlük kalıpları"
   },
   "login": {
     "userid": "Kullanıcı Kimliği",

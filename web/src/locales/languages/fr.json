@@ -698,7 +698,9 @@
     "license_already_active_title": "Licence déjà active",
     "license_already_active_msg": "Votre licence est toujours active. Voulez-vous le mettre à jour avec la nouvelle clé de licence ?",
     "yes_update_license": "Oui, mettre à jour la licence",
-    "no_keep_current": "Non, restez au courant"
+    "no_keep_current": "Non, restez au courant",
+    "feature_correlation_management": "Gestion des corrélations",
+    "feature_log_patterns": "Modèles de journaux"
   },
   "login": {
     "userid": "ID utilisateur",

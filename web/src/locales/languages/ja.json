@@ -698,7 +698,9 @@
     "license_already_active_title": "ライセンスはすでにアクティブです",
     "license_already_active_msg": "ライセンスはまだ有効です。新しいライセンスキーで更新しますか?",
     "yes_update_license": "はい、ライセンスを更新してください",
-    "no_keep_current": "いいえ、最新の状態に保つ"
+    "no_keep_current": "いいえ、最新の状態に保つ",
+    "feature_correlation_management": "相関管理",
+    "feature_log_patterns": "ログパターン"
   },
   "login": {
     "userid": "ユーザーID",
