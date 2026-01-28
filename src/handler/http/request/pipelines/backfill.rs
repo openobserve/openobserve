@@ -247,7 +247,7 @@ pub async fn get_backfill(
                     job.pipeline_id,
                     pipeline_id
                 );
-                MetaHttpResponse::not_found(format!(
+                return MetaHttpResponse::not_found(format!(
                     "Backfill job {} not found for pipeline {}",
                     job_id, pipeline_id
                 ));
