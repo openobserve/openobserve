@@ -188,10 +188,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div :class="['text-caption tw:mb-3', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">
                         This will permanently delete all data in the destination stream for the specified time range before running the backfill. This action cannot be undone.
                       </div>
-                      <div :class="['tw:font-semibold tw:text-sm tw:mb-1', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Time Alignment Requirements:</div>
+                      <div :class="['tw:font-semibold tw:text-sm tw:mb-1', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Time Alignment Requirements (UTC):</div>
                       <ul :class="['text-caption tw:ml-5 tw:space-y-1 tw:list-disc', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">
-                        <li><strong>Logs</strong> streams: Times must align to hour boundaries (e.g., 10:00:00, not 10:15:00)</li>
-                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries (e.g., 00:00:00)</li>
+                        <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
+                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
                       </ul>
                     </div>
                   </div>

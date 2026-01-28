@@ -61,8 +61,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="row justify-between q-pa-md">
+      <!-- AWS Marketplace billing - show managed externally message -->
+      <div v-if="billingProvider === 'aws'" class="full-width text-center">
+        <q-chip
+          color="green-2"
+          text-color="green-10"
+          icon="check_circle"
+          label="Managed via AWS Marketplace"
+          class="q-px-md q-py-sm"
+        />
+        <div class="text-caption text-grey-7 q-mt-sm">
+          Billing is handled through your AWS account
+        </div>
+      </div>
+      <div v-else-if="billingProvider === 'azure'" class="full-width text-center">
+        <q-chip
+          color="green-2"
+          text-color="green-10"
+          icon="check_circle"
+          label="Managed via Azure Marketplace"
+          class="q-px-md q-py-sm"
+        />
+        <div class="text-caption text-grey-7 q-mt-sm">
+          Billing is handled through your Azure account
+        </div>
+      </div>
+      <!-- Stripe billing - show subscribe/manage buttons -->
       <q-btn
-        v-if="planType == planName"
+        v-else-if="planType == planName"
         :label="btnCancelSubscription"
         text-color="black"
         class="full-width bg-grey-4 text-bold text-capitalize text-subtitle1"
@@ -87,7 +113,7 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "proPlan",
-  props: ["planType"],
+  props: ["planType", "billingProvider"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";
@@ -95,19 +121,31 @@ export default defineComponent({
     const btnSubscribe = ref(t('billing.subscribe'));
 
     const features = [
-      { name: 'Ingestion (Logs, Metrics, Traces)', price: '$0.30/GB' , is_parent: true},
-      { name: 'Query Volume', price: '$0.01/GB' , is_parent: true},
+      { name: 'Ingestion (Logs, Metrics, Traces)', price: '$0.50 / GB' , is_parent: true},
+      { name: 'Query Volume', price: '$0.01 / GB' , is_parent: true},
       { name: 'Pipelines', price: '' , is_parent: true},
-      { name: 'Data Processed', price: '$0.20/ GB' , is_parent: false},
-      { name: 'Each additional destination', price: '$0.30/ GB' , is_parent: false},
-      { name: 'Each remote destination', price: '$0.45/ GB' , is_parent: false},
-      { name: 'RUM & Session Replay', price: '$1/ 1K sessions' , is_parent: true},
-      { name: 'Error Tracking', price: '$0.15/ 1K events' , is_parent: true},
-      { name: 'Action Script', price: '$1/ 1K runs' , is_parent: true},
+      { name: 'Data Processed', price: '$0.20 / GB' , is_parent: false},
+      { name: 'Each additional destination', price: '$0.30 / GB' , is_parent: false},
+      // { name: 'Each remote destination', price: '$0.45 per GB' , is_parent: false},
+      { name: 'Front end monitoring', price: '' , is_parent: true},
+      { name: 'Real User Monitoring (RUM)', price: '$0.15 / 1K sessions' , is_parent: false},
+      { name: 'Session Replay', price: '$1.00 / 1K sessions' , is_parent: false},
+      { name: 'Error Tracking', price: '$0.15 / 1K events' , is_parent: false},
+      { name: 'Sensitive Data Redaction', price: '$0.15 / GB' , is_parent: true},
+      
+      { name: 'Incident Management', price: '$0 during preview' , is_parent: true},
+      { name: 'AI Assistant', price: '$0 during preview' , is_parent: true},
+      { name: 'AI SRE Agent', price: '$0 during preview' , is_parent: true},
+      { name: 'Audit Trail', price: '2% of monthly spend' , is_parent: true},
+      { name: 'Retention', price: '' , is_parent: true},
+      { name: '15-Days Retention', price: 'Included' , is_parent: false},
+      { name: 'Additional Retention', price: '$0.10 / 30 days' , is_parent: false},
+      
+      // { name: 'Action Script', price: '$1.00 / 1K runs' , is_parent: true},
       { name: 'Unlimited Users', price: '' , is_parent: true},
       { name: 'Role-Based Access Control (RBAC)', price: '' , is_parent: true},
-      { name: '15-Days Retention', price: '' , is_parent: true},
-      { name: '30 days additional retention', price: '$0.10/GB' , is_parent: true},
+      
+      
     ];
 
     const cancelSubscription = () => {

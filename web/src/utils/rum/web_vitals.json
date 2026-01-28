@@ -23,14 +23,14 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_largest_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_largest_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
             "x": [
               {
-                "label": "Timestamp",
+                "label": "",
                 "alias": "x_axis_1",
                 "column": "x_axis_1",
                 "color": null,
@@ -39,7 +39,7 @@
             ],
             "y": [
               {
-                "label": " ",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -73,14 +73,14 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_interaction_to_next_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_interaction_to_next_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
             "x": [
               {
-                "label": "Timestamp",
+                "label": "",
                 "alias": "x_axis_1",
                 "column": "x_axis_1",
                 "color": null,
@@ -89,7 +89,7 @@
             ],
             "y": [
               {
-                "label": " ",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -122,14 +122,14 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": false,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
             "x": [
               {
-                "label": "Timestamp",
+                "label": "",
                 "alias": "x_axis_1",
                 "column": "_timestamp",
                 "color": null,
@@ -138,7 +138,7 @@
             ],
             "y": [
               {
-                "label": " ",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "view_cumulative_layout_shift",
                 "color": "#5960b2",
@@ -173,14 +173,14 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
             "x": [
               {
-                "label": "Timestamp",
+                "label": "",
                 "alias": "x_axis_1",
                 "column": "x_axis_1",
                 "color": null,
@@ -189,7 +189,7 @@
             ],
             "y": [
               {
-                "label": " ",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -223,14 +223,14 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_byte/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_byte/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
             "x": [
               {
-                "label": "Timestamp",
+                "label": "",
                 "alias": "x_axis_1",
                 "column": "x_axis_1",
                 "color": null,
@@ -239,7 +239,7 @@
             ],
             "y": [
               {
-                "label": " ",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -273,14 +273,14 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_loading_time/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_loading_time/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
             "x": [
               {
-                "label": "Timestamp",
+                "label": "",
                 "alias": "x_axis_1",
                 "column": "x_axis_1",
                 "color": null,
@@ -289,7 +289,7 @@
             ],
             "y": [
               {
-                "label": " ",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -322,7 +322,9 @@
           "max_record_size": null
         },
         "value": "",
-        "options": []
+        "options": [],
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       },
       {
         "type": "query_values",
@@ -335,7 +337,9 @@
           "max_record_size": null
         },
         "value": "",
-        "options": []
+        "options": [],
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       },
       {
         "type": "query_values",
@@ -348,7 +352,9 @@
           "max_record_size": null
         },
         "value": "",
-        "options": []
+        "options": [],
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       }
     ]
   }

@@ -526,8 +526,6 @@ pub async fn extend_trial_period(
     Path(org_id): Path<String>,
     Json(req): Json<ExtendTrialPeriodRequest>,
 ) -> Response {
-    use axum::body::Body;
-
     use crate::service::db::organization::ORG_KEY_PREFIX;
 
     let org = org_id;

@@ -17,8 +17,6 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub mod actions;
-// #[cfg(feature = "enterprise")]
-pub mod agent;
 #[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;

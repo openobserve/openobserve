@@ -332,7 +332,8 @@ import { validateDashboardJson } from "@/utils/dashboard/convertDataIntoUnitValu
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import QueryEditor from "@/components/CodeQueryEditor.vue";
+import { defineAsyncComponent } from "vue";
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",

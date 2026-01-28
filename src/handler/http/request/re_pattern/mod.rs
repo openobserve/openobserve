@@ -22,17 +22,17 @@ use infra::table::re_pattern::PatternEntry;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[cfg(feature = "enterprise")]
-use crate::common::{
-    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-    utils::auth::{remove_ownership, set_ownership},
+#[cfg(feature = "vectorscan")]
+use crate::{
+    common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    handler::http::request::BulkDeleteResponse,
 };
 use crate::{
-    common::utils::auth::UserEmail,
-    handler::http::{
-        extractors::Headers,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::{extractors::Headers, request::BulkDeleteRequest},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -148,7 +148,7 @@ pub async fn save(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<PatternCreateRequest>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         use infra::table::{re_pattern::PatternEntry, re_pattern_stream_map::PatternPolicy};
         use o2_enterprise::enterprise::re_patterns::PatternManager;
@@ -181,7 +181,7 @@ pub async fn save(
             Err(e) => MetaHttpResponse::bad_request(e),
         }
     }
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "vectorscan"))]
     {
         drop(org_id);
         drop(user_email);
@@ -211,13 +211,13 @@ pub async fn save(
     ),
     tag = "RePattern"
 )]
-pub async fn get(Path((_org_id, id)): Path<(String, String)>) -> Response {
-    #[cfg(feature = "enterprise")]
+pub async fn get(Path((_org_id, _id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "vectorscan")]
     {
-        let pattern = match infra::table::re_pattern::get(&id).await {
+        let pattern = match infra::table::re_pattern::get(&_id).await {
             Ok(Some(k)) => k,
             Ok(None) => {
-                return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
+                return MetaHttpResponse::not_found(format!("Pattern with id {_id} not found"));
             }
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
@@ -225,7 +225,7 @@ pub async fn get(Path((_org_id, id)): Path<(String, String)>) -> Response {
         let res: PatternGetResponse = pattern.into();
         MetaHttpResponse::json(res)
     }
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "vectorscan"))]
     {
         MetaHttpResponse::forbidden("not supported")
     }
@@ -249,7 +249,7 @@ pub async fn get(Path((_org_id, id)): Path<(String, String)>) -> Response {
     tag = "RePattern"
 )]
 pub async fn list(Path(org_id): Path<String>) -> Response {
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         let patterns = match infra::table::re_pattern::list_by_org(&org_id).await {
             Ok(list) => list,
@@ -261,7 +261,7 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
         let res = PatternListResponse { patterns };
         MetaHttpResponse::json(res)
     }
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "vectorscan"))]
     {
         drop(org_id);
         MetaHttpResponse::forbidden("not supported")
@@ -289,7 +289,7 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
     tag = "RePattern"
 )]
 pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
@@ -323,7 +323,7 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
             Err(e) => MetaHttpResponse::internal_error(e),
         }
     }
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "vectorscan"))]
     {
         drop(org_id);
         drop(id);
@@ -332,7 +332,6 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
 }
 
 /// delete pattern with given id
-#[cfg(feature = "enterprise")]
 #[utoipa::path(
     delete,
     path = "/{org_id}/re_patterns/bulk",
@@ -362,71 +361,82 @@ pub async fn delete_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
-    use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+    #[cfg(feature = "vectorscan")]
+    {
+        use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
-    use crate::common::utils::auth::check_permissions;
+        use crate::common::utils::auth::check_permissions;
 
-    let user_id = user_email.user_id;
-    let mgr = match get_pattern_manager().await {
-        Ok(m) => m,
-        Err(e) => {
-            return MetaHttpResponse::internal_error(
-                format!("Cannot get pattern manager : {e:?}",),
-            );
-        }
-    };
-
-    let mut successful = Vec::with_capacity(req.ids.len());
-    let mut unsuccessful = Vec::with_capacity(req.ids.len());
-    let mut err = None;
-
-    for id in &req.ids {
-        if !check_permissions(id, &org_id, &user_id, "re_patterns", "DELETE", None).await {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
-        let pattern_usage = mgr.get_pattern_usage(id);
-        let (pattern_streams, extra) = if pattern_usage.len() > 5 {
-            (
-                &pattern_usage[0..5],
-                format!(" and {} more", pattern_usage.len() - 5),
-            )
-        } else {
-            (&pattern_usage[0..], "".to_string())
+        let user_id = user_email.user_id;
+        let mgr = match get_pattern_manager().await {
+            Ok(m) => m,
+            Err(e) => {
+                return MetaHttpResponse::internal_error(format!(
+                    "Cannot get pattern manager : {e:?}",
+                ));
+            }
         };
-        if !pattern_usage.is_empty() {
-            unsuccessful.push(id.to_string());
-            err = Some(format!(
-                "Cannot delete pattern, associated with {pattern_streams:?}{extra}"
-            ));
+
+        let mut successful = Vec::with_capacity(req.ids.len());
+        let mut unsuccessful = Vec::with_capacity(req.ids.len());
+        let mut err = None;
+
+        for id in &req.ids {
+            if !check_permissions(id, &org_id, &user_id, "re_patterns", "DELETE", None).await {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+            let pattern_usage = mgr.get_pattern_usage(id);
+            let (pattern_streams, extra) = if pattern_usage.len() > 5 {
+                (
+                    &pattern_usage[0..5],
+                    format!(" and {} more", pattern_usage.len() - 5),
+                )
+            } else {
+                (&pattern_usage[0..], "".to_string())
+            };
+            if !pattern_usage.is_empty() {
+                unsuccessful.push(id.to_string());
+                err = Some(format!(
+                    "Cannot delete pattern, associated with {pattern_streams:?}{extra}"
+                ));
+            }
         }
-    }
-    if !unsuccessful.is_empty() {
-        return MetaHttpResponse::json(BulkDeleteResponse {
+        if !unsuccessful.is_empty() {
+            return MetaHttpResponse::json(BulkDeleteResponse {
+                successful,
+                unsuccessful,
+                err,
+            });
+        }
+
+        for id in req.ids {
+            match crate::service::db::re_pattern::remove(&id).await {
+                Ok(_) => {
+                    remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
+                    successful.push(id);
+                }
+                Err(e) => {
+                    log::error!("error while deleting pattern {org_id}/{id} : {e}");
+                    unsuccessful.push(id);
+                    err = Some(e.to_string());
+                }
+            }
+        }
+
+        MetaHttpResponse::json(BulkDeleteResponse {
             successful,
             unsuccessful,
             err,
-        });
+        })
     }
 
-    for id in req.ids {
-        match crate::service::db::re_pattern::remove(&id).await {
-            Ok(_) => {
-                remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
-                successful.push(id);
-            }
-            Err(e) => {
-                log::error!("error while deleting pattern {org_id}/{id} : {e}");
-                unsuccessful.push(id);
-                err = Some(e.to_string());
-            }
-        }
+    #[cfg(not(feature = "vectorscan"))]
+    {
+        drop(org_id);
+        drop(user_email);
+        drop(req);
+        MetaHttpResponse::forbidden("not supported")
     }
-
-    MetaHttpResponse::json(BulkDeleteResponse {
-        successful,
-        unsuccessful,
-        err,
-    })
 }
 
 /// update the pattern for given id
@@ -459,7 +469,7 @@ pub async fn update(
     Path((_org_id, id)): Path<(String, String)>,
     Json(req): Json<PatternCreateRequest>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         use infra::table::re_pattern_stream_map::PatternPolicy;
         use o2_enterprise::enterprise::re_patterns::PatternManager;
@@ -488,7 +498,7 @@ pub async fn update(
             Err(e) => MetaHttpResponse::bad_request(e),
         }
     }
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "vectorscan"))]
     {
         drop(id);
         drop(req);
@@ -520,7 +530,7 @@ pub async fn update(
     tag = "RePattern"
 )]
 pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         use infra::table::re_pattern_stream_map::PatternPolicy;
         use o2_enterprise::enterprise::re_patterns::PatternManager;
@@ -547,7 +557,7 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
 
         MetaHttpResponse::json(PatternTestResponse { results: ret })
     }
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "vectorscan"))]
     {
         drop(req);
         MetaHttpResponse::forbidden("not supported")

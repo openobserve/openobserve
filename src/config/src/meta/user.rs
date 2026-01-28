@@ -49,18 +49,15 @@ pub struct UserOrg {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
+#[serde(rename = "snake_case")]
 pub enum UserRole {
-    #[serde(rename = "root")]
     Root = 0,
-    #[serde(rename = "admin")]
     Admin = 1,
-    #[serde(rename = "editor")]
     Editor = 2,
-    #[serde(rename = "viewer")] // read only user
+    // read only user
     Viewer = 3,
-    #[serde(rename = "user")] // No access only login user
+    // No access only login user
     User = 4,
-    #[serde(rename = "service_account")]
     ServiceAccount = 5,
 }
 

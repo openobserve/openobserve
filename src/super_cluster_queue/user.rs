@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -101,7 +101,7 @@ async fn update(msg: Message) -> Result<()> {
 
 async fn delete(msg: Message) -> Result<()> {
     let keys = msg.key.split('/').collect::<Vec<_>>();
-    if keys.len() != 2 {
+    if keys.len() != 3 {
         log::error!(
             "[SUPER_CLUSTER:sync] Invalid key: {}, expected 3 parts, got {}",
             msg.key,
@@ -109,7 +109,7 @@ async fn delete(msg: Message) -> Result<()> {
         );
         return Err(Error::Message("Invalid key".to_string()));
     }
-    let email = keys[1];
+    let email = keys[2];
     if let Err(e) = org_users::remove_by_user(email).await {
         log::error!("[SUPER_CLUSTER:sync] Failed to delete user: {email}, error: {e}");
         return Err(e);
