@@ -278,7 +278,7 @@ export default defineComponent({
         return html.replace(
           regex,
           (match) =>
-            `<mark class="tw:bg-yellow-400 tw:text-black tw:rounded-sm tw:px-0.5 tw:shadow-sm">${match}</mark>`,
+            `<mark class="tw:bg-yellow-400 tw:text-black tw:rounded-sm tw:shadow-sm">${match}</mark>`,
         );
       } catch (e) {
         return html;
@@ -352,7 +352,7 @@ export default defineComponent({
   background-color: #facc15;
   color: black;
   border-radius: 2px;
-  padding: 0 2px;
+  padding: 0;
 }
 
 // Ensure Monaco colorized content looks good
