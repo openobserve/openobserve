@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sendToAiChat="handleSendToAiChat"
           @addSearchTerm="handleAddSearchTerm"
           @addFieldToTable="handleAddFieldToTable"
+          @closeColumn="handleCloseColumn"
           @expandRow="handleExpandRow"
           @show-correlation="handleNestedCorrelation"
           data-test="logs-tenstack-table"
@@ -258,6 +259,7 @@ const {
 const wrapTableCells = ref(false);
 const expandedRows = ref<any[]>([]);
 const selectedFields = ref<any[]>([]);
+const visibleColumns = ref<Set<string>>(new Set());
 
 // Pending dimensions - for the apply button pattern
 const pendingFilters = ref<Record<string, string>>({ ...currentFilters.value });
@@ -377,8 +379,8 @@ const getFilterOptions = (
   }));
 };
 
-// Generate table columns dynamically from search results
-const tableColumns = computed<ColumnDef<any>[]>(() => {
+// Get all available fields from search results
+const availableFields = computed(() => {
   if (!searchResults.value || searchResults.value.length === 0) {
     return [];
   }
@@ -389,7 +391,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     Object.keys(row).forEach((key) => fieldSet.add(key));
   });
 
-  const fields = Array.from(fieldSet).sort((a, b) => {
+  return Array.from(fieldSet).sort((a, b) => {
     // Prioritize _timestamp first
     if (a === "_timestamp") return -1;
     if (b === "_timestamp") return 1;
@@ -403,8 +405,33 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     // Then alphabetically
     return a.localeCompare(b);
   });
+});
 
-  return fields.map((field) => {
+// Watch for new fields and initialize visibleColumns
+watch(
+  availableFields,
+  (fields) => {
+    if (fields.length > 0 && visibleColumns.value.size === 0) {
+      visibleColumns.value = new Set(fields);
+    }
+    // Add any new fields to visible columns
+    fields.forEach((field) => {
+      if (!visibleColumns.value.has(field)) {
+        visibleColumns.value.add(field);
+      }
+    });
+  },
+  { immediate: true },
+);
+
+// Generate table columns dynamically from visible fields
+const tableColumns = computed<ColumnDef<any>[]>(() => {
+  // Filter out hidden columns
+  const visibleFields = availableFields.value.filter((field) =>
+    visibleColumns.value.has(field),
+  );
+
+  return visibleFields.map((field) => {
     // Special handling for timestamp column
     if (field === "_timestamp") {
       return {
@@ -570,6 +597,18 @@ const handleAddSearchTerm = (
 
 const handleAddFieldToTable = (field: string) => {
   console.log("[CorrelatedLogsTable] Add field to table:", field);
+};
+
+const handleCloseColumn = (columnDef: any) => {
+  console.log("[CorrelatedLogsTable] Close column:", columnDef);
+  const columnId = columnDef.id || columnDef.name;
+
+  // Remove from visible columns
+  if (columnId && visibleColumns.value.has(columnId)) {
+    visibleColumns.value.delete(columnId);
+    // Force reactivity by creating new Set
+    visibleColumns.value = new Set(visibleColumns.value);
+  }
 };
 
 const handleExpandRow = (row: any) => {
