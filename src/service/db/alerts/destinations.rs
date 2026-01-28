@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 
 use config::meta::destinations::Destination;
 use infra::table;
@@ -38,6 +38,10 @@ pub enum DestinationError {
     InvalidName,
     #[error("HTTP destination must have a url")]
     EmptyUrl,
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(String),
+    #[error("URL targets restricted address (private IP, localhost, or metadata endpoint): {0}")]
+    RestrictedUrl(String),
     #[error("SNS destination must have Topic ARN and Region")]
     InvalidSns,
     #[error("Email destination must have at least one email recipient")]
@@ -239,4 +243,114 @@ pub(super) fn parse_event_key<'a>(
     }
 
     Ok((org_id, name))
+}
+
+/// Validates URL to prevent SSRF attacks
+///
+/// NOTE: This validation occurs at save time. For complete SSRF protection,
+/// additional validation should be performed at request time to prevent
+/// DNS rebinding attacks (where a domain resolves to different IPs over time).
+pub fn validate_url(url_str: &str) -> Result<(), DestinationError> {
+    // Parse URL
+    let url = url::Url::parse(url_str)
+        .map_err(|e| DestinationError::InvalidUrl(format!("Failed to parse URL: {}", e)))?;
+
+    // Only allow http and https schemes
+    let scheme = url.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(DestinationError::InvalidUrl(format!(
+            "Only http and https schemes are allowed, got: {}",
+            scheme
+        )));
+    }
+
+    // Get host
+    let host = url
+        .host_str()
+        .ok_or_else(|| DestinationError::InvalidUrl("URL must have a host".to_string()))?;
+
+    // Check for localhost
+    if host == "localhost"
+        || host == "127.0.0.1"
+        || host == "::1"
+        || host.starts_with("127.")
+        || host.ends_with(".localhost")
+    {
+        return Err(DestinationError::RestrictedUrl(format!(
+            "localhost not allowed: {}",
+            host
+        )));
+    }
+
+    // Check for metadata endpoints
+    if host == "169.254.169.254" || host == "fd00:ec2::254" {
+        return Err(DestinationError::RestrictedUrl(
+            "Cloud metadata endpoints not allowed".to_string(),
+        ));
+    }
+
+    // Try to parse as IP address
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        // Check for restricted IP addresses
+        if is_restricted_ip(&ip) {
+            return Err(DestinationError::RestrictedUrl(format!(
+                "Restricted IP address not allowed: {}",
+                ip
+            )));
+        }
+    } else {
+        // For domain names, perform basic DNS resolution to check if it resolves to a private IP
+        // This helps prevent attackers from using domains that point to internal addresses
+        if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(&format!("{}:80", host)) {
+            for addr in addrs {
+                let ip = addr.ip();
+                if is_restricted_ip(&ip) {
+                    return Err(DestinationError::RestrictedUrl(format!(
+                        "Domain '{}' resolves to restricted IP address: {}",
+                        host, ip
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Checks if an IP address is restricted (private, reserved, or special-purpose)
+fn is_restricted_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => {
+            let octets = ipv4.octets();
+            // 0.0.0.0/8 (this network)
+            octets[0] == 0
+            // 10.0.0.0/8 (private)
+            || octets[0] == 10
+            // 127.0.0.0/8 (loopback)
+            || octets[0] == 127
+            // 169.254.0.0/16 (link-local)
+            || (octets[0] == 169 && octets[1] == 254)
+            // 172.16.0.0/12 (private)
+            || (octets[0] == 172 && (octets[1] >= 16 && octets[1] <= 31))
+            // 192.168.0.0/16 (private)
+            || (octets[0] == 192 && octets[1] == 168)
+            // 224.0.0.0/4 (multicast)
+            || (octets[0] >= 224 && octets[0] <= 239)
+            // 240.0.0.0/4 (reserved) and 255.255.255.255 (broadcast)
+            || octets[0] >= 240
+        }
+        IpAddr::V6(ipv6) => {
+            let segments = ipv6.segments();
+            // ::1 (loopback)
+            ipv6.is_loopback()
+            // :: (unspecified)
+            || ipv6.is_unspecified()
+            // fe80::/10 (link-local)
+            || (segments[0] & 0xffc0) == 0xfe80
+            // fc00::/7 (unique local)
+            || (segments[0] & 0xfe00) == 0xfc00
+            // ff00::/8 (multicast)
+            || (segments[0] & 0xff00) == 0xff00
+        }
+    }
 }

@@ -48,11 +48,13 @@ impl TraceService for TraceServer {
             return Err(Status::invalid_argument(msg));
         }
 
+        // Extract org_id as string, returning error if it can't be converted
+        let org_id_str = org_id
+            .and_then(|id| id.to_str().ok())
+            .ok_or_else(|| Status::invalid_argument("Invalid org_id in metadata"))?;
+
         let stream_name = metadata.get(&cfg.grpc.stream_header_key);
-        let mut in_stream_name: Option<&str> = None;
-        if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap());
-        };
+        let in_stream_name: Option<&str> = stream_name.and_then(|s| s.to_str().ok());
 
         let user_email = metadata
             .get("user_id")
@@ -65,7 +67,7 @@ impl TraceService for TraceServer {
         let user = IngestUser::from_user_email(user_email);
 
         let resp = handle_otlp_request(
-            org_id.unwrap().to_str().unwrap(),
+            org_id_str,
             in_req,
             OtlpRequestType::Grpc,
             in_stream_name,
