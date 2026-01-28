@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="overflow-y: auto" class="scroll">
-    <div class="tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
+    <!-- Header section - conditional based on showHeader prop -->
+    <div v-if="showHeader" class="tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
       <div
         class="flex items-center q-pa-sm card-container"
         :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
@@ -305,18 +306,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="layout-panel-container col">
                     <DashboardQueryBuilder
+                      v-if="showQueryEditor"
                       :dashboardData="currentDashboardData.data"
                       @custom-chart-template-selected="
                         handleCustomChartTemplateSelected
                       "
                     />
-                    <q-separator />
+                    <q-separator v-if="showQueryEditor && showVariablesSelector" />
                     <VariablesValueSelector
                       v-if="
-                        dateTimeForVariables ||
-                        (dashboardPanelData.meta.dateTime &&
-                          dashboardPanelData.meta.dateTime.start_time &&
-                          dashboardPanelData.meta.dateTime.end_time)
+                        showVariablesSelector &&
+                        (dateTimeForVariables ||
+                          (dashboardPanelData.meta.dateTime &&
+                            dashboardPanelData.meta.dateTime.start_time &&
+                            dashboardPanelData.meta.dateTime.end_time))
                       "
                       :variablesConfig="currentDashboardData.data?.variables"
                       :showDynamicFilters="
@@ -440,14 +443,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :allowAnnotationsAdd="editMode"
                         :width="6"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
-                        :showLegendsButton="true"
+                        :showLegendsButton="showLegendsButton"
+                        :searchResponse="searchResponse"
+                        :is_ui_histogram="is_ui_histogram"
                         @error="handleChartApiError"
-                        @updated:data-zoom="onDataZoom"
+                        @updated:data-zoom="enableDataZoom ? onDataZoom : undefined"
                         @updated:vrlFunctionFieldList="
                           updateVrlFunctionFieldList
                         "
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
-                        searchType="dashboards"
+                        :searchType="searchType"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
                         ref="panelSchemaRendererRef"
@@ -465,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <div class="row column tw:h-[calc(100vh-180px)]">
+                  <div v-if="showQueryEditor" class="row column tw:h-[calc(100vh-180px)]">
                     <DashboardQueryEditor />
                   </div>
                 </div>
@@ -487,12 +492,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-splitter>
         </div>
         <div
-          v-if="dashboardPanelData.data.type == 'html'"
+          v-if="allowHTMLEditor && dashboardPanelData.data.type == 'html'"
           class="col column"
           style="width: 100%; height: calc(100vh - 99px); flex: 1"
         >
           <div class="card-container tw:h-full tw:flex tw:flex-col">
             <VariablesValueSelector
+              v-if="showVariablesSelector"
               :variablesConfig="currentDashboardData.data?.variables"
               :showDynamicFilters="
                 currentDashboardData.data?.variables?.showDynamicFilters
@@ -520,12 +526,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
-          v-if="dashboardPanelData.data.type == 'markdown'"
+          v-if="allowMarkdownEditor && dashboardPanelData.data.type == 'markdown'"
           class="col column"
           style="width: 100%; height: calc(100vh - 99px); flex: 1"
         >
           <div class="card-container tw:h-full tw:flex tw:flex-col">
             <VariablesValueSelector
+              v-if="showVariablesSelector"
               :variablesConfig="currentDashboardData.data?.variables"
               :showDynamicFilters="
                 currentDashboardData.data?.variables?.showDynamicFilters
@@ -553,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
-          v-if="dashboardPanelData.data.type == 'custom_chart'"
+          v-if="allowCustomCharts && dashboardPanelData.data.type == 'custom_chart'"
           class="col"
           style="
             overflow-y: auto;
@@ -710,16 +717,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :variablesData="updatedVariablesData"
                           :width="6"
                           :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
-                          :showLegendsButton="true"
+                          :showLegendsButton="showLegendsButton"
+                          :searchResponse="searchResponse"
+                          :is_ui_histogram="is_ui_histogram"
                           @error="handleChartApiError"
-                          @updated:data-zoom="onDataZoom"
+                          @updated:data-zoom="enableDataZoom ? onDataZoom : undefined"
                           @updated:vrlFunctionFieldList="
                             updateVrlFunctionFieldList
                           "
                           @last-triggered-at-update="
                             handleLastTriggeredAtUpdate
                           "
-                          searchType="dashboards"
+                          :searchType="searchType"
                           @series-data-update="seriesDataUpdate"
                         />
                       </template>
@@ -732,7 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <div class="row column tw:h-[calc(100vh-180px)]">
+                  <div v-if="showQueryEditor" class="row column tw:h-[calc(100vh-180px)]">
                     <DashboardQueryEditor />
                   </div>
                 </div>
@@ -868,7 +877,291 @@ const CustomChartEditor = defineAsyncComponent(() => {
 
 export default defineComponent({
   name: "AddPanel",
-  props: ["metaData"],
+  props: {
+    // ========================================
+    // Core Configuration
+    // ========================================
+
+    /**
+     * Context mode determines which features are enabled
+     * @values 'dashboard' | 'logs' | 'metrics'
+     * @default 'dashboard' (maintains existing behavior)
+     */
+    mode: {
+      type: String as () => 'dashboard' | 'logs' | 'metrics',
+      default: 'dashboard',
+    },
+
+    /**
+     * Page key for dashboard panel data composable
+     * Used to namespace state in the composable
+     */
+    pageKey: {
+      type: String,
+      default: undefined,
+    },
+
+    // ========================================
+    // Data Props (for logs/metrics)
+    // ========================================
+
+    /**
+     * Chart configuration data
+     * Required for logs/metrics, optional for dashboard (uses store)
+     */
+    visualizeChartData: {
+      type: Object,
+      default: undefined,
+    },
+
+    /**
+     * Error data object for error tracking
+     */
+    errorData: {
+      type: Object,
+      default: undefined,
+    },
+
+    /**
+     * Search response data (logs-specific)
+     */
+    searchResponse: {
+      type: Object,
+      default: undefined,
+    },
+
+    /**
+     * Metadata from parent component (metrics-specific)
+     */
+    metaData: {
+      type: Object,
+      default: undefined,
+    },
+
+    // ========================================
+    // UI Control Flags - Header Section
+    // ========================================
+
+    /**
+     * Show the entire header section
+     * @default true (dashboard), false (logs/metrics have their own headers)
+     */
+    showHeader: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Show panel name input (Dashboard only)
+     */
+    showPanelNameInput: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Show tutorial button (Dashboard only)
+     */
+    showTutorialButton: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Show query inspector button (Dashboard only)
+     */
+    showQueryInspector: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Show save/discard buttons (Dashboard only)
+     */
+    showSaveButtons: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Show apply button
+     */
+    showApplyButton: {
+      type: Boolean,
+      default: true,
+    },
+
+    // ========================================
+    // Feature Flags - Visualization Area
+    // ========================================
+
+    /**
+     * Show DashboardQueryEditor/DashboardQueryBuilder component
+     * @default true (dashboard and metrics)
+     * @default false (logs - query editor is in parent page)
+     */
+    showQueryEditor: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Show variables selector (Dashboard only)
+     * @default true (dashboard), false (logs/metrics)
+     */
+    showVariablesSelector: {
+      type: Boolean,
+      default: true,
+    },
+
+    // ========================================
+    // Feature Flags - Chart Types
+    // ========================================
+
+    /**
+     * Allow HTML editor mode
+     * @default true (dashboard only)
+     */
+    allowHTMLEditor: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Allow Markdown editor mode
+     * @default true (dashboard only)
+     */
+    allowMarkdownEditor: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Allow custom JavaScript charts
+     * @default true (dashboard only)
+     */
+    allowCustomCharts: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Allowed chart types for selection
+     */
+    allowedChartTypes: {
+      type: Array as () => string[],
+      default: () => ['area', 'bar', 'h-bar', 'line', 'scatter', 'table', 'html', 'markdown', 'custom_chart'],
+    },
+
+    // ========================================
+    // Feature Flags - Functionality
+    // ========================================
+
+    /**
+     * Show legends button in chart
+     */
+    showLegendsButton: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
+     * Show "Add to Dashboard" functionality
+     * @default false (dashboard - already in dashboard)
+     * @default true (logs/metrics)
+     */
+    showAddToDashboard: {
+      type: Boolean,
+      default: false,
+    },
+
+    /**
+     * Enable data zoom functionality
+     * @default false (true for metrics)
+     */
+    enableDataZoom: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ========================================
+    // Default Values
+    // ========================================
+
+    /**
+     * Default chart type when initializing
+     */
+    defaultChartType: {
+      type: String,
+      default: 'line',
+    },
+
+    /**
+     * Default query type
+     */
+    defaultQueryType: {
+      type: String as () => 'sql' | 'promql',
+      default: 'sql',
+    },
+
+    /**
+     * Default/enforced stream type
+     * @default undefined (dashboard - user selectable)
+     * @default 'logs' (logs/visualize)
+     * @default 'metrics' (metrics - hardcoded enforcement)
+     */
+    defaultStreamType: {
+      type: String as () => 'logs' | 'metrics' | undefined,
+      default: undefined,
+    },
+
+    /**
+     * Enforce stream type (prevent user from changing)
+     * @default false (dashboard)
+     * @default true (metrics - stream_type locked to "metrics")
+     */
+    enforceStreamType: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ========================================
+    // Behavior Props
+    // ========================================
+
+    /**
+     * UI histogram flag (logs-specific)
+     */
+    is_ui_histogram: {
+      type: Boolean,
+      default: false,
+    },
+
+    /**
+     * Force refresh without cache
+     */
+    shouldRefreshWithoutCache: {
+      type: Boolean,
+      default: false,
+    },
+
+    /**
+     * Search type for panel schema renderer
+     * @values 'ui' | 'dashboards' | undefined
+     */
+    searchType: {
+      type: String as () => 'ui' | 'dashboards' | undefined,
+      default: 'dashboards',
+    },
+  },
+
+  emits: [
+    'handleChartApiError',
+    'addToDashboard',
+    'dataZoom',
+    'resultMetadataUpdate',
+    'lastTriggeredAtUpdate',
+  ],
 
   components: {
     ChartSelection,
@@ -892,7 +1185,7 @@ export default defineComponent({
     CustomMarkdownEditor,
     CustomChartEditor,
   },
-  setup(props) {
+  setup(props, { emit }) {
     provide("dashboardPanelDataPageKey", "dashboard");
 
     // This will be used to copy the chart data to the chart renderer component
@@ -1004,6 +1297,11 @@ export default defineComponent({
     const lastTriggeredAt = ref(null);
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
+
+      // Emit event for parent components (metrics mode)
+      if (props.mode === 'metrics') {
+        emit('lastTriggeredAtUpdate', data);
+      }
     };
 
     // Get merged variables for the current panel from variablesManager
@@ -1175,11 +1473,14 @@ export default defineComponent({
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
 
-      removeAiContextHandler();
+      // Only cleanup dashboard-specific context when in dashboard mode
+      if (props.mode === 'dashboard') {
+        removeAiContextHandler();
 
-      // Clean up dashboard context provider
-      contextRegistry.unregister("dashboards");
-      contextRegistry.setActive("");
+        // Clean up dashboard context provider
+        contextRegistry.unregister("dashboards");
+        contextRegistry.setActive("");
+      }
 
       // console.timeEnd("onUnmounted");
 
@@ -1242,10 +1543,30 @@ export default defineComponent({
         updateDateTime(selectedDate.value);
       } else {
         editMode.value = false;
-        resetDashboardPanelDataAndAddTimeField();
-        chartData.value = {};
-        // set the value of the date time after the reset
-        updateDateTime(selectedDate.value);
+
+        // In logs/metrics mode, skip reset since parent page manages dashboardPanelData
+        // Both parent and child share the same dashboardPanelData instance via pageKey
+        if (props.mode !== 'logs' && props.mode !== 'metrics') {
+          resetDashboardPanelDataAndAddTimeField();
+        }
+
+        // Apply stream type enforcement if specified (for metrics/logs modes)
+        if (props.defaultStreamType && dashboardPanelData.data.queries[0]) {
+          dashboardPanelData.data.queries[0].fields.stream_type = props.defaultStreamType;
+        }
+
+        // For logs/metrics mode, initialize chartData with visualizeChartData from parent
+        // This matches the original implementation: const chartData = ref(visualizeChartData.value);
+        if (props.visualizeChartData && (props.mode === 'logs' || props.mode === 'metrics')) {
+          chartData.value = JSON.parse(JSON.stringify(props.visualizeChartData));
+        } else {
+          chartData.value = {};
+        }
+
+        // set the value of the date time after the reset (only for dashboard mode)
+        if (props.mode !== 'logs' && props.mode !== 'metrics') {
+          updateDateTime(selectedDate.value);
+        }
       }
       // console.timeEnd("onMounted");
       // let it call the wathcers and then mark the panel config watcher as activated
@@ -1254,31 +1575,36 @@ export default defineComponent({
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
-      // console.time("add panel loadDashboard");
-      await loadDashboard();
 
-      // Call makeAutoSQLQuery after dashboard data is loaded
-      // Only generate SQL if we're in auto query mode
-      if (
-        !editMode.value &&
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-      ) {
-        await makeAutoSQLQuery();
+      // Only load dashboard data and setup context when in dashboard mode
+      // Logs and metrics modes don't need dashboard context
+      if (props.mode === 'dashboard') {
+        // console.time("add panel loadDashboard");
+        await loadDashboard();
+
+        // Call makeAutoSQLQuery after dashboard data is loaded
+        // Only generate SQL if we're in auto query mode
+        if (
+          !editMode.value &&
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        ) {
+          await makeAutoSQLQuery();
+        }
+
+        registerAiContextHandler();
+
+        // Set up dashboard context provider
+        const dashboardProvider = createDashboardsContextProvider(
+          route,
+          store,
+          dashboardPanelData,
+          editMode.value,
+        );
+        contextRegistry.register("dashboards", dashboardProvider);
+        contextRegistry.setActive("dashboards");
       }
-
-      registerAiContextHandler();
-
-      // Set up dashboard context provider
-      const dashboardProvider = createDashboardsContextProvider(
-        route,
-        store,
-        dashboardPanelData,
-        editMode.value,
-      );
-      contextRegistry.register("dashboards", dashboardProvider);
-      contextRegistry.setActive("dashboards");
 
       // console.timeEnd("add panel loadDashboard");
     });
@@ -1497,12 +1823,29 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
+    // Watch for visualizeChartData prop changes (logs/metrics mode)
+    // In logs mode, the query comes from the parent page and is passed as visualizeChartData
+    watch(
+      () => props.visualizeChartData,
+      async (newVal) => {
+        if (newVal && (props.mode === 'logs' || props.mode === 'metrics')) {
+          // Update chartData with the data from parent
+          chartData.value = JSON.parse(JSON.stringify(newVal));
+        }
+      },
+      { deep: true, immediate: true },
+    );
+
     watch(
       () => dashboardPanelData.data.type,
       async () => {
         // console.time("watch:dashboardPanelData.data.type");
         await nextTick();
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        // Only update chartData from dashboardPanelData in dashboard mode
+        // In logs/metrics mode, chartData comes from visualizeChartData prop
+        if (props.mode === 'dashboard') {
+          chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        }
         // console.timeEnd("watch:dashboardPanelData.data.type");
       },
     );
@@ -2045,6 +2388,11 @@ export default defineComponent({
       } else {
         errorMessage.value = "";
       }
+
+      // Emit error event for parent components (logs/metrics modes)
+      if (props.mode !== 'dashboard') {
+        emit('handleChartApiError', errorMsg);
+      }
     };
 
     // Handle limit number of series warning from PanelSchemaRenderer
@@ -2057,6 +2405,11 @@ export default defineComponent({
         metadata,
         store.state.timezone,
       );
+
+      // Emit event for parent components (logs mode)
+      if (props.mode === 'logs') {
+        emit('resultMetadataUpdate', metadata);
+      }
     };
     const onDataZoom = (event: any) => {
       // console.time("onDataZoom");
@@ -2076,6 +2429,12 @@ export default defineComponent({
 
       // set it as a absolute time
       dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
+
+      // Emit event for parent components (metrics mode)
+      if (props.mode === 'metrics' && props.enableDataZoom) {
+        emit('dataZoom', event);
+      }
+
       // console.timeEnd("onDataZoom");
     };
 
@@ -2380,6 +2739,12 @@ export default defineComponent({
     });
 
     const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+      // Only auto-update chartData from dashboardPanelData in dashboard mode
+      // In logs/metrics mode, chartData comes from visualizeChartData prop
+      if (props.mode !== 'dashboard') {
+        return;
+      }
+
       if (!isEqual(chartData.value, newVal)) {
         const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,
