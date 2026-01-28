@@ -698,7 +698,9 @@
     "license_already_active_title": "Lizenz ist bereits aktiv",
     "license_already_active_msg": "Ihre Lizenz ist noch aktiv. Möchten Sie sie mit dem neuen Lizenzschlüssel aktualisieren?",
     "yes_update_license": "Ja, Lizenz aktualisieren",
-    "no_keep_current": "Nein, auf dem Laufenden bleiben"
+    "no_keep_current": "Nein, auf dem Laufenden bleiben",
+    "feature_correlation_management": "Korrelationsmanagement",
+    "feature_log_patterns": "Muster protokollieren"
   },
   "login": {
     "userid": "Benutzer-ID",

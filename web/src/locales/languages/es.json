@@ -698,7 +698,9 @@
     "license_already_active_title": "La licencia ya está activa",
     "license_already_active_msg": "Su licencia sigue activa. ¿Desea actualizarla con la nueva clave de licencia?",
     "yes_update_license": "Sí, actualizar la licencia",
-    "no_keep_current": "No, mantente al día"
+    "no_keep_current": "No, mantente al día",
+    "feature_correlation_management": "Gestión de correlaciones",
+    "feature_log_patterns": "Patrones de registro"
   },
   "login": {
     "userid": "ID de usuario",

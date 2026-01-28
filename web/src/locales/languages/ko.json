@@ -698,7 +698,9 @@
     "license_already_active_title": "라이선스가 이미 활성화됨",
     "license_already_active_msg": "라이선스가 아직 활성 상태입니다.새 라이선스 키로 업데이트하시겠습니까?",
     "yes_update_license": "예, 라이선스 업데이트",
-    "no_keep_current": "아니요, 최신 상태로 유지"
+    "no_keep_current": "아니요, 최신 상태로 유지",
+    "feature_correlation_management": "상관관계 관리",
+    "feature_log_patterns": "로그 패턴"
   },
   "login": {
     "userid": "사용자 ID",
