@@ -18,37 +18,37 @@ pub struct O2Attributes;
 
 impl O2Attributes {
     /// Type of LLM observation (e.g., "generation", "chat", "embedding")
-    pub const OBSERVATION_TYPE: &'static str = "_o2_observation_type";
+    pub const OBSERVATION_TYPE: &'static str = "_o2_llm_observation_type";
 
     /// Name of the LLM model used
-    pub const MODEL_NAME: &'static str = "_o2_model_name";
+    pub const MODEL_NAME: &'static str = "_o2_llm_model_name";
 
     /// Input to the LLM (prompts, messages, tool arguments)
-    pub const INPUT: &'static str = "_o2_input";
+    pub const INPUT: &'static str = "_o2_llm_input";
 
     /// Output from the LLM (responses, completions, tool results)
-    pub const OUTPUT: &'static str = "_o2_output";
+    pub const OUTPUT: &'static str = "_o2_llm_output";
 
     /// Model parameters used (temperature, max_tokens, etc.)
-    pub const MODEL_PARAMETERS: &'static str = "_o2_model_parameters";
+    pub const MODEL_PARAMETERS: &'static str = "_o2_llm_model_parameters";
 
     /// Token usage details (input, output, total counts)
-    pub const USAGE_DETAILS: &'static str = "_o2_usage_details";
+    pub const USAGE_DETAILS: &'static str = "_o2_llm_usage_details";
 
     /// Cost details for the LLM call
-    pub const COST_DETAILS: &'static str = "_o2_cost_details";
+    pub const COST_DETAILS: &'static str = "_o2_llm_cost_details";
 
     /// User identifier
-    pub const USER_ID: &'static str = "_o2_user_id";
+    pub const USER_ID: &'static str = "_o2_llm_user_id";
 
     /// Session identifier
-    pub const SESSION_ID: &'static str = "_o2_session_id";
+    pub const SESSION_ID: &'static str = "_o2_llm_session_id";
 
     /// Name of the prompt template used
-    pub const PROMPT_NAME: &'static str = "_o2_prompt_name";
+    pub const PROMPT_NAME: &'static str = "_o2_llm_prompt_name";
 
     /// Name of the LLM provider (e.g., "openai", "anthropic", "google")
-    pub const PROVIDER_NAME: &'static str = "_o2_provider_name";
+    pub const PROVIDER_NAME: &'static str = "_o2_llm_provider_name";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -230,16 +230,16 @@ mod tests {
 
     #[test]
     fn test_llm_enriched_attributes() {
-        assert_eq!(O2Attributes::OBSERVATION_TYPE, "_o2_observation_type");
-        assert_eq!(O2Attributes::MODEL_NAME, "_o2_model_name");
-        assert_eq!(O2Attributes::INPUT, "_o2_input");
-        assert_eq!(O2Attributes::OUTPUT, "_o2_output");
-        assert_eq!(O2Attributes::MODEL_PARAMETERS, "_o2_model_parameters");
-        assert_eq!(O2Attributes::USAGE_DETAILS, "_o2_usage_details");
-        assert_eq!(O2Attributes::COST_DETAILS, "_o2_cost_details");
-        assert_eq!(O2Attributes::USER_ID, "_o2_user_id");
-        assert_eq!(O2Attributes::SESSION_ID, "_o2_session_id");
-        assert_eq!(O2Attributes::PROMPT_NAME, "_o2_prompt_name");
-        assert_eq!(O2Attributes::PROVIDER_NAME, "_o2_provider_name");
+        assert_eq!(O2Attributes::OBSERVATION_TYPE, "_o2_llm_observation_type");
+        assert_eq!(O2Attributes::MODEL_NAME, "_o2_llm_model_name");
+        assert_eq!(O2Attributes::INPUT, "_o2_llm_input");
+        assert_eq!(O2Attributes::OUTPUT, "_o2_llm_output");
+        assert_eq!(O2Attributes::MODEL_PARAMETERS, "_o2_llm_model_parameters");
+        assert_eq!(O2Attributes::USAGE_DETAILS, "_o2_llm_usage_details");
+        assert_eq!(O2Attributes::COST_DETAILS, "_o2_llm_cost_details");
+        assert_eq!(O2Attributes::USER_ID, "_o2_llm_user_id");
+        assert_eq!(O2Attributes::SESSION_ID, "_o2_llm_session_id");
+        assert_eq!(O2Attributes::PROMPT_NAME, "_o2_llm_prompt_name");
+        assert_eq!(O2Attributes::PROVIDER_NAME, "_o2_llm_provider_name");
     }
 }
