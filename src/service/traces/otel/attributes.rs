@@ -106,6 +106,14 @@ impl GenAiAttributes {
     pub const SYSTEM: &'static str = "gen_ai.system";
 }
 
+pub struct LLMAttributes;
+
+impl LLMAttributes {
+    pub const REQUEST_TYPE: &'static str = "llm.request.type";
+    pub const USAGE_TOTAL_TOKENS: &'static str = "llm.usage.total_tokens";
+    pub const USER: &'static str = "llm.user";
+}
+
 /// Standard OpenTelemetry Attributes
 pub struct OtelAttributes;
 

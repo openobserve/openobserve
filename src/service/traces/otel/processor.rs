@@ -61,8 +61,8 @@ impl OtelIngestionProcessor {
     }
 
     /// Process span attributes and enrich them with OpenObserve-specific fields
-    /// This modifies span_attributes in-place, removing processed attributes and adding enriched
-    /// fields
+    /// This modifies span_attributes in-place, removing processed attributes(only input/output
+    /// related attributes) and adding enriched fields
     pub fn process_span(
         &self,
         span_attributes: &mut HashMap<String, json::Value>,

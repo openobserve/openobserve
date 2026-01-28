@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use super::super::attributes::{GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes};
+use crate::service::traces::otel::attributes::LLMAttributes;
 
 /// Observation types supported by OpenObserve
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +36,7 @@ pub enum ObservationType {
     Retriever,
     Evaluator,
     Embedding,
+    Rerank,
     Guardrail,
 }
 
@@ -50,6 +52,7 @@ impl ObservationType {
             ObservationType::Retriever => "RETRIEVER",
             ObservationType::Evaluator => "EVALUATOR",
             ObservationType::Embedding => "EMBEDDING",
+            ObservationType::Rerank => "RERANK",
             ObservationType::Guardrail => "GUARDRAIL",
         }
     }
@@ -66,22 +69,37 @@ pub fn map_to_observation_type(
     _resource_attributes: &HashMap<String, json::Value>,
     scope: Option<&ScopeInfo>,
 ) -> ObservationType {
-    // Gen-AI Operation Name
+    // Gen-AI Operation Name - OpenTelemetry semantic conventions
+    // https://opentelemetry.io/docs/specs/semconv/gen-ai/
+    // Official values: "chat", "text_completion", "generate_content", "embeddings",
+    //                  "invoke_agent", "create_agent", "execute_tool"
     if let Some(operation) = attributes
         .get(GenAiAttributes::OPERATION_NAME)
         .and_then(|v| v.as_str())
     {
         match operation.to_lowercase().as_str() {
-            "chat" | "completion" | "text_completion" | "generate_content" | "generate" => {
+            "chat" | "text_completion" | "generate_content" => {
                 return ObservationType::Generation;
             }
             "embeddings" => return ObservationType::Embedding,
             "invoke_agent" | "create_agent" => return ObservationType::Agent,
             "execute_tool" => return ObservationType::Tool,
-            "chain" => return ObservationType::Chain,
-            "retriever" | "retrieve" => return ObservationType::Retriever,
-            "evaluator" | "evaluate" => return ObservationType::Evaluator,
-            "guardrail" => return ObservationType::Guardrail,
+            _ => {}
+        }
+    }
+
+    // LLM Request Type - OpenLLMetry semantic conventions
+    // https://github.com/traceloop/openllmetry
+    // Official values: "chat", "completion", "embedding", "rerank", "unknown"
+    if let Some(request_type) = attributes
+        .get(LLMAttributes::REQUEST_TYPE)
+        .and_then(|v| v.as_str())
+    {
+        match request_type.to_lowercase().as_str() {
+            "chat" | "completion" => return ObservationType::Generation,
+            "embedding" => return ObservationType::Embedding,
+            "rerank" => return ObservationType::Rerank,
+            "unknown" => {} // Fall through to other detection methods
             _ => {}
         }
     }
@@ -239,12 +257,13 @@ mod tests {
         assert_eq!(ObservationType::Retriever.as_str(), "RETRIEVER");
         assert_eq!(ObservationType::Evaluator.as_str(), "EVALUATOR");
         assert_eq!(ObservationType::Embedding.as_str(), "EMBEDDING");
+        assert_eq!(ObservationType::Rerank.as_str(), "RERANK");
         assert_eq!(ObservationType::Guardrail.as_str(), "GUARDRAIL");
     }
 
     #[test]
     fn test_chain_detection() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "chain")]);
+        let attrs = make_attributes(vec![("openinference.span.kind", "CHAIN")]);
         let resource_attrs = HashMap::new();
 
         let result = map_to_observation_type(&attrs, &resource_attrs, None);
@@ -253,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_retriever_detection() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "retriever")]);
+        let attrs = make_attributes(vec![("openinference.span.kind", "RETRIEVER")]);
         let resource_attrs = HashMap::new();
 
         let result = map_to_observation_type(&attrs, &resource_attrs, None);
@@ -271,11 +290,56 @@ mod tests {
 
     #[test]
     fn test_guardrail_detection() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "guardrail")]);
+        let attrs = make_attributes(vec![("openinference.span.kind", "GUARDRAIL")]);
         let resource_attrs = HashMap::new();
 
         let result = map_to_observation_type(&attrs, &resource_attrs, None);
         assert_eq!(result, ObservationType::Guardrail);
+    }
+
+    #[test]
+    fn test_gen_ai_operation_text_completion() {
+        let attrs = make_attributes(vec![("gen_ai.operation.name", "text_completion")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_gen_ai_operation_generate_content() {
+        let attrs = make_attributes(vec![("gen_ai.operation.name", "generate_content")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_gen_ai_operation_invoke_agent() {
+        let attrs = make_attributes(vec![("gen_ai.operation.name", "invoke_agent")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Agent);
+    }
+
+    #[test]
+    fn test_gen_ai_operation_create_agent() {
+        let attrs = make_attributes(vec![("gen_ai.operation.name", "create_agent")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Agent);
+    }
+
+    #[test]
+    fn test_gen_ai_operation_execute_tool() {
+        let attrs = make_attributes(vec![("gen_ai.operation.name", "execute_tool")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Tool);
     }
 
     #[test]
@@ -285,5 +349,41 @@ mod tests {
 
         let result = map_to_observation_type(&attrs, &resource_attrs, None);
         assert_eq!(result, ObservationType::Chain);
+    }
+
+    #[test]
+    fn test_llm_request_type_rerank() {
+        let attrs = make_attributes(vec![("llm.request.type", "rerank")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Rerank);
+    }
+
+    #[test]
+    fn test_llm_request_type_chat() {
+        let attrs = make_attributes(vec![("llm.request.type", "chat")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_llm_request_type_completion() {
+        let attrs = make_attributes(vec![("llm.request.type", "completion")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_llm_request_type_embedding() {
+        let attrs = make_attributes(vec![("llm.request.type", "embedding")]);
+        let resource_attrs = HashMap::new();
+
+        let result = map_to_observation_type(&attrs, &resource_attrs, None);
+        assert_eq!(result, ObservationType::Embedding);
     }
 }
