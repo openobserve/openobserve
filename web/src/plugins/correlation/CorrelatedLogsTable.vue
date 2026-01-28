@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :function-error-msg="''"
           :expanded-rows="expandedRows"
           :highlight-timestamp="-1"
-          :default-columns="false"
+          :default-columns="showingDefaultColumns"
           :jsonpreview-stream-name="primaryStream"
           :highlight-query="highlightQuery"
           :selected-stream-fts-keys="ftsFields"
@@ -452,18 +452,17 @@ const availableFields = computed(() => {
 });
 
 // Watch for new fields and initialize visibleColumns
+// By default, only show timestamp (which will trigger source column display)
 watch(
   availableFields,
   (fields) => {
     if (fields.length > 0 && visibleColumns.value.size === 0) {
-      visibleColumns.value = new Set(fields);
-    }
-    // Add any new fields to visible columns
-    fields.forEach((field) => {
-      if (!visibleColumns.value.has(field)) {
-        visibleColumns.value.add(field);
+      // Only show timestamp by default - this will display timestamp + source columns
+      const timestampField = fields.find((f) => f === "_timestamp");
+      if (timestampField) {
+        visibleColumns.value = new Set([timestampField]);
       }
-    });
+    }
   },
   { immediate: true },
 );
@@ -475,7 +474,11 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     visibleColumns.value.has(field),
   );
 
-  return visibleFields.map((field) => {
+  // Check if only timestamp is visible - if so, add source column
+  const hasOnlyTimestamp =
+    visibleFields.length === 1 && visibleFields[0] === "_timestamp";
+
+  const columns = visibleFields.map((field) => {
     // Special handling for timestamp column
     if (field === "_timestamp") {
       return {
@@ -533,6 +536,34 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
       },
     };
   });
+
+  // Add source column when only timestamp is visible
+  if (hasOnlyTimestamp) {
+    columns.push({
+      name: "source",
+      id: "source",
+      accessorFn: (row: any) => JSON.stringify(row),
+      cell: (info: any) => info.getValue(),
+      header: t("search.source"),
+      sortable: true,
+      enableResizing: false,
+      meta: {
+        closable: false,
+        showWrap: false,
+        wrapContent: false,
+      },
+    } as any);
+  }
+
+  return columns;
+});
+
+// Determine if we're showing default columns (only timestamp + source)
+const showingDefaultColumns = computed(() => {
+  const visibleFields = availableFields.value.filter((field) =>
+    visibleColumns.value.has(field),
+  );
+  return visibleFields.length === 1 && visibleFields[0] === "_timestamp";
 });
 
 /**
@@ -641,6 +672,27 @@ const handleAddSearchTerm = (
 
 const handleAddFieldToTable = (field: string) => {
   console.log("[CorrelatedLogsTable] Add field to table:", field);
+
+  // Add the field to visible columns if it's not already visible
+  if (!visibleColumns.value.has(field)) {
+    visibleColumns.value.add(field);
+    // Force reactivity by creating new Set
+    visibleColumns.value = new Set(visibleColumns.value);
+
+    // Show success notification
+    $q.notify({
+      type: "positive",
+      message: `Column "${field}" added to table`,
+      timeout: 1500,
+    });
+  } else {
+    // Field is already visible, show info notification
+    $q.notify({
+      type: "info",
+      message: `Column "${field}" is already visible`,
+      timeout: 1500,
+    });
+  }
 };
 
 const handleCloseColumn = (columnDef: any) => {
