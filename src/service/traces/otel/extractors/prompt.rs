@@ -19,42 +19,16 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use super::utils::extract_i64;
+use crate::service::traces::otel::attributes::GenAiAttributes;
 
 pub struct PromptExtractor;
 
 impl PromptExtractor {
     /// Extract prompt name from AI SDK metadata
     pub fn extract_name(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
-        if let Some((name, _)) = parse_ai_sdk_prompt_metadata(attributes) {
-            return Some(name);
-        }
-        None
+        attributes
+            .get(GenAiAttributes::PROMPT_NAME)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
     }
-
-    /// Extract prompt version from AI SDK metadata
-    pub fn extract_version(&self, attributes: &HashMap<String, json::Value>) -> Option<i32> {
-        if let Some((_, version)) = parse_ai_sdk_prompt_metadata(attributes) {
-            return Some(version);
-        }
-        None
-    }
-}
-
-/// Parses prompt metadata from Vercel AI SDK attributes
-/// Supports ai.telemetry.metadata.langfusePrompt (common from Vercel AI SDK)
-fn parse_ai_sdk_prompt_metadata(
-    attributes: &HashMap<String, json::Value>,
-) -> Option<(String, i32)> {
-    // Check for langfusePrompt from Vercel AI SDK
-    if let Some(value) = attributes.get("ai.telemetry.metadata.langfusePrompt")
-        && let Some(s) = value.as_str()
-        && let Ok(parsed) = serde_json::from_str::<json::Value>(s)
-        && let Some(name) = parsed.get("name").and_then(|v| v.as_str())
-        && let Some(version) = parsed.get("version").and_then(extract_i64)
-    {
-        return Some((name.to_string(), version as i32));
-    }
-
-    None
 }

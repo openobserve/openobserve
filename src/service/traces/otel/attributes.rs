@@ -47,8 +47,8 @@ impl O2Attributes {
     /// Name of the prompt template used
     pub const PROMPT_NAME: &'static str = "_o2_prompt_name";
 
-    /// Version of the prompt template
-    pub const PROMPT_VERSION: &'static str = "_o2_prompt_version";
+    /// Name of the LLM provider (e.g., "openai", "anthropic", "google")
+    pub const PROVIDER_NAME: &'static str = "_o2_provider_name";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -69,6 +69,9 @@ impl GenAiAttributes {
     // Gen-AI Response
     pub const RESPONSE_MODEL: &'static str = "gen_ai.response.model";
     pub const RESPONSE_FINISH_REASONS: &'static str = "gen_ai.response.finish_reasons";
+
+    // Gen-AI Prompt
+    pub const PROMPT_NAME: &'static str = "gen_ai.prompt.name";
 
     // Gen-AI Input/Output
     pub const INPUT_MESSAGES: &'static str = "gen_ai.input.messages";
@@ -95,6 +98,9 @@ impl GenAiAttributes {
 
     // Gen-AI System
     pub const SYSTEM: &'static str = "gen_ai.system";
+
+    // Gen-AI Provider
+    pub const PROVIDER_NAME: &'static str = "gen_ai.provider.name";
 }
 
 pub struct LLMAttributes;
@@ -252,6 +258,7 @@ mod tests {
     fn test_gen_ai_attributes() {
         assert_eq!(GenAiAttributes::OPERATION_NAME, "gen_ai.operation.name");
         assert_eq!(GenAiAttributes::INPUT_MESSAGES, "gen_ai.input.messages");
+        assert_eq!(GenAiAttributes::PROVIDER_NAME, "gen_ai.provider.name");
     }
 
     #[test]
@@ -272,6 +279,6 @@ mod tests {
         assert_eq!(O2Attributes::USER_ID, "_o2_user_id");
         assert_eq!(O2Attributes::SESSION_ID, "_o2_session_id");
         assert_eq!(O2Attributes::PROMPT_NAME, "_o2_prompt_name");
-        assert_eq!(O2Attributes::PROMPT_VERSION, "_o2_prompt_version");
+        assert_eq!(O2Attributes::PROVIDER_NAME, "_o2_provider_name");
     }
 }

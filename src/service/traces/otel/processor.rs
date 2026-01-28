@@ -26,13 +26,14 @@ use super::{
     attributes::O2Attributes,
     extractors::{
         InputOutputExtractor, MetadataExtractor, ModelExtractor, ParametersExtractor,
-        PromptExtractor, ScopeInfo, UsageExtractor, map_to_observation_type,
+        PromptExtractor, ProviderExtractor, ScopeInfo, UsageExtractor, map_to_observation_type,
     },
 };
 use crate::common::meta::traces::Event;
 
 pub struct OtelIngestionProcessor {
     model_extractor: ModelExtractor,
+    provider_extractor: ProviderExtractor,
     input_output_extractor: InputOutputExtractor,
     parameters_extractor: ParametersExtractor,
     usage_extractor: UsageExtractor,
@@ -50,6 +51,7 @@ impl OtelIngestionProcessor {
     pub fn new() -> Self {
         Self {
             model_extractor: ModelExtractor,
+            provider_extractor: ProviderExtractor,
             input_output_extractor: InputOutputExtractor,
             parameters_extractor: ParametersExtractor,
             usage_extractor: UsageExtractor,
@@ -78,6 +80,9 @@ impl OtelIngestionProcessor {
         // Extract model name
         let model_name = self.model_extractor.extract(span_attributes);
 
+        // Extract provider name
+        let provider_name = self.provider_extractor.extract(span_attributes);
+
         // Extract input and output (this will identify which attributes to remove)
         let (input, output) =
             self.input_output_extractor
@@ -102,7 +107,6 @@ impl OtelIngestionProcessor {
 
         // Extract prompt information
         let prompt_name = self.prompt_extractor.extract_name(span_attributes);
-        let prompt_version = self.prompt_extractor.extract_version(span_attributes);
 
         // Now remove all input/output related attributes
         span_attributes
@@ -116,6 +120,13 @@ impl OtelIngestionProcessor {
 
         if let Some(model) = model_name {
             span_attributes.insert(O2Attributes::MODEL_NAME.to_string(), json::json!(model));
+        }
+
+        if let Some(provider) = provider_name {
+            span_attributes.insert(
+                O2Attributes::PROVIDER_NAME.to_string(),
+                json::json!(provider),
+            );
         }
 
         if let Some(input_val) = input {
@@ -151,13 +162,6 @@ impl OtelIngestionProcessor {
 
         if let Some(pname) = prompt_name {
             span_attributes.insert(O2Attributes::PROMPT_NAME.to_string(), json::json!(pname));
-        }
-
-        if let Some(pversion) = prompt_version {
-            span_attributes.insert(
-                O2Attributes::PROMPT_VERSION.to_string(),
-                json::json!(pversion),
-            );
         }
     }
 }
@@ -202,5 +206,74 @@ mod tests {
         assert!(span_attrs.contains_key("user.id"));
         assert!(span_attrs.contains_key("gen_ai.request.model"));
         assert!(span_attrs.contains_key("gen_ai.operation.name"));
+    }
+
+    #[test]
+    fn test_process_span_extracts_provider_name() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4"));
+        span_attrs.insert("gen_ai.provider.name".to_string(), json::json!("openai"));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Provider name should be extracted and added
+        assert!(span_attrs.contains_key(O2Attributes::PROVIDER_NAME));
+        assert_eq!(
+            span_attrs.get(O2Attributes::PROVIDER_NAME).unwrap(),
+            &json::json!("openai")
+        );
+
+        // Original provider attribute should remain
+        assert!(span_attrs.contains_key("gen_ai.provider.name"));
+    }
+
+    #[test]
+    fn test_process_span_extracts_provider_from_system() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("claude-3"));
+        span_attrs.insert("gen_ai.system".to_string(), json::json!("anthropic"));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Provider name should be extracted from gen_ai.system
+        assert!(span_attrs.contains_key(O2Attributes::PROVIDER_NAME));
+        assert_eq!(
+            span_attrs.get(O2Attributes::PROVIDER_NAME).unwrap(),
+            &json::json!("anthropic")
+        );
+    }
+
+    #[test]
+    fn test_process_span_extracts_provider_from_vercel_ai() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("ai.model.id".to_string(), json::json!("gemini-pro"));
+        span_attrs.insert("ai.model.provider".to_string(), json::json!("google"));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Provider name should be extracted from Vercel AI SDK attribute
+        assert!(span_attrs.contains_key(O2Attributes::PROVIDER_NAME));
+        assert_eq!(
+            span_attrs.get(O2Attributes::PROVIDER_NAME).unwrap(),
+            &json::json!("google")
+        );
     }
 }

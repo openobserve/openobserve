@@ -21,6 +21,7 @@ pub mod model;
 pub mod observation_type;
 pub mod parameters;
 pub mod prompt;
+pub mod provider;
 pub mod usage;
 pub mod utils;
 
@@ -30,4 +31,5 @@ pub use model::ModelExtractor;
 pub use observation_type::{ObservationType, ScopeInfo, map_to_observation_type};
 pub use parameters::ParametersExtractor;
 pub use prompt::PromptExtractor;
+pub use provider::ProviderExtractor;
 pub use usage::UsageExtractor;
