@@ -93,21 +93,27 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
   /**
    * Test: Verify traces stream type is available in pipeline creation
    * Priority: P0 - Smoke
-   * Objective: Confirm that "traces" appears as a stream type option when creating a pipeline
+   * Objective: Confirm that "traces" appears as a stream type option in the stream node form
    */
   test("should show traces as stream type option in add pipeline dialog @P0 @smoke", async ({ page }) => {
-    testLogger.info('Testing traces stream type visibility in add pipeline dialog');
+    testLogger.info('Testing traces stream type visibility in stream node form');
 
     // Navigate to pipelines
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
 
-    // Click add pipeline button
+    // Click add pipeline button - routes to pipeline editor
     await pageManager.pipelinesPage.addPipeline();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
 
-    // Click on stream type dropdown using POM method
-    await pageManager.pipelinesPage.clickStreamTypeSelect();
+    // Click on the Stream button and drag it to the canvas to open the stream form dialog
+    await pageManager.pipelinesPage.selectStream();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
+    await page.waitForTimeout(1000);
+
+    // Click on stream type dropdown in the stream form (uses input-node-stream-type-select)
+    await pageManager.pipelinesPage.clickInputNodeStreamTypeSelect();
     await page.waitForTimeout(500);
 
     // Verify "traces" option is available using POM
@@ -121,7 +127,11 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
       await pageManager.pipelinesPage.logMenuOptions();
     }
 
-    // Close dialog
+    // Close dialog by pressing Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+
+    // Navigate back to pipelines list
     await page.keyboard.press('Escape');
 
     testLogger.info('Test completed: Traces stream type visibility check');
@@ -449,78 +459,12 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     testLogger.info('Test completed: Pipeline with function node');
   });
 
-  /**
-   * Test: Verify function validation - empty function name
-   * Priority: P1 - Validation
-   * Objective: Verify that creating a function without name shows error
-   */
-  test("should show error when creating function without name @P1 @validation @function", async ({ page }) => {
-    testLogger.info('Testing function validation - empty name');
-
-    await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.addPipeline();
-
-    // Drag function node
-    await pageManager.pipelinesPage.selectAndDragFunction();
-    await page.waitForTimeout(2000);
-
-    // Toggle to create new function
-    await pageManager.pipelinesPage.toggleCreateFunction();
-    await page.waitForTimeout(1000);
-
-    // Try to save without entering name
-    await pageManager.pipelinesPage.saveNewFunction();
-
-    // Verify error
-    await pageManager.pipelinesPage.assertFunctionNameRequiredErrorVisible();
-
-    testLogger.info('Test completed: Function name required error shown');
-  });
-
-  /**
-   * Test: Verify pipeline name validation - empty name
-   * Priority: P1 - Validation
-   * Objective: Verify that saving pipeline without name shows error
-   */
-  test("should show error when saving pipeline without name @P1 @validation", async ({ page }) => {
-    testLogger.info('Testing pipeline name validation - empty name');
-
-    await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.addPipeline();
-
-    // Try to save without entering pipeline name
-    await pageManager.pipelinesPage.savePipeline();
-
-    // Verify error
-    await pageManager.pipelinesPage.confirmPipelineNameRequired();
-
-    testLogger.info('Test completed: Pipeline name required error shown');
-  });
-
-  /**
-   * Test: Verify pipeline validation - missing source node
-   * Priority: P1 - Validation
-   * Objective: Verify that saving pipeline without source node shows error
-   */
-  test("should show error when saving pipeline without source node @P1 @validation", async ({ page }) => {
-    testLogger.info('Testing pipeline validation - missing source node');
-
-    await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.addPipeline();
-
-    // Enter pipeline name but don't add source
-    const pipelineName = `no-source-pipeline-${Date.now()}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-
-    // Verify error
-    await pageManager.pipelinesPage.confirmSourceNodeRequired();
-
-    testLogger.info('Test completed: Source node required error shown');
-  });
+  // NOTE: The following validation tests were removed as duplicates of existing tests in pipelines.spec.js:
+  // - "should show error when creating function without name" -> duplicates "should display error when function name is not added"
+  // - "should show error when saving pipeline without name" -> duplicates "should display error on entering only pipeline name and save"
+  // - "should show error when saving pipeline without source node" -> duplicates "should display error on entering only source node and save"
+  // Pipeline validation (name required, source node required, function name required) is stream-type agnostic
+  // and doesn't need to be repeated for each stream type (logs/traces/metrics).
 
   /**
    * Test: Verify pipeline validation - missing destination node
@@ -557,8 +501,8 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await page.waitForTimeout(1000);
 
     // Check for error message OR successful save (depending on auto-creation behavior)
-    const hasError = await page.getByText(/destination.*required/i).isVisible({ timeout: 5000 }).catch(() => false);
-    const hasSaved = await page.getByText(/success|created|saved/i).isVisible({ timeout: 2000 }).catch(() => false);
+    const hasError = await pageManager.pipelinesPage.isDestinationRequiredErrorVisible();
+    const hasSaved = await pageManager.pipelinesPage.isPipelineSaveSuccessVisible();
 
     if (hasError) {
       testLogger.info('Destination node required error shown as expected');
@@ -566,7 +510,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
       testLogger.info('Pipeline saved (destination node was auto-created or not required)');
     } else {
       // Try to verify the UI state - the pipeline may have validation that prevents save
-      const isOnPipelinePage = await page.locator('[data-test="pipeline-name-input"]').isVisible().catch(() => false);
+      const isOnPipelinePage = await pageManager.pipelinesPage.isPipelineNameInputVisible();
       if (isOnPipelinePage) {
         testLogger.info('Still on pipeline editing page - validation may have prevented save');
       }

@@ -208,6 +208,8 @@ jobs:
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
+                "pipeline-traces.spec.js",
+                "pipeline-metrics.spec.js",
                 # "remotepipeline.spec.js"
               ]
           - testfolder: "Functions"

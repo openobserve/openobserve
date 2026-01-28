@@ -2,24 +2,17 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+import { LoginPage } from "../../pages/generalPages/loginPage.js";
 const testLogger = require('../utils/test-logger.js');
-const path = require('path');
+
 
 test.describe.configure({ mode: "parallel" });
-
-// Use stored authentication state from global setup instead of logging in each test
-const authFile = path.join(__dirname, '../utils/auth/user.json');
-test.use({
-  storageState: authFile,
-  contextOptions: {
-    slowMo: 1000
-  }
-});
 
 const randomPipelineName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
   let pageManager;
+  let loginPage;
 
   function removeUTFCharacters(text) {
     // Remove UTF characters using regular expression
@@ -27,7 +20,12 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
   }
 
   test.beforeEach(async ({ page }) => {
-    // Auth is handled via storageState - no login needed
+    // Login using LoginPage
+    loginPage = new LoginPage(page);
+    await loginPage.gotoLoginPage();
+    await loginPage.loginAsInternalUser();
+    await loginPage.login();
+
     pageManager = new PageManager(page);
 
     // Ingest data using page object method

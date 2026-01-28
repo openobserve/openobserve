@@ -100,21 +100,27 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
   /**
    * Test: Verify metrics stream type is available in pipeline creation
    * Priority: P0 - Smoke
-   * Objective: Confirm that "metrics" appears as a stream type option
+   * Objective: Confirm that "metrics" appears as a stream type option in the stream node form
    */
   test("should show metrics as stream type option in add pipeline dialog @P0 @smoke", async ({ page }) => {
-    testLogger.info('Testing metrics stream type visibility in add pipeline dialog');
+    testLogger.info('Testing metrics stream type visibility in stream node form');
 
     // Navigate to pipelines
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
 
-    // Click add pipeline button
+    // Click add pipeline button - routes to pipeline editor
     await pageManager.pipelinesPage.addPipeline();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
 
-    // Click on stream type dropdown using POM method
-    await pageManager.pipelinesPage.clickStreamTypeSelect();
+    // Click on the Stream button and drag it to the canvas to open the stream form dialog
+    await pageManager.pipelinesPage.selectStream();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
+    await page.waitForTimeout(1000);
+
+    // Click on stream type dropdown in the stream form (uses input-node-stream-type-select)
+    await pageManager.pipelinesPage.clickInputNodeStreamTypeSelect();
     await page.waitForTimeout(500);
 
     // Verify "metrics" option is available using POM
@@ -128,7 +134,11 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
       await pageManager.pipelinesPage.logMenuOptions();
     }
 
-    // Close dialog
+    // Close dialog by pressing Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+
+    // Navigate back to pipelines list
     await page.keyboard.press('Escape');
 
     testLogger.info('Test completed: Metrics stream type visibility check');
@@ -448,7 +458,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await page.waitForTimeout(500);
 
     // Use force click to bypass the dialog overlay
-    await page.locator('[data-test="add-pipeline-cancel-btn"]').click({ force: true });
+    await pageManager.pipelinesPage.clickCancelPipelineBtnForce();
 
     testLogger.info('Test completed: Scheduled pipeline with query source for metrics');
   });
@@ -509,7 +519,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await page.waitForTimeout(500);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(500);
-    await page.locator('[data-test="add-pipeline-cancel-btn"]').click({ force: true });
+    await pageManager.pipelinesPage.clickCancelPipelineBtnForce();
 
     testLogger.info('Test completed: Query auto-generation on stream change for metrics');
   });
