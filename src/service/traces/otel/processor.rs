@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use super::{
-    attributes::LlmAttributes,
+    attributes::O2Attributes,
     extractors::{
         InputOutputExtractor, MetadataExtractor, ModelExtractor, ParametersExtractor,
         PromptExtractor, ScopeInfo, TimingExtractor, UsageExtractor, map_to_observation_type,
@@ -126,68 +126,68 @@ impl OtelIngestionProcessor {
 
         // Add enriched fields
         span_attributes.insert(
-            LlmAttributes::OBSERVATION_TYPE.to_string(),
+            O2Attributes::OBSERVATION_TYPE.to_string(),
             json::json!(obs_type.as_str()),
         );
 
         if let Some(model) = model_name {
-            span_attributes.insert(LlmAttributes::MODEL_NAME.to_string(), json::json!(model));
+            span_attributes.insert(O2Attributes::MODEL_NAME.to_string(), json::json!(model));
         }
 
         if let Some(input_val) = input {
-            span_attributes.insert(LlmAttributes::INPUT.to_string(), input_val);
+            span_attributes.insert(O2Attributes::INPUT.to_string(), input_val);
         }
 
         if let Some(output_val) = output {
-            span_attributes.insert(LlmAttributes::OUTPUT.to_string(), output_val);
+            span_attributes.insert(O2Attributes::OUTPUT.to_string(), output_val);
         }
 
         if !model_params.is_empty() {
             span_attributes.insert(
-                LlmAttributes::MODEL_PARAMETERS.to_string(),
+                O2Attributes::MODEL_PARAMETERS.to_string(),
                 json::json!(model_params),
             );
         }
 
         if !usage.is_empty() {
-            span_attributes.insert(LlmAttributes::USAGE_DETAILS.to_string(), json::json!(usage));
+            span_attributes.insert(O2Attributes::USAGE_DETAILS.to_string(), json::json!(usage));
         }
 
         if !cost.is_empty() {
-            span_attributes.insert(LlmAttributes::COST_DETAILS.to_string(), json::json!(cost));
+            span_attributes.insert(O2Attributes::COST_DETAILS.to_string(), json::json!(cost));
         }
 
         if let Some(uid) = user_id {
-            span_attributes.insert(LlmAttributes::USER_ID.to_string(), json::json!(uid));
+            span_attributes.insert(O2Attributes::USER_ID.to_string(), json::json!(uid));
         }
 
         if let Some(sid) = session_id {
-            span_attributes.insert(LlmAttributes::SESSION_ID.to_string(), json::json!(sid));
+            span_attributes.insert(O2Attributes::SESSION_ID.to_string(), json::json!(sid));
         }
 
         span_attributes.insert(
-            LlmAttributes::ENVIRONMENT.to_string(),
+            O2Attributes::ENVIRONMENT.to_string(),
             json::json!(environment),
         );
 
         if !tags.is_empty() {
-            span_attributes.insert(LlmAttributes::TAGS.to_string(), json::json!(tags));
+            span_attributes.insert(O2Attributes::TAGS.to_string(), json::json!(tags));
         }
 
         if let Some(pname) = prompt_name {
-            span_attributes.insert(LlmAttributes::PROMPT_NAME.to_string(), json::json!(pname));
+            span_attributes.insert(O2Attributes::PROMPT_NAME.to_string(), json::json!(pname));
         }
 
         if let Some(pversion) = prompt_version {
             span_attributes.insert(
-                LlmAttributes::PROMPT_VERSION.to_string(),
+                O2Attributes::PROMPT_VERSION.to_string(),
                 json::json!(pversion),
             );
         }
 
         if let Some(completion_time) = completion_start_time {
             span_attributes.insert(
-                LlmAttributes::COMPLETION_START_TIME.to_string(),
+                O2Attributes::COMPLETION_START_TIME.to_string(),
                 json::json!(completion_time),
             );
         }
@@ -225,11 +225,11 @@ mod tests {
         assert!(!span_attrs.contains_key("gen_ai.output.messages"));
 
         // Enriched fields should be added with llm_ prefix
-        assert!(span_attrs.contains_key(LlmAttributes::INPUT));
-        assert!(span_attrs.contains_key(LlmAttributes::OUTPUT));
-        assert!(span_attrs.contains_key(LlmAttributes::OBSERVATION_TYPE));
-        assert!(span_attrs.contains_key(LlmAttributes::MODEL_NAME));
-        assert!(span_attrs.contains_key(LlmAttributes::ENVIRONMENT));
+        assert!(span_attrs.contains_key(O2Attributes::INPUT));
+        assert!(span_attrs.contains_key(O2Attributes::OUTPUT));
+        assert!(span_attrs.contains_key(O2Attributes::OBSERVATION_TYPE));
+        assert!(span_attrs.contains_key(O2Attributes::MODEL_NAME));
+        assert!(span_attrs.contains_key(O2Attributes::ENVIRONMENT));
 
         // Other attributes should remain
         assert!(span_attrs.contains_key("user.id"));

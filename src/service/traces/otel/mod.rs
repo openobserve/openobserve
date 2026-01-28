@@ -119,7 +119,7 @@ mod tests {
     use config::utils::json;
 
     use super::*;
-    use crate::common::meta::traces::Event;
+    use crate::{common::meta::traces::Event, service::traces::otel::attributes::O2Attributes};
 
     /// Test that simulates the complete OpenObserve traces ingestion flow
     /// with OTEL processor integration
@@ -179,7 +179,7 @@ mod tests {
         // 1. Observation type should be GENERATION
         assert_eq!(
             span_attributes
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
@@ -187,33 +187,35 @@ mod tests {
         // 2. Model name should be extracted
         assert_eq!(
             span_attributes
-                .get("llm_model_name")
+                .get(O2Attributes::MODEL_NAME)
                 .and_then(|v| v.as_str()),
             Some("gpt-4o-2024-08-06")
         );
 
         // 3. Usage details should be present
-        assert!(span_attributes.contains_key("llm_usage_details"));
-        let usage = span_attributes.get("llm_usage_details").unwrap();
+        assert!(span_attributes.contains_key(O2Attributes::USAGE_DETAILS));
+        let usage = span_attributes.get(O2Attributes::USAGE_DETAILS).unwrap();
         assert!(usage.is_object());
         assert_eq!(usage.get("input").and_then(|v| v.as_i64()), Some(12));
         assert_eq!(usage.get("output").and_then(|v| v.as_i64()), Some(8));
 
         // 4. Cost details should be present
-        assert!(span_attributes.contains_key("llm_cost_details"));
-        let cost = span_attributes.get("llm_cost_details").unwrap();
+        assert!(span_attributes.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attributes.get(O2Attributes::COST_DETAILS).unwrap();
         assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.00042));
 
         // 5. User ID should be extracted
         assert_eq!(
-            span_attributes.get("llm_user_id").and_then(|v| v.as_str()),
+            span_attributes
+                .get(O2Attributes::USER_ID)
+                .and_then(|v| v.as_str()),
             Some("user-789")
         );
 
         // 6. Session ID should be extracted
         assert_eq!(
             span_attributes
-                .get("llm_session_id")
+                .get(O2Attributes::SESSION_ID)
                 .and_then(|v| v.as_str()),
             Some("conv-123")
         );
@@ -221,21 +223,21 @@ mod tests {
         // 7. Environment should be extracted
         assert_eq!(
             span_attributes
-                .get("llm_environment")
+                .get(O2Attributes::ENVIRONMENT)
                 .and_then(|v| v.as_str()),
             Some("production")
         );
 
         // 8. Model parameters should be extracted
-        assert!(span_attributes.contains_key("llm_model_parameters"));
-        let params = span_attributes.get("llm_model_parameters").unwrap();
+        assert!(span_attributes.contains_key(O2Attributes::MODEL_PARAMETERS));
+        let params = span_attributes.get(O2Attributes::MODEL_PARAMETERS).unwrap();
         assert!(params.is_object());
         assert!(params.get("temperature").is_some());
         assert!(params.get("max_tokens").is_some());
 
         // 9. LLM input/output should be present
-        assert!(span_attributes.contains_key("llm_input"));
-        assert!(span_attributes.contains_key("llm_output"));
+        assert!(span_attributes.contains_key(O2Attributes::INPUT));
+        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
     }
 
     #[test]
@@ -274,28 +276,30 @@ mod tests {
         // Verify Vercel AI SDK specific enrichment
         assert_eq!(
             span_attributes
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
         assert_eq!(
             span_attributes
-                .get("llm_model_name")
+                .get(O2Attributes::MODEL_NAME)
                 .and_then(|v| v.as_str()),
             Some("gpt-4")
         );
         assert_eq!(
-            span_attributes.get("llm_user_id").and_then(|v| v.as_str()),
+            span_attributes
+                .get(O2Attributes::USER_ID)
+                .and_then(|v| v.as_str()),
             Some("user-456")
         );
         assert_eq!(
             span_attributes
-                .get("llm_session_id")
+                .get(O2Attributes::SESSION_ID)
                 .and_then(|v| v.as_str()),
             Some("session-789")
         );
-        assert!(span_attributes.contains_key("llm_input"));
-        assert!(span_attributes.contains_key("llm_output"));
+        assert!(span_attributes.contains_key(O2Attributes::INPUT));
+        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
     }
 
     #[test]
@@ -334,12 +338,12 @@ mod tests {
         // Verify tool call enrichment
         assert_eq!(
             span_attributes
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("TOOL")
         );
-        assert!(span_attributes.contains_key("llm_input"));
-        assert!(span_attributes.contains_key("llm_output"));
+        assert!(span_attributes.contains_key(O2Attributes::INPUT));
+        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
     }
 
     #[test]
@@ -371,13 +375,13 @@ mod tests {
         // Verify embedding enrichment
         assert_eq!(
             span_attributes
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("EMBEDDING")
         );
         assert_eq!(
             span_attributes
-                .get("llm_model_name")
+                .get(O2Attributes::MODEL_NAME)
                 .and_then(|v| v.as_str()),
             Some("text-embedding-ada-002")
         );
@@ -440,8 +444,8 @@ mod tests {
         );
 
         // Verify event-based input/output extraction
-        assert!(span_attributes.contains_key("llm_input"));
-        assert!(span_attributes.contains_key("llm_output"));
+        assert!(span_attributes.contains_key(O2Attributes::INPUT));
+        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
     }
 
     #[test]
@@ -470,9 +474,9 @@ mod tests {
         );
 
         // Check completion_start_time was extracted
-        assert!(span_attributes.contains_key("llm_completion_start_time"));
+        assert!(span_attributes.contains_key(O2Attributes::COMPLETION_START_TIME));
         let completion_time = span_attributes
-            .get("llm_completion_start_time")
+            .get(O2Attributes::COMPLETION_START_TIME)
             .and_then(|v| v.as_str())
             .expect("completion_start_time should be a string");
 
@@ -504,8 +508,8 @@ mod tests {
         );
 
         // Verify backward compatibility with legacy names
-        assert!(span_attributes.contains_key("llm_usage_details"));
-        let usage = span_attributes.get("llm_usage_details").unwrap();
+        assert!(span_attributes.contains_key(O2Attributes::USAGE_DETAILS));
+        let usage = span_attributes.get(O2Attributes::USAGE_DETAILS).unwrap();
         assert_eq!(usage.get("input").and_then(|v| v.as_i64()), Some(100));
         assert_eq!(usage.get("output").and_then(|v| v.as_i64()), Some(50));
     }
@@ -549,27 +553,35 @@ mod tests {
         // Verify enriched attributes
         assert_eq!(
             span_attrs
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
         assert_eq!(
-            span_attrs.get("llm_model_name").and_then(|v| v.as_str()),
+            span_attrs
+                .get(O2Attributes::MODEL_NAME)
+                .and_then(|v| v.as_str()),
             Some("gpt-4o-2024-08-06")
         );
-        assert!(span_attrs.contains_key("llm_model_parameters"));
-        assert!(span_attrs.contains_key("llm_usage_details"));
-        assert!(span_attrs.contains_key("llm_cost_details"));
+        assert!(span_attrs.contains_key(O2Attributes::MODEL_PARAMETERS));
+        assert!(span_attrs.contains_key(O2Attributes::USAGE_DETAILS));
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
         assert_eq!(
-            span_attrs.get("llm_user_id").and_then(|v| v.as_str()),
+            span_attrs
+                .get(O2Attributes::USER_ID)
+                .and_then(|v| v.as_str()),
             Some("user-123")
         );
         assert_eq!(
-            span_attrs.get("llm_session_id").and_then(|v| v.as_str()),
+            span_attrs
+                .get(O2Attributes::SESSION_ID)
+                .and_then(|v| v.as_str()),
             Some("conv-456")
         );
         assert_eq!(
-            span_attrs.get("llm_environment").and_then(|v| v.as_str()),
+            span_attrs
+                .get(O2Attributes::ENVIRONMENT)
+                .and_then(|v| v.as_str()),
             Some("production")
         );
     }
@@ -599,12 +611,12 @@ mod tests {
 
         assert_eq!(
             span_attrs
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("TOOL")
         );
-        assert!(span_attrs.contains_key("llm_input"));
-        assert!(span_attrs.contains_key("llm_output"));
+        assert!(span_attrs.contains_key(O2Attributes::INPUT));
+        assert!(span_attrs.contains_key(O2Attributes::OUTPUT));
     }
 
     #[test]
@@ -628,7 +640,7 @@ mod tests {
 
         assert_eq!(
             span_attrs
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("EMBEDDING")
         );
@@ -662,20 +674,24 @@ mod tests {
 
         assert_eq!(
             span_attrs
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
         assert_eq!(
-            span_attrs.get("llm_model_name").and_then(|v| v.as_str()),
+            span_attrs
+                .get(O2Attributes::MODEL_NAME)
+                .and_then(|v| v.as_str()),
             Some("gpt-4")
         );
         assert_eq!(
-            span_attrs.get("llm_user_id").and_then(|v| v.as_str()),
+            span_attrs
+                .get(O2Attributes::USER_ID)
+                .and_then(|v| v.as_str()),
             Some("user-789")
         );
-        assert!(span_attrs.contains_key("llm_input"));
-        assert!(span_attrs.contains_key("llm_output"));
+        assert!(span_attrs.contains_key(O2Attributes::INPUT));
+        assert!(span_attrs.contains_key(O2Attributes::OUTPUT));
     }
 
     #[test]
@@ -697,10 +713,10 @@ mod tests {
         // OpenInference has higher priority than model-based detection
         assert_eq!(
             span_attrs
-                .get("llm_observation_type")
+                .get(O2Attributes::OBSERVATION_TYPE)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
-        assert!(span_attrs.contains_key("llm_usage_details"));
+        assert!(span_attrs.contains_key(O2Attributes::USAGE_DETAILS));
     }
 }

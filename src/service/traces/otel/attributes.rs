@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// OpenObserve LLM Attributes
-pub struct LlmAttributes;
+pub struct O2Attributes;
 
-impl LlmAttributes {
+impl O2Attributes {
     /// Type of LLM observation (e.g., "generation", "chat", "embedding")
     pub const OBSERVATION_TYPE: &'static str = "_o2_observation_type";
 
@@ -269,18 +269,18 @@ mod tests {
 
     #[test]
     fn test_llm_enriched_attributes() {
-        assert_eq!(LlmAttributes::OBSERVATION_TYPE, "_o2_observation_type");
-        assert_eq!(LlmAttributes::MODEL_NAME, "_o2_model_name");
-        assert_eq!(LlmAttributes::INPUT, "_o2_input");
-        assert_eq!(LlmAttributes::OUTPUT, "_o2_output");
-        assert_eq!(LlmAttributes::MODEL_PARAMETERS, "_o2_model_parameters");
-        assert_eq!(LlmAttributes::USAGE_DETAILS, "_o2_usage_details");
-        assert_eq!(LlmAttributes::COST_DETAILS, "_o2_cost_details");
-        assert_eq!(LlmAttributes::USER_ID, "_o2_user_id");
-        assert_eq!(LlmAttributes::SESSION_ID, "_o2_session_id");
-        assert_eq!(LlmAttributes::ENVIRONMENT, "_o2_environment");
-        assert_eq!(LlmAttributes::TAGS, "_o2_tags");
-        assert_eq!(LlmAttributes::PROMPT_NAME, "_o2_prompt_name");
-        assert_eq!(LlmAttributes::PROMPT_VERSION, "_o2_prompt_version");
+        assert_eq!(O2Attributes::OBSERVATION_TYPE, "_o2_observation_type");
+        assert_eq!(O2Attributes::MODEL_NAME, "_o2_model_name");
+        assert_eq!(O2Attributes::INPUT, "_o2_input");
+        assert_eq!(O2Attributes::OUTPUT, "_o2_output");
+        assert_eq!(O2Attributes::MODEL_PARAMETERS, "_o2_model_parameters");
+        assert_eq!(O2Attributes::USAGE_DETAILS, "_o2_usage_details");
+        assert_eq!(O2Attributes::COST_DETAILS, "_o2_cost_details");
+        assert_eq!(O2Attributes::USER_ID, "_o2_user_id");
+        assert_eq!(O2Attributes::SESSION_ID, "_o2_session_id");
+        assert_eq!(O2Attributes::ENVIRONMENT, "_o2_environment");
+        assert_eq!(O2Attributes::TAGS, "_o2_tags");
+        assert_eq!(O2Attributes::PROMPT_NAME, "_o2_prompt_name");
+        assert_eq!(O2Attributes::PROMPT_VERSION, "_o2_prompt_version");
     }
 }
