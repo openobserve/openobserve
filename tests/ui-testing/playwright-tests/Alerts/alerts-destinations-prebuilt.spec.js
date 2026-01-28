@@ -15,7 +15,7 @@ const EXTENDED_TIMEOUT_MS = 180000; // 3 minutes for consolidated tests
  * - Navigation and button states
  * - Destination type selection with stepper UI
  * - Form validation and credential input
- * - Testing destination connectivity
+ * - Testing destination connectivity 
  * - Creating, editing, and deleting destinations
  * - Support for all prebuilt types: Slack, Discord, Teams, PagerDuty, Opsgenie, ServiceNow
  *
