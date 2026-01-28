@@ -76,11 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="correlated-logs-v2"
             :label="t('correlation.correlatedLogs')"
           />
-          <!-- NEW: Logs V2 Tab for testing new component -->
+          <!-- NEW: Logs Tab with TanStack Table -->
           <q-tab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-logs-v2"
-            :label="t('correlation.correlatedLogsV2')"
+            :label="t('correlation.correlatedLogs')"
           />
           <q-tab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
