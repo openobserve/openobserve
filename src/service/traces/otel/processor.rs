@@ -26,7 +26,7 @@ use super::{
     attributes::O2Attributes,
     extractors::{
         InputOutputExtractor, MetadataExtractor, ModelExtractor, ParametersExtractor,
-        PromptExtractor, ScopeInfo, TimingExtractor, UsageExtractor, map_to_observation_type,
+        PromptExtractor, ScopeInfo, UsageExtractor, map_to_observation_type,
     },
 };
 use crate::common::meta::traces::Event;
@@ -38,7 +38,6 @@ pub struct OtelIngestionProcessor {
     usage_extractor: UsageExtractor,
     metadata_extractor: MetadataExtractor,
     prompt_extractor: PromptExtractor,
-    timing_extractor: TimingExtractor,
 }
 
 impl Default for OtelIngestionProcessor {
@@ -56,7 +55,6 @@ impl OtelIngestionProcessor {
             usage_extractor: UsageExtractor,
             metadata_extractor: MetadataExtractor,
             prompt_extractor: PromptExtractor,
-            timing_extractor: TimingExtractor,
         }
     }
 
@@ -69,56 +67,42 @@ impl OtelIngestionProcessor {
         resource_attributes: &HashMap<String, json::Value>,
         scope_name: Option<&str>,
         events: &[Event],
-        start_time_iso: Option<&str>,
     ) {
-        // 1. Extract and add observation type
+        // Extract and add observation type
         let scope_info = scope_name.map(|name| ScopeInfo {
             name: Some(name.to_string()),
         });
         let obs_type =
             map_to_observation_type(span_attributes, resource_attributes, scope_info.as_ref());
 
-        // 2. Extract model name
+        // Extract model name
         let model_name = self.model_extractor.extract(span_attributes);
 
-        // 3. Extract input and output (this will identify which attributes to remove)
+        // Extract input and output (this will identify which attributes to remove)
         let (input, output) =
             self.input_output_extractor
                 .extract(events, span_attributes, scope_name.unwrap_or(""));
 
-        // 4. Extract model parameters
+        // Extract model parameters
         let model_params = self
             .parameters_extractor
             .extract(span_attributes, scope_name.unwrap_or(""));
 
-        // 5. Extract usage details
+        // Extract usage details
         let usage = self
             .usage_extractor
             .extract_usage(span_attributes, scope_name.unwrap_or(""));
 
-        // 6. Extract cost details
+        // Extract cost details
         let cost = self.usage_extractor.extract_cost(span_attributes);
 
-        // 7. Extract user and session
+        // Extract user and session
         let user_id = self.metadata_extractor.extract_user_id(span_attributes);
         let session_id = self.metadata_extractor.extract_session_id(span_attributes);
 
-        // 8. Extract environment
-        let environment = self
-            .metadata_extractor
-            .extract_environment(span_attributes, resource_attributes);
-
-        // 9. Extract tags
-        let tags = self.metadata_extractor.extract_tags(span_attributes);
-
-        // 10. Extract prompt information
+        // Extract prompt information
         let prompt_name = self.prompt_extractor.extract_name(span_attributes);
         let prompt_version = self.prompt_extractor.extract_version(span_attributes);
-
-        // 11. Extract completion start time (time to first token)
-        let completion_start_time = self
-            .timing_extractor
-            .extract_completion_start_time(span_attributes, start_time_iso);
 
         // Now remove all input/output related attributes
         span_attributes
@@ -165,15 +149,6 @@ impl OtelIngestionProcessor {
             span_attributes.insert(O2Attributes::SESSION_ID.to_string(), json::json!(sid));
         }
 
-        span_attributes.insert(
-            O2Attributes::ENVIRONMENT.to_string(),
-            json::json!(environment),
-        );
-
-        if !tags.is_empty() {
-            span_attributes.insert(O2Attributes::TAGS.to_string(), json::json!(tags));
-        }
-
         if let Some(pname) = prompt_name {
             span_attributes.insert(O2Attributes::PROMPT_NAME.to_string(), json::json!(pname));
         }
@@ -182,13 +157,6 @@ impl OtelIngestionProcessor {
             span_attributes.insert(
                 O2Attributes::PROMPT_VERSION.to_string(),
                 json::json!(pversion),
-            );
-        }
-
-        if let Some(completion_time) = completion_start_time {
-            span_attributes.insert(
-                O2Attributes::COMPLETION_START_TIME.to_string(),
-                json::json!(completion_time),
             );
         }
     }
@@ -218,7 +186,7 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
-        processor.process_span(&mut span_attrs, &resource_attrs, None, &events, None);
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         // Input/output attributes should be removed
         assert!(!span_attrs.contains_key("gen_ai.input.messages"));
@@ -229,7 +197,6 @@ mod tests {
         assert!(span_attrs.contains_key(O2Attributes::OUTPUT));
         assert!(span_attrs.contains_key(O2Attributes::OBSERVATION_TYPE));
         assert!(span_attrs.contains_key(O2Attributes::MODEL_NAME));
-        assert!(span_attrs.contains_key(O2Attributes::ENVIRONMENT));
 
         // Other attributes should remain
         assert!(span_attrs.contains_key("user.id"));

@@ -19,6 +19,8 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
+use super::utils::extract_i64;
+
 pub struct PromptExtractor;
 
 impl PromptExtractor {
@@ -49,7 +51,7 @@ fn parse_ai_sdk_prompt_metadata(
         && let Some(s) = value.as_str()
         && let Ok(parsed) = serde_json::from_str::<json::Value>(s)
         && let Some(name) = parsed.get("name").and_then(|v| v.as_str())
-        && let Some(version) = parsed.get("version").and_then(|v| v.as_i64())
+        && let Some(version) = parsed.get("version").and_then(extract_i64)
     {
         return Some((name.to_string(), version as i32));
     }

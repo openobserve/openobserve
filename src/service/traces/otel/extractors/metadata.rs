@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use crate::service::traces::otel::attributes::{
-    FrameworkAttributes, GenAiAttributes, OtelAttributes, VercelAiSdkAttributes,
+    GenAiAttributes, OtelAttributes, VercelAiSdkAttributes,
 };
 
 pub struct MetadataExtractor;
@@ -59,63 +59,5 @@ impl MetadataExtractor {
             }
         }
         None
-    }
-
-    /// Extract environment
-    pub fn extract_environment(
-        &self,
-        attributes: &HashMap<String, json::Value>,
-        resource_attributes: &HashMap<String, json::Value>,
-    ) -> String {
-        let environment_keys = [
-            OtelAttributes::DEPLOYMENT_ENVIRONMENT_NAME,
-            OtelAttributes::DEPLOYMENT_ENVIRONMENT,
-        ];
-
-        for key in &environment_keys {
-            if let Some(value) = attributes.get(*key)
-                && let Some(s) = value.as_str()
-            {
-                return s.to_string();
-            }
-            if let Some(value) = resource_attributes.get(*key)
-                && let Some(s) = value.as_str()
-            {
-                return s.to_string();
-            }
-        }
-
-        "default".to_string()
-    }
-
-    /// Extract tags
-    pub fn extract_tags(&self, attributes: &HashMap<String, json::Value>) -> Vec<String> {
-        let tags_keys = [
-            VercelAiSdkAttributes::TELEMETRY_METADATA_TAGS,
-            FrameworkAttributes::TAG_TAGS,
-        ];
-
-        for key in &tags_keys {
-            if let Some(value) = attributes.get(*key) {
-                if let Some(arr) = value.as_array() {
-                    return arr
-                        .iter()
-                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                        .collect();
-                } else if let Some(s) = value.as_str() {
-                    if s.starts_with('[') {
-                        if let Ok(arr) = serde_json::from_str::<Vec<String>>(s) {
-                            return arr;
-                        }
-                    } else if s.contains(',') {
-                        return s.split(',').map(|t| t.trim().to_string()).collect();
-                    } else {
-                        return vec![s.to_string()];
-                    }
-                }
-            }
-        }
-
-        Vec::new()
     }
 }

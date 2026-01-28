@@ -19,8 +19,9 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
+use super::utils::{extract_f64, extract_i64};
 use crate::service::traces::otel::attributes::{
-    GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes,
+    GenAiAttributes, LLMAttributes, OpenInferenceAttributes, VercelAiSdkAttributes,
 };
 
 pub struct UsageExtractor;
@@ -34,27 +35,11 @@ impl UsageExtractor {
     ) -> HashMap<String, i64> {
         let mut usage = HashMap::new();
 
-        // Vercel AI SDK
-        if instrumentation_scope_name == "ai" {
-            if let Some(v) = attributes
-                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
-                .or_else(|| attributes.get(GenAiAttributes::USAGE_PROMPT_TOKENS))
-                && let Some(num) = v.as_i64()
-            {
-                usage.insert("input".to_string(), num);
-            }
-            if let Some(v) = attributes
-                .get(GenAiAttributes::USAGE_OUTPUT_TOKENS)
-                .or_else(|| attributes.get(GenAiAttributes::USAGE_COMPLETION_TOKENS))
-                && let Some(num) = v.as_i64()
-            {
-                usage.insert("output".to_string(), num);
-            }
-            if let Some(v) = attributes.get(VercelAiSdkAttributes::USAGE_TOKENS)
-                && let Some(num) = v.as_i64()
-            {
-                usage.insert("total".to_string(), num);
-            }
+        // LLM Usage Total Tokens
+        if let Some(v) = attributes.get(LLMAttributes::USAGE_TOTAL_TOKENS)
+            && let Some(num) = extract_i64(v)
+        {
+            usage.insert("total".to_string(), num);
         }
 
         // Standard Gen-AI attributes
@@ -76,7 +61,7 @@ impl UsageExtractor {
 
         for (key, usage_key) in &token_keys {
             if let Some(value) = attributes.get(*key)
-                && let Some(num) = value.as_i64()
+                && let Some(num) = extract_i64(value)
             {
                 usage.insert(usage_key.to_string(), num);
             }
@@ -84,14 +69,37 @@ impl UsageExtractor {
 
         // OpenInference
         if let Some(v) = attributes.get(OpenInferenceAttributes::LLM_TOKEN_COUNT_PROMPT)
-            && let Some(num) = v.as_i64()
+            && let Some(num) = extract_i64(v)
         {
             usage.insert("input".to_string(), num);
         }
         if let Some(v) = attributes.get(OpenInferenceAttributes::LLM_TOKEN_COUNT_COMPLETION)
-            && let Some(num) = v.as_i64()
+            && let Some(num) = extract_i64(v)
         {
             usage.insert("output".to_string(), num);
+        }
+
+        // Vercel AI SDK
+        if instrumentation_scope_name == "ai" {
+            if let Some(v) = attributes
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .or_else(|| attributes.get(GenAiAttributes::USAGE_PROMPT_TOKENS))
+                && let Some(num) = extract_i64(v)
+            {
+                usage.insert("input".to_string(), num);
+            }
+            if let Some(v) = attributes
+                .get(GenAiAttributes::USAGE_OUTPUT_TOKENS)
+                .or_else(|| attributes.get(GenAiAttributes::USAGE_COMPLETION_TOKENS))
+                && let Some(num) = extract_i64(v)
+            {
+                usage.insert("output".to_string(), num);
+            }
+            if let Some(v) = attributes.get(VercelAiSdkAttributes::USAGE_TOKENS)
+                && let Some(num) = extract_i64(v)
+            {
+                usage.insert("total".to_string(), num);
+            }
         }
 
         usage
@@ -102,7 +110,7 @@ impl UsageExtractor {
         let mut cost = HashMap::new();
 
         if let Some(v) = attributes.get(GenAiAttributes::USAGE_COST)
-            && let Some(num) = v.as_f64()
+            && let Some(num) = extract_f64(v)
         {
             cost.insert("total".to_string(), num);
         }

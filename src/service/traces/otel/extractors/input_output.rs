@@ -37,7 +37,42 @@ impl InputOutputExtractor {
         attributes: &HashMap<String, json::Value>,
         instrumentation_scope_name: &str,
     ) -> (Option<json::Value>, Option<json::Value>) {
-        // 1. Vercel AI SDK
+        // Gen-AI events (from span.events)
+        if let Some((input, output)) = self.extract_from_gen_ai_events(events) {
+            return (input, output);
+        }
+
+        // TraceLoop (with direct attributes)
+        if let Some(input) = attributes.get(FrameworkAttributes::TRACELOOP_ENTITY_INPUT) {
+            let output = attributes.get(FrameworkAttributes::TRACELOOP_ENTITY_OUTPUT);
+            return (Some(input.clone()), output.cloned());
+        }
+
+        // TraceLoop nested attributes (gen_ai.prompt.* and gen_ai.completion.*)
+        let (input, output) = self.extract_traceloop_nested(attributes);
+        if input.is_some() || output.is_some() {
+            return (input, output);
+        }
+
+        // Standard Gen-AI attributes
+        if let Some(input) = attributes.get(GenAiAttributes::INPUT_MESSAGES) {
+            let output = attributes.get(GenAiAttributes::OUTPUT_MESSAGES);
+            return (Some(input.clone()), output.cloned());
+        }
+
+        // Gen-AI tool attributes
+        if let Some(input) = attributes.get(GenAiAttributes::TOOL_CALL_ARGUMENTS) {
+            let output = attributes.get(GenAiAttributes::TOOL_CALL_RESULT);
+            return (Some(input.clone()), output.cloned());
+        }
+
+        // Legacy Semantic Kernel events
+        let (input, output) = self.extract_legacy_semantic_kernel_events(events);
+        if input.is_some() || output.is_some() {
+            return (input, output);
+        }
+
+        // Vercel AI SDK
         if instrumentation_scope_name == "ai" {
             let (input, output) = self.extract_vercel_ai_sdk(attributes);
             if input.is_some() || output.is_some() {
@@ -45,18 +80,7 @@ impl InputOutputExtractor {
             }
         }
 
-        // 2. Gen-AI events (from span.events)
-        if let Some((input, output)) = self.extract_from_gen_ai_events(events) {
-            return (input, output);
-        }
-
-        // 3. Legacy Semantic Kernel events
-        let (input, output) = self.extract_legacy_semantic_kernel_events(events);
-        if input.is_some() || output.is_some() {
-            return (input, output);
-        }
-
-        // 4. Google Vertex AI
+        // Google Vertex AI
         if let Some(input) = attributes.get(FrameworkAttributes::GCP_VERTEX_AGENT_LLM_REQUEST) {
             let mut output_val = attributes.get(FrameworkAttributes::GCP_VERTEX_AGENT_LLM_RESPONSE);
             let mut input_val = Some(input.clone());
@@ -74,13 +98,13 @@ impl InputOutputExtractor {
             return (input_val, output_val.cloned());
         }
 
-        // 5. Logfire
+        // Logfire
         if let Some(input) = attributes.get(FrameworkAttributes::LOGFIRE_PROMPT) {
             let output = attributes.get(FrameworkAttributes::LOGFIRE_ALL_MESSAGES_EVENTS);
             return (Some(input.clone()), output.cloned());
         }
 
-        // 6. LiveKit
+        // LiveKit
         if let Some(input) = attributes.get(FrameworkAttributes::LIVEKIT_INPUT_TEXT) {
             let output = attributes
                 .get(FrameworkAttributes::LIVEKIT_FUNCTION_TOOL_OUTPUT)
@@ -88,65 +112,41 @@ impl InputOutputExtractor {
             return (Some(input.clone()), output.cloned());
         }
 
-        // 7. Logfire events array
+        // Logfire events array
         if let Some(events_val) = attributes.get(FrameworkAttributes::LOGFIRE_EVENTS)
             && let Some((input, output)) = self.extract_logfire_events(events_val)
         {
             return (input, output);
         }
 
-        // 8. MLFlow
+        // MLFlow
         if let Some(input) = attributes.get(FrameworkAttributes::MLFLOW_SPAN_INPUTS) {
             let output = attributes.get(FrameworkAttributes::MLFLOW_SPAN_OUTPUTS);
             return (Some(input.clone()), output.cloned());
         }
 
-        // 9. TraceLoop (with direct attributes)
-        if let Some(input) = attributes.get(FrameworkAttributes::TRACELOOP_ENTITY_INPUT) {
-            let output = attributes.get(FrameworkAttributes::TRACELOOP_ENTITY_OUTPUT);
-            return (Some(input.clone()), output.cloned());
-        }
-
-        // 10. SmolAgents
+        // SmolAgents
         if let Some(input) = attributes.get(FrameworkAttributes::INPUT_VALUE) {
             let output = attributes.get(FrameworkAttributes::OUTPUT_VALUE);
             return (Some(input.clone()), output.cloned());
         }
 
-        // 11. Pydantic
+        // Pydantic
         if let Some(input) = attributes.get(FrameworkAttributes::INPUT) {
             let output = attributes.get(FrameworkAttributes::OUTPUT);
             return (Some(input.clone()), output.cloned());
         }
 
-        // 12. Pydantic-AI tools
+        // Pydantic-AI tools
         if let Some(input) = attributes.get(FrameworkAttributes::TOOL_ARGUMENTS) {
             let output = attributes.get(FrameworkAttributes::TOOL_RESPONSE);
             return (Some(input.clone()), output.cloned());
         }
 
-        // 13. TraceLoop nested attributes (gen_ai.prompt.* and gen_ai.completion.*)
-        let (input, output) = self.extract_traceloop_nested(attributes);
-        if input.is_some() || output.is_some() {
-            return (input, output);
-        }
-
-        // 14. OpenInference nested attributes (llm.input_messages.* and llm.output_messages.*)
+        // OpenInference nested attributes (llm.input_messages.* and llm.output_messages.*)
         let (input, output) = self.extract_openinference_nested(attributes);
         if input.is_some() || output.is_some() {
             return (input, output);
-        }
-
-        // 15. Standard Gen-AI attributes
-        if let Some(input) = attributes.get(GenAiAttributes::INPUT_MESSAGES) {
-            let output = attributes.get(GenAiAttributes::OUTPUT_MESSAGES);
-            return (Some(input.clone()), output.cloned());
-        }
-
-        // 16. Gen-AI tool attributes
-        if let Some(input) = attributes.get(GenAiAttributes::TOOL_CALL_ARGUMENTS) {
-            let output = attributes.get(GenAiAttributes::TOOL_CALL_RESULT);
-            return (Some(input.clone()), output.cloned());
         }
 
         (None, None)

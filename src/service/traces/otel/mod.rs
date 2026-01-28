@@ -172,7 +172,6 @@ mod tests {
             &resource_attributes,
             Some("openai"),
             &events,
-            None,
         );
 
         // Verify enrichment
@@ -220,14 +219,6 @@ mod tests {
             Some("conv-123")
         );
 
-        // 7. Environment should be extracted
-        assert_eq!(
-            span_attributes
-                .get(O2Attributes::ENVIRONMENT)
-                .and_then(|v| v.as_str()),
-            Some("production")
-        );
-
         // 8. Model parameters should be extracted
         assert!(span_attributes.contains_key(O2Attributes::MODEL_PARAMETERS));
         let params = span_attributes.get(O2Attributes::MODEL_PARAMETERS).unwrap();
@@ -270,7 +261,6 @@ mod tests {
             &resource_attributes,
             Some("ai"),
             &events,
-            Some("2024-01-01T00:00:00Z"),
         );
 
         // Verify Vercel AI SDK specific enrichment
@@ -327,13 +317,7 @@ mod tests {
         let resource_attributes = HashMap::new();
         let events = vec![];
 
-        processor.process_span(
-            &mut span_attributes,
-            &resource_attributes,
-            None,
-            &events,
-            None,
-        );
+        processor.process_span(&mut span_attributes, &resource_attributes, None, &events);
 
         // Verify tool call enrichment
         assert_eq!(
@@ -364,13 +348,7 @@ mod tests {
         let resource_attributes = HashMap::new();
         let events = vec![];
 
-        processor.process_span(
-            &mut span_attributes,
-            &resource_attributes,
-            None,
-            &events,
-            None,
-        );
+        processor.process_span(&mut span_attributes, &resource_attributes, None, &events);
 
         // Verify embedding enrichment
         assert_eq!(
@@ -435,53 +413,11 @@ mod tests {
 
         let resource_attributes = HashMap::new();
 
-        processor.process_span(
-            &mut span_attributes,
-            &resource_attributes,
-            None,
-            &events,
-            None,
-        );
+        processor.process_span(&mut span_attributes, &resource_attributes, None, &events);
 
         // Verify event-based input/output extraction
         assert!(span_attributes.contains_key(O2Attributes::INPUT));
         assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
-    }
-
-    #[test]
-    fn test_completion_start_time_extraction() {
-        let processor = OtelIngestionProcessor::new();
-        let mut span_attributes = HashMap::new();
-
-        // Simulate Vercel AI SDK span with msToFirstChunk
-        span_attributes.insert(
-            "ai.response.msToFirstChunk".to_string(),
-            json::json!(250), // 250ms to first chunk
-        );
-        span_attributes.insert("ai.model.id".to_string(), json::json!("gpt-4"));
-        span_attributes.insert("ai.response.text".to_string(), json::json!("Response text"));
-
-        let resource_attributes = HashMap::new();
-        let events = vec![];
-        let start_time_iso = "2024-01-01T10:00:00.000Z"; // Start time
-
-        processor.process_span(
-            &mut span_attributes,
-            &resource_attributes,
-            Some("ai"),
-            &events,
-            Some(start_time_iso),
-        );
-
-        // Check completion_start_time was extracted
-        assert!(span_attributes.contains_key(O2Attributes::COMPLETION_START_TIME));
-        let completion_time = span_attributes
-            .get(O2Attributes::COMPLETION_START_TIME)
-            .and_then(|v| v.as_str())
-            .expect("completion_start_time should be a string");
-
-        // Verify it's 250ms after start time
-        assert!(completion_time.contains("2024-01-01T10:00:00.25"));
     }
 
     #[test]
@@ -499,13 +435,7 @@ mod tests {
         let resource_attributes = HashMap::new();
         let events = vec![];
 
-        processor.process_span(
-            &mut span_attributes,
-            &resource_attributes,
-            None,
-            &events,
-            None,
-        );
+        processor.process_span(&mut span_attributes, &resource_attributes, None, &events);
 
         // Verify backward compatibility with legacy names
         assert!(span_attributes.contains_key(O2Attributes::USAGE_DETAILS));
@@ -542,13 +472,7 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
-        processor.process_span(
-            &mut span_attrs,
-            &resource_attrs,
-            Some("openai"),
-            &events,
-            None,
-        );
+        processor.process_span(&mut span_attrs, &resource_attrs, Some("openai"), &events);
 
         // Verify enriched attributes
         assert_eq!(
@@ -578,12 +502,6 @@ mod tests {
                 .and_then(|v| v.as_str()),
             Some("conv-456")
         );
-        assert_eq!(
-            span_attrs
-                .get(O2Attributes::ENVIRONMENT)
-                .and_then(|v| v.as_str()),
-            Some("production")
-        );
     }
 
     #[test]
@@ -607,7 +525,7 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
-        processor.process_span(&mut span_attrs, &resource_attrs, None, &events, None);
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         assert_eq!(
             span_attrs
@@ -636,7 +554,7 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
-        processor.process_span(&mut span_attrs, &resource_attrs, None, &events, None);
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         assert_eq!(
             span_attrs
@@ -670,7 +588,7 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
-        processor.process_span(&mut span_attrs, &resource_attrs, Some("ai"), &events, None);
+        processor.process_span(&mut span_attrs, &resource_attrs, Some("ai"), &events);
 
         assert_eq!(
             span_attrs
@@ -708,7 +626,7 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
-        processor.process_span(&mut span_attrs, &resource_attrs, None, &events, None);
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         // OpenInference has higher priority than model-based detection
         assert_eq!(

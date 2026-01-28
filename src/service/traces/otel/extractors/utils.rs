@@ -13,21 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Extractor modules for processing OTEL span attributes
+//! Helper functions for extracting values from JSON
 
-pub mod input_output;
-pub mod metadata;
-pub mod model;
-pub mod observation_type;
-pub mod parameters;
-pub mod prompt;
-pub mod usage;
-pub mod utils;
+use config::utils::json;
 
-pub use input_output::InputOutputExtractor;
-pub use metadata::MetadataExtractor;
-pub use model::ModelExtractor;
-pub use observation_type::{ObservationType, ScopeInfo, map_to_observation_type};
-pub use parameters::ParametersExtractor;
-pub use prompt::PromptExtractor;
-pub use usage::UsageExtractor;
+/// Helper function to extract i64 from JSON value (handles both integer and string)
+pub fn extract_i64(value: &json::Value) -> Option<i64> {
+    value
+        .as_i64()
+        .or_else(|| value.as_str().and_then(|s| s.parse::<i64>().ok()))
+}
+
+/// Helper function to extract f64 from JSON value (handles both float and string)
+pub fn extract_f64(value: &json::Value) -> Option<f64> {
+    value
+        .as_f64()
+        .or_else(|| value.as_str().and_then(|s| s.parse::<f64>().ok()))
+}

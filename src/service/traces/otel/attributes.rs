@@ -44,20 +44,11 @@ impl O2Attributes {
     /// Session identifier
     pub const SESSION_ID: &'static str = "_o2_session_id";
 
-    /// Environment (e.g., "production", "staging", "development")
-    pub const ENVIRONMENT: &'static str = "_o2_environment";
-
-    /// Tags associated with the span
-    pub const TAGS: &'static str = "_o2_tags";
-
     /// Name of the prompt template used
     pub const PROMPT_NAME: &'static str = "_o2_prompt_name";
 
     /// Version of the prompt template
     pub const PROMPT_VERSION: &'static str = "_o2_prompt_version";
-
-    /// Completion start time (time to first token)
-    pub const COMPLETION_START_TIME: &'static str = "_o2_completion_start_time";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -122,10 +113,6 @@ impl OtelAttributes {
     pub const USER_ID: &'static str = "user.id";
     pub const SESSION_ID: &'static str = "session.id";
 
-    // Deployment
-    pub const DEPLOYMENT_ENVIRONMENT_NAME: &'static str = "deployment.environment.name";
-    pub const DEPLOYMENT_ENVIRONMENT: &'static str = "deployment.environment";
-
     // Service
     pub const SERVICE_NAME: &'static str = "service.name";
     pub const SERVICE_VERSION: &'static str = "service.version";
@@ -183,9 +170,6 @@ impl VercelAiSdkAttributes {
     pub const TELEMETRY_METADATA_TAGS: &'static str = "ai.telemetry.metadata.tags";
     pub const TELEMETRY_FUNCTION_ID: &'static str = "ai.telemetry.functionId";
     pub const OPERATION_ID: &'static str = "ai.operationId";
-
-    // AI Stream (legacy)
-    pub const STREAM_MS_TO_FIRST_CHUNK: &'static str = "ai.stream.msToFirstChunk";
 }
 
 /// OpenInference Attributes
@@ -286,8 +270,6 @@ mod tests {
         assert_eq!(O2Attributes::COST_DETAILS, "_o2_cost_details");
         assert_eq!(O2Attributes::USER_ID, "_o2_user_id");
         assert_eq!(O2Attributes::SESSION_ID, "_o2_session_id");
-        assert_eq!(O2Attributes::ENVIRONMENT, "_o2_environment");
-        assert_eq!(O2Attributes::TAGS, "_o2_tags");
         assert_eq!(O2Attributes::PROMPT_NAME, "_o2_prompt_name");
         assert_eq!(O2Attributes::PROMPT_VERSION, "_o2_prompt_version");
     }
