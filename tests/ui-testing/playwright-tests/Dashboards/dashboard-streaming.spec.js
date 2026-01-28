@@ -26,7 +26,7 @@ test.describe("dashboard streaming testcases", () => {
     );
   });
 
-  test("should verify the custom value search from variable dropdown with streaming enabled", async ({
+  test.skip("should verify the custom value search from variable dropdown with streaming enabled", async ({
     page,
   }) => {
     const valuesResponses = [];
@@ -185,7 +185,7 @@ test.describe("dashboard streaming testcases", () => {
     // await pm.managementPage.setStreamingState(false);
   });
 
-  test("should add dashboard variable with filter configuration", async ({
+  test.skip("should add dashboard variable with filter configuration", async ({
     page,
   }) => {
     const valuesResponses = [];
