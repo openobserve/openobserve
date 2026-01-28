@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use super::super::attributes::{GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes};
-use crate::service::traces::otel::attributes::LLMAttributes;
+use crate::service::traces::otel::attributes::{FrameworkAttributes, LLMAttributes};
 
 /// Observation types supported by OpenObserve
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,7 +34,9 @@ pub enum ObservationType {
     Tool,
     Chain,
     Retriever,
+    Task,
     Evaluator,
+    Workflow,
     Embedding,
     Rerank,
     Guardrail,
@@ -50,7 +52,9 @@ impl ObservationType {
             ObservationType::Tool => "TOOL",
             ObservationType::Chain => "CHAIN",
             ObservationType::Retriever => "RETRIEVER",
+            ObservationType::Task => "TASK",
             ObservationType::Evaluator => "EVALUATOR",
+            ObservationType::Workflow => "WORKFLOW",
             ObservationType::Embedding => "EMBEDDING",
             ObservationType::Rerank => "RERANK",
             ObservationType::Guardrail => "GUARDRAIL",
@@ -100,6 +104,20 @@ pub fn map_to_observation_type(
             "embedding" => return ObservationType::Embedding,
             "rerank" => return ObservationType::Rerank,
             "unknown" => {} // Fall through to other detection methods
+            _ => {}
+        }
+    }
+
+    // TraceLoop Span Kind
+    if let Some(span_kind) = attributes
+        .get(FrameworkAttributes::TRACELOOP_SPAN_KIND)
+        .and_then(|v| v.as_str())
+    {
+        match span_kind.to_lowercase().as_str() {
+            "workflow" => return ObservationType::Workflow,
+            "task" => return ObservationType::Task,
+            "agent" => return ObservationType::Agent,
+            "tool" => return ObservationType::Tool,
             _ => {}
         }
     }

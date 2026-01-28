@@ -212,6 +212,7 @@ impl FrameworkAttributes {
     // TraceLoop
     pub const TRACELOOP_ENTITY_INPUT: &'static str = "traceloop.entity.input";
     pub const TRACELOOP_ENTITY_OUTPUT: &'static str = "traceloop.entity.output";
+    pub const TRACELOOP_SPAN_KIND: &'static str = "traceloop.span.kind";
 
     // SmolAgents
     pub const INPUT_VALUE: &'static str = "input.value";
