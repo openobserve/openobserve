@@ -1432,9 +1432,16 @@ export default defineComponent({
       if (!incidentDetails.value) {
         return { startTime: 0, endTime: 0 };
       }
+
+      // Expand time range to ensure we capture relevant telemetry
+      // If first_alert_at == last_alert_at (single alert), expand ±15 minutes
+      const FIFTEEN_MINUTES_MICROS = 15 * 60 * 1000000;
+      const startTime = incidentDetails.value.first_alert_at - FIFTEEN_MINUTES_MICROS;
+      const endTime = incidentDetails.value.last_alert_at + FIFTEEN_MINUTES_MICROS;
+
       return {
-        startTime: incidentDetails.value.first_alert_at,
-        endTime: incidentDetails.value.last_alert_at,
+        startTime,
+        endTime,
       };
     });
 

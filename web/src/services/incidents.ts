@@ -98,7 +98,7 @@ export interface IncidentCorrelatedStreams {
   logStreams: StreamInfo[];
   metricStreams: StreamInfo[];
   traceStreams: StreamInfo[];
-  correlationData: CorrelationResponse;
+  correlationData: CorrelationResponse | null;
 }
 
 // Service Graph visualization types
@@ -219,6 +219,19 @@ const incidents = {
 
     const response = await serviceStreamsApi.correlate(org_identifier, request);
     const correlationData = response.data;
+
+    // Handle null response when no service is found
+    if (!correlationData) {
+      return {
+        serviceName: "Unknown Service",
+        matchedDimensions: {},
+        additionalDimensions: dimensions,
+        logStreams: [],
+        metricStreams: [],
+        traceStreams: [],
+        correlationData: null,
+      };
+    }
 
     return {
       serviceName: correlationData.service_name,
