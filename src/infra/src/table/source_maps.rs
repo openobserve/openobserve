@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait};
+use sea_orm::{
+    ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait, prelude::Expr,
+};
 use serde::{Deserialize, Serialize};
 
 use super::{entity::source_maps::*, get_lock};
@@ -154,13 +156,13 @@ pub async fn delete_group(
     Ok(())
 }
 
-pub async fn get_sourcemap_file_name(
+pub async fn get_sourcemap_file(
     org: &str,
     source_file: &str,
     service: &Option<String>,
     env: &Option<String>,
     version: &Option<String>,
-) -> Result<Option<String>, errors::Error> {
+) -> Result<Option<SourceMap>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;
 
@@ -180,7 +182,7 @@ pub async fn get_sourcemap_file_name(
         stmt = stmt.filter(Column::Version.eq(v));
     }
 
-    let res = stmt.one(client).await?.map(|model| model.file_store_id);
+    let res = stmt.one(client).await?.map(|model| model.into());
     Ok(res)
 }
 
@@ -214,4 +216,19 @@ pub async fn list_files(
         .map(|model| model.into())
         .collect();
     Ok(res)
+}
+
+pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    Entity::update_many()
+        .filter(Column::Org.eq(entry.org))
+        .filter(Column::FileStoreId.eq(entry.file_store_id))
+        .filter(Column::SourceMapFileName.eq(entry.source_map_file_name))
+        .col_expr(Column::Cluster, Expr::value(entry.cluster))
+        .exec(client)
+        .await?;
+
+    Ok(())
 }
