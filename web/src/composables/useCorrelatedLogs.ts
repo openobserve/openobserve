@@ -368,7 +368,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
           traceId: traceId,
           org_id: store.state.selectedOrganization.identifier,
           pageType: 'logs',
-          searchType: 'dashboards',
+          searchType: 'UI',
         },
         {
           data: (_data: any, response: any) => {
