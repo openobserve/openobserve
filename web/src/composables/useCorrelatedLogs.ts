@@ -15,12 +15,11 @@
 
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
-import streamingSearch from "@/services/streaming_search";
-import type { StreamInfo } from "@/services/service_streams";
+import type { StreamInfo, SemanticFieldGroup } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import type { AxiosRequestConfig, CancelTokenSource } from "axios";
-import axios from "axios";
 import { generateTraceContext } from "@/utils/zincutils";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import useHttpStreamingSearch from "@/composables/useStreamingSearch";
 
 export interface TimeRange {
   startTime: number;
@@ -65,6 +64,8 @@ export interface SearchResponse {
  */
 export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const store = useStore();
+  const { loadSemanticGroups } = useServiceCorrelation();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreamingSearch();
 
   // State
   const loading = ref(false);
@@ -86,8 +87,11 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const currentPage = ref(1);
   const pageSize = ref(100);
 
-  // Cancel token for request cancellation
-  let cancelTokenSource: CancelTokenSource | null = null;
+  // Current trace ID for request cancellation
+  let currentTraceId: string | null = null;
+
+  // Cache for semantic patterns (loaded once per component instance)
+  let semanticPatternsCache: Record<string, string[]> | null = null;
 
   // Computed
   const hasResults = computed(() => searchResults.value.length > 0);
@@ -111,16 +115,124 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   });
 
   /**
+   * Get default semantic patterns as fallback
+   * These are common patterns that work for standard K8s/AWS/GCP setups
+   */
+  const getDefaultSemanticPatterns = (): Record<string, string[]> => {
+    return {
+      'k8s-namespace': ['k8s_namespace_name', 'k8s.namespace.name', 'namespace'],
+      'k8s-deployment': ['k8s_deployment_name', 'k8s.deployment.name', 'deployment'],
+      'k8s-pod': ['k8s_pod_name', 'k8s.pod.name', 'pod_name', 'pod'],
+      'k8s-container': ['k8s_container_name', 'k8s.container.name', 'container_name', 'container'],
+      'k8s-statefulset': ['k8s_statefulset_name', 'k8s.statefulset.name', 'statefulset'],
+      'k8s-daemonset': ['k8s_daemonset_name', 'k8s.daemonset.name', 'daemonset'],
+      'k8s-replicaset': ['k8s_replicaset_name', 'k8s.replicaset.name', 'replicaset'],
+      'k8s-job': ['k8s_job_name', 'k8s.job.name', 'job'],
+      'k8s-cronjob': ['k8s_cronjob_name', 'k8s.cronjob.name', 'cronjob'],
+      'k8s-node': ['k8s_node_name', 'k8s.node.name', 'node_name', 'node'],
+      'k8s-cluster': ['k8s_cluster_name', 'k8s.cluster.name', 'cluster'],
+      'host-name': ['host_name', 'host.name', 'hostname'],
+      'cloud-region': ['cloud_region', 'cloud.region', 'region'],
+      'cloud-availability-zone': ['cloud_availability_zone', 'cloud.availability_zone', 'availability_zone', 'zone'],
+      'container-name': ['container_name', 'container.name'],
+      'container-id': ['container_id', 'container.id'],
+      'service-name': ['service_name', 'service.name', 'service', 'svc'],
+    };
+  };
+
+  /**
+   * Load semantic patterns from backend or use defaults
+   * Converts SemanticFieldGroup[] to pattern format: { id: string[] }
+   *
+   * @returns Promise resolving to semantic patterns
+   */
+  const loadSemanticPatterns = async (): Promise<Record<string, string[]>> => {
+    // Return cached patterns if available
+    if (semanticPatternsCache) {
+      console.log('[useCorrelatedLogs] Using cached semantic patterns');
+      return semanticPatternsCache;
+    }
+
+    try {
+      // Load semantic groups from backend (uses global cache in useServiceCorrelation)
+      console.log('[useCorrelatedLogs] Loading semantic groups from backend...');
+      const semanticGroups: SemanticFieldGroup[] = await loadSemanticGroups();
+
+      if (semanticGroups && semanticGroups.length > 0) {
+        // Convert SemanticFieldGroup[] to pattern format
+        const patterns: Record<string, string[]> = {};
+        for (const group of semanticGroups) {
+          patterns[group.id] = group.fields;
+        }
+
+        console.log(`[useCorrelatedLogs] Loaded ${Object.keys(patterns).length} semantic patterns from backend`);
+        semanticPatternsCache = patterns;
+        return patterns;
+      } else {
+        console.warn('[useCorrelatedLogs] No semantic groups returned from backend, using defaults');
+        const defaults = getDefaultSemanticPatterns();
+        semanticPatternsCache = defaults;
+        return defaults;
+      }
+    } catch (err) {
+      console.error('[useCorrelatedLogs] Failed to load semantic groups, using defaults:', err);
+      const defaults = getDefaultSemanticPatterns();
+      semanticPatternsCache = defaults;
+      return defaults;
+    }
+  };
+
+  /**
+   * Create reverse mapping from semantic dimension names to actual field names
+   * This is critical for building SQL queries with correct field names
+   *
+   * Example:
+   * - Semantic name: "k8s-statefulset"
+   * - Actual field names: "k8s_statefulset_name", "k8s.statefulset.name"
+   * - We check availableDimensions to find which actual field name exists
+   *
+   * @returns Map of semantic dimension name → actual field name
+   */
+  const getSemanticToFieldMapping = async (): Promise<Record<string, string>> => {
+    const mapping: Record<string, string> = {};
+
+    // If no availableDimensions provided, we can't do reverse mapping
+    if (!props.availableDimensions) {
+      console.warn('[useCorrelatedLogs] No availableDimensions provided for field name mapping');
+      return mapping;
+    }
+
+    // Load semantic patterns (from backend or defaults)
+    const semanticPatterns = await loadSemanticPatterns();
+
+    // For each semantic dimension, find the first matching field name in availableDimensions
+    for (const [semanticName, possibleFieldNames] of Object.entries(semanticPatterns)) {
+      for (const fieldName of possibleFieldNames) {
+        if (fieldName in props.availableDimensions) {
+          mapping[semanticName] = fieldName;
+          console.log(`[useCorrelatedLogs] Mapped semantic dimension "${semanticName}" → field "${fieldName}"`);
+          break;
+        }
+      }
+    }
+
+    return mapping;
+  };
+
+  /**
    * Build SQL query with proper escaping for special characters and SQL injection prevention
    * Note: Time range is handled by the search API's start_time/end_time parameters, not in SQL WHERE clause
    */
-  const buildSQLQuery = (
+  const buildSQLQuery = async (
     streamName: string,
     filters: Record<string, string>,
-    timeRange: TimeRange,
+    _timeRange: TimeRange, // Unused: time range handled by API parameters
     limit: number = 100
-  ): string => {
+  ): Promise<string> => {
     const conditions: string[] = [];
+
+    // Get mapping from semantic dimension names to actual field names (async now)
+    const semanticToFieldMap = await getSemanticToFieldMapping();
 
     // Add dimension filters
     for (const [field, value] of Object.entries(filters)) {
@@ -139,8 +251,19 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         continue;
       }
 
-      // Quote field names if they contain special characters
-      const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
+      // Map semantic dimension name to actual field name if available
+      // This is the critical fix: convert "k8s-statefulset" → "k8s_statefulset_name"
+      const actualFieldName = semanticToFieldMap[field] || field;
+
+      // Log the mapping for debugging
+      if (semanticToFieldMap[field]) {
+        console.log(`[useCorrelatedLogs] Using field "${actualFieldName}" for semantic dimension "${field}"`);
+      }
+
+      // Quote field names if they contain special characters (dots, hyphens, etc.)
+      const quotedField = /[^a-zA-Z0-9_]/.test(actualFieldName)
+        ? `"${actualFieldName.replace(/"/g, '""')}"`
+        : actualFieldName;
 
       // Escape single quotes in values
       const escapedValue = String(value).replace(/'/g, "''");
@@ -148,26 +271,31 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       conditions.push(`${quotedField} = '${escapedValue}'`);
     }
 
-    // Quote stream name if it contains special characters
-    const quotedStream = /[^a-zA-Z0-9_]/.test(streamName) ? `"${streamName.replace(/"/g, '""')}"` : streamName;
+    // Always quote stream name to match dashboard behavior
+    // This ensures consistency with working queries
+    const quotedStream = `"${streamName.replace(/"/g, '""')}"`;
 
     // Build WHERE clause
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    return `SELECT * FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`;
+    const sqlQuery = `SELECT * FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`;
+
+    console.log('[useCorrelatedLogs] Generated SQL query:', sqlQuery);
+
+    return sqlQuery;
   };
 
   /**
-   * Fetch correlated logs from search API
+   * Fetch correlated logs from search API using HTTP streaming
    */
   const fetchCorrelatedLogs = async () => {
     // Cancel previous request if exists
-    if (cancelTokenSource) {
-      cancelTokenSource.cancel('New request initiated');
+    if (currentTraceId) {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: currentTraceId,
+        org_id: store.state.selectedOrganization.identifier,
+      });
     }
-
-    // Create new cancel token
-    cancelTokenSource = axios.CancelToken.source();
 
     // Validate stream name
     if (!primaryStream.value) {
@@ -189,10 +317,11 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
     loading.value = true;
     error.value = null;
+    searchResults.value = []; // Clear previous results
 
     try {
-      // Build SQL query
-      const sqlQuery = buildSQLQuery(
+      // Build SQL query (now async to support dynamic semantic group loading)
+      const sqlQuery = await buildSQLQuery(
         primaryStream.value,
         currentFilters.value,
         currentTimeRange.value,
@@ -202,29 +331,28 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       console.log('[useCorrelatedLogs] SQL Query:', sqlQuery);
 
       // Prepare search query
-      // Note: timestamps in timeRange are in microseconds, need to convert to milliseconds for the API
-      const startTimeMs = Math.floor(currentTimeRange.value.startTime / 1000);
-      const endTimeMs = Math.floor(currentTimeRange.value.endTime / 1000);
+      // Note: timestamps in timeRange are in microseconds
+      // API expects microseconds, so NO conversion needed
+      const startTimeMicros = currentTimeRange.value.startTime;
+      const endTimeMicros = currentTimeRange.value.endTime;
 
-      console.log('[useCorrelatedLogs] Time range conversion:', {
-        startTimeMicros: currentTimeRange.value.startTime,
-        endTimeMicros: currentTimeRange.value.endTime,
-        startTimeMs,
-        endTimeMs
+      console.log('[useCorrelatedLogs] Time range (microseconds):', {
+        startTimeMicros,
+        endTimeMicros
       });
 
       // Generate trace context for streaming
       const traceContext = generateTraceContext();
       const traceId = traceContext?.traceId || '';
+      currentTraceId = traceId;
 
       // Build search query - clean structure matching logs page format
       const searchQuery = {
         query: {
           sql: sqlQuery,
           sql_mode: 'full',
-          track_total_hits: true,
-          start_time: startTimeMs,
-          end_time: endTimeMs,
+          start_time: startTimeMicros,
+          end_time: endTimeMicros,
           size: pageSize.value,
         },
       };
@@ -232,42 +360,87 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       console.log('[useCorrelatedLogs] Search query:', JSON.stringify(searchQuery, null, 2));
       console.log('[useCorrelatedLogs] Trace ID:', traceId);
 
-      // Execute streaming search
-      const response = await streamingSearch.search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: searchQuery,
-        page_type: 'logs',
-        search_type: 'dashboards',
-        traceId: traceId,
-      });
+      // Execute streaming search with handlers
+      await fetchQueryDataWithHttpStream(
+        {
+          queryReq: searchQuery,
+          type: 'search',
+          traceId: traceId,
+          org_id: store.state.selectedOrganization.identifier,
+          pageType: 'logs',
+          searchType: 'dashboards',
+        },
+        {
+          data: (_data: any, response: any) => {
+            console.log('[useCorrelatedLogs] ===== Stream data event =====');
+            console.log('[useCorrelatedLogs] Event type:', response.type);
+            console.log('[useCorrelatedLogs] Full response:', JSON.stringify(response, null, 2));
 
-      console.log('[useCorrelatedLogs] Response:', response);
+            // Handle metadata event
+            if (response.type === 'search_response_metadata') {
+              const results = response.content?.results;
+              if (results) {
+                totalHits.value = results.total || 0;
+                took.value = results.took || 0;
+                console.log(`[useCorrelatedLogs] Metadata: ${totalHits.value} total hits, ${took.value}ms`);
+              }
+            }
 
-      // Update state with results
-      searchResults.value = response.data?.hits || [];
-      totalHits.value = response.data?.total?.value || response.data?.total || 0;
-      took.value = response.data?.took || 0;
+            // Handle hits event (this has the actual data)
+            // Raw backend response: {"hits": [{...}, {...}]}
+            // After wsMapper: response.content.results = {"hits": [{...}, {...}]}
+            if (response.type === 'search_response_hits') {
+              console.log('[useCorrelatedLogs] Hits response.content:', response.content);
+              console.log('[useCorrelatedLogs] Hits response.content.results:', response.content?.results);
 
-      console.log(`[useCorrelatedLogs] Found ${totalHits.value} logs in ${took.value}ms`, searchResults.value);
+              // The results object IS the hits container {"hits": [...]}
+              const resultsObj = response.content?.results;
+              const hits = resultsObj?.hits || [];
+
+              console.log(`[useCorrelatedLogs] Extracted hits array:`, hits);
+              console.log(`[useCorrelatedLogs] Received ${hits.length} hits`);
+
+              // Append hits (streaming can send multiple chunks)
+              if (hits.length > 0) {
+                searchResults.value.push(...hits);
+                console.log(`[useCorrelatedLogs] Total accumulated: ${searchResults.value.length} logs`);
+              } else {
+                console.warn('[useCorrelatedLogs] No hits found in response!');
+              }
+            }
+          },
+          error: (_data: any, response: any) => {
+            console.error('[useCorrelatedLogs] Stream error:', response);
+            error.value = response.content?.message || 'Failed to fetch correlated logs';
+            loading.value = false;
+            searchResults.value = [];
+            totalHits.value = 0;
+          },
+          complete: (_data: any) => {
+            console.log('[useCorrelatedLogs] ===== Stream complete =====');
+            console.log('[useCorrelatedLogs] Final searchResults count:', searchResults.value.length);
+            console.log('[useCorrelatedLogs] Final totalHits:', totalHits.value);
+            console.log('[useCorrelatedLogs] hasResults:', hasResults.value);
+            loading.value = false;
+            currentTraceId = null;
+          },
+          reset: (_data: any, response: any) => {
+            console.log('[useCorrelatedLogs] Stream reset:', response);
+          },
+        }
+      );
     } catch (e: any) {
-      // Handle cancellation (don't show error)
-      if (axios.isCancel(e)) {
-        console.log('[useCorrelatedLogs] Request cancelled');
-        return;
-      }
-
       console.error('[useCorrelatedLogs] Failed to fetch logs:', e);
       console.error('[useCorrelatedLogs] Error details:', {
         message: e.message,
-        response: e.response?.data,
-        status: e.response?.status
+        response: e?.response?.data,
+        status: e?.response?.status
       });
-      error.value = e.response?.data?.message || e.message || 'Failed to fetch correlated logs';
+      error.value = e?.response?.data?.message || e.message || 'Failed to fetch correlated logs';
 
       // Clear results on error
       searchResults.value = [];
       totalHits.value = 0;
-    } finally {
       loading.value = false;
     }
   };
@@ -365,8 +538,11 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
   // Cleanup on unmount
   onUnmounted(() => {
-    if (cancelTokenSource) {
-      cancelTokenSource.cancel('Component unmounted');
+    if (currentTraceId) {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: currentTraceId,
+        org_id: store.state.selectedOrganization.identifier,
+      });
     }
 
     // Clear large datasets to free memory
