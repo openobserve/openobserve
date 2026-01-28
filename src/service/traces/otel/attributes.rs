@@ -18,46 +18,46 @@ pub struct LlmAttributes;
 
 impl LlmAttributes {
     /// Type of LLM observation (e.g., "generation", "chat", "embedding")
-    pub const OBSERVATION_TYPE: &'static str = "llm_observation_type";
+    pub const OBSERVATION_TYPE: &'static str = "_o2_observation_type";
 
     /// Name of the LLM model used
-    pub const MODEL_NAME: &'static str = "llm_model_name";
+    pub const MODEL_NAME: &'static str = "_o2_model_name";
 
     /// Input to the LLM (prompts, messages, tool arguments)
-    pub const INPUT: &'static str = "llm_input";
+    pub const INPUT: &'static str = "_o2_input";
 
     /// Output from the LLM (responses, completions, tool results)
-    pub const OUTPUT: &'static str = "llm_output";
+    pub const OUTPUT: &'static str = "_o2_output";
 
     /// Model parameters used (temperature, max_tokens, etc.)
-    pub const MODEL_PARAMETERS: &'static str = "llm_model_parameters";
+    pub const MODEL_PARAMETERS: &'static str = "_o2_model_parameters";
 
     /// Token usage details (input, output, total counts)
-    pub const USAGE_DETAILS: &'static str = "llm_usage_details";
+    pub const USAGE_DETAILS: &'static str = "_o2_usage_details";
 
     /// Cost details for the LLM call
-    pub const COST_DETAILS: &'static str = "llm_cost_details";
+    pub const COST_DETAILS: &'static str = "_o2_cost_details";
 
     /// User identifier
-    pub const USER_ID: &'static str = "llm_user_id";
+    pub const USER_ID: &'static str = "_o2_user_id";
 
     /// Session identifier
-    pub const SESSION_ID: &'static str = "llm_session_id";
+    pub const SESSION_ID: &'static str = "_o2_session_id";
 
     /// Environment (e.g., "production", "staging", "development")
-    pub const ENVIRONMENT: &'static str = "llm_environment";
+    pub const ENVIRONMENT: &'static str = "_o2_environment";
 
     /// Tags associated with the span
-    pub const TAGS: &'static str = "llm_tags";
+    pub const TAGS: &'static str = "_o2_tags";
 
     /// Name of the prompt template used
-    pub const PROMPT_NAME: &'static str = "llm_prompt_name";
+    pub const PROMPT_NAME: &'static str = "_o2_prompt_name";
 
     /// Version of the prompt template
-    pub const PROMPT_VERSION: &'static str = "llm_prompt_version";
+    pub const PROMPT_VERSION: &'static str = "_o2_prompt_version";
 
     /// Completion start time (time to first token)
-    pub const COMPLETION_START_TIME: &'static str = "llm_completion_start_time";
+    pub const COMPLETION_START_TIME: &'static str = "_o2_completion_start_time";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -269,18 +269,18 @@ mod tests {
 
     #[test]
     fn test_llm_enriched_attributes() {
-        assert_eq!(LlmAttributes::OBSERVATION_TYPE, "llm_observation_type");
-        assert_eq!(LlmAttributes::MODEL_NAME, "llm_model_name");
-        assert_eq!(LlmAttributes::INPUT, "llm_input");
-        assert_eq!(LlmAttributes::OUTPUT, "llm_output");
-        assert_eq!(LlmAttributes::MODEL_PARAMETERS, "llm_model_parameters");
-        assert_eq!(LlmAttributes::USAGE_DETAILS, "llm_usage_details");
-        assert_eq!(LlmAttributes::COST_DETAILS, "llm_cost_details");
-        assert_eq!(LlmAttributes::USER_ID, "llm_user_id");
-        assert_eq!(LlmAttributes::SESSION_ID, "llm_session_id");
-        assert_eq!(LlmAttributes::ENVIRONMENT, "llm_environment");
-        assert_eq!(LlmAttributes::TAGS, "llm_tags");
-        assert_eq!(LlmAttributes::PROMPT_NAME, "llm_prompt_name");
-        assert_eq!(LlmAttributes::PROMPT_VERSION, "llm_prompt_version");
+        assert_eq!(LlmAttributes::OBSERVATION_TYPE, "_o2_observation_type");
+        assert_eq!(LlmAttributes::MODEL_NAME, "_o2_model_name");
+        assert_eq!(LlmAttributes::INPUT, "_o2_input");
+        assert_eq!(LlmAttributes::OUTPUT, "_o2_output");
+        assert_eq!(LlmAttributes::MODEL_PARAMETERS, "_o2_model_parameters");
+        assert_eq!(LlmAttributes::USAGE_DETAILS, "_o2_usage_details");
+        assert_eq!(LlmAttributes::COST_DETAILS, "_o2_cost_details");
+        assert_eq!(LlmAttributes::USER_ID, "_o2_user_id");
+        assert_eq!(LlmAttributes::SESSION_ID, "_o2_session_id");
+        assert_eq!(LlmAttributes::ENVIRONMENT, "_o2_environment");
+        assert_eq!(LlmAttributes::TAGS, "_o2_tags");
+        assert_eq!(LlmAttributes::PROMPT_NAME, "_o2_prompt_name");
+        assert_eq!(LlmAttributes::PROMPT_VERSION, "_o2_prompt_version");
     }
 }
