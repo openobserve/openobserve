@@ -329,6 +329,18 @@ watch(
   { deep: true },
 );
 
+// Pending dimensions - for the apply button pattern
+const pendingFilters = ref<Record<string, string>>({ ...currentFilters.value });
+
+// Watch currentFilters to sync pendingFilters when filters are applied or reset
+watch(
+  currentFilters,
+  (newFilters) => {
+    pendingFilters.value = { ...newFilters };
+  },
+  { deep: true },
+);
+
 // Computed
 const themeClass = computed(() =>
   store.state.theme === "dark" ? "dark-theme" : "light-theme",
@@ -344,6 +356,32 @@ const hideViewRelatedButton = computed(
 const hideSearchTermActions = computed(
   () => props.hideSearchTermActions ?? false,
 );
+
+// Combined dimensions for DimensionFiltersBar (merges matched and additional)
+const allDimensions = computed(() => ({
+  ...matchedDimensions.value,
+  ...additionalDimensions.value,
+}));
+
+// Track which dimensions are unstable (for UI styling)
+const unstableDimensionKeys = computed(
+  () => new Set(Object.keys(additionalDimensions.value)),
+);
+
+// Track if there are pending changes that haven't been applied
+const hasPendingChanges = computed(() => {
+  const current = currentFilters.value;
+  const pending = pendingFilters.value;
+
+  const allKeys = new Set([...Object.keys(current), ...Object.keys(pending)]);
+  for (const key of allKeys) {
+    if (current[key] !== pending[key]) {
+      return true;
+    }
+  }
+
+  return false;
+});
 
 // Combined dimensions for DimensionFiltersBar (merges matched and additional)
 const allDimensions = computed(() => ({
