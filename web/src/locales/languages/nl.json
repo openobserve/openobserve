@@ -305,7 +305,8 @@
     "hide": "Verstoppen",
     "show": "Laat zien",
     "editor": "Redacteur",
-    "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder."
+    "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
+    "showHideColumns": "Kolommen tonen/verbergen"
   },
   "menu": {
     "home": "Home",

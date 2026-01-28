@@ -305,7 +305,8 @@
     "hide": "Masquer",
     "show": "Afficher",
     "editor": "Rédacteur",
-    "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur."
+    "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
+    "showHideColumns": "Afficher/masquer les colonnes"
   },
   "menu": {
     "home": "Accueil",

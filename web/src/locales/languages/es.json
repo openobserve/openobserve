@@ -305,7 +305,8 @@
     "hide": "Esconder",
     "show": "Mostrar",
     "editor": "Redactor",
-    "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL."
+    "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL.",
+    "showHideColumns": "Mostrar/ocultar columnas"
   },
   "menu": {
     "home": "Inicio",

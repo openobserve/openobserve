@@ -305,7 +305,8 @@
     "hide": "Gizle",
     "show": "Göster",
     "editor": "Editör",
-    "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır."
+    "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır.",
+    "showHideColumns": "Sütunları Göster/Gizle"
   },
   "menu": {
     "home": "Ana Sayfa",

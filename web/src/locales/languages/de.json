@@ -305,7 +305,8 @@
     "hide": "Verstecken",
     "show": "Zeige",
     "editor": "Redakteur",
-    "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde."
+    "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
+    "showHideColumns": "Spalten ein-/ausblenden"
   },
   "menu": {
     "home": "Startseite",
