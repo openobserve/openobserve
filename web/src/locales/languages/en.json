@@ -2627,7 +2627,7 @@
     "clickToLoadTraces": "Click to load correlated traces",
     "logs": {
       "title": "Correlated Logs",
-      "filters": "Filters",
+      "filtersLabel": "Filters",
       "loading": "Loading correlated logs...",
       "loadingDetails": "Fetching logs from correlated streams...",
       "error": "Failed to Load Logs",
