@@ -156,6 +156,7 @@
     "toggleFunctionLabel": "Function",
     "labelWrap": "Wrap Content",
     "messageWrapContent": "Wrap Table Content",
+    "showHideColumns": "Show/Hide Columns",
     "functionPlaceholder": "Saved Functions",
     "functionMessage": "Press Tab or Enter to apply a new function name.",
     "saveFunctionLabel": "Save Function",
