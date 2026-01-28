@@ -1,12 +1,22 @@
 use std::io::Read;
 
 use anyhow::Context;
+use config::get_config;
 use hashbrown::{HashMap, HashSet};
 use infra::{
     storage,
     table::source_maps::{FileType, SourceMap},
 };
 use serde::Serialize;
+#[cfg(feature = "enterprise")]
+use {
+    infra::client::grpc::make_grpc_search_client,
+    infra::errors::ErrorCodes,
+    o2_enterprise::enterprise::{
+        common::config::get_config as get_o2_config,
+        super_cluster::search::get_cluster_node_by_name,
+    },
+};
 
 use super::db::sourcemaps;
 
@@ -79,6 +89,8 @@ pub async fn process_zip(
     version: Option<String>,
     file_data: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+
     // Attempt to read the uploaded data as a ZIP file
     let mut archive = match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
         Ok(archive) => archive,
@@ -164,7 +176,7 @@ pub async fn process_zip(
             source_map_file_name: smap,
             file_store_id: storage_name,
             file_type: FileType::SourceMap,
-            is_local: true,
+            cluster: config::get_cluster_name(),
             created_at: now,
         };
         source_maps.push(sourcemap);
@@ -229,14 +241,104 @@ fn parse_line(line: &str) -> Result<ParsedLine, ()> {
 async fn get_sourcemap_file_info(
     minified_file: &str,
     f: &Filter,
-) -> Result<Option<String>, anyhow::Error> {
+) -> Result<Option<SourceMap>, anyhow::Error> {
     let service = &f.service;
     let env = &f.env;
     let version = &f.version;
 
-    let id =
+    let info =
         sourcemaps::get_sourcemap_file(&f.org_id, minified_file, service, env, version).await?;
-    Ok(id)
+    Ok(info)
+}
+
+// this function does not return error, as we do not have retry.
+// if something fails in this attempt which is a temporary failure
+// when that sourcemap is fetched again, this will be retried
+async fn store_file_locally(mut smap_info: SourceMap, file_data: bytes::Bytes) {
+    let path = get_file_path(&smap_info.org, &smap_info.file_store_id);
+    if let Err(e) = storage::put("", &path, file_data).await {
+        log::error!(
+            "error storing sourcemap file {}/{} at path {path} in local cluster : {e}",
+            smap_info.org,
+            smap_info.source_map_file_name,
+        );
+        return;
+    }
+    let org = smap_info.org.clone();
+    let fname = smap_info.source_map_file_name.clone();
+    smap_info.cluster = config::get_cluster_name();
+    if let Err(e) = sourcemaps::update_file_cluster(smap_info).await {
+        log::error!(
+            "error updating db to set local cluster in sourcemap for file {org}/{fname} : {e}"
+        );
+    }
+}
+
+async fn get_sourcemap_file_data(
+    org_id: &str,
+    smap_file: &SourceMap,
+) -> Result<bytes::Bytes, anyhow::Error> {
+    let path = get_file_path(&org_id, &smap_file.file_store_id);
+    if smap_file.cluster == config::get_cluster_name() {
+        let get_res = storage::get("", &path).await?;
+        let bytes = get_res.bytes().await?;
+        return Ok(bytes);
+    }
+
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let trace_id = config::ider::generate_trace_id();
+        let node = get_cluster_node_by_name(&smap_file.cluster).await?;
+        let file_path = path.to_string();
+        let org_id = org_id.to_string();
+        let original_name = smap_file.source_map_file_name.clone();
+        let cluster = smap_file.cluster.to_string();
+        let task = tokio::task::spawn(async move {
+            let mut request = tonic::Request::new(proto::cluster_rpc::GetSourcemapFileRequest {
+                org_id: org_id.clone(),
+                path: file_path,
+                original_name,
+            });
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+            match client.get_sourcemap_file(request).await {
+                Ok(res) => {
+                    let response = res.into_inner();
+                    Ok(response.file_data)
+                }
+                Err(err) => {
+                    log::error!(
+                        "[trace_id: {trace_id}] error getting sourcemap file from cluster {cluster} node {} for org_id {org_id} path {path} : {err:?}",
+                        &node.get_grpc_addr(),
+                    );
+                    let err = ErrorCodes::from_json(err.message())?;
+                    Err(anyhow::anyhow!(
+                        "error getting file from other cluster : {err}",
+                    ))
+                }
+            }
+        });
+        let response = task
+            .await
+            .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;
+        match response {
+            Ok(v) => {
+                let bytes = bytes::Bytes::from(v);
+                let smap_copy = smap_file.clone();
+                let bytes_copy = bytes.clone();
+                tokio::spawn(async { store_file_locally(smap_copy, bytes_copy).await });
+                return Ok(bytes);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    // if super cluster is not enabled AND cluster name is not same
+    // then we cannot do anything, so this is the default fallback to error
+    Err(anyhow::anyhow!(
+        "unexpected cluster name {} and super cluster not enabled",
+        smap_file.cluster
+    ))
 }
 
 async fn resolve_stack(
@@ -248,7 +350,7 @@ async fn resolve_stack(
     let smap_line = parsed.line.saturating_sub(1);
     let smap_col = parsed.col.saturating_sub(1);
 
-    let Some(smap_file_name) = get_sourcemap_file_info(&parsed.file, f).await? else {
+    let Some(smap_file_info) = get_sourcemap_file_info(&parsed.file, f).await? else {
         return Err(anyhow::anyhow!(
             "sourcemap file not found for minified file {} in org_id {}",
             parsed.file,
@@ -256,10 +358,7 @@ async fn resolve_stack(
         ));
     };
 
-    let path = get_file_path(&f.org_id, &smap_file_name);
-
-    let get_res = storage::get("", &path).await?;
-    let bytes = get_res.bytes().await?;
+    let bytes = get_sourcemap_file_data(&f.org_id, &smap_file_info).await?;
     let reader = sourcemap::SourceMap::from_slice(&bytes)?;
 
     let Some(tok) = reader.lookup_token(smap_line, smap_col) else {

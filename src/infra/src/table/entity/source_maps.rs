@@ -16,7 +16,7 @@ pub struct Model {
     pub file_store_id: String,
     pub file_type: i32,
     pub created_at: i64,
-    pub is_local: bool,
+    pub cluster: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -19,9 +19,10 @@ use config::{
 };
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, GetTableRequest, GetTableResponse, QueryStatusRequest,
-    QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse, SearchRequest,
-    SearchResponse, search_server::Search,
+    GetResultRequest, GetResultResponse, GetSourcemapFileRequest, GetSourcemapFileResponse,
+    GetTableRequest, GetTableResponse, QueryStatusRequest, QueryStatusResponse,
+    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
+    search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -378,5 +379,30 @@ impl Search for Searcher {
         _req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
+    }
+
+    async fn get_sourcemap_file(
+        &self,
+        req: Request<GetSourcemapFileRequest>,
+    ) -> Result<Response<GetSourcemapFileResponse>, Status> {
+        let req = req.into_inner();
+        log::info!(
+            "got get request for sourcemap file : {}/{} at {}",
+            req.org_id,
+            req.original_name,
+            req.path
+        );
+
+        let res = infra::storage::get_bytes("", &req.path)
+            .await
+            .map_err(|e| {
+                Status::internal(format!(
+                    "failed to get sourcemap for {}/{} at path {}: {e}",
+                    req.org_id, req.original_name, req.path
+                ))
+            })?;
+        Ok(Response::new(GetSourcemapFileResponse {
+            file_data: res.to_vec(),
+        }))
     }
 }

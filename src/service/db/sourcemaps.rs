@@ -51,7 +51,6 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
             )
             .await?;
 
-        // TODO: handle SC
         #[cfg(feature = "enterprise")]
         {
             let config = o2_enterprise::enterprise::common::config::get_config();
@@ -87,9 +86,9 @@ pub async fn get_sourcemap_file(
     service: &Option<String>,
     env: &Option<String>,
     version: &Option<String>,
-) -> Result<Option<String>, anyhow::Error> {
+) -> Result<Option<SourceMap>, anyhow::Error> {
     let ret =
-        infra::table::source_maps::get_sourcemap_file_name(org, source_file, service, env, version)
+        infra::table::source_maps::get_sourcemap_file(org, source_file, service, env, version)
             .await?;
     Ok(ret)
 }
@@ -129,7 +128,6 @@ pub async fn delete_group(
         )
         .await?;
 
-    // TODO: handle SC
     #[cfg(feature = "enterprise")]
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
@@ -161,6 +159,25 @@ pub async fn delete_group(
             }
         }
     }
+
+    Ok(())
+}
+
+pub async fn update_file_cluster(entry: SourceMap) -> Result<(), anyhow::Error> {
+    infra::table::source_maps::update_cluster(entry.clone()).await?;
+
+    // trigger watch event by putting value to cluster coordinator
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .put(
+            SOURCEMAP_PREFIX,
+            serde_json::to_vec(&entry)?.into(),
+            true,
+            None,
+        )
+        .await?;
+
+    // no need for super cluster, as this update is only for local db
 
     Ok(())
 }
