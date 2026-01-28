@@ -29,19 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         indicator-color="primary"
         align="left"
       >
-        <q-tab name="pretty" label="Pretty" />
         <q-tab name="raw" label="Raw" />
+        <q-tab name="pretty" label="Pretty" />
       </q-tabs>
 
       <q-separator class="q-mb-sm" />
 
       <!-- Tab panels -->
       <q-tab-panels v-model="activeTab" animated>
-        <!-- Pretty formatted view -->
-        <q-tab-panel name="pretty" class="q-pa-none">
-          <PrettyStackTrace v-if="activeTab === 'pretty'" :error_stack="error_stack" :error="error" />
-        </q-tab-panel>
-
         <!-- Raw view -->
         <q-tab-panel name="raw" class="q-pa-none">
           <div class="error-stacks">
@@ -63,6 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </div>
+        </q-tab-panel>
+
+        <!-- Pretty formatted view -->
+        <q-tab-panel name="pretty" class="q-pa-none">
+          <PrettyStackTrace v-if="activeTab === 'pretty'" :error_stack="error_stack" :error="error" />
         </q-tab-panel>
       </q-tab-panels>
     </div>

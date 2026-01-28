@@ -124,6 +124,7 @@ const showTabs = computed(() => {
     "rumPerformanceWebVitals",
     "rumPerformanceErrors",
     "rumPerformanceApis",
+    "SourceMaps",
   ];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
@@ -150,6 +151,10 @@ const tabs = [
     label: t("rum.errorTracking"),
     value: "error_tracking",
   },
+  {
+    label: "Source Maps",
+    value: "source_maps",
+  },
 ];
 
 const isRumEnabled = ref<boolean>(false);
@@ -175,6 +180,7 @@ onMounted(async () => {
     ErrorViewer: "error_tracking",
     Sessions: "sessions",
     rumPerformanceSummary: "performance",
+    SourceMaps: "source_maps",
   };
 
   if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -203,6 +209,7 @@ onUpdated(async () => {
       ErrorViewer: "error_tracking",
       Sessions: "sessions",
       rumPerformanceSummary: "performance",
+      SourceMaps: "source_maps",
     };
 
     if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -242,6 +249,7 @@ const updateTabOnRouteChange = () => {
     rumPerformanceWebVitals: "performance",
     rumPerformanceErrors: "performance",
     rumPerformanceApis: "performance",
+    SourceMaps: "source_maps",
   };
   const tab =
     routeNameMapping[
@@ -319,6 +327,16 @@ const changeTab = (tab: string) => {
         performanceState.data.datetime,
         sessionState.data.editorValue,
       ),
+    });
+    return;
+  }
+
+  if (tab === "source_maps") {
+    router.push({
+      name: "SourceMaps",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
     return;
   }

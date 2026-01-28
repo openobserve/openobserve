@@ -27,6 +27,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- No source maps available message -->
+    <div v-else-if="allSourceInfoNull" class="no-source-maps-container q-pa-xl text-center">
+      <q-icon name="code_off" size="3em" color="grey-6" class="q-mb-md" />
+      <div class="text-h6 text-grey-8 q-mb-sm" style="font-weight: 500;">
+        Source Maps Not Available
+      </div>
+      <div class="text-body2 text-grey-6 tw:pb-2" style="max-width: 500px; margin: 0 auto;">
+        To view detailed stack traces with original source code and line numbers, please upload source maps for this application.
+      </div>
+      <q-btn
+        unelevated
+        no-caps
+        color="primary"
+        label="Upload Source Maps"
+        icon="cloud_upload"
+        class="o2-primary-button tw:mt-2"
+        @click="navigateToUpload"
+      />
+    </div>
+
     <!-- Pretty formatted view -->
     <div v-else-if="translatedStackTrace.length > 0" class="pretty-stack-container">
       <template v-for="(stackTrace, traceIndex) in translatedStackTrace" :key="traceIndex">
@@ -209,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick, computed } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import {
@@ -218,6 +239,7 @@ import {
 } from "@/utils/stackTraceCache";
 
 const store = useStore();
+const router = useRouter();
 
 const isDarkMode = computed(() => store.state.theme === "dark");
 
@@ -267,6 +289,15 @@ const translationError = ref<string>("");
 const expandedTraces = ref<Record<number, boolean>>({});
 const expandedFrames = ref<Record<string, boolean>>({});
 const editorRefs = ref<Record<string, any>>({});
+
+// Check if all source_info values are null (source maps not available)
+const allSourceInfoNull = computed(() => {
+  if (translatedStackTrace.value.length === 0) return false;
+
+  return translatedStackTrace.value.every((trace) =>
+    trace.stack.every((frame) => !frame.source_info)
+  );
+});
 
 const showFrames = (traceIndex: number) => {
   expandedTraces.value[traceIndex] = true;
@@ -462,6 +493,16 @@ const translateStackTrace = async () => {
   }
 };
 
+// Navigate to upload source maps page
+const navigateToUpload = () => {
+  router.push({
+    name: "UploadSourceMaps",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
+
 // Translate when component mounts (lazy loaded when tab switches to "pretty")
 onMounted(() => {
   translateStackTrace();
@@ -479,6 +520,18 @@ watch(
 <style lang="scss" scoped>
 .loading-container {
   min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: v-bind(backgroundColor);
+  border: 1px solid v-bind(borderColor);
+  border-radius: 6px;
+}
+
+.no-source-maps-container {
+  min-height: 150px;
+  height: 220px;
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -53,6 +53,34 @@ const sourcemapsService = {
     const url = `/api/${org_identifier}/sourcemaps/stacktrace`;
     return http().post(url, data);
   },
+
+  listSourceMaps: (
+    org_identifier: string,
+    params?: { version?: string; service?: string; env?: string }
+  ): Promise<{ data: any[] }> => {
+    const url = `/api/${org_identifier}/sourcemaps`;
+    return http().get(url, { params });
+  },
+
+  uploadSourceMaps: (
+    org_identifier: string,
+    formData: FormData
+  ): Promise<{ data: any }> => {
+    const url = `/api/${org_identifier}/sourcemaps`;
+    return http().post(url, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+
+  deleteSourceMaps: (
+    org_identifier: string,
+    params: { version: string; service: string; env: string }
+  ): Promise<{ data: any }> => {
+    const url = `/api/${org_identifier}/sourcemaps`;
+    return http().delete(url, { params });
+  },
 };
 
 export default sourcemapsService;
