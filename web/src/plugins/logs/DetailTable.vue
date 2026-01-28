@@ -349,7 +349,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           :hide-view-related-button="true"
+          :hide-search-term-actions="true"
           @sendToAiChat="sendToAiChat"
+          @addSearchTerm="addSearchTerm"
         />
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
@@ -761,6 +763,15 @@ export default defineComponent({
       emit("sendToAiChat", value);
       emit("closeTable");
     };
+
+    const addSearchTerm = (
+      field: string | number,
+      fieldValue: string | number | boolean,
+      action: string,
+    ) => {
+      emit("add:searchterm", field, fieldValue, action);
+    };
+
     const closeTable = () => {
       emit("closeTable");
     };
@@ -793,6 +804,7 @@ export default defineComponent({
       viewTrace,
       hasAggregationQuery,
       sendToAiChat,
+      addSearchTerm,
       closeTable,
       showCorrelation,
       statusColor,
