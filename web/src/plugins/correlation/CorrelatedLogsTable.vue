@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :get-dimension-options="getFilterOptions"
           :has-pending-changes="hasPendingChanges"
           :show-apply-button="true"
-          :filter-label="t('correlation.logs.filters')"
+          :filter-label="t('correlation.logs.filtersLabel')"
           :unstable-dimension-tooltip="t('correlation.logs.unstableDimension')"
           @update:dimension="handleDimensionUpdate"
           @apply="handleApplyFilters"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Results Summary Row -->
-      <div class="tw:p-3 tw:pt-2">
+      <!-- <div class="tw:p-3 tw:pt-2">
         <div class="tw:text-xs tw:opacity-70" data-test="results-summary">
           <template v-if="hasResults && !isLoading">
             {{
@@ -65,13 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height="14px"
           />
         </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
       <!-- Logs Table or Skeleton -->
-      <div class="tw:h-full tw:w-full tw:overflow-auto">
+      <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
         <!-- Actual Table (when data is loaded) -->
         <TenstackTable
           v-if="hasResults"
@@ -672,5 +672,11 @@ watch(
       flex-direction: column;
     }
   }
+}
+</style>
+
+<style lang="scss">
+.logs-table-container .container {
+  height: calc(100vh - 170px) !important;
 }
 </style>
