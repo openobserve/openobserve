@@ -639,6 +639,25 @@ watch(
 // );
 
 watch(
+  () => props.highlightQuery,
+  async (newVal, oldVal) => {
+    // Only re-process if highlightQuery actually changed and we have data
+    if (newVal !== oldVal && props.columns?.length && tableRows.value?.length) {
+      await nextTick();
+
+      processHitsInChunks(
+        tableRows.value,
+        props.columns,
+        true, // Clear cache to re-process with new highlight query
+        props.highlightQuery,
+        100,
+        selectedStreamFtsKeys.value,
+      );
+    }
+  },
+);
+
+watch(
   () => columnOrder.value,
   () => {
     emits("update:columnOrder", columnOrder.value, props.columns);
