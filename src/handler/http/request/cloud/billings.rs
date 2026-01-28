@@ -499,7 +499,7 @@ pub async fn handle_azure_event(headers: HeaderMap, payload: axum::body::Bytes) 
         }
     }
 
-    // TODO: send event for this
+    // TODO: send event for this when validated
     // for (org_id, sub_type) in orgs {
     //             let org = match organization::get_org(&org_id).await {
     //                 None => continue,
