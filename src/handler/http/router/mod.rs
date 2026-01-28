@@ -85,6 +85,7 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_lowercase(b"x-openobserve-span-id").unwrap(),
             header::HeaderName::from_lowercase(b"x-openobserve-trace-id").unwrap(),
             header::HeaderName::from_lowercase(b"x-openobserve-sampled").unwrap(),
+            header::HeaderName::from_lowercase(b"x-o2-assistant-session-id").unwrap(),
         ])
         .allow_origin(AllowOrigin::mirror_request())
         .allow_credentials(true)

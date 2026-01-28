@@ -371,6 +371,22 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     let trace_id = auth_data.get_trace_id();
     let user_id = auth_data.user_id.clone();
 
+    // Extract headers to forward to agent for tracking
+    let mut forward_headers = std::collections::HashMap::new();
+    if let Some(session_id) = parts.headers.get("x-o2-assistant-session-id") {
+        if let Ok(val) = session_id.to_str() {
+            forward_headers.insert("x-o2-assistant-session-id".to_string(), val.to_string());
+        }
+    }
+    if !auth_data.traceparent.is_empty() {
+        forward_headers.insert("traceparent".to_string(), auth_data.traceparent.clone());
+    }
+    if let Some(user_agent) = parts.headers.get("user-agent") {
+        if let Ok(val) = user_agent.to_str() {
+            forward_headers.insert("user-agent".to_string(), val.to_string());
+        }
+    }
+
     // Parse JSON body
     let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
         Ok(bytes) => bytes,
@@ -529,9 +545,14 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         .await;
 
         // Create streaming response
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
         let s = stream! {
-            // Call the agent service
-            let response = match client.query_stream(agent_type, query_req).await {
+            // Call the agent service with forwarded headers
+            let response = match client.query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref()).await {
                 Ok(r) => r,
                 Err(e) => {
                     log::error!(
