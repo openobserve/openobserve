@@ -153,7 +153,7 @@ const incidents = {
     status: "open" | "acknowledged" | "resolved"
   ) => {
     return http().patch<Incident>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/status`,
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
       { status }
     );
   },

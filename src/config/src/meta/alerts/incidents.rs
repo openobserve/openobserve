@@ -108,6 +108,19 @@ impl std::fmt::Display for CorrelationReason {
     }
 }
 
+impl TryFrom<&str> for CorrelationReason {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "service_discovery" => Ok(Self::ServiceDiscovery),
+            "manual_extraction" => Ok(Self::ManualExtraction),
+            "temporal" => Ok(Self::Temporal),
+            unmatched => Err(format!("'{unmatched}' is not a valid CorrelationReason")),
+        }
+    }
+}
+
 /// Alert flow graph showing how alerts cascaded across services over time
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct IncidentTopology {
@@ -312,7 +325,7 @@ pub struct IncidentStats {
 ///
 /// Shows how alerts cascaded across services over time, with nodes representing
 /// unique (service, alert) pairs and edges showing temporal and dependency relationships.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct IncidentServiceGraph {
     /// Alert nodes in the flow graph
     pub nodes: Vec<AlertNode>,
@@ -323,7 +336,7 @@ pub struct IncidentServiceGraph {
 }
 
 /// Summary statistics for the incident service graph
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct IncidentGraphStats {
     /// Total number of services in the graph
     pub total_services: usize,

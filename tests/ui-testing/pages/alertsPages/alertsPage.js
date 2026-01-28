@@ -673,29 +673,39 @@ export class AlertsPage {
     async navigateToAlertsPage() {
         testLogger.info('Navigating to Alerts page');
         await this.page.locator(this.locators.alertMenuItem).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
         await this.waitForAlertListPageReady();
         testLogger.info('Navigated to Alerts page');
     }
 
     /**
      * Navigate to Incidents page via sidebar menu
+     * Note: Incidents menu item depends on service_graph_enabled config from the server.
+     * The menu item may take time to render while the config API response is processed.
      */
     async navigateToIncidentsPage() {
         testLogger.info('Navigating to Incidents page');
+        // Wait for the incidents menu item to be available (may take time for config to load)
+        await this.page.locator(this.locators.incidentsMenuItem).waitFor({ state: 'visible', timeout: 30000 });
         await this.page.locator(this.locators.incidentsMenuItem).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
         await this.page.locator(this.locators.incidentList).waitFor({ state: 'visible', timeout: 30000 });
         testLogger.info('Navigated to Incidents page');
     }
 
     /**
-     * Verify sidebar menu items are visible for navigation
+     * Verify sidebar menu items are visible for navigation.
+     * Note: The incidents menu item is an enterprise feature that depends on service_graph_enabled.
+     * It may take time to render while waiting for the config API response.
      */
     async expectSidebarMenuItemsVisible() {
         testLogger.info('Verifying sidebar menu items are visible');
+        // Alerts menu should be visible quickly
         await expect(this.page.locator(this.locators.alertMenuItem)).toBeVisible({ timeout: 10000 });
-        await expect(this.page.locator(this.locators.incidentsMenuItem)).toBeVisible({ timeout: 10000 });
+        // Incidents menu depends on config API - use longer timeout and waitFor pattern
+        // The menu item is dynamically added after config loads with service_graph_enabled=true
+        await this.page.locator(this.locators.incidentsMenuItem).waitFor({ state: 'visible', timeout: 30000 });
+        await expect(this.page.locator(this.locators.incidentsMenuItem)).toBeVisible({ timeout: 5000 });
         testLogger.info('Sidebar menu items verified');
     }
 

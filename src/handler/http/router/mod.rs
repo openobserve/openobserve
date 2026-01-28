@@ -81,6 +81,10 @@ pub fn cors_layer() -> CorsLayer {
             header::ACCEPT,
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
+            header::HeaderName::from_lowercase(b"tracestate").unwrap(),
+            header::HeaderName::from_lowercase(b"x-openobserve-span-id").unwrap(),
+            header::HeaderName::from_lowercase(b"x-openobserve-trace-id").unwrap(),
+            header::HeaderName::from_lowercase(b"x-openobserve-sampled").unwrap(),
         ])
         .allow_origin(AllowOrigin::mirror_request())
         .allow_credentials(true)
@@ -386,7 +390,17 @@ pub fn basic_routes() -> Router {
     {
         router = router.nest(
             "/webhook",
-            Router::new().route("/stripe", post(cloud::billings::handle_stripe_event)),
+            Router::new()
+                .route("/stripe", post(cloud::billings::handle_stripe_event))
+                .route("/azure", post(cloud::billings::handle_azure_event)),
+        );
+
+        // AWS Marketplace registration endpoint - receives POST from AWS Marketplace
+        // Must be publicly accessible (no auth) as users haven't logged in yet
+        // Using /marketplace path to avoid conflict with authenticated /api scope
+        router = router.route(
+            "/marketplace/aws/register",
+            post(cloud::aws_marketplace::aws_marketplace_register),
         );
     }
 
@@ -630,7 +644,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph", get(alerts::incidents::get_incident_service_graph))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/status", patch(alerts::incidents::update_incident_status))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
@@ -741,9 +755,6 @@ pub fn service_routes() -> Router {
             // AI
             .route("/{org_id}/ai/chat", post(ai::chat::chat))
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
-            .route("/{org_id}/ai/prompts", get(ai::prompt::list_prompts))
-            .route("/{org_id}/ai/prompts/{prompt_id}", get(ai::prompt::get_prompt).put(ai::prompt::update_prompt))
-            .route("/{org_id}/ai/prompts/{prompt_id}/rollback", post(ai::prompt::rollback_prompt))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -763,10 +774,6 @@ pub fn service_routes() -> Router {
 
             // Patterns
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
-
-            // Agent chat
-            .route("/{org_id}/agent/chat", post(agent::chat::agent_chat))
-            .route("/{org_id}/agent/chat_stream", post(agent::chat::agent_chat_stream))
 
             // Service streams
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
@@ -826,6 +833,18 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/extend_trial_period",
                 put(organization::org::extend_trial_period),
+            )
+            .route(
+                "/{org_id}/aws-marketplace/link-subscription",
+                post(cloud::aws_marketplace::link_subscription),
+            )
+            .route(
+                "/{org_id}/aws-marketplace/activation-status",
+                get(cloud::aws_marketplace::activation_status),
+            )
+            .route(
+                "/{org_id}/azure-marketplace/link-subscription",
+                post(cloud::azure_marketplace::link_subscription),
             );
     }
 

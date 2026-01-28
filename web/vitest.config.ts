@@ -57,7 +57,7 @@ export default mergeConfig(
       setupFiles: ['src/test/unit/helpers/setupTests.ts'],
       server: {
         deps: {
-          inline: ["monaco-editor", "vitest-canvas-mock"],
+          inline: ["monaco-editor", "vitest-canvas-mock", "@openobserve/browser-rum", "@openobserve/browser-logs"],
         },
       },
       // Prevent unhandled errors from failing the test suite

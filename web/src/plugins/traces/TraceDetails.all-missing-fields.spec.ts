@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -131,7 +131,21 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     globalThis.server.use(
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        () => {
+        async ({ request }) => {
+          const body: any = await request.json();
+          // Check if this is a RUM data query
+          if (body.query?.sql?.includes("_rumdata")) {
+            // Return empty RUM data
+            return HttpResponse.json({
+              took: 0,
+              hits: [],
+              total: 0,
+              from: 0,
+              size: 0,
+              scan_size: 0,
+            });
+          }
+          // Return trace spans for regular trace queries
           return HttpResponse.json(mockSpansWithManyMissingFields);
         },
       ),
