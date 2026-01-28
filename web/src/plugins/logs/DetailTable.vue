@@ -54,16 +54,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.table')"
           />
           <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+          <!-- OLD: Dashboard Panel Tab (hidden by default, enable via console: enableOldLogsTab()) -->
           <q-tab
-            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+            v-if="
+              serviceStreamsEnabled &&
+              config.isEnterprise === 'true' &&
+              showOldLogsTab
+            "
             name="correlated-logs"
             :label="t('correlation.correlatedLogs')"
           />
-          <!-- NEW: Logs V2 Tab for testing new component -->
+          <!-- NEW: Logs Tab with TanStack Table -->
           <q-tab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-logs-v2"
-            :label="t('correlation.correlatedLogsV2')"
+            :label="t('correlation.correlatedLogs')"
           />
           <q-tab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
@@ -600,6 +605,23 @@ export default defineComponent({
 
     const $q = useQuasar();
 
+    // Control visibility of old dashboard panel tab (hidden by default)
+    const showOldLogsTab = ref(false);
+
+    // Expose function to browser console for testing/verification
+    if (typeof window !== "undefined") {
+      (window as any).enableOldLogsTab = () => {
+        showOldLogsTab.value = true;
+        console.log(
+          "[DetailTable] Old Correlated Logs tab enabled. Refresh the sidebar to see it.",
+        );
+      };
+      (window as any).disableOldLogsTab = () => {
+        showOldLogsTab.value = false;
+        console.log("[DetailTable] Old Correlated Logs tab disabled.");
+      };
+    }
+
     // Watch for initialTab prop changes to update tab
     watch(
       () => props.initialTab,
@@ -813,6 +835,7 @@ export default defineComponent({
       tablePagination,
       serviceStreamsEnabled,
       config,
+      showOldLogsTab,
     };
   },
   async created() {
