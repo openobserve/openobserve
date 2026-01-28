@@ -758,6 +758,18 @@ const toggleColumnVisibility = (field: string) => {
   visibleColumns.value = new Set(visibleColumns.value);
 };
 
+const handleCloseColumn = (columnDef: any) => {
+  console.log("[CorrelatedLogsTable] Close column:", columnDef);
+  const columnId = columnDef.id || columnDef.name;
+
+  // Remove from visible columns
+  if (columnId && visibleColumns.value.has(columnId)) {
+    visibleColumns.value.delete(columnId);
+    // Force reactivity by creating new Set
+    visibleColumns.value = new Set(visibleColumns.value);
+  }
+};
+
 const handleExpandRow = (row: any) => {
   const index = expandedRows.value.findIndex((r) => r === row);
   if (index >= 0) {
