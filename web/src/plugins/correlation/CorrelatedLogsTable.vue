@@ -22,117 +22,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Header with Inline Filters -->
     <div
-      class="correlation-controls tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]"
+      class="correlation-controls tw:p-0 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]"
     >
-      <!-- Dimension Filters - Inline Dropdowns -->
-      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:mb-3">
-        <span class="tw:text-xs tw:font-semibold tw:opacity-70">
-          {{ t('correlation.logs.filters') }}:
-        </span>
+      <!-- Dimension Filters Bar with Pending/Apply Pattern -->
+      <template v-if="!isLoading || hasResults">
+        <DimensionFiltersBar
+          :dimensions="pendingFilters"
+          :unstable-dimension-keys="unstableDimensionKeys"
+          :get-dimension-options="getFilterOptions"
+          :has-pending-changes="hasPendingChanges"
+          :show-apply-button="true"
+          :filter-label="t('correlation.logs.filters')"
+          :unstable-dimension-tooltip="t('correlation.logs.unstableDimension')"
+          @update:dimension="handleDimensionUpdate"
+          @apply="handleApplyFilters"
+        />
+      </template>
 
-        <!-- Show inline filters if loaded -->
-        <template v-if="!isLoading || hasResults">
-          <!-- Matched dimensions (stable) -->
-          <div
-            v-for="(value, key) in matchedDimensions"
-            :key="`matched-${key}`"
-            class="tw:flex tw:items-center tw:gap-2"
-            :data-test="`filter-${key}`"
-          >
-            <span class="tw:text-xs tw:font-semibold tw:opacity-100">
-              {{ key }}:
-            </span>
-            <q-select
-              :model-value="currentFilters[key]"
-              :options="getFilterOptions(key)"
-              dense
-              outlined
-              borderless
-              emit-value
-              map-options
-              class="dimension-dropdown"
-              style="min-width: 120px"
-              @update:model-value="(val) => handleFilterChange(key, val)"
-              :data-test="`filter-select-${key}`"
-            />
-          </div>
-
-          <!-- Additional dimensions (unstable) -->
-          <div
-            v-for="(value, key) in additionalDimensions"
-            :key="`additional-${key}`"
-            class="tw:flex tw:items-center tw:gap-2"
-            :data-test="`filter-${key}`"
-          >
-            <span class="tw:text-xs tw:font-semibold tw:opacity-60">
-              {{ key }}:
-            </span>
-            <q-select
-              :model-value="currentFilters[key]"
-              :options="getFilterOptions(key)"
-              dense
-              outlined
-              borderless
-              emit-value
-              map-options
-              class="dimension-dropdown"
-              style="min-width: 120px"
-              @update:model-value="(val) => handleFilterChange(key, val)"
-              :data-test="`filter-select-${key}`"
-            />
-            <q-tooltip>
-              {{ t('correlation.logs.unstableDimension') }}
-            </q-tooltip>
-          </div>
-        </template>
-
-        <!-- Show skeleton while loading -->
-        <template v-else>
-          <q-skeleton type="rect" width="200px" height="32px" />
-          <q-skeleton type="rect" width="200px" height="32px" />
-          <q-skeleton type="rect" width="200px" height="32px" />
-        </template>
+      <!-- Show skeleton while loading -->
+      <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
+        <q-skeleton type="rect" width="200px" height="32px" />
+        <q-skeleton type="rect" width="200px" height="32px" />
+        <q-skeleton type="rect" width="200px" height="32px" />
       </div>
 
-      <!-- Action Buttons Row -->
-      <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
-        <!-- Left side: Results summary -->
+      <!-- Results Summary Row -->
+      <div class="tw:p-3 tw:pt-2">
         <div class="tw:text-xs tw:opacity-70" data-test="results-summary">
           <template v-if="hasResults && !isLoading">
             {{
-              t('correlation.logs.resultsCount', {
+              t("correlation.logs.resultsCount", {
                 count: totalHits,
                 stream: primaryStream,
                 time: took,
               })
             }}
           </template>
-          <q-skeleton v-else-if="isLoading" type="text" width="200px" height="14px" />
-        </div>
-
-        <!-- Right side: Action buttons -->
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <q-btn
-            flat
-            dense
-            no-caps
-            :label="t('correlation.logs.resetFilters')"
-            icon="restart_alt"
-            class="o2-secondary-button"
-            @click="handleResetFilters"
-            :disable="isLoading && !hasResults"
-            data-test="reset-filters-btn"
-          />
-          <q-btn
-            flat
-            dense
-            no-caps
-            :label="t('common.refresh')"
-            icon="refresh"
-            class="o2-secondary-button"
-            @click="handleRefresh"
-            :loading="isLoading"
-            data-test="refresh-btn"
+          <q-skeleton
+            v-else-if="isLoading"
+            type="text"
+            width="200px"
+            height="14px"
           />
         </div>
       </div>
@@ -153,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :function-error-msg="''"
           :expanded-rows="expandedRows"
           :highlight-timestamp="-1"
-          :default-columns="true"
+          :default-columns="false"
           :jsonpreview-stream-name="primaryStream"
           :highlight-query="highlightQuery"
           :selected-stream-fts-keys="ftsFields"
@@ -174,7 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="table-skeleton"
         >
           <!-- Table Header Skeleton -->
-          <div class="tw:flex tw:gap-4 tw:mb-4 tw:pb-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+          <div
+            class="tw:flex tw:gap-4 tw:mb-4 tw:pb-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+          >
             <q-skeleton type="text" width="12%" height="20px" />
             <q-skeleton type="text" width="15%" height="20px" />
             <q-skeleton type="text" width="40%" height="20px" />
@@ -194,10 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading indicator inside skeleton -->
-          <div class="tw:flex tw:items-center tw:justify-center tw:mt-8 tw:gap-3">
+          <div
+            class="tw:flex tw:items-center tw:justify-center tw:mt-8 tw:gap-3"
+          >
             <q-spinner color="primary" size="24px" />
             <span class="tw:text-sm tw:text-gray-600">
-              {{ t('correlation.logs.loading') }}
+              {{ t("correlation.logs.loading") }}
             </span>
           </div>
         </div>
@@ -208,11 +142,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           data-test="error-state"
         >
-          <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-4" />
+          <q-icon
+            name="error_outline"
+            size="3rem"
+            color="negative"
+            class="tw:mb-4"
+          />
           <p class="tw:text-base tw:text-negative tw:font-medium tw:mb-2">
-            {{ t('correlation.logs.error') }}
+            {{ t("correlation.logs.error") }}
           </p>
-          <p class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:max-w-md tw:text-center">
+          <p
+            class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:max-w-md tw:text-center"
+          >
             {{ error }}
           </p>
           <q-btn
@@ -230,12 +171,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           data-test="empty-state"
         >
-          <q-icon name="search_off" size="3rem" color="grey-6" class="tw:mb-4" />
+          <q-icon
+            name="search_off"
+            size="3rem"
+            color="grey-6"
+            class="tw:mb-4"
+          />
           <p class="tw:text-base tw:font-medium tw:text-gray-600 tw:mb-2">
-            {{ t('correlation.logs.noData') }}
+            {{ t("correlation.logs.noData") }}
           </p>
           <p class="tw:text-sm tw:text-gray-500 tw:mb-4">
-            {{ t('correlation.logs.noDataDetails') }}
+            {{ t("correlation.logs.noDataDetails") }}
           </p>
           <q-btn
             class="o2-secondary-button"
@@ -252,15 +198,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useStore } from 'vuex';
-import { useCorrelatedLogs } from '@/composables/useCorrelatedLogs';
-import type { CorrelatedLogsProps } from '@/composables/useCorrelatedLogs';
-import TenstackTable from '@/plugins/logs/TenstackTable.vue';
-import { date } from 'quasar';
-import type { ColumnDef } from '@tanstack/vue-table';
-import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
+import { ref, computed, onMounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
+import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
+import TenstackTable from "@/plugins/logs/TenstackTable.vue";
+import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import { date } from "quasar";
+import type { ColumnDef } from "@tanstack/vue-table";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { byString } from "@/utils/json";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -296,15 +244,53 @@ const wrapTableCells = ref(false);
 const expandedRows = ref<any[]>([]);
 const selectedFields = ref<any[]>([]);
 
+// Pending dimensions - for the apply button pattern
+const pendingFilters = ref<Record<string, string>>({ ...currentFilters.value });
+
+// Watch currentFilters to sync pendingFilters when filters are applied or reset
+watch(
+  currentFilters,
+  (newFilters) => {
+    pendingFilters.value = { ...newFilters };
+  },
+  { deep: true },
+);
+
 // Computed
 const themeClass = computed(() =>
-  store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'
+  store.state.theme === "dark" ? "dark-theme" : "light-theme",
 );
 
 const matchedDimensions = computed(() => props.matchedDimensions);
 const additionalDimensions = computed(() => props.additionalDimensions || {});
 const availableDimensions = computed(() => props.availableDimensions || {});
 const ftsFields = computed(() => props.ftsFields || []);
+
+// Combined dimensions for DimensionFiltersBar (merges matched and additional)
+const allDimensions = computed(() => ({
+  ...matchedDimensions.value,
+  ...additionalDimensions.value,
+}));
+
+// Track which dimensions are unstable (for UI styling)
+const unstableDimensionKeys = computed(
+  () => new Set(Object.keys(additionalDimensions.value)),
+);
+
+// Track if there are pending changes that haven't been applied
+const hasPendingChanges = computed(() => {
+  const current = currentFilters.value;
+  const pending = pendingFilters.value;
+
+  const allKeys = new Set([...Object.keys(current), ...Object.keys(pending)]);
+  for (const key of allKeys) {
+    if (current[key] !== pending[key]) {
+      return true;
+    }
+  }
+
+  return false;
+});
 
 /**
  * Build highlight query from current filters for logs highlighting
@@ -320,12 +306,12 @@ const highlightQuery = computed(() => {
     }
 
     // Skip internal fields
-    if (field.startsWith('_')) {
+    if (field.startsWith("_")) {
       continue;
     }
 
     // Skip null/undefined values
-    if (value === null || value === undefined || value === '') {
+    if (value === null || value === undefined || value === "") {
       continue;
     }
 
@@ -334,15 +320,17 @@ const highlightQuery = computed(() => {
     conditions.push(`${field} = '${escapedValue}'`);
   }
 
-  return conditions.join(' and ').toLowerCase();
+  return conditions.join(" and ").toLowerCase();
 });
 
 /**
  * Get filter options for a dimension
  * Returns the current value + wildcard option
  */
-const getFilterOptions = (key: string): Array<{ label: string; value: string }> => {
-  const currentValue = currentFilters.value[key];
+const getFilterOptions = (
+  key: string,
+  currentValue: string,
+): Array<{ label: string; value: string }> => {
   const uniqueValues = new Set<string>();
 
   // Always include current value and wildcard
@@ -354,7 +342,7 @@ const getFilterOptions = (key: string): Array<{ label: string; value: string }> 
     const dimensionValues = availableDimensions.value[key];
     if (Array.isArray(dimensionValues)) {
       dimensionValues.forEach((val: string) => {
-        if (val !== null && val !== undefined && val !== '') {
+        if (val !== null && val !== undefined && val !== "") {
           uniqueValues.add(val);
         }
       });
@@ -362,9 +350,9 @@ const getFilterOptions = (key: string): Array<{ label: string; value: string }> 
   }
 
   // Convert to { label, value } format for q-select with map-options
-  return Array.from(uniqueValues).map(val => ({
-    label: val === SELECT_ALL_VALUE ? 'All Values' : val,
-    value: val
+  return Array.from(uniqueValues).map((val) => ({
+    label: val === SELECT_ALL_VALUE ? "All Values" : val,
+    value: val,
   }));
 };
 
@@ -382,8 +370,8 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
 
   const fields = Array.from(fieldSet).sort((a, b) => {
     // Prioritize _timestamp first
-    if (a === '_timestamp') return -1;
-    if (b === '_timestamp') return 1;
+    if (a === "_timestamp") return -1;
+    if (b === "_timestamp") return 1;
 
     // Then matched dimensions
     const aIsMatched = isMatchedDimension(a);
@@ -395,27 +383,64 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     return a.localeCompare(b);
   });
 
-  return fields.map((field) => ({
-    id: field,
-    accessorKey: field,
-    header: field,
-    size: field === '_timestamp' ? 180 : field === 'message' ? 400 : 150,
-    cell: (info: any) => {
-      const value = info.getValue();
+  return fields.map((field) => {
+    // Special handling for timestamp column
+    if (field === "_timestamp") {
+      return {
+        name: field,
+        id: field,
+        accessorKey: field,
+        label: t("search.timestamp") + ` (${store.state.timezone})`,
+        header: t("search.timestamp") + ` (${store.state.timezone})`,
+        align: "left",
+        sortable: true,
+        enableResizing: false,
+        accessorFn: (row: any) => {
+          const value = row[field];
+          if (typeof value === "number") {
+            return formatTimestamp(value);
+          }
+          return value !== null && value !== undefined ? String(value) : "";
+        },
+        cell: (info: any) => info.getValue(),
+        prop: (row: any) => {
+          const value = row[field];
+          if (typeof value === "number") {
+            return formatTimestamp(value);
+          }
+          return value !== null && value !== undefined ? String(value) : "";
+        },
+        size: 260,
+        meta: {
+          closable: false,
+          showWrap: false,
+          wrapContent: false,
+        },
+      };
+    }
 
-      // Format timestamp
-      if (field === '_timestamp' && typeof value === 'number') {
-        return formatTimestamp(value);
-      }
-
-      // Return value as string
-      return value !== null && value !== undefined ? String(value) : '';
-    },
-    meta: {
-      closable: field !== '_timestamp', // Don't allow closing timestamp column
-      showWrap: false,
-    },
-  }));
+    // Regular field columns
+    return {
+      name: field,
+      id: field,
+      accessorKey: field,
+      header: field,
+      align: "left",
+      sortable: true,
+      enableResizing: true,
+      accessorFn: (row: any) => {
+        return byString(row, field);
+      },
+      cell: (info: any) => info.getValue(),
+      size: field === "message" ? 400 : 150,
+      maxSize: window.innerWidth,
+      meta: {
+        closable: true,
+        showWrap: true,
+        wrapContent: false,
+      },
+    };
+  });
 });
 
 /**
@@ -424,24 +449,59 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return date.formatDate(ms, 'YYYY-MM-DD HH:mm:ss.SSS');
+  return date.formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
 };
 
 /**
  * Format time range for display
  */
-const formatTimeRange = (range: { startTime: number; endTime: number }): string => {
+const formatTimeRange = (range: {
+  startTime: number;
+  endTime: number;
+}): string => {
   const start = formatTimestamp(range.startTime);
   const end = formatTimestamp(range.endTime);
   return `${start} - ${end}`;
 };
 
+// Compute selected fields from the columns
+watch(
+  tableColumns,
+  (columns) => {
+    selectedFields.value = columns.map((col) => ({
+      name: col.name,
+      type: "Utf8",
+    }));
+  },
+  { immediate: true },
+);
+
 /**
  * Event Handlers
  */
-const handleFilterChange = (key: string, value: string) => {
-  console.log('[CorrelatedLogsTable] Filter changed:', { key, value });
-  updateFilter(key, value);
+// Handle dimension update from DimensionFiltersBar - updates pending state only
+const handleDimensionUpdate = ({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}) => {
+  pendingFilters.value[key] = value;
+  console.log("[CorrelatedLogsTable] Pending filter changed:", {
+    key,
+    value,
+    pending: pendingFilters.value,
+  });
+};
+
+// Apply pending filter changes
+const handleApplyFilters = () => {
+  console.log("[CorrelatedLogsTable] Applying filters:", pendingFilters.value);
+  // Update all filters at once
+  Object.keys(pendingFilters.value).forEach((key) => {
+    updateFilter(key, pendingFilters.value[key]);
+  });
 };
 
 const handleRefresh = () => {
@@ -457,19 +517,19 @@ const handleResetFilters = () => {
 };
 
 const handleRowClick = (row: any) => {
-  console.log('[CorrelatedLogsTable] Row clicked:', row);
+  console.log("[CorrelatedLogsTable] Row clicked:", row);
 };
 
 const handleCopy = (data: any) => {
-  console.log('[CorrelatedLogsTable] Copy:', data);
+  console.log("[CorrelatedLogsTable] Copy:", data);
 };
 
 const handleAddSearchTerm = (data: any) => {
-  console.log('[CorrelatedLogsTable] Add search term:', data);
+  console.log("[CorrelatedLogsTable] Add search term:", data);
 };
 
 const handleAddFieldToTable = (field: string) => {
-  console.log('[CorrelatedLogsTable] Add field to table:', field);
+  console.log("[CorrelatedLogsTable] Add field to table:", field);
 };
 
 const handleExpandRow = (row: any) => {
@@ -483,12 +543,12 @@ const handleExpandRow = (row: any) => {
 
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
-  console.log('[CorrelatedLogsTable] Nested correlation disabled');
+  console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
 
 // Lifecycle
 onMounted(() => {
-  console.log('[CorrelatedLogsTable] Component mounted with props:', {
+  console.log("[CorrelatedLogsTable] Component mounted with props:", {
     serviceName: props.serviceName,
     matchedDimensions: props.matchedDimensions,
     additionalDimensions: props.additionalDimensions,
@@ -496,7 +556,7 @@ onMounted(() => {
     sourceStream: props.sourceStream,
     sourceType: props.sourceType,
     timeRange: props.timeRange,
-    primaryStream: primaryStream.value
+    primaryStream: primaryStream.value,
   });
 
   // Fetch logs on mount
@@ -507,9 +567,9 @@ onMounted(() => {
 watch(
   () => props.timeRange,
   (newRange) => {
-    console.log('[CorrelatedLogsTable] Time range changed:', newRange);
+    console.log("[CorrelatedLogsTable] Time range changed:", newRange);
   },
-  { deep: true }
+  { deep: true },
 );
 </script>
 
