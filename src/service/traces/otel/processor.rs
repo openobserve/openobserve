@@ -26,7 +26,8 @@ use super::{
     attributes::O2Attributes,
     extractors::{
         InputOutputExtractor, MetadataExtractor, ModelExtractor, ParametersExtractor,
-        PromptExtractor, ProviderExtractor, ScopeInfo, UsageExtractor, map_to_observation_type,
+        PromptExtractor, ProviderExtractor, ScopeInfo, ToolExtractor, UsageExtractor,
+        map_to_observation_type,
     },
 };
 use crate::common::meta::traces::Event;
@@ -39,6 +40,7 @@ pub struct OtelIngestionProcessor {
     usage_extractor: UsageExtractor,
     metadata_extractor: MetadataExtractor,
     prompt_extractor: PromptExtractor,
+    tool_extractor: ToolExtractor,
 }
 
 impl Default for OtelIngestionProcessor {
@@ -57,6 +59,7 @@ impl OtelIngestionProcessor {
             usage_extractor: UsageExtractor,
             metadata_extractor: MetadataExtractor,
             prompt_extractor: PromptExtractor,
+            tool_extractor: ToolExtractor,
         }
     }
 
@@ -107,6 +110,12 @@ impl OtelIngestionProcessor {
 
         // Extract prompt information
         let prompt_name = self.prompt_extractor.extract_name(span_attributes);
+
+        // Extract tool information
+        let tool_name = self.tool_extractor.extract_tool_name(span_attributes);
+        let tool_call_id = self.tool_extractor.extract_tool_call_id(span_attributes);
+        let tool_call_arguments = self.tool_extractor.extract_tool_call_arguments(span_attributes);
+        let tool_call_result = self.tool_extractor.extract_tool_call_result(span_attributes);
 
         // Now remove all input/output related attributes
         span_attributes
@@ -162,6 +171,22 @@ impl OtelIngestionProcessor {
 
         if let Some(pname) = prompt_name {
             span_attributes.insert(O2Attributes::PROMPT_NAME.to_string(), json::json!(pname));
+        }
+
+        if let Some(tname) = tool_name {
+            span_attributes.insert(O2Attributes::TOOL_NAME.to_string(), json::json!(tname));
+        }
+
+        if let Some(tcid) = tool_call_id {
+            span_attributes.insert(O2Attributes::TOOL_CALL_ID.to_string(), json::json!(tcid));
+        }
+
+        if let Some(targs) = tool_call_arguments {
+            span_attributes.insert(O2Attributes::TOOL_CALL_ARGUMENTS.to_string(), targs);
+        }
+
+        if let Some(tresult) = tool_call_result {
+            span_attributes.insert(O2Attributes::TOOL_CALL_RESULT.to_string(), tresult);
         }
     }
 }
@@ -275,5 +300,63 @@ mod tests {
             span_attrs.get(O2Attributes::PROVIDER_NAME).unwrap(),
             &json::json!("google")
         );
+    }
+
+    #[test]
+    fn test_process_span_extracts_tool_fields() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("tool"));
+        span_attrs.insert("gen_ai.tool.name".to_string(), json::json!("get_weather"));
+        span_attrs.insert(
+            "gen_ai.tool.call.id".to_string(),
+            json::json!("call_12345"),
+        );
+        span_attrs.insert(
+            "gen_ai.tool.call.arguments".to_string(),
+            json::json!({"city": "San Francisco"}),
+        );
+        span_attrs.insert(
+            "gen_ai.tool.call.result".to_string(),
+            json::json!({"temperature": 72}),
+        );
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Tool name should be extracted and added
+        assert!(span_attrs.contains_key(O2Attributes::TOOL_NAME));
+        assert_eq!(
+            span_attrs.get(O2Attributes::TOOL_NAME).unwrap(),
+            &json::json!("get_weather")
+        );
+
+        // Tool call ID should be extracted and added
+        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ID));
+        assert_eq!(
+            span_attrs.get(O2Attributes::TOOL_CALL_ID).unwrap(),
+            &json::json!("call_12345")
+        );
+
+        // Tool call arguments should be extracted and added
+        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ARGUMENTS));
+        assert_eq!(
+            span_attrs.get(O2Attributes::TOOL_CALL_ARGUMENTS).unwrap(),
+            &json::json!({"city": "San Francisco"})
+        );
+
+        // Tool call result should be extracted and added
+        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_RESULT));
+        assert_eq!(
+            span_attrs.get(O2Attributes::TOOL_CALL_RESULT).unwrap(),
+            &json::json!({"temperature": 72})
+        );
+
+        // Original tool attributes should remain (except arguments and result which are input/output)
+        assert!(span_attrs.contains_key("gen_ai.tool.name"));
+        assert!(span_attrs.contains_key("gen_ai.tool.call.id"));
     }
 }

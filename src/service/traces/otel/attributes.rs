@@ -49,6 +49,18 @@ impl O2Attributes {
 
     /// Name of the LLM provider (e.g., "openai", "anthropic", "google")
     pub const PROVIDER_NAME: &'static str = "_o2_llm_provider_name";
+
+    /// Name of the tool being called
+    pub const TOOL_NAME: &'static str = "_o2_llm_tool_name";
+
+    /// Identifier for the tool call
+    pub const TOOL_CALL_ID: &'static str = "_o2_llm_tool_call_id";
+
+    /// Arguments passed to the tool call
+    pub const TOOL_CALL_ARGUMENTS: &'static str = "_o2_llm_tool_call_arguments";
+
+    /// Result returned from the tool call
+    pub const TOOL_CALL_RESULT: &'static str = "_o2_llm_tool_call_result";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -241,5 +253,12 @@ mod tests {
         assert_eq!(O2Attributes::SESSION_ID, "_o2_llm_session_id");
         assert_eq!(O2Attributes::PROMPT_NAME, "_o2_llm_prompt_name");
         assert_eq!(O2Attributes::PROVIDER_NAME, "_o2_llm_provider_name");
+        assert_eq!(O2Attributes::TOOL_NAME, "_o2_llm_tool_name");
+        assert_eq!(O2Attributes::TOOL_CALL_ID, "_o2_llm_tool_call_id");
+        assert_eq!(
+            O2Attributes::TOOL_CALL_ARGUMENTS,
+            "_o2_llm_tool_call_arguments"
+        );
+        assert_eq!(O2Attributes::TOOL_CALL_RESULT, "_o2_llm_tool_call_result");
     }
 }
