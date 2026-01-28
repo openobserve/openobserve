@@ -899,6 +899,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
+    await page.waitForTimeout(5000);
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 30000 });
