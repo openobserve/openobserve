@@ -411,6 +411,10 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
       // Return value as string
       return value !== null && value !== undefined ? String(value) : '';
     },
+    meta: {
+      closable: field !== '_timestamp', // Don't allow closing timestamp column
+      showWrap: false,
+    },
   }));
 });
 
