@@ -62,9 +62,6 @@ impl GenAiAttributes {
     pub const REQUEST_MODEL: &'static str = "gen_ai.request.model";
     pub const REQUEST_MAX_TOKENS: &'static str = "gen_ai.request.max_tokens";
     pub const REQUEST_TEMPERATURE: &'static str = "gen_ai.request.temperature";
-    pub const REQUEST_TOP_P: &'static str = "gen_ai.request.top_p";
-    pub const REQUEST_FREQUENCY_PENALTY: &'static str = "gen_ai.request.frequency_penalty";
-    pub const REQUEST_PRESENCE_PENALTY: &'static str = "gen_ai.request.presence_penalty";
 
     // Gen-AI Response
     pub const RESPONSE_MODEL: &'static str = "gen_ai.response.model";
@@ -108,7 +105,6 @@ pub struct LLMAttributes;
 impl LLMAttributes {
     pub const REQUEST_TYPE: &'static str = "llm.request.type";
     pub const USAGE_TOTAL_TOKENS: &'static str = "llm.usage.total_tokens";
-    pub const USER: &'static str = "llm.user";
 }
 
 /// Standard OpenTelemetry Attributes
@@ -118,15 +114,6 @@ impl OtelAttributes {
     // User and Session
     pub const USER_ID: &'static str = "user.id";
     pub const SESSION_ID: &'static str = "session.id";
-
-    // Service
-    pub const SERVICE_NAME: &'static str = "service.name";
-    pub const SERVICE_VERSION: &'static str = "service.version";
-
-    // Telemetry SDK
-    pub const TELEMETRY_SDK_LANGUAGE: &'static str = "telemetry.sdk.language";
-    pub const TELEMETRY_SDK_NAME: &'static str = "telemetry.sdk.name";
-    pub const TELEMETRY_SDK_VERSION: &'static str = "telemetry.sdk.version";
 }
 
 /// Vercel AI SDK Attributes
@@ -140,11 +127,9 @@ impl VercelAiSdkAttributes {
     // AI Prompt
     pub const PROMPT_MESSAGES: &'static str = "ai.prompt.messages";
     pub const PROMPT: &'static str = "ai.prompt";
-    pub const PROMPT_TOOLS: &'static str = "ai.prompt.tools";
     pub const PROMPT_TOOL_CHOICE: &'static str = "ai.prompt.toolChoice";
 
     // AI Tool Call
-    pub const TOOL_CALL_NAME: &'static str = "ai.toolCall.name";
     pub const TOOL_CALL_ARGS: &'static str = "ai.toolCall.args";
     pub const TOOL_CALL_RESULT: &'static str = "ai.toolCall.result";
 
@@ -152,8 +137,6 @@ impl VercelAiSdkAttributes {
     pub const RESPONSE_TEXT: &'static str = "ai.response.text";
     pub const RESPONSE_OBJECT: &'static str = "ai.response.object";
     pub const RESPONSE_TOOL_CALLS: &'static str = "ai.response.toolCalls";
-    pub const RESPONSE_PROVIDER_METADATA: &'static str = "ai.response.providerMetadata";
-    pub const RESPONSE_MS_TO_FIRST_CHUNK: &'static str = "ai.response.msToFirstChunk";
 
     // AI Result (legacy)
     pub const RESULT_TEXT: &'static str = "ai.result.text";
@@ -167,15 +150,10 @@ impl VercelAiSdkAttributes {
 
     // AI Usage
     pub const USAGE_TOKENS: &'static str = "ai.usage.tokens";
-    pub const USAGE_CACHED_INPUT_TOKENS: &'static str = "ai.usage.cachedInputTokens";
-    pub const USAGE_REASONING_TOKENS: &'static str = "ai.usage.reasoningTokens";
 
     // AI Telemetry Metadata
     pub const TELEMETRY_METADATA_USER_ID: &'static str = "ai.telemetry.metadata.userId";
     pub const TELEMETRY_METADATA_SESSION_ID: &'static str = "ai.telemetry.metadata.sessionId";
-    pub const TELEMETRY_METADATA_TAGS: &'static str = "ai.telemetry.metadata.tags";
-    pub const TELEMETRY_FUNCTION_ID: &'static str = "ai.telemetry.functionId";
-    pub const OPERATION_ID: &'static str = "ai.operationId";
 }
 
 /// OpenInference Attributes
@@ -201,7 +179,6 @@ impl FrameworkAttributes {
     pub const GCP_VERTEX_AGENT_TOOL_RESPONSE: &'static str = "gcp.vertex.agent.tool_response";
 
     // Logfire
-    pub const LOGFIRE_MSG: &'static str = "logfire.msg";
     pub const LOGFIRE_PROMPT: &'static str = "prompt";
     pub const LOGFIRE_ALL_MESSAGES_EVENTS: &'static str = "all_messages_events";
     pub const LOGFIRE_EVENTS: &'static str = "events";
@@ -232,9 +209,6 @@ impl FrameworkAttributes {
     pub const TOOL_ARGUMENTS: &'static str = "tool_arguments";
     pub const TOOL_RESPONSE: &'static str = "tool_response";
     pub const MODEL_CONFIG: &'static str = "model_config";
-
-    // LlamaIndex
-    pub const TAG_TAGS: &'static str = "tag.tags";
 }
 
 /// Gen-AI Event Names
@@ -253,19 +227,6 @@ impl GenAiEventNames {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_gen_ai_attributes() {
-        assert_eq!(GenAiAttributes::OPERATION_NAME, "gen_ai.operation.name");
-        assert_eq!(GenAiAttributes::INPUT_MESSAGES, "gen_ai.input.messages");
-        assert_eq!(GenAiAttributes::PROVIDER_NAME, "gen_ai.provider.name");
-    }
-
-    #[test]
-    fn test_otel_attributes() {
-        assert_eq!(OtelAttributes::USER_ID, "user.id");
-        assert_eq!(OtelAttributes::SERVICE_NAME, "service.name");
-    }
 
     #[test]
     fn test_llm_enriched_attributes() {
