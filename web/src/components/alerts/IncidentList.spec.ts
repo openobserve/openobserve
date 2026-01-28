@@ -90,13 +90,6 @@ describe("IncidentList.vue", () => {
       user_email: "example@gmail.com",
       subscription_type: "",
     };
-    store.state.sreChatContext = null;
-
-    // Mock store action
-    if (!store._actions) {
-      store._actions = {};
-    }
-    store._actions['setIsSREChatOpen'] = [vi.fn()];
 
     // Default mock implementation
     (incidentsService.list as any).mockResolvedValue({
@@ -794,46 +787,6 @@ describe("IncidentList.vue", () => {
 
       expect(actionsCol).toBeDefined();
       expect(actionsCol.align).toBe("center");
-    });
-  });
-
-  describe("SRE Chat Integration", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-    });
-
-    it("should open SRE chat with incident context", () => {
-      const incident = wrapper.vm.incidents[0];
-
-      wrapper.vm.openSREChat(incident);
-
-      expect(store.state.sreChatContext).toEqual({
-        type: 'incident',
-        data: incident,
-      });
-    });
-
-    it("should dispatch setIsSREChatOpen action", () => {
-      const incident = wrapper.vm.incidents[0];
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
-
-      wrapper.vm.openSREChat(incident);
-
-      expect(dispatchSpy).toHaveBeenCalledWith("setIsSREChatOpen", true);
-    });
-
-    it("should pass correct incident data to chat", () => {
-      const customIncident = createIncident({
-        id: "custom-id",
-        title: "Custom Incident",
-        severity: "P1",
-      });
-
-      wrapper.vm.openSREChat(customIncident);
-
-      expect(store.state.sreChatContext.data.id).toBe("custom-id");
-      expect(store.state.sreChatContext.data.title).toBe("Custom Incident");
     });
   });
 

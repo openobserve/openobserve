@@ -353,18 +353,6 @@ describe('O2AIChat - watchers & lifecycle', () => {
   });
 });
 
-// 9. Model/provider selection
-describe('O2AIChat - model/provider selection', () => {
-  it('availableModels updates when provider changes', async () => {
-    const wrapper = await mountChat({ isOpen: true });
-    wrapper.vm.selectedProvider = 'groq';
-    await wrapper.vm.$nextTick();
-    expect(Array.isArray(wrapper.vm.availableModels)).toBe(true);
-    expect(wrapper.vm.availableModels.length).toBeGreaterThan(0);
-  });
-});
-
-
 // 11. Capabilities panel helpers
 describe('O2AIChat - capabilities', () => {
   it('selectCapability strips numeric prefix', async () => {

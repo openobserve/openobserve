@@ -357,24 +357,6 @@
         >
         </q-input>
         <div class="tw:flex tw:items-center tw:justify-end tw:mt-2 tw:gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
-          <q-select
-              v-model="selectedModel"
-              :options="availableModels"
-              dense
-              flat
-              borderless
-              style="max-width: 100px; height: 36px;"
-            >
-              <template v-slot:selected-item="scope">
-                <div
-                  class="ellipsis"
-                  style="max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;"
-                >
-                  {{ scope.opt.label || scope.opt }}
-                </div>
-              </template>
-            </q-select>
-
           <!-- Debug info - remove this later -->
           <!-- <div class="tw:text-xs tw:text-gray-500">Loading: {{ isLoading }}, Input: {{ inputMessage.length }}</div> -->
 
@@ -509,7 +491,6 @@ export default defineComponent({
     const currentStreamingMessage = ref('');
     const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
     const selectedProvider = ref<string>('openai');
-    const selectedModel = ref<any>('gpt-4.1');
     const showHistory = ref(false);
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
@@ -613,12 +594,6 @@ export default defineComponent({
       '9. How to monitor azure services',
       '10. How to monitor google cloud services'
     ];
-
-    const availableModels = computed(() => modelConfig[selectedProvider.value] || []);
-
-    watch(selectedProvider, (newProvider: string) => {
-      selectedModel.value = modelConfig[newProvider][0];
-    });
 
     const formatMessage = (content: string) => {
       try {
@@ -1112,8 +1087,7 @@ export default defineComponent({
           timestamp: new Date().toISOString(),
           title,
           messages: serializableMessages,
-          provider: selectedProvider.value,
-          model: selectedModel.value
+          provider: selectedProvider.value
         };
 
         // Always use put with the current chat ID to update existing chat
@@ -1201,7 +1175,6 @@ export default defineComponent({
       chatMessages.value = [];
       currentChatId.value = null;
       selectedProvider.value = 'openai';
-      selectedModel.value = modelConfig.openai[0];
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
@@ -1241,7 +1214,6 @@ export default defineComponent({
             
             chatMessages.value = formattedMessages;
             selectedProvider.value = chat.provider || 'openai';
-            selectedModel.value = chat.model || modelConfig.openai[0];
             currentChatId.value = chatId;
             showHistory.value = false;
             shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
@@ -1827,8 +1799,6 @@ export default defineComponent({
       capabilities,
       selectCapability,
       selectedProvider,
-      selectedModel,
-      availableModels,
       showHistory,
       chatHistory,
       addNewChat,

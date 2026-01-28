@@ -85,14 +85,6 @@ const useAiChat = () => {
                 context: contextWithoutAgentType
             };
 
-            if (agent_type) {
-                payload.agent_type = agent_type;
-            }
-
-            if (model.length > 0) {
-                payload.model = model;
-            }
-
             body = JSON.stringify(payload);
         } else if (legacyContext && _messages.length > 0) {
             // Fallback to legacy approach - inject context into message content

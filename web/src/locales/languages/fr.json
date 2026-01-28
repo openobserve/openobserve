@@ -1389,7 +1389,14 @@
     "folders": "Dossiers",
     "searchFolder": "Dossier de recherche",
     "deleteFolder": "Supprimer le dossier",
-    "deleteFolderMessage": "Êtes-vous sûr de vouloir supprimer ce dossier ?"
+    "deleteFolderMessage": "Êtes-vous sûr de vouloir supprimer ce dossier ?",
+    "columnOrder": "Ordre des colonnes",
+    "configureColumnOrder": "Configurer l'ordre des colonnes",
+    "columnOrderDescription": "Personnalisez l'ordre d'affichage des colonnes du tableau. Seules les colonnes visibles (basées sur des filtres visibles/masqués) peuvent être réorganisées. Faites glisser les colonnes pour modifier leur ordre.",
+    "noColumnsOrdered": "Aucune colonne ordonnée",
+    "columnsDefaultOrder": "Les colonnes seront affichées dans leur ordre par défaut",
+    "moveUp": "Monter",
+    "moveDown": "Déplacer vers le bas"
   },
   "panel": {
     "header": "Panneau",

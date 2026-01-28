@@ -1362,4 +1362,518 @@ describe("TableConverter", () => {
       expect(result.series).toEqual([]);
     });
   });
+
+  describe("Column Ordering", () => {
+    it("should apply column order when specified", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { zebra: "z", apple: "a", banana: "b" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+          column_order: ["banana", "zebra", "apple"],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      expect(labelColumns[0].name).toBe("banana");
+      expect(labelColumns[1].name).toBe("zebra");
+      expect(labelColumns[2].name).toBe("apple");
+    });
+
+    it("should place unordered columns at the end alphabetically", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { zebra: "z", apple: "a", banana: "b", cat: "c" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+          column_order: ["banana"],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      expect(labelColumns[0].name).toBe("banana");
+      // Remaining should be alphabetically sorted
+      expect(labelColumns[1].name).toBe("apple");
+      expect(labelColumns[2].name).toBe("cat");
+      expect(labelColumns[3].name).toBe("zebra");
+    });
+
+    it("should filter out columns not in available columns from column order", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { apple: "a", banana: "b" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+          column_order: ["zebra", "banana", "apple", "cat"],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      // Only banana and apple should be present (zebra and cat don't exist)
+      expect(labelColumns.length).toBe(2);
+      expect(labelColumns[0].name).toBe("banana");
+      expect(labelColumns[1].name).toBe("apple");
+    });
+
+    it("should apply column order in expanded_timeseries mode", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { zebra: "z", apple: "a", banana: "b" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "expanded_timeseries",
+          column_order: ["zebra", "apple", "banana"],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const labelColumns = result.columns.filter(
+        (c: any) => c.name !== "timestamp" && c.name !== "value",
+      );
+      expect(labelColumns[0].name).toBe("zebra");
+      expect(labelColumns[1].name).toBe("apple");
+      expect(labelColumns[2].name).toBe("banana");
+    });
+
+    it("should default to alphabetical sorting when no column order specified", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { zebra: "z", apple: "a", banana: "b" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+          column_order: [],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      expect(labelColumns[0].name).toBe("apple");
+      expect(labelColumns[1].name).toBe("banana");
+      expect(labelColumns[2].name).toBe("zebra");
+    });
+  });
+
+  describe("Edge Cases and Error Handling", () => {
+    it("should handle empty processedData array", () => {
+      const result = converter.convert([], { type: "table", config: {} }, mockStore, mockExtras);
+
+      expect(result.rows).toEqual([]);
+      expect(result.columns).toBeDefined();
+    });
+
+    it("should handle series with no values", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { job: "api" },
+              name: "metric",
+              data: [],
+              values: [],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "single",
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.rows).toEqual([]);
+    });
+
+    it("should handle multiple queries", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { job: "api" },
+              name: "query1",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+        {
+          series: [
+            {
+              metric: { job: "web" },
+              name: "query2",
+              data: [],
+              values: [[1234567890, "200"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.rows).toHaveLength(2);
+    });
+
+    it("should handle non-numeric string values", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { job: "api" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "NaN"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "single",
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.rows[0].value).toBeNaN();
+    });
+
+    it("should handle metric with many labels", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: {
+                job: "api",
+                instance: "localhost",
+                env: "prod",
+                region: "us-east",
+                zone: "1a",
+                pod: "pod-1",
+                container: "app",
+                namespace: "default",
+              },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      expect(labelColumns.length).toBe(8);
+    });
+  });
+
+  describe("Value Mapping Edge Cases", () => {
+    it("should handle value mapping when mapped text returns null", async () => {
+      const { findFirstValidMappedValue } =
+        await import("../convertDataIntoUnitValue");
+      vi.mocked(findFirstValidMappedValue).mockReturnValueOnce(null);
+
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: {},
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "single",
+          mappings: [{ type: "value", value: 50, text: "Medium" }],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      // Should fall back to unit formatting
+      const formatted = result.columns[1].format(100);
+      expect(formatted).toBeDefined();
+    });
+
+    it("should handle value mapping without text property", async () => {
+      const { findFirstValidMappedValue } =
+        await import("../convertDataIntoUnitValue");
+      vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({});
+
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { env: "prod" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+          mappings: [],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const envColumn = result.columns.find((c: any) => c.name === "env");
+      const formatted = envColumn.format("prod");
+      expect(formatted).toBe("prod");
+    });
+  });
+
+  describe("Multiple Value Columns", () => {
+    it("should create separate columns for multiple aggregations", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { job: "api" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"], [1234567900, "200"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+          table_aggregations: ["min", "max"],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const valueColumns = result.columns.filter((c: any) =>
+        c.name.startsWith("value_"),
+      );
+      expect(valueColumns).toHaveLength(2);
+      expect(valueColumns[0].name).toBe("value_min");
+      expect(valueColumns[1].name).toBe("value_max");
+      expect(valueColumns[0].label).toBe("Value (min)");
+      expect(valueColumns[1].label).toBe("Value (max)");
+    });
+
+    it("should apply unit override to multiple value columns", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            {
+              metric: { job: "api" },
+              name: "metric",
+              data: [],
+              values: [[1234567890, "100"]],
+            },
+          ],
+          timestamps: [],
+        },
+      ];
+
+      const panelSchema = {
+        type: "table",
+        config: {
+          promql_table_mode: "all",
+          table_aggregations: ["min", "max"],
+          override_config: [
+            {
+              field: { value: "value_min" },
+              config: [
+                {
+                  type: "unit",
+                  value: { unit: "bytes", customUnit: "" },
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      const minColumn = result.columns.find((c: any) => c.name === "value_min");
+      const formatted = minColumn.format(100);
+      expect(formatted).toBe("100.00B");
+    });
+  });
 });
+

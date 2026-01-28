@@ -237,8 +237,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(db::ai_prompts::watch());
     // Service streams watch only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() {
@@ -296,10 +294,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
-    #[cfg(feature = "enterprise")]
-    db::ai_prompts::cache()
-        .await
-        .expect("ai prompts cache failed");
     // Service streams cache only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() {
