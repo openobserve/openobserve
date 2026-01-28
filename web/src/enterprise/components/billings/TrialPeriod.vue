@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -50,6 +50,8 @@ import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import { getDueDays } from "@/utils/zincutils";
+import BillingService from "@/services/billings";
+
 
 export default defineComponent({
   name: "TrialPeriod",
@@ -76,8 +78,28 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
 
-    const showTrialPeriodMsg = ref((Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry") && store.state.organizationData.organizationSettings.free_trial_expiry != "" && store.state.organizationData.organizationSettings.free_trial_expiry != null) ? true : false);
-    
+    const hasTrialExpiry = Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry")
+      && store.state.organizationData.organizationSettings.free_trial_expiry != ""
+      && store.state.organizationData.organizationSettings.free_trial_expiry != null;
+
+    const showTrialPeriodMsg = ref(hasTrialExpiry);
+
+    // Check if org is on AWS billing - don't show trial message for AWS orgs
+    onMounted(async () => {
+      try {
+        const res = await BillingService.list_subscription(
+          store.state.selectedOrganization.identifier
+        );
+        if (res.data?.provider === "aws") {
+          // AWS billing - don't show trial period message
+          showTrialPeriodMsg.value = false;
+        }
+      } catch (e) {
+        // If fetch fails, keep the default behavior
+        console.error("Failed to fetch billing info:", e);
+      }
+    });
+
     const redirectBilling = () => {
       router.push('/billings/plans/')
     };
