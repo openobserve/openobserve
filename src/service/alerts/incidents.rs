@@ -524,7 +524,20 @@ pub async fn get_incident_with_alerts(
     let incident_org_id = incident.org_id.clone();
 
     // Convert to config types
-    let incident_data = model_to_incident(incident).await?;
+    let mut incident_data = model_to_incident(incident).await?;
+
+    // Fix alert_count from actual triggers (source of truth)
+    // This heals any inconsistencies from race conditions or historical bugs
+    let actual_count = incident_alerts.len() as i32;
+    if incident_data.alert_count != actual_count {
+        log::warn!(
+            "[incidents] Incident {} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            incident_id,
+            incident_data.alert_count,
+            actual_count
+        );
+        incident_data.alert_count = actual_count;
+    }
 
     // Convert incident_alerts to triggers
     let triggers: Vec<IncidentAlert> = incident_alerts
@@ -591,11 +604,29 @@ pub async fn list_incidents(
 
     let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
 
-    let incidents_list = incidents
+    // Get actual alert counts from junction table (source of truth)
+    let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
+    let actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
+
+    let incidents_list: Vec<Incident> = incidents
         .into_iter()
         .map(|i| {
-            // topology_context is not required while listing all incidents
-            model_to_incident_with_topology(i, None)
+            let mut incident = model_to_incident_with_topology(i.clone(), None);
+
+            // Fix alert_count from actual triggers (self-healing for corrupted data)
+            if let Some(&actual_count) = actual_counts.get(&i.id)
+                && incident.alert_count != actual_count
+            {
+                log::debug!(
+                    "[incidents] List: Incident {} alert_count mismatch: stored={}, actual={}",
+                    i.id,
+                    incident.alert_count,
+                    actual_count
+                );
+                incident.alert_count = actual_count;
+            }
+
+            incident
         })
         .collect();
 
