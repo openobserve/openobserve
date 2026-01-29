@@ -443,15 +443,21 @@ describe("CorrelatedLogsTable.vue", () => {
       expect(wrapper.vm.showingDefaultColumns).toBe(false);
     });
 
-    it("should compute availableFields from search results", () => {
-      wrapper = createWrapper();
+    it("should compute availableFields from search results", async () => {
       const mockResults = [
         { _timestamp: 123, field1: "a", field2: "b" },
         { _timestamp: 456, field1: "c", field3: "d" },
       ];
 
-      // Mock searchResults
-      wrapper.vm.searchResults = mockResults;
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: { value: mockResults },
+        hasResults: { value: true },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
 
       const fields = wrapper.vm.availableFields;
       expect(fields).toContain("_timestamp");
