@@ -753,17 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <!-- Header -->
-                <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b"
-                  :style="{
-                    background: 'var(--o2-table-header-bg)'
-                  }"
-                >
-                  <q-icon
-                    name="show_chart"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                    style="font-size: 18px;"
-                  />
+                <div class="tw:px-4 tw:pt-2 tw:pb-1">
                   <div
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
                     class="tw:text-sm tw:font-semibold"
@@ -792,14 +782,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                 >
                   <!-- Header -->
-                  <div
-                    class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b"
-                    :style="{
-                      background: 'var(--o2-table-header-bg)',
-                      borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
-                    }"
-                  >
-                    <q-icon name="info" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'" style="font-size: 18px;" />
+                  <div class="tw:px-4 tw:pt-2 tw:pb-1">
                     <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
                       Incident Details
                     </div>
@@ -822,10 +805,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
                         <q-icon
-                          name="content_copy"
-                          class="tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500 tw:transition-all tw:flex-shrink-0"
-                          style="font-size: 14px;"
-                          @click="copyToClipboard(incidentDetails?.id)"
+                          :name="copiedField === 'incident_id' ? 'check' : 'content_copy'"
+                          :class="copiedField === 'incident_id' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
+                          class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
+                          style="font-size: 14px; cursor: pointer;"
+                          @click="copyToClipboard(incidentDetails?.id, 'incident_id')"
                         />
                       </div>
                     </div>
@@ -845,10 +829,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
                         <q-icon
-                          name="content_copy"
-                          class="tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500 tw:transition-all tw:flex-shrink-0"
-                          style="font-size: 14px;"
-                          @click="copyToClipboard(incidentDetails?.title)"
+                          :name="copiedField === 'incident_title' ? 'check' : 'content_copy'"
+                          :class="copiedField === 'incident_title' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
+                          class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
+                          style="font-size: 14px; cursor: pointer;"
+                          @click="copyToClipboard(incidentDetails?.title, 'incident_title')"
                         />
                       </div>
                     </div>
@@ -868,10 +853,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.correlation_key || 'N/A' }}</span>
                         <q-icon
-                          name="content_copy"
-                          class="tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500 tw:transition-all tw:flex-shrink-0"
-                          style="font-size: 14px;"
-                          @click="copyToClipboard(incidentDetails?.correlation_key)"
+                          :name="copiedField === 'correlation_key' ? 'check' : 'content_copy'"
+                          :class="copiedField === 'correlation_key' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
+                          class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
+                          style="font-size: 14px; cursor: pointer;"
+                          @click="copyToClipboard(incidentDetails?.correlation_key, 'correlation_key')"
                         />
                       </div>
                     </div>
@@ -906,18 +892,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                 >
                   <!-- Header -->
-                  <div
-                    class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:border-b"
-                    :style="{
-                      background: 'var(--o2-table-header-bg)',
-                      borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
-                    }"
-                  >
-                    <div class="tw:flex tw:items-center tw:gap-2">
-                      <q-icon name="schedule" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'" style="font-size: 18px;" />
-                      <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
-                        Incident Timeline
-                      </div>
+                  <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3">
+                    <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
+                      Incident Timeline
                     </div>
                     <div
                       class="tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-medium"
@@ -1017,17 +994,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <!-- Header -->
-                <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b"
-                  :style="{
-                    background: 'var(--o2-table-header-bg)'
-                  }"
-                >
-                  <q-icon
-                    name="tune"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                    style="font-size: 18px;"
-                  />
+                <div class="tw:px-4 tw:pt-2 tw:pb-1">
                   <div
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
                     class="tw:text-sm tw:font-semibold"
@@ -1114,17 +1081,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <!-- Header -->
-                <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b"
-                  :style="{
-                    background: 'var(--o2-table-header-bg)'
-                  }"
-                >
-                  <q-icon
-                    name="label"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                    style="font-size: 18px;"
-                  />
+                <div class="tw:px-4 tw:pt-2 tw:pb-1">
                   <div
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
                     class="tw:text-sm tw:font-semibold"
@@ -1180,20 +1137,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <!-- Header -->
-                <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-2 tw:border-b"
-                  :style="{
-                    background: 'var(--o2-table-header-bg)'
-                  }"
-                >
-                  <q-icon
-                    name="bolt"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                    style="font-size: 16px;"
-                  />
+                <div class="tw:px-4 tw:pt-2 tw:pb-1">
                   <div
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
-                    class="tw:text-xs tw:font-semibold"
+                    class="tw:text-sm tw:font-semibold"
                   >
                     Quick Actions
                   </div>
@@ -1752,6 +1699,36 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const router = useRouter();
+
+    // Copy to clipboard state
+    const copiedField = ref<string | null>(null);
+
+    // Copy to clipboard function with visual feedback
+    const copyToClipboard = (text: string, fieldName: string) => {
+      if (!text) return;
+
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          copiedField.value = fieldName;
+          $q.notify({
+            type: "positive",
+            message: "Copied to clipboard",
+            timeout: 2000,
+          });
+          // Reset the icon after 2 seconds
+          setTimeout(() => {
+            copiedField.value = null;
+          }, 2000);
+        })
+        .catch(() => {
+          $q.notify({
+            type: "negative",
+            message: "Failed to copy to clipboard",
+            timeout: 2000,
+          });
+        });
+    };
 
     const loading = ref(false);
     const updating = ref(false);
@@ -3173,6 +3150,8 @@ export default defineComponent({
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,
+      copyToClipboard,
+      copiedField,
       calculateDuration,
       formatRcaContent,
       getTimezone,
