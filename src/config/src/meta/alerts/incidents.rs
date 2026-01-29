@@ -321,31 +321,6 @@ pub struct IncidentStats {
     pub alerts_per_incident_avg: f64,
 }
 
-/// Alert flow graph visualization for an incident
-///
-/// Shows how alerts cascaded across services over time, with nodes representing
-/// unique (service, alert) pairs and edges showing temporal and dependency relationships.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
-pub struct IncidentServiceGraph {
-    /// Alert nodes in the flow graph
-    pub nodes: Vec<AlertNode>,
-    /// Edges showing alert flow (temporal + service dependencies)
-    pub edges: Vec<AlertEdge>,
-    /// Summary statistics
-    pub stats: IncidentGraphStats,
-}
-
-/// Summary statistics for the incident service graph
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
-pub struct IncidentGraphStats {
-    /// Total number of services in the graph
-    pub total_services: usize,
-    /// Total number of alerts across all services
-    pub total_alerts: u32,
-    /// Number of services that have at least one alert
-    pub services_with_alerts: usize,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -21,13 +21,6 @@ import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
-// Mock services
-vi.mock("@/services/incidents", () => ({
-  default: {
-    getServiceGraph: vi.fn(),
-  },
-}));
-
 // Mock ChartRenderer component
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   default: {
@@ -35,8 +28,6 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
     template: '<div data-test="chart-renderer"></div>',
   },
 }));
-
-import incidentsService from "@/services/incidents";
 
 installQuasar({ plugins: [Notify] });
 
