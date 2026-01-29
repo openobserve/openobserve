@@ -293,11 +293,11 @@ export default defineComponent({
       });
     };
 
-    onMounted(() => {
-      updateColorizedQueries();
-    });
-
-    watch(() => props.metaData, updateColorizedQueries, { deep: true });
+    watch(
+      () => props.metaData,
+      updateColorizedQueries,
+      { deep: true, immediate: true }
+    );
 
     return {
       store,
