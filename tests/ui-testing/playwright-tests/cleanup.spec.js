@@ -120,7 +120,11 @@ test.describe("Pre-Test Cleanup", () => {
         /^scheurl\d+$/,       // scheurl556, scheurl149, etc. (pipelineImport.spec.js)
         /^schefile\d+$/,      // schefile399, schefile971, etc. (pipelineImport.spec.js)
         /^realurl\d+$/,       // realurl822, etc. (pipelineImport.spec.js)
-        /^realfile\d+$/       // realfile123, etc. (pipelineImport.spec.js) - was missing!
+        /^realfile\d+$/,      // realfile123, etc. (pipelineImport.spec.js) - was missing!
+        /^metrics-pipeline-/,           // metrics-pipeline-* (scheduled pipeline tests)
+        /^traces-pipeline-/,            // traces-pipeline-* (scheduled pipeline tests)
+        /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
+        /^metrics-condition-pipeline-/  // metrics-condition-pipeline-* (scheduled pipeline tests)
       ]
     );
 
@@ -136,7 +140,10 @@ test.describe("Pre-Test Cleanup", () => {
       /^first\d{1,3}$/,              // first0, first1, first99
       /^second\d{1,3}$/,             // second0, second1, second99
       /^sanitytest_/,                // sanitytest_a3f2, etc.
-      /^e2eautomatefunctions_/       // e2eautomatefunctions_x9y2, etc.
+      /^e2eautomatefunctions_/,      // e2eautomatefunctions_x9y2, etc.
+      /^vrl_func_/,                  // vrl_func_* (pipeline-core.spec.js VRL function tests)
+      /^vrl_traces_func_/,           // vrl_traces_func_* (pipeline VRL function tests for traces)
+      /^vrl_metrics_func_/           // vrl_metrics_func_* (pipeline VRL function tests for metrics)
     ];
 
     // Patterns from Functions folder tests (js-transform-type.spec.js)
@@ -186,7 +193,7 @@ test.describe("Pre-Test Cleanup", () => {
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
-      /^search_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // search_test_<uuid>_csv (search filter test)
+      /^search_test_[a-f0-9]{8}/,                                                            // search_test_<uuid>* (search filter test - matches both old short and new full UUID patterns)
       /^edit_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // edit_test_<uuid>_csv (edit workflow test)
       /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // delete_test_<uuid>_csv (delete confirmation test)
       // URL-based enrichment table tests (enrichment-table-url.spec.js) - uses UUID first segment (8 hex chars)
@@ -216,6 +223,19 @@ test.describe("Pre-Test Cleanup", () => {
       /^api_test_manual_\d+$/                                                                 // api_test_manual_<timestamp> (manual curl tests)
     ]);
 
+    // Clean up URL-based enrichment tables (those showing "NaN MB" in UI)
+    // These are tracked separately in /api/{org}/enrichment_tables/status
+    await pm.apiCleanup.cleanupUrlEnrichmentTables([
+      /^schema_mismatch_[a-f0-9]{8}$/,    // schema_mismatch_<uuid> (schema mismatch URL tests)
+      /^schema_view_[a-f0-9]{8}$/,        // schema_view_<uuid> (schema view URL tests)
+      /^url_404_[a-f0-9]{8}$/,            // url_404_<uuid> (404 error URL tests)
+      /^url_lifecycle_[a-f0-9]{8}$/,      // url_lifecycle_<uuid> (lifecycle URL tests)
+      /^invalid_url_[a-f0-9]{8}$/,        // invalid_url_<uuid> (invalid URL tests)
+      /^cancel_test_[a-f0-9]{8}$/,        // cancel_test_<uuid> (cancel URL tests)
+      /^toggle_test_[a-f0-9]{8}$/,        // toggle_test_<uuid> (toggle URL tests)
+      /^edit_form_[a-f0-9]{8}$/           // edit_form_<uuid> (edit form URL tests)
+    ]);
+
     // Clean up streams matching test patterns
     await pm.apiCleanup.cleanupStreams(
       [
@@ -225,6 +245,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^sdr_/,                       // sdr_* (SDR test streams)
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
         /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
+        /^e2e_apostrophe_/,            // e2e_apostrophe_* (Bug #9475 apostrophe test streams from logs-regression.spec.js)
         /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
         /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
         /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
@@ -260,7 +281,9 @@ test.describe("Pre-Test Cleanup", () => {
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
         /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
-        /^e2e_test_traces$/                            // Pipeline regression test traces stream (Issue #9901)
+        /^e2e_test_traces$/,                           // Pipeline regression test traces stream (Issue #9901)
+        /^e2e_traces_pipeline_test$/,                  // Pipeline test traces stream
+        /^e2e_traces_\d+_[a-z0-9]+$/                   // Dynamic traces streams (e2e_traces_<timestamp>_<suffix>)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
