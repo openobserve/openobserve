@@ -25,18 +25,18 @@ use config::meta::actions::action::ActionType;
 use o2_enterprise::enterprise::actions::action_deployer::ACTION_DEPLOYER;
 
 pub async fn create_job(Path(org_id): Path<String>, body: Bytes) -> Response {
-    log::info!("[script_server] create_job called for org_id: {org_id}");
+    log::info!("[action_server] create_job called for org_id: {org_id}");
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.create_app(&org_id, body).await {
             Ok(created_at) => {
-                log::info!("[script_server] create_job success for org_id: {org_id}");
+                log::info!("[action_server] create_job success for org_id: {org_id}");
                 Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::from(created_at.to_rfc3339()))
                     .unwrap()
             }
             Err(e) => {
-                log::error!("[script_server] create_job failed for org_id: {org_id}, error: {e}");
+                log::error!("[action_server] create_job failed for org_id: {org_id}, error: {e}");
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -48,7 +48,7 @@ pub async fn create_job(Path(org_id): Path<String>, body: Bytes) -> Response {
         };
     }
 
-    log::error!("[script_server] create_job failed: AppDeployer not initialized");
+    log::error!("[action_server] create_job failed: AppDeployer not initialized");
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .header(header::CONTENT_TYPE, "application/json")
@@ -59,11 +59,11 @@ pub async fn create_job(Path(org_id): Path<String>, body: Bytes) -> Response {
 }
 
 pub async fn delete_job(Path((org_id, name)): Path<(String, String)>) -> Response {
-    log::info!("[script_server] delete_job called for org_id: {org_id}, name: {name}");
+    log::info!("[action_server] delete_job called for org_id: {org_id}, name: {name}");
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.delete_app(&org_id, &name).await {
             Ok(_) => {
-                log::info!("[script_server] delete_job success for org_id: {org_id}, name: {name}");
+                log::info!("[action_server] delete_job success for org_id: {org_id}, name: {name}");
                 Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::empty())
@@ -71,7 +71,7 @@ pub async fn delete_job(Path((org_id, name)): Path<(String, String)>) -> Respons
             }
             Err(e) => {
                 log::error!(
-                    "[script_server] delete_job failed for org_id: {org_id}, name: {name}, error: {e}"
+                    "[action_server] delete_job failed for org_id: {org_id}, name: {name}, error: {e}"
                 );
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -83,7 +83,7 @@ pub async fn delete_job(Path((org_id, name)): Path<(String, String)>) -> Respons
             }
         };
     }
-    log::error!("[script_server] delete_job failed: AppDeployer not initialized");
+    log::error!("[action_server] delete_job failed: AppDeployer not initialized");
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .header(header::CONTENT_TYPE, "application/json")
@@ -94,12 +94,12 @@ pub async fn delete_job(Path((org_id, name)): Path<(String, String)>) -> Respons
 }
 
 pub async fn get_app_details(Path((org_id, name)): Path<(String, String)>) -> Response {
-    log::info!("[script_server] get_app_details called for org_id: {org_id}, name: {name}");
+    log::info!("[action_server] get_app_details called for org_id: {org_id}, name: {name}");
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.get_app_status(&org_id, &name).await {
             Ok(resp) => {
                 log::info!(
-                    "[script_server] get_app_details success for org_id: {org_id}, name: {name}"
+                    "[action_server] get_app_details success for org_id: {org_id}, name: {name}"
                 );
                 Response::builder()
                     .status(StatusCode::OK)
@@ -109,7 +109,7 @@ pub async fn get_app_details(Path((org_id, name)): Path<(String, String)>) -> Re
             }
             Err(e) => {
                 log::error!(
-                    "[script_server] get_app_details failed for org_id: {org_id}, name: {name}, error: {e}"
+                    "[action_server] get_app_details failed for org_id: {org_id}, name: {name}, error: {e}"
                 );
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -121,7 +121,7 @@ pub async fn get_app_details(Path((org_id, name)): Path<(String, String)>) -> Re
             }
         };
     }
-    log::error!("[script_server] get_app_details failed: AppDeployer not initialized");
+    log::error!("[action_server] get_app_details failed: AppDeployer not initialized");
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .header(header::CONTENT_TYPE, "application/json")
@@ -132,12 +132,12 @@ pub async fn get_app_details(Path((org_id, name)): Path<(String, String)>) -> Re
 }
 
 pub async fn list_deployed_apps(Path(org_id): Path<String>) -> Response {
-    log::info!("[script_server] list_deployed_apps called for org_id: {org_id}");
+    log::info!("[action_server] list_deployed_apps called for org_id: {org_id}");
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.list_apps(&org_id).await {
             Ok(resp) => {
                 log::info!(
-                    "[script_server] list_deployed_apps success for org_id: {org_id}, count: {}",
+                    "[action_server] list_deployed_apps success for org_id: {org_id}, count: {}",
                     resp.len()
                 );
                 Response::builder()
@@ -148,7 +148,7 @@ pub async fn list_deployed_apps(Path(org_id): Path<String>) -> Response {
             }
             Err(e) => {
                 log::error!(
-                    "[script_server] list_deployed_apps failed for org_id: {org_id}, error: {e}"
+                    "[action_server] list_deployed_apps failed for org_id: {org_id}, error: {e}"
                 );
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -161,7 +161,7 @@ pub async fn list_deployed_apps(Path(org_id): Path<String>) -> Response {
         };
     }
 
-    log::error!("[script_server] list_deployed_apps failed: AppDeployer not initialized");
+    log::error!("[action_server] list_deployed_apps failed: AppDeployer not initialized");
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .header(header::CONTENT_TYPE, "application/json")
@@ -177,14 +177,14 @@ pub async fn patch_action(
     Query(query): Query<HashMap<String, String>>,
     body: Bytes,
 ) -> Response {
-    log::info!("[script_server] patch_action called for org_id: {org_id}, id: {id}");
+    log::info!("[action_server] patch_action called for org_id: {org_id}, id: {id}");
     // Extract the "action_type" from query parameters and handle missing cases properly
     let action_type: ActionType = match query.get("action_type") {
         Some(value) => match value.clone().as_str().try_into() {
             Ok(action_type) => action_type,
             Err(e) => {
                 log::error!(
-                    "[script_server] patch_action failed: invalid action_type for org_id: {org_id}, id: {id}, error: {e}"
+                    "[action_server] patch_action failed: invalid action_type for org_id: {org_id}, id: {id}, error: {e}"
                 );
                 return Response::builder()
                     .status(StatusCode::BAD_REQUEST)
@@ -197,7 +197,7 @@ pub async fn patch_action(
         },
         None => {
             log::error!(
-                "[script_server] patch_action failed: missing action_type parameter for org_id: {org_id}, id: {id}"
+                "[action_server] patch_action failed: missing action_type parameter for org_id: {org_id}, id: {id}"
             );
             return Response::builder()
                 .status(StatusCode::BAD_REQUEST)
@@ -212,7 +212,7 @@ pub async fn patch_action(
             .await
         {
             Ok(modified_at) => {
-                log::info!("[script_server] patch_action success for org_id: {org_id}, id: {id}");
+                log::info!("[action_server] patch_action success for org_id: {org_id}, id: {id}");
                 Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::from(modified_at.to_rfc3339()))
@@ -220,7 +220,7 @@ pub async fn patch_action(
             }
             Err(e) => {
                 log::error!(
-                    "[script_server] patch_action failed for org_id: {org_id}, id: {id}, error: {e}"
+                    "[action_server] patch_action failed for org_id: {org_id}, id: {id}, error: {e}"
                 );
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -233,7 +233,7 @@ pub async fn patch_action(
         };
     }
 
-    log::error!("[script_server] patch_action failed: AppDeployer not initialized");
+    log::error!("[action_server] patch_action failed: AppDeployer not initialized");
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .header(header::CONTENT_TYPE, "application/json")
