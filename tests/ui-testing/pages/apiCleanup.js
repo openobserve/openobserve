@@ -582,7 +582,8 @@ class APICleanup {
             });
 
             if (!response.ok) {
-                testLogger.error('Failed to fetch URL enrichment tables', { status: response.status });
+                const errorBody = await response.text();
+                testLogger.error('Failed to fetch URL enrichment tables', { status: response.status, body: errorBody });
                 return [];
             }
 
