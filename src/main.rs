@@ -1350,7 +1350,7 @@ pub fn create_script_server_router() -> axum::Router {
         Router,
         extract::DefaultBodyLimit,
         middleware,
-        routing::{delete, get, patch, post},
+        routing::{get, post},
     };
     use openobserve::handler::http::{request::script_server, router::cors_layer};
 
@@ -1358,12 +1358,18 @@ pub fn create_script_server_router() -> axum::Router {
     let base_uri = &cfg.common.base_uri;
 
     // Create script server routes with authentication
+    // Routes match action_manager.rs expected URLs: /api/{org_id}/v1/job[/{id}]
     let api_routes = Router::new()
-        .route("/{org_id}/job", post(script_server::create_job))
-        .route("/{org_id}/job/{name}", delete(script_server::delete_job))
-        .route("/{org_id}/app/{name}", get(script_server::get_app_details))
-        .route("/{org_id}/apps", get(script_server::list_deployed_apps))
-        .route("/{org_id}/action/{id}", patch(script_server::patch_action))
+        .route(
+            "/{org_id}/v1/job",
+            post(script_server::create_job).get(script_server::list_deployed_apps),
+        )
+        .route(
+            "/{org_id}/v1/job/{name}",
+            get(script_server::get_app_details)
+                .delete(script_server::delete_job)
+                .put(script_server::patch_action),
+        )
         .layer(middleware::from_fn(
             openobserve::handler::http::auth::script_server::auth_middleware,
         ))
