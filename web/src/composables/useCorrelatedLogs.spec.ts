@@ -412,7 +412,8 @@ describe("useCorrelatedLogs", () => {
       // Clear any previous calls from initialization
       mockFetchQueryDataWithHttpStream.mockClear();
 
-      await composable.refresh();
+      composable.refresh();
+      await nextTick();
 
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
     });
@@ -544,6 +545,7 @@ describe("useCorrelatedLogs", () => {
       const composable = useCorrelatedLogs(props);
 
       await composable.fetchCorrelatedLogs();
+      await nextTick();
       expect(composable.hasError.value).toBe(true);
 
       // Should be able to recover and try again
@@ -557,7 +559,10 @@ describe("useCorrelatedLogs", () => {
           return Promise.resolve();
         }
       );
-      await composable.refresh();
+
+      const refreshPromise = composable.refresh();
+      await nextTick();
+      await refreshPromise;
       await nextTick();
 
       expect(composable.loading.value).toBe(false);
