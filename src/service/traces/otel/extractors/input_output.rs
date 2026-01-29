@@ -44,14 +44,11 @@ impl InputOutputExtractor {
         }
 
         // Langfuse (support both dot and underscore formats)
-        if let Some(input) = attributes
-            .get(LangfuseAttributes::OBSERVATION_INPUT)
-            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_INPUT_UNDERSCORE))
-        {
+        if let Some(input) = attributes.get(LangfuseAttributes::OBSERVATION_INPUT) {
             let output = attributes
                 .get(LangfuseAttributes::OBSERVATION_OUTPUT)
-                .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_OUTPUT_UNDERSCORE));
-            return (Some(input.clone()), output.cloned());
+                .cloned();
+            return (Some(input.clone()), output);
         }
 
         // TraceLoop (with direct attributes)
@@ -213,9 +210,7 @@ impl InputOutputExtractor {
             GenAiAttributes::TOOL_CALL_RESULT,
             // Langfuse (both dot and underscore formats)
             LangfuseAttributes::OBSERVATION_INPUT,
-            LangfuseAttributes::OBSERVATION_INPUT_UNDERSCORE,
             LangfuseAttributes::OBSERVATION_OUTPUT,
-            LangfuseAttributes::OBSERVATION_OUTPUT_UNDERSCORE,
         ];
 
         // Check exact matches

@@ -287,7 +287,6 @@ pub async fn get_is_llm_stream(org_id: &str, stream_name: &str, stream_type: Str
     false
 }
 
-
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;

@@ -92,10 +92,7 @@ mod tests {
     fn test_extract_tool_name() {
         let extractor = ToolExtractor;
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.tool.name".to_string(),
-            json::json!("get_weather"),
-        );
+        attrs.insert("gen_ai.tool.name".to_string(), json::json!("get_weather"));
 
         let result = extractor.extract_tool_name(&attrs);
         assert_eq!(result, Some("get_weather".to_string()));
@@ -199,10 +196,7 @@ mod tests {
     fn test_extract_tool_name_prefers_gen_ai() {
         let extractor = ToolExtractor;
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.tool.name".to_string(),
-            json::json!("get_weather"),
-        );
+        attrs.insert("gen_ai.tool.name".to_string(), json::json!("get_weather"));
         attrs.insert(
             "langfuse_observation_metadata_tool_name".to_string(),
             json::json!("Read"),

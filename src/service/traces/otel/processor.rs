@@ -26,8 +26,8 @@ use super::{
     attributes::O2Attributes,
     extractors::{
         InputOutputExtractor, MetadataExtractor, ModelExtractor, ParametersExtractor,
-        PromptExtractor, ProviderExtractor, ScopeInfo, ToolExtractor, UsageExtractor,
-        map_to_observation_type,
+        PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor, ToolExtractor,
+        UsageExtractor, map_to_observation_type,
     },
 };
 use crate::common::meta::traces::Event;
@@ -41,6 +41,7 @@ pub struct OtelIngestionProcessor {
     metadata_extractor: MetadataExtractor,
     prompt_extractor: PromptExtractor,
     tool_extractor: ToolExtractor,
+    service_name_extractor: ServiceNameExtractor,
 }
 
 impl Default for OtelIngestionProcessor {
@@ -60,7 +61,18 @@ impl OtelIngestionProcessor {
             metadata_extractor: MetadataExtractor,
             prompt_extractor: PromptExtractor,
             tool_extractor: ToolExtractor,
+            service_name_extractor: ServiceNameExtractor,
         }
+    }
+
+    /// Extract service name from span attributes as a fallback
+    /// Returns the extracted service name or None if no valid source is found
+    pub fn extract_service_name_from_span(
+        &self,
+        span_attributes: &HashMap<String, json::Value>,
+    ) -> Option<String> {
+        self.service_name_extractor
+            .extract_from_span_attributes(span_attributes)
     }
 
     /// Process span attributes and enrich them with OpenObserve-specific fields

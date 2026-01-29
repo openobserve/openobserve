@@ -33,7 +33,6 @@ impl ModelExtractor {
             VercelAiSdkAttributes::MODEL_ID,
             GenAiAttributes::REQUEST_MODEL,
             LangfuseAttributes::OBSERVATION_MODEL,
-            LangfuseAttributes::OBSERVATION_MODEL_UNDERSCORE,
             OpenInferenceAttributes::LLM_RESPONSE_MODEL,
             OpenInferenceAttributes::LLM_MODEL_NAME,
             "model",

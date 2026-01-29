@@ -245,6 +245,7 @@ pub async fn handle_otlp_request(
     let otel_processor = OtelIngestionProcessor::new();
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        let mut service_name_explicitly_set = false;
         if let Some(resource) = res_span.resource {
             for res_attr in resource.attributes {
                 if res_attr.key.eq(SERVICE_NAME) {
@@ -252,6 +253,9 @@ pub async fn handle_otlp_request(
                     if let Some(name) = loc_service_name.as_str() {
                         service_name = name.to_string();
                         service_att_map.insert(SERVICE_NAME.to_string(), loc_service_name);
+                        if service_name.to_lowercase().replace("_", " ") != "unknown service" {
+                            service_name_explicitly_set = true;
+                        }
                     }
                 } else {
                     service_att_map.insert(
@@ -303,6 +307,18 @@ pub async fn handle_otlp_request(
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
+                // Use span attributes as service_name fallback if service_name is not explicitly
+                // set This handles the case where service.name is not present in
+                // resource attributes
+                if cfg.common.traces_otel_llm_transform_enabled
+                    && !service_name_explicitly_set
+                    && let Some(val) = otel_processor.extract_service_name_from_span(&span_att_map)
+                {
+                    service_name = val.clone();
+                    service_att_map.insert(SERVICE_NAME.to_string(), json::json!(val));
+                    service_name_explicitly_set = true;
+                }
+
                 // special addition for https://github.com/openobserve/openobserve/issues/4851
                 // we set the status (error/non-error) properly, but skip the message
                 // however, that can be useful when debugging with traces, so we
@@ -345,7 +361,6 @@ pub async fn handle_otlp_request(
                         is_llm_stream = true;
                         need_mark_llm_stream = true;
                     }
-
                 }
 
                 let mut links = vec![];
@@ -641,7 +656,7 @@ pub async fn ingest_json(
     // llm stream detection
     let mut is_llm_stream = false;
     let mut need_mark_llm_stream = false;
-    if infra::schema::get_is_llm_stream(org_id, &traces_stream_name, StreamType::Traces).await {
+    if infra::schema::get_is_llm_stream(org_id, traces_stream_name, StreamType::Traces).await {
         is_llm_stream = true;
     }
 
@@ -763,7 +778,7 @@ pub async fn ingest_json(
     if need_mark_llm_stream
         && let Err(e) = super::db::schema::set_stream_is_llm(
             org_id,
-            &traces_stream_name,
+            traces_stream_name,
             StreamType::Traces,
             true,
         )

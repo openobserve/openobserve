@@ -75,17 +75,13 @@ impl ParametersExtractor {
         }
 
         // Langfuse model parameters (support both dot and underscore formats)
-        if let Some(val) = attributes
-            .get(LangfuseAttributes::OBSERVATION_MODEL_PARAMETERS)
-            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_MODEL_PARAMETERS_UNDERSCORE))
+        if let Some(val) = attributes.get(LangfuseAttributes::OBSERVATION_MODEL_PARAMETERS)
+            && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
         {
-            if let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
-            {
-                for (k, v) in parsed {
-                    params.insert(k, self.sanitize_param_value(&v));
-                }
-                return params;
+            for (k, v) in parsed {
+                params.insert(k, self.sanitize_param_value(&v));
             }
+            return params;
         }
 
         // Pydantic-AI model_config

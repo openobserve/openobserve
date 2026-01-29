@@ -104,19 +104,15 @@ impl UsageExtractor {
         }
 
         // Langfuse usage_details (support both dot and underscore formats)
-        if let Some(val) = attributes
-            .get(LangfuseAttributes::OBSERVATION_USAGE_DETAILS)
-            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_USAGE_DETAILS_UNDERSCORE))
+        if let Some(val) = attributes.get(LangfuseAttributes::OBSERVATION_USAGE_DETAILS)
+            && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
         {
-            if let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
-            {
-                for (k, v) in parsed {
-                    if let Some(num) = extract_i64(&v) {
-                        usage.insert(k, num);
-                    }
+            for (k, v) in parsed {
+                if let Some(num) = extract_i64(&v) {
+                    usage.insert(k, num);
                 }
-                return usage;
             }
+            return usage;
         }
 
         usage
@@ -133,19 +129,15 @@ impl UsageExtractor {
         }
 
         // Langfuse cost_details (support both dot and underscore formats)
-        if let Some(val) = attributes
-            .get(LangfuseAttributes::OBSERVATION_COST_DETAILS)
-            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_COST_DETAILS_UNDERSCORE))
+        if let Some(val) = attributes.get(LangfuseAttributes::OBSERVATION_COST_DETAILS)
+            && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
         {
-            if let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
-            {
-                for (k, v) in parsed {
-                    if let Some(num) = extract_f64(&v) {
-                        cost.insert(k, num);
-                    }
+            for (k, v) in parsed {
+                if let Some(num) = extract_f64(&v) {
+                    cost.insert(k, num);
                 }
-                return cost;
             }
+            return cost;
         }
 
         cost

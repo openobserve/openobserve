@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use crate::service::traces::otel::attributes::{
-    GenAiAttributes, OtelAttributes, VercelAiSdkAttributes,
+    GenAiAttributes, LangfuseAttributes, OtelAttributes, VercelAiSdkAttributes,
 };
 
 pub struct MetadataExtractor;
@@ -49,6 +49,8 @@ impl MetadataExtractor {
             OtelAttributes::SESSION_ID,
             GenAiAttributes::CONVERSATION_ID,
             VercelAiSdkAttributes::TELEMETRY_METADATA_SESSION_ID,
+            LangfuseAttributes::OBSERVATION_METADATA_LANGFUSE_SESSION_ID,
+            LangfuseAttributes::OBSERVATION_METADATA_SESSION_ID,
         ];
 
         for key in &session_id_keys {

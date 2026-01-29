@@ -32,10 +32,7 @@ impl PromptExtractor {
         }
 
         // Check Langfuse attributes (support both dot and underscore formats)
-        if let Some(value) = attributes
-            .get(LangfuseAttributes::OBSERVATION_PROMPT_NAME)
-            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_PROMPT_NAME_UNDERSCORE))
-        {
+        if let Some(value) = attributes.get(LangfuseAttributes::OBSERVATION_PROMPT_NAME) {
             return value.as_str().map(|s| s.to_string());
         }
 

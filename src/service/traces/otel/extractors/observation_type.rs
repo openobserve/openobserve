@@ -22,7 +22,9 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use super::super::attributes::{GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes};
-use crate::service::traces::otel::attributes::{FrameworkAttributes, LLMAttributes};
+use crate::service::traces::otel::attributes::{
+    FrameworkAttributes, LLMAttributes, LangfuseAttributes,
+};
 
 /// Observation types supported by OpenObserve
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,6 +138,23 @@ pub fn map_to_observation_type(
             "RETRIEVER" => return ObservationType::Retriever,
             "EVALUATOR" => return ObservationType::Evaluator,
             "GUARDRAIL" => return ObservationType::Guardrail,
+            _ => {}
+        }
+    }
+
+    // Langfuse Span Kind
+    if let Some(span_kind) = attributes
+        .get(LangfuseAttributes::OBSERVATION_TYPE)
+        .and_then(|v| v.as_str())
+    {
+        match span_kind.to_uppercase().as_str() {
+            "GENERATION" => return ObservationType::Generation,
+            "CHAIN" => return ObservationType::Chain,
+            "EMBEDDING" => return ObservationType::Embedding,
+            "AGENT" => return ObservationType::Agent,
+            "TOOL" => return ObservationType::Tool,
+            "SPAN" => return ObservationType::Span,
+            "RETRIEVER" => return ObservationType::Retriever,
             _ => {}
         }
     }
