@@ -286,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 mode="expanded"
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
+                :hide-view-related="hideViewRelatedButton"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
@@ -352,6 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :column="cell.column"
                     :row="cell.row.original as any"
                     :selectedStreamFields="selectedStreamFields"
+                    :hide-search-term-actions="hideSearchTermActions"
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
@@ -489,6 +491,14 @@ const props = defineProps({
     type: Array as PropType<StreamField[]>,
     default: () => [],
   },
+  hideSearchTermActions: {
+    type: Boolean,
+    default: false,
+  },
+  hideViewRelatedButton: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const { t } = useI18n();
@@ -608,6 +618,25 @@ watch(
     deep: true,
   },
 );
+
+// watch(
+//   () => props.highlightQuery,
+//   async (newVal, oldVal) => {
+//     // Only re-process if highlightQuery actually changed and we have data
+//     if (newVal !== oldVal && props.columns?.length && tableRows.value?.length) {
+//       await nextTick();
+
+//       processHitsInChunks(
+//         tableRows.value,
+//         props.columns,
+//         true, // Clear cache to re-process with new highlight query
+//         props.highlightQuery,
+//         100,
+//         selectedStreamFtsKeys.value,
+//       );
+//     }
+//   },
+// );
 
 watch(
   () => columnOrder.value,
