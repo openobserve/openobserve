@@ -238,24 +238,9 @@ export const useSearchResponseHandler = () => {
     const isNewSearch = currentTraceId !== payload.traceId;
 
     if (isNewSearch) {
-      console.log('[handleStreamingHits] ✅ New search detected (traceId changed), clearing dedup set', {
-        previousTraceId: currentTraceId,
-        newTraceId: payload.traceId,
-        previousSetSize: processedHitIds.size,
-      });
       processedHitIds.clear();
       currentTraceId = payload.traceId;
     }
-
-    const currentPartition = searchPartitionMap[payload.traceId]?.partition;
-
-    console.log('[handleStreamingHits] Received hits:', {
-      count: hits.length,
-      traceId: payload.traceId,
-      partition: currentPartition,
-      processedIdsCount: processedHitIds.size,
-      isNewSearch: isNewSearch,
-    });
 
     // Generate unique ID for each hit and filter duplicates
     const newHits = hits.filter((hit: any) => {
@@ -263,7 +248,6 @@ export const useSearchResponseHandler = () => {
       const hitId = generateHitHash(hit);
 
       if (processedHitIds.has(hitId)) {
-        console.log('[handleStreamingHits] Duplicate detected, hitId:', hitId.substring(0, 100));
         return false;
       }
 
@@ -272,12 +256,6 @@ export const useSearchResponseHandler = () => {
     });
 
     if (newHits.length === 0) {
-      console.warn('[handleStreamingHits] All hits filtered as duplicates:', {
-        totalHits: hits.length,
-        traceId: payload.traceId,
-        partition: searchPartitionMap[payload.traceId]?.partition,
-        processedIdsCount: processedHitIds.size,
-      });
       return;
     }
 
