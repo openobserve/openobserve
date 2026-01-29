@@ -373,18 +373,18 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
     // Extract headers to forward to agent for tracking
     let mut forward_headers = std::collections::HashMap::new();
-    if let Some(session_id) = parts.headers.get("x-o2-assistant-session-id") {
-        if let Ok(val) = session_id.to_str() {
-            forward_headers.insert("x-o2-assistant-session-id".to_string(), val.to_string());
-        }
+    if let Some(session_id) = parts.headers.get("x-o2-assistant-session-id")
+        && let Ok(val) = session_id.to_str()
+    {
+        forward_headers.insert("x-o2-assistant-session-id".to_string(), val.to_string());
     }
     if !auth_data.traceparent.is_empty() {
         forward_headers.insert("traceparent".to_string(), auth_data.traceparent.clone());
     }
-    if let Some(user_agent) = parts.headers.get("user-agent") {
-        if let Ok(val) = user_agent.to_str() {
-            forward_headers.insert("user-agent".to_string(), val.to_string());
-        }
+    if let Some(user_agent) = parts.headers.get("user-agent")
+        && let Ok(val) = user_agent.to_str()
+    {
+        forward_headers.insert("user-agent".to_string(), val.to_string());
     }
 
     // Parse JSON body
