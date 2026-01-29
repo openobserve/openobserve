@@ -632,6 +632,7 @@ export default defineComponent({
         );
 
         // Mark current tab and panel as visible so their variables can load
+        // This needs to happen BEFORE loading from URL so tab/panel scoped variables exist
         if (tabId) {
           variablesManager.setTabVisibility(tabId, true);
         }
@@ -640,6 +641,37 @@ export default defineComponent({
         if (props.panelId) {
           variablesManager.setPanelVisibility(props.panelId, true);
         }
+
+        // If parent passed variable values, use them to prevent API calls for those variables
+        if (props.initialVariableValues && props.initialVariableValues.values && props.initialVariableValues.values.length > 0) {
+          // Update variablesManager with passed values
+          props.initialVariableValues.values.forEach((passedVar: any) => {
+            // Find and update the variable in the manager (global scope)
+            const globalVar = variablesManager.variablesData.global.find((v: any) => v.name === passedVar.name);
+            if (globalVar) {
+              globalVar.value = passedVar.value;
+              globalVar.isVariablePartialLoaded = true;
+              globalVar.isLoading = false;
+              // KEY FIX: Set pending to false to prevent API call
+              globalVar.isVariableLoadingPending = false;
+            }
+          });
+
+          // Also populate currentVariablesDataRef with passed values
+          Object.assign(currentVariablesDataRef, props.initialVariableValues);
+          Object.assign(variablesData, props.initialVariableValues);
+        }
+
+        // Load variable values from URL parameters (supports tab-level and panel-level variables)
+        // This handles patterns like:
+        // - var-myVar (global)
+        // - var-myVar.t.tabId (tab-scoped)
+        // - var-myVar.p.panelId (panel-scoped)
+        // URL values will OVERRIDE parent-passed values
+        variablesManager.loadFromUrl(route);
+
+        // Commit the values immediately so they're used by the chart
+        variablesManager.commitAll();
       } catch (error) {
       }
 
