@@ -471,7 +471,7 @@ pub fn config_routes() -> Router {
         .route("/reload", get(status::config_reload))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
-        .route("/dex_refresh", post(status::refresh_token_with_dex))
+        .route("/dex_refresh", get(status::refresh_token_with_dex))
         .route("/token", post(users::service_accounts::exchange_token))
         .layer(cors_layer())
 }
