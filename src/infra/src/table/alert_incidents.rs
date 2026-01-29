@@ -18,8 +18,8 @@
 //! Provides CRUD operations for incidents and incident-alert associations.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 use svix_ksuid::KsuidLike;
 
@@ -231,6 +231,22 @@ pub async fn list(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let mut query = alert_incidents::Entity::find()
+        .select_only()
+        // Select all columns EXCEPT topology_context for performance
+        .column(alert_incidents::Column::Id)
+        .column(alert_incidents::Column::OrgId)
+        .column(alert_incidents::Column::CorrelationKey)
+        .column(alert_incidents::Column::Status)
+        .column(alert_incidents::Column::Severity)
+        .column(alert_incidents::Column::StableDimensions)
+        .column(alert_incidents::Column::FirstAlertAt)
+        .column(alert_incidents::Column::LastAlertAt)
+        .column(alert_incidents::Column::ResolvedAt)
+        .column(alert_incidents::Column::AlertCount)
+        .column(alert_incidents::Column::Title)
+        .column(alert_incidents::Column::AssignedTo)
+        .column(alert_incidents::Column::CreatedAt)
+        .column(alert_incidents::Column::UpdatedAt)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .order_by_desc(alert_incidents::Column::LastAlertAt);
 
