@@ -23,7 +23,8 @@ use serde_json::Map;
 use crate::{
     common::meta::traces::Event,
     service::traces::otel::attributes::{
-        FrameworkAttributes, GenAiAttributes, GenAiEventNames, VercelAiSdkAttributes,
+        FrameworkAttributes, GenAiAttributes, GenAiEventNames, LangfuseAttributes,
+        VercelAiSdkAttributes,
     },
 };
 
@@ -40,6 +41,17 @@ impl InputOutputExtractor {
         // Gen-AI events (from span.events)
         if let Some((input, output)) = self.extract_from_gen_ai_events(events) {
             return (input, output);
+        }
+
+        // Langfuse (support both dot and underscore formats)
+        if let Some(input) = attributes
+            .get(LangfuseAttributes::OBSERVATION_INPUT)
+            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_INPUT_UNDERSCORE))
+        {
+            let output = attributes
+                .get(LangfuseAttributes::OBSERVATION_OUTPUT)
+                .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_OUTPUT_UNDERSCORE));
+            return (Some(input.clone()), output.cloned());
         }
 
         // TraceLoop (with direct attributes)
@@ -199,6 +211,11 @@ impl InputOutputExtractor {
             GenAiAttributes::OUTPUT_MESSAGES,
             GenAiAttributes::TOOL_CALL_ARGUMENTS,
             GenAiAttributes::TOOL_CALL_RESULT,
+            // Langfuse (both dot and underscore formats)
+            LangfuseAttributes::OBSERVATION_INPUT,
+            LangfuseAttributes::OBSERVATION_INPUT_UNDERSCORE,
+            LangfuseAttributes::OBSERVATION_OUTPUT,
+            LangfuseAttributes::OBSERVATION_OUTPUT_UNDERSCORE,
         ];
 
         // Check exact matches
@@ -715,5 +732,40 @@ mod tests {
         let result = convert_key_path_to_nested_object(&input, "obj");
         assert_eq!(result["user"]["name"], "Bob");
         assert_eq!(result["user"]["age"], 25);
+    }
+
+    #[test]
+    fn test_extract_langfuse_input_output() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse_observation_input".to_string(),
+            json::json!(r#"{"file_path": "/path/to/file.md"}"#),
+        );
+        attrs.insert(
+            "langfuse_observation_output".to_string(),
+            json::json!("File content here"),
+        );
+
+        let events = vec![];
+        let (input, output) = extractor.extract(&events, &attrs, "");
+
+        assert!(input.is_some());
+        assert_eq!(
+            input.unwrap(),
+            json::json!(r#"{"file_path": "/path/to/file.md"}"#)
+        );
+        assert!(output.is_some());
+        assert_eq!(output.unwrap(), json::json!("File content here"));
+    }
+
+    #[test]
+    fn test_is_input_output_attribute_langfuse() {
+        let extractor = InputOutputExtractor;
+
+        assert!(extractor.is_input_output_attribute("langfuse_observation_input"));
+        assert!(extractor.is_input_output_attribute("langfuse_observation_output"));
+        assert!(!extractor.is_input_output_attribute("langfuse_observation_metadata_tool_name"));
+        assert!(!extractor.is_input_output_attribute("langfuse_observation_type"));
     }
 }

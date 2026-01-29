@@ -21,7 +21,8 @@ use config::utils::json;
 
 use super::utils::{extract_f64, extract_i64};
 use crate::service::traces::otel::attributes::{
-    GenAiAttributes, LLMAttributes, OpenInferenceAttributes, VercelAiSdkAttributes,
+    GenAiAttributes, LLMAttributes, LangfuseAttributes, OpenInferenceAttributes,
+    VercelAiSdkAttributes,
 };
 
 pub struct UsageExtractor;
@@ -102,6 +103,22 @@ impl UsageExtractor {
             }
         }
 
+        // Langfuse usage_details (support both dot and underscore formats)
+        if let Some(val) = attributes
+            .get(LangfuseAttributes::OBSERVATION_USAGE_DETAILS)
+            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_USAGE_DETAILS_UNDERSCORE))
+        {
+            if let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
+            {
+                for (k, v) in parsed {
+                    if let Some(num) = extract_i64(&v) {
+                        usage.insert(k, num);
+                    }
+                }
+                return usage;
+            }
+        }
+
         usage
     }
 
@@ -113,6 +130,22 @@ impl UsageExtractor {
             && let Some(num) = extract_f64(v)
         {
             cost.insert("total".to_string(), num);
+        }
+
+        // Langfuse cost_details (support both dot and underscore formats)
+        if let Some(val) = attributes
+            .get(LangfuseAttributes::OBSERVATION_COST_DETAILS)
+            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_COST_DETAILS_UNDERSCORE))
+        {
+            if let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
+            {
+                for (k, v) in parsed {
+                    if let Some(num) = extract_f64(&v) {
+                        cost.insert(k, num);
+                    }
+                }
+                return cost;
+            }
         }
 
         cost

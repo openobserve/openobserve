@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use crate::service::traces::otel::attributes::{
-    GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes,
+    GenAiAttributes, LangfuseAttributes, OpenInferenceAttributes, VercelAiSdkAttributes,
 };
 
 pub struct ModelExtractor;
@@ -32,6 +32,8 @@ impl ModelExtractor {
             GenAiAttributes::RESPONSE_MODEL,
             VercelAiSdkAttributes::MODEL_ID,
             GenAiAttributes::REQUEST_MODEL,
+            LangfuseAttributes::OBSERVATION_MODEL,
+            LangfuseAttributes::OBSERVATION_MODEL_UNDERSCORE,
             OpenInferenceAttributes::LLM_RESPONSE_MODEL,
             OpenInferenceAttributes::LLM_MODEL_NAME,
             "model",

@@ -97,12 +97,12 @@ impl OtelIngestionProcessor {
             .extract(span_attributes, scope_name.unwrap_or(""));
 
         // Extract usage details
-        let usage = self
+        let mut usage = self
             .usage_extractor
             .extract_usage(span_attributes, scope_name.unwrap_or(""));
 
         // Extract cost details
-        let cost = self.usage_extractor.extract_cost(span_attributes);
+        let mut cost = self.usage_extractor.extract_cost(span_attributes);
 
         // Extract user and session
         let user_id = self.metadata_extractor.extract_user_id(span_attributes);
@@ -114,8 +114,12 @@ impl OtelIngestionProcessor {
         // Extract tool information
         let tool_name = self.tool_extractor.extract_tool_name(span_attributes);
         let tool_call_id = self.tool_extractor.extract_tool_call_id(span_attributes);
-        let tool_call_arguments = self.tool_extractor.extract_tool_call_arguments(span_attributes);
-        let tool_call_result = self.tool_extractor.extract_tool_call_result(span_attributes);
+        let tool_call_arguments = self
+            .tool_extractor
+            .extract_tool_call_arguments(span_attributes);
+        let tool_call_result = self
+            .tool_extractor
+            .extract_tool_call_result(span_attributes);
 
         // Now remove all input/output related attributes
         span_attributes
@@ -136,6 +140,22 @@ impl OtelIngestionProcessor {
                 O2Attributes::PROVIDER_NAME.to_string(),
                 json::json!(provider),
             );
+        }
+
+        // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
+        if input.is_some() || output.is_some() {
+            if !usage.contains_key("total") {
+                let input = usage.get("input").cloned().unwrap_or_default();
+                let output = usage.get("output").cloned().unwrap_or_default();
+                let total = input + output;
+                usage.insert("total".to_string(), total);
+            }
+            if !cost.contains_key("total") {
+                let input = cost.get("input").cloned().unwrap_or_default();
+                let output = cost.get("output").cloned().unwrap_or_default();
+                let total = input + output;
+                cost.insert("total".to_string(), total);
+            }
         }
 
         if let Some(input_val) = input {
@@ -309,10 +329,7 @@ mod tests {
         let mut span_attrs = HashMap::new();
         span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("tool"));
         span_attrs.insert("gen_ai.tool.name".to_string(), json::json!("get_weather"));
-        span_attrs.insert(
-            "gen_ai.tool.call.id".to_string(),
-            json::json!("call_12345"),
-        );
+        span_attrs.insert("gen_ai.tool.call.id".to_string(), json::json!("call_12345"));
         span_attrs.insert(
             "gen_ai.tool.call.arguments".to_string(),
             json::json!({"city": "San Francisco"}),
@@ -355,8 +372,75 @@ mod tests {
             &json::json!({"temperature": 72})
         );
 
-        // Original tool attributes should remain (except arguments and result which are input/output)
+        // Original tool attributes should remain (except arguments and result which are
+        // input/output)
         assert!(span_attrs.contains_key("gen_ai.tool.name"));
         assert!(span_attrs.contains_key("gen_ai.tool.call.id"));
+    }
+
+    #[test]
+    fn test_process_span_extracts_langfuse_attributes() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("langfuse_observation_type".to_string(), json::json!("span"));
+        span_attrs.insert(
+            "langfuse_observation_input".to_string(),
+            json::json!(r#"{"file_path": "/Users/test/file.md"}"#),
+        );
+        span_attrs.insert(
+            "langfuse_observation_output".to_string(),
+            json::json!("File content here..."),
+        );
+        span_attrs.insert(
+            "langfuse_observation_metadata_tool_name".to_string(),
+            json::json!("Read"),
+        );
+        span_attrs.insert(
+            "langfuse_observation_metadata_tool_id".to_string(),
+            json::json!("toolu_01T1Mfo98ePBYgoRXG3yPkWt"),
+        );
+        span_attrs.insert("operation_name".to_string(), json::json!("Tool: Read"));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Input/output should be extracted and added
+        assert!(span_attrs.contains_key(O2Attributes::INPUT));
+        assert_eq!(
+            span_attrs.get(O2Attributes::INPUT).unwrap(),
+            &json::json!(r#"{"file_path": "/Users/test/file.md"}"#)
+        );
+
+        assert!(span_attrs.contains_key(O2Attributes::OUTPUT));
+        assert_eq!(
+            span_attrs.get(O2Attributes::OUTPUT).unwrap(),
+            &json::json!("File content here...")
+        );
+
+        // Tool name and ID should be extracted
+        assert!(span_attrs.contains_key(O2Attributes::TOOL_NAME));
+        assert_eq!(
+            span_attrs.get(O2Attributes::TOOL_NAME).unwrap(),
+            &json::json!("Read")
+        );
+
+        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ID));
+        assert_eq!(
+            span_attrs.get(O2Attributes::TOOL_CALL_ID).unwrap(),
+            &json::json!("toolu_01T1Mfo98ePBYgoRXG3yPkWt")
+        );
+
+        // Original input/output attributes should be removed
+        assert!(!span_attrs.contains_key("langfuse_observation_input"));
+        assert!(!span_attrs.contains_key("langfuse_observation_output"));
+
+        // Tool metadata and other attributes should remain
+        assert!(span_attrs.contains_key("langfuse_observation_metadata_tool_name"));
+        assert!(span_attrs.contains_key("langfuse_observation_metadata_tool_id"));
+        assert!(span_attrs.contains_key("langfuse_observation_type"));
+        assert!(span_attrs.contains_key("operation_name"));
     }
 }

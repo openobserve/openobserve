@@ -188,7 +188,6 @@ pub async fn get_latest_traces(
     let user_id = &user_email.user_id;
 
     // Check permissions on stream
-
     #[cfg(feature = "enterprise")]
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
@@ -289,6 +288,9 @@ pub async fn get_latest_traces(
         StreamType::Traces,
     )
     .await;
+    let is_llm_stream =
+        infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
+            .await;
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -302,9 +304,19 @@ pub async fn get_latest_traces(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // search
-    let query_sql = format!(
-        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}"
-    );
+    let query_sql = if is_llm_stream {
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+        sum(_o2_llm_usage_details_total) as llm_usage_tokens, \
+        sum(_o2_llm_cost_details_total) as llm_usage_costs, \
+        FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+        FROM {stream_name}"
+        )
+    } else {
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}"
+        )
+    };
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
     } else {
@@ -405,6 +417,10 @@ pub async fn get_latest_traces(
         if trace_end_time / 1000 > end_time {
             end_time = trace_end_time / 1000;
         }
+        let llm_usage_tokens =
+            json::get_int_value(item.get("llm_usage_tokens").unwrap_or_default());
+        let llm_usage_costs =
+            json::get_float_value(item.get("llm_usage_costs").unwrap_or_default());
         traces_data.insert(
             trace_id.clone(),
             TraceResponseItem {
@@ -414,6 +430,9 @@ pub async fn get_latest_traces(
                 duration: 0,
                 spans: [0, 0],
                 service_name: Vec::new(),
+                llm_usage_tokens,
+                llm_usage_costs,
+                llm_input: item.get("llm_input").cloned(),
                 first_event: serde_json::Value::Null,
             },
         );
@@ -580,6 +599,9 @@ struct TraceResponseItem {
     duration: i64,
     spans: [u16; 2],
     service_name: Vec<TraceServiceNameItem>,
+    llm_usage_tokens: i64,
+    llm_usage_costs: f64,
+    llm_input: Option<serde_json::Value>,
     first_event: serde_json::Value,
 }
 

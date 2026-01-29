@@ -463,6 +463,10 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
+import {
+  parseUsageDetails,
+  parseCostDetails,
+} from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -1316,6 +1320,10 @@ export default defineComponent({
     // Convert span object to required format
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
+      // Parse usage details from split fields
+      const usage = parseUsageDetails(span);
+      const cost = parseCostDetails(span);
+      
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
@@ -1341,6 +1349,8 @@ export default defineComponent({
           color: "",
         },
         links: JSON.parse(span.links || "[]"),
+        llm_usage: usage,
+        llm_cost: cost,
       };
     };
 

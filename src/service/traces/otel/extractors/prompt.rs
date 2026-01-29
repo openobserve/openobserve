@@ -19,16 +19,26 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use crate::service::traces::otel::attributes::GenAiAttributes;
+use crate::service::traces::otel::attributes::{GenAiAttributes, LangfuseAttributes};
 
 pub struct PromptExtractor;
 
 impl PromptExtractor {
     /// Extract prompt name from AI SDK metadata
     pub fn extract_name(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
-        attributes
-            .get(GenAiAttributes::PROMPT_NAME)
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+        // Check Gen-AI attributes first
+        if let Some(value) = attributes.get(GenAiAttributes::PROMPT_NAME) {
+            return value.as_str().map(|s| s.to_string());
+        }
+
+        // Check Langfuse attributes (support both dot and underscore formats)
+        if let Some(value) = attributes
+            .get(LangfuseAttributes::OBSERVATION_PROMPT_NAME)
+            .or_else(|| attributes.get(LangfuseAttributes::OBSERVATION_PROMPT_NAME_UNDERSCORE))
+        {
+            return value.as_str().map(|s| s.to_string());
+        }
+
+        None
     }
 }

@@ -816,6 +816,9 @@ const getTracesMetaData = (traces) => {
       spans: trace.spans[0],
       errors: trace.spans[1],
       duration: trace.duration,
+      llm_usage_tokens: trace.llm_usage_tokens,
+      llm_usage_costs: trace.llm_usage_costs,
+      llm_input: trace.llm_input || {},
       services: {},
       zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
     };

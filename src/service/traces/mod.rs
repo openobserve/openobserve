@@ -203,9 +203,17 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
+
     let now = now_micros();
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
+
+    // llm stream detection
+    let mut is_llm_stream = false;
+    let mut need_mark_llm_stream = false;
+    if infra::schema::get_is_llm_stream(org_id, &traces_stream_name, StreamType::Traces).await {
+        is_llm_stream = true;
+    }
 
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
@@ -215,9 +223,10 @@ pub async fn handle_otlp_request(
     // End pipeline params construction
 
     // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
-    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> =
+        HashMap::with_capacity(1);
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::with_capacity(1);
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::with_capacity(1);
     crate::service::ingestion::get_uds_and_original_data_streams(
         std::slice::from_ref(&stream_param),
         &mut user_defined_schema_map,
@@ -327,6 +336,16 @@ pub async fn handle_otlp_request(
                         scope_name,
                         &events,
                     );
+
+                    // check if we have any LLM related attributes
+                    if !is_llm_stream
+                        && (span_att_map.contains_key(otel::attributes::O2Attributes::INPUT)
+                            || span_att_map.contains_key(otel::attributes::O2Attributes::OUTPUT))
+                    {
+                        is_llm_stream = true;
+                        need_mark_llm_stream = true;
+                    }
+
                 }
 
                 let mut links = vec![];
@@ -558,6 +577,19 @@ pub async fn handle_otlp_request(
             .into_response());
     }
 
+    // mark llm stream if needed
+    if need_mark_llm_stream
+        && let Err(e) = super::db::schema::set_stream_is_llm(
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+            true,
+        )
+        .await
+    {
+        log::error!("Error while marking llm stream: {e}");
+    }
+
     let time = start.elapsed().as_secs_f64();
     let ep = match req_type {
         OtlpRequestType::Grpc => "/grpc/otlp/traces",
@@ -605,6 +637,13 @@ pub async fn ingest_json(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+
+    // llm stream detection
+    let mut is_llm_stream = false;
+    let mut need_mark_llm_stream = false;
+    if infra::schema::get_is_llm_stream(org_id, &traces_stream_name, StreamType::Traces).await {
+        is_llm_stream = true;
+    }
 
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
@@ -669,6 +708,15 @@ pub async fn ingest_json(
             }
         };
 
+        // check if we have any LLM related attributes
+        if !is_llm_stream
+            && (record_val.contains_key(otel::attributes::O2Attributes::INPUT)
+                || record_val.contains_key(otel::attributes::O2Attributes::OUTPUT))
+        {
+            is_llm_stream = true;
+            need_mark_llm_stream = true;
+        }
+
         // add timestamp
         record_val.insert(
             TIMESTAMP_COL_NAME.to_string(),
@@ -709,6 +757,19 @@ pub async fn ingest_json(
             )),
         )
             .into_response());
+    }
+
+    // mark llm stream if needed
+    if need_mark_llm_stream
+        && let Err(e) = super::db::schema::set_stream_is_llm(
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+            true,
+        )
+        .await
+    {
+        log::error!("Error while marking llm stream: {e}");
     }
 
     let time = start.elapsed().as_secs_f64();
