@@ -410,10 +410,11 @@ describe("useCorrelatedLogs", () => {
       const composable = useCorrelatedLogs(props);
 
       // Clear any previous calls from initialization
-      mockFetchQueryDataWithHttpStream.mockClear();
+      vi.clearAllMocks();
 
-      composable.refresh();
+      const refreshPromise = composable.refresh();
       await nextTick();
+      await refreshPromise;
 
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
     });
