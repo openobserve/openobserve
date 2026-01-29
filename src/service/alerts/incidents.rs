@@ -17,7 +17,7 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use config::{
     meta::alerts::{
@@ -25,7 +25,7 @@ use config::{
         deduplication::GlobalDeduplicationConfig,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentGraphStats, IncidentServiceGraph, IncidentTopology, IncidentWithAlerts,
+            IncidentTopology, IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -950,60 +950,6 @@ fn model_to_incident_with_topology(
         created_at: db_model.created_at,
         updated_at: db_model.updated_at,
     }
-}
-
-/// Get alert flow graph for an incident
-///
-/// Returns the pre-built alert flow graph showing how alerts cascaded
-/// across services over time. Graph is built incrementally as alerts fire.
-pub async fn get_service_graph(
-    org_id: &str,
-    incident_id: &str,
-) -> Result<Option<IncidentServiceGraph>, anyhow::Error> {
-    // Check if incident exists
-    if infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
-        .is_none()
-    {
-        return Ok(None);
-    }
-
-    // Get topology from DB
-    let topology = infra::table::alert_incidents::get_topology(org_id, incident_id).await?;
-
-    // If no topology, return empty graph
-    let topology = match topology {
-        Some(t) => t,
-        None => {
-            return Ok(Some(IncidentServiceGraph::default()));
-        }
-    };
-
-    // Calculate stats from nodes before moving topology
-    let total_services = topology
-        .nodes
-        .iter()
-        .map(|n| &n.service_name)
-        .collect::<HashSet<_>>()
-        .len();
-    let total_alerts: u32 = topology.nodes.iter().map(|n| n.alert_count).sum();
-    let services_with_alerts = topology
-        .nodes
-        .iter()
-        .map(|n| &n.service_name)
-        .collect::<HashSet<_>>()
-        .len();
-
-    // Return topology directly
-    Ok(Some(IncidentServiceGraph {
-        nodes: topology.nodes,
-        edges: topology.edges,
-        stats: IncidentGraphStats {
-            total_services,
-            total_alerts,
-            services_with_alerts,
-        },
-    }))
 }
 
 /// Update incident status
