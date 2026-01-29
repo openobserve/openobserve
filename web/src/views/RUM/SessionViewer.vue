@@ -489,6 +489,11 @@ const getSessionErrorLogs = () => {
       });
 
       segmentEvents.value.sort((a, b) => a.timestamp - b.timestamp);
+
+      videoPlayerRef.value?.updatePlayerState();
+
+      // Calculate time_spent based on actual event timestamps (lastEvent - firstEvent)
+      // This matches rrweb-player's calculation
     })
     .catch((error) => {
       console.error("Failed to fetch sesion error logs:", error);
