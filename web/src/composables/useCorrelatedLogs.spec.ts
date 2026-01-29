@@ -409,12 +409,11 @@ describe("useCorrelatedLogs", () => {
     it("should execute search when refresh is called", async () => {
       const composable = useCorrelatedLogs(props);
 
-      // Clear any previous calls from initialization
-      vi.clearAllMocks();
+      // Clear call history but keep the implementation
+      mockFetchQueryDataWithHttpStream.mockClear();
 
-      const refreshPromise = composable.refresh();
+      composable.refresh();
       await nextTick();
-      await refreshPromise;
 
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
     });
