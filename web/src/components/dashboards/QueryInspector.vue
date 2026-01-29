@@ -198,7 +198,6 @@ import { computed, defineComponent, ref, watch, onMounted } from "vue";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
-import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "QueryInspector",
@@ -213,7 +212,6 @@ export default defineComponent({
     },
   },
   setup(props: any) {
-    const $q = useQuasar();
     const store = useStore();
     const queryData = computed(() => props.metaData?.queries || []);
     const searchQuery = ref("");
@@ -283,14 +281,7 @@ export default defineComponent({
 
     const copyText = (text: string) => {
       if (!text) return;
-      navigator.clipboard.writeText(text).then(() => {
-        $q.notify({
-          type: "positive",
-          message: "Copied to clipboard",
-          timeout: 2000,
-          position: "bottom",
-        });
-      });
+      navigator.clipboard.writeText(text);
     };
 
     watch(
