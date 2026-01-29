@@ -170,14 +170,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <q-btn
           v-if="incidentDetails.status === 'resolved'"
-          color="info"
-          size="sm"
           no-caps
           unelevated
-          dense
           @click="reopenIncident"
           :loading="updating"
-          class="incident-action-buttons"
+          class="o2-secondary-button"
         >
           <q-icon name="refresh" size="16px" class="tw:mr-1" />
           <span>{{ t("alerts.incidents.reopen") }}</span>
