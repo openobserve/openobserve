@@ -105,8 +105,7 @@ describe("IncidentServiceGraph.vue", () => {
 
     return mount(IncidentServiceGraph, {
       props: {
-        orgId: "test-org",
-        incidentId: "incident-123",
+        topologyContext: mockGraphData,
         ...props,
       },
       global: {
@@ -122,39 +121,21 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Initialization", () => {
     it("should mount component successfully", () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
       wrapper = mountComponent();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should display loading state on mount", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => resolve({ data: mockGraphData } as any), 100);
-          })
-      );
-
+    it("should not have loading state on mount (data comes from props)", async () => {
       wrapper = mountComponent();
       await nextTick();
-      expect(wrapper.vm.loading).toBe(true);
+      expect(wrapper.vm.loading).toBe(false);
     });
 
-    it("should call loadGraph on mount", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
+    it("should receive topology context from props", async () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(incidentsService.getServiceGraph).toHaveBeenCalledWith(
-        "test-org",
-        "incident-123"
-      );
+      expect(wrapper.vm.graphData).toEqual(mockGraphData);
     });
 
     it("should initialize with force layout by default", async () => {
@@ -168,11 +149,7 @@ describe("IncidentServiceGraph.vue", () => {
   });
 
   describe("Data Loading", () => {
-    it("should load and display graph data successfully", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
+    it("should display graph data from props", async () => {
       wrapper = mountComponent();
       await flushPromises();
 
@@ -180,11 +157,7 @@ describe("IncidentServiceGraph.vue", () => {
       expect(wrapper.vm.loading).toBe(false);
     });
 
-    it("should display graph when data is loaded", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
+    it("should display graph when topology context is provided", async () => {
       wrapper = mountComponent();
       await flushPromises();
       await nextTick();
@@ -194,16 +167,7 @@ describe("IncidentServiceGraph.vue", () => {
       expect(wrapper.vm.graphData).toEqual(mockGraphData);
     });
 
-    it("should not display root cause when not available", async () => {
-      const dataWithoutRootCause = {
-        ...mockGraphData,
-        root_cause_service: undefined,
-      };
-
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: dataWithoutRootCause,
-      } as any);
-
+    it("should mark first node as root cause (red)", async () => {
       wrapper = mountComponent();
       await flushPromises();
       await nextTick();
@@ -218,140 +182,84 @@ describe("IncidentServiceGraph.vue", () => {
 
     it("should handle empty graph data", async () => {
       const emptyGraphData = {
-        incident_service: "service-a",
         nodes: [],
         edges: [],
-        stats: {
-          total_services: 0,
-          total_alerts: 0,
-          services_with_alerts: 0,
-        },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: emptyGraphData,
-      } as any);
-
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: emptyGraphData });
       await flushPromises();
       await nextTick();
 
       expect(wrapper.text()).toContain("Service Graph Unavailable");
       expect(wrapper.text()).toContain(
-        "Topology data is being generated in the background"
+        "No topology data available for this incident"
       );
     });
   });
 
   describe("Error Handling", () => {
-    it("should handle 404 error gracefully (show empty state)", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockRejectedValue({
-        response: { status: 404 },
-      });
-
-      wrapper = mountComponent();
+    it("should handle null topology context (show empty state)", async () => {
+      wrapper = mountComponent({ topologyContext: null });
       await flushPromises();
 
       expect(wrapper.vm.loading).toBe(false);
       expect(wrapper.vm.graphData).toBeNull();
-      // Should not show notification for 404
+      // Should show empty state
+      expect(wrapper.text()).toContain("Service Graph Unavailable");
     });
 
-    it("should show warning notification for 403 error", async () => {
-      const notifyMock = vi.fn();
-      vi.stubGlobal("$q", { notify: notifyMock });
-
-      vi.mocked(incidentsService.getServiceGraph).mockRejectedValue({
-        response: { status: 403 },
-      });
-
-      wrapper = mountComponent();
+    it("should handle undefined topology context gracefully", async () => {
+      wrapper = mountComponent({ topologyContext: undefined });
       await flushPromises();
 
-      // Verify loading is false and no data
       expect(wrapper.vm.loading).toBe(false);
       expect(wrapper.vm.graphData).toBeNull();
-
-      vi.unstubAllGlobals();
     });
 
-    it("should show error notification for other errors", async () => {
-      const notifyMock = vi.fn();
-      vi.stubGlobal("$q", { notify: notifyMock });
-
-      vi.mocked(incidentsService.getServiceGraph).mockRejectedValue({
-        response: { status: 500 },
-        message: "Server error",
-      });
-
-      wrapper = mountComponent();
+    it("should handle topology context with no nodes", async () => {
+      wrapper = mountComponent({ topologyContext: { nodes: [], edges: [] } });
       await flushPromises();
 
       expect(wrapper.vm.loading).toBe(false);
-      expect(wrapper.vm.graphData).toBeNull();
-
-      vi.unstubAllGlobals();
+      expect(wrapper.vm.graphData).toEqual({ nodes: [], edges: [] });
+      expect(wrapper.text()).toContain("Service Graph Unavailable");
     });
 
-    it("should handle network errors", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockRejectedValue(
-        new Error("Network Error")
-      );
-
-      wrapper = mountComponent();
+    it("should handle topology context with undefined nodes", async () => {
+      wrapper = mountComponent({ topologyContext: { edges: [] } });
       await flushPromises();
 
       expect(wrapper.vm.loading).toBe(false);
-      expect(wrapper.vm.graphData).toBeNull();
+      expect(wrapper.text()).toContain("Service Graph Unavailable");
     });
   });
 
   describe("User Interactions", () => {
-    it("should refresh graph when refresh button is clicked", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
+    it("should increment chartKey when loadGraph is called", async () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      vi.mocked(incidentsService.getServiceGraph).mockClear();
+      const initialKey = wrapper.vm.chartKey;
 
-      // Call loadGraph directly since the button is a Quasar component
-      await wrapper.vm.loadGraph();
-      await flushPromises();
-
-      expect(incidentsService.getServiceGraph).toHaveBeenCalledTimes(1);
-    });
-
-    it("should show loading state during refresh", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
-      wrapper = mountComponent();
-      await flushPromises();
-
-      vi.mocked(incidentsService.getServiceGraph).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => resolve({ data: mockGraphData } as any), 100);
-          })
-      );
-
-      // Call loadGraph directly and check loading state immediately
-      const loadPromise = wrapper.vm.loadGraph();
+      // Call loadGraph directly
+      wrapper.vm.loadGraph();
       await nextTick();
 
-      expect(wrapper.vm.loading).toBe(true);
+      expect(wrapper.vm.chartKey).toBe(initialKey + 1);
+    });
 
-      await loadPromise;
+    it("should not show loading state during refresh (data comes from props)", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Call loadGraph directly
+      wrapper.vm.loadGraph();
+      await nextTick();
+
+      expect(wrapper.vm.loading).toBe(false);
     });
 
     it("should change layout when layout selector changes", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -375,14 +283,11 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: emptyGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
 
-      vi.mocked(incidentsService.getServiceGraph).mockClear();
 
       // Find refresh button in empty state
       const buttons = wrapper.findAll("button");
@@ -393,16 +298,12 @@ describe("IncidentServiceGraph.vue", () => {
         await refreshBtn.trigger("click");
         await flushPromises();
 
-        expect(incidentsService.getServiceGraph).toHaveBeenCalled();
       }
     });
   });
 
   describe("Layout Options", () => {
     it("should use D3-force pre-computed layout", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -420,9 +321,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate circular layout configuration", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -441,9 +339,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Node Styling", () => {
     it("should color root cause nodes red", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -455,9 +350,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should color high alert nodes orange", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -498,11 +390,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: normalNodeData,
-      } as any);
-
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: normalNodeData });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
@@ -532,9 +420,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: mixedData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -546,9 +432,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should calculate node size based on alert count", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -584,11 +467,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: largeAlertData,
-      } as any);
-
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: largeAlertData });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
@@ -597,9 +476,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should add border to primary service nodes", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -613,9 +489,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should not add border to non-primary nodes", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -631,21 +504,19 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Chart Data Generation", () => {
     it("should return empty options when no graph data", () => {
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: null });
       const chartData = wrapper.vm.chartData;
 
       expect(chartData).toEqual({ options: {}, notMerge: true });
     });
 
     it("should return empty options when nodes are empty", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: {
+      wrapper = mountComponent({
+        topologyContext: {
           ...mockGraphData,
           nodes: [],
-        },
-      } as any);
-
-      wrapper = mountComponent();
+        }
+      });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
@@ -653,9 +524,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate valid ECharts options with nodes and edges", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -668,9 +536,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set tooltip configuration", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -680,9 +545,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should enable roam and draggable on graph", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -693,9 +555,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set emphasis focus to adjacency", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -705,9 +564,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate edge with arrow symbols", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -720,9 +576,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set edge curveness", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -736,9 +589,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Theme Support", () => {
     it("should apply light theme colors", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
@@ -751,9 +601,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme colors", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
@@ -766,9 +613,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme to edge colors", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
@@ -780,9 +624,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply light theme to edge colors", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
@@ -794,9 +635,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme to node labels", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
@@ -807,9 +645,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply light theme to node labels", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
@@ -821,62 +656,54 @@ describe("IncidentServiceGraph.vue", () => {
   });
 
   describe("Watchers", () => {
-    it("should reload graph when incidentId changes", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
-      wrapper = mountComponent({ incidentId: "incident-123" });
+    it("should clear cached positions when topology context changes", async () => {
+      wrapper = mountComponent();
       await flushPromises();
 
-      vi.mocked(incidentsService.getServiceGraph).mockClear();
+      const initialKey = wrapper.vm.chartKey;
 
-      await wrapper.setProps({ incidentId: "incident-456" });
+      // Change the topology context
+      const newData = {
+        nodes: [mockGraphData.nodes[0]], // Different data - only first node
+        edges: [], // No edges since we only have one node
+      };
+
+      await wrapper.setProps({ topologyContext: newData });
       await flushPromises();
 
-      expect(incidentsService.getServiceGraph).toHaveBeenCalledWith(
-        "test-org",
-        "incident-456"
-      );
+      expect(wrapper.vm.chartKey).toBe(initialKey + 1);
     });
 
-    it("should not reload when incidentId stays the same", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
-      wrapper = mountComponent({ incidentId: "incident-123" });
+    it("should not reload when topology context stays the same", async () => {
+      wrapper = mountComponent();
       await flushPromises();
 
-      vi.mocked(incidentsService.getServiceGraph).mockClear();
+      const initialKey = wrapper.vm.chartKey;
 
-      // Set the same incident ID
-      await wrapper.setProps({ incidentId: "incident-123" });
+      // Set the same topology context (no actual change)
+      await wrapper.setProps({ topologyContext: mockGraphData });
       await flushPromises();
 
-      expect(incidentsService.getServiceGraph).not.toHaveBeenCalled();
+      // chartKey should not change since the data is the same (Vue's deep watcher won't trigger)
+      expect(wrapper.vm.chartKey).toBe(initialKey);
     });
   });
 
   describe("Props Validation", () => {
-    it("should require orgId prop", () => {
-      const { orgId } = IncidentServiceGraph.props;
-      expect(orgId.required).toBe(true);
-      expect(orgId.type).toBe(String);
+    it("should have topologyContext prop", () => {
+      const { topologyContext } = IncidentServiceGraph.props;
+      expect(topologyContext).toBeDefined();
+      expect(topologyContext.required).toBe(false);
     });
 
-    it("should require incidentId prop", () => {
-      const { incidentId } = IncidentServiceGraph.props;
-      expect(incidentId.required).toBe(true);
-      expect(incidentId.type).toBe(String);
+    it("should accept null as default for topologyContext", () => {
+      const { topologyContext } = IncidentServiceGraph.props;
+      expect(topologyContext.default).toBe(null);
     });
   });
 
   describe("Legend Display", () => {
     it("should display legend with all node types", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -895,9 +722,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Node Tooltips", () => {
     it("should include service name in tooltip", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -910,9 +734,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should include alert count in tooltip", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -926,9 +747,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should show root cause indicator in tooltip", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -942,9 +760,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should show primary service indicator in tooltip", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -958,9 +773,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should not show root cause indicator for non-root-cause nodes", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -994,11 +806,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: singleNodeData,
-      } as any);
-
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: singleNodeData });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
@@ -1034,11 +842,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: dataWithZeroAlerts,
-      } as any);
-
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: dataWithZeroAlerts });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
@@ -1067,11 +871,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: dataWithLargeAlerts,
-      } as any);
-
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: dataWithLargeAlerts });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
@@ -1096,9 +896,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Animation Configuration", () => {
     it("should set animation duration", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -1109,9 +906,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set animation easing", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -1124,9 +918,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Chart Renderer Integration", () => {
     it("should pass chart data to ChartRenderer", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
 
       wrapper = mountComponent();
       await flushPromises();
@@ -1148,11 +939,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: emptyData,
-      } as any);
-
-      wrapper = mountComponent();
+      wrapper = mountComponent({ topologyContext: emptyData });
       await flushPromises();
       await nextTick();
 
@@ -1160,22 +947,18 @@ describe("IncidentServiceGraph.vue", () => {
       expect(chartRenderer.exists()).toBe(false);
     });
 
-    it("should update chartKey when data changes", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
+    it("should update chartKey when loadGraph is called", async () => {
 
       wrapper = mountComponent();
       await flushPromises();
 
       const initialKey = wrapper.vm.chartKey;
 
-      // chartKey is no longer incremented on loadGraph to preserve node positions
-      await wrapper.vm.loadGraph();
-      await flushPromises();
+      // loadGraph increments chartKey to force re-render
+      wrapper.vm.loadGraph();
+      await nextTick();
 
-      // chartKey stays the same to preserve cached positions
-      expect(wrapper.vm.chartKey).toBe(initialKey);
+      expect(wrapper.vm.chartKey).toBe(initialKey + 1);
     });
   });
 });
