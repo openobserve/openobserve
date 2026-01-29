@@ -227,6 +227,7 @@ export function useLogsHighlighter() {
   /**
    * Estimates the size of data without expensive JSON.stringify
    * Used to determine if content should be truncated or skip highlighting
+   * Optimized for large objects with many fields
    */
   const estimateSize = (data: any): number => {
     if (data === null || data === undefined) return 0;
@@ -238,33 +239,42 @@ export function useLogsHighlighter() {
     if (typeof data !== "object") return String(data).length;
 
     // For objects/arrays, estimate based on key count and depth
-    // This is a rough estimate to avoid JSON.stringify performance hit
     try {
       const keys = Object.keys(data);
       if (keys.length === 0) return 2; // "{}" or "[]"
 
-      // Rough estimate: keys * avg_key_size + values * avg_value_size
-      let estimate = keys.length * 20; // Average key name ~20 chars
+      // For very large objects (50+ fields), sample more aggressively
+      const sampleSize = keys.length > 50 ? Math.min(10, keys.length) : Math.min(5, keys.length);
+      let totalSize = 0;
 
-      // Sample first few values to estimate
-      const sampleSize = Math.min(5, keys.length);
+      // Sample values to estimate
       for (let i = 0; i < sampleSize; i++) {
-        const value = data[keys[i]];
+        const key = keys[i];
+        const value = data[key];
+
+        // Add key size (with quotes and colon)
+        totalSize += key.length + 4; // "key":
+
         if (typeof value === "string") {
-          estimate += value.length;
+          totalSize += value.length + 2; // Add quotes
         } else if (typeof value === "object" && value !== null) {
-          estimate += Object.keys(value).length * 50; // Nested object estimate
+          // For nested objects/arrays, recurse or estimate
+          if (Array.isArray(value)) {
+            totalSize += JSON.stringify(value).length; // Arrays need accurate size
+          } else {
+            totalSize += Object.keys(value).length * 50; // Nested object estimate
+          }
         } else {
-          estimate += 20; // Primitive value
+          totalSize += String(value).length;
         }
       }
 
       // Extrapolate to all keys
-      if (keys.length > sampleSize) {
-        estimate = (estimate / sampleSize) * keys.length;
-      }
+      const avgFieldSize = totalSize / sampleSize;
+      const estimate = avgFieldSize * keys.length;
 
-      return estimate;
+      // Add overhead for braces, commas, etc (10% buffer)
+      return Math.ceil(estimate * 1.1);
     } catch (error) {
       return 1000; // Default safe estimate
     }
@@ -704,12 +714,30 @@ export function useLogsHighlighter() {
     showQuotes: boolean = false,
     queryString: string = "",
     simpleMode: boolean = false,
+    disableTruncation: boolean = false, // Set true for expanded/detail views to show complete data
   ): string {
     if (data === null || data === undefined) {
       return "";
     }
 
     const currentColors = getThemeColors(isDarkTheme);
+
+    // Apply truncation logic for list views (not expanded/detail views)
+    if (!disableTruncation && typeof data === "object" && data !== null) {
+      const estimatedSize = estimateSize(data);
+      const skipHighlighting = estimatedSize > 50000;
+
+      // Truncate very large content (>50KB) to prevent UI freeze in list view
+      if (estimatedSize > 50000) {
+        data = truncateLargeContent(data, 50000);
+        // After truncation, skip highlighting and use simple display
+        if (typeof data === "string") {
+          return `<span class="log-string">${escapeHtml(data)}</span>`;
+        }
+        // If still large after truncation, disable highlighting
+        queryString = skipHighlighting ? "" : queryString;
+      }
+    }
 
     // Simple mode: only highlighting, no semantic colorization
     if (simpleMode) {
@@ -786,8 +814,85 @@ export function useLogsHighlighter() {
     }
   }
 
+  /**
+   * Progressive rendering for very large logs in expanded/detail views
+   * Renders field-by-field to avoid UI freeze
+   * Returns a ref that updates incrementally
+   */
+  async function colorizeJsonProgressive(
+    data: any,
+    isDarkTheme: boolean,
+    showBraces: boolean = true,
+    showQuotes: boolean = false,
+    queryString: string = "",
+    onChunk?: (html: string) => void, // Callback for each chunk
+  ): Promise<string> {
+    if (data === null || data === undefined) {
+      return "";
+    }
+
+    // For non-objects, use regular colorization
+    if (typeof data !== "object") {
+      return colorizeJson(data, isDarkTheme, showBraces, showQuotes, queryString, false, true);
+    }
+
+    const currentColors = getThemeColors(isDarkTheme);
+    const keys = Object.keys(data);
+    let result = showBraces ? "{" : "";
+
+    // Process fields in chunks of 10 to avoid blocking
+    const chunkSize = 10;
+    for (let i = 0; i < keys.length; i += chunkSize) {
+      const chunkKeys = keys.slice(i, Math.min(i + chunkSize, keys.length));
+      let chunkHtml = "";
+
+      for (const key of chunkKeys) {
+        const value = data[key];
+
+        // Add key
+        chunkHtml += `<span style="color: ${currentColors.key}">${showQuotes ? '"' : ''}${escapeHtml(key)}${showQuotes ? '"' : ''}</span>: `;
+
+        // Add value (truncate individual fields if >100KB)
+        let processedValue = value;
+        if (typeof value === "string" && value.length > 100000) {
+          processedValue = value.substring(0, 100000) + `... [field truncated, ${value.length} chars]`;
+        } else if (typeof value === "object" && value !== null) {
+          const valueStr = JSON.stringify(value);
+          if (valueStr.length > 100000) {
+            processedValue = valueStr.substring(0, 100000) + `... [field truncated, ${valueStr.length} chars]`;
+          }
+        }
+
+        // Colorize the value (without highlighting for performance)
+        const colorizedValue = colorizeJson(processedValue, isDarkTheme, showBraces, showQuotes, "", false, true);
+        chunkHtml += colorizedValue;
+
+        // Add comma if not last
+        if (key !== keys[keys.length - 1]) {
+          chunkHtml += ", ";
+        }
+      }
+
+      result += chunkHtml;
+
+      // Call callback with current result if provided
+      if (onChunk) {
+        onChunk(result + (showBraces ? "}" : ""));
+      }
+
+      // Yield to event loop every chunk
+      if (i + chunkSize < keys.length) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    }
+
+    result += showBraces ? "}" : "";
+    return result;
+  }
+
   return {
     colorizeJson,
+    colorizeJsonProgressive, // New progressive rendering function
     simpleHighlight,
     createStyledSpan,
     createStyledSpanWithClasses,

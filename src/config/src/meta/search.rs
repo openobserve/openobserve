@@ -348,9 +348,7 @@ impl Iterator for ResponseChunkIterator {
             // CRITICAL: Must pop_front() to avoid infinite loop of duplicates
             if hit_size > self.chunk_size {
                 let hit = self.remaining_hits.pop_front().unwrap();
-                return Some(ResponseChunk::Hits {
-                    hits: vec![hit],
-                });
+                return Some(ResponseChunk::Hits { hits: vec![hit] });
             }
 
             // If adding this hit would exceed target size, break
