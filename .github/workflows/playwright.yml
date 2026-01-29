@@ -268,6 +268,7 @@ jobs:
                 "metrics-config-tabs.spec.js",
                 "metrics-visualizations.spec.js",
                 "metrics-config.spec.js",
+                "metrics-table-column-order.spec.js"
               ]
           - testfolder: "Dashboards-Variables-Scoped"
             browser: "chrome"
