@@ -16,273 +16,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: 100%; width: 100%">
-    <div class="row" style="height: 100%">
-      <!-- LEFT: Chart Types -->
-      <div class="tw:pl-[0.625rem]" style="overflow-y: auto">
-        <div
-          class="col scroll card-container tw:mr-[0.625rem]"
-          style="
-            overflow-y: auto;
-            height: 100%;
-            min-width: 100px;
-            max-width: 100px;
-          "
-        >
-          <ChartSelection
-            :allowedchartstype="[
-              'area',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'pie',
-              'donut',
-              'table',
-              'metric',
-            ]"
-            :selectedChartType="dashboardPanelData.data.type"
-            @update:selected-chart-type="handleChartTypeChange"
-          />
-        </div>
+  <VisualizationLayout
+    :containerStyle="{ overflowY: 'auto' }"
+    containerClass="scroll"
+    :dashboardPanelData="dashboardPanelData"
+    :chartData="chartData"
+    :seriesData="seriesData"
+    :errorData="errorData"
+    :metaData="metaData"
+    :showHeader="false"
+    :splitterLimits="[0, 20]"
+    editMode
+    hideAllFieldsSelection
+    :showQueryBuilder="false"
+    showQueryEditor
+    :showVariablesSelector="false"
+    :errorMessage="errorMessage"
+    :maxQueryRangeWarning="maxQueryRangeWarning"
+    :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+    :showLastRefreshed="false"
+    searchType="logs"
+    :searchResponse="searchResponse"
+    :is_ui_histogram="is_ui_histogram"
+    allowAlertCreation
+    :allowedChartTypes="[
+      'area',
+      'area-stacked',
+      'bar',
+      'h-bar',
+      'line',
+      'scatter',
+      'pie',
+      'donut',
+      'heatmap',
+      'stacked',
+      'h-stacked',
+      'metric',
+      'table',
+    ]"
+    :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+    :isOutDated="isOutDated"
+    :outDatedWarningMessage="outDatedWarningMessage"
+    :fieldListContainerStyle="{ height: '100%', overflowY: 'auto' }"
+    :chartColumnStyle="{ height: '100%', overflow: 'hidden' }"
+    @chartTypeChange="handleChartTypeChange"
+    @collapseFieldList="collapseFieldList"
+    @metadataUpdate="metaDataValue"
+    @resultMetadataUpdate="onResultMetadataUpdate"
+    @limitWarningUpdate="handleLimitNumberOfSeriesWarningMessage"
+    @chartError="handleChartApiError"
+    @vrlFunctionFieldListUpdate="updateVrlFunctionFieldList"
+    @seriesDataUpdate="seriesDataUpdate"
+    @showLegends="showLegendsDialog = true"
+    ref="visualizationLayoutRef"
+  >
+    <template #dialogs>
+      <!-- Show Legends Dialog -->
+      <q-dialog v-model="showLegendsDialog">
+        <ShowLegendsPopup
+          v-if="seriesData"
+          :seriesData="seriesData"
+          @close="showLegendsDialog = false"
+        />
+      </q-dialog>
+
+      <!-- Add to Dashboard Button - Positioned as overlay -->
+      <div
+        v-if="!errorData?.errors?.length"
+        style="
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          z-index: 9999;
+        "
+      >
+        <q-btn
+          size="md"
+          class="no-border"
+          no-caps
+          unelevated
+          color="primary"
+          @click="addToDashboard"
+          :title="t('search.addToDashboard')"
+          icon="add_box"
+          :label="t('search.addToDashboard')"
+        />
       </div>
-      <q-separator vertical />
-
-      <!-- MIDDLE & RIGHT: Fields + Chart + Config -->
-      <div class="col flex column" style="width: 100%; height: 100%">
-        <!-- collapse field list bar -->
-        <div
-          v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container"
-          @click="collapseFieldList"
-          style="width: 50px; height: 100%"
-        >
-          <q-icon
-            name="expand_all"
-            class="field-list-collapsed-icon rotate-90"
-            data-test="dashboard-field-list-collapsed-icon"
-          />
-          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
-        </div>
-        <q-splitter
-          v-model="dashboardPanelData.layout.splitter"
-          @update:model-value="layoutSplitterUpdated"
-          :limits="[0, 100]"
-          style="width: 100%; height: 100%"
-        >
-          <template #before>
-            <div class="tw:w-full tw:h-full">
-              <div
-                class="col scroll card-container"
-                style="height: 100%; overflow-y: auto"
-              >
-                <div class="column" style="height: 100%">
-                  <div class="col-auto q-pa-sm">
-                    <span class="text-weight-bold">{{ t("panel.fields") }}</span>
-                  </div>
-                  <div class="col" style="width: 100%; height: 100%">
-                    <FieldList :editMode="editMode" :hideAllFieldsSelection="false" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
-          <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
-            <q-btn
-              color="primary"
-              size="sm"
-              :icon="
-                dashboardPanelData.layout.showFieldList
-                  ? 'chevron_left'
-                  : 'chevron_right'
-              "
-              :class="
-                dashboardPanelData.layout.showFieldList
-                  ? 'splitter-icon-collapse'
-                  : 'splitter-icon-expand'
-              "
-              dense
-              round
-              style="top: 14px; z-index: 100"
-              @click.stop="collapseFieldList"
-            />
-          </template>
-          <template #after>
-            <div
-              class="row card-container"
-              style="height: 100%; width: 100%"
-            >
-              <div class="col" style="height: 100%; overflow: hidden">
-                <div class="layout-panel-container column" style="height: 100%; display: flex; flex-direction: column">
-                  <!-- Query Builder (drag-and-drop fields) -->
-                  <div class="col-auto">
-                    <DashboardQueryBuilder :dashboardData="{}" />
-                  </div>
-                  <q-separator />
-
-                  <div
-                    v-if="isOutDated"
-                    class="col-auto"
-                    :style="{
-                      borderColor: '#c3920d',
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      backgroundColor:
-                        store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
-                      padding: '1%',
-                      margin: '1%',
-                      borderRadius: '5px',
-                    }"
-                  >
-                    <div style="font-weight: 700">
-                      Your chart is not up to date
-                    </div>
-                    <div>
-                      Chart configuration has been updated, but the chart was not
-                      updated automatically. Click on the "Run Query" button to run
-                      the query again
-                    </div>
-                  </div>
-
-                  <div
-                    class="col"
-                    style="position: relative; min-height: 0; flex: 1; display: flex; flex-direction: column"
-                  >
-                    <div
-                      style="
-                        flex: 1;
-                        min-height: 0;
-                        width: 100%;
-                        margin-top: 36px;
-                        overflow: auto;
-                      "
-                    >
-                      <PanelSchemaRenderer
-                        @metadata-update="metaDataValue"
-                        @result-metadata-update="onResultMetadataUpdate"
-                        :key="dashboardPanelData.data.type"
-                        :panelSchema="chartData"
-                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                        :variablesData="{}"
-                        :showLegendsButton="true"
-                        @updated:vrl-function-field-list="
-                          updateVrlFunctionFieldList
-                        "
-                        @limit-number-of-series-warning-message-update="
-                          handleLimitNumberOfSeriesWarningMessage
-                        "
-                        :width="6"
-                        @error="handleChartApiError"
-                        :searchResponse="searchResponse"
-                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
-                        :allowAlertCreation="false"
-                        @series-data-update="seriesDataUpdate"
-                        @show-legends="showLegendsDialog = true"
-                        ref="panelSchemaRendererRef"
-                      />
-                    </div>
-                    <div
-                      class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
-                      style="position: absolute; top: 0px; right: -13px"
-                    >
-                      <!-- Error/Warning tooltips -->
-                      <q-btn
-                        v-if="errorMessage"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-error-data"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ errorMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="maxQueryRangeWarning"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-max-duration-warning"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ maxQueryRangeWarning }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="limitNumberOfSeriesWarningMessage"
-                        :icon="symOutlinedDataInfoAlert"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-limit-number-of-series-warning"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ limitNumberOfSeriesWarningMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        size="md"
-                        class="no-border"
-                        no-caps
-                        dense
-                        style="padding: 2px 4px; z-index: 1"
-                        color="primary"
-                        @click="addToDashboard"
-                        :title="t('search.addToDashboard')"
-                        :disabled="errorData?.errors?.length > 0"
-                        >{{ t("search.addToDashboard") }}</q-btn
-                      >
-                    </div>
-                  </div>
-                  <DashboardErrorsComponent
-                    :errors="errorData"
-                    class="col-auto"
-                    style="flex-shrink: 0"
-                  />
-                </div>
-              </div>
-              <q-separator vertical />
-              <div class="col-auto" style="height: 100%">
-                <PanelSidebar
-                  :title="t('dashboard.configLabel')"
-                  v-model="dashboardPanelData.layout.isConfigPanelOpen"
-                >
-                  <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
-                    :panelData="seriesData"
-                  />
-                </PanelSidebar>
-              </div>
-            </div>
-          </template>
-        </q-splitter>
-      </div>
-    </div>
-  </div>
+    </template>
+  </VisualizationLayout>
 </template>
 
 <script lang="ts">
@@ -291,21 +112,20 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
-// Import components (same as VisualizeLogsQuery.vue)
-import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
-import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
-import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
-import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
-import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
-import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
+// Import the new common component
+import VisualizationLayout from "@/components/dashboards/VisualizationLayout.vue";
 
-// Import composable
+// Import specific components
+import ShowLegendsPopup from "@/components/dashboards/addPanel/ShowLegendsPopup.vue";
+
+// Import composables
 import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { useFieldListCollapse } from "@/composables/useFieldListCollapse";
+import { useChartWarnings } from "@/composables/useChartWarnings";
 
 // Import utilities
 import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, isEqual } from "lodash-es";
 import { parseSQLQueryToPanelObject } from "@/utils/dashboard/sqlQueryParser";
 
 // Import icons
@@ -315,13 +135,8 @@ import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlin
 export default defineComponent({
   name: "BuildQueryTab",
   components: {
-    ChartSelection,
-    FieldList,
-    PanelSchemaRenderer,
-    ConfigPanel,
-    PanelSidebar,
-    DashboardErrorsComponent,
-    DashboardQueryBuilder,
+    VisualizationLayout,
+    ShowLegendsPopup,
   },
   props: {
     errorData: {
@@ -340,7 +155,10 @@ export default defineComponent({
     const $q = useQuasar();
 
     // Inject the registration function from parent (Index.vue)
-    const registerBuildQueryTabRunQuery = inject("registerBuildQueryTabRunQuery", null);
+    const registerBuildQueryTabRunQuery = inject(
+      "registerBuildQueryTabRunQuery",
+      null
+    );
 
     // Inject searchObj from logs page (Index.vue) to access current datetime
     const logsPageSearchObj: any = inject("logsPageSearchObj", null);
@@ -359,22 +177,47 @@ export default defineComponent({
       makeAutoSQLQuery,
     }: any = useDashboardPanelData(dashboardPanelDataPageKey);
 
+    // Use shared composables
+    const { collapseFieldList, layoutSplitterUpdated } =
+      useFieldListCollapse(dashboardPanelData);
+
+    const {
+      errorMessage,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      handleChartApiError,
+      handleLimitNumberOfSeriesWarningMessage,
+      onResultMetadataUpdate,
+    } = useChartWarnings();
+
     // Refs for UI state
-    const isOutDated = ref(false);
-    const errorMessage = ref("");
-    const maxQueryRangeWarning = ref("");
-    const limitNumberOfSeriesWarningMessage = ref("");
     const showLegendsDialog = ref(false);
     const seriesData = ref(null);
-    const panelSchemaRendererRef = ref(null);
+    const visualizationLayoutRef = ref(null);
     const searchResponse = ref(null);
 
     // Create local chartData ref (matching VisualizeLogsQuery pattern)
     // This creates a reactive copy that re-renders the chart when updated
-    const chartData = ref(JSON.parse(JSON.stringify(dashboardPanelData.data)));
+    const chartData = ref(
+      JSON.parse(JSON.stringify(dashboardPanelData.data))
+    );
+
+    // Computed for isOutDated
+    const isOutDated = ref(false);
+
+    // Out dated warning message
+    const outDatedWarningMessage = "Chart configuration has been updated, but the chart was not updated automatically. Click on the Run Query button to run the query again";
 
     // Initialize from logs context
     const initializeFromLogsContext = () => {
+      // Set sqlMode to true before parsing query
+      if (logsPageSearchObj?.meta) {
+        logsPageSearchObj.meta.sqlMode = true;
+        console.log(
+          "[BuildQueryTab] Set logs page sqlMode to true before parsing"
+        );
+      }
+
       // IMPORTANT: Build tab only supports auto SQL (visual query builder)
       // Not custom SQL, not PromQL - only auto-generated SQL
       dashboardPanelData.data.queries[0].customQuery = false;
@@ -387,7 +230,7 @@ export default defineComponent({
         const dateTime =
           logsPageSearchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                logsPageSearchObj.data.datetime.relativeTimePeriod,
+                logsPageSearchObj.data.datetime.relativeTimePeriod
               )
             : cloneDeep(logsPageSearchObj.data.datetime);
 
@@ -404,66 +247,125 @@ export default defineComponent({
 
         try {
           // Skip if query is empty or an array (multiple queries not supported)
-          if (existingQuery && typeof existingQuery === "string" && existingQuery.trim()) {
-            console.log("[BuildQueryTab] Attempting to parse query:", existingQuery);
+          if (
+            existingQuery &&
+            typeof existingQuery === "string" &&
+            existingQuery.trim()
+          ) {
+            console.log(
+              "[BuildQueryTab] Attempting to parse query:",
+              existingQuery
+            );
 
             // Parse the SQL query to panel object
-            const streamType = logsPageSearchObj.data?.stream?.selectedStream?.[0]?.stream_type ||
-                             store.state.organizationData.organizationSettings?.stream_type ||
-                             "logs";
+            const streamType =
+              logsPageSearchObj.data?.stream?.selectedStream?.[0]
+                ?.stream_type ||
+              store.state.organizationData.organizationSettings?.stream_type ||
+              "logs";
 
-            const parsedQuery = parseSQLQueryToPanelObject(existingQuery, streamType);
+            const parsedQuery = parseSQLQueryToPanelObject(
+              existingQuery,
+              streamType
+            );
             console.log("[BuildQueryTab] Parsed query result:", parsedQuery);
 
             // Populate dashboard panel fields from parsed query
             if (parsedQuery && parsedQuery.fields) {
               // Set stream name
               if (parsedQuery.fields.stream) {
-                dashboardPanelData.data.queries[0].fields.stream = parsedQuery.fields.stream;
-                console.log("[BuildQueryTab] Set stream:", parsedQuery.fields.stream);
+                dashboardPanelData.data.queries[0].fields.stream =
+                  parsedQuery.fields.stream;
+                console.log(
+                  "[BuildQueryTab] Set stream:",
+                  parsedQuery.fields.stream
+                );
               }
 
               // Set stream type
               if (parsedQuery.fields.stream_type) {
-                dashboardPanelData.data.queries[0].fields.stream_type = parsedQuery.fields.stream_type;
-                console.log("[BuildQueryTab] Set stream_type:", parsedQuery.fields.stream_type);
+                dashboardPanelData.data.queries[0].fields.stream_type =
+                  parsedQuery.fields.stream_type;
+                console.log(
+                  "[BuildQueryTab] Set stream_type:",
+                  parsedQuery.fields.stream_type
+                );
               }
 
               // Set x-axis fields (GROUP BY fields)
               if (parsedQuery.fields.x && parsedQuery.fields.x.length > 0) {
-                dashboardPanelData.data.queries[0].fields.x = cloneDeep(parsedQuery.fields.x);
-                console.log("[BuildQueryTab] Set x-axis fields:", parsedQuery.fields.x.length);
+                dashboardPanelData.data.queries[0].fields.x = cloneDeep(
+                  parsedQuery.fields.x
+                );
+                console.log(
+                  "[BuildQueryTab] Set x-axis fields:",
+                  parsedQuery.fields.x.length
+                );
               }
 
               // Set y-axis fields (aggregations)
               if (parsedQuery.fields.y && parsedQuery.fields.y.length > 0) {
-                dashboardPanelData.data.queries[0].fields.y = cloneDeep(parsedQuery.fields.y);
-                console.log("[BuildQueryTab] Set y-axis fields:", parsedQuery.fields.y.length);
+                dashboardPanelData.data.queries[0].fields.y = cloneDeep(
+                  parsedQuery.fields.y
+                );
+                console.log(
+                  "[BuildQueryTab] Set y-axis fields:",
+                  parsedQuery.fields.y.length
+                );
               }
 
               // Set breakdown field
-              if (parsedQuery.fields.breakdown && parsedQuery.fields.breakdown.length > 0) {
-                dashboardPanelData.data.queries[0].fields.breakdown = cloneDeep(parsedQuery.fields.breakdown);
-                console.log("[BuildQueryTab] Set breakdown fields:", parsedQuery.fields.breakdown.length);
+              if (
+                parsedQuery.fields.breakdown &&
+                parsedQuery.fields.breakdown.length > 0
+              ) {
+                dashboardPanelData.data.queries[0].fields.breakdown = cloneDeep(
+                  parsedQuery.fields.breakdown
+                );
+                console.log(
+                  "[BuildQueryTab] Set breakdown fields:",
+                  parsedQuery.fields.breakdown.length
+                );
               }
 
               // Set filters (WHERE clause)
-              if (parsedQuery.fields.filter && parsedQuery.fields.filter.conditions) {
-                dashboardPanelData.data.queries[0].fields.filter = cloneDeep(parsedQuery.fields.filter);
-                console.log("[BuildQueryTab] Set filters with", parsedQuery.fields.filter.conditions.length, "conditions");
+              if (
+                parsedQuery.fields.filter &&
+                parsedQuery.fields.filter.conditions
+              ) {
+                dashboardPanelData.data.queries[0].fields.filter = cloneDeep(
+                  parsedQuery.fields.filter
+                );
+                console.log(
+                  "[BuildQueryTab] Set filters with",
+                  parsedQuery.fields.filter.conditions.length,
+                  "conditions"
+                );
               }
 
               // Set joins
               if (parsedQuery.joins && parsedQuery.joins.length > 0) {
-                dashboardPanelData.data.queries[0].joins = cloneDeep(parsedQuery.joins);
-                console.log("[BuildQueryTab] Set joins:", parsedQuery.joins.length);
+                dashboardPanelData.data.queries[0].joins = cloneDeep(
+                  parsedQuery.joins
+                );
+                console.log(
+                  "[BuildQueryTab] Set joins:",
+                  parsedQuery.joins.length
+                );
               }
 
               // Set config options (limit, sort)
               if (parsedQuery.config) {
-                if (parsedQuery.config.limit !== undefined && parsedQuery.config.limit > 0) {
-                  dashboardPanelData.data.config.limit = parsedQuery.config.limit;
-                  console.log("[BuildQueryTab] Set limit:", parsedQuery.config.limit);
+                if (
+                  parsedQuery.config.limit !== undefined &&
+                  parsedQuery.config.limit > 0
+                ) {
+                  dashboardPanelData.data.config.limit =
+                    parsedQuery.config.limit;
+                  console.log(
+                    "[BuildQueryTab] Set limit:",
+                    parsedQuery.config.limit
+                  );
                 }
               }
 
@@ -473,7 +375,9 @@ export default defineComponent({
               dashboardPanelData.data.queries[0].customQuery = false;
 
               queryParsed = true;
-              console.log("[BuildQueryTab] Successfully parsed and populated query fields");
+              console.log(
+                "[BuildQueryTab] Successfully parsed and populated query fields"
+              );
             }
           }
         } catch (error) {
@@ -498,7 +402,9 @@ export default defineComponent({
 
       // If no query was parsed, generate initial SQL (auto SQL mode)
       if (!queryParsed) {
-        console.log("[BuildQueryTab] No query parsed, generating default auto SQL");
+        console.log(
+          "[BuildQueryTab] No query parsed, generating default auto SQL"
+        );
         makeAutoSQLQuery();
       }
     };
@@ -507,17 +413,6 @@ export default defineComponent({
     const handleChartTypeChange = (type: string) => {
       dashboardPanelData.data.type = type;
       resetAggregationFunction();
-    };
-
-    // Collapse field list
-    const collapseFieldList = () => {
-      dashboardPanelData.layout.showFieldList =
-        !dashboardPanelData.layout.showFieldList;
-    };
-
-    // Layout splitter updated
-    const layoutSplitterUpdated = (value: number) => {
-      dashboardPanelData.layout.splitter = value;
     };
 
     // Add to dashboard
@@ -534,25 +429,9 @@ export default defineComponent({
       // Handle metadata
     };
 
-    // On result metadata update
-    const onResultMetadataUpdate = (data: any) => {
-      // Handle result metadata
-    };
-
     // Update VRL function field list
     const updateVrlFunctionFieldList = (data: any) => {
       // Update field list
-    };
-
-    // Handle limit number of series warning
-    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
-      limitNumberOfSeriesWarningMessage.value = message;
-    };
-
-    // Handle chart API error
-    const handleChartApiError = (error: any) => {
-      errorMessage.value = error.message || "An error occurred";
-      emit("error", error);
     };
 
     // Series data update
@@ -569,7 +448,7 @@ export default defineComponent({
           const dateTime =
             logsPageSearchObj.data.datetime.type === "relative"
               ? getConsumableRelativeTime(
-                  logsPageSearchObj.data.datetime.relativeTimePeriod,
+                  logsPageSearchObj.data.datetime.relativeTimePeriod
                 )
               : cloneDeep(logsPageSearchObj.data.datetime);
 
@@ -586,19 +465,6 @@ export default defineComponent({
         emit("error", err);
       }
     };
-
-    // // Watch for query changes and update chartData
-    // watch(
-    //   () => dashboardPanelData.data.queries[0],
-    //   () => {
-    //     const query = dashboardPanelData.data.queries[0]?.query || "";
-    //     emit("query-changed", query);
-
-    //     // Update chartData to trigger chart re-render
-    //     chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-    //   },
-    //   { deep: true }
-    // );
 
     // Watch for chart type changes
     watch(
@@ -625,7 +491,8 @@ export default defineComponent({
           makeAutoSQLQuery();
 
           // Emit the generated query to parent
-          const generatedQuery = dashboardPanelData.data.queries[0]?.query || "";
+          const generatedQuery =
+            dashboardPanelData.data.queries[0]?.query || "";
           if (generatedQuery) {
             emit("query-changed", generatedQuery);
           }
@@ -636,7 +503,10 @@ export default defineComponent({
 
     onMounted(() => {
       // Register the runQuery function with parent (Index.vue)
-      if (registerBuildQueryTabRunQuery && typeof registerBuildQueryTabRunQuery === 'function') {
+      if (
+        registerBuildQueryTabRunQuery &&
+        typeof registerBuildQueryTabRunQuery === "function"
+      ) {
         registerBuildQueryTabRunQuery(runQuery);
       }
 
@@ -663,43 +533,23 @@ export default defineComponent({
       runQuery,
       chartData,
       isOutDated,
+      outDatedWarningMessage,
       errorMessage,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       showLegendsDialog,
       seriesData,
-      panelSchemaRendererRef,
+      visualizationLayoutRef,
       searchResponse,
       outlinedWarning,
       symOutlinedDataInfoAlert,
-      errorData: props.errorData,
-      shouldRefreshWithoutCache: props.shouldRefreshWithoutCache,
+      metaData: ref(null),
+      is_ui_histogram: ref(false),
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
-// Styles from VisualizeLogsQuery
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--q-card-bg);
-}
-
-.field-list-collapsed-icon {
-  font-size: 24px;
-  margin-bottom: 8px;
-}
-
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 1px;
-}
+@import "@/styles/visualization-layout.scss";
 </style>
