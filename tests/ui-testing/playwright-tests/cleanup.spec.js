@@ -188,8 +188,9 @@ test.describe("Pre-Test Cleanup", () => {
     ];
     await pm.apiCleanup.cleanupFunctionsInOrg('_meta', metaOrgFunctionPatterns);
 
-    // Clean up enrichment tables matching test patterns
-    await pm.apiCleanup.cleanupEnrichmentTables([
+    // Clean up file-based enrichment tables matching test patterns
+    // These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
+    await pm.apiCleanup.cleanupFileEnrichmentTables([
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)

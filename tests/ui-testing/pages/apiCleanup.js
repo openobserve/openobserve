@@ -517,11 +517,12 @@ class APICleanup {
     }
 
     /**
-     * Clean up enrichment tables matching specified patterns
+     * Clean up file-based enrichment tables matching specified patterns
+     * These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
      * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
      */
-    async cleanupEnrichmentTables(patterns = []) {
-        testLogger.info('Starting enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
+    async cleanupFileEnrichmentTables(patterns = []) {
+        testLogger.info('Starting file-based enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
             // Fetch all enrichment tables
@@ -555,14 +556,14 @@ class APICleanup {
                 }
             }
 
-            testLogger.info('Enrichment tables cleanup completed', {
+            testLogger.info('File-based enrichment tables cleanup completed', {
                 total: matchingTables.length,
                 deleted: deletedCount,
                 failed: failedCount
             });
 
         } catch (error) {
-            testLogger.error('Enrichment tables cleanup failed', { error: error.message });
+            testLogger.error('File-based enrichment tables cleanup failed', { error: error.message });
         }
     }
 
@@ -587,7 +588,8 @@ class APICleanup {
 
             const data = await response.json();
             // Response is a map where keys are table names
-            return Object.keys(data);
+            // Guard against null/undefined response
+            return Object.keys(data || {});
         } catch (error) {
             testLogger.error('Failed to fetch URL enrichment tables', { error: error.message });
             return [];

@@ -96,7 +96,8 @@ async function globalSetup() {
     testLogger.info('Authentication state saved successfully', { authFile });
     
     // Skip data ingestion for cleanup-only runs
-    const isCleanupOnly = process.argv.some(arg => arg.includes('cleanup.spec'));
+    // Use precise regex to match only cleanup.spec.js (not some-cleanup.spec.js or cleanup.spec-backup.js)
+    const isCleanupOnly = process.argv.some(arg => /cleanup\.spec\.(js|ts)$/.test(arg));
     if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
       testLogger.info('Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
     } else {
