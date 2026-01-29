@@ -517,11 +517,12 @@ class APICleanup {
     }
 
     /**
-     * Clean up enrichment tables matching specified patterns
+     * Clean up file-based enrichment tables matching specified patterns
+     * These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
      * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
      */
-    async cleanupEnrichmentTables(patterns = []) {
-        testLogger.info('Starting enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
+    async cleanupFileEnrichmentTables(patterns = []) {
+        testLogger.info('Starting file-based enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
             // Fetch all enrichment tables
@@ -555,14 +556,95 @@ class APICleanup {
                 }
             }
 
-            testLogger.info('Enrichment tables cleanup completed', {
+            testLogger.info('File-based enrichment tables cleanup completed', {
                 total: matchingTables.length,
                 deleted: deletedCount,
                 failed: failedCount
             });
 
         } catch (error) {
-            testLogger.error('Enrichment tables cleanup failed', { error: error.message });
+            testLogger.error('File-based enrichment tables cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all URL-based enrichment tables from the status API
+     * @returns {Promise<Array<string>>} Array of URL enrichment table names
+     */
+    async fetchUrlEnrichmentTables() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/enrichment_tables/status`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                testLogger.error('Failed to fetch URL enrichment tables', { status: response.status, body: errorBody });
+                return [];
+            }
+
+            const data = await response.json();
+            // Response is a map where keys are table names
+            // Guard against null/undefined response
+            return Object.keys(data || {});
+        } catch (error) {
+            testLogger.error('Failed to fetch URL enrichment tables', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Clean up URL-based enrichment tables matching specified patterns
+     * These are tables created via URL ingestion that show as "NaN MB" in the UI
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
+     */
+    async cleanupUrlEnrichmentTables(patterns = []) {
+        testLogger.info('Starting URL enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
+
+        try {
+            // Fetch all URL-based enrichment tables
+            const tableNames = await this.fetchUrlEnrichmentTables();
+            testLogger.info('Fetched URL enrichment tables', { total: tableNames.length });
+
+            // Filter tables matching patterns
+            const matchingTables = tableNames.filter(name =>
+                patterns.some(pattern => pattern.test(name))
+            );
+            testLogger.info('Found URL enrichment tables matching cleanup pattern', { count: matchingTables.length });
+
+            if (matchingTables.length === 0) {
+                testLogger.info('No URL enrichment tables to clean up');
+                return;
+            }
+
+            // Delete each table (uses same delete endpoint as file-based tables)
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const tableName of matchingTables) {
+                const result = await this.deleteEnrichmentTable(tableName);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted URL enrichment table', { name: tableName });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete URL enrichment table', { name: tableName, result });
+                }
+            }
+
+            testLogger.info('URL enrichment tables cleanup completed', {
+                total: matchingTables.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('URL enrichment tables cleanup failed', { error: error.message });
         }
     }
 
