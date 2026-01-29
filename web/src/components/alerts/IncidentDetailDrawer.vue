@@ -263,370 +263,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
       <div v-if="activeTab === 'incidentAnalysis'" class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full" style="order: 1;">
 
-        <!-- Top Section - Table of Contents (only on Incident Analysis) OR Overview (other tabs) -->
+        <!-- Table of Contents (only on Incident Analysis) -->
         <IncidentTableOfContents
-          v-if="activeTab === 'incidentAnalysis'"
           :table-of-contents="tableOfContents"
           :expanded-sections="expandedSections"
           :is-dark-mode="isDarkMode"
           @scroll-to-section="scrollToSection"
           @toggle-section="toggleSection"
         />
-
-        <!-- Overview Section (Other Tabs) -->
-        <div
-          v-else
-          class="tw:px-2 tw:pt-4 tw:pb-2 tw:flex tw:flex-col"
-        >
-          <div
-            :class="[
-              'section-container tw:overflow-hidden tw:flex tw:flex-col'
-            ]"
-          >
-            <!-- Header -->
-            <div
-              :class="[
-                'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
-                store.state.theme === 'dark'
-                  ? 'tw:border-gray-700'
-                  : 'tw:border-gray-200'
-              ]"
-            >
-              <q-icon :name="activeTab === 'incidentAnalysis' ? 'format_list_bulleted' : 'settings'" size="16px" class="tw:opacity-80" />
-              <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
-                {{ activeTab === 'incidentAnalysis' ? 'Table of Contents' : 'Manage' }}
-              </span>
-            </div>
-            <!-- Content -->
-            <div class="tw:p-3">
-
-              <!-- Table of Contents (Incident Analysis Tab) -->
-              <template v-if="activeTab === 'incidentAnalysis'">
-                <div v-if="tableOfContents.length === 0" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic">
-                  No sections available
-                </div>
-                <div v-else class="tw:space-y-1">
-                <!-- TOC Items -->
-                <template v-for="item in tableOfContents" :key="item.id">
-                  <div>
-                    <!-- Level 1 Item -->
-                    <div
-                      :class="[
-                        'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1.5 tw:rounded tw:transition-colors',
-                        store.state.theme === 'dark'
-                          ? 'tw:text-gray-200'
-                          : 'tw:text-gray-900'
-                      ]"
-                    >
-                      <!-- Icon on the left -->
-                      <q-icon
-                        :name="item.children.length > 0 ? 'folder' : 'article'"
-                        size="14px"
-                        class="tw:opacity-60 tw:flex-shrink-0"
-                      />
-                      <!-- Text in the middle - clickable to scroll -->
-                      <span
-                        @click="scrollToSection(item.id)"
-                        :class="[
-                          'tw:text-sm tw:font-medium tw:truncate tw:flex-1 tw:cursor-pointer',
-                          store.state.theme === 'dark'
-                            ? 'hover:tw:text-blue-400'
-                            : 'hover:tw:text-blue-600'
-                        ]"
-                      >{{ item.text }}</span>
-                      <!-- Expand button on the right (only for items with children) -->
-                      <q-btn
-                        v-if="item.children.length > 0"
-                        flat
-                        dense
-                        round
-                        size="xs"
-                        :icon="expandedSections[item.id] ? 'expand_more' : 'chevron_right'"
-                        @click="toggleSection(item, $event)"
-                        class="tw:flex-shrink-0"
-                      >
-                        <q-tooltip :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
-                      </q-btn>
-                    </div>
-
-                    <!-- Level 2 Children -->
-                    <div v-if="expandedSections[item.id] && item.children.length > 0" class="tw:ml-4 tw:space-y-1 tw:mt-1">
-                      <template v-for="child in item.children" :key="child.id">
-                        <div>
-                          <!-- Level 2 Item -->
-                          <div
-                            :class="[
-                              'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:transition-colors',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-300'
-                                : 'tw:text-gray-700'
-                            ]"
-                          >
-                            <!-- Icon on the left -->
-                            <q-icon
-                              name="label"
-                              size="12px"
-                              class="tw:opacity-60 tw:flex-shrink-0"
-                            />
-                            <!-- Text in the middle - clickable to scroll -->
-                            <span
-                              @click="scrollToSection(child.id)"
-                              :class="[
-                                'tw:text-sm tw:truncate tw:flex-1 tw:cursor-pointer',
-                                store.state.theme === 'dark'
-                                  ? 'hover:tw:text-blue-400'
-                                  : 'hover:tw:text-blue-600'
-                              ]"
-                            >{{ child.text }}</span>
-                            <!-- Expand button on the right (only for items with children) -->
-                            <q-btn
-                              v-if="child.children.length > 0"
-                              flat
-                              dense
-                              round
-                              size="xs"
-                              :icon="expandedSections[child.id] ? 'expand_more' : 'chevron_right'"
-                              @click="toggleSection(child, $event)"
-                              class="tw:flex-shrink-0"
-                            >
-                              <q-tooltip :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
-                            </q-btn>
-                          </div>
-
-                          <!-- Level 3 Children -->
-                          <div v-if="expandedSections[child.id] && child.children.length > 0" class="tw:ml-4 tw:space-y-1 tw:mt-1">
-                            <div
-                              v-for="grandchild in child.children"
-                              :key="grandchild.id"
-                              @click="scrollToSection(grandchild.id)"
-                              :class="[
-                                'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:cursor-pointer tw:transition-colors',
-                                store.state.theme === 'dark'
-                                  ? 'hover:tw:bg-gray-700 tw:text-gray-400'
-                                  : 'hover:tw:bg-blue-50 tw:text-gray-600'
-                              ]"
-                            >
-                              <q-icon name="fiber_manual_record" size="8px" class="tw:opacity-60" />
-                              <span class="tw:text-[11px] tw:truncate">{{ grandchild.text }}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                </template>
-              </div>
-              </template>
-
-              <!-- Overview Section (Other Tabs) -->
-              <template v-else>
-                <div v-if="incidentDetails" class="tw:space-y-3">
-                  <!-- Status Section -->
-                  <div>
-                    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                      <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
-                        Status
-                      </span>
-                    </div>
-                    <q-select
-                      v-model="editableStatus"
-                      :options="statusOptions"
-                      option-value="value"
-                      option-label="label"
-                      emit-value
-                      map-options
-                      borderless
-                      dense
-                      @update:model-value="handleStatusChange"
-                      :class="store.state.theme === 'dark' ? 'dark-select' : ''"
-                    />
-                  </div>
-
-                  <!-- Severity Section -->
-                  <div>
-                    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                      <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
-                        Severity
-                      </span>
-                    </div>
-                    <q-select
-                      v-model="editableSeverity"
-                      :options="severityOptions"
-                      option-value="value"
-                      option-label="label"
-                      emit-value
-                      map-options
-                      borderless
-                      dense
-                      @update:model-value="handleSeverityChange"
-                      :class="store.state.theme === 'dark' ? 'dark-select' : ''"
-                    />
-                  </div>
-                </div>
-              </template>
-
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom Section - Timeline, Dimensions, Topology (only for non-Incident Analysis tabs) -->
-        <div v-if="activeTab !== 'incidentAnalysis'" class="tw:flex-1 tw:overflow-y-auto tw:px-2 tw:pt-2 tw:pb-2">
-        <!-- Timeline with UTC timestamps -->
-        <div
-          id="timeline"
-          :class="[
-            'section-container tw:mb-4 tw:overflow-hidden tw:flex tw:flex-col'
-          ]"
-          style="max-height: 120px;"
-        >
-          <!-- Header -->
-          <div
-            :class="[
-              'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:justify-between tw:border-b',
-              store.state.theme === 'dark'
-                ? 'tw:border-gray-700'
-                : 'tw:border-gray-200'
-            ]"
-          >
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <q-icon name="schedule" size="16px" class="tw:opacity-80" />
-              <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
-                Timeline
-              </span>
-            </div>
-            <span
-              :class="[
-                'tw:text-[10px] tw:font-medium tw:px-2 tw:py-0.5 tw:rounded-full',
-                store.state.theme === 'dark'
-                  ? 'tw:text-blue-300 tw:bg-blue-900/30'
-                  : 'tw:text-blue-700 tw:bg-blue-100'
-              ]"
-            >
-              UTC
-            </span>
-          </div>
-
-          <!-- Content -->
-          <div class="tw:p-3">
-            <div class="tw:space-y-2.5">
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <q-icon name="play_arrow" size="14px" :class="store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'" />
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-[14px] tw:font-medium">
-                  First Alert:
-                </span>
-                <span
-                  :class="[
-                    'tw:text-sm tw:font-mono',
-                    store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'
-                  ]"
-                >
-                  {{ formatTimestampUTC(incidentDetails.first_alert_at) }}
-                </span>
-              </div>
-
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <q-icon name="flag" size="14px" :class="store.state.theme === 'dark' ? 'tw:text-orange-400' : 'tw:text-orange-600'" />
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-[14px] tw:font-medium">
-                  Last Alert:
-                </span>
-                <span
-                  :class="[
-                    'tw:text-sm tw:font-mono',
-                    store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'
-                  ]"
-                >
-                  {{ formatTimestampUTC(incidentDetails.last_alert_at) }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Dimensions & Topology - stacked -->
-        <div class="tw:flex tw:flex-col tw:gap-3 tw:mb-4">
-          <!-- Stable Dimensions -->
-          <div
-            :class="[
-              'section-container tw:overflow-hidden tw:flex tw:flex-col'
-            ]"
-            style="max-height: 250px;"
-          >
-            <!-- Header -->
-            <div
-              :class="[
-                'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
-                store.state.theme === 'dark'
-                  ? 'tw:border-gray-700'
-                  : 'tw:border-gray-200'
-              ]"
-            >
-              <q-icon name="category" size="16px" class="tw:opacity-80" />
-              <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
-                {{ t("alerts.incidents.stableDimensions") }}
-              </span>
-            </div>
-            <!-- Content -->
-            <div class="tw:p-3 tw:overflow-y-auto tw:flex-1">
-              <div
-                v-for="(value, key) in incidentDetails.stable_dimensions"
-                :key="key"
-                class="tw:flex tw:text-sm tw:mb-1.5 last:tw:mb-0"
-              >
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:mr-1 tw:font-medium tw:whitespace-nowrap">{{ key }}:</span>
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:font-mono tw:whitespace-nowrap">{{ value }}</span>
-              </div>
-              <div
-                v-if="Object.keys(incidentDetails.stable_dimensions).length === 0"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
-                class="tw:text-sm tw:italic"
-              >
-                No dimensions
-              </div>
-            </div>
-          </div>
-
-          <!-- Alert Flow Summary -->
-          <div
-            v-if="incidentDetails.topology_context && incidentDetails.topology_context.nodes?.length"
-            :class="[
-              'section-container tw:overflow-hidden tw:flex tw:flex-col'
-            ]"
-            style="max-height: 250px;"
-          >
-            <!-- Header -->
-            <div
-              :class="[
-                'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
-                store.state.theme === 'dark'
-                  ? 'tw:border-gray-700'
-                  : 'tw:border-gray-200'
-              ]"
-            >
-              <q-icon name="timeline" size="16px" class="tw:opacity-80" />
-              <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
-                Alert Flow ({{ incidentDetails.topology_context.nodes.length }} unique)
-              </span>
-            </div>
-            <!-- Content -->
-            <div class="tw:p-3 tw:overflow-y-auto tw:flex-1">
-              <div class="tw:flex tw:flex-wrap tw:gap-1.5">
-                <q-badge
-                  v-for="(node, index) in incidentDetails.topology_context.nodes"
-                  :key="node.alert_id"
-                  :color="index === 0 ? 'red-5' : 'blue-grey-5'"
-                  :label="`${node.alert_name} (${node.service_name})`"
-                  size="xs"
-                >
-                  <q-tooltip v-if="node.alert_count > 1" class="text-xs">
-                    Fired {{ node.alert_count }} times
-                  </q-tooltip>
-                </q-badge>
-              </div>
-            </div>
-          </div>
-        </div>
-        </div>
-        <!-- End Bottom Section -->
       </div>
 
       <!-- Right Column: Content -->
@@ -1692,31 +1336,6 @@ export default defineComponent({
     const selectedAlertIndex = ref(-1);
 
     // Computed property to process alerts with formatted conditions upfront
-    const processedAlerts = computed(() => {
-      if (!alerts.value || alerts.value.length === 0) return [];
-
-      return alerts.value.map((alert: any) => {
-        let formattedConditions = '--';
-
-        if (alert.query_condition) {
-          const qc = alert.query_condition;
-
-          if (qc.type === 'custom' && qc.conditions) {
-            formattedConditions = formatCustomConditions(qc.conditions);
-          } else if (qc.sql) {
-            formattedConditions = qc.sql;
-          } else if (qc.promql) {
-            formattedConditions = qc.promql;
-          }
-        }
-
-        return {
-          ...alert,
-          _displayConditions: formattedConditions,
-        };
-      });
-    });
-
     // Editable status and severity for Overview tab
     const editableStatus = ref<"open" | "acknowledged" | "resolved">("open");
     const editableSeverity = ref<"P1" | "P2" | "P3" | "P4">("P3");
@@ -1745,7 +1364,6 @@ export default defineComponent({
     }
     const tableOfContents = ref<TocItem[]>([]);
     const expandedSections = ref<Record<string, boolean>>({});
-    const tocRenderKey = ref(0);
 
     // Telemetry correlation state
     const correlationData = ref<IncidentCorrelatedStreams | null>(null);
@@ -1763,12 +1381,6 @@ export default defineComponent({
     });
 
     // Computed properties for statistics
-    const uniqueAlertsCount = computed(() => {
-      if (!incidentDetails.value?.alerts) return 0;
-      const uniqueAlertIds = new Set(incidentDetails.value.alerts.map(a => a.id));
-      return uniqueAlertIds.size;
-    });
-
     const affectedServicesCount = computed(() => {
       if (!incidentDetails.value?.topology_context?.nodes) return 0;
       return incidentDetails.value.topology_context.nodes.length;
@@ -2325,32 +1937,6 @@ export default defineComponent({
       }
     };
 
-    const getStatusDotColor = (status: string) => {
-      switch (status) {
-        case "open":
-          return "#ef4444"; // red-500
-        case "acknowledged":
-          return "#f59e0b"; // amber-500
-        case "resolved":
-          return "#10b981"; // green-500
-        default:
-          return "#6b7280"; // gray-500
-      }
-    };
-
-    const getStatusTextColor = (status: string) => {
-      switch (status) {
-        case "open":
-          return "#dc2626"; // red-600
-        case "acknowledged":
-          return "#d97706"; // amber-600
-        case "resolved":
-          return "#059669"; // green-600
-        default:
-          return "#4b5563"; // gray-600
-      }
-    };
-
     const getStatusLabel = (status: string) => {
       switch (status) {
         case "open":
@@ -2361,36 +1947,6 @@ export default defineComponent({
           return t("alerts.incidents.statusResolved");
         default:
           return status;
-      }
-    };
-
-    const getSeverityColor = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "red-10";
-        case "P2":
-          return "orange-8";
-        case "P3":
-          return "amber-8";
-        case "P4":
-          return "grey-7";
-        default:
-          return "grey";
-      }
-    };
-
-    const getSeverityDotColor = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "#991b1b"; // red-900
-        case "P2":
-          return "#ea580c"; // orange-600
-        case "P3":
-          return "#f59e0b"; // amber-500
-        case "P4":
-          return "#6b7280"; // gray-500
-        default:
-          return "#9ca3af"; // gray-400
       }
     };
 
@@ -2409,46 +1965,6 @@ export default defineComponent({
       }
     };
 
-    const getSeverityTextColor = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "#b91c1c"; // red-700
-        case "P2":
-          return "#c2410c"; // orange-700
-        case "P3":
-          return "#d97706"; // amber-600
-        case "P4":
-          return "#6b7280"; // gray-500
-        default:
-          return "#6b7280"; // gray-500
-      }
-    };
-
-    const getReasonColor = (reason: string) => {
-      switch (reason) {
-        case "service_discovery":
-          return "blue";
-        case "manual_extraction":
-          return "purple";
-        case "temporal":
-          return "teal";
-        default:
-          return "grey";
-      }
-    };
-
-    const getReasonLabel = (reason: string) => {
-      switch (reason) {
-        case "service_discovery":
-          return t("alerts.incidents.correlationServiceDiscovery");
-        case "manual_extraction":
-          return t("alerts.incidents.correlationManualExtraction");
-        case "temporal":
-          return t("alerts.incidents.correlationTemporal");
-        default:
-          return reason;
-      }
-    };
 
     const formatPeriod = (periodInSeconds: number | undefined) => {
       if (!periodInSeconds) return 'N/A';
@@ -2531,19 +2047,6 @@ export default defineComponent({
       }
 
       return typeof conditionData === 'string' ? conditionData : '--';
-    };
-
-    const getStatusIcon = (status: string) => {
-      switch (status) {
-        case "open":
-          return "error";
-        case "acknowledged":
-          return "warning";
-        case "resolved":
-          return "check_circle";
-        default:
-          return "info";
-      }
     };
 
     // Handle status change from dropdown
@@ -3013,15 +2516,6 @@ export default defineComponent({
       }
     };
 
-    const getTimezone = () => {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    };
-
-    const getAIIconURL = () => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg');
-    };
 
     return {
       t,
@@ -3039,7 +2533,6 @@ export default defineComponent({
       activeTab,
       tableOfContents,
       expandedSections,
-      tocRenderKey,
       formattedRcaContent,
       correlationData,
       correlationLoading,
@@ -3048,7 +2541,6 @@ export default defineComponent({
       hasAnyStreams,
       telemetryTimeRange,
       incidentContextData,
-      uniqueAlertsCount,
       affectedServicesCount,
       alertFrequency,
       peakAlertRate,
@@ -3078,16 +2570,8 @@ export default defineComponent({
       handleSeverityChange,
       handleTriggerRowClick,
       getStatusColor,
-      getStatusDotColor,
-      getStatusTextColor,
       getStatusLabel,
-      getStatusIcon,
-      getSeverityColor,
-      getSeverityDotColor,
       getSeverityColorHex,
-      getSeverityTextColor,
-      getReasonColor,
-      getReasonLabel,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,
@@ -3096,8 +2580,6 @@ export default defineComponent({
       copiedField,
       calculateDuration,
       formatRcaContent,
-      getTimezone,
-      getAIIconURL,
     };
   },
 });
