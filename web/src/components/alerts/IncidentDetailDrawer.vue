@@ -1071,11 +1071,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- 2.2B: Dimensions Panel (35% of available height after gaps) -->
+              <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent) -->
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: 'calc(35% - 5.6px)',
+                  height: incidentDetails?.topology_context?.nodes?.length
+                    ? 'calc(35% - 5.6px)'
+                    : 'calc(60% - 8px)',
                   minHeight: 0,
                   flexShrink: 0
                 }"
@@ -1129,8 +1131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- 2.2C: Quick Actions Panel (25% of available height after gaps) -->
+              <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
               <div
+                v-if="incidentDetails?.topology_context?.nodes?.length"
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
                   height: 'calc(25% - 4px)'
@@ -1142,109 +1145,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
                     class="tw:text-sm tw:font-semibold"
                   >
-                    Quick Actions
+                    Related Alerts
                   </div>
                 </div>
 
-                <!-- Content - Single row of centered buttons -->
-                <div class="tw:p-4 tw:flex tw:items-center tw:justify-center tw:gap-3 tw:flex-1">
-                  <!-- Action 1: RCA Analysis -->
-                  <div
-                    @click="activeTab = 'incidentAnalysis'"
-                    class="tw:rounded tw:border tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-0.5 tw:cursor-pointer tw:transition-all tw:px-8 tw:py-2"
-                    :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#1F2021' : '#F9FAFB',
-                      borderColor: store.state.theme === 'dark' ? '#444444' : '#D1D5DB'
-                    }"
-                    :class="{
-                      'hover:tw:border-purple-500': true
-                    }"
-                  >
-                    <q-icon
-                      name="psychology"
-                      class="tw:text-purple-500 tw:transition-colors"
-                      style="font-size: 20px;"
-                    />
+                <!-- Content - Vertical list -->
+                <div class="tw:px-3 tw:pb-3 tw:overflow-y-auto tw:flex-1" style="min-height: 0;">
+                  <div class="tw:flex tw:flex-col tw:gap-0">
                     <div
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                      class="tw:text-xs tw:font-medium tw:text-center tw:whitespace-nowrap"
+                      v-for="(node, index) in incidentDetails.topology_context.nodes"
+                      :key="node.alert_id"
+                      class="tw:py-2.5 tw:border-b"
+                      :style="{
+                        borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
+                      }"
+                      :class="{ 'tw:border-b-0': index === incidentDetails.topology_context.nodes.length - 1 }"
                     >
-                      RCA
-                    </div>
-                  </div>
-
-                  <!-- Action 2: Logs -->
-                  <div
-                    @click="activeTab = 'logs'"
-                    class="tw:rounded tw:border tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-0.5 tw:cursor-pointer tw:transition-all tw:px-8 tw:py-2"
-                    :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#1F2021' : '#F9FAFB',
-                      borderColor: store.state.theme === 'dark' ? '#444444' : '#D1D5DB'
-                    }"
-                    :class="{
-                      'hover:tw:border-blue-500': true
-                    }"
-                  >
-                    <q-icon
-                      name="description"
-                      class="tw:text-blue-500 tw:transition-colors"
-                      style="font-size: 20px;"
-                    />
-                    <div
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                      class="tw:text-xs tw:font-medium tw:text-center tw:whitespace-nowrap"
-                    >
-                      Logs
-                    </div>
-                  </div>
-
-                  <!-- Action 3: Metrics -->
-                  <div
-                    @click="activeTab = 'metrics'"
-                    class="tw:rounded tw:border tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-0.5 tw:cursor-pointer tw:transition-all tw:px-8 tw:py-2"
-                    :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#1F2021' : '#F9FAFB',
-                      borderColor: store.state.theme === 'dark' ? '#444444' : '#D1D5DB'
-                    }"
-                    :class="{
-                      'hover:tw:border-green-500': true
-                    }"
-                  >
-                    <q-icon
-                      name="insert_chart"
-                      class="tw:text-green-500 tw:transition-colors"
-                      style="font-size: 20px;"
-                    />
-                    <div
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                      class="tw:text-xs tw:font-medium tw:text-center tw:whitespace-nowrap"
-                    >
-                      Metrics
-                    </div>
-                  </div>
-
-                  <!-- Action 4: Traces -->
-                  <div
-                    @click="activeTab = 'traces'"
-                    class="tw:rounded tw:border tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-0.5 tw:cursor-pointer tw:transition-all tw:px-8 tw:py-2"
-                    :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#1F2021' : '#F9FAFB',
-                      borderColor: store.state.theme === 'dark' ? '#444444' : '#D1D5DB'
-                    }"
-                    :class="{
-                      'hover:tw:border-orange-500': true
-                    }"
-                  >
-                    <q-icon
-                      name="route"
-                      class="tw:text-orange-500 tw:transition-colors"
-                      style="font-size: 20px;"
-                    />
-                    <div
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                      class="tw:text-xs tw:font-medium tw:text-center tw:whitespace-nowrap"
-                    >
-                      Traces
+                      <div
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
+                        class="tw:text-sm tw:flex tw:gap-2 tw:items-center"
+                      >
+                        <span
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+                          class="tw:font-medium tw:flex-shrink-0"
+                        >
+                          {{ index + 1 }}.
+                        </span>
+                        <div class="tw:flex-1 tw:min-w-0">
+                          <q-tooltip v-if="node.alert_name.length > 30">
+                            {{ node.alert_name }}
+                          </q-tooltip>
+                          <span class="tw:font-medium tw:truncate tw:block">
+                            {{ node.alert_name.length > 30 ? node.alert_name.substring(0, 30) + '...' : node.alert_name }}
+                          </span>
+                        </div>
+                        <div class="tw:flex-shrink-0" style="width: 120px;">
+                          <span
+                            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
+                          >
+                            Fired {{ node.alert_count }} time(s)
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
