@@ -175,6 +175,8 @@ export const useSearchResponseHandler = () => {
 
   // Deduplication: Track processed hit IDs to prevent duplicate appending
   const processedHitIds = new Set<string>();
+  // Track current traceId to detect new searches and clear dedup set
+  let currentTraceId: string | null = null;
 
   /**
    * Generates a lightweight hash for a hit object without expensive JSON.stringify
@@ -231,12 +233,37 @@ export const useSearchResponseHandler = () => {
       return;
     }
 
+    // Clear dedup set when we detect a NEW search (based on traceId change)
+    // This ensures the Set is cleared regardless of which partition we see first
+    const isNewSearch = currentTraceId !== payload.traceId;
+
+    if (isNewSearch) {
+      console.log('[handleStreamingHits] ✅ New search detected (traceId changed), clearing dedup set', {
+        previousTraceId: currentTraceId,
+        newTraceId: payload.traceId,
+        previousSetSize: processedHitIds.size,
+      });
+      processedHitIds.clear();
+      currentTraceId = payload.traceId;
+    }
+
+    const currentPartition = searchPartitionMap[payload.traceId]?.partition;
+
+    console.log('[handleStreamingHits] Received hits:', {
+      count: hits.length,
+      traceId: payload.traceId,
+      partition: currentPartition,
+      processedIdsCount: processedHitIds.size,
+      isNewSearch: isNewSearch,
+    });
+
     // Generate unique ID for each hit and filter duplicates
     const newHits = hits.filter((hit: any) => {
       // Generate lightweight hash instead of expensive JSON.stringify
       const hitId = generateHitHash(hit);
 
       if (processedHitIds.has(hitId)) {
+        console.log('[handleStreamingHits] Duplicate detected, hitId:', hitId.substring(0, 100));
         return false;
       }
 
@@ -245,15 +272,19 @@ export const useSearchResponseHandler = () => {
     });
 
     if (newHits.length === 0) {
+      console.warn('[handleStreamingHits] All hits filtered as duplicates:', {
+        totalHits: hits.length,
+        traceId: payload.traceId,
+        partition: searchPartitionMap[payload.traceId]?.partition,
+        processedIdsCount: processedHitIds.size,
+      });
       return;
     }
 
-    if (
-      (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
-      !appendResult
-    ) {
+    // Clear cache and replace hits when starting a new search (not appending)
+    // Or when it's a new search detected by traceId change
+    if (isNewSearch || !appendResult) {
       clearCache();
-      processedHitIds.clear(); // Clear dedup set on fresh results
       searchObj.data.queryResults.hits = newHits;
     } else if (appendResult) {
       searchObj.data.queryResults.hits.push(...newHits);
