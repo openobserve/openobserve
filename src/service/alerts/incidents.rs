@@ -84,12 +84,44 @@ pub async fn correlate_alert_to_incident(
     let org_config = match super::org_config::get_deduplication_config(&alert.org_id).await {
         Ok(Some(config)) if config.enabled => config,
         Ok(Some(_)) | Ok(None) => {
-            // No org config or disabled - use default semantic groups
-            GlobalDeduplicationConfig::default()
+            // No org config or disabled - use enterprise default semantic groups
+            #[cfg(feature = "enterprise")]
+            {
+                GlobalDeduplicationConfig {
+                    enabled: false,
+                    alert_dedup_enabled: false,
+                    semantic_field_groups:
+                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
+                        ),
+                    time_window_minutes: None,
+                    alert_fingerprint_groups: vec![],
+                    fqn_priority_dimensions: vec![],
+                }
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                GlobalDeduplicationConfig::default()
+            }
         }
         Err(e) => {
             log::warn!("Failed to fetch org config for incident correlation: {e}, using defaults",);
-            GlobalDeduplicationConfig::default()
+            #[cfg(feature = "enterprise")]
+            {
+                GlobalDeduplicationConfig {
+                    enabled: false,
+                    alert_dedup_enabled: false,
+                    semantic_field_groups:
+                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
+                        ),
+                    time_window_minutes: None,
+                    alert_fingerprint_groups: vec![],
+                    fqn_priority_dimensions: vec![],
+                }
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                GlobalDeduplicationConfig::default()
+            }
         }
     };
 

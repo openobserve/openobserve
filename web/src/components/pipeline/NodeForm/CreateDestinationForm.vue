@@ -1444,6 +1444,7 @@ defineExpose({
     text-align: center;
     line-height: 1.3;
     margin-top: 4px;
+    color: var(--o2-text-primary);
   }
 
   .check-icon {

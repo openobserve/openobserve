@@ -12,9 +12,9 @@ import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 
-const processedResults = ref({});
-
 export function useLogsHighlighter() {
+  const processedResults = ref({});
+
   const store = useStore();
   const currentColors = ref(getThemeColors(store.state.theme === "dark"));
   const { searchObj } = searchState();
@@ -360,7 +360,12 @@ export function useLogsHighlighter() {
     // 3xx: Redirection (300-308)
     // 4xx: Client Error (400-431, 451)
     // 5xx: Server Error (500-511)
-    if (/^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(trimmed)) return "status-code";
+    if (
+      /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(
+        trimmed,
+      )
+    )
+      return "status-code";
 
     // UUIDs
     if (
