@@ -317,30 +317,6 @@ watch(
   { deep: true },
 );
 
-// Pending dimensions - for the apply button pattern
-const pendingFilters = ref<Record<string, string>>({ ...currentFilters.value });
-
-// Watch currentFilters to sync pendingFilters when filters are applied or reset
-watch(
-  currentFilters,
-  (newFilters) => {
-    pendingFilters.value = { ...newFilters };
-  },
-  { deep: true },
-);
-
-// Pending dimensions - for the apply button pattern
-const pendingFilters = ref<Record<string, string>>({ ...currentFilters.value });
-
-// Watch currentFilters to sync pendingFilters when filters are applied or reset
-watch(
-  currentFilters,
-  (newFilters) => {
-    pendingFilters.value = { ...newFilters };
-  },
-  { deep: true },
-);
-
 // Computed
 const themeClass = computed(() =>
   store.state.theme === "dark" ? "dark-theme" : "light-theme",
@@ -356,58 +332,6 @@ const hideViewRelatedButton = computed(
 const hideSearchTermActions = computed(
   () => props.hideSearchTermActions ?? false,
 );
-
-// Combined dimensions for DimensionFiltersBar (merges matched and additional)
-const allDimensions = computed(() => ({
-  ...matchedDimensions.value,
-  ...additionalDimensions.value,
-}));
-
-// Track which dimensions are unstable (for UI styling)
-const unstableDimensionKeys = computed(
-  () => new Set(Object.keys(additionalDimensions.value)),
-);
-
-// Track if there are pending changes that haven't been applied
-const hasPendingChanges = computed(() => {
-  const current = currentFilters.value;
-  const pending = pendingFilters.value;
-
-  const allKeys = new Set([...Object.keys(current), ...Object.keys(pending)]);
-  for (const key of allKeys) {
-    if (current[key] !== pending[key]) {
-      return true;
-    }
-  }
-
-  return false;
-});
-
-// Combined dimensions for DimensionFiltersBar (merges matched and additional)
-const allDimensions = computed(() => ({
-  ...matchedDimensions.value,
-  ...additionalDimensions.value,
-}));
-
-// Track which dimensions are unstable (for UI styling)
-const unstableDimensionKeys = computed(
-  () => new Set(Object.keys(additionalDimensions.value)),
-);
-
-// Track if there are pending changes that haven't been applied
-const hasPendingChanges = computed(() => {
-  const current = currentFilters.value;
-  const pending = pendingFilters.value;
-
-  const allKeys = new Set([...Object.keys(current), ...Object.keys(pending)]);
-  for (const key of allKeys) {
-    if (current[key] !== pending[key]) {
-      return true;
-    }
-  }
-
-  return false;
-});
 
 // Combined dimensions for DimensionFiltersBar (merges matched and additional)
 const allDimensions = computed(() => ({
@@ -769,56 +693,6 @@ const handleAddFieldToTable = (field: string) => {
       timeout: 1500,
     });
   }
-};
-
-const handleCloseColumn = (columnDef: any) => {
-  console.log("[CorrelatedLogsTable] Close column:", columnDef);
-  const columnId = columnDef.id || columnDef.name;
-
-  // Remove from visible columns
-  if (columnId && visibleColumns.value.has(columnId)) {
-    visibleColumns.value.delete(columnId);
-    // Force reactivity by creating new Set
-    visibleColumns.value = new Set(visibleColumns.value);
-  }
-};
-
-const toggleColumnVisibility = (field: string) => {
-  // Prevent hiding timestamp column
-  if (field === "_timestamp") return;
-
-  if (visibleColumns.value.has(field)) {
-    visibleColumns.value.delete(field);
-  } else {
-    visibleColumns.value.add(field);
-  }
-  // Force reactivity by creating new Set
-  visibleColumns.value = new Set(visibleColumns.value);
-};
-
-const handleCloseColumn = (columnDef: any) => {
-  console.log("[CorrelatedLogsTable] Close column:", columnDef);
-  const columnId = columnDef.id || columnDef.name;
-
-  // Remove from visible columns
-  if (columnId && visibleColumns.value.has(columnId)) {
-    visibleColumns.value.delete(columnId);
-    // Force reactivity by creating new Set
-    visibleColumns.value = new Set(visibleColumns.value);
-  }
-};
-
-const toggleColumnVisibility = (field: string) => {
-  // Prevent hiding timestamp column
-  if (field === "_timestamp") return;
-
-  if (visibleColumns.value.has(field)) {
-    visibleColumns.value.delete(field);
-  } else {
-    visibleColumns.value.add(field);
-  }
-  // Force reactivity by creating new Set
-  visibleColumns.value = new Set(visibleColumns.value);
 };
 
 const handleCloseColumn = (columnDef: any) => {
