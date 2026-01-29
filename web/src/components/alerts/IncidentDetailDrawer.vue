@@ -745,35 +745,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:gap-3 tw:flex-1" style="height: calc(100vh - 380px);">
             <!-- PART 1: Primary Content (66.67% width) -->
             <div class="tw:flex tw:flex-col tw:gap-3" style="width: 66.67%;">
-              <!-- 2.1A: Alert Activity Chart (50% height, full width) -->
-              <div
-                class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
-                :style="{
-                  height: '50%'
-                }"
-              >
-                <!-- Header -->
-                <div class="tw:px-4 tw:pt-2 tw:pb-1">
-                  <div
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
-                    class="tw:text-sm tw:font-semibold"
-                  >
-                    Alert Activity
+                <!-- 2.1A: Top Row - Incident Details (2/3) + Incident Timeline (1/3) -->
+              <div class="tw:flex tw:gap-3" style="height: 50%;">
+                               <!-- Incident Timeline (33.33% width) -->
+                <div
+                  class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                  :style="{
+                    width: '33.33%'
+                  }"
+                >
+                  <!-- Header -->
+                  <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3">
+                    <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
+                      Incident Timeline
+                    </div>
+                    <div
+                      class="tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-medium"
+                      :style="{
+                        backgroundColor: store.state.theme === 'dark' ? '#3A3B3C' : '#E5E7EB',
+                        color: store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                      }"
+                    >
+                      UTC
+                    </div>
+                  </div>
+
+                  <!-- Content with vertical timeline -->
+                  <div class="tw:flex tw:flex-col tw:gap-6 tw:p-4 tw:overflow-y-auto tw:relative">
+                    <!-- Vertical line -->
+                    <div
+                      class="tw:absolute tw:w-0.5"
+                      :style="{
+                        left: '21px',
+                        top: '21px',
+                        bottom: '21px',
+                        backgroundColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
+                      }"
+                    ></div>
+
+                    <!-- First Alert Received -->
+                    <div class="tw:flex tw:items-start tw:gap-3 tw:relative">
+                      <div
+                        class="tw:w-2.5 tw:h-2.5 tw:rounded-full tw:flex-shrink-0 tw:z-10 tw:mt-2"
+                        :style="{
+                          backgroundColor: '#10B981'
+                        }"
+                      ></div>
+                      <div class="tw:flex-1">
+                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-medium tw:mb-1">
+                          First Alert Received
+                        </div>
+                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
+                          {{ incidentDetails?.first_alert_at ? formatTimestampUTC(incidentDetails.first_alert_at) : 'N/A' }}
+                          <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
+                          <span>Initial trigger</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Peak Activity (if available) -->
+                    <div v-if="peakActivity" class="tw:flex tw:items-start tw:gap-3 tw:relative">
+                      <div
+                        class="tw:w-2.5 tw:h-2.5 tw:rounded-full tw:flex-shrink-0 tw:z-10 tw:mt-2"
+                        :style="{
+                          backgroundColor: '#F59E0B'
+                        }"
+                      ></div>
+                      <div class="tw:flex-1">
+                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-medium tw:mb-1">
+                          Peak Activity
+                        </div>
+                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
+                          {{ peakActivity.timestamp ? formatTimestampUTC(peakActivity.timestamp) : 'N/A' }}
+                          <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
+                          <span>{{ peakActivity.count }} alerts in 5 mins</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Latest Alert -->
+                    <div class="tw:flex tw:items-start tw:gap-3 tw:relative">
+                      <div
+                        class="tw:w-2.5 tw:h-2.5 tw:rounded-full tw:flex-shrink-0 tw:z-10 tw:mt-2"
+                        :style="{
+                          backgroundColor: incidentDetails?.status === 'resolved' ? '#10B981' : '#EF4444'
+                        }"
+                      ></div>
+                      <div class="tw:flex-1">
+                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-medium tw:mb-1">
+                          Latest Alert
+                        </div>
+                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
+                          {{ incidentDetails?.last_alert_at ? formatTimestampUTC(incidentDetails.last_alert_at) : 'N/A' }}
+                          <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
+                          <span>{{ incidentDetails?.status === 'resolved' ? 'Resolved' : 'Still ongoing' }}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <!-- Chart Content -->
-                <div class="tw:flex-1 tw:overflow-hidden tw:p-2">
-                  <CustomChartRenderer
-                    v-if="alertActivityChartData"
-                    :data="alertActivityChartData"
-                    class="tw:w-full tw:h-full"
-                  />
-                </div>
-              </div>
-
-              <!-- 2.1B: Bottom Row - Incident Details (2/3) + Incident Timeline (1/3) -->
-              <div class="tw:flex tw:gap-3" style="height: 50%;">
                 <!-- Incident Details (66.67% width) -->
                 <div
                   class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
@@ -883,105 +953,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-
-                <!-- Incident Timeline (33.33% width) -->
-                <div
-                  class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
-                  :style="{
-                    width: '33.33%'
-                  }"
-                >
-                  <!-- Header -->
-                  <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3">
-                    <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
-                      Incident Timeline
-                    </div>
-                    <div
-                      class="tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-medium"
-                      :style="{
-                        backgroundColor: store.state.theme === 'dark' ? '#3A3B3C' : '#E5E7EB',
-                        color: store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'
-                      }"
-                    >
-                      UTC
-                    </div>
-                  </div>
-
-                  <!-- Content with vertical timeline -->
-                  <div class="tw:flex tw:flex-col tw:gap-6 tw:p-4 tw:overflow-y-auto tw:relative">
-                    <!-- Vertical line -->
-                    <div
-                      class="tw:absolute tw:w-0.5"
-                      :style="{
-                        left: '21px',
-                        top: '21px',
-                        bottom: '21px',
-                        backgroundColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
-                      }"
-                    ></div>
-
-                    <!-- First Alert Received -->
-                    <div class="tw:flex tw:items-start tw:gap-3 tw:relative">
-                      <div
-                        class="tw:w-2.5 tw:h-2.5 tw:rounded-full tw:flex-shrink-0 tw:z-10 tw:mt-2"
-                        :style="{
-                          backgroundColor: '#10B981'
-                        }"
-                      ></div>
-                      <div class="tw:flex-1">
-                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-medium tw:mb-1">
-                          First Alert Received
-                        </div>
-                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
-                          {{ incidentDetails?.first_alert_at ? formatTimestampUTC(incidentDetails.first_alert_at) : 'N/A' }}
-                          <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
-                          <span>Initial trigger</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Peak Activity (if available) -->
-                    <div v-if="peakActivity" class="tw:flex tw:items-start tw:gap-3 tw:relative">
-                      <div
-                        class="tw:w-2.5 tw:h-2.5 tw:rounded-full tw:flex-shrink-0 tw:z-10 tw:mt-2"
-                        :style="{
-                          backgroundColor: '#F59E0B'
-                        }"
-                      ></div>
-                      <div class="tw:flex-1">
-                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-medium tw:mb-1">
-                          Peak Activity
-                        </div>
-                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
-                          {{ peakActivity.timestamp ? formatTimestampUTC(peakActivity.timestamp) : 'N/A' }}
-                          <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
-                          <span>{{ peakActivity.count }} alerts in 5 mins</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Latest Alert -->
-                    <div class="tw:flex tw:items-start tw:gap-3 tw:relative">
-                      <div
-                        class="tw:w-2.5 tw:h-2.5 tw:rounded-full tw:flex-shrink-0 tw:z-10 tw:mt-2"
-                        :style="{
-                          backgroundColor: incidentDetails?.status === 'resolved' ? '#10B981' : '#EF4444'
-                        }"
-                      ></div>
-                      <div class="tw:flex-1">
-                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-medium tw:mb-1">
-                          Latest Alert
-                        </div>
-                        <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
-                          {{ incidentDetails?.last_alert_at ? formatTimestampUTC(incidentDetails.last_alert_at) : 'N/A' }}
-                          <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
-                          <span>{{ incidentDetails?.status === 'resolved' ? 'Resolved' : 'Still ongoing' }}</span>
-                        </div>
-                      </div>
-                    </div>
+              </div>
+                <!-- alert activity -->
+               <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
+              <div
+                class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                :style="{
+                  height: '50%'
+                }"
+              >
+                <!-- Header -->
+                <div class="tw:px-4 tw:pt-2 tw:pb-1">
+                  <div
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
+                    class="tw:text-sm tw:font-semibold"
+                  >
+                    Alert Activity
                   </div>
                 </div>
+
+                <!-- Chart Content -->
+                <div class="tw:flex-1 tw:overflow-hidden tw:p-2">
+                  <CustomChartRenderer
+                    v-if="alertActivityChartData"
+                    :data="alertActivityChartData"
+                    class="tw:w-full tw:h-full"
+                  />
+                </div>
               </div>
+
             </div>
 
             <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
