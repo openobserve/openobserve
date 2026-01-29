@@ -53,6 +53,17 @@ describe("useCorrelatedLogs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Default mock implementation that does nothing (tests will override as needed)
+    mockFetchQueryDataWithHttpStream.mockImplementation(
+      (_params: any, callbacks: any) => {
+        // Default: just complete without any data
+        if (callbacks?.complete) {
+          callbacks.complete(null);
+        }
+        return Promise.resolve();
+      }
+    );
+
     props = {
       matchedDimensions: {
         service: "api",
@@ -114,11 +125,23 @@ describe("useCorrelatedLogs", () => {
 
   describe("Computed Properties", () => {
     it("should compute hasResults correctly when results exist", async () => {
-      mockFetchQueryDataWithHttpStream.mockResolvedValue({
-        hits: [{ _timestamp: 123, field: "value" }],
-        total: 1,
-        took: 10,
-      });
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          // Simulate metadata event
+          callbacks.data(null, {
+            type: 'search_response_metadata',
+            content: { results: { total: 1, took: 10 } }
+          });
+          // Simulate hits event
+          callbacks.data(null, {
+            type: 'search_response_hits',
+            content: { results: { hits: [{ _timestamp: 123, field: "value" }] } }
+          });
+          // Simulate complete
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
+      );
 
       const composable = useCorrelatedLogs(props);
       await composable.fetchCorrelatedLogs();
@@ -134,7 +157,15 @@ describe("useCorrelatedLogs", () => {
 
     it("should compute isLoading correctly", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ hits: [] }), 100))
+        (_params: any, callbacks: any) => {
+          // Simulate metadata and complete
+          callbacks.data(null, {
+            type: 'search_response_metadata',
+            content: { results: { total: 0, took: 5 } }
+          });
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
       );
 
       const composable = useCorrelatedLogs(props);
@@ -147,7 +178,14 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should compute hasError correctly when error exists", async () => {
-      mockFetchQueryDataWithHttpStream.mockRejectedValue(new Error("Test error"));
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.error(null, {
+            content: { message: "Test error" }
+          });
+          return Promise.resolve();
+        }
+      );
 
       const composable = useCorrelatedLogs(props);
       await composable.fetchCorrelatedLogs();
@@ -169,10 +207,16 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should compute isEmpty correctly when has results", async () => {
-      mockFetchQueryDataWithHttpStream.mockResolvedValue({
-        hits: [{ _timestamp: 123 }],
-        total: 1,
-      });
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.data(null, {
+            type: 'search_response_hits',
+            content: { results: { hits: [{ _timestamp: 123 }] } }
+          });
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
+      );
 
       const composable = useCorrelatedLogs(props);
       await composable.fetchCorrelatedLogs();
@@ -213,21 +257,27 @@ describe("useCorrelatedLogs", () => {
       expect(composable.currentFilters.value.region).toBeUndefined();
     });
 
-    it("should reset filters to matched and additional dimensions", async () => {
+    it("should reset filters to matched dimensions only", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
+      );
+
       const composable = useCorrelatedLogs(props);
 
       // Modify filters
       composable.updateFilter("service", "modified");
       composable.updateFilter("newKey", "newValue");
 
-      // Reset
+      // Reset - should only keep matched dimensions, not additional ones
       composable.resetFilters();
       await nextTick();
 
       expect(composable.currentFilters.value).toEqual({
         service: "api",
         environment: "prod",
-        region: "us-west",
       });
     });
   });
@@ -288,8 +338,10 @@ describe("useCorrelatedLogs", () => {
   describe("Search Execution", () => {
     it("should set loading state during search", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
-        () =>
-          new Promise((resolve) => setTimeout(() => resolve({ data: [] }), 100))
+        async (_params: any, callbacks: any) => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          callbacks.complete(null);
+        }
       );
 
       const composable = useCorrelatedLogs(props);
@@ -298,11 +350,15 @@ describe("useCorrelatedLogs", () => {
       expect(composable.loading.value).toBe(true);
 
       await searchPromise;
+      expect(composable.loading.value).toBe(false);
     });
 
     it("should handle search errors", async () => {
-      mockFetchQueryDataWithHttpStream.mockRejectedValue(
-        new Error("Search failed")
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.error(null, { content: { message: "Search failed" } });
+          return Promise.resolve();
+        }
       );
 
       const composable = useCorrelatedLogs(props);
@@ -315,16 +371,27 @@ describe("useCorrelatedLogs", () => {
 
     it("should clear error on successful search after previous error", async () => {
       // First, cause an error
-      mockFetchQueryDataWithHttpStream.mockRejectedValue(new Error("Previous error"));
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.error(null, { content: { message: "Previous error" } });
+          return Promise.resolve();
+        }
+      );
       const composable = useCorrelatedLogs(props);
       await composable.fetchCorrelatedLogs();
       expect(composable.hasError.value).toBe(true);
 
       // Then succeed
-      mockFetchQueryDataWithHttpStream.mockResolvedValue({
-        hits: [],
-        total: 0,
-      });
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.data(null, {
+            type: 'search_response_metadata',
+            content: { results: { total: 0, took: 5 } }
+          });
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
+      );
       await composable.fetchCorrelatedLogs();
 
       expect(composable.error.value).toBe(null);
@@ -334,7 +401,12 @@ describe("useCorrelatedLogs", () => {
 
   describe("Refresh", () => {
     it("should execute search when refresh is called", async () => {
-      mockFetchQueryDataWithHttpStream.mockResolvedValue({ data: [] });
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
+      );
 
       const composable = useCorrelatedLogs(props);
 
@@ -446,8 +518,11 @@ describe("useCorrelatedLogs", () => {
 
   describe("State Consistency", () => {
     it("should maintain consistent state after error", async () => {
-      mockFetchQueryDataWithHttpStream.mockRejectedValue(
-        new Error("Network error")
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.error(null, { content: { message: "Network error" } });
+          return Promise.resolve();
+        }
       );
 
       const composable = useCorrelatedLogs(props);
@@ -455,15 +530,23 @@ describe("useCorrelatedLogs", () => {
       await composable.fetchCorrelatedLogs();
 
       // Should be able to recover and try again
-      mockFetchQueryDataWithHttpStream.mockResolvedValue({ data: [] });
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
+      );
       await composable.refresh();
 
       expect(composable.loading.value).toBe(false);
     });
 
     it("should preserve filters after failed search", async () => {
-      mockFetchQueryDataWithHttpStream.mockRejectedValue(
-        new Error("Search error")
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.error(null, { content: { message: "Search error" } });
+          return Promise.resolve();
+        }
       );
 
       const composable = useCorrelatedLogs(props);
