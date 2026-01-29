@@ -275,6 +275,46 @@ pub async fn get_incident_alerts(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Get actual alert counts for multiple incidents (source of truth)
+///
+/// Returns a HashMap of incident_id -> actual_count from junction table.
+/// Use this to fix denormalized alert_count fields that may be out of sync.
+pub async fn get_alert_counts(
+    incident_ids: &[String],
+) -> Result<std::collections::HashMap<String, i32>, errors::Error> {
+    use sea_orm::FromQueryResult;
+
+    if incident_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    #[derive(Debug, FromQueryResult)]
+    struct CountResult {
+        incident_id: String,
+        count: i64,
+    }
+
+    let results = alert_incident_alerts::Entity::find()
+        .filter(
+            alert_incident_alerts::Column::IncidentId
+                .is_in(incident_ids.iter().map(|s| s.as_str())),
+        )
+        .group_by(alert_incident_alerts::Column::IncidentId)
+        .column_as(alert_incident_alerts::Column::IncidentId.count(), "count")
+        .column(alert_incident_alerts::Column::IncidentId)
+        .into_model::<CountResult>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(results
+        .into_iter()
+        .map(|r| (r.incident_id, r.count as i32))
+        .collect())
+}
+
 /// Count open incidents for an org
 pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
