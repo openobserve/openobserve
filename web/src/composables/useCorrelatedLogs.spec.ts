@@ -23,8 +23,14 @@ vi.mock("@/utils/commons", () => ({
   getQueryPartitions: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/services/http_streaming", () => ({
-  fetchQueryDataWithHttpStream: vi.fn(),
+const mockFetchQueryDataWithHttpStream = vi.fn();
+const mockCancelStreamQueryBasedOnRequestId = vi.fn();
+
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: vi.fn(() => ({
+    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
+    cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
+  })),
 }));
 
 vi.mock("vuex", () => ({
@@ -270,10 +276,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Search Execution", () => {
     it("should set loading state during search", async () => {
-      const { fetchQueryDataWithHttpStream } = await import(
-        "@/services/http_streaming"
-      );
-      (fetchQueryDataWithHttpStream as any).mockImplementation(
+      mockFetchQueryDataWithHttpStream.mockImplementation(
         () =>
           new Promise((resolve) => setTimeout(() => resolve({ data: [] }), 100))
       );
@@ -287,10 +290,7 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should handle search errors", async () => {
-      const { fetchQueryDataWithHttpStream } = await import(
-        "@/services/http_streaming"
-      );
-      (fetchQueryDataWithHttpStream as any).mockRejectedValue(
+      mockFetchQueryDataWithHttpStream.mockRejectedValue(
         new Error("Search failed")
       );
 
@@ -303,10 +303,7 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should clear error on successful search", async () => {
-      const { fetchQueryDataWithHttpStream } = await import(
-        "@/services/http_streaming"
-      );
-      (fetchQueryDataWithHttpStream as any).mockResolvedValue({
+      mockFetchQueryDataWithHttpStream.mockResolvedValue({
         data: [],
       });
 
@@ -321,17 +318,13 @@ describe("useCorrelatedLogs", () => {
 
   describe("Refresh", () => {
     it("should execute search when refresh is called", async () => {
-      const { fetchQueryDataWithHttpStream } = await import(
-        "@/services/http_streaming"
-      );
-      const mockFetch = vi.fn().mockResolvedValue({ data: [] });
-      (fetchQueryDataWithHttpStream as any).mockImplementation(mockFetch);
+      mockFetchQueryDataWithHttpStream.mockResolvedValue({ data: [] });
 
       const composable = useCorrelatedLogs(props);
 
       await composable.refresh();
 
-      expect(mockFetch).toHaveBeenCalled();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
     });
   });
 
@@ -437,10 +430,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("State Consistency", () => {
     it("should maintain consistent state after error", async () => {
-      const { fetchQueryDataWithHttpStream } = await import(
-        "@/services/http_streaming"
-      );
-      (fetchQueryDataWithHttpStream as any).mockRejectedValue(
+      mockFetchQueryDataWithHttpStream.mockRejectedValue(
         new Error("Network error")
       );
 
@@ -449,17 +439,14 @@ describe("useCorrelatedLogs", () => {
       await composable.fetchCorrelatedLogs();
 
       // Should be able to recover and try again
-      (fetchQueryDataWithHttpStream as any).mockResolvedValue({ data: [] });
+      mockFetchQueryDataWithHttpStream.mockResolvedValue({ data: [] });
       await composable.refresh();
 
       expect(composable.loading.value).toBe(false);
     });
 
     it("should preserve filters after failed search", async () => {
-      const { fetchQueryDataWithHttpStream } = await import(
-        "@/services/http_streaming"
-      );
-      (fetchQueryDataWithHttpStream as any).mockRejectedValue(
+      mockFetchQueryDataWithHttpStream.mockRejectedValue(
         new Error("Search error")
       );
 
