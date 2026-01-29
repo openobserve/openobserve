@@ -46,7 +46,7 @@ pub enum DestinationError {
     UserNotPermitted,
     #[error("Email destination must have SMTP configured")]
     SMTPUnavailable,
-    #[error("Email destination recipients cannot use public email domains")]
+    #[error("Non-member recipients cannot use public email domains")]
     BlockedPublicEmailDomain,
     #[error("Alert destination must have a template")]
     TemplateNotFound,

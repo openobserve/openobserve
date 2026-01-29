@@ -52,14 +52,14 @@ const BLOCKED_PUBLIC_EMAIL_DOMAINS: [&str; 24] = [
 ];
 
 fn is_blocked_public_email_domain(email: &str) -> bool {
-    email
-        .rsplit_once('@')
-        .map(|(_, domain)| domain.trim())
-        .is_some_and(|domain| {
-            BLOCKED_PUBLIC_EMAIL_DOMAINS
-                .iter()
-                .any(|blocked| domain == *blocked)
-        })
+    let Ok(mailbox) = email.parse::<lettre::message::Mailbox>() else {
+        return false;
+    };
+    let domain = mailbox.email.domain().trim().trim_end_matches('.');
+    let domain = domain.to_lowercase();
+    BLOCKED_PUBLIC_EMAIL_DOMAINS
+        .iter()
+        .any(|blocked| domain == *blocked)
 }
 
 pub async fn save(
