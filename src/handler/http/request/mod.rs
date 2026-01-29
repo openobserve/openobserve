@@ -42,6 +42,7 @@ pub mod organization;
 pub mod patterns;
 pub mod pipeline;
 pub mod pipelines;
+pub mod profiling;
 pub mod promql;
 pub mod ratelimit;
 #[cfg(feature = "enterprise")]

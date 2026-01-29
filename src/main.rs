@@ -75,9 +75,9 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
-#[cfg(feature = "profiling")]
+#[cfg(feature = "pyroscope")]
 use pyroscope::PyroscopeAgent;
-#[cfg(feature = "profiling")]
+#[cfg(feature = "pyroscope")]
 use pyroscope_pprofrs::{PprofConfig, pprof_backend};
 use tokio::{net::TcpListener, sync::oneshot};
 use tonic::{
@@ -95,6 +95,9 @@ use {
     o2_enterprise::enterprise::{ai, common::config::O2Config},
     utoipa::OpenApi,
 };
+
+#[unsafe(export_name = "malloc_conf")]
+pub static malloc_conf: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:16\0";
 
 #[cfg(all(feature = "mimalloc", not(feature = "jemalloc")))]
 #[global_allocator]
@@ -133,20 +136,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .parse::<SocketAddr>()?,
         )
         .init();
-
-    // setup profiling
-    #[cfg(feature = "profiling")]
-    let pprof_guard =
-        if get_config().profiling.pprof_enabled || get_config().profiling.pprof_protobuf_enabled {
-            let guard = pprof::ProfilerGuardBuilder::default()
-                .frequency(1000)
-                .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-                .build()
-                .unwrap();
-            Some(guard)
-        } else {
-            None
-        };
 
     // setup pyroscope
     #[cfg(feature = "pyroscope")]
@@ -518,45 +507,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .send_track_event("OpenObserve - Server stopped", None, true, true)
             .await;
     }
-
-    // stop profiling
-    #[cfg(feature = "profiling")]
-    if let Some(guard) = pprof_guard
-        && let Ok(report) = guard.report().build()
-    {
-        if cfg.profiling.pprof_protobuf_enabled {
-            let pb_file = format!("{}.pb", cfg.profiling.pprof_flamegraph_path);
-            match std::fs::File::create(&pb_file) {
-                Ok(mut file) => {
-                    use std::io::Write;
-
-                    use pprof::protos::Message;
-
-                    if let Ok(profile) = report.pprof() {
-                        let mut content = Vec::new();
-                        profile.encode(&mut content).unwrap();
-                        if let Err(e) = file.write_all(&content) {
-                            log::error!("Failed to write flamegraph: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::error!("Failed to create flamegraph file: {}", e);
-                }
-            }
-        } else {
-            match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
-                Ok(file) => {
-                    if let Err(e) = report.flamegraph(file) {
-                        log::error!("Failed to write flamegraph: {}", e);
-                    }
-                }
-                Err(e) => {
-                    log::error!("Failed to create flamegraph file: {}", e);
-                }
-            }
-        }
-    };
 
     // stop pyroscope
     #[cfg(feature = "pyroscope")]
