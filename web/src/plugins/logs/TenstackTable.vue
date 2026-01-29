@@ -645,17 +645,17 @@ watch(
     if (newVal !== oldVal && props.columns?.length && tableRows.value?.length) {
       await nextTick();
 
-      processHitsInChunks(
-        tableRows.value,
-        props.columns,
-        true, // Clear cache to re-process with new highlight query
-        props.highlightQuery,
-        100,
-        selectedStreamFtsKeys.value,
-      );
-    }
-  },
-);
+//       processHitsInChunks(
+//         tableRows.value,
+//         props.columns,
+//         true, // Clear cache to re-process with new highlight query
+//         props.highlightQuery,
+//         100,
+//         selectedStreamFtsKeys.value,
+//       );
+//     }
+//   },
+// );
 
 watch(
   () => columnOrder.value,
