@@ -854,8 +854,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'serviceGraph'" class="tw:absolute tw:inset-0">
           <IncidentServiceGraph
             v-if="incidentDetails"
-            :org-id="store.state.selectedOrganization.identifier"
-            :incident-id="incidentDetails.id"
+            :topology-context="incidentDetails.topology_context"
           />
         </div>
 
