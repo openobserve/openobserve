@@ -24,6 +24,44 @@ use crate::{
     service::db::{self, alerts::destinations::DestinationError, user},
 };
 
+const BLOCKED_PUBLIC_EMAIL_DOMAINS: [&str; 24] = [
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "msn.com",
+    "yahoo.com",
+    "ymail.com",
+    "rocketmail.com",
+    "protonmail.com",
+    "proton.me",
+    "pm.me",
+    "mail.com",
+    "icloud.com",
+    "me.com",
+    "mac.com",
+    "aol.com",
+    "gmx.com",
+    "gmx.net",
+    "fastmail.com",
+    "tutanota.com",
+    "tuta.com",
+    "yandex.com",
+    "zoho.com",
+];
+
+fn is_blocked_public_email_domain(email: &str) -> bool {
+    email
+        .rsplit_once('@')
+        .map(|(_, domain)| domain.trim())
+        .is_some_and(|domain| {
+            BLOCKED_PUBLIC_EMAIL_DOMAINS
+                .iter()
+                .any(|blocked| domain == *blocked)
+        })
+}
+
 pub async fn save(
     name: &str,
     mut destination: Destination,
@@ -46,8 +84,9 @@ pub async fn save(
                     let email = email.trim().to_lowercase();
                     // Check if the email is part of the org
                     let res = user::get(Some(&destination.org_id), &email).await;
-                    if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
-                        return Err(DestinationError::UserNotPermitted);
+                    let is_member = res.is_ok_and(|usr| usr.is_some());
+                    if !is_member && is_blocked_public_email_domain(&email) {
+                        return Err(DestinationError::BlockedPublicEmailDomain);
                     }
                     lowercase_emails.push(email);
                 }
