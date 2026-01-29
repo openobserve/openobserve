@@ -232,10 +232,6 @@ export default defineComponent({
       return `${ts} (${formatted} ${store.state.timezone})`;
     };
 
-    const getDuration = (start: number, end: number) => {
-      if (!start || !end) return 0;
-      return (end / 1000 - start / 1000).toFixed(2);
-    };
 
     const getVariablesByType = (query: any, type: string) => {
       return (query.variables || []).filter((v: any) => v.type === type);
@@ -311,7 +307,6 @@ export default defineComponent({
       searchQuery,
       colorizedQueries,
       formatTimestamp,
-      getDuration,
       getVariablesByType,
       highlightSearch,
       copyText,
