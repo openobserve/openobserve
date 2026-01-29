@@ -19,7 +19,7 @@ import PageManager from "../../pages/page-manager.js";
 import { LoginPage } from "../../pages/generalPages/loginPage.js";
 const testLogger = require('../utils/test-logger.js');
 
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "parallel" });
 
 test.use({
   contextOptions: {
