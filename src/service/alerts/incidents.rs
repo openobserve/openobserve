@@ -539,6 +539,27 @@ pub async fn get_incident_with_alerts(
         incident_data.alert_count = actual_count;
     }
 
+    // Fix topology node alert_counts from actual triggers
+    if let Some(ref mut topology) = incident_data.topology_context {
+        for node in &mut topology.nodes {
+            let actual_node_count = incident_alerts
+                .iter()
+                .filter(|t| t.alert_id == node.alert_id)
+                .count() as u32;
+
+            if node.alert_count != actual_node_count {
+                log::debug!(
+                    "[incidents] Topology node {} in incident {} count mismatch: stored={}, actual={}",
+                    node.alert_id,
+                    incident_id,
+                    node.alert_count,
+                    actual_node_count
+                );
+                node.alert_count = actual_node_count;
+            }
+        }
+    }
+
     // Convert incident_alerts to triggers
     let triggers: Vec<IncidentAlert> = incident_alerts
         .iter()

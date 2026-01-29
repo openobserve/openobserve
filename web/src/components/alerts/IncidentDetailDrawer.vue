@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Bottom: Large Number -->
               <div :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'" class="tw:text-3xl tw:font-semibold tw:leading-none">
-                {{ incidentDetails?.alert_count || 0 }}
+                {{ incidentDetails?.alerts?.length || 0 }}
               </div>
             </div>
 
@@ -817,7 +817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
                           >
-                            Fired {{ node.alert_count }} time(s)
+                            Fired {{ getTriggerCountForAlert(node.alert_id) }} time(s)
                           </span>
                         </div>
                       </div>
@@ -1395,6 +1395,12 @@ export default defineComponent({
         return `1 Per ${minutesBetween} Mins`;
       }
     });
+
+    // Helper: Get actual trigger count for a specific alert_id
+    const getTriggerCountForAlert = (alertId: string) => {
+      if (!triggers.value) return 0;
+      return triggers.value.filter(t => t.alert_id === alertId).length;
+    };
 
     // Peak Alert Rate - find the highest concentration of alerts
     const peakAlertRate = computed(() => {
@@ -2532,6 +2538,7 @@ export default defineComponent({
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
+      getTriggerCountForAlert,
       peakAlertRate,
       peakActivity,
       correlationType,
