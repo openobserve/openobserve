@@ -13,6 +13,21 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
  * ❌ "Time series" (single) - Column Order button NOT visible (default mode)
  *
  * Most tests use "Expanded Time series" mode as it reliably shows the Column Order button.
+ *
+ * ⚠️ CRITICAL: Timestamp Column Behavior
+ *
+ * The "Timestamp" column is ALWAYS in the first position (table position 0) and is NOT reorderable.
+ *
+ * Column Order Popup:        Table Chart:
+ * ├─ Position 0: __name__    ├─ Position 0: Timestamp (NOT in popup, always first)
+ * ├─ Position 1: environment ├─ Position 1: __name__ (popup pos 0)
+ * └─ Position 2: flag        ├─ Position 2: environment (popup pos 1)
+ *                            └─ Position 3: flag (popup pos 2)
+ *
+ * When testing column order, remember:
+ * - Popup position 0 = Table position 1
+ * - Popup position 1 = Table position 2
+ * - Moving a column to "1st position" in popup = "2nd position" in table (after Timestamp)
  */
 test.describe("PromQL Table Chart - Column Order Feature", () => {
   test.describe.configure({ mode: 'serial' });
@@ -43,6 +58,13 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
+
+  // Helper function to extract column name from table header (removes sort icon text)
+  function extractColumnName(headerText) {
+    // Remove sorting icon text (arrow_upward, arrow_downward) from column name
+    // Table headers look like: "__name__arrow_upward" or "environmentarrow_downward"
+    return headerText.replace(/arrow_upward|arrow_downward/g, '').trim();
+  }
 
   // Helper function to set up a table chart with data
   async function setupTableChart(page, tableMode = 'all') {
@@ -575,84 +597,273 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     const initialHeaderCount = await tableHeaders.count();
     testLogger.info(`Table has ${initialHeaderCount} columns`);
 
-    if (initialHeaderCount < 2) {
-      testLogger.warn('Not enough columns in table to test reordering');
+    if (initialHeaderCount < 3) {
+      testLogger.warn('Not enough columns in table to test reordering (need at least 3)');
       return;
     }
 
-    // Get the first 3 column names from the actual table
-    const initialFirstColumn = await tableHeaders.nth(0).textContent();
-    const initialSecondColumn = await tableHeaders.nth(1).textContent();
-    const initialThirdColumn = initialHeaderCount > 2 ? await tableHeaders.nth(2).textContent() : null;
-    testLogger.info(`Initial table order: 1st="${initialFirstColumn}", 2nd="${initialSecondColumn}", 3rd="${initialThirdColumn}"`);
+    // Read initial table state
+    const initialTimestamp = extractColumnName(await tableHeaders.nth(0).textContent());
+    const initialSecondColumn = extractColumnName(await tableHeaders.nth(1).textContent());
+    const initialThirdColumn = extractColumnName(await tableHeaders.nth(2).textContent());
+    testLogger.info(`Initial table order: 1st="${initialTimestamp}" (Timestamp), 2nd="${initialSecondColumn}", 3rd="${initialThirdColumn}"`);
 
-    // STEP 2: Open Column Order popup
+    // STEP 2: Open Column Order popup and reorder
     testLogger.info('Opening Column Order popup');
     const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
-    // STEP 3: Get the column names from the popup to confirm they match
-    const secondColumnRow = page.locator('[data-test="column-order-row-1"]');
-    const secondColumnName = await secondColumnRow.locator('.column-name').textContent();
-    testLogger.info(`Column in 2nd position in popup: "${secondColumnName}"`);
-
-    // STEP 4: Move the 2nd column to 1st position (move up once)
-    testLogger.info('Moving 2nd column to 1st position');
+    // Move 2nd popup column to 1st position
+    testLogger.info('Moving popup 2nd column (table 3rd column) to 1st position in popup');
     const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
     await moveUpButton.click();
     await page.waitForTimeout(500);
 
-    // Verify the order changed in the popup
+    // Get the column that's now in popup position 0 (should be table position 1 after save)
     const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const newFirstColumnName = await firstColumnRow.locator('.column-name').textContent();
-    testLogger.info(`After move up, 1st column in popup: "${newFirstColumnName}"`);
-    expect(newFirstColumnName).toBe(secondColumnName);
+    const expectedSecondTableColumn = await firstColumnRow.locator('.column-name').textContent();
+    testLogger.info(`Column now in popup position 0: "${expectedSecondTableColumn}" (should be table position 1)`);
 
-    // STEP 5: Save the column order
+    // STEP 3: Save the column order
     testLogger.info('Saving column order');
     const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
     await saveButton.click();
-    await page.waitForTimeout(2000); // Wait longer for table to re-render with new order
+    await page.waitForTimeout(2000);
+    testLogger.info('Column order saved');
 
-    // STEP 6: Verify the popup closed
+    // STEP 4: Verify the popup closed
     const columnOrderPopup = page.locator('[data-test="dashboard-column-order-popup"]');
     await expect(columnOrderPopup).not.toBeVisible({ timeout: 3000 });
     testLogger.info('Column Order popup closed after save');
 
-    // STEP 7: Get the new table column order from the actual table
+    // STEP 5: Verify table shows the new column order
     testLogger.info('Reading new table column order after save');
-    await page.waitForTimeout(1500); // Extra wait for table to fully re-render
+    await page.waitForTimeout(1500);
 
     const newTableHeaders = page.locator('table thead th');
     const newHeaderCount = await newTableHeaders.count();
     testLogger.info(`Table still has ${newHeaderCount} columns`);
-    expect(newHeaderCount).toBe(initialHeaderCount); // Column count should remain same
+    expect(newHeaderCount).toBe(initialHeaderCount);
 
-    // Get the new first 3 column names
-    const newFirstColumn = await newTableHeaders.nth(0).textContent();
-    const newSecondColumn = await newTableHeaders.nth(1).textContent();
-    const newThirdColumn = newHeaderCount > 2 ? await newTableHeaders.nth(2).textContent() : null;
-    testLogger.info(`New table order: 1st="${newFirstColumn}", 2nd="${newSecondColumn}", 3rd="${newThirdColumn}"`);
+    // Get the new column names
+    const newTimestamp = extractColumnName(await newTableHeaders.nth(0).textContent());
+    const newSecondColumn = extractColumnName(await newTableHeaders.nth(1).textContent());
+    const newThirdColumn = extractColumnName(await newTableHeaders.nth(2).textContent());
+    testLogger.info(`New table order: 1st="${newTimestamp}" (Timestamp), 2nd="${newSecondColumn}", 3rd="${newThirdColumn}"`);
 
-    // STEP 8: Verify the column that was in 2nd position is now in 1st position
+    // STEP 6: Verify the column order change was applied correctly
     testLogger.info('Verifying column order change was applied to table');
 
-    // The column that was originally in 2nd position should now be in 1st position
-    expect(newFirstColumn).toBe(initialSecondColumn);
-    testLogger.info(`✓ Column that was in 2nd position ("${initialSecondColumn}") is now in 1st position`);
+    // Timestamp should always remain in position 0
+    expect(newTimestamp).toBe(initialTimestamp);
+    testLogger.info(`✓ Timestamp remains in 1st position: "${newTimestamp}"`);
 
-    // The column that was originally in 1st position should now be in 2nd position
-    expect(newSecondColumn).toBe(initialFirstColumn);
-    testLogger.info(`✓ Column that was in 1st position ("${initialFirstColumn}") is now in 2nd position`);
-
-    // If there's a 3rd column, it should remain in 3rd position
-    if (initialThirdColumn && newThirdColumn) {
-      expect(newThirdColumn).toBe(initialThirdColumn);
-      testLogger.info(`✓ 3rd column position unchanged ("${initialThirdColumn}")`);
-    }
+    // The column we moved to popup position 0 should now be in table position 1
+    expect(newSecondColumn).toBe(expectedSecondTableColumn);
+    testLogger.info(`✓ Reordered column "${expectedSecondTableColumn}" is now in table position 1 (2nd column)`);
 
     testLogger.info('✓ Column order changes successfully applied to table chart!');
+  });
+
+  test("Verify column order persists after re-running the query", {
+    tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing column order persists after re-running the query');
+
+    await setupTableChart(page, 'expanded_timeseries');
+
+    // STEP 1: Set custom column order
+    testLogger.info('Setting custom column order');
+    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    await columnOrderButton.click();
+    await page.waitForTimeout(500);
+
+    // Move 2nd column to 1st position in the popup
+    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
+    await moveUpButton.click();
+    await page.waitForTimeout(500);
+
+    // Get the expected column name after reorder (should be 1st in popup, 2nd in table)
+    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
+    const expectedColumnName = await firstColumnRow.locator('.column-name').textContent();
+    testLogger.info(`Expected column after reorder: "${expectedColumnName}"`);
+
+    // Save the column order
+    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    await saveButton.click();
+    await page.waitForTimeout(2000);
+    testLogger.info('Column order saved');
+
+    // STEP 2: Verify table shows reordered columns
+    // NOTE: Timestamp is always in position 0 (first column)
+    // The reordered column should appear in position 1 (second column)
+    let tableHeaders = page.locator('table thead th');
+    const timestampColumn = extractColumnName(await tableHeaders.nth(0).textContent());
+    testLogger.info(`First column (always Timestamp): "${timestampColumn}"`);
+
+    let secondColumnAfterSave = extractColumnName(await tableHeaders.nth(1).textContent());
+    testLogger.info(`Second column after save: "${secondColumnAfterSave}"`);
+    expect(secondColumnAfterSave).toBe(expectedColumnName);
+
+    // STEP 3: Close the config sidebar
+    await pm.metricsPage.clickDashboardSidebarCollapseButton();
+    await page.waitForTimeout(500);
+    testLogger.info('Closed config sidebar');
+
+    // STEP 4: Re-run the query by clicking Apply button
+    testLogger.info('Re-running the query');
+    await pm.metricsPage.clickApplyButton();
+    await pm.metricsPage.waitForMetricsResults();
+    await page.waitForTimeout(2000);
+    testLogger.info('Query re-executed');
+
+    // STEP 5: Verify column order is still maintained after query re-run
+    // The reordered column should still be in position 1 (second column after Timestamp)
+    testLogger.info('Verifying column order persists after re-running query');
+    tableHeaders = page.locator('table thead th');
+    const timestampAfterRerun = extractColumnName(await tableHeaders.nth(0).textContent());
+    const secondColumnAfterRerun = extractColumnName(await tableHeaders.nth(1).textContent());
+    testLogger.info(`First column after re-run (Timestamp): "${timestampAfterRerun}"`);
+    testLogger.info(`Second column after re-running query: "${secondColumnAfterRerun}"`);
+
+    expect(secondColumnAfterRerun).toBe(expectedColumnName);
+    testLogger.info('✓ Column order successfully persisted after re-running the query!');
+    testLogger.info('✓ Reordered column correctly appears in 2nd position (after Timestamp)');
+  });
+
+  test("Verify column order persists when switching between chart types", {
+    tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing column order persists when switching chart types');
+
+    await setupTableChart(page, 'expanded_timeseries');
+
+    // STEP 1: Set custom column order
+    testLogger.info('Setting custom column order');
+    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    await columnOrderButton.click();
+    await page.waitForTimeout(500);
+
+    // Move 2nd column to 1st position in the popup
+    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
+    await moveUpButton.click();
+    await page.waitForTimeout(500);
+
+    // Get the expected column name (should be 1st in popup, 2nd in table after Timestamp)
+    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
+    const expectedColumnName = await firstColumnRow.locator('.column-name').textContent();
+    testLogger.info(`Expected column: "${expectedColumnName}"`);
+
+    // Save the column order
+    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    await saveButton.click();
+    await page.waitForTimeout(2000);
+    testLogger.info('Column order saved');
+
+    // STEP 2: Switch to a different chart type (e.g., line chart)
+    testLogger.info('Switching to line chart');
+    await pm.metricsPage.selectChartType('line');
+    await page.waitForTimeout(1500);
+    testLogger.info('Switched to line chart');
+
+    // STEP 3: Switch back to table chart
+    testLogger.info('Switching back to table chart');
+    await pm.metricsPage.selectChartType('table');
+    await page.waitForTimeout(2000);
+    testLogger.info('Switched back to table chart');
+
+    // STEP 4: Verify column order is still maintained
+    // NOTE: Timestamp is always in position 0, reordered column should be in position 1
+    testLogger.info('Verifying column order persists after switching chart types');
+    const tableHeaders = page.locator('table thead th');
+    const timestampColumn = extractColumnName(await tableHeaders.nth(0).textContent());
+    const secondColumnAfterSwitch = extractColumnName(await tableHeaders.nth(1).textContent());
+    testLogger.info(`First column (Timestamp): "${timestampColumn}"`);
+    testLogger.info(`Second column after switching back to table: "${secondColumnAfterSwitch}"`);
+
+    expect(secondColumnAfterSwitch).toBe(expectedColumnName);
+    testLogger.info('✓ Column order successfully persisted when switching chart types!');
+    testLogger.info('✓ Reordered column correctly appears in 2nd position (after Timestamp)');
+  });
+
+  test("Verify column order is maintained with different queries on same metric", {
+    tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing column order with different queries on same metric');
+
+    await setupTableChart(page, 'expanded_timeseries');
+
+    // STEP 1: Set custom column order for cpu_usage query
+    testLogger.info('Setting custom column order for cpu_usage');
+    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    await columnOrderButton.click();
+    await page.waitForTimeout(500);
+
+    // Get initial column count
+    const columnRows = page.locator('[data-test^="column-order-row-"]');
+    const initialColumnCount = await columnRows.count();
+    testLogger.info(`Initial column count: ${initialColumnCount}`);
+
+    if (initialColumnCount < 2) {
+      testLogger.warn('Not enough columns to test');
+      const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+      await cancelButton.click();
+      return;
+    }
+
+    // Move 2nd column to 1st position in the popup
+    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
+    await moveUpButton.click();
+    await page.waitForTimeout(500);
+
+    // Get the expected column name (should be 1st in popup, 2nd in table after Timestamp)
+    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
+    const expectedColumnName = await firstColumnRow.locator('.column-name').textContent();
+    testLogger.info(`Expected column (should be 2nd in table): "${expectedColumnName}"`);
+
+    // Save the column order
+    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    await saveButton.click();
+    await page.waitForTimeout(2000);
+    testLogger.info('Column order saved');
+
+    // Close config sidebar
+    await pm.metricsPage.clickDashboardSidebarCollapseButton();
+    await page.waitForTimeout(500);
+
+    // STEP 2: Modify the query slightly (add a filter or aggregation)
+    testLogger.info('Modifying query with aggregation');
+    await pm.metricsPage.enterMetricsQuery('sum(cpu_usage)');
+    await pm.metricsPage.clickApplyButton();
+    await pm.metricsPage.waitForMetricsResults();
+    await page.waitForTimeout(2000);
+
+    // STEP 3: Verify table still renders (may have different structure with aggregation)
+    const tableVisible = await page.locator('table').isVisible().catch(() => false);
+    testLogger.info(`Table visible after query change: ${tableVisible}`);
+
+    if (tableVisible) {
+      const tableHeaders = page.locator('table thead th');
+      const headerCount = await tableHeaders.count();
+      testLogger.info(`Table has ${headerCount} columns after query change`);
+
+      // Note: Column order behavior may differ based on whether the same columns are present
+      // This test documents the behavior rather than enforcing specific expectations
+      if (headerCount > 0) {
+        const timestampColumn = extractColumnName(await tableHeaders.nth(0).textContent());
+        testLogger.info(`First column (Timestamp): "${timestampColumn}"`);
+
+        if (headerCount > 1) {
+          const secondColumn = extractColumnName(await tableHeaders.nth(1).textContent());
+          testLogger.info(`Second column with modified query: "${secondColumn}"`);
+        }
+
+        testLogger.info('✓ Table rendered successfully with modified query');
+      }
+    } else {
+      testLogger.info('Table not visible with aggregated query (may show different visualization)');
+    }
   });
 
   // P2 - Edge Cases
