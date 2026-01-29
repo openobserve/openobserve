@@ -221,7 +221,19 @@ test.describe("Pre-Test Cleanup", () => {
       /^api_url_append_[a-f0-9]{8}$/,                                                         // api_url_append_<uuid> (append test)
       /^api_url_retry_[a-f0-9]{8}$/,                                                          // api_url_retry_<uuid> (retry test)
       /^api_url_schema_[a-f0-9]{8}$/,                                                         // api_url_schema_<uuid> (schema mismatch test)
-      /^api_test_manual_\d+$/                                                                 // api_test_manual_<timestamp> (manual curl tests)
+      /^api_test_manual_\d+$/,                                                                // api_test_manual_<timestamp> (manual curl tests)
+      // o2-enterprise RBAC enrichment table tests
+      /^editor_create_test_[a-f0-9]+$/,                                                       // editor_create_test_<hash> (RBAC editor tests)
+      /^enrich_basic_[a-f0-9]+$/,                                                             // enrich_basic_<hash> (RBAC basic enrichment tests)
+      /^enrich_duplicate_[a-f0-9]+$/,                                                         // enrich_duplicate_<hash> (RBAC duplicate tests)
+      /^enrich_invalid_[a-f0-9]+$/,                                                           // enrich_invalid_<hash> (RBAC invalid tests)
+      /^enrich_protocols_[a-f0-9]+$/,                                                         // enrich_protocols_<hash> (RBAC protocols tests)
+      /^enrich_table_[a-f0-9]+$/,                                                             // enrich_table_<hash> (RBAC table tests)
+      /^enrich_update_append_[a-f0-9]+$/,                                                     // enrich_update_append_<hash> (RBAC update append tests)
+      /^enrich_update_replace_[a-f0-9]+$/,                                                    // enrich_update_replace_<hash> (RBAC update replace tests)
+      /^viewer_created_et_[a-f0-9]+$/,                                                        // viewer_created_et_<hash> (RBAC viewer create ET tests - test_basic_rbac.py:653)
+      /^partial_access_et_[a-f0-9]+$/,                                                        // partial_access_et_<hash> (RBAC partial access ET tests - test_basic_rbac.py:793)
+      /^health_check_[a-f0-9]+$/                                                              // health_check_<hash> (scheduled health check tables - orphaned)
     ]);
 
     // Clean up URL-based enrichment tables (those showing "NaN MB" in UI)
@@ -284,7 +296,9 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
         /^e2e_test_traces$/,                           // Pipeline regression test traces stream (Issue #9901)
         /^e2e_traces_pipeline_test$/,                  // Pipeline test traces stream
-        /^e2e_traces_\d+_[a-z0-9]+$/                   // Dynamic traces streams (e2e_traces_<timestamp>_<suffix>)
+        /^e2e_traces_\d+_[a-z0-9]+$/,                  // Dynamic traces streams (e2e_traces_<timestamp>_<suffix>)
+        /^backfill_source_\d+$/,                       // Backfill source streams (backfill_source_<number>)
+        /^backfill_dest_\d+$/                          // Backfill dest streams (backfill_dest_<number>)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
