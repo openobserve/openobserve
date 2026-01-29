@@ -147,6 +147,24 @@
       }
     },
     {
+      "id": "correlation_management",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "log_patterns",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
       "id": "query_management",
       "category": "enterprise",
       "availability": {
