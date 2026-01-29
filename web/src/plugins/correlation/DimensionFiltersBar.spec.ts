@@ -180,16 +180,16 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should disable apply button when no pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: false });
-      const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
-      // Check if disabled attribute exists (Quasar sets it when button is disabled)
-      expect(applyBtn.attributes("disable")).toBeTruthy();
+      const applyBtn = wrapper.findComponent(QBtn);
+      // Check the Quasar button component's disable prop directly
+      expect(applyBtn.props("disable")).toBe(true);
     });
 
     it("should enable apply button when there are pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: true });
-      const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
-      // When enabled, the disable attribute should not be set
-      expect(applyBtn.attributes("disable")).toBeFalsy();
+      const applyBtn = wrapper.findComponent(QBtn);
+      // When enabled, the disable prop should be false
+      expect(applyBtn.props("disable")).toBe(false);
     });
 
     it("should emit apply event when apply button is clicked", async () => {
@@ -342,15 +342,15 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should react to hasPendingChanges prop changes", async () => {
       wrapper = createWrapper({ hasPendingChanges: false });
-      let applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
-      expect(applyBtn.attributes("disable")).toBeTruthy();
+      let applyBtn = wrapper.findComponent(QBtn);
+      expect(applyBtn.props("disable")).toBe(true);
 
       await wrapper.setProps({ hasPendingChanges: true });
       await nextTick();
 
       // Re-find the button after prop change
-      applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
-      expect(applyBtn.attributes("disable")).toBeFalsy();
+      applyBtn = wrapper.findComponent(QBtn);
+      expect(applyBtn.props("disable")).toBe(false);
     });
   });
 });
