@@ -113,40 +113,50 @@ describe("useCorrelatedLogs", () => {
   });
 
   describe("Computed Properties", () => {
-    it("should compute hasResults correctly when results exist", () => {
+    it("should compute hasResults correctly when results exist", async () => {
+      mockFetchQueryDataWithHttpStream.mockResolvedValue({
+        hits: [{ _timestamp: 123, field: "value" }],
+        total: 1,
+        took: 10,
+      });
+
       const composable = useCorrelatedLogs(props);
-      composable.searchResults.value = [{ _timestamp: 123, field: "value" }];
+      await composable.fetchCorrelatedLogs();
 
       expect(composable.hasResults.value).toBe(true);
     });
 
     it("should compute hasResults correctly when no results", () => {
       const composable = useCorrelatedLogs(props);
-      composable.searchResults.value = [];
 
       expect(composable.hasResults.value).toBe(false);
     });
 
-    it("should compute isLoading correctly", () => {
+    it("should compute isLoading correctly", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ hits: [] }), 100))
+      );
+
       const composable = useCorrelatedLogs(props);
 
-      composable.loading.value = true;
+      const searchPromise = composable.fetchCorrelatedLogs();
       expect(composable.isLoading.value).toBe(true);
 
-      composable.loading.value = false;
+      await searchPromise;
       expect(composable.isLoading.value).toBe(false);
     });
 
-    it("should compute hasError correctly when error exists", () => {
+    it("should compute hasError correctly when error exists", async () => {
+      mockFetchQueryDataWithHttpStream.mockRejectedValue(new Error("Test error"));
+
       const composable = useCorrelatedLogs(props);
-      composable.error.value = new Error("Test error");
+      await composable.fetchCorrelatedLogs();
 
       expect(composable.hasError.value).toBe(true);
     });
 
     it("should compute hasError correctly when no error", () => {
       const composable = useCorrelatedLogs(props);
-      composable.error.value = null;
 
       expect(composable.hasError.value).toBe(false);
     });
@@ -155,17 +165,18 @@ describe("useCorrelatedLogs", () => {
       const composable = useCorrelatedLogs(props);
 
       // Empty when no results and not loading
-      composable.searchResults.value = [];
-      composable.loading.value = false;
       expect(composable.isEmpty.value).toBe(true);
+    });
 
-      // Not empty when has results
-      composable.searchResults.value = [{ _timestamp: 123 }];
-      expect(composable.isEmpty.value).toBe(false);
+    it("should compute isEmpty correctly when has results", async () => {
+      mockFetchQueryDataWithHttpStream.mockResolvedValue({
+        hits: [{ _timestamp: 123 }],
+        total: 1,
+      });
 
-      // Not empty when loading
-      composable.searchResults.value = [];
-      composable.loading.value = true;
+      const composable = useCorrelatedLogs(props);
+      await composable.fetchCorrelatedLogs();
+
       expect(composable.isEmpty.value).toBe(false);
     });
   });
@@ -302,17 +313,22 @@ describe("useCorrelatedLogs", () => {
       expect(composable.error.value).toBeTruthy();
     });
 
-    it("should clear error on successful search", async () => {
-      mockFetchQueryDataWithHttpStream.mockResolvedValue({
-        data: [],
-      });
-
+    it("should clear error on successful search after previous error", async () => {
+      // First, cause an error
+      mockFetchQueryDataWithHttpStream.mockRejectedValue(new Error("Previous error"));
       const composable = useCorrelatedLogs(props);
-      composable.error.value = new Error("Previous error");
+      await composable.fetchCorrelatedLogs();
+      expect(composable.hasError.value).toBe(true);
 
+      // Then succeed
+      mockFetchQueryDataWithHttpStream.mockResolvedValue({
+        hits: [],
+        total: 0,
+      });
       await composable.fetchCorrelatedLogs();
 
       expect(composable.error.value).toBe(null);
+      expect(composable.hasError.value).toBe(false);
     });
   });
 
