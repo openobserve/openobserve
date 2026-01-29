@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-show="expandState.preview" class="section-content">
         <keep-alive>
           <preview-alert
-            style="height: 100%; overflow: auto;"
+            style="height: 100%;"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
@@ -297,7 +297,7 @@ export default defineComponent({
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
   border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  overflow: hidden;
+  // overflow: hidden;
 
   .section-header {
     flex-shrink: 0;
@@ -317,7 +317,7 @@ export default defineComponent({
 
   .section-content {
     flex: 1;
-    overflow: hidden;
+    // overflow: hidden;
     display: flex;
     flex-direction: column;
   }

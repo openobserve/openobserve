@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesData="{}"
         searchType="UI"
         :is_ui_histogram="shouldUseHistogram"
-        style="height: 180px; width: 100%; overflow-x: hidden;"
+        style="height: 180px; width: 100%;"
         @result-metadata-update="handleChartDataUpdate"
         @series-data-update="handleSeriesDataUpdate"
       />
