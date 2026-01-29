@@ -290,7 +290,7 @@ const useHttpStreaming = () => {
       if(worker) {
       // Set up worker message handling
         worker.onmessage = (event) => {
-          const { type, traceId: eventTraceId, data } = event.data;
+          const { type, traceId: eventTraceId, data, reason } = event.data;
           switch (type) {
             case 'search_response_metadata':
               onData(eventTraceId, 'search_response_metadata', data);
@@ -312,6 +312,15 @@ const useHttpStreaming = () => {
               break;
             case 'end':
               onData(eventTraceId, 'end', 'end');
+              break;
+            case 'abort_stream':
+              // Worker detected excessive duplicates, abort the stream
+              console.warn('[useStreamingSearch] Aborting stream due to:', reason, 'for traceId:', eventTraceId);
+              if (abortControllers.value[eventTraceId]) {
+                abortControllers.value[eventTraceId].abort();
+              }
+              // Clean up the trace
+              cleanUpListeners(eventTraceId);
               break;
           }
         };

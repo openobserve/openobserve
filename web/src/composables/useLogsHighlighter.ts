@@ -151,38 +151,45 @@ export function useLogsHighlighter() {
 
       // Yield control back to event loop with tracked timeout
       // This prevents blocking the UI thread
-      await new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          // Remove from pending list when executed
-          const index = pendingTimeouts.indexOf(timeoutId);
-          if (index > -1) {
-            pendingTimeouts.splice(index, 1);
-          }
+      // For small datasets (<10 records), skip delay for instant rendering
+      // For larger datasets, use small delay to prevent UI blocking
+      const shouldDelay = hits.length >= 10 && chunkIndex < chunks.length - 1;
+      const delayMs = shouldDelay ? 10 : 0; // Reduced from 50ms to 10ms, skip for small datasets
 
-          // Check if aborted before resolving
-          if (signal.aborted) {
+      if (delayMs > 0) {
+        await new Promise<void>((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            // Remove from pending list when executed
+            const index = pendingTimeouts.indexOf(timeoutId);
+            if (index > -1) {
+              pendingTimeouts.splice(index, 1);
+            }
+
+            // Check if aborted before resolving
+            if (signal.aborted) {
+              reject(new Error("Processing aborted"));
+            } else {
+              resolve();
+            }
+          }, delayMs);
+
+          // Track this timeout for cleanup
+          pendingTimeouts.push(timeoutId);
+
+          // Handle abort signal
+          signal.addEventListener("abort", () => {
+            clearTimeout(timeoutId);
+            const index = pendingTimeouts.indexOf(timeoutId);
+            if (index > -1) {
+              pendingTimeouts.splice(index, 1);
+            }
             reject(new Error("Processing aborted"));
-          } else {
-            resolve();
-          }
-        }, 50);
-
-        // Track this timeout for cleanup
-        pendingTimeouts.push(timeoutId);
-
-        // Handle abort signal
-        signal.addEventListener("abort", () => {
-          clearTimeout(timeoutId);
-          const index = pendingTimeouts.indexOf(timeoutId);
-          if (index > -1) {
-            pendingTimeouts.splice(index, 1);
-          }
-          reject(new Error("Processing aborted"));
+          });
+        }).catch(() => {
+          // Silently handle abort errors
+          // Processing was intentionally cancelled
         });
-      }).catch(() => {
-        // Silently handle abort errors
-        // Processing was intentionally cancelled
-      });
+      }
     }
     return processedResults.value;
   }
@@ -218,6 +225,77 @@ export function useLogsHighlighter() {
   };
 
   /**
+   * Estimates the size of data without expensive JSON.stringify
+   * Used to determine if content should be truncated or skip highlighting
+   */
+  const estimateSize = (data: any): number => {
+    if (data === null || data === undefined) return 0;
+
+    // For strings, use length directly
+    if (typeof data === "string") return data.length;
+
+    // For primitives, use string representation
+    if (typeof data !== "object") return String(data).length;
+
+    // For objects/arrays, estimate based on key count and depth
+    // This is a rough estimate to avoid JSON.stringify performance hit
+    try {
+      const keys = Object.keys(data);
+      if (keys.length === 0) return 2; // "{}" or "[]"
+
+      // Rough estimate: keys * avg_key_size + values * avg_value_size
+      let estimate = keys.length * 20; // Average key name ~20 chars
+
+      // Sample first few values to estimate
+      const sampleSize = Math.min(5, keys.length);
+      for (let i = 0; i < sampleSize; i++) {
+        const value = data[keys[i]];
+        if (typeof value === "string") {
+          estimate += value.length;
+        } else if (typeof value === "object" && value !== null) {
+          estimate += Object.keys(value).length * 50; // Nested object estimate
+        } else {
+          estimate += 20; // Primitive value
+        }
+      }
+
+      // Extrapolate to all keys
+      if (keys.length > sampleSize) {
+        estimate = (estimate / sampleSize) * keys.length;
+      }
+
+      return estimate;
+    } catch (error) {
+      return 1000; // Default safe estimate
+    }
+  };
+
+  /**
+   * Truncates large content to prevent memory/performance issues
+   */
+  const truncateLargeContent = (data: any, maxSize: number = 50000): any => {
+    if (typeof data === "string" && data.length > maxSize) {
+      return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
+    }
+
+    if (typeof data === "object" && data !== null) {
+      try {
+        const jsonStr = JSON.stringify(data);
+        if (jsonStr.length > maxSize) {
+          // Return truncated JSON string, not a message
+          return jsonStr.substring(0, maxSize) + `... [truncated, original size: ${jsonStr.length} chars]`;
+        }
+        // If within size limit, return the original data
+        return data;
+      } catch (error) {
+        return "[Object too large to display]";
+      }
+    }
+
+    return data;
+  };
+
+  /**
    * Main colorization logic with integrated highlighting
    */
   const colorizedJson = ({
@@ -237,17 +315,33 @@ export function useLogsHighlighter() {
       return "";
     }
 
+    // Estimate size and skip highlighting for large content (>50KB)
+    const estimatedSize = estimateSize(data);
+    const skipHighlighting = estimatedSize > 50000;
+
+    // Truncate very large content (>50KB) to prevent memory issues
+    if (estimatedSize > 50000) {
+      data = truncateLargeContent(data, 50000);
+      // After truncation, skip highlighting and use simple display
+      if (typeof data === "string") {
+        return `<span class="log-string">${escapeHtml(data)}</span>`;
+      }
+    }
+
+    // If skipping highlighting, use basic colorization without search highlighting
+    const effectiveQueryString = skipHighlighting ? "" : queryString;
+
     // Simple mode: only highlighting, no semantic colorization
     if (simpleMode) {
       const textStr = String(data);
-      return simpleHighlight(textStr, queryString);
+      return simpleHighlight(textStr, effectiveQueryString);
     }
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
       return processTextWithHighlights(
         data,
-        queryString,
+        effectiveQueryString,
         currentColors.value,
         showQuotes,
       );
@@ -263,14 +357,14 @@ export function useLogsHighlighter() {
           return createStyledSpan(
             dataStr,
             currentColors.value.timestamp,
-            queryString,
+            effectiveQueryString,
             false,
           );
         } else {
           return createStyledSpan(
             dataStr,
             currentColors.value.numberValue,
-            queryString,
+            effectiveQueryString,
             showQuotes,
           );
         }
@@ -278,20 +372,20 @@ export function useLogsHighlighter() {
         return createStyledSpan(
           String(data),
           currentColors.value.booleanValue,
-          queryString,
+          effectiveQueryString,
           showQuotes,
         );
       } else if (data === null) {
         return createStyledSpan(
           "null",
           currentColors.value.nullValue,
-          queryString,
+          effectiveQueryString,
           showQuotes,
         );
       } else {
         return processTextWithHighlights(
           dataStr,
-          queryString,
+          effectiveQueryString,
           currentColors.value,
           showQuotes,
         );
@@ -305,7 +399,7 @@ export function useLogsHighlighter() {
         data,
         showBraces,
         showQuotes,
-        queryString,
+        effectiveQueryString,
       );
     } catch (error) {
       return escapeHtml(JSON.stringify(data));
