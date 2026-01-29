@@ -64,6 +64,10 @@ pub mod ui;
 
 pub const ERROR_HEADER: &str = "X-Error-Message";
 
+/// Custom header name for O2 Assistant session tracking (UUID v7)
+pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =
+    header::HeaderName::from_static("x-o2-assistant-session-id");
+
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
     CorsLayer::new()
@@ -80,11 +84,12 @@ pub fn cors_layer() -> CorsLayer {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
-            header::HeaderName::from_lowercase(b"traceparent").unwrap(),
-            header::HeaderName::from_lowercase(b"tracestate").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-span-id").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-trace-id").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-sampled").unwrap(),
+            header::HeaderName::from_static("traceparent"),
+            header::HeaderName::from_static("tracestate"),
+            header::HeaderName::from_static("x-openobserve-span-id"),
+            header::HeaderName::from_static("x-openobserve-trace-id"),
+            header::HeaderName::from_static("x-openobserve-sampled"),
+            X_O2_ASSISTANT_SESSION_ID,
         ])
         .allow_origin(AllowOrigin::mirror_request())
         .allow_credentials(true)

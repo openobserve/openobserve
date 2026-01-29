@@ -20,9 +20,10 @@ if (!navigator.clipboard) {
   navigator.clipboard = { writeText: vi.fn().mockResolvedValue(undefined) };
 }
 
-// Mock image util
+// Mock image util and UUID generator
 vi.mock('@/utils/zincutils', () => ({
   getImageURL: vi.fn(() => '#'),
+  getUUIDv7: vi.fn(() => 'test-session-id-12345'),
 }));
 
 // In-memory fake IndexedDB

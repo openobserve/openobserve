@@ -53,6 +53,7 @@ const useAiChat = () => {
      * @param org_id - Organization identifier for API routing
      * @param abortSignal - Optional AbortController signal for request cancellation
      * @param explicitContext - Optional explicit context to use (takes precedence over registered context)
+     * @param sessionId - Optional UUID v7 session ID for tracking all API calls in a chat session
      * @returns Promise<Response> - Fetch response object with streaming capabilities
      *
      * Example usage:
@@ -64,7 +65,7 @@ const useAiChat = () => {
      * abortController.abort();
      * ```
      */
-    const fetchAiChat = async (messages: any[], model: string, org_id: string, abortSignal?: AbortSignal, explicitContext?: any) => {
+    const fetchAiChat = async (messages: any[], model: string, org_id: string, abortSignal?: AbortSignal, explicitContext?: any, sessionId?: string) => {
         let url  = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chat_stream`;
 
         // Try explicit context first, then structured context, then fallback to legacy context
@@ -104,15 +105,24 @@ const useAiChat = () => {
             // Generate traceparent header with UUID v7 for distributed tracing
             const { traceparent } = generateTraceContext();
 
+            // Build headers object
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'traceparent': traceparent,
+            };
+
+            // Add session ID header if provided for linking API calls within a chat session
+            if (sessionId) {
+                headers['x-o2-assistant-session-id'] = sessionId;
+                console.log('[O2 Assistant] Session ID:', sessionId);
+            }
+
             // Configure fetch options with abort signal for request cancellation
             const fetchOptions: RequestInit = {
                 method: 'POST',
                 body: body,
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'traceparent': traceparent,
-                },
+                headers,
                 // Add abort signal if provided to enable request cancellation
                 ...(abortSignal && { signal: abortSignal })
             };
