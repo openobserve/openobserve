@@ -313,16 +313,22 @@ describe("useCorrelatedLogs", () => {
 
   describe("Time Range Management", () => {
     it("should update time range", async () => {
-      const composable = useCorrelatedLogs(props);
-      const newTimeRange = {
-        startTime: Date.now() - 7200000,
-        endTime: Date.now(),
-      };
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_params: any, callbacks: any) => {
+          callbacks.complete(null);
+          return Promise.resolve();
+        }
+      );
 
-      composable.updateTimeRange(newTimeRange);
+      const composable = useCorrelatedLogs(props);
+      const newStartTime = Date.now() - 7200000;
+      const newEndTime = Date.now();
+
+      composable.updateTimeRange(newStartTime, newEndTime);
       await nextTick();
 
-      expect(composable.currentTimeRange.value).toEqual(newTimeRange);
+      expect(composable.currentTimeRange.value.startTime).toBe(newStartTime);
+      expect(composable.currentTimeRange.value.endTime).toBe(newEndTime);
     });
   });
 
@@ -401,14 +407,10 @@ describe("useCorrelatedLogs", () => {
 
   describe("Refresh", () => {
     it("should execute search when refresh is called", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_params: any, callbacks: any) => {
-          callbacks.complete(null);
-          return Promise.resolve();
-        }
-      );
-
       const composable = useCorrelatedLogs(props);
+
+      // Clear any previous calls from initialization
+      mockFetchQueryDataWithHttpStream.mockClear();
 
       await composable.refresh();
 
@@ -446,6 +448,20 @@ describe("useCorrelatedLogs", () => {
       };
 
       const composable = useCorrelatedLogs(propsWithEmptyStreams);
+      // When logStreams is empty but sourceStream is provided and sourceType is 'logs',
+      // primaryStream returns sourceStream
+      expect(composable.primaryStream.value).toBe("app-logs");
+    });
+
+    it("should return empty string when logStreams is empty and no sourceStream", () => {
+      const propsWithNoStreams = {
+        ...props,
+        logStreams: [],
+        sourceStream: "",
+        sourceType: "traces",
+      };
+
+      const composable = useCorrelatedLogs(propsWithNoStreams);
       expect(composable.primaryStream.value).toBe("");
     });
 
@@ -528,17 +544,24 @@ describe("useCorrelatedLogs", () => {
       const composable = useCorrelatedLogs(props);
 
       await composable.fetchCorrelatedLogs();
+      expect(composable.hasError.value).toBe(true);
 
       // Should be able to recover and try again
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_params: any, callbacks: any) => {
+          callbacks.data(null, {
+            type: 'search_response_metadata',
+            content: { results: { total: 0, took: 5 } }
+          });
           callbacks.complete(null);
           return Promise.resolve();
         }
       );
       await composable.refresh();
+      await nextTick();
 
       expect(composable.loading.value).toBe(false);
+      expect(composable.error.value).toBe(null);
     });
 
     it("should preserve filters after failed search", async () => {
