@@ -505,7 +505,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
    * Refresh data (re-fetch with current filters)
    */
   const refresh = () => {
-    fetchCorrelatedLogs();
+    return fetchCorrelatedLogs();
   };
 
   /**
