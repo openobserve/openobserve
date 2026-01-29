@@ -228,7 +228,6 @@ export const useSearchResponseHandler = () => {
     const hits = response.content?.results?.hits || [];
 
     if (hits.length === 0) {
-      console.log('[handleStreamingHits] No hits to process');
       return;
     }
 
@@ -238,8 +237,6 @@ export const useSearchResponseHandler = () => {
       const hitId = generateHitHash(hit);
 
       if (processedHitIds.has(hitId)) {
-        // Duplicate already filtered by worker, skip silently
-        // Uncomment for debugging: console.warn(`[handleStreamingHits] Duplicate hit detected, skipping: ${hitId.substring(0, 80)}...`);
         return false;
       }
 
@@ -248,14 +245,7 @@ export const useSearchResponseHandler = () => {
     });
 
     if (newHits.length === 0) {
-      // All duplicates filtered by worker, skip silently
-      // Uncomment for debugging: console.warn('[handleStreamingHits] All hits were duplicates, skipping append');
       return;
-    }
-
-    // Log only successful processing with new hits
-    if (newHits.length > 0) {
-      console.log(`[handleStreamingHits] Processing ${newHits.length} new hits (${hits.length - newHits.length} duplicates filtered). Total: ${searchObj.data.queryResults.hits.length + (appendResult ? newHits.length : 0)}`);
     }
 
     if (
