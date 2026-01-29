@@ -378,7 +378,7 @@ describe("CorrelatedLogsTable.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.expandedRows.length).toBe(1);
-      expect(wrapper.vm.expandedRows[0]).toBe(row);
+      expect(wrapper.vm.expandedRows[0]).toStrictEqual(row);
     });
 
     it("should collapse row when handleExpandRow is called for expanded row", async () => {
@@ -493,8 +493,8 @@ describe("CorrelatedLogsTable.vue", () => {
       await nextTick();
 
       // With loading=true and no results, should show skeleton
-      expect(wrapper.vm.isLoading).toBe(true);
-      expect(wrapper.vm.hasResults).toBe(false);
+      expect(wrapper.vm.isLoading.value).toBe(true);
+      expect(wrapper.vm.hasResults.value).toBe(false);
     });
 
     it("should disable column dropdown when no results", async () => {
@@ -508,7 +508,7 @@ describe("CorrelatedLogsTable.vue", () => {
       await nextTick();
 
       // Check that hasResults is false
-      expect(wrapper.vm.hasResults).toBe(false);
+      expect(wrapper.vm.hasResults.value).toBe(false);
     });
   });
 });
