@@ -413,6 +413,9 @@ describe("useCorrelatedLogs", () => {
       mockFetchQueryDataWithHttpStream.mockClear();
 
       composable.refresh();
+
+      // Wait for the async fetchCorrelatedLogs to be called
+      await new Promise(resolve => setTimeout(resolve, 10));
       await nextTick();
 
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
