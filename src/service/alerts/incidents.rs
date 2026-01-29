@@ -594,22 +594,8 @@ pub async fn list_incidents(
     let incidents_list = incidents
         .into_iter()
         .map(|i| {
-            let incident_id = i.id.clone();
-            let topology_context = i.topology_context.as_ref().and_then(|v| {
-                match serde_json::from_value(v.clone()) {
-                    Ok(topology) => Some(topology),
-                    Err(e) => {
-                        log::error!(
-                            "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
-                            incident_id,
-                            e,
-                            v
-                        );
-                        None
-                    }
-                }
-            });
-            model_to_incident_with_topology(i, topology_context)
+            // topology_context is not required while listing all incidents
+            model_to_incident_with_topology(i, None)
         })
         .collect();
 
