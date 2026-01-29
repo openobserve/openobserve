@@ -1,12 +1,15 @@
 name: Build PR Docker Image
 
 on:
-  pull_request:
-    branches:
-      - "*"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build (e.g., feature/my-branch)'
+        required: true
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -29,20 +32,14 @@ jobs:
       - name: Check if relevant code has changes
         id: check_changes
         run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qvE '\.(md|yml|yaml)$'; then
+          if git diff --name-only origin/main ${{ github.sha }} | grep -qvE '\.(md|yml|yaml)$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
-          # Also check if this is a non-fork PR
-          if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ] && \
-             [ "${{ github.event.pull_request.head.repo.fork }}" == "false" ]; then
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_build=false" >> $GITHUB_OUTPUT
-          fi
+          # Manual workflow dispatch - always build
+          echo "should_build=true" >> $GITHUB_OUTPUT
 
   build_pr_image_amd64:
     name: build_pr_image_amd64
@@ -63,8 +60,8 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -150,8 +147,8 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -229,8 +226,8 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
           fetch-tags: true
       - name: Set GIT_TAG env
