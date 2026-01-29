@@ -68,11 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Compact Status, Severity, Alerts badges at extreme right -->
-      <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto tw:mr-3">
+      <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
         <!-- Status Badge -->
         <q-badge
           :color="getStatusColor(incidentDetails.status)"
           class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
+          style="height: 33px;"
           outline
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -86,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Severity Badge -->
         <q-badge
-          :style="{ color: getSeverityColorHex(incidentDetails.severity) }"
+          :style="{ color: getSeverityColorHex(incidentDetails.severity), height: '33px' }"
           class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
           outline
         >
@@ -103,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-badge
           color="primary"
           class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
+          style="height: 33px;"
           outline
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -118,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Save/Cancel buttons when editing -->
       <div v-if="incidentDetails && isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
          <q-btn
-          dense
           no-caps
           @click="cancelTitleEdit"
           class="o2-secondary-button"
@@ -127,7 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <q-btn
           no-caps
-          dense
           @click="saveTitleEdit"
           class="o2-primary-button"
         >
@@ -148,16 +148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:gap-2 tw:items-center">
         <q-btn
           v-if="incidentDetails.status === 'open'"
-          color="brown-5"
-          size="sm"
           no-caps
           unelevated
-          dense
           @click="acknowledgeIncident"
           :loading="updating"
-          class="incident-action-buttons"
+          class="o2-secondary-button"
         >
-          <q-icon name="check_circle" size="16px" class="tw:mr-1" />
           <span>{{ t("alerts.incidents.acknowledge") }}</span>
           <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
         </q-btn>
@@ -165,12 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="incidentDetails.status !== 'resolved'"
           no-caps
           unelevated
-          dense
           @click="resolveIncident"
           :loading="updating"
-          class="o2-primary-button"
+          class="o2-secondary-button"
         >
-          <q-icon name="task_alt" size="16px" class="tw:mr-1" />
           <span>{{ t("alerts.incidents.resolve") }}</span>
           <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
         </q-btn>
@@ -194,7 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           no-caps
           flat
-          dense
           @click="startTitleEdit"
           class="o2-secondary-button"
         >
