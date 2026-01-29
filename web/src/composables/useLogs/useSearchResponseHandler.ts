@@ -173,53 +173,6 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-  // Deduplication: Track processed hit IDs to prevent duplicate appending
-  const processedHitIds = new Set<string>();
-  // Track current traceId to detect new searches and clear dedup set
-  let currentTraceId: string | null = null;
-
-  /**
-   * Generates a lightweight hash for a hit object without expensive JSON.stringify
-   * Samples key fields to create a fingerprint
-   */
-  const generateHitHash = (hit: any): string => {
-    // If we have an ID field, use it directly
-    if (hit._id) return `id_${hit._id}`;
-    if (hit.id) return `id_${hit.id}`;
-
-    // Otherwise, create a lightweight hash from key fields
-    // Sample common log fields and a few custom fields
-    const parts: string[] = [];
-
-    // Common timestamp fields
-    if (hit._timestamp) parts.push(`ts_${hit._timestamp}`);
-    if (hit.timestamp) parts.push(`ts_${hit.timestamp}`);
-    if (hit['@timestamp']) parts.push(`ts_${hit['@timestamp']}`);
-
-    // Sample first few field names and values
-    const keys = Object.keys(hit);
-    const sampleSize = Math.min(5, keys.length);
-
-    for (let i = 0; i < sampleSize; i++) {
-      const key = keys[i];
-      const value = hit[key];
-
-      if (typeof value === 'string') {
-        // For strings, use first 20 chars to avoid huge field values
-        parts.push(`${key}_${value.substring(0, 20)}`);
-      } else if (typeof value === 'number' || typeof value === 'boolean') {
-        parts.push(`${key}_${value}`);
-      } else if (value && typeof value === 'object') {
-        // For nested objects, just use the key count as fingerprint
-        parts.push(`${key}_obj${Object.keys(value).length}`);
-      }
-    }
-
-    // Add field count as additional fingerprint
-    parts.push(`fields_${keys.length}`);
-
-    return parts.join('|');
-  };
 
   const handleStreamingHits = (
     payload: WebSocketSearchPayload,
@@ -229,43 +182,14 @@ export const useSearchResponseHandler = () => {
   ) => {
     const hits = response.content?.results?.hits || [];
 
-    if (hits.length === 0) {
-      return;
-    }
-
-    // Clear dedup set when we detect a NEW search (based on traceId change)
-    // This ensures the Set is cleared regardless of which partition we see first
-    const isNewSearch = currentTraceId !== payload.traceId;
-
-    if (isNewSearch) {
-      processedHitIds.clear();
-      currentTraceId = payload.traceId;
-    }
-
-    // Generate unique ID for each hit and filter duplicates
-    const newHits = hits.filter((hit: any) => {
-      // Generate lightweight hash instead of expensive JSON.stringify
-      const hitId = generateHitHash(hit);
-
-      if (processedHitIds.has(hitId)) {
-        return false;
-      }
-
-      processedHitIds.add(hitId);
-      return true;
-    });
-
-    if (newHits.length === 0) {
-      return;
-    }
-
-    // Clear cache and replace hits when starting a new search (not appending)
-    // Or when it's a new search detected by traceId change
-    if (isNewSearch || !appendResult) {
+    if (
+      (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
+      !appendResult
+    ) {
       clearCache();
-      searchObj.data.queryResults.hits = newHits;
+      searchObj.data.queryResults.hits = hits;
     } else if (appendResult) {
-      searchObj.data.queryResults.hits.push(...newHits);
+      searchObj.data.queryResults.hits.push(...hits);
     }
 
     if (searchObj.meta.refreshInterval == 0) {
