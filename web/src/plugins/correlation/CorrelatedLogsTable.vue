@@ -305,7 +305,7 @@ const expandedRows = ref<any[]>([]);
 const selectedFields = ref<any[]>([]);
 const visibleColumns = ref<Set<string>>(new Set());
 
-// Pending dimensions - for the apply button pattern
+// Pending filters for the apply button pattern (tracks user changes before applying)
 const pendingFilters = ref<Record<string, string>>({ ...currentFilters.value });
 
 // Watch currentFilters to sync pendingFilters when filters are applied or reset
