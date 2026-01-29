@@ -388,7 +388,7 @@ describe("useCorrelatedLogs", () => {
       expect(composable).toBeDefined();
     });
 
-    it("should handle filter with special characters", () => {
+    it("should handle filter with special characters", async () => {
       const composable = useCorrelatedLogs(props);
 
       composable.updateFilter("special-key", "special@value#123");
@@ -399,7 +399,7 @@ describe("useCorrelatedLogs", () => {
       );
     });
 
-    it("should handle very long filter values", () => {
+    it("should handle very long filter values", async () => {
       const composable = useCorrelatedLogs(props);
       const longValue = "a".repeat(10000);
 

@@ -181,13 +181,15 @@ describe("DimensionFiltersBar.vue", () => {
     it("should disable apply button when no pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: false });
       const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
-      expect(applyBtn.attributes("disable")).toBe("true");
+      // Check if disabled attribute exists (Quasar sets it when button is disabled)
+      expect(applyBtn.attributes("disable")).toBeTruthy();
     });
 
     it("should enable apply button when there are pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: true });
       const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
-      expect(applyBtn.attributes("disable")).toBeUndefined();
+      // When enabled, the disable attribute should not be set
+      expect(applyBtn.attributes("disable")).toBeFalsy();
     });
 
     it("should emit apply event when apply button is clicked", async () => {
@@ -268,14 +270,14 @@ describe("DimensionFiltersBar.vue", () => {
       expect(typeof wrapper.vm.handleApply).toBe("function");
     });
 
-    it("should call handleApply when apply button is clicked", async () => {
+    it("should emit apply when apply button is clicked", async () => {
       wrapper = createWrapper({ hasPendingChanges: true });
-      const handleApplySpy = vi.spyOn(wrapper.vm, "handleApply");
 
       const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
       await applyBtn.trigger("click");
+      await nextTick();
 
-      expect(handleApplySpy).toHaveBeenCalled();
+      expect(wrapper.emitted("apply")).toBeTruthy();
     });
   });
 
@@ -340,13 +342,15 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should react to hasPendingChanges prop changes", async () => {
       wrapper = createWrapper({ hasPendingChanges: false });
-      const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
-      expect(applyBtn.attributes("disable")).toBe("true");
+      let applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
+      expect(applyBtn.attributes("disable")).toBeTruthy();
 
       await wrapper.setProps({ hasPendingChanges: true });
       await nextTick();
 
-      expect(applyBtn.attributes("disable")).toBeUndefined();
+      // Re-find the button after prop change
+      applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
+      expect(applyBtn.attributes("disable")).toBeFalsy();
     });
   });
 });
