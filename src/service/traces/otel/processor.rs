@@ -150,20 +150,22 @@ impl OtelIngestionProcessor {
             // Calculate cost from tokens if cost is missing but we have model and usage
             if let Some(ref model_name) = model_name
                 && cost.is_empty()
+                && matches!(obs_type, ObservationType::Generation)
             {
                 let input_tokens = usage.get("input").cloned().unwrap_or_default();
                 let output_tokens = usage.get("output").cloned().unwrap_or_default();
 
-                if (input_tokens > 0 || output_tokens > 0)
-                    && matches!(obs_type, ObservationType::Generation)
-                    && let Some((input_cost, output_cost, total_cost)) =
-                        pricing::calculate_cost(model_name, input_tokens, output_tokens)
+                if let Some((input_cost, output_cost, total_cost)) =
+                    pricing::calculate_cost(model_name, input_tokens, output_tokens)
                 {
                     cost.insert("input".to_string(), input_cost);
                     cost.insert("output".to_string(), output_cost);
                     cost.insert("total".to_string(), total_cost);
                 }
-            } else if !cost.contains_key("total") {
+            }
+
+            // Ensure cost has a total if it has any data
+            if !cost.contains_key("total") {
                 let input = cost.get("input").cloned().unwrap_or_default();
                 let output = cost.get("output").cloned().unwrap_or_default();
                 let total = input + output;
@@ -660,5 +662,36 @@ mod tests {
             // Should be an empty object
             assert!(cost.as_object().unwrap().is_empty());
         }
+    }
+
+    #[test]
+    fn test_process_span_calculates_cost_with_zero_tokens() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4o"));
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\"}]"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(0));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(0));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Cost should be calculated even with 0 tokens (result should be $0.00)
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+        assert_eq!(cost.get("input").and_then(|v| v.as_f64()), Some(0.0));
+        assert_eq!(cost.get("output").and_then(|v| v.as_f64()), Some(0.0));
+        assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.0));
     }
 }
