@@ -62,6 +62,11 @@ export class TracesPage {
     this.analysisDashboardCard = '.analysis-dashboard-card';
     // Metrics dashboard container
     this.tracesMetricsDashboard = '.traces-metrics-dashboard';
+    // Analysis Dashboard Tabs
+    this.analysisDashboardTabs = '.analysis-dashboard-card .q-tabs';
+    this.volumeTab = '.analysis-dashboard-card .q-tab[name="volume"], .analysis-dashboard-card .q-tabs button:has-text("Volume")';
+    this.latencyTab = '.analysis-dashboard-card .q-tab[name="latency"], .analysis-dashboard-card .q-tabs button:has-text("Latency")';
+    this.errorTab = '.analysis-dashboard-card .q-tab[name="error"], .analysis-dashboard-card .q-tabs button:has-text("Error")';
 
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
@@ -1570,30 +1575,84 @@ export class TracesPage {
   /**
    * Perform brush selection on metrics chart (simulated via click and drag)
    * This requires the metrics dashboard to be visible
-   * @param {string} chartSelector - Selector for the chart to brush
    */
-  async performBrushSelectionOnChart(chartSelector = 'canvas') {
+  async performBrushSelectionOnChart() {
     // Find the chart canvas in the metrics dashboard
-    const chart = this.page.locator(this.tracesMetricsDashboard).locator(chartSelector).first();
+    // Try multiple selectors to find the chart
+    const chartSelectors = [
+      this.page.locator(this.tracesMetricsDashboard).locator('canvas').first(),
+      this.page.locator('[data-test="chart-renderer"] canvas').first(),
+      this.page.locator('.chart-container canvas').first(),
+      this.page.locator('canvas').first()
+    ];
 
-    if (await chart.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const box = await chart.boundingBox();
-      if (box) {
-        // Perform a brush selection (drag from left to right on the chart)
-        const startX = box.x + box.width * 0.2;
-        const endX = box.x + box.width * 0.8;
-        const y = box.y + box.height / 2;
-
-        await this.page.mouse.move(startX, y);
-        await this.page.mouse.down();
-        await this.page.mouse.move(endX, y, { steps: 10 });
-        await this.page.mouse.up();
-
-        await this.page.waitForTimeout(1000);
-        return true;
+    let chart = null;
+    for (const selector of chartSelectors) {
+      if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
+        chart = selector;
+        break;
       }
     }
-    return false;
+
+    if (!chart) {
+      return false;
+    }
+
+    const box = await chart.boundingBox();
+    if (!box) {
+      return false;
+    }
+
+    // Wait for chart to be fully rendered
+    await this.page.waitForTimeout(2000);
+
+    // Try multiple brush selection approaches
+
+    // Approach 1: Standard mouse drag with slower steps
+    const startX = box.x + box.width * 0.25;
+    const endX = box.x + box.width * 0.75;
+    const y = box.y + box.height / 2;
+
+    await this.page.mouse.move(startX, y);
+    await this.page.waitForTimeout(100);
+    await this.page.mouse.down();
+    await this.page.waitForTimeout(100);
+
+    // Move in smaller steps to simulate real drag
+    const steps = 20;
+    for (let i = 1; i <= steps; i++) {
+      const currentX = startX + (endX - startX) * (i / steps);
+      await this.page.mouse.move(currentX, y);
+      await this.page.waitForTimeout(20);
+    }
+
+    await this.page.waitForTimeout(100);
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1500);
+
+    // Check if brush selection worked by looking for filter chip or analyze button
+    const chipVisible = await this.isRangeFilterChipVisible();
+    const buttonVisible = await this.isAnalyzeDimensionsButtonVisible();
+
+    if (chipVisible || buttonVisible) {
+      return true;
+    }
+
+    // Approach 2: Try clicking to focus, then drag
+    await chart.click();
+    await this.page.waitForTimeout(500);
+
+    await this.page.mouse.move(startX, y);
+    await this.page.mouse.down();
+    await this.page.mouse.move(endX, y, { steps: 15 });
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1000);
+
+    // Check again
+    const chipVisible2 = await this.isRangeFilterChipVisible();
+    const buttonVisible2 = await this.isAnalyzeDimensionsButtonVisible();
+
+    return chipVisible2 || buttonVisible2;
   }
 
   /**
@@ -1612,6 +1671,164 @@ export class TracesPage {
 
     // Wait for dashboard content
     await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+  }
+
+  /**
+   * Check if Volume tab is visible in Analysis Dashboard
+   * @returns {Promise<boolean>}
+   */
+  async isVolumeTabVisible() {
+    // Try multiple selectors for Volume tab
+    const selectors = [
+      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Volume/i }),
+      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Volume/i })
+    ];
+
+    for (const selector of selectors) {
+      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if Latency tab is visible in Analysis Dashboard
+   * @returns {Promise<boolean>}
+   */
+  async isLatencyTabVisible() {
+    const selectors = [
+      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Latency/i }),
+      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Latency/i })
+    ];
+
+    for (const selector of selectors) {
+      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if Error tab is visible in Analysis Dashboard
+   * @returns {Promise<boolean>}
+   */
+  async isErrorTabVisible() {
+    const selectors = [
+      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Error/i }),
+      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Error/i })
+    ];
+
+    for (const selector of selectors) {
+      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Click on Volume tab in Analysis Dashboard
+   */
+  async clickVolumeTab() {
+    const selectors = [
+      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Volume/i }),
+      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Volume/i })
+    ];
+
+    for (const selector of selectors) {
+      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        await selector.first().click();
+        await this.page.waitForTimeout(1000);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Click on Latency tab in Analysis Dashboard
+   */
+  async clickLatencyTab() {
+    const selectors = [
+      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Latency/i }),
+      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Latency/i })
+    ];
+
+    for (const selector of selectors) {
+      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        await selector.first().click();
+        await this.page.waitForTimeout(1000);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Click on Error tab in Analysis Dashboard
+   */
+  async clickErrorTab() {
+    const selectors = [
+      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Error/i }),
+      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Error/i })
+    ];
+
+    for (const selector of selectors) {
+      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        await selector.first().click();
+        await this.page.waitForTimeout(1000);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if a specific tab is active in Analysis Dashboard
+   * @param {string} tabName - 'volume', 'latency', or 'error'
+   * @returns {Promise<boolean>}
+   */
+  async isTabActive(tabName) {
+    const activeTabSelectors = [
+      this.page.locator('.analysis-dashboard-card .q-tab--active').filter({ hasText: new RegExp(tabName, 'i') }),
+      this.page.locator('.analysis-dashboard-card .q-tab.q-tab--active').filter({ hasText: new RegExp(tabName, 'i') })
+    ];
+
+    for (const selector of activeTabSelectors) {
+      if (await selector.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get the title of the Analysis Dashboard
+   * @returns {Promise<string>}
+   */
+  async getAnalysisDashboardTitle() {
+    const titleSelectors = [
+      this.page.locator('.analysis-dashboard-card .q-card__section').first(),
+      this.page.locator('.analysis-dashboard-card h6, .analysis-dashboard-card .text-h6').first()
+    ];
+
+    for (const selector of titleSelectors) {
+      if (await selector.isVisible({ timeout: 2000 }).catch(() => false)) {
+        return await selector.textContent() || '';
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Check how many tabs are visible in Analysis Dashboard
+   * @returns {Promise<number>}
+   */
+  async getVisibleTabCount() {
+    const tabLocator = this.page.locator('.analysis-dashboard-card .q-tab');
+    return await tabLocator.count();
   }
 
 }
