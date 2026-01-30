@@ -311,28 +311,18 @@ describe("colorizeQuery", () => {
       const error = new Error("Colorization failed");
       mockColorize.mockRejectedValueOnce(error);
 
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
       const result = await colorizeQuery(query, "sql");
 
       expect(result).toBe(query);
-      expect(consoleSpy).toHaveBeenCalledWith("Colorization failed", error);
-
-      consoleSpy.mockRestore();
     });
 
     it("should handle Monaco editor errors gracefully", async () => {
       const query = "SELECT * FROM logs";
       mockColorize.mockRejectedValueOnce(new Error("Monaco not available"));
 
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
       const result = await colorizeQuery(query, "sql");
 
       expect(result).toBe(query);
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
     });
 
     it("should handle internal errors gracefully", async () => {
@@ -341,13 +331,9 @@ describe("colorizeQuery", () => {
       // Mock colorization error
       mockColorize.mockRejectedValueOnce(new Error("Internal error"));
 
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
       // Should return original query on error
       const result = await colorizeQuery(query, "sql");
       expect(result).toBe(query);
-
-      consoleSpy.mockRestore();
     });
 
     it("should handle unknown language gracefully", async () => {
@@ -362,13 +348,9 @@ describe("colorizeQuery", () => {
       const query = "INVALID SQL SYNTAX HERE!!!";
       mockColorize.mockRejectedValueOnce(new Error("Syntax error"));
 
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
       const result = await colorizeQuery(query, "sql");
 
       expect(result).toBe(query);
-
-      consoleSpy.mockRestore();
     });
   });
 

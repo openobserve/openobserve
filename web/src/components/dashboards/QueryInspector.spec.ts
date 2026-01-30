@@ -695,6 +695,112 @@ describe("QueryInspector", () => {
     });
   });
 
+  describe("getQueryTypeDisplay Method", () => {
+    it("should return SQL for empty queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("");
+      expect(result).toBe("SQL");
+    });
+
+    it("should return SQL for null queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay(null);
+      expect(result).toBe("SQL");
+    });
+
+    it("should return SQL for undefined queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay(undefined);
+      expect(result).toBe("SQL");
+    });
+
+    it("should return SQL for sql queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("sql");
+      expect(result).toBe("SQL");
+    });
+
+    it("should return SQL for SQL queryType in uppercase", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("SQL");
+      expect(result).toBe("SQL");
+    });
+
+    it("should return SQL for SQL queryType in mixed case", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("SqL");
+      expect(result).toBe("SQL");
+    });
+
+    it("should return PromQL for promql queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("promql");
+      expect(result).toBe("PromQL");
+    });
+
+    it("should return PromQL for PromQL queryType in uppercase", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("PROMQL");
+      expect(result).toBe("PromQL");
+    });
+
+    it("should return PromQL for metrics queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("metrics");
+      expect(result).toBe("PromQL");
+    });
+
+    it("should return PromQL for METRICS queryType in uppercase", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("METRICS");
+      expect(result).toBe("PromQL");
+    });
+
+    it("should return uppercase for unknown queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("vrl");
+      expect(result).toBe("VRL");
+    });
+
+    it("should return uppercase for custom queryType", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("custom");
+      expect(result).toBe("CUSTOM");
+    });
+
+    it("should handle queryType with special characters", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const result = wrapper.vm.getQueryTypeDisplay("my-query");
+      expect(result).toBe("MY-QUERY");
+    });
+  });
+
   describe("Store Integration", () => {
     it("should use timezone from store", async () => {
       store.state.timezone = "America/New_York";
