@@ -4336,6 +4336,15 @@ export class LogsPage {
         return await this.page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
     }
 
+    /**
+     * Close any open dialog by pressing Escape key
+     */
+    async closeDimensionSelectorDialog() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Closed dimension selector dialog');
+    }
+
     // ===== SHARE LINK METHODS =====
 
     /**

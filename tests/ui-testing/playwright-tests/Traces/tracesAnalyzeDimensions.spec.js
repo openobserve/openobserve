@@ -486,7 +486,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
         testLogger.info('Dimension selector clicked, dialog interaction complete');
 
         // Close dialog
-        await page.keyboard.press('Escape');
+        await pm.tracesPage.closeDimensionSelectorDialog();
       }
 
       // Clean up - close dashboard
