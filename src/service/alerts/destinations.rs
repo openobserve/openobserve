@@ -21,8 +21,90 @@ use crate::{
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db::{self, alerts::destinations::DestinationError, user},
+    service::db::{
+        self,
+        alerts::{destinations::DestinationError, templates::TemplateError},
+        user,
+    },
 };
+
+/// Helper function to ensure a prebuilt template exists for the given type.
+/// Returns the template name if successful.
+///
+/// This function implements template reuse: if a template with the standardized
+/// name already exists, it returns that name. Otherwise, it creates a new template
+/// from the prebuilt configuration.
+async fn ensure_prebuilt_template(
+    org_id: &str,
+    prebuilt_type: &str,
+) -> Result<String, DestinationError> {
+    let template_name = format!("prebuilt_{}", prebuilt_type);
+
+    // CRITICAL: Check if template already exists (avoid duplicates)
+    match db::alerts::templates::get(org_id, &template_name).await {
+        Ok(_existing_template) => {
+            // Template exists, reuse it
+            log::info!(
+                "Reusing existing template '{}' for org '{}' and prebuilt type '{}'",
+                template_name,
+                org_id,
+                prebuilt_type
+            );
+            Ok(template_name)
+        }
+        Err(TemplateError::NotFound) => {
+            // Template doesn't exist, create it from prebuilt config
+            log::info!(
+                "Creating new template '{}' for org '{}' and prebuilt type '{}'",
+                template_name,
+                org_id,
+                prebuilt_type
+            );
+
+            // Load template definition from prebuilt config
+            let mut template_def = config::prebuilt_loader::get_prebuilt_template(prebuilt_type)
+                .ok_or_else(|| {
+                    DestinationError::PrebuiltTemplateNotFound(prebuilt_type.to_string())
+                })?;
+
+            // Set org_id and name
+            template_def.org_id = org_id.to_string();
+            template_def.name = template_name.clone();
+            template_def.is_default = false;
+
+            // Save to database
+            db::alerts::templates::set(template_def)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "Failed to create template '{}' for org '{}': {}",
+                        template_name,
+                        org_id,
+                        e
+                    );
+                    DestinationError::TemplateCreationFailed(e.to_string())
+                })?;
+
+            log::info!(
+                "Successfully created template '{}' for org '{}'",
+                template_name,
+                org_id
+            );
+
+            Ok(template_name)
+        }
+        Err(e) => {
+            // Other error (DB failure, etc.)
+            log::error!(
+                "Error checking for template '{}' in org '{}': {}",
+                template_name,
+                org_id,
+                e
+            );
+            Err(DestinationError::TemplateRetrievalFailed(e.to_string()))
+        }
+    }
+}
 
 pub async fn save(
     name: &str,
@@ -91,6 +173,52 @@ pub async fn save(
         Err(_) => {
             if !create {
                 return Err(DestinationError::NotFound);
+            }
+        }
+    }
+
+    // For prebuilt destinations, ensure template exists before saving destination
+    // This implements template reuse: multiple destinations can share the same prebuilt template
+    if let Module::Alert {
+        ref mut template,
+        ref destination_type,
+    } = destination.module
+    {
+        // Check if this is a prebuilt destination (has destination_type metadata)
+        let prebuilt_type = match destination_type {
+            DestinationType::Http(endpoint) => endpoint.destination_type.as_deref(),
+            DestinationType::Email(_) => {
+                // Check if template is prebuilt or not set (assume prebuilt email)
+                if template.is_none()
+                    || template
+                        .as_ref()
+                        .is_some_and(|t| t.starts_with("prebuilt_"))
+                {
+                    Some("email")
+                } else {
+                    None
+                }
+            }
+            DestinationType::Sns(_) => None, // SNS doesn't have prebuilt templates yet
+        };
+
+        // If it's a prebuilt type and doesn't have a custom template, ensure prebuilt template
+        // exists
+        if let Some(pb_type) = prebuilt_type {
+            // Skip "custom" type (user wants to use custom template)
+            if pb_type != "custom" {
+                // Ensure the prebuilt template exists (creates if needed, reuses if exists)
+                let template_name = ensure_prebuilt_template(&destination.org_id, pb_type).await?;
+
+                // Update destination to reference the template (only if not already set)
+                if template.is_none() {
+                    *template = Some(template_name);
+                    log::info!(
+                        "Associated destination '{}' with prebuilt template for type '{}'",
+                        destination.name,
+                        pb_type
+                    );
+                }
             }
         }
     }
@@ -173,4 +301,295 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     db::alerts::destinations::delete(org_id, name).await?;
     remove_ownership(org_id, "destinations", Authz::new(name)).await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::destinations::{DestinationType, Endpoint, HTTPType, Module};
+
+    use super::*;
+
+    /// Test that ensure_prebuilt_template creates a new template when it doesn't exist
+    #[tokio::test]
+    async fn test_ensure_prebuilt_template_creates_new() {
+        let org_id = "test_org_create";
+        let prebuilt_type = "slack";
+
+        // Clean up any existing template
+        let _ = db::alerts::templates::delete(org_id, &format!("prebuilt_{}", prebuilt_type)).await;
+
+        // Ensure template - should create new one
+        let result = ensure_prebuilt_template(org_id, prebuilt_type).await;
+
+        assert!(result.is_ok(), "Should successfully create template");
+        let template_name = result.unwrap();
+        assert_eq!(template_name, "prebuilt_slack");
+
+        // Verify template was created in database
+        let template = db::alerts::templates::get(org_id, &template_name).await;
+        assert!(template.is_ok(), "Template should exist in database");
+
+        // Clean up
+        let _ = db::alerts::templates::delete(org_id, &template_name).await;
+    }
+
+    /// Test that ensure_prebuilt_template reuses existing template
+    #[tokio::test]
+    async fn test_ensure_prebuilt_template_reuses_existing() {
+        let org_id = "test_org_reuse";
+        let prebuilt_type = "slack";
+        let template_name = format!("prebuilt_{}", prebuilt_type);
+
+        // Clean up
+        let _ = db::alerts::templates::delete(org_id, &template_name).await;
+
+        // Create template first time
+        let result1 = ensure_prebuilt_template(org_id, prebuilt_type).await;
+        assert!(result1.is_ok());
+
+        // Get template ID to verify it's the same one later
+        let template1 = db::alerts::templates::get(org_id, &template_name)
+            .await
+            .unwrap();
+
+        // Try to ensure template again - should reuse existing
+        let result2 = ensure_prebuilt_template(org_id, prebuilt_type).await;
+        assert!(result2.is_ok());
+        assert_eq!(result2.unwrap(), template_name);
+
+        // Verify it's the same template (not recreated)
+        let template2 = db::alerts::templates::get(org_id, &template_name)
+            .await
+            .unwrap();
+        assert_eq!(template1.name, template2.name);
+        assert_eq!(template1.body, template2.body);
+
+        // Clean up
+        let _ = db::alerts::templates::delete(org_id, &template_name).await;
+    }
+
+    /// Test that multiple destinations of same type share one template
+    #[tokio::test]
+    #[ignore] // Test requires full infrastructure (NATS/DB)
+    async fn test_multiple_destinations_share_template() {
+        let org_id = "test_org_share";
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "slack_dest_1").await;
+        let _ = db::alerts::destinations::delete(org_id, "slack_dest_2").await;
+        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+
+        // Create first Slack destination
+        let dest1 = Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: "slack_dest_1".to_string(),
+            module: Module::Alert {
+                template: None,
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://hooks.slack.com/services/TEST1".to_string(),
+                    method: HTTPType::POST,
+                    destination_type: Some("slack".to_string()),
+                    ..Default::default()
+                }),
+            },
+        };
+
+        let saved1 = save("slack_dest_1", dest1.clone(), true).await;
+        assert!(
+            saved1.is_ok(),
+            "First destination should save successfully: {:?}",
+            saved1.err()
+        );
+
+        // Verify template was created
+        let template_check1 = db::alerts::templates::get(org_id, "prebuilt_slack").await;
+        assert!(
+            template_check1.is_ok(),
+            "Template should be created after first destination"
+        );
+
+        // Create second Slack destination
+        let dest2 = Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: "slack_dest_2".to_string(),
+            module: Module::Alert {
+                template: None,
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://hooks.slack.com/services/TEST2".to_string(),
+                    method: HTTPType::POST,
+                    destination_type: Some("slack".to_string()),
+                    ..Default::default()
+                }),
+            },
+        };
+
+        let saved2 = save("slack_dest_2", dest2.clone(), true).await;
+        assert!(
+            saved2.is_ok(),
+            "Second destination should save successfully: {:?}",
+            saved2.err()
+        );
+
+        // Verify both destinations reference the same template
+        let dest1_retrieved = get(org_id, "slack_dest_1").await.unwrap();
+        let dest2_retrieved = get(org_id, "slack_dest_2").await.unwrap();
+
+        if let Module::Alert {
+            template: template1,
+            ..
+        } = dest1_retrieved.module
+        {
+            if let Module::Alert {
+                template: template2,
+                ..
+            } = dest2_retrieved.module
+            {
+                assert_eq!(template1, Some("prebuilt_slack".to_string()));
+                assert_eq!(template2, Some("prebuilt_slack".to_string()));
+                assert_eq!(
+                    template1, template2,
+                    "Both destinations should use the same template"
+                );
+            }
+        }
+
+        // Verify only ONE template exists
+        let templates = db::alerts::templates::list(org_id).await.unwrap();
+        let slack_templates: Vec<_> = templates
+            .iter()
+            .filter(|t| t.name == "prebuilt_slack")
+            .collect();
+        assert_eq!(
+            slack_templates.len(),
+            1,
+            "Should have exactly one prebuilt_slack template"
+        );
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "slack_dest_1").await;
+        let _ = db::alerts::destinations::delete(org_id, "slack_dest_2").await;
+        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+    }
+
+    /// Test that template is auto-recreated if manually deleted
+    #[tokio::test]
+    #[ignore] // Test requires full infrastructure (NATS/DB)
+    async fn test_template_recreation_after_deletion() {
+        let org_id = "test_org_recreate";
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "slack_dest_recreate").await;
+        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+
+        // Create first destination (creates template)
+        let dest1 = Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: "slack_dest_recreate".to_string(),
+            module: Module::Alert {
+                template: None,
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://hooks.slack.com/services/TEST".to_string(),
+                    method: HTTPType::POST,
+                    destination_type: Some("slack".to_string()),
+                    ..Default::default()
+                }),
+            },
+        };
+
+        let _ = save("slack_dest_recreate", dest1.clone(), true).await;
+
+        // Verify template exists
+        assert!(
+            db::alerts::templates::get(org_id, "prebuilt_slack")
+                .await
+                .is_ok()
+        );
+
+        // Force delete the template (simulating manual deletion)
+        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+
+        // Verify template is gone
+        assert!(
+            db::alerts::templates::get(org_id, "prebuilt_slack")
+                .await
+                .is_err()
+        );
+
+        // Create another destination of same type - should recreate template
+        let dest2 = Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: "slack_dest_recreate2".to_string(),
+            module: Module::Alert {
+                template: None,
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://hooks.slack.com/services/TEST2".to_string(),
+                    method: HTTPType::POST,
+                    destination_type: Some("slack".to_string()),
+                    ..Default::default()
+                }),
+            },
+        };
+
+        let result = save("slack_dest_recreate2", dest2.clone(), true).await;
+        assert!(
+            result.is_ok(),
+            "Should successfully create destination and recreate template: {:?}",
+            result.err()
+        );
+
+        // Verify template was recreated
+        assert!(
+            db::alerts::templates::get(org_id, "prebuilt_slack")
+                .await
+                .is_ok(),
+            "Template should be recreated"
+        );
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "slack_dest_recreate").await;
+        let _ = db::alerts::destinations::delete(org_id, "slack_dest_recreate2").await;
+        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+    }
+
+    /// Test that custom destination type is skipped from auto-template
+    #[tokio::test]
+    #[ignore] // Test requires full infrastructure (NATS/DB)
+    async fn test_custom_destination_no_auto_template() {
+        let org_id = "test_org_custom";
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "custom_webhook").await;
+
+        // Create custom destination with "custom" type
+        let dest = Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: "custom_webhook".to_string(),
+            module: Module::Alert {
+                template: Some("my_custom_template".to_string()),
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://my-service.com/webhook".to_string(),
+                    method: HTTPType::POST,
+                    destination_type: Some("custom".to_string()),
+                    ..Default::default()
+                }),
+            },
+        };
+
+        let _ = save("custom_webhook", dest.clone(), true).await;
+
+        // Verify no "prebuilt_custom" template was created
+        let template_check = db::alerts::templates::get(org_id, "prebuilt_custom").await;
+        assert!(
+            template_check.is_err(),
+            "Should not create prebuilt template for 'custom' type"
+        );
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "custom_webhook").await;
+    }
 }

@@ -18,7 +18,7 @@ import { useI18n } from 'vue-i18n';
 
 // Services
 import alertDestinationService from '@/services/alert_destination';
-import alertTemplateService from '@/services/alert_templates';
+import templatesService from '@/services/alert_templates';
 
 // Types and configurations
 import {
@@ -32,6 +32,15 @@ import {
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory
 } from '@/utils/prebuilt-templates';
+
+/**
+ * System Templates Architecture:
+ * - Templates are managed by the backend (src/config/src/prebuilt_loader.rs)
+ * - Frontend fetches templates via GET /api/{org}/alerts/templates/system/prebuilt
+ * - Templates are cached in memory to avoid repeated API calls
+ * - Fallback templates in PrebuiltConfig are used only if backend fetch fails
+ */
+const systemTemplatesCache = ref<Map<string, any>>(new Map());
 
 import type {
   PrebuiltType,
@@ -82,10 +91,54 @@ export function usePrebuiltDestinations() {
    * NOTE: System templates are now managed by the backend via prebuilt destinations config
    * This function is kept for backward compatibility but does nothing
    */
-  async function ensureSystemTemplates(): Promise<void> {
-    // System templates are now automatically provided by the backend
-    // No need to create them from the frontend
-    return Promise.resolve();
+  /**
+   * Ensure system templates exist for all prebuilt destinations
+   * Creates templates if they don't exist in the backend
+   */
+  /**
+   * Fetch system templates from backend and cache them
+   * System templates are now managed entirely by the backend
+   */
+  async function fetchSystemTemplates(): Promise<void> {
+    try {
+      // Check if already cached
+      if (systemTemplatesCache.value.size > 0) {
+        return;
+      }
+
+      // Fetch system templates from backend
+      const response = await templatesService.get_system_templates({
+        org_identifier: organizationIdentifier.value,
+      });
+
+      // Handle response and cache templates
+      let templates: any[] = [];
+      if (Array.isArray(response.data)) {
+        templates = response.data;
+      } else if (response.data?.list && Array.isArray(response.data.list)) {
+        templates = response.data.list;
+      }
+
+      // Cache templates by name for quick lookup
+      systemTemplatesCache.value.clear();
+      templates.forEach((template: any) => {
+        systemTemplatesCache.value.set(template.name, template);
+      });
+
+      console.log(`Fetched ${templates.length} system templates from backend`);
+    } catch (error) {
+      console.error('Failed to fetch system templates from backend:', error);
+      // Don't throw - allow destination operations to proceed
+      // Backend will handle template resolution
+    }
+  }
+
+  /**
+   * Get a cached system template by type
+   */
+  function getSystemTemplate(type: PrebuiltTypeId): any | null {
+    const templateName = `prebuilt_${type}`;
+    return systemTemplatesCache.value.get(templateName) || null;
   }
 
   /**
@@ -135,9 +188,34 @@ export function usePrebuiltDestinations() {
   /**
    * Generate preview data for template preview
    */
-  function generatePreview(type: PrebuiltTypeId): string {
+  async function generatePreview(type: PrebuiltTypeId, credentials?: Record<string, any>): Promise<string> {
     const config = getPrebuiltConfig(type);
     if (!config) return '';
+
+    // Ensure system templates are fetched
+    await fetchSystemTemplates();
+
+    // Get template from cache or fetch from backend
+    let templateBody = config.templateBody; // Fallback
+    const cachedTemplate = getSystemTemplate(type);
+
+    if (cachedTemplate?.body) {
+      templateBody = cachedTemplate.body;
+    } else {
+      // Try fetching directly if not in cache
+      try {
+        const templateResponse = await templatesService.get_by_name({
+          org_identifier: organizationIdentifier.value,
+          template_name: config.templateName
+        });
+        if (templateResponse.data?.body) {
+          templateBody = templateResponse.data.body;
+        }
+      } catch (error) {
+        console.warn('Failed to fetch template from backend, using fallback:', error);
+        // Continue with hardcoded template as fallback
+      }
+    }
 
     // Generate realistic alert URL using current browser context
     const baseUrl = window.location.origin;
@@ -146,7 +224,7 @@ export function usePrebuiltDestinations() {
     const oneHourAgo = now - (60 * 60 * 1000 * 1000);
 
     // Sample alert data with realistic context
-    const sampleData = {
+    const sampleData: Record<string, string> = {
       alert_name: 'Test Alert - High CPU Usage',
       stream_name: 'system-metrics',
       stream_type: 'logs',
@@ -156,15 +234,32 @@ export function usePrebuiltDestinations() {
       alert_time: new Date().toLocaleString(),
       // Use actual OpenObserve instance URL instead of fake example
       alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
-      // Add specific fields for different types
+      // Default values for credential-based fields
       integration_key: 'sample-integration-key',
       severity: 'error',
       assignment_group: 'IT Operations',
       api_key: 'sample-api-key'
     };
 
-    // Replace placeholders in template with sample data
-    let preview = config.templateBody;
+    // Override with actual credentials if provided
+    if (credentials) {
+      // Map credential keys to template placeholder names
+      if (credentials.integrationKey) {
+        sampleData.integration_key = credentials.integrationKey;
+      }
+      if (credentials.severity) {
+        sampleData.severity = credentials.severity;
+      }
+      if (credentials.apiKey) {
+        sampleData.api_key = credentials.apiKey;
+      }
+      if (credentials.assignmentGroup) {
+        sampleData.assignment_group = credentials.assignmentGroup;
+      }
+    }
+
+    // Replace placeholders in fetched template with sample data
+    let preview = templateBody;
     for (const [key, value] of Object.entries(sampleData)) {
       const regex = new RegExp(`{${key}}`, 'g');
       preview = preview.replace(regex, value);
@@ -184,35 +279,101 @@ export function usePrebuiltDestinations() {
       const validation = validateCredentials(type, credentials);
       if (!validation.isValid) {
         const firstError = Object.values(validation.errors)[0];
-        return {
+        const result = {
           success: false,
           error: `Validation error: ${firstError}`,
           timestamp: Date.now()
         };
+        lastTestResult.value = result;
+        return result;
       }
 
       const config = getPrebuiltConfig(type);
       if (!config) {
-        return {
+        const result = {
           success: false,
           error: 'Invalid destination type',
           timestamp: Date.now()
         };
+        lastTestResult.value = result;
+        return result;
       }
 
-      // Generate test payload
+      // Ensure system templates are fetched
+      await fetchSystemTemplates();
+
+      // Get template from cache or fetch from backend
+      let templateBody = config.templateBody; // Fallback
+      const cachedTemplate = getSystemTemplate(type);
+
+      if (cachedTemplate?.body) {
+        templateBody = cachedTemplate.body;
+      } else {
+        // Try fetching directly if not in cache
+        try {
+          const templateResponse = await templatesService.get_by_name({
+            org_identifier: organizationIdentifier.value,
+            template_name: config.templateName
+          });
+          if (templateResponse.data?.body) {
+            templateBody = templateResponse.data.body;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch template from backend, using fallback:', error);
+          // Continue with hardcoded template as fallback
+        }
+      }
+
+      // Generate test payload with fetched template
       const testUrl = generateDestinationUrl(type, credentials);
       const testHeaders = generateDestinationHeaders(type, credentials);
-      const testBody = generatePreview(type);
+
+      // Generate preview using fetched template
+      const baseUrl = window.location.origin;
+      const orgId = organizationIdentifier.value;
+      const now = Date.now() * 1000; // microseconds
+      const oneHourAgo = now - (60 * 60 * 1000 * 1000);
+
+      const sampleData: Record<string, string> = {
+        alert_name: 'Test Alert - High CPU Usage',
+        stream_name: 'system-metrics',
+        stream_type: 'logs',
+        alert_count: '15',
+        alert_operator: 'greater than',
+        alert_threshold: '80%',
+        alert_time: new Date().toLocaleString(),
+        alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
+        integration_key: 'sample-integration-key',
+        severity: 'error',
+        assignment_group: 'IT Operations',
+        api_key: 'sample-api-key'
+      };
+
+      // Override with actual credentials
+      if (credentials) {
+        if (credentials.integrationKey) sampleData.integration_key = credentials.integrationKey;
+        if (credentials.severity) sampleData.severity = credentials.severity;
+        if (credentials.apiKey) sampleData.api_key = credentials.apiKey;
+        if (credentials.assignmentGroup) sampleData.assignment_group = credentials.assignmentGroup;
+      }
+
+      // Replace placeholders in fetched template
+      let testBody = templateBody;
+      for (const [key, value] of Object.entries(sampleData)) {
+        const regex = new RegExp(`{${key}}`, 'g');
+        testBody = testBody.replace(regex, value);
+      }
 
       // For email type, use email-specific test
       if (type === 'email') {
         // Email testing would require backend SMTP setup
         // For now, just validate email format and show success
-        return {
+        const result = {
           success: true,
           timestamp: Date.now()
         };
+        lastTestResult.value = result;
+        return result;
       }
 
       // Send test request via backend
@@ -227,11 +388,11 @@ export function usePrebuiltDestinations() {
       });
 
       lastTestResult.value = {
-        success: testResult.success || false,
+        success: testResult.data.success || false,
         timestamp: Date.now(),
-        error: testResult.error,
-        statusCode: testResult.statusCode,
-        responseBody: testResult.responseBody
+        error: testResult.data.error,
+        statusCode: testResult.data.statusCode,
+        responseBody: testResult.data.responseBody
       };
 
       return lastTestResult.value;
@@ -264,7 +425,7 @@ export function usePrebuiltDestinations() {
       isLoading.value = true;
 
       // Ensure system templates exist
-      await ensureSystemTemplates();
+      await fetchSystemTemplates();
 
       // Validate inputs
       const validation = validateCredentials(type, credentials);
@@ -385,7 +546,7 @@ export function usePrebuiltDestinations() {
       isLoading.value = true;
 
       // Ensure system templates exist
-      await ensureSystemTemplates();
+      await fetchSystemTemplates();
 
       // Skip credential validation in update mode - credentials are optional
       // User might not be changing credentials, and sensitive fields are cleared for security
@@ -490,13 +651,19 @@ export function usePrebuiltDestinations() {
       return destination.metadata.prebuilt_type;
     }
 
-    // Check for email type (email destinations are always prebuilt)
-    // Email destinations don't have URL and are created through prebuilt flow
-    if (destination.type === 'email') {
-      return 'email';
+    // Check if template name starts with "prebuilt_" or "system-prebuilt-" - this is the definitive indicator
+    if (destination.template && typeof destination.template === 'string') {
+      if (destination.template.startsWith('system-prebuilt-')) {
+        // Extract type from template name (e.g., "system-prebuilt-email" -> "email")
+        return destination.template.replace('system-prebuilt-', '') as PrebuiltTypeId;
+      }
+      if (destination.template.startsWith('prebuilt_')) {
+        // Extract type from template name (e.g., "prebuilt_slack" -> "slack")
+        return destination.template.replace('prebuilt_', '') as PrebuiltTypeId;
+      }
     }
 
-    // Try to detect based on URL pattern
+    // Try to detect based on URL pattern (fallback for destinations without template info)
     if (destination.url) {
       return detectPrebuiltTypeFromUrl(destination.url) as PrebuiltTypeId;
     }
@@ -526,7 +693,7 @@ export function usePrebuiltDestinations() {
       }
 
       // Ensure system templates exist
-      await ensureSystemTemplates();
+      await fetchSystemTemplates();
 
       // Update destination with prebuilt configuration
       const updatedData = {
@@ -582,7 +749,7 @@ export function usePrebuiltDestinations() {
     typesByCategory,
 
     // Methods
-    ensureSystemTemplates,
+    fetchSystemTemplates,
     validateCredentials,
     generatePreview,
     testDestination,

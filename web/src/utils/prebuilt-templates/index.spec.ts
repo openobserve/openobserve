@@ -86,7 +86,7 @@ describe('Prebuilt Templates Index', () => {
     it('should return config for valid types', () => {
       const slackConfig = getPrebuiltConfig('slack');
       expect(slackConfig).toBeDefined();
-      expect(slackConfig?.templateName).toBe('system-prebuilt-slack');
+      expect(slackConfig?.templateName).toBe('prebuilt_slack');
     });
 
     it('should return null for invalid types', () => {

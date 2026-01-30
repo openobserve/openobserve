@@ -53,7 +53,7 @@ export class AlertDestinationsPage {
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
         this.prioritySelect = '[data-test="opsgenie-priority-select"]';
         this.testButton = 'button:has-text("Test")';
-        this.testResult = '[data-test="prebuilt-test-result"], .test-result';
+        this.testResult = '[data-test="destination-test-result"], [data-test="prebuilt-test-result"], .test-result, .o2-test-result';
         this.saveButton = 'button:has-text("Save")';
         this.cancelButton = 'button:has-text("Cancel")';
         this.backButton = 'button:has-text("Back")';

@@ -117,6 +117,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     testLogger.info('Part 2: Testing Slack destination Test button');
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('slack');
+    await pm.alertDestinationsPage.fillDestinationName(`test_slack_${sharedRandomValue}`);
     await pm.alertDestinationsPage.fillWebhookUrl(webhookUrl);
     await pm.alertDestinationsPage.expectTestButtonEnabled();
     await pm.alertDestinationsPage.clickTest();
