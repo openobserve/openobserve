@@ -776,19 +776,15 @@ export default defineComponent({
     const detailTableInitialTab = ref<string>("json");
     const { findRelatedTelemetry } = useServiceCorrelation();
 
-    // Debug: computed to check why dialog isn't showing
+    // Flag to prevent duplicate correlation API calls
+    const correlationFetchInProgress = ref(false);
+
     const shouldShowInlineDialog = computed(() => {
-      const result =
+      return (
         showCorrelation.value &&
         correlationDashboardProps.value &&
-        !searchObj.meta.showDetailTab;
-      console.log("[SearchResult] shouldShowInlineDialog:", {
-        showCorrelation: showCorrelation.value,
-        hasProps: !!correlationDashboardProps.value,
-        showDetailTab: searchObj.meta.showDetailTab,
-        result,
-      });
-      return result;
+        !searchObj.meta.showDetailTab
+      );
     });
 
     const patternsColumns = [
@@ -983,16 +979,13 @@ export default defineComponent({
     };
 
     const openCorrelationFromLog = async (logData: any) => {
-      console.log(
-        "[SearchResult] openCorrelationFromLog called with logData:",
-        logData,
-      );
-      console.log(
-        "[SearchResult] Current stream:",
-        searchObj.data.stream.selectedStream[0],
-      );
+      // Prevent duplicate calls - if a fetch is already in progress, skip
+      if (correlationFetchInProgress.value) {
+        return;
+      }
 
       try {
+        correlationFetchInProgress.value = true;
         correlationLoading.value = true;
         correlationError.value = null; // Clear any previous error
 
@@ -1002,8 +995,6 @@ export default defineComponent({
           fields: logData,
         };
         correlationContext.value = context;
-
-        console.log("[SearchResult] Calling findRelatedTelemetry...");
 
         // Fetch correlation data
         const result = await findRelatedTelemetry(
@@ -1125,6 +1116,7 @@ export default defineComponent({
         correlationDashboardProps.value = null;
       } finally {
         correlationLoading.value = false;
+        correlationFetchInProgress.value = false;
       }
     };
 

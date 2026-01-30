@@ -604,9 +604,6 @@ export default defineComponent({
           tab.value.startsWith("correlated-") &&
           !props.correlationProps
         ) {
-          console.log(
-            "[DetailTable] rowData available + correlation tab active, emitting load-correlation",
-          );
           // Emit the original modelValue (not flattened rowData) as it has _timestamp
           emit("load-correlation", props.modelValue);
         }
@@ -627,9 +624,6 @@ export default defineComponent({
         rowData.value &&
         Object.keys(rowData.value).length > 0
       ) {
-        console.log(
-          "[DetailTable] User clicked correlation tab, emitting load-correlation",
-        );
         // Emit the original modelValue (not flattened rowData) as it has _timestamp
         emit("load-correlation", props.modelValue);
       }
