@@ -301,9 +301,10 @@ pub async fn get_alert_counts(
             alert_incident_alerts::Column::IncidentId
                 .is_in(incident_ids.iter().map(|s| s.as_str())),
         )
-        .group_by(alert_incident_alerts::Column::IncidentId)
-        .column_as(alert_incident_alerts::Column::IncidentId.count(), "count")
+        .select_only()
         .column(alert_incident_alerts::Column::IncidentId)
+        .column_as(alert_incident_alerts::Column::IncidentId.count(), "count")
+        .group_by(alert_incident_alerts::Column::IncidentId)
         .into_model::<CountResult>()
         .all(client)
         .await
