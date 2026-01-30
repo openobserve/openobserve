@@ -29,7 +29,7 @@ async function globalSetup() {
   
   try {
     testLogger.info('Performing global login authentication');
-    
+
     // Navigate to login page with org identifier to establish correct org context
     const loginUrl = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
     await page.goto(loginUrl);

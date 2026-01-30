@@ -1,0 +1,37 @@
+{
+  "cookies": [
+    {
+      "name": "auth_tokens",
+      "value": "eyJhY2Nlc3NfdG9rZW4iOiJCYXNpYyBjbTl2ZEVCbGVHRnRjR3hsTG1OdmJUcERiMjF3YkdWNGNHRnpjeU14TWpNPSIsInJlZnJlc2hfdG9rZW4iOiIifQ==",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1772197059.976809,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:5080",
+      "localStorage": [
+        {
+          "name": "theme",
+          "value": "light"
+        },
+        {
+          "name": "currentuser",
+          "value": "\"{\\\"given_name\\\":\\\"root@example.com\\\",\\\"auth_time\\\":1769605059,\\\"name\\\":\\\"root@example.com\\\",\\\"exp\\\":1772197059,\\\"family_name\\\":\\\"\\\",\\\"email\\\":\\\"root@example.com\\\"}\""
+        },
+        {
+          "name": "o2_initial_commit_hash",
+          "value": "e292355a67ef8014695b0ed2f59ed3ac7ab62da3"
+        },
+        {
+          "name": "userInfo",
+          "value": "eyJnaXZlbl9uYW1lIjoicm9vdEBleGFtcGxlLmNvbSIsImF1dGhfdGltZSI6MTc2OTYwNTA1OSwibmFtZSI6InJvb3RAZXhhbXBsZS5jb20iLCJleHAiOjE3NzIxOTcwNTksImZhbWlseV9uYW1lIjoiIiwiZW1haWwiOiJyb290QGV4YW1wbGUuY29tIn0="
+        }
+      ]
+    }
+  ]
+}
