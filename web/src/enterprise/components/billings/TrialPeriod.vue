@@ -87,12 +87,14 @@ export default defineComponent({
     // Check if org is on AWS billing - don't show trial message for AWS orgs
     onMounted(async () => {
       try {
-        const res = await BillingService.list_subscription(
-          store.state.selectedOrganization.identifier
-        );
-        if (res.data?.provider === "aws") {
-          // AWS billing - don't show trial period message
-          showTrialPeriodMsg.value = false;
+        if (config.isCloud === "true") {
+          const res = await BillingService.list_subscription(
+            store.state.selectedOrganization.identifier
+          );
+          if (res.data?.provider === "aws") {
+            // AWS billing - don't show trial period message
+            showTrialPeriodMsg.value = false;
+          }
         }
       } catch (e) {
         // If fetch fails, keep the default behavior

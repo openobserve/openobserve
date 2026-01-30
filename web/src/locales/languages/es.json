@@ -109,7 +109,9 @@
     "chunkLoadError": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
     "chunkLoadErrorMsg": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
     "id": "CARNÉ DE IDENTIDAD",
-    "getStarted": "Comenzar"
+    "getStarted": "Comenzar",
+    "reset": "Reiniciar",
+    "retry": "Reintentar"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -303,7 +305,8 @@
     "hide": "Esconder",
     "show": "Mostrar",
     "editor": "Redactor",
-    "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL."
+    "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL.",
+    "showHideColumns": "Mostrar/ocultar columnas"
   },
   "menu": {
     "home": "Inicio",
@@ -695,7 +698,9 @@
     "license_already_active_title": "La licencia ya está activa",
     "license_already_active_msg": "Su licencia sigue activa. ¿Desea actualizarla con la nueva clave de licencia?",
     "yes_update_license": "Sí, actualizar la licencia",
-    "no_keep_current": "No, mantente al día"
+    "no_keep_current": "No, mantente al día",
+    "feature_correlation_management": "Gestión de correlaciones",
+    "feature_log_patterns": "Patrones de registro"
   },
   "login": {
     "userid": "ID de usuario",
@@ -2676,7 +2681,57 @@
     "stable": "Estable",
     "stableTooltip": "Las dimensiones estables tienen una cardinalidad baja y se utilizan para el cálculo de la clave de correlación",
     "normalize": "Normalizar",
-    "noSemanticGroupsInCategory": "No hay grupos semánticos en la categoría: {category}"
+    "noSemanticGroupsInCategory": "No hay grupos semánticos en la categoría: {category}",
+    "correlatedLogsV2": "Registros V2",
+    "clickToLoadLogsV2": "Haga clic para cargar los registros correlacionados (V2)",
+    "logs": {
+      "title": "Registros correlacionados",
+      "filters": {
+        "title": "Editar filtros de correlación",
+        "description": "Ajuste los filtros de dimensión para refinar la consulta de correlación. Las dimensiones coincidentes son identificadores estables, mientras que las dimensiones adicionales pueden cambiar al reiniciar el pod.",
+        "matchedDimensions": "Dimensiones coincidentes (estables)",
+        "matchedDimensionsTooltip": "Estas dimensiones son identificadores estables que permanecen consistentes al reiniciarse el pod y se utilizan para hacer coincidir la telemetría relacionada.",
+        "additionalDimensions": "Dimensiones adicionales (inestables)",
+        "additionalDimensionsTooltip": "Estas dimensiones pueden cambiar al reiniciar el pod (por ejemplo, pod_name, container_id). Puedes configurarlos como «Todos los valores» para ampliar la búsqueda.",
+        "stableDimension": "Dimensión estable",
+        "unstableDimension": "Inestable: cambios al reiniciar",
+        "setToAll": "Establecer en todos los valores",
+        "showingAll": "Mostrar todos los valores",
+        "wildcardHelp": "Utilice «Todos los valores» para ignorar esta dimensión en el filtrado",
+        "noAdditionalDimensions": "No hay dimensiones adicionales disponibles"
+      },
+      "loading": "Cargando registros correlacionados...",
+      "loadingDetails": "Obteniendo registros de transmisiones correlacionadas...",
+      "error": "No se pudieron cargar los registros",
+      "noData": "No se han encontrado registros correlacionados",
+      "noDataDetails": "No se encontró ningún registro que coincida con los filtros de correlación.",
+      "resetFilters": "Restablecer filtros",
+      "editFilters": "Editar filtros",
+      "editTimeRange": "Editar rango de tiempo",
+      "selectValue": "Seleccione un valor",
+      "stableDimension": "Dimensión estable: uniforme en todos los reinicios del pod",
+      "unstableDimension": "Dimensión inestable: puede cambiar al reiniciar el pod",
+      "resultsCount": "{count} registros encontrados en {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Ajustar el rango de tiempo",
+        "sourceTime": "Tiempo de registro de origen",
+        "window": "Ventana de tiempo",
+        "minute1": "±1 minuto",
+        "minute5": "±5 minutos (predeterminado)",
+        "minute15": "±15 minutos",
+        "minute30": "±30 minutos",
+        "hour1": "±1 hora",
+        "custom": "Personalizado",
+        "customStart": "Hora de inicio personalizada",
+        "customEnd": "Hora de finalización personalizada",
+        "currentRange": "Intervalo de tiempo actual",
+        "start": "Comenzar",
+        "end": "Finalizar",
+        "duration": "Duración",
+        "startBeforeEnd": "La hora de inicio debe ser anterior a la hora de finalización",
+        "endAfterStart": "La hora de finalización debe ser posterior a la hora de inicio"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
@@ -2719,5 +2774,11 @@
     "contactSupport": "Comuníquese con el soporte",
     "tryAgain": "Inténtalo de nuevo",
     "activationTimeout": "Tiempo de espera de activación. Ponte en contacto con el servicio de asistencia si el problema persiste."
+  },
+  "validation": {
+    "required": "Este campo es obligatorio",
+    "invalidFormat": "Formato no válido",
+    "mustBeGreaterThan": "Debe ser mayor que {value}",
+    "mustBeLessThan": "Debe ser inferior a {value}"
   }
 }

@@ -402,7 +402,7 @@ import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
-import { getImageURL } from '@/utils/zincutils';
+import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
 
 // Add IndexedDB setup
@@ -490,10 +490,10 @@ export default defineComponent({
     const chatInput = ref<HTMLElement | null>(null);
     const currentStreamingMessage = ref('');
     const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
-    const selectedProvider = ref<string>('openai');
     const showHistory = ref(false);
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
+    const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const store = useStore ();
     const chatUpdated = computed(() => store.state.chatUpdated);
 
@@ -1083,11 +1083,16 @@ export default defineComponent({
           return serialized;
         });
 
+        // Generate session ID if not already set for this chat
+        if (!currentSessionId.value) {
+          currentSessionId.value = getUUIDv7();
+        }
+
         const chatData = {
           timestamp: new Date().toISOString(),
           title,
           messages: serializableMessages,
-          provider: selectedProvider.value
+          sessionId: currentSessionId.value
         };
 
         // Always use put with the current chat ID to update existing chat
@@ -1174,7 +1179,7 @@ export default defineComponent({
     const addNewChat = () => {
       chatMessages.value = [];
       currentChatId.value = null;
-      selectedProvider.value = 'openai';
+      currentSessionId.value = null; // Will be generated on first save
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
@@ -1213,8 +1218,8 @@ export default defineComponent({
             const lastMessage = formattedMessages[formattedMessages.length - 1];
             
             chatMessages.value = formattedMessages;
-            selectedProvider.value = chat.provider || 'openai';
             currentChatId.value = chatId;
+            currentSessionId.value = chat.sessionId || null; // Restore session ID from history
             showHistory.value = false;
             shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
             
@@ -1270,13 +1275,20 @@ export default defineComponent({
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
         
         let response: any;
-        try { 
-          // Pass abort signal to enable request cancellation
+        try {
+          // Ensure session ID exists for tracking this chat session
+          if (!currentSessionId.value) {
+            currentSessionId.value = getUUIDv7();
+          }
+
+          // Pass abort signal and session ID to enable request cancellation and session tracking
           response = await fetchAiChat(
             chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
-            currentAbortController.value.signal
+            currentAbortController.value.signal,
+            undefined, // explicitContext
+            currentSessionId.value // sessionId for x-o2-session-id header
           );
         } catch (error) {
           console.error('Error fetching AI chat:', error);
@@ -1798,7 +1810,6 @@ export default defineComponent({
       formatMessage,
       capabilities,
       selectCapability,
-      selectedProvider,
       showHistory,
       chatHistory,
       addNewChat,
@@ -2098,6 +2109,23 @@ export default defineComponent({
         overflow-wrap: break-word;
         word-break: break-word;
         max-width: 100%;
+      }
+
+      // Restore list styling (Tailwind preflight removes it)
+      :deep(ol) {
+        list-style-type: decimal;
+        padding-left: 1.5em;
+        margin: 0.5em 0;
+      }
+
+      :deep(ul) {
+        list-style-type: disc;
+        padding-left: 1.5em;
+        margin: 0.5em 0;
+      }
+
+      :deep(li) {
+        margin: 0.25em 0;
       }
     }
 

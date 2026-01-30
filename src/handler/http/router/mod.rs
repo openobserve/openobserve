@@ -64,6 +64,10 @@ pub mod ui;
 
 pub const ERROR_HEADER: &str = "X-Error-Message";
 
+/// Custom header name for O2 Assistant session tracking (UUID v7)
+pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =
+    header::HeaderName::from_static("x-o2-assistant-session-id");
+
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
     CorsLayer::new()
@@ -80,11 +84,12 @@ pub fn cors_layer() -> CorsLayer {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
-            header::HeaderName::from_lowercase(b"traceparent").unwrap(),
-            header::HeaderName::from_lowercase(b"tracestate").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-span-id").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-trace-id").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-sampled").unwrap(),
+            header::HeaderName::from_static("traceparent"),
+            header::HeaderName::from_static("tracestate"),
+            header::HeaderName::from_static("x-openobserve-span-id"),
+            header::HeaderName::from_static("x-openobserve-trace-id"),
+            header::HeaderName::from_static("x-openobserve-sampled"),
+            X_O2_ASSISTANT_SESSION_ID,
         ])
         .allow_origin(AllowOrigin::mirror_request())
         .allow_credentials(true)
@@ -471,7 +476,7 @@ pub fn config_routes() -> Router {
         .route("/reload", get(status::config_reload))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
-        .route("/dex_refresh", post(status::refresh_token_with_dex))
+        .route("/dex_refresh", get(status::refresh_token_with_dex))
         .route("/token", post(users::service_accounts::exchange_token))
         .layer(cors_layer())
 }
@@ -643,7 +648,6 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph", get(alerts::incidents::get_incident_service_graph))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
 
         // Alert templates
