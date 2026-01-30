@@ -74,38 +74,37 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Test: Navigate to backfill jobs page
    * Priority: P1 - Smoke
    * Objective: Verify backfill jobs page is accessible
-   * SKIPPED: Timeout issues with pipeline menu in test environment
    */
-  // test("should navigate to backfill jobs page @P1 @smoke", async ({ page }) => {
-  //   testLogger.info('Testing navigation to backfill jobs page');
+  test("should navigate to backfill jobs page @P1 @smoke", async ({ page }) => {
+    testLogger.info('Testing navigation to backfill jobs page');
 
-  //   // Navigate to pipelines
-  //   await pageManager.pipelinesPage.openPipelineMenu();
-  //   await page.waitForTimeout(1000);
+    // Navigate to pipelines
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
 
-  //   // Navigate to backfill page using POM method
-  //   const orgName = process.env["ORGNAME"];
-  //   await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
+    // Navigate to backfill page using POM method
+    const orgName = process.env["ORGNAME"];
+    await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
-  //   // Verify backfill page loaded using POM methods
-  //   const isPageVisible = await pageManager.pipelinesPage.isBackfillPageVisible();
+    // Verify backfill page loaded using POM methods
+    const isPageVisible = await pageManager.pipelinesPage.isBackfillPageVisible();
 
-  //   if (isPageVisible) {
-  //     testLogger.info('Backfill jobs page loaded successfully');
-  //     await expect(pageManager.pipelinesPage.backfillPageLocator).toBeVisible();
-  //   } else {
-  //     // Check for any backfill-related content using POM
-  //     const isBackfillTextVisible = await pageManager.pipelinesPage.isBackfillTextVisible();
-  //     if (isBackfillTextVisible) {
-  //       testLogger.info('Backfill page content found');
-  //     } else {
-  //       testLogger.info('Backfill page selectors may need updating - checking URL');
-  //       await expect(page).toHaveURL(/backfill/);
-  //     }
-  //   }
+    if (isPageVisible) {
+      testLogger.info('Backfill jobs page loaded successfully');
+      await expect(pageManager.pipelinesPage.backfillPageLocator).toBeVisible();
+    } else {
+      // Check for any backfill-related content using POM
+      const isBackfillTextVisible = await pageManager.pipelinesPage.isBackfillTextVisible();
+      if (isBackfillTextVisible) {
+        testLogger.info('Backfill page content found');
+      } else {
+        testLogger.info('Backfill page selectors may need updating - checking URL');
+        await expect(page).toHaveURL(/backfill/);
+      }
+    }
 
-  //   testLogger.info('Test completed: Backfill jobs navigation');
-  // });
+    testLogger.info('Test completed: Backfill jobs navigation');
+  });
 
   /**
    * Test: Verify backfill page has required elements
@@ -283,25 +282,24 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Test: Verify job action buttons presence
    * Priority: P2 - Regression
    * Objective: Verify pause, resume, edit, delete, view buttons exist
-   * SKIPPED: Network issues with test environment
    */
-  // test("should display job action buttons @P2 @regression", async ({ page }) => {
-  //   testLogger.info('Testing job action buttons presence');
+  test("should display job action buttons @P2 @regression", async ({ page }) => {
+    testLogger.info('Testing job action buttons presence');
 
-  //   // Navigate to backfill page using POM
-  //   const orgName = process.env["ORGNAME"];
-  //   await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
+    // Navigate to backfill page using POM
+    const orgName = process.env["ORGNAME"];
+    await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
-  //   // Get job action button counts using POM method
-  //   const actionCounts = await pageManager.pipelinesPage.getJobActionButtonCounts();
-  //   testLogger.info(`Pause: ${actionCounts.pause}, Resume: ${actionCounts.resume}, Edit: ${actionCounts.edit}, Delete: ${actionCounts.delete}, View: ${actionCounts.view}`);
+    // Get job action button counts using POM method
+    const actionCounts = await pageManager.pipelinesPage.getJobActionButtonCounts();
+    testLogger.info(`Pause: ${actionCounts.pause}, Resume: ${actionCounts.resume}, Cancel: ${actionCounts.cancel}`);
 
-  //   // Also check for total table buttons using POM method
-  //   const totalButtonCount = await pageManager.pipelinesPage.getTableButtonCount();
-  //   testLogger.info(`Total table buttons: ${totalButtonCount}`);
+    // Also check for total table buttons using POM method
+    const totalButtonCount = await pageManager.pipelinesPage.getTableButtonCount();
+    testLogger.info(`Total table buttons: ${totalButtonCount}`);
 
-  //   testLogger.info('Test completed: Job action buttons check');
-  // });
+    testLogger.info('Test completed: Job action buttons check');
+  });
 
   /**
    * Test: Verify job statuses in table
@@ -363,35 +361,34 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Test: Error indicator button functionality
    * Priority: P2 - Regression
    * Objective: Verify error indicator shows error details
-   * SKIPPED: Timeout issues with test environment
    */
-  // test("should show error details when clicking error indicator @P2 @regression", async ({ page }) => {
-  //   testLogger.info('Testing error indicator functionality');
+  test("should show error details when clicking error indicator @P2 @regression", async ({ page }) => {
+    testLogger.info('Testing error indicator functionality');
 
-  //   // Navigate to backfill page using POM
-  //   const orgName = process.env["ORGNAME"];
-  //   await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
+    // Navigate to backfill page using POM
+    const orgName = process.env["ORGNAME"];
+    await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
-  //   // Check for error indicator buttons using POM
-  //   const errorCount = await pageManager.pipelinesPage.getErrorIndicatorCount();
+    // Check for error indicator buttons using POM
+    const errorCount = await pageManager.pipelinesPage.getErrorIndicatorCount();
 
-  //   if (errorCount > 0) {
-  //     testLogger.info(`Found ${errorCount} error indicators`);
+    if (errorCount > 0) {
+      testLogger.info(`Found ${errorCount} error indicators`);
 
-  //     // Click first error indicator using POM method
-  //     await pageManager.pipelinesPage.clickFirstErrorIndicator();
+      // Click first error indicator using POM method
+      await pageManager.pipelinesPage.clickFirstErrorIndicator();
 
-  //     // Check if error dialog appeared using POM
-  //     const isDialogVisible = await pageManager.pipelinesPage.isErrorDialogVisible();
-  //     if (isDialogVisible) {
-  //       testLogger.info('Error dialog displayed');
-  //       // Close dialog using POM method
-  //       await pageManager.pipelinesPage.closeErrorDialog();
-  //     }
-  //   } else {
-  //     testLogger.info('No error indicators found - may be no failed jobs');
-  //   }
+      // Check if error dialog appeared using POM
+      const isDialogVisible = await pageManager.pipelinesPage.isErrorDialogVisible();
+      if (isDialogVisible) {
+        testLogger.info('Error dialog displayed');
+        // Close dialog using POM method
+        await pageManager.pipelinesPage.closeErrorDialog();
+      }
+    } else {
+      testLogger.info('No error indicators found - may be no failed jobs');
+    }
 
-  //   testLogger.info('Test completed: Error indicator check');
-  // });
+    testLogger.info('Test completed: Error indicator check');
+  });
 });
