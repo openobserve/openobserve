@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
-      class="collapsible-section card-container"
+      class="collapsible-section card-container preview-section"
       :style="previewSectionStyle"
     >
       <div
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="expand-toggle-btn"
         />
       </div>
-      <div v-show="expandState.summary" class="section-content">
+      <div v-show="expandState.summary" class="summary-section-content">
         <alert-summary
           style="height: 100%; overflow: auto;"
           :formData="formData"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, reactive, watch, type PropType } from "vue";
+import { defineComponent, ref, computed, reactive, watch, onMounted, onUnmounted, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import PreviewAlert from "./PreviewAlert.vue";
@@ -266,6 +266,29 @@ export default defineComponent({
       }
     };
 
+    // Handle window resize to rerender chart
+    let resizeTimeout: NodeJS.Timeout;
+    const handleResize = () => {
+      // Debounce resize events to avoid excessive rerenders
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (previewAlertRef.value && expandState.preview) {
+          (previewAlertRef.value as any).refreshData();
+        }
+      }, 300);
+    };
+
+    // Setup resize listener on mount
+    onMounted(() => {
+      window.addEventListener('resize', handleResize);
+    });
+
+    // Cleanup resize listener on unmount
+    onUnmounted(() => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    });
+
     // Expose the method to parent component
     expose({
       refreshData,
@@ -317,10 +340,18 @@ export default defineComponent({
 
   .section-content {
     flex: 1;
-    // overflow: hidden;
     display: flex;
     flex-direction: column;
   }
+
+
+  .summary-section-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
 
   .expand-toggle-btn {
     opacity: 0.5;
