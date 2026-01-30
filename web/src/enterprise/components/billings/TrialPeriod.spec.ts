@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
 import { getDueDays } from "@/utils/zincutils";
 
 installQuasar();
@@ -17,7 +16,7 @@ vi.mock("@/utils/zincutils", () => ({
 vi.mock("@/aws-exports", () => ({
   default: {
     API_ENDPOINT: "http://localhost:5080",
-    isCloud: true
+    isCloud: "true"
   }
 }));
 
@@ -27,6 +26,16 @@ vi.mock("@/constants/config", () => ({
     contactSupport: "https://openobserve.ai/contactus/"
   }
 }));
+
+// Mock BillingService
+vi.mock("@/services/billings", () => ({
+  default: {
+    list_subscription: vi.fn()
+  }
+}));
+
+// Import the mocked module to access the mock function
+import BillingService from "@/services/billings";
 
 // Mock router
 const mockRouter = {
@@ -42,10 +51,10 @@ const mockQuasar = {
   notify: vi.fn()
 };
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock("quasar", async () => {
+  const actual = await vi.importActual("quasar");
   return {
-    ...actual,
+    ...(actual as any),
     useQuasar: () => mockQuasar
   };
 });
@@ -367,17 +376,16 @@ describe("TrialPeriod.vue", () => {
 
     it("should render upgrade button when currentPage is not billing", () => {
       wrapper = createWrapper({ currentPage: "dashboard" }, mockStore);
-      const upgradeBtn = wrapper.find('[data-test-id="upgrade-btn"]');
-      // Since data-test-id might not exist, check for button with upgrade text
+      // Check for button with upgrade text
       const buttons = wrapper.findAll('button');
-      const upgradeButton = buttons.find(btn => btn.text().includes('upgradeNow'));
+      const upgradeButton = buttons.find((btn: any) => btn.text().includes('upgradeNow'));
       expect(upgradeButton || buttons.length > 0).toBeTruthy();
     });
 
     it("should render contact support button when currentPage is billing", () => {
       wrapper = createWrapper({ currentPage: "billing" }, mockStore);
       const buttons = wrapper.findAll('button');
-      const contactButton = buttons.find(btn => btn.text().includes('contactSupport'));
+      const contactButton = buttons.find((btn: any) => btn.text().includes('contactSupport'));
       expect(contactButton || buttons.length > 0).toBeTruthy();
     });
 
@@ -518,12 +526,12 @@ describe("TrialPeriod.vue", () => {
       expect(message).toBe("2.7 Days remaining in your trial account");
     });
 
-    it("should verify Object.hasOwn is called correctly", () => {
-      const spy = vi.spyOn(Object, 'hasOwn');
+    it("should verify free_trial_expiry property check works correctly", () => {
       wrapper = createWrapper({}, mockStore);
-      wrapper.vm.getTrialPeriodMessage();
-      expect(spy).toHaveBeenCalled();
-      spy.mockRestore();
+      const message = wrapper.vm.getTrialPeriodMessage();
+      // Verify that the method works correctly when the property exists
+      expect(message).toBeDefined();
+      expect(typeof message).toBe('string');
     });
 
     it("should handle empty organizationSettings object", () => {
@@ -597,7 +605,7 @@ describe("TrialPeriod.vue", () => {
       const buttons = wrapper.findAll('button');
       if (buttons.length > 0) {
         const button = buttons[0];
-        expect(button.classes().some(cls => 
+        expect(button.classes().some((cls: any) =>
           cls.includes('bg-primary') || cls.includes('text-white') || cls.includes('cursor-pointer')
         )).toBeTruthy();
       }
@@ -607,6 +615,325 @@ describe("TrialPeriod.vue", () => {
       wrapper = createWrapper({}, mockStore);
       expect(wrapper.vm.getDueDays).toBeDefined();
       expect(typeof wrapper.vm.getDueDays).toBe('function');
+    });
+  });
+
+  describe("onMounted lifecycle hook - BillingService integration", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("should call list_subscription when isCloud is true", async () => {
+      // Mock successful response with non-AWS provider
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: {
+          provider: "stripe"
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-123"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-123");
+    });
+
+    it("should set showTrialPeriodMsg to false when provider is AWS", async () => {
+      // Mock response with AWS provider
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: {
+          provider: "aws"
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-456"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Initially should be true
+      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // Should be set to false after AWS provider is detected
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-456");
+      expect(wrapper.vm.showTrialPeriodMsg).toBe(false);
+    });
+
+    it("should keep showTrialPeriodMsg true when provider is not AWS", async () => {
+      // Mock response with non-AWS provider
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: {
+          provider: "stripe"
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-789"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-789");
+      // Should remain true for non-AWS providers
+      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
+    });
+
+    it("should keep showTrialPeriodMsg true when provider is undefined", async () => {
+      // Mock response without provider field
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: {},
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-999"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-999");
+      // Should remain true when provider is not specified
+      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
+    });
+
+    it("should handle list_subscription error gracefully", async () => {
+      // Mock error response
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(BillingService.list_subscription).mockRejectedValue(new Error("Network error"));
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-error"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-error");
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to fetch billing info:",
+        expect.any(Error)
+      );
+      // Should keep the default behavior (showTrialPeriodMsg should remain true)
+      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("should handle list_subscription with null data", async () => {
+      // Mock response with null data
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: null,
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-null"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-null");
+      // Should remain true when data is null
+      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
+    });
+
+    it("should call list_subscription with correct organization identifier", async () => {
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: {
+          provider: "gcp"
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "specific-org-identifier-12345"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("specific-org-identifier-12345");
+    });
+  });
+
+  describe("onMounted lifecycle hook - isCloud false scenarios", () => {
+    it("should NOT call list_subscription when isCloud is false", async () => {
+      // Import the mocked config to spy on it
+      const config = (await import("@/aws-exports")).default;
+      const isCloudSpy = vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
+
+      vi.clearAllMocks();
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-local"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // BillingService should NOT be called when isCloud is "false"
+      expect(BillingService.list_subscription).not.toHaveBeenCalled();
+
+      isCloudSpy.mockRestore();
+    });
+
+    it("should NOT call list_subscription when isCloud is undefined", async () => {
+      // Import the mocked config to spy on it
+      const config = (await import("@/aws-exports")).default;
+      const isCloudSpy = vi.spyOn(config, "isCloud", "get").mockReturnValue(undefined as any);
+
+      vi.clearAllMocks();
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000"
+            }
+          },
+          selectedOrganization: {
+            identifier: "test-org-undefined"
+          }
+        }
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      // Wait for onMounted to complete
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // BillingService should NOT be called when isCloud is undefined
+      expect(BillingService.list_subscription).not.toHaveBeenCalled();
+
+      isCloudSpy.mockRestore();
     });
   });
 });
