@@ -754,7 +754,9 @@ pub async fn enrich_with_topology(
     }
 
     // Build service dependency edges (different services, from Service Graph)
-    let sg_edges = match service_graph::query_edges_from_stream_internal(org_id, None).await {
+    let sg_edges = match service_graph::query_edges_from_stream_internal(org_id, None, None, None)
+        .await
+    {
         Ok(e) => e,
         Err(e) => {
             log::debug!(

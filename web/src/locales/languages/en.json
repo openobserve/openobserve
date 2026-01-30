@@ -693,7 +693,7 @@
           "note": "Automated detection and correlation"
         },
         "service_maps": {
-          "name": "Service Maps",
+          "name": "Service Graph",
           "note": "Visualize service dependencies"
         }
       },
