@@ -1019,94 +1019,85 @@ watch(() => route.query, () => {
 
 ### 5. Time Range Computation
 
-**File:** `d:\openobserve\web\src\composables\dashboard\usePanelTimeRange.ts` (NEW)
+**IMPORTANT:** Reuse existing global time conversion functions - do NOT create duplicate code.
 
-Create a composable for time range calculations:
+**Strategy:** The global dashboard already has functions that convert date time picker values to `{ start_time: Date, end_time: Date }` format. These same functions must be reused for panel-level time ranges.
+
+**Implementation Approach:**
 
 ```typescript
-import { computed, type Ref } from 'vue';
-import { date } from 'quasar';
+// In ViewDashboard.vue - use existing time conversion logic
 
-/**
- * Calculate relative time range
- */
-export function calculateRelativeTime(endTime: Date, period: string): Date {
-  const value = parseInt(period.slice(0, -1));
-  const unit = period.slice(-1);
+// Calculate time object from config/URL (reuse existing logic)
+const calculateTimeObject = (timeConfig: any) => {
+  // IMPORTANT: This should call the SAME conversion function used for global time
+  // Look for existing function like:
+  // - dateTimePicker.getConsumableDateTime()
+  // - Existing time conversion utilities in the codebase
 
-  const unitMap: Record<string, string> = {
-    's': 'seconds',
-    'm': 'minutes',
-    'h': 'hours',
-    'd': 'days',
-    'w': 'weeks',
-    'M': 'months',
-  };
-
-  const dateUnit = unitMap[unit] || 'minutes';
-  const subtractObject = { [dateUnit]: value };
-
-  return date.subtractFromDate(endTime, subtractObject);
-}
-
-/**
- * Calculate time object from time config
- */
-export function calculateTimeFromConfig(timeConfig: any) {
   if (timeConfig.type === 'relative' && timeConfig.relativeTimePeriod) {
+    // Reuse existing relative time calculation
+    // Same logic as global dashboard uses
     const endTime = new Date();
     const startTime = calculateRelativeTime(endTime, timeConfig.relativeTimePeriod);
     return {
       start_time: startTime,
       end_time: endTime,
     };
-  } else if (timeConfig.type === 'absolute' && timeConfig.startTime && timeConfig.endTime) {
+  } else if (timeConfig.type === 'absolute') {
+    // Reuse existing absolute time conversion
     return {
       start_time: new Date(timeConfig.startTime),
       end_time: new Date(timeConfig.endTime),
     };
   }
 
-  return null;
-}
+  return currentTimeObj.value;  // Fallback to global
+};
 
-/**
- * Format time range for display
- */
-export function formatTimeRange(timeConfig: any): string {
-  if (!timeConfig) return '';
-
-  if (timeConfig.type === 'relative' && timeConfig.relativeTimePeriod) {
-    return formatRelativePeriod(timeConfig.relativeTimePeriod);
-  } else if (timeConfig.type === 'absolute') {
-    return 'Custom dates';
-  }
-
-  return '';
-}
-
-/**
- * Format relative period for display
- */
-export function formatRelativePeriod(period: string): string {
-  const value = period.slice(0, -1);
-  const unit = period.slice(-1);
-
-  const unitMap: Record<string, string> = {
-    's': 'sec',
-    'm': 'min',
-    'h': 'hr',
-    'd': 'day',
-    'w': 'week',
-    'M': 'month',
-  };
-
-  const unitLabel = unitMap[unit] || unit;
-  const plural = parseInt(value) > 1 ? 's' : '';
-
-  return `Last ${value} ${unitLabel}${plural}`;
-}
+// The calculateRelativeTime function should be the SAME one
+// used for global time calculation
+// Find it in existing code and import it - do NOT duplicate
 ```
+
+**Where to Find Existing Functions:**
+
+Look for existing time conversion functions in these locations:
+1. **ViewDashboard.vue** - Check how `currentTimeObj` is calculated from global date time picker
+2. **DateTimePickerDashboard.vue** - May have `getConsumableDateTime()` method
+3. **DateTime.vue** - Core date time picker component
+4. **Existing time utilities** - Check if there's already a utility file for time conversions
+
+**Key Points:**
+
+- ✅ **Reuse existing code** - Don't create new time conversion functions
+- ✅ **Single source of truth** - Panel and global use same conversion logic
+- ✅ **Consistency** - Ensures panel times behave exactly like global times
+- ✅ **Maintainability** - Changes to time logic only need to be made once
+
+**Example: Reusing getConsumableDateTime()**
+
+```typescript
+// If DateTimePickerDashboard has getConsumableDateTime():
+const dateTimePicker = ref(null);
+
+const getPanelTimeObject = () => {
+  if (dateTimePicker.value) {
+    // Reuse the exact same method used for global time
+    return dateTimePicker.value.getConsumableDateTime();
+  }
+  return null;
+};
+```
+
+**No New File Needed:**
+
+Since we're reusing existing functions, we do NOT need to create:
+- ❌ `usePanelTimeRange.ts` composable
+- ❌ New `calculateRelativeTime()` function
+- ❌ New `calculateTimeFromConfig()` function
+
+Instead, we'll use the existing functions already in the codebase that handle global dashboard time ranges.
 
 ---
 
@@ -1721,54 +1712,32 @@ const exitFullScreen = () => {
 
 ### Unit Tests
 
-**Test File:** `web/src/composables/dashboard/__tests__/usePanelTimeRange.spec.ts`
+**No Unit Tests Needed for Panel Time Ranges**
 
-```typescript
-describe('Panel Time Range Utilities', () => {
-  describe('calculateRelativeTime', () => {
-    it('should calculate "15m" correctly', () => {
-      const endTime = new Date('2024-01-01T12:00:00Z');
-      const startTime = calculateRelativeTime(endTime, '15m');
-      expect(startTime.getTime()).toBe(endTime.getTime() - 15 * 60 * 1000);
-    });
+Since we're **reusing existing time conversion functions** from the global dashboard code (not creating new ones), we don't need to write new unit tests. The existing functions are already tested.
 
-    it('should calculate "7d" correctly', () => {
-      // Test 7 days subtraction
-    });
-  });
+**Why No Unit Tests?**
 
-  describe('calculateTimeFromConfig', () => {
-    it('should handle relative config', () => {
-      const config = { type: 'relative', relativeTimePeriod: '1h' };
-      const result = calculateTimeFromConfig(config);
-      expect(result).toHaveProperty('start_time');
-      expect(result).toHaveProperty('end_time');
-    });
+✅ **Code Reusability:** Panel-level time conversion uses the same functions as global dashboard time
+✅ **Already Tested:** The existing time conversion functions already have unit tests
+✅ **Single Source of Truth:** No duplicate code = no duplicate tests needed
+✅ **E2E Coverage:** The 47 E2E tests verify end-to-end behavior including time conversion
 
-    it('should handle absolute config', () => {
-      const config = {
-        type: 'absolute',
-        startTime: 1704067200000,
-        endTime: 1704153600000,
-      };
-      const result = calculateTimeFromConfig(config);
-      expect(result.start_time).toBeInstanceOf(Date);
-    });
-  });
+**Existing Tests to Verify:**
 
-  describe('formatTimeRange', () => {
-    it('should format relative period', () => {
-      const config = { type: 'relative', relativeTimePeriod: '1h' };
-      expect(formatTimeRange(config)).toBe('Last 1 hr');
-    });
+Instead of writing new tests, verify that the existing time conversion tests in the codebase cover:
+- Relative time calculation ("15m", "1h", "7d", etc.)
+- Absolute time handling (Unix timestamps)
+- Edge cases (invalid periods, timezone handling)
 
-    it('should format absolute dates', () => {
-      const config = { type: 'absolute', startTime: 123, endTime: 456 };
-      expect(formatTimeRange(config)).toBe('Custom dates');
-    });
-  });
-});
-```
+**Where to Find Existing Tests:**
+
+Look for unit tests for:
+- `DateTimePickerDashboard.vue` component
+- `DateTime.vue` component
+- Any existing time utility functions in the codebase
+
+These existing tests already cover the time conversion logic that will be reused for panel-level times.
 
 ### Integration Tests
 
@@ -2480,28 +2449,30 @@ tests/
 |------|------|---------|-----------|
 | `web/src/components/dashboards/addPanel/ConfigPanel.vue` | Edit | Add toggle, radio buttons, logic | ~100 |
 | `web/src/views/Dashboards/addPanel/AddPanel.vue` | Edit | Update date picker label, wire to config | ~50 |
-| `web/src/components/dashboards/PanelContainer.vue` | Edit | Add panel time picker widget | ~200 |
-| `web/src/views/Dashboards/ViewDashboard.vue` | Edit | Add URL parsing, time computation | ~150 |
-| `web/src/composables/dashboard/usePanelTimeRange.ts` | New | Utility functions for time calculation | ~150 |
+| `web/src/components/dashboards/PanelContainer.vue` | Edit | Add panel time picker widget, yellow refresh button | ~200 |
+| `web/src/views/Dashboards/ViewDashboard.vue` | Edit | Add URL parsing, time computation, **reuse existing time conversion functions** | ~150 |
 | `web/src/components/dashboards/ViewPanel.vue` (or modal) | Edit | Add panel time picker to view modal | ~80 |
 | `web/src/components/dashboards/FullScreenPanel.vue` (or route) | Edit | Add panel time picker to full screen | ~100 |
 | `web/src/locales/en-US.json` | Edit | Add i18n translations | ~10 |
 
-**Total New/Modified Code:** ~840 lines
+**Total New/Modified Code:** ~690 lines
+
+**Note:** No new utility files needed - reusing existing time conversion functions from global dashboard code.
 
 ### Test Files (New)
 
 | File | Type | Purpose | Tests |
 |------|------|---------|-------|
-| `tests/unit/usePanelTimeRange.spec.ts` | New | Unit tests for time utilities | ~15 tests |
 | `tests/e2e/panel-time/01-configuration.spec.ts` | New | E2E: Configuration UI | 8 tests |
 | `tests/e2e/panel-time/02-view-mode-picker.spec.ts` | New | E2E: View mode picker | 10 tests |
 | `tests/e2e/panel-time/03-url-parameters.spec.ts` | New | E2E: URL sync | 10 tests |
 | `tests/e2e/panel-time/04-priority-system.spec.ts` | New | E2E: Priority system | 7 tests |
 | `tests/e2e/panel-time/05-view-fullscreen.spec.ts` | New | E2E: View/fullscreen | 5 tests |
-| `tests/e2e/panel-time/06-dashboard-operations.spec.ts` | New | E2E: Operations | 5 tests |
+| `tests/e2e/panel-time/06-dashboard-operations.spec.ts` | New | E2E: Operations | 7 tests |
 
-**Total Test Files:** 7 files (~45 E2E tests + 15 unit tests = 60 tests)
+**Total Test Files:** 6 E2E test files (~47 E2E tests)
+
+**Note:** No unit tests needed for time utilities since we're reusing existing, already-tested functions.
 
 ---
 
@@ -2613,7 +2584,8 @@ This implementation provides a comprehensive solution for panel-level time range
 ✅ **Yellow Refresh Icon** - Refresh button turns yellow when time changed but not yet refreshed (like variables)
 ✅ **Individual Panel Indicator** - Only affected panel's refresh button changes color, not global refresh
 ✅ **URL Sync on Refresh** - URL parameters update after refresh button is clicked
-✅ **Comprehensive Testing** - 47 E2E test cases + 15 unit tests = 62 total tests
+✅ **Code Reusability** - Reuses existing global time conversion functions, no code duplication
+✅ **Comprehensive Testing** - 47 E2E test cases
 
 ### Key Advantages
 
@@ -2629,9 +2601,9 @@ This implementation provides a comprehensive solution for panel-level time range
 
 **Code Changes:**
 - Backend: 1 file (~15 lines)
-- Frontend: 8 files (~840 lines)
-- Tests: 7 files (60 tests)
-- **Total**: ~855 lines of code + 60 automated tests
+- Frontend: 7 files (~690 lines) - **Reuses existing time conversion functions**
+- Tests: 6 E2E test files (47 tests)
+- **Total**: ~705 lines of code + 47 E2E tests
 
 **Time Estimate:**
 - Development: 11 days
@@ -2646,7 +2618,7 @@ This implementation provides a comprehensive solution for panel-level time range
 - **Category 4**: Priority System (7 E2E tests)
 - **Category 5**: View Panel & Full Screen (5 E2E tests)
 - **Category 6**: Dashboard Operations (7 E2E tests - includes refresh button & yellow indicator tests)
-- **Unit Tests**: Time calculation utilities (15 tests)
+- **Unit Tests**: Not needed - reusing existing tested time conversion functions
 
 ### Features Included
 
