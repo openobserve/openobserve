@@ -502,7 +502,27 @@ export default class LogsVisualise {
 
   //wait for query inspector to be visible
   async waitForQueryInspector(page) {
-    const queryInspector = page.getByText("Query Inspectorclose");
-    await expect(queryInspector).toBeVisible({ timeout: 10000 });
+    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-close-btn"]');
+    await queryInspectorCloseBtn.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  //verify query in inspector by partial text match
+  async verifyQueryInInspector(page, queryText, exact = false) {
+    if (exact) {
+      // For exact match, use the full query text
+      await expect(
+        page.locator('.inspector-query-editor').filter({
+          hasText: queryText
+        }).first()
+      ).toBeVisible();
+    } else {
+      // For partial match, extract first meaningful part of the query (e.g., SELECT ... as "x_axis_1")
+      const partialText = queryText.match(/SELECT[^,]*/)?.[0] || queryText.substring(0, 50);
+      await expect(
+        page.locator('.inspector-query-editor').filter({
+          hasText: partialText
+        }).first()
+      ).toBeVisible();
+    }
   }
 }

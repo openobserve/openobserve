@@ -468,10 +468,10 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.waitForQueryInspector(page);
 
+    // Verify the query is displayed in the Query Inspector
     await expect(
-      page
-        .getByRole("cell", {
-          name: 'SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", count(kubernetes_container_hash) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", count(kubernetes_host) as "y_axis_3", count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", count(kubernetes_labels_prometheus) as "y_axis_8", kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY x_axis_1, breakdown_1',
+      page.locator('.inspector-query-editor').filter({
+        hasText: 'SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", count(kubernetes_container_hash) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", count(kubernetes_host) as "y_axis_3", count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", count(kubernetes_labels_prometheus) as "y_axis_8", kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY x_axis_1, breakdown_1',
         })
         .first()
     ).toBeVisible();
@@ -514,10 +514,10 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.waitForQueryInspector(page);
 
+    // Verify the query is displayed in the Query Inspector
     await expect(
-      page
-        .getByRole("cell", {
-          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      page.locator('.inspector-query-editor').filter({
+        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         })
         .first()
     ).toBeVisible();
@@ -568,10 +568,10 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.waitForQueryInspector(page);
 
+    // Verify the query is displayed in the Query Inspector
     await expect(
-      page
-        .getByRole("cell", {
-          name: 'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC',
+      page.locator('.inspector-query-editor').filter({
+        hasText: 'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC',
         })
         .first()
     ).toBeVisible();
