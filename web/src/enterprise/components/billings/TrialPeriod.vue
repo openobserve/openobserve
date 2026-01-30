@@ -76,8 +76,30 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
 
-    const showTrialPeriodMsg = ref((Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry") && store.state.organizationData.organizationSettings.free_trial_expiry != "" && store.state.organizationData.organizationSettings.free_trial_expiry != null) ? true : false);
-    
+    const hasTrialExpiry = Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry")
+      && store.state.organizationData.organizationSettings.free_trial_expiry != ""
+      && store.state.organizationData.organizationSettings.free_trial_expiry != null;
+
+    const showTrialPeriodMsg = ref(hasTrialExpiry);
+
+    // Check if org is on AWS billing - don't show trial message for AWS orgs
+    onMounted(async () => {
+      try {
+        if (config.isCloud === "true") {
+          const res = await BillingService.list_subscription(
+            store.state.selectedOrganization.identifier
+          );
+          if (res.data?.provider === "aws") {
+            // AWS billing - don't show trial period message
+            showTrialPeriodMsg.value = false;
+          }
+        }
+      } catch (e) {
+        // If fetch fails, keep the default behavior
+        console.error("Failed to fetch billing info:", e);
+      }
+    });
+
     const redirectBilling = () => {
       router.push('/billings/plans/')
     };
