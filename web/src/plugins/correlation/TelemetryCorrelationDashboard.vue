@@ -678,8 +678,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <!-- Loading State -->
+        <div
+          v-if="loading"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+        >
+          <q-spinner-hourglass
+            color="primary"
+            size="3.75rem"
+            class="tw:mb-4"
+          />
+          <div class="tw:text-base">{{ t("correlation.loading") }}</div>
+          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+            {{ t("correlation.loadingLogs") }}
+          </div>
+        </div>
+
+        <!-- Logs Dashboard -->
         <RenderDashboardCharts
-          v-if="logsDashboardData"
+          v-else-if="logsDashboardData"
           :key="logsDashboardRenderKey"
           :dashboardData="logsDashboardData"
           :currentTimeObj="currentTimeObj"
@@ -687,6 +704,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :allowAlertCreation="false"
           searchType="dashboards"
         />
+
+        <!-- No Logs State -->
+        <div
+          v-else
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+        >
+          <q-icon
+            name="article"
+            size="3.75rem"
+            color="grey-6"
+            class="tw:mb-4"
+          />
+          <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
+          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
+            {{ t("correlation.service", { service: serviceName }) }}
+          </div>
+        </div>
       </div>
 
       <div v-if="activeTab == 'metrics'" class="tw:h-full">
@@ -720,8 +754,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:p-0 tw:flex-1 tw:overflow-auto"
           style="height: calc(100vh - 272px)"
         >
+          <!-- Loading State -->
+          <div
+            v-if="loading"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          >
+            <q-spinner-hourglass
+              color="primary"
+              size="3.75rem"
+              class="tw:mb-4"
+            />
+            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
+            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+              {{
+                t("correlation.loadingMetrics", {
+                  count: selectedMetricStreams.length,
+                })
+              }}
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="error"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          >
+            <q-icon
+              name="error_outline"
+              size="3.75rem"
+              color="negative"
+              class="tw:mb-4"
+            />
+            <div class="tw:text-base tw:mb-2">
+              {{ t("correlation.failedToLoad") }}
+            </div>
+            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+            <q-btn
+              outline
+              color="primary"
+              :label="t('correlation.retryButton')"
+              class="tw:mt-4"
+              @click="loadDashboard"
+            />
+          </div>
+
+          <!-- Dashboard -->
           <RenderDashboardCharts
-            v-if="dashboardData"
+            v-else-if="dashboardData"
             :key="dashboardRenderKey"
             :dashboardData="dashboardData"
             :currentTimeObj="currentTimeObj"
@@ -729,6 +808,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :allowAlertCreation="false"
             searchType="dashboards"
           />
+
+          <!-- No Metrics State -->
+          <div
+            v-else
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          >
+            <q-icon
+              name="info_outline"
+              size="3.75rem"
+              color="grey-6"
+              class="tw:mb-4"
+            />
+            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
+          </div>
         </div>
       </div>
 
