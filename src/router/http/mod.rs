@@ -25,9 +25,15 @@ use config::{
     META_ORG_ID, RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
-        search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
+        search::{
+            MultiSearchPartitionRequest, MultiStreamRequest, Request as SearchRequest,
+            SearchPartitionRequest, ValuesRequest,
+        },
     },
-    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
+    router::{
+        extract_path_without_query, is_fixed_querier_route, is_querier_route,
+        is_querier_route_by_body,
+    },
     utils::{json, rand::get_rand_element},
 };
 use futures::StreamExt;
@@ -64,8 +70,12 @@ enum QuerierPayload {
     PromQL(HashMap<String, String>),
     /// Search request JSON
     Search(Box<SearchRequest>),
+    /// Search request JSON
+    MultiSearch(Box<MultiStreamRequest>),
     /// Search partition request JSON
     SearchPartition(Box<SearchPartitionRequest>),
+    /// Search partition request JSON
+    MultiSearchPartition(Box<MultiSearchPartitionRequest>),
     /// Values stream request JSON
     Values(Box<ValuesRequest>),
 }
@@ -296,7 +306,13 @@ async fn proxy_with_body_routing(
         QuerierPayload::Empty => client.get(&target.full_url).headers(headers),
         QuerierPayload::PromQL(form) => client.post(&target.full_url).headers(headers).form(&form),
         QuerierPayload::Search(json) => client.post(&target.full_url).headers(headers).json(&*json),
+        QuerierPayload::MultiSearch(json) => {
+            client.post(&target.full_url).headers(headers).json(&*json)
+        }
         QuerierPayload::SearchPartition(json) => {
+            client.post(&target.full_url).headers(headers).json(&*json)
+        }
+        QuerierPayload::MultiSearchPartition(json) => {
             client.post(&target.full_url).headers(headers).json(&*json)
         }
         QuerierPayload::Values(json) => client.post(&target.full_url).headers(headers).json(&*json),
@@ -346,6 +362,30 @@ async fn parse_querier_payload(
             ))
         }
 
+        // Multi stream Search endpoints
+        s if s.ends_with("/_search_multi") || s.ends_with("/_search_multi_stream") => {
+            let body = read_payload_bytes(req, "multi search").await?;
+            let query = json::from_slice::<MultiStreamRequest>(&body).map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse multi search request",
+                )
+                    .into_response()
+            })?;
+            if query.sql.is_empty() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse multi search request",
+                )
+                    .into_response());
+            }
+            Some((
+                // Only use the first sql query for routing
+                query.sql[0].sql.clone(),
+                QuerierPayload::MultiSearch(Box::new(query)),
+            ))
+        }
+
         // Search partition endpoint
         s if s.ends_with("/_search_partition") => {
             let body = read_payload_bytes(req, "search partition").await?;
@@ -359,6 +399,29 @@ async fn parse_querier_payload(
             Some((
                 query.sql.to_string(),
                 QuerierPayload::SearchPartition(Box::new(query)),
+            ))
+        }
+
+        // Search partition endpoint
+        s if s.ends_with("/_search_partition_multi") => {
+            let body = read_payload_bytes(req, "multi search partition").await?;
+            let query = json::from_slice::<MultiSearchPartitionRequest>(&body).map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse mutli search partition request",
+                )
+                    .into_response()
+            })?;
+            if query.sql.is_empty() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse multi search request",
+                )
+                    .into_response());
+            }
+            Some((
+                query.sql[0].clone(),
+                QuerierPayload::MultiSearchPartition(Box::new(query)),
             ))
         }
 
@@ -561,12 +624,6 @@ fn is_streaming_endpoint(path: &str) -> bool {
     STREAMING_ENDPOINTS.iter().any(|&ep| path.ends_with(ep))
 }
 
-/// Extracts the path without query string.
-fn extract_path_without_query(path: &str) -> &str {
-    let query_start = path.find('?').unwrap_or(path.len());
-    &path[..query_start]
-}
-
 /// Reads payload bytes with error handling.
 async fn read_payload_bytes(req: Request, request_type: &str) -> Result<Bytes, Response> {
     match req.into_body().collect().await {
@@ -634,16 +691,6 @@ mod tests {
         ));
         assert!(!is_streaming_endpoint("/api/org/_search"));
         assert!(!is_streaming_endpoint("/api/org/logs"));
-    }
-
-    #[test]
-    fn test_extract_path_without_query() {
-        assert_eq!(extract_path_without_query("/api/test?foo=bar"), "/api/test");
-        assert_eq!(extract_path_without_query("/api/test"), "/api/test");
-        assert_eq!(
-            extract_path_without_query("/api/test?foo=bar&baz=qux"),
-            "/api/test"
-        );
     }
 
     #[tokio::test]
