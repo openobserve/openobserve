@@ -1831,6 +1831,14 @@ export class TracesPage {
     return await tabLocator.count();
   }
 
+  /**
+   * Close any open dialog by pressing Escape key
+   */
+  async closeDimensionSelectorDialog() {
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForTimeout(500);
+  }
+
 }
 
 
