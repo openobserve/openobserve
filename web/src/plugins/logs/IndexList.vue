@@ -383,7 +383,8 @@ export default defineComponent({
     const scrollToTop = () => {
       if (fieldListRef.value) {
         // Find the scrollable container within the q-table
-        const scrollContainer = fieldListRef?.value?.querySelector(
+        // fieldListRef.value is a component instance, need to access $el for DOM
+        const scrollContainer = fieldListRef.value.$el?.querySelector(
           ".q-table__middle.scroll",
         );
         if (scrollContainer) {

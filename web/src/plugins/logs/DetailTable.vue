@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="sidebar"
             hide-view-related
             :highlight-query="highlightQuery"
+            :should-wrap-values="shouldWrapValues"
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
@@ -304,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'tw:whitespace-nowrap'
                         : 'tw:whitespace-pre-wrap'
                     "
-                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" /></pre>
+                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" :disable-truncation="true" /></pre>
                 </div>
               </q-td>
             </template>
