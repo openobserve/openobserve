@@ -509,7 +509,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/settings", get(organization::settings::get).post(organization::settings::create))
         .route("/{org_id}/settings/logo", post(organization::settings::upload_logo).delete(organization::settings::delete_logo))
-        .route("/{org_id}/settings/logo_text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
+        .route("/{org_id}/settings/logo/text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
 
         // System settings v2
         .route("/{org_id}/settings/v2", get(organization::system_settings::list_settings).post(organization::system_settings::set_org_setting))
