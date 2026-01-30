@@ -4023,6 +4023,12 @@ export default defineComponent({
               ? "0.375rem solid var(--o2-card-bg)"
               : "0.375rem solid var(--o2-card-bg)"
             : "none",
+        // Conditional width when focused (expand-on-focus active)
+        width: isFocused.value
+          ? store.state.isAiChatEnabled
+            ? "calc(75% - 104px)" // AI chat enabled: 75% minus nav width
+            : "calc(100% - 104px)" // AI chat disabled: full width minus nav
+          : undefined,
       };
     });
     const editorWidthToggleFunction = computed(() => {
@@ -4609,7 +4615,7 @@ export default defineComponent({
   position: fixed !important;
   height: calc(100vh - 12.5rem) !important;
   z-index: 20 !important;
-  width: calc(100% - 104px);
+  /* Width is now handled dynamically via backgroundColorStyle computed property */
 }
 
 .file-type label {
