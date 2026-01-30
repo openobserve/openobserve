@@ -38,6 +38,8 @@
     "goHome": "Eve git",
     "name": "İsim",
     "add": "Ekle",
+    "selectAll": "Tümünü seç",
+    "deselectAll": "Tümünün seçimini kaldır",
     "details": "Ayrıntılar",
     "tags": "Etiketler",
     "process": "Süreç",
@@ -1946,6 +1948,8 @@
     "searchMetric": "Bir Metrik Ara",
     "searchLabel": "Metrik etiketi ara",
     "add": "Ekle",
+    "selectAll": "Tümünü seç",
+    "deselectAll": "Tümünün seçimini kaldır",
     "cancel": "İptal",
     "promqlLabel": "PromQL",
     "runQuery": "Sorguyu Çalıştırma",
@@ -2682,8 +2686,6 @@
     "stableTooltip": "Kararlı boyutlar düşük kardinaliteye sahiptir ve korelasyon anahtarı hesaplaması için kullanılır",
     "normalize": "Normalleştir",
     "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}",
-    "correlatedLogsV2": "Günlükler V2",
-    "clickToLoadLogsV2": "İlişkili günlükleri yüklemek için tıklayın (V2)",
     "logs": {
       "title": "İlişkili Günlükler",
       "filters": {

@@ -378,18 +378,33 @@ pub async fn update_action_details(
 pub async fn list_actions(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if let Ok(list) = get_actions(&org_id).await {
-            if let Ok(list) = list
-                .into_iter()
-                .map(GetActionInfoResponse::try_from)
-                .collect::<Result<Vec<GetActionInfoResponse>, _>>()
-            {
-                MetaHttpResponse::json(list)
-            } else {
-                MetaHttpResponse::bad_request("Failed to transform actions")
+        log::info!("[actions] list_actions called for org_id: {org_id}");
+        match get_actions(&org_id).await {
+            Ok(list) => {
+                log::info!(
+                    "[actions] list_actions fetched {} actions for org_id: {org_id}",
+                    list.len()
+                );
+                match list
+                    .into_iter()
+                    .map(GetActionInfoResponse::try_from)
+                    .collect::<Result<Vec<GetActionInfoResponse>, _>>()
+                {
+                    Ok(list) => MetaHttpResponse::json(list),
+                    Err(e) => {
+                        log::error!(
+                            "[actions] list_actions failed to transform actions for org_id: {org_id}, error: {e}"
+                        );
+                        MetaHttpResponse::bad_request(format!("Failed to transform actions: {e}"))
+                    }
+                }
             }
-        } else {
-            MetaHttpResponse::bad_request("Failed to fetch actions")
+            Err(e) => {
+                log::error!(
+                    "[actions] list_actions failed to fetch actions for org_id: {org_id}, error: {e}"
+                );
+                MetaHttpResponse::bad_request(format!("Failed to fetch actions: {e}"))
+            }
         }
     }
 

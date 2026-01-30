@@ -15,22 +15,107 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
-    meta::stream::{
-        FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange,
+    meta::{
+        cluster::Role,
+        stream::{
+            ALL_STREAM_TYPES, FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel,
+            StreamType, TimeRange,
+        },
     },
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
-    cluster::get_node_by_uuid, file_list as infra_file_list,
+    cluster::{get_node_by_uuid, get_node_from_consistent_hash},
+    file_list as infra_file_list,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
 
 use crate::service::{db, file_list, file_list_dump::generate_dump_stream_name};
+
+pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    // check data retention
+    if cfg.compact.data_retention_days <= 0 {
+        return Ok(());
+    }
+
+    // check if current hour is allowed for retention
+    if !cfg.compact.retention_allowed_hours.is_empty() {
+        let current_hour = Utc::now().hour();
+        let allowed_hours: Vec<u32> = cfg
+            .compact
+            .retention_allowed_hours
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u32>().ok())
+            .filter(|&h| h < 24)
+            .collect();
+
+        if !allowed_hours.is_empty() && !allowed_hours.contains(&current_hour) {
+            log::info!(
+                "[COMPACTOR] retention skipped: current hour {} is not in allowed hours {:?}",
+                current_hour,
+                allowed_hours
+            );
+            return Ok(());
+        }
+    }
+
+    let now = config::utils::time::now();
+    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+
+    let orgs = db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        for stream_type in ALL_STREAM_TYPES {
+            if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Filelist {
+                continue; // skip data retention for enrichment tables and filelist
+            }
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            for stream_name in streams {
+                let Some(node_name) =
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
+                else {
+                    continue; // no compactor node
+                };
+                if LOCAL_NODE.name.ne(&node_name) {
+                    continue; // not this node
+                }
+
+                let stream_settings =
+                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
+                        .await
+                        .unwrap_or_default();
+                let stream_data_retention_end = if stream_settings.data_retention > 0 {
+                    now - Duration::try_days(stream_settings.data_retention).unwrap()
+                } else {
+                    data_lifecycle_end
+                };
+
+                let extended_retention_days = &stream_settings.extended_retention_days;
+                // creates jobs to delete data
+                if let Err(e) = generate_retention_job(
+                    &stream_data_retention_end,
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    extended_retention_days,
+                )
+                .await
+                {
+                    log::error!(
+                        "[COMPACTOR] lifecycle: generate_retention_job [{org_id}/{stream_type}/{stream_name}] error: {e}"
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
 
 /// This function will split the original time range based on the exclude range
 /// It expects a mutable reference to a Vec which will be populated with the split time ranges
