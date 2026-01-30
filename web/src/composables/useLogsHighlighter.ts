@@ -258,11 +258,13 @@ export function useLogsHighlighter() {
         if (typeof value === "string") {
           totalSize += value.length + 2; // Add quotes
         } else if (typeof value === "object" && value !== null) {
-          // For nested objects/arrays, recurse or estimate
+          // For nested objects/arrays, recurse to maintain performance
           if (Array.isArray(value)) {
-            totalSize += JSON.stringify(value).length; // Arrays need accurate size
+            // Recursively estimate array size to avoid expensive JSON.stringify
+            totalSize += estimateSize(value);
           } else {
-            totalSize += Object.keys(value).length * 50; // Nested object estimate
+            // Recursively estimate nested object size
+            totalSize += estimateSize(value);
           }
         } else {
           totalSize += String(value).length;
@@ -282,27 +284,30 @@ export function useLogsHighlighter() {
 
   /**
    * Truncates large content to prevent memory/performance issues
+   * Always returns a string representation for consistency
    */
-  const truncateLargeContent = (data: any, maxSize: number = 50000): any => {
-    if (typeof data === "string" && data.length > maxSize) {
-      return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
+  const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
+    if (typeof data === "string") {
+      if (data.length > maxSize) {
+        return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
+      }
+      return data;
     }
 
     if (typeof data === "object" && data !== null) {
       try {
         const jsonStr = JSON.stringify(data);
         if (jsonStr.length > maxSize) {
-          // Return truncated JSON string, not a message
           return jsonStr.substring(0, maxSize) + `... [truncated, original size: ${jsonStr.length} chars]`;
         }
-        // If within size limit, return the original data
-        return data;
+        return jsonStr;
       } catch (error) {
         return "[Object too large to display]";
       }
     }
 
-    return data;
+    // For primitives (numbers, booleans, null), convert to string
+    return String(data);
   };
 
   /**
@@ -331,11 +336,9 @@ export function useLogsHighlighter() {
 
     // Truncate very large content (>50KB) to prevent memory issues
     if (estimatedSize > 50000) {
-      data = truncateLargeContent(data, 50000);
+      const truncatedStr = truncateLargeContent(data, 50000);
       // After truncation, skip highlighting and use simple display
-      if (typeof data === "string") {
-        return `<span class="log-string">${escapeHtml(data)}</span>`;
-      }
+      return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
     }
 
     // If skipping highlighting, use basic colorization without search highlighting
@@ -725,17 +728,12 @@ export function useLogsHighlighter() {
     // Apply truncation logic for list views (not expanded/detail views)
     if (!disableTruncation && typeof data === "object" && data !== null) {
       const estimatedSize = estimateSize(data);
-      const skipHighlighting = estimatedSize > 50000;
 
       // Truncate very large content (>50KB) to prevent UI freeze in list view
       if (estimatedSize > 50000) {
-        data = truncateLargeContent(data, 50000);
+        const truncatedStr = truncateLargeContent(data, 50000);
         // After truncation, skip highlighting and use simple display
-        if (typeof data === "string") {
-          return `<span class="log-string">${escapeHtml(data)}</span>`;
-        }
-        // If still large after truncation, disable highlighting
-        queryString = skipHighlighting ? "" : queryString;
+        return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
       }
     }
 
