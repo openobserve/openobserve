@@ -58,6 +58,13 @@ const slackTemplateBody = JSON.stringify({
   ]
 }, null, 2);
 
+export const slackTemplate = {
+  name: 'prebuilt_slack',
+  body: slackTemplateBody,
+  type: 'http' as const,
+  isDefault: false
+};
+
 export const slackConfig: PrebuiltConfig = {
   templateName: 'prebuilt_slack',
   templateBody: slackTemplateBody,
