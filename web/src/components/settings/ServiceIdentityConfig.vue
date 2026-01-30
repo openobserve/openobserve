@@ -805,12 +805,14 @@ const handleDrop = (targetIndex: number, event: DragEvent) => {
 
   localFqnPriority.value = newList;
   draggedIndex.value = null;
+  sortFqnPriorityByScopeFirst();
 };
 
 // Add selected dimensions from right to left
 const addSelectedDimensions = () => {
   localFqnPriority.value.push(...selectedAvailableDimensions.value);
   selectedAvailableDimensions.value = [];
+  sortFqnPriorityByScopeFirst();
 };
 
 // Remove selected dimensions from left
@@ -819,6 +821,7 @@ const removeSelectedDimensions = () => {
     (d) => !selectedPriorityDimensions.value.includes(d),
   );
   selectedPriorityDimensions.value = [];
+  sortFqnPriorityByScopeFirst();
 };
 
 // Get display name for a dimension - check semantic groups first, then format the ID
@@ -842,12 +845,36 @@ const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
   localSemanticGroups.value = filteredGroups;
 };
 
+// Sort FQN priority dimensions: scope dimensions always come before workload dimensions
+const sortFqnPriorityByScopeFirst = () => {
+  const groupLookup = new Map<string, SemanticFieldGroup>();
+  localSemanticGroups.value.forEach((g) => groupLookup.set(g.id, g));
+
+  const scopeDims: string[] = [];
+  const workloadDims: string[] = [];
+
+  // Separate scope and workload dimensions while preserving order within each type
+  for (const dimId of localFqnPriority.value) {
+    const group = groupLookup.get(dimId);
+    const isScope = group?.is_scope ?? false;
+    if (isScope) {
+      scopeDims.push(dimId);
+    } else {
+      workloadDims.push(dimId);
+    }
+  }
+
+  // Combine: scope first, then workload
+  localFqnPriority.value = [...scopeDims, ...workloadDims];
+};
+
 // FQN Priority dimension management
 const moveFqnDimensionUp = (index: number) => {
   if (index === 0) return;
   const dims = [...localFqnPriority.value];
   [dims[index - 1], dims[index]] = [dims[index], dims[index - 1]];
   localFqnPriority.value = dims;
+  sortFqnPriorityByScopeFirst();
 };
 
 const moveFqnDimensionDown = (index: number) => {
@@ -855,10 +882,12 @@ const moveFqnDimensionDown = (index: number) => {
   const dims = [...localFqnPriority.value];
   [dims[index], dims[index + 1]] = [dims[index + 1], dims[index]];
   localFqnPriority.value = dims;
+  sortFqnPriorityByScopeFirst();
 };
 
 const removeFqnDimension = (index: number) => {
   localFqnPriority.value.splice(index, 1);
+  sortFqnPriorityByScopeFirst();
 };
 
 const addFqnDimension = () => {
@@ -868,6 +897,7 @@ const addFqnDimension = () => {
   ) {
     localFqnPriority.value.push(selectedSemanticGroup.value);
     selectedSemanticGroup.value = null;
+    sortFqnPriorityByScopeFirst();
   }
 };
 
@@ -875,6 +905,7 @@ const resetFqnPriority = () => {
   // Reset to backend defaults from O2_FQN_PRIORITY_DIMENSIONS
   const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
   localFqnPriority.value = [...backendDefaults];
+  sortFqnPriorityByScopeFirst();
 };
 
 const saveFqnPriority = async () => {
@@ -1046,10 +1077,12 @@ const loadConfig = async () => {
 
     localFqnPriority.value = fqnPriority;
     localSemanticGroups.value = filteredSemanticGroups;
+    sortFqnPriorityByScopeFirst();
   } catch (error) {
     // Error loading config, using defaults
     localFqnPriority.value = [...backendDefaults];
     localSemanticGroups.value = [];
+    sortFqnPriorityByScopeFirst();
   } finally {
     loading.value = false;
   }

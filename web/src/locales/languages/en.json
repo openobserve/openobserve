@@ -2373,7 +2373,7 @@
       "correlationLabel": "Correlation:",
       "correlationDescription": "Services with the same identity are correlated, even if they have different {field} names.",
       "fqnPriorityTitle": "Identity Priority Dimensions",
-      "fqnPriorityTooltip": "Defines which dimensions are used to derive the Service Identity. Scope dimensions (blue) are concatenated. The first workload dimension (green) with a value determines the service name.",
+      "fqnPriorityTooltip": "Defines which dimensions are used to derive the Service Identity. Scope dimensions are concatenated. The first workload dimension (green) with a value determines the service name.",
       "fqnPriorityDescription": "Drag to reorder. Scope dimensions are concatenated, first non-null workload dimension wins.",
       "resetToDefaults": "Reset to defaults",
       "noDimensionsConfigured": "No dimensions configured. Click \"Reset to Defaults\" or add dimensions below.",
