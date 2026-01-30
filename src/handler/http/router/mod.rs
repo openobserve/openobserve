@@ -509,7 +509,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/settings", get(organization::settings::get).post(organization::settings::create))
         .route("/{org_id}/settings/logo", post(organization::settings::upload_logo).delete(organization::settings::delete_logo))
-        .route("/{org_id}/settings/logo_text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
+        .route("/{org_id}/settings/logo/text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
 
         // System settings v2
         .route("/{org_id}/settings/v2", get(organization::system_settings::list_settings).post(organization::system_settings::set_org_setting))
@@ -549,8 +549,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
         .route("/{org_id}/{stream_name}/_multi", post(logs::ingest::multi))
         .route("/{org_id}/{stream_name}/_json", post(logs::ingest::json))
-        .route("/{org_id}/{stream_name}/_kinesis_firehose", post(logs::ingest::handle_kinesis_request))
-        .route("/{org_id}/{stream_name}/_sub", post(logs::ingest::handle_gcp_request))
         .route("/{org_id}/_hec", post(logs::ingest::hec))
         .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
@@ -886,7 +884,7 @@ pub fn other_service_routes() -> Router {
     // AWS routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let aws_routes = Router::new()
         .route(
-            "/{org_id}/_kinesis_firehose",
+            "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
         .layer(middleware::from_fn(aws_auth_middleware))
@@ -897,7 +895,10 @@ pub fn other_service_routes() -> Router {
 
     // GCP routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let gcp_routes = Router::new()
-        .route("/{org_id}/_sub", post(logs::ingest::handle_gcp_request))
+        .route(
+            "/{org_id}/{stream_name}/_sub",
+            post(logs::ingest::handle_gcp_request),
+        )
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(

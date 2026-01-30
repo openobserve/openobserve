@@ -64,8 +64,14 @@ pub async fn get_current_topology(
 ) -> HttpResponse {
     use config::meta::service_graph::ServiceGraphData;
 
-    // Query edges from stream (last 60 minutes by default)
-    let edges = match query_edges_from_stream_internal(&org_id, query.stream_name.as_deref()).await
+    // Query edges from stream with optional time range
+    let edges = match query_edges_from_stream_internal(
+        &org_id,
+        query.stream_name.as_deref(),
+        query.start_time,
+        query.end_time,
+    )
+    .await
     {
         Ok(edges) => edges,
         Err(e) => {
@@ -114,39 +120,48 @@ pub async fn get_current_topology(
 /// Query edge records from the _o2_service_graph stream
 ///
 /// Internal version exposed for incident topology enrichment.
+/// Supports optional custom time range via start_time/end_time parameters.
 pub async fn query_edges_from_stream_internal(
     org_id: &str,
     stream_filter: Option<&str>,
+    custom_start_time: Option<i64>,
+    custom_end_time: Option<i64>,
 ) -> Result<Vec<serde_json::Value>, infra::errors::Error> {
     use config::meta::stream::StreamType;
 
     let stream_name = "_o2_service_graph";
 
-    // Use configured time range (same as processor)
-    let now = chrono::Utc::now().timestamp_micros();
-    let window_minutes = o2_enterprise::enterprise::common::config::get_config()
-        .service_graph
-        .query_time_range_minutes;
-    let window_micros = window_minutes * 60 * 1_000_000;
-    let start_time = now - window_micros;
+    // Use custom time range if provided, otherwise fall back to configured window
+    let (start_time, end_time) =
+        if let (Some(start), Some(end)) = (custom_start_time, custom_end_time) {
+            (start, end)
+        } else {
+            // Use configured time range (same as processor)
+            let now = chrono::Utc::now().timestamp_micros();
+            let window_minutes = o2_enterprise::enterprise::common::config::get_config()
+                .service_graph
+                .query_time_range_minutes;
+            let window_micros = window_minutes * 60 * 1_000_000;
+            (now - window_micros, now)
+        };
 
     // Query pre-aggregated edge state (already summarized per minute)
     let sql = if let Some(stream) = stream_filter {
         format!(
             "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {}
+             WHERE _timestamp >= {} AND _timestamp < {}
              AND org_id = '{}'
              AND trace_stream_name = '{}'
              LIMIT 10000",
-            stream_name, start_time, org_id, stream
+            stream_name, start_time, end_time, org_id, stream
         )
     } else {
         format!(
             "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {}
+             WHERE _timestamp >= {} AND _timestamp < {}
              AND org_id = '{}'
              LIMIT 10000",
-            stream_name, start_time, org_id
+            stream_name, start_time, end_time, org_id
         )
     };
 
@@ -157,7 +172,7 @@ pub async fn query_edges_from_stream_internal(
             from: 0,
             size: 100000,
             start_time,
-            end_time: now,
+            end_time,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
