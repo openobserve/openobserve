@@ -408,14 +408,14 @@ async fn parse_querier_payload(
             let query = json::from_slice::<MultiSearchPartitionRequest>(&body).map_err(|_| {
                 (
                     StatusCode::BAD_REQUEST,
-                    "Failed to parse mutli search partition request",
+                    "Failed to parse multi search partition request",
                 )
                     .into_response()
             })?;
             if query.sql.is_empty() {
                 return Err((
                     StatusCode::BAD_REQUEST,
-                    "Failed to parse multi search request",
+                    "Failed to parse multi search partition request",
                 )
                     .into_response());
             }
