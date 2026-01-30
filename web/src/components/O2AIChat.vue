@@ -479,6 +479,10 @@ export default defineComponent({
     aiChatInputContext: {
       type: String,
       default: ''
+    },
+    appendMode: {
+      type: Boolean,
+      default: true
     }
   },
   setup(props) {
@@ -488,6 +492,7 @@ export default defineComponent({
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<HTMLElement | null>(null);
+    const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref('');
     const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
@@ -709,7 +714,20 @@ export default defineComponent({
 
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
       if(newAiChatInputContext) {
-        inputMessage.value = newAiChatInputContext;
+        if (props.appendMode) {
+          // Append mode: add to existing input with separator if needed
+          const currentValue = inputMessage.value?.trim();
+          if (currentValue) {
+            inputMessage.value = currentValue + "\n\n" + newAiChatInputContext;
+          } else {
+            inputMessage.value = newAiChatInputContext;
+          }
+          // Scroll to show the newly appended content
+          scrollInputToBottom();
+        } else {
+          // Replace mode: replace the input
+          inputMessage.value = newAiChatInputContext;
+        }
       }
     });
 
@@ -1406,6 +1424,34 @@ export default defineComponent({
           textarea.focus();
         }
       }
+    };
+
+    // Scroll input textarea to bottom to show latest appended content
+    const scrollInputToBottom = () => {
+      // Clear any pending scroll timeout
+      if (scrollTimeoutId.value !== null) {
+        clearTimeout(scrollTimeoutId.value);
+      }
+
+      // Set new timeout for scroll
+      scrollTimeoutId.value = setTimeout(() => {
+        const textarea = chatInput.value?.$el?.querySelector('textarea');
+        if (!textarea) return;
+
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        // Scroll all scrollable parent elements
+        let element = textarea;
+        while (element && element !== document.body) {
+          if (element.scrollHeight > element.clientHeight) {
+            element.scrollTop = element.scrollHeight;
+          }
+          element = element.parentElement;
+        }
+
+        scrollTimeoutId.value = null;
+      }, 50);
     };
 
     // Load query history from localStorage
