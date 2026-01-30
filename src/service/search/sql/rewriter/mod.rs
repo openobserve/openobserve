@@ -21,4 +21,5 @@ pub mod approx_percentile;
 pub mod index;
 pub mod match_all_raw;
 pub mod remove_dashboard_placeholder;
+pub mod remove_limit;
 pub mod track_total_hits;

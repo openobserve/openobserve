@@ -35,6 +35,7 @@ use crate::{
             sql::rewriter::{
                 add_new_filter::add_new_filters_with_and_operator,
                 add_ordering_term::check_or_add_order_by_timestamp,
+                remove_limit::remove_outermost_limit,
             },
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
@@ -81,6 +82,9 @@ pub(crate) async fn around(
             },
         }
     };
+
+    // Remove any LIMIT clause from the SQL to ensure around_size parameter is respected
+    around_sql = remove_outermost_limit(&around_sql)?;
 
     // check playload
     let mut filters = HashMap::new();
