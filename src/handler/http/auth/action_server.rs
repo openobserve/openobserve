@@ -14,51 +14,49 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
-    extract::{FromRequestParts, Request},
-    http::header,
+    extract::Request,
+    http::{StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use base64::{Engine, engine::general_purpose::STANDARD};
+use config::get_config;
 
-use super::validator::{AuthError, AuthValidationResult, RequestData};
-use crate::common::utils::auth::AuthExtractor;
+/// Validates the action server token from Basic auth header.
+/// Expected format: Basic {base64(token + ":")}
+fn validate_action_server_token(auth_header: Option<&str>) -> bool {
+    let Some(auth_str) = auth_header else {
+        return false;
+    };
 
-/// Validator for script server authentication
-pub async fn validator(
-    req_data: &RequestData,
-    auth_info: &AuthExtractor,
-) -> Result<AuthValidationResult, AuthError> {
-    // Use the standard validator for script server authentication
-    // Script server uses the same authentication mechanism as the main API
-    super::validator::oo_validator(req_data, auth_info).await
+    let Some(encoded) = auth_str.strip_prefix("Basic ") else {
+        return false;
+    };
+
+    let Ok(decoded) = STANDARD.decode(encoded.trim()) else {
+        return false;
+    };
+
+    let Ok(decoded_str) = String::from_utf8(decoded) else {
+        return false;
+    };
+
+    let cfg = get_config();
+    let expected_token = format!("{}:", cfg.auth.action_server_token);
+    decoded_str == expected_token
 }
 
-/// Authentication middleware for script server routes
+/// Authentication middleware for action server routes.
+/// Validates requests using O2_ACTION_SERVER_TOKEN.
 pub async fn auth_middleware(request: Request, next: Next) -> Response {
-    // Extract request data
-    let req_data = RequestData {
-        uri: request.uri().clone(),
-        method: request.method().clone(),
-        headers: request.headers().clone(),
-    };
+    let auth_header = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
 
-    // Extract auth info
-    let (mut parts, body) = request.into_parts();
-    let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
-        Ok(info) => info,
-        Err(e) => return e.into_response(),
-    };
-
-    // Validate authentication
-    match validator(&req_data, &auth_info).await {
-        Ok(result) => {
-            parts.headers.insert(
-                header::HeaderName::from_static("user_id"),
-                header::HeaderValue::from_str(&result.user_email)
-                    .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-            );
-            next.run(Request::from_parts(parts, body)).await
-        }
-        Err(e) => e.into_response(),
+    if validate_action_server_token(auth_header) {
+        next.run(request).await
+    } else {
+        (StatusCode::UNAUTHORIZED, "Unauthorized Access").into_response()
     }
 }
