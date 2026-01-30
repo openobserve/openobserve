@@ -2570,7 +2570,11 @@ mod tests {
 
         // Verify we have the expected number of chunks
         // 1 metadata + at least 3 hit chunks (small batch, oversized, remaining small)
-        assert!(chunks.len() >= 4, "Should have at least 4 chunks (metadata + 3 hit chunks), got {}", chunks.len());
+        assert!(
+            chunks.len() >= 4,
+            "Should have at least 4 chunks (metadata + 3 hit chunks), got {}",
+            chunks.len()
+        );
 
         // Chunk 0: Metadata
         if let ResponseChunk::Metadata { response } = &chunks[0] {
@@ -2596,11 +2600,9 @@ mod tests {
             let expected_id = idx + 1;
             let actual_id = hit.get("id").and_then(|v| v.as_u64()).unwrap() as usize;
             assert_eq!(
-                actual_id,
-                expected_id,
+                actual_id, expected_id,
                 "Hit order broken: expected id {}, got {}",
-                expected_id,
-                actual_id
+                expected_id, actual_id
             );
         }
 
@@ -2613,7 +2615,10 @@ mod tests {
                         if id == 11 {
                             // Verify this is indeed the oversized hit
                             assert!(
-                                hits[0].get("oversized").and_then(|v| v.as_bool()).unwrap_or(false),
+                                hits[0]
+                                    .get("oversized")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false),
                                 "Chunk with single hit should contain the oversized hit"
                             );
                             found_oversized_chunk = true;
@@ -2630,7 +2635,10 @@ mod tests {
             }
         }
 
-        assert!(found_oversized_chunk, "Should find a chunk with the oversized hit sent alone");
+        assert!(
+            found_oversized_chunk,
+            "Should find a chunk with the oversized hit sent alone"
+        );
     }
 
     #[test]
