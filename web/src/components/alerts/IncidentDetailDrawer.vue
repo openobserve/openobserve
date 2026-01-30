@@ -109,10 +109,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
             <q-icon name="notifications_active" size="14px" />
-            <span>{{ incidentDetails.alert_count }} Alerts</span>
+            <span>{{ triggers.length }} Alerts</span>
           </div>
           <q-tooltip :delay="200" class="tw:text-sm">
-            {{ t("alerts.incidents.alertCount") }}: {{ incidentDetails.alert_count }} correlated alerts
+            {{ t("alerts.incidents.alertCount") }}: {{ triggers.length }} correlated alerts
           </q-tooltip>
         </q-badge>
       </div>
@@ -272,14 +272,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'overview'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
           <!-- SECTION 1: Hero Metrics (100px height) -->
           <div class="tw:flex tw:gap-3 tw:mb-3" style="height: 100px;">
-            <!-- 1. Total Triggers Card -->
+            <!-- 1. Total Alerts Card -->
             <div
               class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
                 <div :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-medium">
-                  Total Triggers
+                  Total Alerts
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-amber-500/10' : 'tw:bg-amber-50'">
                   <q-icon name="bolt" :class="store.state.theme === 'dark' ? 'tw:text-amber-400' : 'tw:text-amber-600'" style="font-size: 20px;" />
@@ -767,7 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
               <div
-                v-if="incidentDetails?.topology_context?.nodes?.length"
+                v-if="sortedAlertsByTriggerCount?.length"
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
                   height: 'calc(25% - 4px)'
@@ -787,13 +787,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:px-3 tw:pb-3 tw:overflow-y-auto tw:flex-1" style="min-height: 0;">
                   <div class="tw:flex tw:flex-col tw:gap-0">
                     <div
-                      v-for="(node, index) in incidentDetails.topology_context.nodes"
-                      :key="node.alert_id"
+                      v-for="(alert, index) in sortedAlertsByTriggerCount"
+                      :key="alert.id"
                       class="tw:py-2.5 tw:border-b"
                       :style="{
                         borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
                       }"
-                      :class="{ 'tw:border-b-0': index === incidentDetails.topology_context.nodes.length - 1 }"
+                      :class="{ 'tw:border-b-0': index === sortedAlertsByTriggerCount.length - 1 }"
                     >
                       <div
                         :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
@@ -806,18 +806,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ index + 1 }}.
                         </span>
                         <div class="tw:flex-1 tw:min-w-0">
-                          <q-tooltip v-if="node.alert_name.length > 30">
-                            {{ node.alert_name }}
+                          <q-tooltip v-if="alert.name.length > 30">
+                            {{ alert.name }}
                           </q-tooltip>
                           <span class="tw:font-medium tw:truncate tw:block">
-                            {{ node.alert_name.length > 30 ? node.alert_name.substring(0, 30) + '...' : node.alert_name }}
+                            {{ alert.name.length > 30 ? alert.name.substring(0, 30) + '...' : alert.name }}
                           </span>
                         </div>
                         <div class="tw:flex-shrink-0" style="width: 120px;">
                           <span
                             :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
                           >
-                            Fired {{ getTriggerCountForAlert(node.alert_id) }} time(s)
+                            Fired {{ getTriggerCountForAlert(alert.id) }} time(s)
                           </span>
                         </div>
                       </div>
@@ -1401,6 +1401,16 @@ export default defineComponent({
       if (!triggers.value) return 0;
       return triggers.value.filter(t => t.alert_id === alertId).length;
     };
+
+    // Computed: Alerts sorted by trigger count (descending)
+    const sortedAlertsByTriggerCount = computed(() => {
+      if (!alerts.value || alerts.value.length === 0) return [];
+      return [...alerts.value].sort((a, b) => {
+        const countA = getTriggerCountForAlert(a.id);
+        const countB = getTriggerCountForAlert(b.id);
+        return countB - countA; // Descending order
+      });
+    });
 
     // Peak Alert Rate - find the highest concentration of alerts
     const peakAlertRate = computed(() => {
@@ -2539,6 +2549,7 @@ export default defineComponent({
       affectedServicesCount,
       alertFrequency,
       getTriggerCountForAlert,
+      sortedAlertsByTriggerCount,
       peakAlertRate,
       peakActivity,
       correlationType,
