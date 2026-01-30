@@ -150,18 +150,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
     </div>
+
+    <!-- Import Dialog -->
+    <q-dialog v-model="showImportDrawer" maximized position="right" full-height>
+      <q-card class="import-dialog-card">
+        <ImportSemanticGroupsDrawer
+          :current-groups="localGroups"
+          :org-id="store.state.selectedOrganization.identifier"
+          @apply="handleImportApply"
+          @close="showImportDrawer = false"
+        />
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, nextTick } from "vue";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
-
-const router = useRouter();
+import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
 
 const store = useStore();
 const { t } = useI18n();
@@ -205,6 +215,7 @@ const localGroups = ref<SemanticGroup[]>(
 );
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
 const selectedCategory = ref<string | null>(null);
+const showImportDrawer = ref(false);
 
 // Watch for external changes and auto-select first category
 watch(
@@ -330,9 +341,23 @@ const removeGroupByFilter = (filteredIndex: number) => {
 };
 
 const navigateToImport = () => {
-  router.push({
-    name: "importSemanticGroups",
-  });
+  showImportDrawer.value = true;
+};
+
+const handleImportApply = (importedGroups: SemanticGroup[]) => {
+  // Merge imported groups with existing groups
+  const groupsMap = new Map<string, SemanticGroup>();
+
+  // Add existing groups to map
+  localGroups.value.forEach((g) => groupsMap.set(g.id, g));
+
+  // Update or add imported groups
+  importedGroups.forEach((g) => groupsMap.set(g.id, g));
+
+  // Convert back to array
+  localGroups.value = Array.from(groupsMap.values());
+
+  emitUpdate();
 };
 
 const emitUpdate = () => {
@@ -378,5 +403,11 @@ onMounted(() => {
 
 .fingerprint-checkbox {
   min-width: 200px;
+}
+
+.import-dialog-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 </style>
