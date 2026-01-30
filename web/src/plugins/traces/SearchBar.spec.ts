@@ -258,7 +258,7 @@ describe("SearchBar", () => {
         true,
       );
       expect(
-        wrapper.find('[data-test="traces-service-maps-toggle"]').exists(),
+        wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
       ).toBe(true);
     });
 
@@ -628,14 +628,14 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("update:activeTab")[0]).toEqual(["search"]);
     });
 
-    it.skip("should emit update:activeTab when service-maps tab is clicked", async () => {
+    it.skip("should emit update:activeTab when service-graph tab is clicked", async () => {
       const serviceMapsBtn = wrapper.find(
-        '[data-test="traces-service-maps-toggle"]',
+        '[data-test="traces-service-graph-toggle"]',
       );
       await serviceMapsBtn.trigger("click");
 
       expect(wrapper.emitted("update:activeTab")).toBeTruthy();
-      expect(wrapper.emitted("update:activeTab")[0]).toEqual(["service-maps"]);
+      expect(wrapper.emitted("update:activeTab")[0]).toEqual(["service-graph"]);
     });
 
     it("should show search controls only when activeTab is search", async () => {
@@ -651,8 +651,8 @@ describe("SearchBar", () => {
           .exists(),
       ).toBe(true);
 
-      // Switch to service-maps tab
-      await wrapper.setProps({ activeTab: "service-maps" });
+      // Switch to service-graph tab
+      await wrapper.setProps({ activeTab: "service-graph" });
       await wrapper.vm.$nextTick();
 
       // Search controls should be hidden

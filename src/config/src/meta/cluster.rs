@@ -126,14 +126,14 @@ impl Node {
     pub fn is_alert_manager(&self) -> bool {
         self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
     }
-    pub fn is_script_server(&self) -> bool {
-        self.role.contains(&Role::ScriptServer) || self.role.contains(&Role::All)
+    pub fn is_action_server(&self) -> bool {
+        self.role.contains(&Role::ActionServer) || self.role.contains(&Role::All)
     }
     pub fn is_standalone(&self) -> bool {
         // standalone implies there is no external dependency required
         // for this node. All role will always have DB dep.
-        // currently only script server has no external dep
-        !self.role.contains(&Role::All) && self.role.contains(&Role::ScriptServer)
+        // currently only action server has no external dep
+        !self.role.contains(&Role::All) && self.role.contains(&Role::ActionServer)
     }
 }
 
@@ -206,7 +206,7 @@ pub enum Role {
     Router,
     AlertManager,
     FlattenCompactor,
-    ScriptServer,
+    ActionServer,
 }
 
 impl FromStr for Role {
@@ -221,7 +221,9 @@ impl FromStr for Role {
             "router" => Ok(Role::Router),
             "alertmanager" | "alert_manager" => Ok(Role::AlertManager),
             "flatten_compactor" => Ok(Role::FlattenCompactor),
-            "script_server" | "scriptserver" => Ok(Role::ScriptServer),
+            "action_server" | "actionserver" | "script_server" | "scriptserver" => {
+                Ok(Role::ActionServer)
+            }
             _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
@@ -237,7 +239,7 @@ impl std::fmt::Display for Role {
             Role::Router => write!(f, "router"),
             Role::AlertManager => write!(f, "alert_manager"),
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
-            Role::ScriptServer => write!(f, "script_server"),
+            Role::ActionServer => write!(f, "action_server"),
         }
     }
 }
@@ -369,9 +371,9 @@ mod tests {
         node.role = vec![Role::AlertManager];
         assert!(node.is_alert_manager());
 
-        // Test script server
-        node.role = vec![Role::ScriptServer];
-        assert!(node.is_script_server());
+        // Test action server
+        node.role = vec![Role::ActionServer];
+        assert!(node.is_action_server());
 
         // Test flatten compactor
         node.role = vec![Role::FlattenCompactor];
