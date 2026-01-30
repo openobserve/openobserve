@@ -260,7 +260,8 @@ export const convertServiceGraphToTree = (
       // Root node: sum of all outgoing edges (traffic flowing from this node)
       totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
       failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
-      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
+      // If no outgoing edges, fall back to node's own error_rate
+      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : (node.error_rate ?? 0);
     }
 
     // Calculate connections count (incoming + outgoing edges)
