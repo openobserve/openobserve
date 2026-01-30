@@ -961,7 +961,7 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
+const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
   if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -973,14 +973,14 @@ const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
     //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
     //otherwise we need to filter the row based on the columns that user have applied
     if (checkIfSourceColumnPresent(props.columns)) {
-      emits("sendToAiChat", JSON.stringify(row));
+      emits("sendToAiChat", JSON.stringify(row), append);
     } else {
       //we need to filter the row based on the columns that user have applied
       const filteredRow = filterRowBasedOnColumns(row, props.columns);
-      emits("sendToAiChat", JSON.stringify(filteredRow));
+      emits("sendToAiChat", JSON.stringify(filteredRow), append);
     }
   } else {
-    emits("sendToAiChat", value);
+    emits("sendToAiChat", value, append);
   }
 };
 
