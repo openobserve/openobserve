@@ -277,7 +277,7 @@ const groupIdOptions = computed(() => {
 
 // Generate a short unique ID for new groups using first 8 chars of UUID
 const generateShortId = (): string => {
-  return uuidv4().substring(0, 4);
+  return uuidv4().substring(0, 8);
 };
 
 // Add a new custom group (assign to current category if selected)

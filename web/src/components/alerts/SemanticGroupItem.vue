@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stack-label
             class="showLabelOnTop"
             @update:model-value="handleDisplayChange"
-            @blur="handleDisplayBlur"
           />
         </div>
         <!-- Show ID as read-only caption for existing groups -->
