@@ -22,7 +22,7 @@ import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 import config from "@/aws-exports";
 
 installQuasar({
@@ -394,28 +394,38 @@ describe("IdentityAccessManagement.vue Component", () => {
 
   describe("Route Watcher Tests", () => {
     it("should redirect to users when accessing quota as non-meta org", async () => {
-      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
-
-      // Simulate route change to quota by updating the currentRoute
-      // Since the route doesn't exist in test router, we mock the navigation
-      Object.defineProperty(router, "currentRoute", {
-        get: () => ({
-          value: {
-            name: "quota",
-            query: { org_identifier: "test-org" },
-          },
-        }),
-        configurable: true,
+      // Create a reactive route ref
+      const currentRoute = ref({
+        name: "users",
+        query: { org_identifier: "test-org" },
       });
 
-      // Trigger the watcher by mounting a new instance
+      // Mock router with reactive currentRoute
+      const testRouter: any = {
+        ...router,
+        currentRoute: currentRoute,
+        push: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const routerPushSpy = testRouter.push;
+
+      // Mount component with mocked router
       const testWrapper = mount(IdentityAccessManagement, {
         global: {
           provide: { store: store },
-          plugins: [i18n, router],
+          plugins: [i18n, testRouter],
           stubs: { RouterView: true, RouteTabs: true },
         },
       });
+
+      await flushPromises();
+      await nextTick();
+
+      // Change route to quota to trigger the watcher
+      currentRoute.value = {
+        name: "quota",
+        query: { org_identifier: "test-org" },
+      };
 
       await flushPromises();
       await nextTick();

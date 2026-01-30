@@ -16,7 +16,7 @@ vi.mock("@/utils/zincutils", () => ({
 vi.mock("@/aws-exports", () => ({
   default: {
     API_ENDPOINT: "http://localhost:5080",
-    isCloud: true
+    isCloud: "true"
   }
 }));
 
@@ -872,29 +872,12 @@ describe("TrialPeriod.vue", () => {
   });
 
   describe("onMounted lifecycle hook - isCloud false scenarios", () => {
-    let originalIsCloud: string;
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-      // Store original value
-      const config = require("@/aws-exports").default;
-      originalIsCloud = config.isCloud;
-    });
-
-    afterEach(() => {
-      // Restore original value
-      const config = require("@/aws-exports").default;
-      config.isCloud = originalIsCloud;
-    });
-
     it("should NOT call list_subscription when isCloud is false", async () => {
-      // Mock isCloud to be false
-      vi.doMock("@/aws-exports", () => ({
-        default: {
-          API_ENDPOINT: "http://localhost:5080",
-          isCloud: "false"
-        }
-      }));
+      // Import the mocked config to spy on it
+      const config = (await import("@/aws-exports")).default;
+      const isCloudSpy = vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
+
+      vi.clearAllMocks();
 
       const testStore = {
         state: {
@@ -915,19 +898,18 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Since isCloud was mocked as "true" in the global mock,
-      // we verify that in the actual component it checks correctly
-      // This test documents the behavior when isCloud is not "true"
-      expect(wrapper.vm.config).toBeDefined();
+      // BillingService should NOT be called when isCloud is "false"
+      expect(BillingService.list_subscription).not.toHaveBeenCalled();
+
+      isCloudSpy.mockRestore();
     });
 
     it("should NOT call list_subscription when isCloud is undefined", async () => {
-      // Mock isCloud to be undefined
-      vi.doMock("@/aws-exports", () => ({
-        default: {
-          API_ENDPOINT: "http://localhost:5080"
-        }
-      }));
+      // Import the mocked config to spy on it
+      const config = (await import("@/aws-exports")).default;
+      const isCloudSpy = vi.spyOn(config, "isCloud", "get").mockReturnValue(undefined as any);
+
+      vi.clearAllMocks();
 
       const testStore = {
         state: {
@@ -948,8 +930,10 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Verify config is accessible
-      expect(wrapper.vm.config).toBeDefined();
+      // BillingService should NOT be called when isCloud is undefined
+      expect(BillingService.list_subscription).not.toHaveBeenCalled();
+
+      isCloudSpy.mockRestore();
     });
   });
 });
