@@ -1184,9 +1184,7 @@ class="q-pr-sm q-pt-xs" />
                           ? 'empty-function'
                           : ''
                       "
-                      :readOnly="
-                        searchObj.meta.logsVisualizeToggle === 'visualize'
-                      "
+                      :readOnly="false"
                       @keydown="handleKeyDown"
                       language="vrl"
                       @focus="
@@ -1197,29 +1195,6 @@ class="q-pr-sm q-pt-xs" />
                       "
                     />
                   </div>
-                </div>
-                <div
-                  v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
-                  :class="
-                    store.state.theme == 'dark'
-                      ? 'tw:bg-white tw:bg-opacity-10'
-                      : 'tw:bg-black tw:bg-opacity-10'
-                  "
-                  class="tw:absolute tw:bottom-0 tw:w-full"
-                  style="margin-top: 12px; display: flex; align-items: center; flex"
-                >
-                  <q-icon
-                    name="warning"
-                    color="warning"
-                    size="20px"
-                    class="q-mx-sm"
-                  />
-                  <span
-                    class="text-negative q-pa-sm"
-                    style="font-weight: semibold; font-size: 14px"
-                    >VRL Function Editor is not supported in visualize
-                    mode.</span
-                  >
                 </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">

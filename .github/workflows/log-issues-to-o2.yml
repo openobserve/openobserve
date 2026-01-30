@@ -10,15 +10,11 @@ jobs:
   capture:
     runs-on: ubuntu-latest
     permissions:
-      contents: read  # Restrict to read-only, no write access
+      contents: read
 
     steps:
       - name: Build and send payload to OpenObserve
-        env:
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          # Build payload using jq to properly handle JSON (jq --arg handles all escaping safely)
           jq -n \
             --arg event_name "${{ github.event_name }}" \
             --arg action "${{ github.event.action }}" \
@@ -71,7 +67,6 @@ jobs:
             --arg issue_updated_at "${{ github.event.issue.updated_at }}" \
             --arg issue_closed_at "${{ github.event.issue.closed_at }}" \
             --arg issue_author_association "${{ github.event.issue.author_association }}" \
-            --arg issue_body "$ISSUE_BODY" \
             --arg comment_id "${{ github.event.comment.id }}" \
             --arg comment_node_id "${{ github.event.comment.node_id }}" \
             --arg comment_user_login "${{ github.event.comment.user.login }}" \
@@ -82,7 +77,6 @@ jobs:
             --arg comment_created_at "${{ github.event.comment.created_at }}" \
             --arg comment_updated_at "${{ github.event.comment.updated_at }}" \
             --arg comment_author_association "${{ github.event.comment.author_association }}" \
-            --arg comment_body "$COMMENT_BODY" \
             --arg sender_login "${{ github.event.sender.login }}" \
             --arg sender_id "${{ github.event.sender.id }}" \
             --arg sender_node_id "${{ github.event.sender.node_id }}" \
@@ -102,108 +96,14 @@ jobs:
             --argjson issue_labels '${{ toJson(github.event.issue.labels) }}' \
             --argjson changes '${{ toJson(github.event.changes) }}' \
             '{
-              workflow_metadata: {
-                event_name: $event_name,
-                action: $action,
-                workflow: $workflow,
-                run_id: $run_id,
-                run_number: $run_number,
-                timestamp: $timestamp
-              },
-              repository: {
-                id: $repo_id,
-                node_id: $repo_node_id,
-                name: $repo_name,
-                full_name: $repo_full_name,
-                private: $repo_private,
-                owner: {
-                  login: $repo_owner_login,
-                  id: $repo_owner_id,
-                  node_id: $repo_owner_node_id,
-                  type: $repo_owner_type,
-                  site_admin: $repo_owner_site_admin
-                },
-                html_url: $repo_html_url,
-                description: $repo_description,
-                fork: $repo_fork,
-                created_at: $repo_created_at,
-                updated_at: $repo_updated_at,
-                pushed_at: $repo_pushed_at,
-                size: $repo_size,
-                stargazers_count: $repo_stargazers_count,
-                watchers_count: $repo_watchers_count,
-                language: $repo_language,
-                forks_count: $repo_forks_count,
-                open_issues_count: $repo_open_issues_count,
-                default_branch: $repo_default_branch,
-                visibility: $repo_visibility
-              },
-              organization: {
-                login: $org_login,
-                id: $org_id,
-                node_id: $org_node_id,
-                url: $org_url,
-                description: $org_description
-              },
-              issue: {
-                id: $issue_id,
-                node_id: $issue_node_id,
-                number: $issue_number,
-                title: $issue_title,
-                user: {
-                  login: $issue_user_login,
-                  id: $issue_user_id,
-                  node_id: $issue_user_node_id,
-                  type: $issue_user_type,
-                  site_admin: $issue_user_site_admin
-                },
-                state: $issue_state,
-                locked: $issue_locked,
-                assignees: $issue_assignees,
-                labels: $issue_labels,
-                comments: $issue_comments,
-                created_at: $issue_created_at,
-                updated_at: $issue_updated_at,
-                closed_at: $issue_closed_at,
-                author_association: $issue_author_association,
-                body: $issue_body
-              },
-              comment: {
-                id: $comment_id,
-                node_id: $comment_node_id,
-                user: {
-                  login: $comment_user_login,
-                  id: $comment_user_id,
-                  node_id: $comment_user_node_id,
-                  type: $comment_user_type,
-                  site_admin: $comment_user_site_admin
-                },
-                created_at: $comment_created_at,
-                updated_at: $comment_updated_at,
-                author_association: $comment_author_association,
-                body: $comment_body
-              },
-              sender: {
-                login: $sender_login,
-                id: $sender_id,
-                node_id: $sender_node_id,
-                type: $sender_type,
-                site_admin: $sender_site_admin
-              },
-              assignee: {
-                login: $assignee_login,
-                id: $assignee_id,
-                node_id: $assignee_node_id,
-                type: $assignee_type,
-                site_admin: $assignee_site_admin
-              },
-              label: {
-                id: $label_id,
-                node_id: $label_node_id,
-                name: $label_name,
-                color: $label_color,
-                description: $label_description
-              },
+              workflow_metadata: { event_name: $event_name, action: $action, workflow: $workflow, run_id: $run_id, run_number: $run_number, timestamp: $timestamp },
+              repository: { id: $repo_id, node_id: $repo_node_id, name: $repo_name, full_name: $repo_full_name, private: $repo_private, owner: { login: $repo_owner_login, id: $repo_owner_id, node_id: $repo_owner_node_id, type: $repo_owner_type, site_admin: $repo_owner_site_admin }, html_url: $repo_html_url, description: $repo_description, fork: $repo_fork, created_at: $repo_created_at, updated_at: $repo_updated_at, pushed_at: $repo_pushed_at, size: $repo_size, stargazers_count: $repo_stargazers_count, watchers_count: $repo_watchers_count, language: $repo_language, forks_count: $repo_forks_count, open_issues_count: $repo_open_issues_count, default_branch: $repo_default_branch, visibility: $repo_visibility },
+              organization: { login: $org_login, id: $org_id, node_id: $org_node_id, url: $org_url, description: $org_description },
+              issue: { id: $issue_id, node_id: $issue_node_id, number: $issue_number, title: $issue_title, user: { login: $issue_user_login, id: $issue_user_id, node_id: $issue_user_node_id, type: $issue_user_type, site_admin: $issue_user_site_admin }, state: $issue_state, locked: $issue_locked, assignees: $issue_assignees, labels: $issue_labels, comments: $issue_comments, created_at: $issue_created_at, updated_at: $issue_updated_at, closed_at: $issue_closed_at, author_association: $issue_author_association },
+              comment: { id: $comment_id, node_id: $comment_node_id, user: { login: $comment_user_login, id: $comment_user_id, node_id: $comment_user_node_id, type: $comment_user_type, site_admin: $comment_user_site_admin }, created_at: $comment_created_at, updated_at: $comment_updated_at, author_association: $comment_author_association },
+              sender: { login: $sender_login, id: $sender_id, node_id: $sender_node_id, type: $sender_type, site_admin: $sender_site_admin },
+              assignee: { login: $assignee_login, id: $assignee_id, node_id: $assignee_node_id, type: $assignee_type, site_admin: $assignee_site_admin },
+              label: { id: $label_id, node_id: $label_node_id, name: $label_name, color: $label_color, description: $label_description },
               changes: $changes
             } | walk(if type == "object" then with_entries(select(.value != "" and .value != null and .value != "null")) else . end)' > payload.json
 
@@ -219,3 +119,5 @@ jobs:
         run: |
           echo "=== Sent Payload ==="
           cat payload.json
+
+          
