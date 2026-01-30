@@ -175,6 +175,12 @@ export class LogsPage {
         this.correlationLoadingSpinner = '.q-spinner-hourglass';
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
+        // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED) =====
+        this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
+        this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+        this.dimensionSelectorButton = '[data-test="dimension-selector-button"]';
+        this.analysisDashboardCard = '.analysis-dashboard-card';
+
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
         this.queryHistoryButton = '[data-test="logs-search-bar-query-history-btn"]';
@@ -4220,6 +4226,114 @@ export class LogsPage {
             testLogger.error('Stream deletion failed:', { error: error.message });
             throw error;
         }
+    }
+
+    // ===== ANALYZE DIMENSIONS METHODS =====
+
+    /**
+     * Check if Logs Analyze Dimensions button is visible
+     * Button appears when: results exist AND not in SQL mode
+     * @returns {Promise<boolean>}
+     */
+    async isAnalyzeDimensionsButtonVisible() {
+        return await this.page.locator(this.logsAnalyzeDimensionsButton).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Expect Analyze Dimensions button to be visible
+     */
+    async expectAnalyzeDimensionsButtonVisible() {
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Analyze Dimensions button is visible');
+    }
+
+    /**
+     * Expect Analyze Dimensions button to NOT be visible
+     */
+    async expectAnalyzeDimensionsButtonNotVisible() {
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Analyze Dimensions button is not visible (as expected)');
+    }
+
+    /**
+     * Click Analyze Dimensions button
+     */
+    async clickAnalyzeDimensionsButton() {
+        await this.page.locator(this.logsAnalyzeDimensionsButton).click();
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Clicked Analyze Dimensions button');
+    }
+
+    /**
+     * Check if Analysis Dashboard is visible
+     * @returns {Promise<boolean>}
+     */
+    async isAnalysisDashboardVisible() {
+        return await this.page.locator(this.analysisDashboardCard).isVisible({ timeout: 10000 }).catch(() => false);
+    }
+
+    /**
+     * Expect Analysis Dashboard to be visible
+     */
+    async expectAnalysisDashboardVisible() {
+        await expect(this.page.locator(this.analysisDashboardCard)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Analysis Dashboard is visible');
+    }
+
+    /**
+     * Close Analysis Dashboard
+     */
+    async closeAnalysisDashboard() {
+        const closeBtn = this.page.locator(this.analysisDashboardClose);
+        if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await closeBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Closed Analysis Dashboard');
+        }
+    }
+
+    /**
+     * Check if Dimension Selector button is visible in Analysis Dashboard
+     * @returns {Promise<boolean>}
+     */
+    async isDimensionSelectorButtonVisible() {
+        return await this.page.locator(this.dimensionSelectorButton).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click Dimension Selector button
+     */
+    async clickDimensionSelectorButton() {
+        await this.page.locator(this.dimensionSelectorButton).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked Dimension Selector button');
+    }
+
+    /**
+     * Wait for Analysis Dashboard to load completely
+     */
+    async waitForAnalysisDashboardLoad() {
+        // Wait for loading spinner to disappear
+        const spinner = this.page.locator('.q-spinner-hourglass, .q-spinner');
+        try {
+            if (await spinner.isVisible({ timeout: 1000 })) {
+                await spinner.waitFor({ state: 'hidden', timeout: 30000 });
+            }
+        } catch {
+            // Spinner might not appear or already hidden
+        }
+
+        // Wait for dashboard content
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        testLogger.info('Analysis Dashboard loaded');
+    }
+
+    /**
+     * Check if no results message is visible
+     * @returns {Promise<boolean>}
+     */
+    async isNoResultsMessageVisible() {
+        return await this.page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     // ===== SHARE LINK METHODS =====
