@@ -107,8 +107,16 @@ describe("HomeView.vue", () => {
     orgService.get_organization_summary.mockResolvedValue({
       data: {
         streams: { num_streams: 0 },
-        alerts: { num_realtime: 0, num_scheduled: 0 },
-        pipelines: { num_realtime: 0, num_scheduled: 0 },
+        alerts: {
+          num_realtime: 0,
+          num_scheduled: 0,
+          trigger_status: { failed: 0, healthy: 0, warning: 0 }
+        },
+        pipelines: {
+          num_realtime: 0,
+          num_scheduled: 0,
+          trigger_status: { failed: 0, healthy: 0, warning: 0 }
+        },
         total_dashboards: 0,
         total_functions: 0
       }
@@ -214,8 +222,16 @@ describe("HomeView.vue", () => {
       const mockResponse = {
         data: {
           streams: { num_streams: 5, total_storage_size: 100, total_compressed_size: 50, total_records: 1000, total_index_size: 25 },
-          pipelines: { num_scheduled: 3, num_realtime: 2 },
-          alerts: { num_realtime: 4, num_scheduled: 6 },
+          pipelines: {
+            num_scheduled: 3,
+            num_realtime: 2,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          alerts: {
+            num_realtime: 4,
+            num_scheduled: 6,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 8,
           total_functions: 12
         }
@@ -233,8 +249,16 @@ describe("HomeView.vue", () => {
       const mockResponse = {
         data: {
           streams: { num_streams: 0 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
+          alerts: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 0,
           total_functions: 0
         }
@@ -253,8 +277,16 @@ describe("HomeView.vue", () => {
       const mockResponse = {
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
+          alerts: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 0,
           total_functions: 0
         }
@@ -338,8 +370,16 @@ describe("HomeView.vue", () => {
       const mockResponse = {
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 1,
           total_functions: 1
         }
@@ -359,8 +399,16 @@ describe("HomeView.vue", () => {
       const mockResponse = {
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 1,
           total_functions: 1
         }
@@ -392,8 +440,16 @@ describe("HomeView.vue", () => {
       const mockResponse = {
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 1,
           total_functions: 1
         }
@@ -441,8 +497,16 @@ describe("HomeView.vue", () => {
       orgService.get_organization_summary.mockResolvedValue({
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
+          alerts: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 0,
           total_functions: 0
         }
@@ -467,8 +531,16 @@ describe("HomeView.vue", () => {
       orgService.get_organization_summary.mockResolvedValue({
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
+          alerts: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 0,
           total_functions: 0
         }
@@ -486,8 +558,16 @@ describe("HomeView.vue", () => {
       orgService.get_organization_summary.mockResolvedValue({
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
+          alerts: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 0,
           total_functions: 0
         }
@@ -505,8 +585,16 @@ describe("HomeView.vue", () => {
       orgService.get_organization_summary.mockResolvedValue({
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
+          alerts: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 0,
           total_functions: 0
         }
@@ -524,8 +612,16 @@ describe("HomeView.vue", () => {
       orgService.get_organization_summary.mockResolvedValue({
         data: {
           streams: { num_streams: 1 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
+          alerts: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 0,
+            num_scheduled: 0,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 0,
           total_functions: 0
         }
@@ -595,8 +691,16 @@ describe("HomeView.vue", () => {
             total_records: 1000,
             total_index_size: 25
           },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 1,
           total_functions: 1
         }
@@ -668,8 +772,16 @@ describe("HomeView.vue", () => {
             total_records: 1000,
             total_index_size: 25
           },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 1,
           total_functions: 1
         }
@@ -738,8 +850,16 @@ describe("HomeView.vue", () => {
               total_records: 1000,
               total_index_size: 25
             },
-            alerts: { num_realtime: 1, num_scheduled: 1 },
-            pipelines: { num_realtime: 1, num_scheduled: 1 },
+            alerts: {
+              num_realtime: 1,
+              num_scheduled: 1,
+              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            },
+            pipelines: {
+              num_realtime: 1,
+              num_scheduled: 1,
+              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            },
             total_dashboards: 1,
             total_functions: 1
           }
@@ -773,8 +893,16 @@ describe("HomeView.vue", () => {
             total_records: 1000,
             total_index_size: 25
           },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
           total_dashboards: 1,
           total_functions: 1
         }
@@ -785,6 +913,7 @@ describe("HomeView.vue", () => {
 
       wrapper = createWrapper();
       await flushPromises();
+      await nextTick();
 
       // Data should still be loaded even if tile is not rendered
       expect(wrapper.vm.summary.compressed_size_raw).toBe(75);
