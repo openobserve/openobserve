@@ -1,33 +1,10 @@
 // Worker to handle stream processing
 // This offloads decoding and parsing from the main thread
 let activeBuffers = {};
-// Track processed messages to prevent duplicate sends
-let processedMessages = {};
-// Track duplicate count to detect infinite streaming from backend
-let duplicateCount = {};
 
 // Helper function to extract data from message line
 function extractData(line) {
   return line.startsWith('data:') ? line.slice(6) : line.slice(5);
-}
-
-// Generate hash for message deduplication
-function generateMessageHash(eventType, data) {
-  // For search_response_hits, check if data has hits array
-  if (eventType === 'search_response_hits' && data.results && data.results.hits) {
-    const hits = data.results.hits;
-    if (hits.length > 0) {
-      const firstHit = hits[0];
-      // Create hash from timestamp and first few fields
-      const timestamp = firstHit._timestamp || firstHit.timestamp || '';
-      const keys = Object.keys(firstHit).slice(0, 3).join('_');
-      return `${eventType}_${timestamp}_${keys}_${hits.length}`;
-    }
-  }
-
-  // For other types, create basic hash
-  const dataStr = typeof data === 'object' ? JSON.stringify(data).substring(0, 100) : String(data);
-  return `${eventType}_${dataStr}`;
 }
 
 // Handle messages from main thread
@@ -38,8 +15,6 @@ self.onmessage = async (event) => {
     case 'startStream':
       // For Safari compatibility, we receive chunks instead of streams
       activeBuffers[traceId] = '';
-      processedMessages[traceId] = new Set();
-      duplicateCount[traceId] = 0;
       break;
 
     case 'processChunk':
@@ -57,20 +32,14 @@ self.onmessage = async (event) => {
       });
 
       delete activeBuffers[traceId];
-      delete processedMessages[traceId];
-      delete duplicateCount[traceId];
       break;
 
     case 'cancelStream':
       delete activeBuffers[traceId];
-      delete processedMessages[traceId];
-      delete duplicateCount[traceId];
       break;
 
     case 'closeAll':
       activeBuffers = {};
-      processedMessages = {};
-      duplicateCount = {};
       break;
   }
 };
@@ -82,19 +51,19 @@ function processChunk(traceId, chunk) {
   try {
     // Add chunk to buffer
     buffer += chunk;
-        
+
     // Process complete messages
     const messages = buffer.split('\n\n');
     // Keep the last potentially incomplete message in buffer
     buffer = messages.pop() || '';
     activeBuffers[traceId] = buffer;
-    
+
     const lines = messages.filter(line => line.trim());
-    
+
     // Process each complete line
     for (let i = 0; i < lines.length; i++) {
       try {
-        const msgLines = lines[i].split('\n');          
+        const msgLines = lines[i].split('\n');
         // Check if this is an event line
 
         if(msgLines.length > 1){
@@ -108,36 +77,6 @@ function processChunk(traceId, chunk) {
             try {
               // Try to parse as JSON
               const json = JSON.parse(data);
-
-              // Check for duplicate messages
-              const messageHash = generateMessageHash(eventType, json);
-              if (processedMessages[traceId] && processedMessages[traceId].has(messageHash)) {
-                // Duplicate message from server, skip it silently
-                // Uncomment for debugging: console.warn('[Worker] Duplicate message from server, skipping:', eventType, messageHash.substring(0, 80));
-
-                // Increment duplicate count
-                duplicateCount[traceId] = (duplicateCount[traceId] || 0) + 1;
-
-                // If we've received 50+ duplicates, backend is streaming infinitely
-                // Signal main thread to abort the stream connection
-                if (duplicateCount[traceId] >= 50) {
-                  console.warn('[Worker] Backend sending excessive duplicates (' + duplicateCount[traceId] + '), requesting stream abort for:', traceId);
-                  self.postMessage({
-                    type: 'abort_stream',
-                    traceId,
-                    reason: 'excessive_duplicates'
-                  });
-                  duplicateCount[traceId] = 0; // Reset to avoid repeated abort messages
-                }
-
-                continue;
-              }
-
-              // Mark as processed and reset duplicate counter on new unique message
-              if (processedMessages[traceId]) {
-                processedMessages[traceId].add(messageHash);
-                duplicateCount[traceId] = 0; // Reset on new message
-              }
 
               // Send message based on event type
               self.postMessage({
@@ -192,4 +131,4 @@ function processChunk(traceId, chunk) {
       data: { message: 'Stream processing error', error: error.toString() },
     });
   }
-} 
+}
