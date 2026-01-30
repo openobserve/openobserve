@@ -344,9 +344,15 @@ impl Iterator for ResponseChunkIterator {
             let hit = &self.remaining_hits[0];
             let hit_size = crate::utils::json::estimate_json_bytes(hit);
 
-            // If a single hit exceeds chunk size, send it alone and remove from queue
-            // CRITICAL: Must pop_front() to avoid infinite loop of duplicates
+            // If a single hit exceeds chunk size, handle it carefully
             if hit_size > self.chunk_size {
+                // If we already have hits in current chunk, return them first
+                // to preserve order and avoid losing data
+                if !current_chunk.is_empty() {
+                    break;
+                }
+                // Otherwise, send the oversized hit alone and remove from queue
+                // CRITICAL: Must pop_front() to avoid infinite loop of duplicates
                 let hit = self.remaining_hits.pop_front().unwrap();
                 return Some(ResponseChunk::Hits { hits: vec![hit] });
             }
