@@ -38,6 +38,8 @@
     "goHome": "回到主页",
     "name": "姓名",
     "add": "添加",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
     "details": "详情",
     "tags": "标签",
     "process": "处理",
@@ -1942,6 +1944,8 @@
     "searchMetric": "搜索指标",
     "searchLabel": "搜索指标",
     "add": "添加",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
     "cancel": "取消",
     "promqlLabel": "PromQL",
     "runQuery": "查询",
@@ -2678,8 +2682,6 @@
     "stableTooltip": "稳定维度基数低，用于关联键计算",
     "normalize": "正常化",
     "noSemanticGroupsInCategory": "类别中没有语义组：{category}",
-    "correlatedLogsV2": "日志 V2",
-    "clickToLoadLogsV2": "点击加载相关日志 (V2)",
     "logs": {
       "title": "关联日志",
       "filters": {
