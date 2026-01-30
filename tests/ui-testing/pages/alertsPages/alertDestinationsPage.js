@@ -858,6 +858,8 @@ export class AlertDestinationsPage {
      * Verify test result is displayed
      */
     async expectTestResultVisible() {
+        // Wait a bit for the test API call to complete and render the result
+        await this.page.waitForTimeout(2000);
         await expect(this.page.locator(this.testResult)).toBeVisible({ timeout: 30000 });
     }
 
