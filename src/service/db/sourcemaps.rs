@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use config::SOURCEMAP_MEM_CACHE_SIZE;
+use hashbrown::HashMap;
 use hashlink::lru_cache::LruCache;
 use infra::{
     coordinator::get_coordinator,
@@ -25,12 +26,15 @@ use infra::{
 };
 use once_cell::sync::Lazy;
 use parquet::data_type::AsBytes;
+use serde::Serialize;
 use tokio::sync::RwLock;
 
 use crate::service::db;
 
 // DBKey to set sourcemaps keys
 pub const SOURCEMAP_PREFIX: &str = "/sourcemaps/";
+
+pub const SOURCEMAP_VALUES_LIMIT: u64 = 10;
 
 type SourceMapKey = (
     String,
@@ -40,10 +44,23 @@ type SourceMapKey = (
     String,
 );
 
+#[derive(Serialize, Clone)]
+pub struct ParamValues {
+    services: Vec<String>,
+    envs: Vec<String>,
+    versions: Vec<String>,
+}
+
 static CACHE: Lazy<RwLock<LruCache<SourceMapKey, SourceMap>>> =
     Lazy::new(|| RwLock::new(LruCache::new(SOURCEMAP_MEM_CACHE_SIZE)));
 
+static VALUES_CACHE: Lazy<RwLock<HashMap<String, ParamValues>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
 pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
+    if entries.is_empty() {
+        return Ok(());
+    }
     match infra::table::source_maps::add_many(entries.clone()).await {
         Ok(_) => {}
         Err(errors::Error::DbError(DbError::UniqueViolation)) => {
@@ -54,6 +71,7 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
             return Err(anyhow::anyhow!(e));
         }
     }
+    let org = entries[0].org.clone();
 
     {
         let mut cache = CACHE.write().await;
@@ -67,6 +85,12 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
             );
             cache.insert(key, entry.clone());
         }
+    }
+
+    {
+        let mut cache = VALUES_CACHE.write().await;
+        cache.remove(&org);
+        drop(cache);
     }
 
     for entry in entries {
@@ -180,6 +204,12 @@ pub async fn delete_group(
         }
     }
 
+    {
+        let mut cache = VALUES_CACHE.write().await;
+        cache.remove(org);
+        drop(cache);
+    }
+
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
@@ -250,6 +280,29 @@ pub async fn update_file_cluster(entry: SourceMap) -> Result<(), anyhow::Error> 
     Ok(())
 }
 
+pub async fn list_values(org_id: &str) -> Result<ParamValues, anyhow::Error> {
+    {
+        let cache = VALUES_CACHE.read().await;
+        if let Some(v) = cache.get(org_id) {
+            return Ok(v.clone());
+        }
+    }
+
+    let res = infra::table::source_maps::get_values(org_id, SOURCEMAP_VALUES_LIMIT).await?;
+    let ret = ParamValues {
+        services: res.0,
+        envs: res.1,
+        versions: res.2,
+    };
+
+    {
+        let mut cache = VALUES_CACHE.write().await;
+        cache.insert(org_id.to_string(), ret.clone());
+    }
+
+    Ok(ret)
+}
+
 pub async fn watch() -> Result<(), anyhow::Error> {
     let prefix = SOURCEMAP_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
@@ -268,7 +321,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
         match ev {
             Event::Put(ev) => {
-                // TODO: handle after cache is setup
                 let Some(item_v) = ev.value else {
                     log::error!("watch_sourcemaps : missing value for put");
                     continue;
@@ -277,6 +329,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("watch_sourcemaps : invalid json value for put");
                     continue;
                 };
+                let org = entry.org.clone();
+
                 {
                     let key = (
                         entry.org.clone(),
@@ -288,9 +342,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     let mut cache = CACHE.write().await;
                     cache.insert(key, entry);
                 }
+                {
+                    let mut cache = VALUES_CACHE.write().await;
+                    cache.remove(&org);
+                    drop(cache);
+                }
             }
             Event::Delete(ev) => {
-                // TODO: handle after cache is setup
                 let item_key = ev.key.strip_prefix(prefix).unwrap();
                 let splits: Vec<_> = item_key.split("/").collect();
                 if splits.len() != 4 {
@@ -317,6 +375,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     for k in keys {
                         cache.remove(&k);
                     }
+                }
+                {
+                    let mut cache = VALUES_CACHE.write().await;
+                    cache.remove(org);
+                    drop(cache);
                 }
             }
             Event::Empty => {}

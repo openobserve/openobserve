@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait, prelude::Expr,
+    ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
+    TransactionTrait, prelude::Expr,
 };
 use serde::{Deserialize, Serialize};
 
@@ -77,6 +78,11 @@ impl From<i32> for FileType {
             _ => Self::SourceMap,
         }
     }
+}
+
+#[derive(FromQueryResult)]
+struct Value {
+    value: Option<String>,
 }
 
 pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
@@ -231,4 +237,57 @@ pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
         .await?;
 
     Ok(())
+}
+
+pub async fn get_values(
+    org_id: &str,
+    limit: u64,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    let services = Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .select_only()
+        .distinct()
+        .column_as(Column::Service, "value")
+        .limit(limit)
+        .into_model::<Value>()
+        .all(client)
+        .await?;
+
+    let envs = Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .select_only()
+        .distinct()
+        .column_as(Column::Env, "value")
+        .limit(limit)
+        .into_model::<Value>()
+        .all(client)
+        .await?;
+
+    let versions = Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .select_only()
+        .distinct()
+        .column_as(Column::Version, "value")
+        .limit(limit)
+        .into_model::<Value>()
+        .all(client)
+        .await?;
+
+    let services: Vec<_> = services
+        .into_iter()
+        .map(|v| v.value.unwrap_or_default())
+        .collect();
+    let envs: Vec<_> = envs
+        .into_iter()
+        .map(|v| v.value.unwrap_or_default())
+        .collect();
+    let versions: Vec<_> = versions
+        .into_iter()
+        .map(|v| v.value.unwrap_or_default())
+        .collect();
+
+    return Ok((services, envs, versions));
 }

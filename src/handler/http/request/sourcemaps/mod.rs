@@ -111,7 +111,7 @@ pub async fn list(
     MetaHttpResponse::json(ret)
 }
 
-/// ListSourcemaps
+/// DeleteSourcemaps
 #[utoipa::path(
     delete,
     path = "/{org_id}/sourcemaps",
@@ -151,7 +151,7 @@ pub async fn delete(
     }
 }
 
-/// ListSourcemaps
+/// TranslateStacktrace
 #[utoipa::path(
     delete,
     path = "/{org_id}/sourcemaps/stacktrace",
@@ -305,4 +305,38 @@ pub async fn upload_maps(Path(org_id): Path<String>, mut multipart: Multipart) -
             MetaHttpResponse::bad_request(e)
         }
     }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/sourcemaps/values",
+    context_path = "/api",
+    tag = "Sourcemaps",
+    operation_id = "SourcemapValuesList",
+    summary = "List distinct service, env, version values for uploaded sourcemaps in org",
+    description = "List distinct service, env, version values for uploaded sourcemaps in org",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+    )
+)]
+pub async fn list_values(Path(org_id): Path<String>) -> Response {
+    let values = match db_sourcemaps::list_values(&org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error listing sourcemaps values for org_id {org_id} : {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    MetaHttpResponse::json(values)
 }
