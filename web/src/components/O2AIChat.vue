@@ -357,24 +357,6 @@
         >
         </q-input>
         <div class="tw:flex tw:items-center tw:justify-end tw:mt-2 tw:gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
-          <q-select
-              v-model="selectedModel"
-              :options="availableModels"
-              dense
-              flat
-              borderless
-              style="max-width: 100px; height: 36px;"
-            >
-              <template v-slot:selected-item="scope">
-                <div
-                  class="ellipsis"
-                  style="max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;"
-                >
-                  {{ scope.opt.label || scope.opt }}
-                </div>
-              </template>
-            </q-select>
-
           <!-- Debug info - remove this later -->
           <!-- <div class="tw:text-xs tw:text-gray-500">Loading: {{ isLoading }}, Input: {{ inputMessage.length }}</div> -->
 
@@ -420,7 +402,7 @@ import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
-import { getImageURL } from '@/utils/zincutils';
+import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
 
 // Add IndexedDB setup
@@ -497,6 +479,10 @@ export default defineComponent({
     aiChatInputContext: {
       type: String,
       default: ''
+    },
+    appendMode: {
+      type: Boolean,
+      default: true
     }
   },
   setup(props) {
@@ -506,13 +492,13 @@ export default defineComponent({
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<HTMLElement | null>(null);
+    const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref('');
     const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
-    const selectedProvider = ref<string>('openai');
-    const selectedModel = ref<any>('gpt-4.1');
     const showHistory = ref(false);
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
+    const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const store = useStore ();
     const chatUpdated = computed(() => store.state.chatUpdated);
 
@@ -613,12 +599,6 @@ export default defineComponent({
       '9. How to monitor azure services',
       '10. How to monitor google cloud services'
     ];
-
-    const availableModels = computed(() => modelConfig[selectedProvider.value] || []);
-
-    watch(selectedProvider, (newProvider: string) => {
-      selectedModel.value = modelConfig[newProvider][0];
-    });
 
     const formatMessage = (content: string) => {
       try {
@@ -734,7 +714,20 @@ export default defineComponent({
 
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
       if(newAiChatInputContext) {
-        inputMessage.value = newAiChatInputContext;
+        if (props.appendMode) {
+          // Append mode: add to existing input with separator if needed
+          const currentValue = inputMessage.value?.trim();
+          if (currentValue) {
+            inputMessage.value = currentValue + "\n\n" + newAiChatInputContext;
+          } else {
+            inputMessage.value = newAiChatInputContext;
+          }
+          // Scroll to show the newly appended content
+          scrollInputToBottom();
+        } else {
+          // Replace mode: replace the input
+          inputMessage.value = newAiChatInputContext;
+        }
       }
     });
 
@@ -1108,12 +1101,16 @@ export default defineComponent({
           return serialized;
         });
 
+        // Generate session ID if not already set for this chat
+        if (!currentSessionId.value) {
+          currentSessionId.value = getUUIDv7();
+        }
+
         const chatData = {
           timestamp: new Date().toISOString(),
           title,
           messages: serializableMessages,
-          provider: selectedProvider.value,
-          model: selectedModel.value
+          sessionId: currentSessionId.value
         };
 
         // Always use put with the current chat ID to update existing chat
@@ -1200,8 +1197,7 @@ export default defineComponent({
     const addNewChat = () => {
       chatMessages.value = [];
       currentChatId.value = null;
-      selectedProvider.value = 'openai';
-      selectedModel.value = modelConfig.openai[0];
+      currentSessionId.value = null; // Will be generated on first save
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
@@ -1240,9 +1236,8 @@ export default defineComponent({
             const lastMessage = formattedMessages[formattedMessages.length - 1];
             
             chatMessages.value = formattedMessages;
-            selectedProvider.value = chat.provider || 'openai';
-            selectedModel.value = chat.model || modelConfig.openai[0];
             currentChatId.value = chatId;
+            currentSessionId.value = chat.sessionId || null; // Restore session ID from history
             showHistory.value = false;
             shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
             
@@ -1298,13 +1293,20 @@ export default defineComponent({
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
         
         let response: any;
-        try { 
-          // Pass abort signal to enable request cancellation
+        try {
+          // Ensure session ID exists for tracking this chat session
+          if (!currentSessionId.value) {
+            currentSessionId.value = getUUIDv7();
+          }
+
+          // Pass abort signal and session ID to enable request cancellation and session tracking
           response = await fetchAiChat(
             chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
-            currentAbortController.value.signal
+            currentAbortController.value.signal,
+            undefined, // explicitContext
+            currentSessionId.value // sessionId for x-o2-session-id header
           );
         } catch (error) {
           console.error('Error fetching AI chat:', error);
@@ -1422,6 +1424,34 @@ export default defineComponent({
           textarea.focus();
         }
       }
+    };
+
+    // Scroll input textarea to bottom to show latest appended content
+    const scrollInputToBottom = () => {
+      // Clear any pending scroll timeout
+      if (scrollTimeoutId.value !== null) {
+        clearTimeout(scrollTimeoutId.value);
+      }
+
+      // Set new timeout for scroll
+      scrollTimeoutId.value = setTimeout(() => {
+        const textarea = chatInput.value?.$el?.querySelector('textarea');
+        if (!textarea) return;
+
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        // Scroll all scrollable parent elements
+        let element = textarea;
+        while (element && element !== document.body) {
+          if (element.scrollHeight > element.clientHeight) {
+            element.scrollTop = element.scrollHeight;
+          }
+          element = element.parentElement;
+        }
+
+        scrollTimeoutId.value = null;
+      }, 50);
     };
 
     // Load query history from localStorage
@@ -1826,9 +1856,6 @@ export default defineComponent({
       formatMessage,
       capabilities,
       selectCapability,
-      selectedProvider,
-      selectedModel,
-      availableModels,
       showHistory,
       chatHistory,
       addNewChat,
@@ -2128,6 +2155,23 @@ export default defineComponent({
         overflow-wrap: break-word;
         word-break: break-word;
         max-width: 100%;
+      }
+
+      // Restore list styling (Tailwind preflight removes it)
+      :deep(ol) {
+        list-style-type: decimal;
+        padding-left: 1.5em;
+        margin: 0.5em 0;
+      }
+
+      :deep(ul) {
+        list-style-type: disc;
+        padding-left: 1.5em;
+        margin: 0.5em 0;
+      }
+
+      :deep(li) {
+        margin: 0.25em 0;
       }
     }
 

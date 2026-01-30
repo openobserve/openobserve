@@ -142,6 +142,7 @@ jobs:
                 "unflattened.spec.js",
                 "logstable.spec.js",
                 "shareLink.spec.js",
+                "monaco-query-prefill.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -267,6 +268,7 @@ jobs:
                 "metrics-config-tabs.spec.js",
                 "metrics-visualizations.spec.js",
                 "metrics-config.spec.js",
+                "metrics-table-column-order.spec.js"
               ]
           - testfolder: "Dashboards-Variables-Scoped"
             browser: "chrome"
@@ -276,12 +278,12 @@ jobs:
                 "dashboard-variables-tab-level.spec.js",
                 "dashboard-variables-panel-level.spec.js",
               ]
-          # - testfolder: "Dashboards-Variables-Dependency"
-          #   browser: "chrome"
-          #   run_files:
-          #     [
-          #       "dashboard-variables-dependency.spec.js",
-          #     ]
+          - testfolder: "Dashboards-Variables-Dependency"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-variables-dependency.spec.js",
+              ]
           - testfolder: "Dashboards-Variables-Refresh"
             browser: "chrome"
             run_files:

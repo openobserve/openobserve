@@ -34,6 +34,7 @@ pub struct BackfillJob {
     pub delay_between_chunks_secs: Option<i64>,
     pub delete_before_backfill: bool,
     pub created_at: i64, // microseconds
+    pub enabled: bool,
 }
 
 impl From<Model> for BackfillJob {
@@ -48,6 +49,7 @@ impl From<Model> for BackfillJob {
             delay_between_chunks_secs: model.delay_between_chunks_secs,
             delete_before_backfill: model.delete_before_backfill,
             created_at: model.created_at,
+            enabled: model.enabled,
         }
     }
 }
@@ -102,6 +104,7 @@ pub async fn add(job: BackfillJob) -> Result<(), errors::Error> {
         delay_between_chunks_secs: Set(job.delay_between_chunks_secs),
         delete_before_backfill: Set(job.delete_before_backfill),
         created_at: Set(job.created_at),
+        enabled: Set(job.enabled),
     };
 
     let _lock = get_lock().await;
@@ -155,6 +158,34 @@ pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
             match res {
                 Ok(_) => Ok(()),
                 Err(e) => orm_err!(format!("update backfill job error: {e}")),
+            }
+        }
+        Ok(None) => orm_err!("backfill job not found"),
+        Err(e) => orm_err!(format!("find backfill job error: {e}")),
+    }
+}
+
+pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Find existing model
+    let existing = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Id.eq(job_id))
+        .one(client)
+        .await;
+
+    match existing {
+        Ok(Some(model)) => {
+            let mut active: ActiveModel = model.into();
+            active.enabled = Set(enabled);
+
+            let res = active.update(client).await;
+            match res {
+                Ok(_) => Ok(()),
+                Err(e) => orm_err!(format!("update backfill job enabled error: {e}")),
             }
         }
         Ok(None) => orm_err!("backfill job not found"),

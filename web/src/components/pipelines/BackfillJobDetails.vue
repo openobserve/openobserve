@@ -234,11 +234,13 @@ import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { timestampToTimezoneDate } from "../../utils/zincutils";
 
 interface Props {
   modelValue: boolean;
   jobId: string;
+  pipelineId: string;
 }
 
 interface Emits {
@@ -285,6 +287,7 @@ const loadJobDetails = async () => {
   try {
     const response = await backfillService.getBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: props.pipelineId,
       job_id: props.jobId,
     });
     job.value = response;
@@ -312,11 +315,19 @@ const confirmCancelJob = () => {
 };
 
 const cancelJob = async () => {
-  if (!job.value) return;
+  if (!job.value || !job.value.pipeline_id) {
+    $q.notify({
+      type: "negative",
+      message: "Job information not available. Please try again.",
+      timeout: 3000,
+    });
+    return;
+  }
 
   try {
     await backfillService.cancelBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: job.value.pipeline_id,
       job_id: job.value.job_id,
     });
 
@@ -481,14 +492,18 @@ const getDeletionStatusLabel = (status?: any) => {
 
 const formatTimestamp = (timestamp?: number) => {
   if (!timestamp) return "N/A";
-  const date = new Date(timestamp / 1000); // Convert from microseconds
-  return format(date, "MMM dd, yyyy HH:mm");
+  const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Convert from microseconds to milliseconds
+  return timestampToTimezoneDate(timestamp / 1000, userTimezone, "MMM dd, yyyy HH:mm");
 };
 
 const formatTimestampFull = (timestamp?: number) => {
   if (!timestamp) return "N/A";
+  const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const date = new Date(timestamp / 1000); // Convert from microseconds
-  return `${format(date, "MMM dd, yyyy HH:mm:ss")} (${formatDistanceToNow(date, { addSuffix: true })})`;
+  const formattedDate = timestampToTimezoneDate(timestamp / 1000, userTimezone, "MMM dd, yyyy HH:mm:ss");
+  const timezoneName = userTimezone === "UTC" ? "UTC" : userTimezone;
+  return `${formattedDate} ${timezoneName} (${formatDistanceToNow(date, { addSuffix: true })})`;
 };
 </script>
 

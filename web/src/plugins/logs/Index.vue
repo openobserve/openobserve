@@ -1604,6 +1604,22 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
+            // Copy VRL function query if present
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function"
+            ) {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = b64EncodeUnicode(
+                searchObj.data.tempFunctionContent,
+              );
+            } else {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = "";
+            }
+
             // Store current config and chart type to preserve them during rebuild
             const queryParams = router.currentRoute.value.query;
             let preservedConfig = null;
@@ -1694,6 +1710,17 @@ export default defineComponent({
               return;
             }
 
+            // Force table chart if VRL functions are present
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function" &&
+              shouldAutoSelectChartType
+            ) {
+              dashboardPanelData.data.type = "table";
+              // Enable dynamic columns for VRL table charts
+              dashboardPanelData.data.config.table_dynamic_columns = true;
+            }
+
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogramQuery.value === true) {
               // only do it if is_histogram_eligible is true on logs page
@@ -1721,6 +1748,8 @@ export default defineComponent({
                   // assign to visualizeChartData as well
                   visualizeChartData.value.queries[0].query =
                     dashboardPanelData.data.queries[0].query;
+                  visualizeChartData.value.queries[0].vrlFunctionQuery =
+                    dashboardPanelData.data.queries[0].vrlFunctionQuery;
                 }
               }
             } else {
@@ -1783,6 +1812,15 @@ export default defineComponent({
               };
             }
 
+            // Enable dynamic columns for VRL table charts (after preservedConfig to ensure it's set)
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function" &&
+              dashboardPanelData.data.type === "table"
+            ) {
+              dashboardPanelData.data.config.table_dynamic_columns = true;
+            }
+
             // run query
             await copyDashboardDataToVisualize();
 
@@ -1831,6 +1869,22 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
 
+          // Update VRL function query if present
+          if (
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function"
+          ) {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].vrlFunctionQuery = b64EncodeUnicode(
+              searchObj.data.tempFunctionContent,
+            );
+          } else {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].vrlFunctionQuery = "";
+          }
+
           // reset old rendered chart
           visualizeChartData.value = {};
 
@@ -1840,6 +1894,15 @@ export default defineComponent({
           // if not able to parse query, do not do anything
           if (shouldUseHistogramQuery.value === null) {
             return false;
+          }
+
+          // Enable dynamic columns for VRL table charts
+          if (
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function" &&
+            dashboardPanelData.data.type === "table"
+          ) {
+            dashboardPanelData.data.config.table_dynamic_columns = true;
           }
 
           // emit resize event
@@ -1927,6 +1990,25 @@ export default defineComponent({
             : cloneDeep(searchObj.data.datetime);
       },
       { deep: true },
+    );
+
+    // Watch AI chat state and adjust splitter to give more space when chat is open
+    const originalSplitterValue = ref(searchObj.config.splitterModel);
+    watch(
+      () => store.state.isAiChatEnabled,
+      (isEnabled) => {
+        // Only adjust splitter if field list is shown
+        if (searchObj.meta.showFields) {
+          if (isEnabled) {
+            // AI chat opened - save current value and set splitter to 25
+            originalSplitterValue.value = searchObj.config.splitterModel;
+            searchObj.config.splitterModel = 25;
+          } else {
+            // AI chat closed - restore original splitter value
+            searchObj.config.splitterModel = originalSplitterValue.value;
+          }
+        }
+      }
     );
 
     const handleRunQueryFn = async (clear_cache = false) => {
@@ -2220,10 +2302,15 @@ export default defineComponent({
 
         checkAbort();
 
-        /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        /* Decide whether to use histogram query - don't use for table charts, when there are group_by fields, or when VRL functions are present */
+        const hasVrlFunction =
+          searchObj.data.tempFunctionContent &&
+          searchObj.data.transformType === "function";
+
         shouldUseHistogramQuery.value =
           dashboardPanelData.data.type !== "table" &&
-          !(extractedFields?.group_by && extractedFields.group_by.length);
+          !(extractedFields?.group_by && extractedFields.group_by.length) &&
+          !hasVrlFunction;
 
         const finalQuery = logsPageQuery;
 
@@ -2451,8 +2538,8 @@ export default defineComponent({
 
     // [END] Context Provider Setup
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
     };
 
     const clearAllTimeouts = () => {

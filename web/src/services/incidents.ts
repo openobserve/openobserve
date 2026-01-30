@@ -98,20 +98,7 @@ export interface IncidentCorrelatedStreams {
   logStreams: StreamInfo[];
   metricStreams: StreamInfo[];
   traceStreams: StreamInfo[];
-  correlationData: CorrelationResponse;
-}
-
-// Service Graph visualization types
-export interface IncidentServiceGraph {
-  nodes: AlertNode[];
-  edges: AlertEdge[];
-  stats: IncidentGraphStats;
-}
-
-export interface IncidentGraphStats {
-  total_services: number;
-  total_alerts: number;
-  services_with_alerts: number;
+  correlationData: CorrelationResponse | null;
 }
 
 const incidents = {
@@ -153,7 +140,7 @@ const incidents = {
     status: "open" | "acknowledged" | "resolved"
   ) => {
     return http().patch<Incident>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/status`,
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
       { status }
     );
   },
@@ -220,6 +207,19 @@ const incidents = {
     const response = await serviceStreamsApi.correlate(org_identifier, request);
     const correlationData = response.data;
 
+    // Handle null response when no service is found
+    if (!correlationData) {
+      return {
+        serviceName: "Unknown Service",
+        matchedDimensions: {},
+        additionalDimensions: dimensions,
+        logStreams: [],
+        metricStreams: [],
+        traceStreams: [],
+        correlationData: null,
+      };
+    }
+
     return {
       serviceName: correlationData.service_name,
       matchedDimensions: correlationData.matched_dimensions || {},
@@ -249,15 +249,6 @@ const incidents = {
       dimensions["traceId"] ||
       dimensions["trace.id"] ||
       dimensions["TraceId"]
-    );
-  },
-
-  /**
-   * Get service graph visualization data for an incident
-   */
-  getServiceGraph: (org_identifier: string, incident_id: string) => {
-    return http().get<IncidentServiceGraph>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/service_graph`
     );
   },
 };

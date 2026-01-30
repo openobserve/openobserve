@@ -38,6 +38,8 @@
     "goHome": "Vai a casa",
     "name": "Nome",
     "add": "Inserisci",
+    "selectAll": "Seleziona tutto",
+    "deselectAll": "Deseleziona tutto",
     "details": "Dettagli",
     "tags": "Etichette",
     "process": "Processo",
@@ -109,7 +111,9 @@
     "chunkLoadError": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
     "chunkLoadErrorMsg": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
     "id": "ID",
-    "getStarted": "Inizia"
+    "getStarted": "Inizia",
+    "reset": "Reimposta",
+    "retry": "Riprova"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -303,7 +307,8 @@
     "hide": "Nascondi",
     "show": "Mostra",
     "editor": "Redattore",
-    "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore."
+    "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
+    "showHideColumns": "Mostra/nascondi colonne"
   },
   "menu": {
     "home": "Home",
@@ -695,7 +700,9 @@
     "license_already_active_title": "Licenza già attiva",
     "license_already_active_msg": "La tua licenza è ancora attiva. Vuoi aggiornarla con la nuova chiave di licenza?",
     "yes_update_license": "Sì, aggiorna la licenza",
-    "no_keep_current": "No, tieniti aggiornato"
+    "no_keep_current": "No, tieniti aggiornato",
+    "feature_correlation_management": "Gestione delle correlazioni",
+    "feature_log_patterns": "Schemi di registro"
   },
   "login": {
     "userid": "ID utente",
@@ -1389,7 +1396,14 @@
     "folders": "Cartelle",
     "searchFolder": "Cartella di ricerca",
     "deleteFolder": "Elimina cartella",
-    "deleteFolderMessage": "Sei sicuro di voler eliminare questa cartella?"
+    "deleteFolderMessage": "Sei sicuro di voler eliminare questa cartella?",
+    "columnOrder": "Ordine delle colonne",
+    "configureColumnOrder": "Configura l'ordine delle colonne",
+    "columnOrderDescription": "Personalizza l'ordine di visualizzazione delle colonne nella tabella. È possibile riordinare solo le colonne visibili (basate su filtri visibili/nascosti). Trascina le colonne per modificarne l'ordine.",
+    "noColumnsOrdered": "Nessuna colonna ordinata",
+    "columnsDefaultOrder": "Le colonne verranno visualizzate nell'ordine predefinito",
+    "moveUp": "Sposta verso l'alto",
+    "moveDown": "Sposta verso il basso"
   },
   "panel": {
     "header": "Pannello",
@@ -2669,7 +2683,55 @@
     "stable": "Stabile",
     "stableTooltip": "Le dimensioni stabili hanno una bassa cardinalità e vengono utilizzate per il calcolo delle chiavi di correlazione",
     "normalize": "Normalizza",
-    "noSemanticGroupsInCategory": "Nessun gruppo semantico nella categoria: {category}"
+    "noSemanticGroupsInCategory": "Nessun gruppo semantico nella categoria: {category}",
+    "logs": {
+      "title": "Log correlati",
+      "filters": {
+        "title": "Modifica filtri di correlazione",
+        "description": "Modifica i filtri delle dimensioni per perfezionare la tua query di correlazione. Le dimensioni corrispondenti sono identificatori stabili, mentre le dimensioni aggiuntive possono cambiare al riavvio del pod.",
+        "matchedDimensions": "Dimensioni abbinate (stabili)",
+        "matchedDimensionsTooltip": "Queste dimensioni sono identificatori stabili che rimangono coerenti durante i riavvii dei pod e vengono utilizzati per abbinare la telemetria correlata.",
+        "additionalDimensions": "Dimensioni aggiuntive (instabili)",
+        "additionalDimensionsTooltip": "Queste dimensioni possono cambiare al riavvio del pod (ad esempio, pod_name, container_id). Puoi impostarle su «Tutti i valori» per ampliare la ricerca.",
+        "stableDimension": "Dimensione stabile",
+        "unstableDimension": "Instabile: modifiche al riavvio",
+        "setToAll": "Imposta su tutti i valori",
+        "showingAll": "Visualizzazione di tutti i valori",
+        "wildcardHelp": "Usa «Tutti i valori» per ignorare questa dimensione nel filtro",
+        "noAdditionalDimensions": "Nessuna dimensione aggiuntiva disponibile"
+      },
+      "loading": "Caricamento dei log correlati...",
+      "loadingDetails": "Recupero dei log dai flussi correlati...",
+      "error": "Caricamento dei log non riuscito",
+      "noData": "Nessun registro correlato trovato",
+      "noDataDetails": "Nessun registro trovato corrispondente ai filtri di correlazione.",
+      "resetFilters": "Reimposta filtri",
+      "editFilters": "Modifica filtri",
+      "editTimeRange": "Modifica intervallo di tempo",
+      "selectValue": "Seleziona valore",
+      "stableDimension": "Dimensione stabile: coerente tra i riavvii del pod",
+      "unstableDimension": "Dimensione instabile: può cambiare al riavvio del pod",
+      "resultsCount": "{count} log trovati in {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Regola l'intervallo di tempo",
+        "sourceTime": "Tempo di registrazione della fonte",
+        "window": "Finestra temporale",
+        "minute1": "±1 minuto",
+        "minute5": "±5 minuti (impostazione predefinita)",
+        "minute15": "±15 minuti",
+        "minute30": "±30 minuti",
+        "hour1": "±1 ora",
+        "custom": "Personalizzato",
+        "customStart": "Ora di inizio personalizzata",
+        "customEnd": "Ora di fine personalizzata",
+        "currentRange": "Intervallo di tempo attuale",
+        "start": "Inizio",
+        "end": "Fine",
+        "duration": "Durata",
+        "startBeforeEnd": "L'ora di inizio deve essere precedente all'ora di fine",
+        "endAfterStart": "L'ora di fine deve essere successiva all'ora di inizio"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
@@ -2677,5 +2739,46 @@
     "clearChatTitle": "Cancella chat",
     "clearChatMessage": "Sei sicuro di voler chiarire questa conversazione?",
     "copiedToClipboard": "Copiato negli appunti"
+  },
+  "awsMarketplace": {
+    "title": "Registrazione AWS Marketplace",
+    "subtitle": "Completa la configurazione dell'abbonamento OpenObserve",
+    "invalidLink": "Link di registrazione non valido",
+    "invalidLinkDescription": "Questo link di registrazione non è valido o è scaduto. Abbonati nuovamente da AWS Marketplace.",
+    "goToMarketplace": "Vai ad AWS Marketplace",
+    "newUser": "Sei nuovo su OpenObserve?",
+    "newUserDescription": "Crea un nuovo account e una nuova organizzazione",
+    "createAccount": "Crea un account",
+    "existingUser": "Hai già un account?",
+    "existingUserDescription": "Accedi per creare una nuova organizzazione con fatturazione AWS",
+    "login": "Accedi",
+    "loggedInAs": "Effettuato l'accesso come",
+    "createNewOrg": "Crea nuova organizzazione",
+    "createNewOrgDescription": "Crea una nuova organizzazione con la fatturazione di AWS Marketplace",
+    "orgName": "Nome dell'organizzazione",
+    "createOrganization": "Crea organizzazione",
+    "linkToExisting": "Collegamento a un'organizzazione esistente",
+    "linkToExistingDescription": "Collega la fatturazione AWS a una delle tue organizzazioni di livello gratuito",
+    "selectOrganization": "Seleziona organizzazione",
+    "linkAwsBilling": "Collega la fatturazione AWS",
+    "settingUp": "Configurazione dell'abbonamento...",
+    "pleaseWait": "Attendi mentre configuriamo il tuo account.",
+    "waitingConfirmation": "In attesa della conferma di AWS",
+    "waitingDescription": "L'abbonamento è in fase di attivazione. Di solito ci vuole meno di un minuto.",
+    "customerId": "ID cliente",
+    "subscriptionActivated": "Abbonamento attivato!",
+    "activatedDescription": "Il tuo abbonamento ad AWS Marketplace è ora attivo.",
+    "goToDashboard": "Vai alla dashboard",
+    "paymentFailed": "Pagamento non riuscito",
+    "paymentFailedDescription": "Si è verificato un problema con il pagamento di AWS Marketplace. Controlla il tuo account AWS o contatta l'assistenza AWS.",
+    "contactSupport": "Contatta l'assistenza",
+    "tryAgain": "Riprova",
+    "activationTimeout": "Timeout di attivazione. Contatta l'assistenza se il problema persiste."
+  },
+  "validation": {
+    "required": "Questo campo è obbligatorio",
+    "invalidFormat": "Formato non valido",
+    "mustBeGreaterThan": "Deve essere maggiore di {value}",
+    "mustBeLessThan": "Deve essere inferiore a {value}"
   }
 }

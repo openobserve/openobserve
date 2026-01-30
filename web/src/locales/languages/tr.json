@@ -38,6 +38,8 @@
     "goHome": "Eve git",
     "name": "İsim",
     "add": "Ekle",
+    "selectAll": "Tümünü seç",
+    "deselectAll": "Tümünün seçimini kaldır",
     "details": "Ayrıntılar",
     "tags": "Etiketler",
     "process": "Süreç",
@@ -109,7 +111,9 @@
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "id": "KİMLİK",
-    "getStarted": "Başlayın"
+    "getStarted": "Başlayın",
+    "reset": "Sıfırla",
+    "retry": "Tekrar dene"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -303,7 +307,8 @@
     "hide": "Gizle",
     "show": "Göster",
     "editor": "Editör",
-    "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır."
+    "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır.",
+    "showHideColumns": "Sütunları Göster/Gizle"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -695,7 +700,9 @@
     "license_already_active_title": "Lisans Zaten Aktif",
     "license_already_active_msg": "Lisansınız hala aktif. Yeni lisans anahtarıyla güncellemek ister misiniz?",
     "yes_update_license": "Evet, lisansı güncelle",
-    "no_keep_current": "Hayır, güncel tut"
+    "no_keep_current": "Hayır, güncel tut",
+    "feature_correlation_management": "Korelasyon yönetimi",
+    "feature_log_patterns": "Günlük kalıpları"
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
@@ -1389,7 +1396,14 @@
     "folders": "Klasörler",
     "searchFolder": "Arama Klasörü",
     "deleteFolder": "Klasörü Sil",
-    "deleteFolderMessage": "Bu klasörü silmek istediğinizden emin misiniz?"
+    "deleteFolderMessage": "Bu klasörü silmek istediğinizden emin misiniz?",
+    "columnOrder": "Sütun Sırası",
+    "configureColumnOrder": "Sütun Sırasını Yapılandırma",
+    "columnOrderDescription": "Tablodaki sütunların görüntüleme sırasını özelleştirin. Yalnızca görünür sütunlar (görünür/gizli filtrelere dayalı) yeniden sıralanabilir. Sıralarını değiştirmek için sütunları sürükleyin.",
+    "noColumnsOrdered": "Sıralı sütun yok",
+    "columnsDefaultOrder": "Sütunlar varsayılan sıralarında görüntülenecektir",
+    "moveUp": "Yukarı hareket et",
+    "moveDown": "Aşağı hareket et"
   },
   "panel": {
     "header": "Panel",
@@ -1934,6 +1948,8 @@
     "searchMetric": "Bir Metrik Ara",
     "searchLabel": "Metrik etiketi ara",
     "add": "Ekle",
+    "selectAll": "Tümünü seç",
+    "deselectAll": "Tümünün seçimini kaldır",
     "cancel": "İptal",
     "promqlLabel": "PromQL",
     "runQuery": "Sorguyu Çalıştırma",
@@ -2669,7 +2685,55 @@
     "stable": "Kararlı",
     "stableTooltip": "Kararlı boyutlar düşük kardinaliteye sahiptir ve korelasyon anahtarı hesaplaması için kullanılır",
     "normalize": "Normalleştir",
-    "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}"
+    "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}",
+    "logs": {
+      "title": "İlişkili Günlükler",
+      "filters": {
+        "title": "Korelasyon Filtrelerini Düzenle",
+        "description": "Korelasyon sorgunuzu hassaslaştırmak için boyut filtrelerini ayarlayın. Eşleşen boyutlar kararlı tanımlayıcılardır, ancak bölme yeniden başlatıldığında ek boyutlar değişebilir.",
+        "matchedDimensions": "Eşleşen Boyutlar (Kararlı)",
+        "matchedDimensionsTooltip": "Bu boyutlar, bölme yeniden başlatmalarında tutarlı kalan ve ilgili telemetriyi eşleştirmek için kullanılan kararlı tanımlayıcılardır.",
+        "additionalDimensions": "Ek Boyutlar (Kararsız)",
+        "additionalDimensionsTooltip": "Bu boyutlar bölme yeniden başlatıldığında değişebilir (örn., pod_name, container_id). Aramayı genişletmek için bunları 'Tüm Değerler' olarak ayarlayabilirsiniz.",
+        "stableDimension": "Kararlı boyut",
+        "unstableDimension": "Kararsız - yeniden başlatmada değişiklikler",
+        "setToAll": "Tüm Değerlere Ayarla",
+        "showingAll": "Tüm Değerlerin Gösterilmesi",
+        "wildcardHelp": "Filtrelemede bu boyutu yok saymak için 'Tüm Değerler'i kullanın",
+        "noAdditionalDimensions": "Ek boyut mevcut değil"
+      },
+      "loading": "İlişkili günlükler yükleniyor...",
+      "loadingDetails": "İlişkili akışlardan günlükler alınıyor...",
+      "error": "Günlükler Yüklenemedi",
+      "noData": "İlişkili Günlükler Bulunamadı",
+      "noDataDetails": "Korelasyon filtreleriyle eşleşen günlük bulunamadı.",
+      "resetFilters": "Filtreleri Sıfırla",
+      "editFilters": "Filtreleri Düzenle",
+      "editTimeRange": "Zaman Aralığını Düzenle",
+      "selectValue": "Değer seç",
+      "stableDimension": "Kararlı boyut - bölme yeniden başlatmalarında tutarlı",
+      "unstableDimension": "Kararsız boyut - pod yeniden başlatıldığında değişebilir",
+      "resultsCount": "{count} günlükleri {stream} ({time} ms) içinde bulundu",
+      "timeRange": {
+        "title": "Zaman Aralığını Ayarla",
+        "sourceTime": "Kaynak Günlüğü Süresi",
+        "window": "Zaman Penceresi",
+        "minute1": "±1 dakika",
+        "minute5": "± 5 dakika (varsayılan)",
+        "minute15": "±15 dakika",
+        "minute30": "±30 dakika",
+        "hour1": "±1 saat",
+        "custom": "Özel",
+        "customStart": "Özel Başlangıç Zamanı",
+        "customEnd": "Özel Bitiş Zamanı",
+        "currentRange": "Geçerli Zaman Aralığı",
+        "start": "Başlat",
+        "end": "Bitiş",
+        "duration": "Süre",
+        "startBeforeEnd": "Başlangıç saati bitiş saatinden önce olmalıdır",
+        "endAfterStart": "Bitiş saati başlangıç saatinden sonra olmalıdır"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
@@ -2677,5 +2741,46 @@
     "clearChatTitle": "Sohbeti Temizle",
     "clearChatMessage": "Bu konuşmayı temizlemek istediğinden emin misin?",
     "copiedToClipboard": "Panoya kopyalandı"
+  },
+  "awsMarketplace": {
+    "title": "AWS Marketplace Kaydı",
+    "subtitle": "OpenObserve abonelik kurulumunuzu tamamlayın",
+    "invalidLink": "Geçersiz Kayıt Bağlantısı",
+    "invalidLinkDescription": "Bu kayıt bağlantısı geçersiz veya süresi doldu. Lütfen AWS Marketplace'ten tekrar abone olun.",
+    "goToMarketplace": "AWS Marketplace'e gidin",
+    "newUser": "OpenObservere'de yeni misiniz?",
+    "newUserDescription": "Yeni bir hesap ve kuruluş oluşturun",
+    "createAccount": "Hesap Oluştur",
+    "existingUser": "Zaten bir hesabınız var mı?",
+    "existingUserDescription": "AWS faturalandırması ile yeni bir kuruluş oluşturmak için oturum açın",
+    "login": "Oturum aç",
+    "loggedInAs": "Olarak oturum açtı",
+    "createNewOrg": "Yeni Organizasyon Oluştur",
+    "createNewOrgDescription": "AWS Marketplace faturalandırması ile yeni bir kuruluş oluşturun",
+    "orgName": "Kuruluş Adı",
+    "createOrganization": "Organizasyon Oluştur",
+    "linkToExisting": "Mevcut Kuruluşa Bağlantı",
+    "linkToExistingDescription": "AWS faturalandırmasını ücretsiz katmanlı kuruluşlarınızdan birine bağlayın",
+    "selectOrganization": "Organizasyon Seçin",
+    "linkAwsBilling": "AWS Faturalandırmayı Bağlayın",
+    "settingUp": "Aboneliğinizi ayarlama...",
+    "pleaseWait": "Hesabınızı yapılandırırken lütfen bekleyin.",
+    "waitingConfirmation": "AWS Onayı Bekliyor",
+    "waitingDescription": "Aboneliğiniz etkinleştiriliyor. Bu genellikle bir dakikadan az sürer.",
+    "customerId": "Müşteri Kimliği",
+    "subscriptionActivated": "Abonelik Etkinleştirildi!",
+    "activatedDescription": "AWS Marketplace aboneliğiniz artık aktif.",
+    "goToDashboard": "Kontrol Paneline Git",
+    "paymentFailed": "Ödeme Başarısız",
+    "paymentFailedDescription": "AWS Marketplace ödemenizle ilgili bir sorun oluştu. Lütfen AWS hesabınızı kontrol edin veya AWS desteğiyle iletişime geçin.",
+    "contactSupport": "Destek ile iletişime geçin",
+    "tryAgain": "Tekrar dene",
+    "activationTimeout": "Aktivasyon zaman aşımı. Sorun devam ederse lütfen destek ekibiyle iletişime geçin."
+  },
+  "validation": {
+    "required": "Bu alan zorunludur",
+    "invalidFormat": "Geçersiz biçim",
+    "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
+    "mustBeLessThan": "{value} 'den küçük olmalıdır"
   }
 }

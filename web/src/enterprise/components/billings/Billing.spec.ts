@@ -49,13 +49,28 @@ vi.mock("quasar", async (importOriginal) => {
   };
 });
 
+// Mock billing service - using factory function to avoid hoisting issues
+vi.mock("@/services/billings", () => ({
+  default: {
+    list_subscription: vi.fn()
+  }
+}));
+
+// Import after mocking
+import BillingService from "@/services/billings";
+
 describe("Billing Component", () => {
   let wrapper: any = null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
+    // Mock billing service response
+    (BillingService.list_subscription as any).mockResolvedValue({
+      data: { provider: "stripe" }
+    });
+
     // Reset router state
     mockRouter.currentRoute.value.name = "billings";
     mockRouter.currentRoute.value.query = {
@@ -90,6 +105,9 @@ describe("Billing Component", () => {
         }
       },
     });
+
+    // Wait for onMounted to complete
+    await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
@@ -108,7 +126,7 @@ describe("Billing Component", () => {
     });
 
     it("should initialize with correct data", () => {
-      expect(wrapper.vm.billingtab).toBe("plans"); // Should be set to "plans" in onMounted
+      expect(wrapper.vm.billingtab).toBe("plans"); // Should be set to "plans" in onMounted after fetchBillingInfo
       expect(wrapper.vm.usageDataType).toBe("gb");
       expect(wrapper.vm.splitterModel).toBe(220);
       expect(wrapper.vm.usageDate).toBe("30days");
@@ -144,7 +162,8 @@ describe("Billing Component", () => {
   });
 
   describe("onMounted Lifecycle Hook", () => {
-    it("should redirect to plans when route is billings", () => {
+    it("should redirect to plans when route is billings", async () => {
+      // The wrapper was already mounted in beforeEach and onMounted completed
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/billings/plans",
         query: { org_identifier: store.state.selectedOrganization.identifier }
@@ -152,10 +171,19 @@ describe("Billing Component", () => {
       expect(wrapper.vm.billingtab).toBe("plans");
     });
 
-    it("should redirect to plans when route is plans", () => {
+    it("should redirect to plans when route is plans", async () => {
+      // Reset router state and clear mocks before mounting
       mockRouter.currentRoute.value.name = "plans";
-      mockRouter.push.mockClear();
-      
+      mockRouter.currentRoute.value.query = {
+        data_type: "gb",
+        usage_date: "30days"
+      };
+
+      // Mock billing service response for this test
+      (BillingService.list_subscription as any).mockResolvedValue({
+        data: { provider: "stripe" }
+      });
+
       const testWrapper = mount(Billing, {
         global: {
           plugins: [i18n],
@@ -181,7 +209,12 @@ describe("Billing Component", () => {
           }
         },
       });
-      
+
+      // Wait for onMounted to complete (including fetchBillingInfo)
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      // The router.push should have been called during onMounted
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/billings/plans",
         query: { org_identifier: store.state.selectedOrganization.identifier }
@@ -190,10 +223,10 @@ describe("Billing Component", () => {
       testWrapper.unmount();
     });
 
-    it("should not redirect when route is usage", () => {
+    it("should not redirect when route is usage", async () => {
       mockRouter.currentRoute.value.name = "usage";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Billing, {
         global: {
           plugins: [i18n],
@@ -219,7 +252,10 @@ describe("Billing Component", () => {
           }
         },
       });
-      
+
+      // Wait for onMounted to complete
+      await testWrapper.vm.$nextTick();
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -445,9 +481,9 @@ describe("Billing Component", () => {
   });
 
   describe("Query Parameter Initialization", () => {
-    it("should initialize usageDataType from router query", () => {
+    it("should initialize usageDataType from router query", async () => {
       mockRouter.currentRoute.value.query.data_type = "mb";
-      
+
       const testWrapper = mount(Billing, {
         global: {
           plugins: [i18n],
@@ -473,14 +509,16 @@ describe("Billing Component", () => {
           }
         },
       });
-      
+
+      await testWrapper.vm.$nextTick();
+
       expect(testWrapper.vm.usageDataType).toBe("mb");
       testWrapper.unmount();
     });
 
-    it("should initialize usageDate from router query", () => {
+    it("should initialize usageDate from router query", async () => {
       mockRouter.currentRoute.value.query.usage_date = "3months";
-      
+
       const testWrapper = mount(Billing, {
         global: {
           plugins: [i18n],
@@ -506,14 +544,16 @@ describe("Billing Component", () => {
           }
         },
       });
-      
+
+      await testWrapper.vm.$nextTick();
+
       expect(testWrapper.vm.usageDate).toBe("3months");
       testWrapper.unmount();
     });
 
-    it("should use default values when query parameters are missing", () => {
+    it("should use default values when query parameters are missing", async () => {
       mockRouter.currentRoute.value.query = {};
-      
+
       const testWrapper = mount(Billing, {
         global: {
           plugins: [i18n],
@@ -539,7 +579,9 @@ describe("Billing Component", () => {
           }
         },
       });
-      
+
+      await testWrapper.vm.$nextTick();
+
       expect(testWrapper.vm.usageDataType).toBe("gb");
       expect(testWrapper.vm.usageDate).toBe("30days");
       testWrapper.unmount();

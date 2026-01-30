@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,6 @@
 pub mod deduplication;
 pub mod deduplication_exec;
 pub mod projections;
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 pub mod regex_projections;
 pub mod tantivy_optimize_exec;

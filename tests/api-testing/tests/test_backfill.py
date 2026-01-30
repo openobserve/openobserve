@@ -49,6 +49,7 @@ QUERY_RETRY_INTERVAL_SECONDS = 2  # Interval between query retries
 MAX_QUERY_RETRIES = 15  # Max retries when waiting for data to be queryable
 
 
+@pytest.mark.skip(reason="Backfill is an enterprise feature and cannot be tested in CI with non-enterprise build")
 class TestBackfillJob:
     """Test class for pipeline backfill API functionality."""
 

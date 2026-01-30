@@ -479,6 +479,7 @@ class="field_list" no-hover>
                         v-model="searchObj.meta.showHistogram"
                         size="xs"
                         flat
+                        class="o2-toggle-button-xs"
                         :class="
                           store.state.theme === 'dark'
                             ? 'o2-toggle-button-xs-dark'
@@ -523,6 +524,7 @@ class="field_list" no-hover>
                             ? 'o2-toggle-button-xs-dark'
                             : 'o2-toggle-button-xs-light'
                         "
+                        class="o2-toggle-button-xs"
                         @click.stop
                       />
                     </div>
@@ -562,6 +564,7 @@ class="field_list" no-hover>
                             ? 'o2-toggle-button-xs-dark'
                             : 'o2-toggle-button-xs-light'
                         "
+                        class="o2-toggle-button-xs"
                         @click.stop="handleQuickMode"
                       />
                     </div>
@@ -1184,9 +1187,7 @@ class="q-pr-sm q-pt-xs" />
                           ? 'empty-function'
                           : ''
                       "
-                      :readOnly="
-                        searchObj.meta.logsVisualizeToggle === 'visualize'
-                      "
+                      :readOnly="false"
                       @keydown="handleKeyDown"
                       language="vrl"
                       @focus="
@@ -1197,29 +1198,6 @@ class="q-pr-sm q-pt-xs" />
                       "
                     />
                   </div>
-                </div>
-                <div
-                  v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
-                  :class="
-                    store.state.theme == 'dark'
-                      ? 'tw:bg-white tw:bg-opacity-10'
-                      : 'tw:bg-black tw:bg-opacity-10'
-                  "
-                  class="tw:absolute tw:bottom-0 tw:w-full"
-                  style="margin-top: 12px; display: flex; align-items: center; flex"
-                >
-                  <q-icon
-                    name="warning"
-                    color="warning"
-                    size="20px"
-                    class="q-mx-sm"
-                  />
-                  <span
-                    class="text-negative q-pa-sm"
-                    style="font-weight: semibold; font-size: 14px"
-                    >VRL Function Editor is not supported in visualize
-                    mode.</span
-                  >
                 </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
@@ -1675,7 +1653,10 @@ import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+// Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
+const CodeQueryEditor = defineAsyncComponent(
+  () => import("@/components/CodeQueryEditor.vue")
+);
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -4042,6 +4023,12 @@ export default defineComponent({
               ? "0.375rem solid var(--o2-card-bg)"
               : "0.375rem solid var(--o2-card-bg)"
             : "none",
+        // Conditional width when focused (expand-on-focus active)
+        width: isFocused.value
+          ? store.state.isAiChatEnabled
+            ? "calc(75% - 104px)" // AI chat enabled: 75% minus nav width
+            : "calc(100% - 104px)" // AI chat disabled: full width minus nav
+          : undefined,
       };
     });
     const editorWidthToggleFunction = computed(() => {
@@ -4628,7 +4615,7 @@ export default defineComponent({
   position: fixed !important;
   height: calc(100vh - 12.5rem) !important;
   z-index: 20 !important;
-  width: calc(100% - 104px);
+  /* Width is now handled dynamically via backgroundColorStyle computed property */
 }
 
 .file-type label {

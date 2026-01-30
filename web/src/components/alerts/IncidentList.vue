@@ -582,13 +582,6 @@ export default defineComponent({
       });
     };
 
-    const openSREChat = (incident: any) => {
-      store.state.sreChatContext = {
-        type: 'incident',
-        data: incident,
-      };
-      store.dispatch("setIsSREChatOpen", true);
-    };
 
     return {
       t,
@@ -619,7 +612,6 @@ export default defineComponent({
       clearStatusFilter,
       clearSeverityFilter,
       changePagination,
-      openSREChat,
       perPageOptions,
       qTableRef,
     };

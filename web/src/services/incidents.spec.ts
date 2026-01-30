@@ -103,7 +103,7 @@ describe("incidents service", () => {
 
       expect(http).toHaveBeenCalled();
       expect(mockHttp.patch).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/status",
+        "/api/v2/test-org/alerts/incidents/incident-123/update",
         { status: "acknowledged" }
       );
     });
@@ -114,7 +114,7 @@ describe("incidents service", () => {
       incidents.updateStatus("test-org", "incident-123", "open");
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/status",
+        "/api/v2/test-org/alerts/incidents/incident-123/update",
         { status: "open" }
       );
     });
@@ -125,7 +125,7 @@ describe("incidents service", () => {
       incidents.updateStatus("test-org", "incident-123", "resolved");
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/status",
+        "/api/v2/test-org/alerts/incidents/incident-123/update",
         { status: "resolved" }
       );
     });
@@ -307,25 +307,6 @@ describe("incidents service", () => {
 
       const result = incidents.extractTraceId(incident);
       expect(result).toBeUndefined();
-    });
-  });
-
-  describe("getServiceGraph", () => {
-    it("should call http.get with correct URL", () => {
-      mockHttp.get.mockResolvedValue({
-        data: {
-          incident_service: "api-gateway",
-          nodes: [],
-          edges: [],
-        },
-      });
-
-      incidents.getServiceGraph("test-org", "incident-123");
-
-      expect(http).toHaveBeenCalled();
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/service_graph"
-      );
     });
   });
 });

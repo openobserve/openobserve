@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="head q-table__title ">
       {{ headerBasedOnRoute() }}
     </div>
-    <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center tw:h-[40px]">
+    <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
       <div class="custom-usage-date-select">
           <q-select
             dense
@@ -50,17 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      class="logs-splitter-smooth tw:overflow-hidden"
+      class="logs-splitter-smooth"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
-          <div class="card-container tw:h-[calc(100vh-118px)]">
-        <q-tabs
-          v-model="billingtab"
-          indicator-color="transparent"
-          inline-label
-          vertical
-        >
+        <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
+          <div class="card-container" style="min-height: calc(100vh - 125px)">
+            <q-tabs
+              v-model="billingtab"
+              indicator-color="transparent"
+              inline-label
+              vertical
+            >
 
           <q-route-tab
             exact
@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             content-class="tab_content"
           />
           <q-route-tab
+            v-if="showInvoiceTab"
             exact
             name="invoice_history"
             :to="
@@ -119,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-          <div class="card-container tw:h-[calc(100vh-118px)]">
+          <div class="card-container q-pb-md">
             <router-view title=""> </router-view>
           </div>
         </div>
@@ -140,6 +141,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import BillingService from "@/services/billings";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -154,6 +156,28 @@ export default defineComponent({
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
     const splitterModel = ref(220);
+    const billingProvider = ref(""); // empty until loaded
+    const billingInfoLoaded = ref(false);
+
+    // Fetch billing info to determine provider
+    const fetchBillingInfo = async () => {
+      try {
+        const res = await BillingService.list_subscription(
+          store.state.selectedOrganization.identifier
+        );
+        billingProvider.value = res.data?.provider || "";
+      } catch (e) {
+        console.error("Failed to fetch billing info:", e);
+        billingProvider.value = "";
+      } finally {
+        billingInfoLoaded.value = true;
+      }
+    };
+
+    // Check if invoice tab should be shown (only for Stripe, and only after loading)
+    const showInvoiceTab = computed(() => {
+      return billingInfoLoaded.value && billingProvider.value === "stripe";
+    });
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
       if (showSidebar.value) {
@@ -164,7 +188,9 @@ export default defineComponent({
       }
     };
 
-    onMounted(() => {
+    onMounted(async () => {
+      // Fetch billing info to determine provider type
+      await fetchBillingInfo();
       if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
         billingtab.value = "plans";
         router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
@@ -226,7 +252,7 @@ export default defineComponent({
       splitterModel,
       headerBasedOnRoute,
       options: [
-        {label: "30 Days", value: "30days"}, 
+        {label: "30 Days", value: "30days"},
         {label: "60 Days", value: "60days"},
         {label: "3 Months", value: "3months"},
         {label: "6 Months", value: "6months"}],
@@ -239,6 +265,8 @@ export default defineComponent({
       collapseSidebar,
       showSidebar,
       lastSplitterPosition,
+      showInvoiceTab,
+      billingProvider,
     };
   },
 });
@@ -246,6 +274,10 @@ export default defineComponent({
 
 <style scoped lang="scss">
 
+.card-container {
+  overflow-y: auto;
+  max-height: calc(100vh - 125px);
+}
 
 .custom-usage-date-select{
   ::v-deep(.q-field--auto-height.q-field--dense .q-field__control) {

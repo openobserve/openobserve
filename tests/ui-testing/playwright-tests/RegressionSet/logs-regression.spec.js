@@ -91,23 +91,31 @@ test.describe("Logs Regression Bugs", () => {
     await ingestTestData(page, streamA);
     testLogger.info(`Ingesting data to stream B: ${streamB}`);
     await ingestTestData(page, streamB);
-    await page.waitForLoadState('networkidle'); // Wait for data to be indexed
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for data indexing by polling streams API until both streams are available
+    await page.waitForResponse(
+        response => response.url().includes('/streams') && response.status() === 200,
+        { timeout: 15000 }
+    ).catch(() => {}); // Streams may already be indexed
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     // ===== STREAM A SETUP =====
     testLogger.info(`Setting up Stream A (${streamA}) with saved view`);
 
     // Select stream A
     await pm.logsPage.selectStream(streamA);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Click refresh to load data
+    // Click refresh to load data - wait for search API response
+    const searchResponseA = page.waitForResponse(
+      resp => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 30000 }
+    );
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await searchResponseA;
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamA);
@@ -139,12 +147,15 @@ test.describe("Logs Regression Bugs", () => {
 
     // Switch to stream B
     await pm.logsPage.selectStream(streamB);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Click refresh to load data
+    // Click refresh to load data - wait for search API response
+    const searchResponseB = page.waitForResponse(
+      resp => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 30000 }
+    );
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await searchResponseB;
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamB);
@@ -829,7 +840,8 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Test: Validate log display with apostrophes and special characters (Bug #9475)');
 
     const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    const streamName = `e2e_apostrophe_${uniqueId}`;
 
     // Multiple test messages with different apostrophe scenarios
     const testMessages = [
@@ -884,7 +896,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     // Select stream and set time range
     await pm.logsPage.selectStream(streamName);

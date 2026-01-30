@@ -166,7 +166,8 @@ export default defineConfig({
             "@openobserve/browser-rum",
           ],
           "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          "monaco-editor": ["monaco-editor"],
+          // monaco-editor removed from manualChunks to enable true lazy loading
+          // "monaco-editor": ["monaco-editor"],
           moment: ["moment", "moment-timezone"],
           lodash: ["lodash-es"],
           echarts: [
