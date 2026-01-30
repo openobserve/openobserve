@@ -19,13 +19,15 @@ pub mod search_jobs;
 
 use config::utils::json;
 use infra::{
-    coordinator::get_coordinator, errors::{Error, Result}, table::{
+    coordinator::get_coordinator,
+    errors::{Error, Result},
+    table::{
         search_job::{
             search_job_partitions::PartitionJobOperator, search_job_results::JobResultOperator,
             search_jobs::JobOperator,
         },
         source_maps::SourceMap,
-    }
+    },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 

@@ -15,17 +15,33 @@
 
 use std::sync::Arc;
 
+use config::SOURCEMAP_MEM_CACHE_SIZE;
+use hashlink::lru_cache::LruCache;
 use infra::{
     coordinator::get_coordinator,
     db::Event,
     errors::{self, DbError},
     table::source_maps::SourceMap,
 };
+use once_cell::sync::Lazy;
+use parquet::data_type::AsBytes;
+use tokio::sync::RwLock;
 
 use crate::service::db;
 
 // DBKey to set sourcemaps keys
 pub const SOURCEMAP_PREFIX: &str = "/sourcemaps/";
+
+type SourceMapKey = (
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    String,
+);
+
+static CACHE: Lazy<RwLock<LruCache<SourceMapKey, SourceMap>>> =
+    Lazy::new(|| RwLock::new(LruCache::new(SOURCEMAP_MEM_CACHE_SIZE)));
 
 pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
     match infra::table::source_maps::add_many(entries.clone()).await {
@@ -36,6 +52,20 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
         Err(e) => {
             log::info!("error while saving sourcemap to db : {e}");
             return Err(anyhow::anyhow!(e));
+        }
+    }
+
+    {
+        let mut cache = CACHE.write().await;
+        for entry in &entries {
+            let key = (
+                entry.org.clone(),
+                entry.service.clone(),
+                entry.env.clone(),
+                entry.version.clone(),
+                entry.source_map_file_name.clone(),
+            );
+            cache.insert(key, entry.clone());
         }
     }
 
@@ -87,9 +117,33 @@ pub async fn get_sourcemap_file(
     env: &Option<String>,
     version: &Option<String>,
 ) -> Result<Option<SourceMap>, anyhow::Error> {
+    let k = (
+        org.to_string(),
+        service.to_owned(),
+        env.to_owned(),
+        version.to_owned(),
+        source_file.to_string(),
+    );
+    {
+        // because we use LRU cache, we must use write, it even get needs to update
+        // the lru access time
+        let mut cache = CACHE.write().await;
+        if let Some(v) = cache.get(&k) {
+            return Ok(Some(v.clone()));
+        }
+    }
+
     let ret =
         infra::table::source_maps::get_sourcemap_file(org, source_file, service, env, version)
             .await?;
+
+    if let Some(v) = &ret {
+        {
+            let mut cache = CACHE.write().await;
+            cache.insert(k, v.clone());
+        }
+    }
+
     Ok(ret)
 }
 
@@ -111,6 +165,20 @@ pub async fn delete_group(
 ) -> Result<(), errors::Error> {
     infra::table::source_maps::delete_group(org, service.clone(), env.clone(), version.clone())
         .await?;
+
+    {
+        let mut cache = CACHE.write().await;
+        let mut keys = Vec::new();
+        for (k, _) in cache.iter() {
+            let (org_id, s, e, v, _) = &k;
+            if org_id == org && s == &service && e == &env && v == &version {
+                keys.push(k.clone());
+            }
+        }
+        for k in keys {
+            cache.remove(&k);
+        }
+    }
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
@@ -201,13 +269,55 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 // TODO: handle after cache is setup
-                // let item_key = ev.key.strip_prefix(prefix).unwrap();
-                // let (org, name) = item_key.split_once("/").unwrap();
+                let Some(item_v) = ev.value else {
+                    log::error!("watch_sourcemaps : missing value for put");
+                    continue;
+                };
+                let Ok(entry) = serde_json::from_slice::<SourceMap>(item_v.as_bytes()) else {
+                    log::error!("watch_sourcemaps : invalid json value for put");
+                    continue;
+                };
+                {
+                    let key = (
+                        entry.org.clone(),
+                        entry.service.clone(),
+                        entry.env.clone(),
+                        entry.version.clone(),
+                        entry.source_map_file_name.clone(),
+                    );
+                    let mut cache = CACHE.write().await;
+                    cache.insert(key, entry);
+                }
             }
             Event::Delete(ev) => {
                 // TODO: handle after cache is setup
-                // let item_key = ev.key.strip_prefix(prefix).unwrap();
-                // let (org, name) = item_key.split_once("/").unwrap();
+                let item_key = ev.key.strip_prefix(prefix).unwrap();
+                let splits: Vec<_> = item_key.split("/").collect();
+                if splits.len() != 4 {
+                    log::error!("watch_sourcemaps : invalid key {item_key} for delete");
+                    continue;
+                }
+                let org = splits[0];
+                let service = splits[1];
+                let env = splits[2];
+                let version = splits[3];
+                {
+                    let mut cache = CACHE.write().await;
+                    let mut keys = Vec::new();
+                    for (k, _) in cache.iter() {
+                        let (org_id, s, e, v, _) = &k;
+                        if org_id == org
+                            && s.as_deref().unwrap_or("") == service
+                            && e.as_deref().unwrap_or("") == env
+                            && v.as_deref().unwrap_or("") == version
+                        {
+                            keys.push(k.clone());
+                        }
+                    }
+                    for k in keys {
+                        cache.remove(&k);
+                    }
+                }
             }
             Event::Empty => {}
         }

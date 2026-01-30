@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use anyhow::Context;
-use config::get_config;
+use config::SOURCEMAP_FILE_MAX_SIZE;
 use hashbrown::{HashMap, HashSet};
 use infra::{
     storage,
@@ -89,8 +89,6 @@ pub async fn process_zip(
     version: Option<String>,
     file_data: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-
     // Attempt to read the uploaded data as a ZIP file
     let mut archive = match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
         Ok(archive) => archive,
@@ -155,7 +153,12 @@ pub async fn process_zip(
             .by_path(&path)
             .context(format!("path {path} missing unexpectedly in archive"))?;
 
-        // TODO : add a restriction on size?
+        if file.size() > SOURCEMAP_FILE_MAX_SIZE {
+            return Err(anyhow::anyhow!(
+                "file {} in zip exceeds maximum allowed file size.",
+                path
+            ));
+        }
         let mut buf = Vec::with_capacity(file.size() as usize);
         file.read_to_end(&mut buf)?;
 
@@ -256,6 +259,10 @@ async fn get_sourcemap_file_info(
 // when that sourcemap is fetched again, this will be retried
 async fn store_file_locally(mut smap_info: SourceMap, file_data: bytes::Bytes) {
     let path = get_file_path(&smap_info.org, &smap_info.file_store_id);
+    log::info!(
+        "storing sourcemap file for org_id {} path {path} in local cluster",
+        smap_info.org,
+    );
     if let Err(e) = storage::put("", &path, file_data).await {
         log::error!(
             "error storing sourcemap file {}/{} at path {path} in local cluster : {e}",
@@ -272,6 +279,7 @@ async fn store_file_locally(mut smap_info: SourceMap, file_data: bytes::Bytes) {
             "error updating db to set local cluster in sourcemap for file {org}/{fname} : {e}"
         );
     }
+    log::info!("stored sourcemap file for org_id {org} path {path} in local cluster successfully");
 }
 
 async fn get_sourcemap_file_data(
@@ -290,14 +298,17 @@ async fn get_sourcemap_file_data(
     if get_o2_config().super_cluster.enabled {
         let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(&smap_file.cluster).await?;
-        let file_path = path.to_string();
-        let org_id = org_id.to_string();
+        let file_path = path.clone();
+        let org = org_id.to_string();
         let original_name = smap_file.source_map_file_name.clone();
         let cluster = smap_file.cluster.to_string();
+
+        log::info!("getting sourcemap file for org_id {org} path {path} from cluster {cluster}");
+
         let task = tokio::task::spawn(async move {
             let mut request = tonic::Request::new(proto::cluster_rpc::GetSourcemapFileRequest {
-                org_id: org_id.clone(),
-                path: file_path,
+                org_id: org.clone(),
+                path: file_path.clone(),
                 original_name,
             });
             let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
@@ -308,7 +319,7 @@ async fn get_sourcemap_file_data(
                 }
                 Err(err) => {
                     log::error!(
-                        "[trace_id: {trace_id}] error getting sourcemap file from cluster {cluster} node {} for org_id {org_id} path {path} : {err:?}",
+                        "[trace_id: {trace_id}] error getting sourcemap file from cluster {cluster} node {} for org_id {org} path {file_path} : {err:?}",
                         &node.get_grpc_addr(),
                     );
                     let err = ErrorCodes::from_json(err.message())?;
@@ -323,6 +334,10 @@ async fn get_sourcemap_file_data(
             .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;
         match response {
             Ok(v) => {
+                log::info!(
+                    "successfully received sorucemap file org_id {org_id} path {path} from cluster {}",
+                    smap_file.cluster
+                );
                 let bytes = bytes::Bytes::from(v);
                 let smap_copy = smap_file.clone();
                 let bytes_copy = bytes.clone();
@@ -344,22 +359,36 @@ async fn get_sourcemap_file_data(
 async fn resolve_stack(
     parsed: ParsedLine,
     f: &Filter,
+    cache: &mut HashMap<String, sourcemap::SourceMap>,
 ) -> Result<TranslatedStackLine, anyhow::Error> {
     // sourcemaps crate use 0 based indexes for line and col, but stacktrace
     // has 1 based index, so we sub saturating-ly to adjust for that
     let smap_line = parsed.line.saturating_sub(1);
     let smap_col = parsed.col.saturating_sub(1);
 
-    let Some(smap_file_info) = get_sourcemap_file_info(&parsed.file, f).await? else {
-        return Err(anyhow::anyhow!(
-            "sourcemap file not found for minified file {} in org_id {}",
-            parsed.file,
-            f.org_id
-        ));
-    };
+    // this cache is "local" to a particular resolve call, so we don't
+    // need to add org id  or service etc, as wel know all files resolved
+    // would be in the same context. The cache helps us
+    // when same files appears multiple times in trace, we don't have
+    // to re-fetch and re-parse the sourcemap every time at the cost of memory
+    let reader = match cache.get(&parsed.file) {
+        Some(v) => v,
+        None => {
+            let Some(smap_file_info) = get_sourcemap_file_info(&parsed.file, f).await? else {
+                return Err(anyhow::anyhow!(
+                    "sourcemap file not found for minified file {} in org_id {}",
+                    parsed.file,
+                    f.org_id
+                ));
+            };
 
-    let bytes = get_sourcemap_file_data(&f.org_id, &smap_file_info).await?;
-    let reader = sourcemap::SourceMap::from_slice(&bytes)?;
+            let bytes = get_sourcemap_file_data(&f.org_id, &smap_file_info).await?;
+            let reader = sourcemap::SourceMap::from_slice(&bytes)?;
+
+            cache.insert(parsed.file.clone(), reader);
+            cache.get(&parsed.file).unwrap()
+        }
+    };
 
     let Some(tok) = reader.lookup_token(smap_line, smap_col) else {
         return Err(anyhow::anyhow!(
@@ -442,6 +471,8 @@ pub async fn translate_stacktrace(
         return Ok(TranslatedStack::empty());
     }
 
+    let mut sourcemap_cache = HashMap::new();
+
     let f = Filter {
         org_id: org_id.to_string(),
         service,
@@ -469,7 +500,7 @@ pub async fn translate_stacktrace(
     for line in lines {
         match parse_line(line) {
             Ok(v) => {
-                let t = match resolve_stack(v, &f).await {
+                let t = match resolve_stack(v, &f, &mut sourcemap_cache).await {
                     Ok(v) => v,
                     Err(e) => {
                         // if there is any error, we use the original line
