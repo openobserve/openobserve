@@ -366,7 +366,11 @@ async fn parse_querier_payload(
         s if s.ends_with("/_search_multi") || s.ends_with("/_search_multi_stream") => {
             let body = read_payload_bytes(req, "multi search").await?;
             let query = json::from_slice::<MultiStreamRequest>(&body).map_err(|_| {
-                (StatusCode::BAD_REQUEST, "Failed to parse search request").into_response()
+                (
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse multi search request",
+                )
+                    .into_response()
             })?;
             if query.sql.is_empty() {
                 return Err((
@@ -404,7 +408,7 @@ async fn parse_querier_payload(
             let query = json::from_slice::<MultiSearchPartitionRequest>(&body).map_err(|_| {
                 (
                     StatusCode::BAD_REQUEST,
-                    "Failed to parse search partition request",
+                    "Failed to parse mutli search partition request",
                 )
                     .into_response()
             })?;
