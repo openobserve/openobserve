@@ -191,7 +191,7 @@ describe("SearchResult Component", () => {
 
       await wrapper.vm.sendToAiChat(testValue);
 
-      expect(wrapper.emitted()["sendToAiChat"]).toEqual([[testValue]]);
+      expect(wrapper.emitted()["sendToAiChat"]).toEqual([[testValue, true]]); // includes append parameter
     });
   });
 
