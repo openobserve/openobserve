@@ -2757,6 +2757,7 @@ export class PipelinesPage {
             // Date range logic would go here
         }
         testLogger.info('Filtered history by date range', { startDate, endDate });
+    }
     // SCHEDULED PIPELINE TAB METHODS - POM Compliance Fix
     // These methods replace raw selectors in spec files for PromQL/SQL tab switching
     // ============================================================================
@@ -2770,7 +2771,7 @@ export class PipelinesPage {
         await promqlTab.waitFor({ state: 'visible', timeout: 5000 });
         await promqlTab.click();
         testLogger.info('Clicked PromQL tab');
-    }
+    };
 
     /**
      * Click SQL tab in scheduled pipeline dialog
