@@ -20,6 +20,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use config::get_config;
 
 /// GET /api/debug/profile/memory
 ///
@@ -44,7 +45,16 @@ pub async fn memory_profile() -> Result<String, String> {
         .map_err(|e| format!("Failed to dump pprof: {e}"))?;
 
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-    let filename = format!("memory_profile_{}.pb", timestamp);
+
+    // Use the configured cache directory with a profiling subdirectory
+    let cfg = get_config();
+    let profile_dir = format!("{}/profiling", cfg.common.data_cache_dir);
+
+    // Ensure the profiling directory exists
+    std::fs::create_dir_all(&profile_dir)
+        .map_err(|e| format!("Failed to create profile directory: {e}"))?;
+
+    let filename = format!("{}/memory_profile_{}.pb", profile_dir, timestamp);
 
     std::fs::write(&filename, pprof_data)
         .map_err(|e| format!("Failed to write profile file: {e}"))?;
@@ -55,7 +65,7 @@ pub async fn memory_profile() -> Result<String, String> {
         .map_err(|e| format!("Failed to dump pprof: {e}"))?;
 
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-    let filename = format!("memory_profile_graph{}.svg", timestamp);
+    let filename = format!("{}/memory_profile_graph_{}.svg", profile_dir, timestamp);
 
     std::fs::write(&filename, pprof_data)
         .map_err(|e| format!("Failed to write profile file: {e}"))?;
