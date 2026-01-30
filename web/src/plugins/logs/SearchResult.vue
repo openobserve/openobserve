@@ -1394,8 +1394,8 @@ export default defineComponent({
       return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
     });
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
     };
 
     const closeTable = () => {

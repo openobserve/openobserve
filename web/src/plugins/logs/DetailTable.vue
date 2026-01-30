@@ -740,8 +740,8 @@ export default defineComponent({
       emit("view-trace");
     };
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
       emit("closeTable");
     };
 

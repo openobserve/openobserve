@@ -2519,8 +2519,8 @@ export default defineComponent({
 
     // [END] Context Provider Setup
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
     };
 
     const clearAllTimeouts = () => {
