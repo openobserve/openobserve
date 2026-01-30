@@ -20,6 +20,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "jemalloc")]
+use axum::{body::Body, http::header};
 use config::get_config;
 
 /// GET /api/debug/profile/memory
@@ -76,6 +78,100 @@ pub async fn memory_profile() -> Result<String, String> {
 
 #[cfg(not(feature = "jemalloc"))]
 pub async fn memory_profile() -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(serde_json::json!({"error": "Memory profiling is not available"})),
+    )
+        .into_response()
+}
+
+/// GET /api/debug/profile/pprof
+///
+/// Get a memory profile in pprof format (protobuf).
+/// Returns the binary pprof data directly in the response.
+///
+/// Returns: Binary pprof data (application/octet-stream)
+#[cfg(feature = "jemalloc")]
+pub async fn memory_pprof() -> Result<impl IntoResponse, (StatusCode, String)> {
+    let prof_ctl = jemalloc_pprof::PROF_CTL.as_ref().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Profiling controller not available".to_string(),
+        )
+    })?;
+
+    let mut prof_ctl = prof_ctl.lock().await;
+
+    if !prof_ctl.activated() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Jemalloc profiling is not activated".to_string(),
+        ));
+    }
+
+    let pprof_data = prof_ctl.dump_pprof().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to dump pprof: {e}"),
+        )
+    })?;
+
+    Ok(pprof_data)
+}
+
+#[cfg(not(feature = "jemalloc"))]
+pub async fn memory_pprof() -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(serde_json::json!({"error": "Memory profiling is not available"})),
+    )
+        .into_response()
+}
+
+/// GET /api/debug/profile/flamegraph
+///
+/// Get a memory profile flamegraph in SVG format.
+/// Returns the SVG flamegraph directly in the response.
+///
+/// Returns: SVG image (image/svg+xml)
+#[cfg(feature = "jemalloc")]
+pub async fn memory_flamegraph() -> Result<impl IntoResponse, (StatusCode, String)> {
+    let prof_ctl = jemalloc_pprof::PROF_CTL.as_ref().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Profiling controller not available".to_string(),
+        )
+    })?;
+
+    let mut prof_ctl = prof_ctl.lock().await;
+
+    if !prof_ctl.activated() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Jemalloc profiling is not activated".to_string(),
+        ));
+    }
+
+    let svg_data = prof_ctl.dump_flamegraph().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to dump flamegraph: {e}"),
+        )
+    })?;
+
+    Response::builder()
+        .header(header::CONTENT_TYPE, "image/svg+xml")
+        .body(Body::from(svg_data))
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build response: {e}"),
+            )
+        })
+}
+
+#[cfg(not(feature = "jemalloc"))]
+pub async fn memory_flamegraph() -> Response {
     (
         StatusCode::SERVICE_UNAVAILABLE,
         Json(serde_json::json!({"error": "Memory profiling is not available"})),

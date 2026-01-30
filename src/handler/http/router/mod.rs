@@ -443,7 +443,9 @@ pub fn basic_routes() -> Router {
     // Debug/profiling routes with auth
     let debug_routes = Router::new()
         .route("/profile/memory", get(profiling::memory_profile))
-        .route("/profile/stats", get(profiling::jemalloc_stats));
+        .route("/profile/stats", get(profiling::jemalloc_stats))
+        .route("/profile/pprof", get(profiling::memory_pprof))
+        .route("/profile/flamegraph", get(profiling::memory_flamegraph));
 
     router = router.nest("/debug", debug_routes);
 
