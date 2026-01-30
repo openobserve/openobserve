@@ -289,7 +289,7 @@ impl super::FileList for MysqlFileList {
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, file, date
     FROM file_list WHERE stream = ? AND date = ? AND file = ?;
             "#,
         )

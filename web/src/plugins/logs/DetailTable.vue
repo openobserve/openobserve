@@ -54,20 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.table')"
           />
           <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
-          <!-- OLD: Dashboard Panel Tab (hidden by default, enable via console: enableOldLogsTab()) -->
-          <q-tab
-            v-if="
-              serviceStreamsEnabled &&
-              config.isEnterprise === 'true' &&
-              showOldLogsTab
-            "
-            name="correlated-logs"
-            :label="t('correlation.correlatedLogs')"
-          />
-          <!-- NEW: Logs Tab with TanStack Table -->
           <q-tab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-logs-v2"
+            name="correlated-logs"
             :label="t('correlation.correlatedLogs')"
           />
           <q-tab
@@ -312,37 +301,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-table>
         </q-card-section>
       </q-tab-panel>
-      <!-- Correlated Logs Tab Panel -->
-      <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
-        <TelemetryCorrelationDashboard
-          v-if="correlationProps"
-          mode="embedded-tabs"
-          external-active-tab="logs"
-          :service-name="correlationProps.serviceName"
-          :matched-dimensions="correlationProps.matchedDimensions"
-          :additional-dimensions="correlationProps.additionalDimensions"
-          :metric-streams="correlationProps.metricStreams"
-          :log-streams="correlationProps.logStreams"
-          :trace-streams="correlationProps.traceStreams"
-          :source-stream="correlationProps.sourceStream"
-          :source-type="correlationProps.sourceType"
-          :available-dimensions="correlationProps.availableDimensions"
-          :fts-fields="correlationProps.ftsFields"
-          :time-range="correlationProps.timeRange"
-          @close="tab = 'json'"
-        />
-        <!-- Loading/Empty state when no data -->
-        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
-          <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
-          </div>
-        </div>
-      </q-tab-panel>
 
-      <!-- NEW: Correlated Logs V2 Tab Panel (Custom Component) -->
-      <q-tab-panel name="correlated-logs-v2" class="q-pa-none full-height">
+      <!-- Correlated Logs Tab Panel (Custom Component) -->
+      <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
         <CorrelatedLogsTable
           v-if="correlationProps"
           :service-name="correlationProps.serviceName"
@@ -360,11 +321,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @addSearchTerm="addSearchTerm"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+        <div
+          v-else
+          class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
+        >
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogsV2') }}</div>
+            <q-spinner-hourglass
+              v-if="correlationLoading"
+              color="primary"
+              size="3rem"
+              class="tw:mb-4"
+            />
+            <div
+              v-else-if="correlationError"
+              class="tw:text-base tw:text-red-500"
+            >
+              {{ correlationError }}
+            </div>
+            <div v-else class="tw:text-base tw:text-gray-500">
+              {{ t("correlation.clickToLoadLogs") }}
+            </div>
           </div>
         </div>
       </q-tab-panel>
@@ -606,23 +582,6 @@ export default defineComponent({
 
     const $q = useQuasar();
 
-    // Control visibility of old dashboard panel tab (hidden by default)
-    const showOldLogsTab = ref(false);
-
-    // Expose function to browser console for testing/verification
-    if (typeof window !== "undefined") {
-      (window as any).enableOldLogsTab = () => {
-        showOldLogsTab.value = true;
-        console.log(
-          "[DetailTable] Old Correlated Logs tab enabled. Refresh the sidebar to see it.",
-        );
-      };
-      (window as any).disableOldLogsTab = () => {
-        showOldLogsTab.value = false;
-        console.log("[DetailTable] Old Correlated Logs tab disabled.");
-      };
-    }
-
     // Watch for initialTab prop changes to update tab
     watch(
       () => props.initialTab,
@@ -658,7 +617,6 @@ export default defineComponent({
     // Watch for tab changes - load correlation data when user clicks a correlation tab
     watch(tab, (newTab, oldTab) => {
       const isCorrelationTab = newTab.startsWith("correlated-");
-      const wasCorrelationTab = oldTab?.startsWith("correlated-");
 
       // Only emit if switching TO a correlation tab AND we don't have data yet
       // Skip if this is the initial load (oldTab is undefined) as rowData watcher handles it
@@ -836,7 +794,6 @@ export default defineComponent({
       tablePagination,
       serviceStreamsEnabled,
       config,
-      showOldLogsTab,
     };
   },
   async created() {

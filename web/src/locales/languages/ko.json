@@ -38,6 +38,8 @@
     "goHome": "홈으로 이동",
     "name": "이름",
     "add": "추가",
+    "selectAll": "모두 선택",
+    "deselectAll": "모두 선택 취소",
     "details": "세부 정보",
     "tags": "태그",
     "process": "프로세스",
@@ -1946,6 +1948,8 @@
     "searchMetric": "지표 검색",
     "searchLabel": "지표 레이블 검색",
     "add": "추가",
+    "selectAll": "모두 선택",
+    "deselectAll": "모두 선택 취소",
     "cancel": "취소",
     "promqlLabel": "PromQL",
     "runQuery": "쿼리 실행",
@@ -2682,8 +2686,6 @@
     "stableTooltip": "안정된 차원은 카디널리티가 낮으며 상관관계 키 계산에 사용됩니다.",
     "normalize": "표준화",
     "noSemanticGroupsInCategory": "카테고리에 시맨틱 그룹이 없습니다: {category}",
-    "correlatedLogsV2": "로그 V2",
-    "clickToLoadLogsV2": "상호 관련된 로그를 로드하려면 클릭 (V2)",
     "logs": {
       "title": "상관관계가 있는 로그",
       "filters": {
