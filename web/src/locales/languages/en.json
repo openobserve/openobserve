@@ -2396,6 +2396,8 @@
       "fqnPrioritySaved": "Identity priority configuration saved successfully",
       "semanticMappingsSaved": "Semantic field mappings saved successfully",
       "configSaveFailed": "Failed to save settings",
+      "duplicateIdsError": "Duplicate group IDs found: {ids}. Please ensure each group has a unique ID.",
+      "emptyIdError": " category has empty groups names. Please ensure all groups have valid names.",
       "correlationSettingsSaved": "Correlation settings saved successfully.",
       "logs": "Logs",
       "traces": "Traces",

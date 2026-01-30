@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="semantic-field-groups-config">
     <div class="section-header q-mb-md">
-      <div class="text-h6">{{ t("settings.correlation.semanticFieldGroupsTitle") }}</div>
+      <div class="text-h6">
+        {{ t("settings.correlation.semanticFieldGroupsTitle") }}
+      </div>
       <div class="text-caption text-grey-7">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
@@ -45,7 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item-section>
                 <q-item-label>
                   <span class="tw:font-medium">{{ scope.opt.label }}</span>
-                  <span class="tw:text-xs tw:text-gray-500 tw:ml-2">({{ scope.opt.count }} {{ t("settings.correlation.groupsLabel") }})</span>
+                  <span class="tw:text-xs tw:text-gray-500 tw:ml-2"
+                    >({{ scope.opt.count }}
+                    {{ t("settings.correlation.groupsLabel") }})</span
+                  >
                 </q-item-label>
               </q-item-section>
             </q-item>
@@ -56,7 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           data-test="correlation-semanticfieldgroup-import-json-btn"
           class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           no-caps
           flat
           :label="t('correlation.importFromJson')"
@@ -65,7 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
           class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           no-caps
           flat
           color="primary"
@@ -88,22 +101,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="text-center q-pa-lg text-grey-7">
       <q-icon name="info" size="md" class="q-mb-sm" />
       <div>
-        {{ t("correlation.noSemanticGroupsInCategory", { category: selectedCategory || t("correlation.other") }) }}
+        {{
+          t("correlation.noSemanticGroupsInCategory", {
+            category: selectedCategory || t("correlation.other"),
+          })
+        }}
       </div>
     </div>
 
     <!-- Total groups indicator -->
     <div v-if="localGroups.length > 0" class="text-caption text-grey-6 q-mt-sm">
-      {{ t("correlation.showingGroups", { filterGroupLength: filteredGroups.length, localGroupLength: localGroups.length }) }}
+      {{
+        t("correlation.showingGroups", {
+          filterGroupLength: filteredGroups.length,
+          localGroupLength: localGroups.length,
+        })
+      }}
     </div>
 
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
-    <div v-if="localGroups.length > 0 && showFingerprintFields" class="fingerprint-section q-mt-lg">
+    <div
+      v-if="localGroups.length > 0 && showFingerprintFields"
+      class="fingerprint-section q-mt-lg"
+    >
       <div class="text-subtitle1 q-mb-sm">
         {{ t("correlation.deduplicateFields") }} *
-        <q-tooltip
-          >{{ t("correlation.deduplicateFieldTooltip") }}</q-tooltip
-        >
+        <q-tooltip>{{ t("correlation.deduplicateFieldTooltip") }}</q-tooltip>
       </div>
       <div class="text-caption text-grey-7 q-mb-md">
         {{ t("correlation.alertDeduplicationMessage") }}
@@ -135,6 +158,7 @@ import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 
 const router = useRouter();
@@ -154,7 +178,7 @@ interface SemanticGroup {
 
 // Reserved IDs that should not be used as semantic groups
 // service-fqn is the OUTPUT of correlation, not an input dimension
-const RESERVED_GROUP_IDS = ['service-fqn', 'servicefqn', 'fqn'];
+const RESERVED_GROUP_IDS = ["service-fqn", "servicefqn", "fqn"];
 
 interface Props {
   semanticFieldGroups?: SemanticGroup[];
@@ -175,7 +199,9 @@ const emit = defineEmits<{
 
 // Filter out reserved IDs like service-fqn (it's the output, not an input)
 const localGroups = ref<SemanticGroup[]>(
-  props.semanticFieldGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()))
+  props.semanticFieldGroups.filter(
+    (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
+  ),
 );
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
 const selectedCategory = ref<string | null>(null);
@@ -185,7 +211,9 @@ watch(
   () => props.semanticFieldGroups,
   (newGroups) => {
     // Filter out reserved IDs like service-fqn (it's the output, not an input)
-    localGroups.value = newGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
+    localGroups.value = newGroups.filter(
+      (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
+    );
     // Auto-select first category if none selected
     if (!selectedCategory.value && localGroups.value.length > 0) {
       nextTick(() => {
@@ -235,7 +263,7 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    group => (group.group || "Other") === selectedCategory.value
+    (group) => (group.group || "Other") === selectedCategory.value,
   );
 });
 
@@ -247,23 +275,33 @@ const groupIdOptions = computed(() => {
   }));
 });
 
+// Generate a short unique ID for new groups using first 8 chars of UUID
+const generateShortId = (): string => {
+  return uuidv4().substring(0, 4);
+};
+
 // Add a new custom group (assign to current category if selected)
 const addGroup = () => {
   const newGroup: SemanticGroup = {
-    id: "",
+    id: generateShortId(),
     display: "",
     group: selectedCategory.value || "Other",
     fields: [],
     normalize: true,
   };
-  localGroups.value.push(newGroup);
+  localGroups.value.unshift(newGroup);
   emitUpdate();
 };
 
 // Update group by filtered index - find actual index in localGroups
-const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
+const updateGroupByFilter = (
+  filteredIndex: number,
+  updatedGroup: SemanticGroup,
+) => {
   const group = filteredGroups.value[filteredIndex];
-  const actualIndex = localGroups.value.findIndex(g => g.id === group.id && g.display === group.display);
+  const actualIndex = localGroups.value.findIndex(
+    (g) => g.id === group.id && g.display === group.display,
+  );
   if (actualIndex !== -1) {
     localGroups.value[actualIndex] = updatedGroup;
     emitUpdate();
@@ -273,7 +311,9 @@ const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup)
 // Remove group by filtered index - find actual index in localGroups
 const removeGroupByFilter = (filteredIndex: number) => {
   const group = filteredGroups.value[filteredIndex];
-  const actualIndex = localGroups.value.findIndex(g => g.id === group.id && g.display === group.display);
+  const actualIndex = localGroups.value.findIndex(
+    (g) => g.id === group.id && g.display === group.display,
+  );
   if (actualIndex !== -1) {
     const removedId = localGroups.value[actualIndex].id;
     localGroups.value.splice(actualIndex, 1);
