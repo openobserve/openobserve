@@ -422,7 +422,7 @@ const getSessionEvents = () => {
         !sessionDetails.value.user_email ||
         sessionDetails.value.user_email === "Unknown User"
       )
-        sessionDetails.value.user_email = res.data.hits[0].usr_email;
+        sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
       segmentEvents.value = res.data.hits.filter((hit: any) => {
         return (
