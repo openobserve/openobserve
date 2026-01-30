@@ -36,7 +36,6 @@ export const colorizeQuery = async (query: string, language: string): Promise<st
     const colorized = await editor.colorize(query, lang, {});
     return colorized;
   } catch (e) {
-    console.error("Colorization failed", e);
     return query;
   }
 };

@@ -50,8 +50,8 @@
                 Query {{ index + 1 }}
               </span>
               <span
-                class="tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-secondary)] tw:text-[10px] tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md tw:uppercase">
-                {{ query.queryType }}
+                class="tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-secondary)] tw:text-[10px] tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md">
+                 {{ getQueryTypeDisplay(query.queryType) }}
               </span>
           </div>
 
@@ -279,6 +279,14 @@ export default defineComponent({
       }
     };
 
+    const getQueryTypeDisplay = (queryType: string) => {
+      if (!queryType) return "SQL";
+      const type = queryType.toLowerCase();
+      if (type === "sql") return "SQL";
+      if (type === "promql" || type === "metrics") return "PromQL";
+      return queryType.toUpperCase();
+    };
+
     const copyText = (text: string) => {
       if (!text) return;
       navigator.clipboard.writeText(text);
@@ -299,6 +307,7 @@ export default defineComponent({
       colorizedQueries,
       formatTimestamp,
       getVariablesByType,
+      getQueryTypeDisplay,
       highlightSearch,
       copyText,
     };
