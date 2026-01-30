@@ -288,6 +288,8 @@ const addGroup = () => {
     group: selectedCategory.value || "Other",
     fields: [],
     normalize: true,
+    is_stable: false,
+    is_scope: false,
   };
   localGroups.value.unshift(newGroup);
   emitUpdate();
