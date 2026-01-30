@@ -368,13 +368,16 @@ async fn parse_querier_payload(
             let query = json::from_slice::<MultiStreamRequest>(&body).map_err(|_| {
                 (StatusCode::BAD_REQUEST, "Failed to parse search request").into_response()
             })?;
+            if query.sql.is_empty() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse multi search request",
+                )
+                    .into_response());
+            }
             Some((
                 // Only use the first sql query for routing
-                query
-                    .sql
-                    .first()
-                    .map(|q| q.sql.to_string())
-                    .unwrap_or_default(),
+                query.sql[0].sql.clone(),
                 QuerierPayload::MultiSearch(Box::new(query)),
             ))
         }
@@ -405,8 +408,15 @@ async fn parse_querier_payload(
                 )
                     .into_response()
             })?;
+            if query.sql.is_empty() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse multi search request",
+                )
+                    .into_response());
+            }
             Some((
-                query.sql.first().cloned().unwrap_or_default(),
+                query.sql[0].clone(),
                 QuerierPayload::MultiSearchPartition(Box::new(query)),
             ))
         }
