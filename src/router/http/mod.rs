@@ -30,7 +30,10 @@ use config::{
             SearchPartitionRequest, ValuesRequest,
         },
     },
-    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
+    router::{
+        extract_path_without_query, is_fixed_querier_route, is_querier_route,
+        is_querier_route_by_body,
+    },
     utils::{json, rand::get_rand_element},
 };
 use futures::StreamExt;
@@ -607,12 +610,6 @@ fn is_streaming_endpoint(path: &str) -> bool {
     STREAMING_ENDPOINTS.iter().any(|&ep| path.ends_with(ep))
 }
 
-/// Extracts the path without query string.
-fn extract_path_without_query(path: &str) -> &str {
-    let query_start = path.find('?').unwrap_or(path.len());
-    &path[..query_start]
-}
-
 /// Reads payload bytes with error handling.
 async fn read_payload_bytes(req: Request, request_type: &str) -> Result<Bytes, Response> {
     match req.into_body().collect().await {
@@ -680,16 +677,6 @@ mod tests {
         ));
         assert!(!is_streaming_endpoint("/api/org/_search"));
         assert!(!is_streaming_endpoint("/api/org/logs"));
-    }
-
-    #[test]
-    fn test_extract_path_without_query() {
-        assert_eq!(extract_path_without_query("/api/test?foo=bar"), "/api/test");
-        assert_eq!(extract_path_without_query("/api/test"), "/api/test");
-        assert_eq!(
-            extract_path_without_query("/api/test?foo=bar&baz=qux"),
-            "/api/test"
-        );
     }
 
     #[tokio::test]
