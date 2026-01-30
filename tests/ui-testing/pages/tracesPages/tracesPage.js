@@ -51,6 +51,18 @@ export class TracesPage {
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
 
+    // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED) =====
+    this.analyzeDimensionsButton = '[data-test="analyze-dimensions-button"]';
+    this.errorOnlyToggle = '[data-test="error-only-toggle"]';
+    this.rangeFilterChip = '[data-test="range-filter-chip"]';
+    this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+    this.dimensionSelectorButton = '[data-test="dimension-selector-button"]';
+    this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
+    // Analysis dashboard card (container)
+    this.analysisDashboardCard = '.analysis-dashboard-card';
+    // Metrics dashboard container
+    this.tracesMetricsDashboard = '.traces-metrics-dashboard';
+
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
     this.fieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
@@ -1449,6 +1461,157 @@ export class TracesPage {
       return await this.isTraceDetailsTreeVisible() || await this.isAnyTraceDetailVisible();
     }
     return false;
+  }
+
+  // ===== ANALYZE DIMENSIONS POM METHODS =====
+
+  /**
+   * Check if Analyze Dimensions button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isAnalyzeDimensionsButtonVisible() {
+    return await this.page.locator(this.analyzeDimensionsButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Click Analyze Dimensions button
+   */
+  async clickAnalyzeDimensionsButton() {
+    await this.page.locator(this.analyzeDimensionsButton).click();
+    await this.page.waitForTimeout(2000);
+  }
+
+  /**
+   * Check if Analysis Dashboard is visible
+   * @returns {Promise<boolean>}
+   */
+  async isAnalysisDashboardVisible() {
+    return await this.page.locator(this.analysisDashboardCard).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Close Analysis Dashboard
+   */
+  async closeAnalysisDashboard() {
+    const closeBtn = this.page.locator(this.analysisDashboardClose);
+    if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await closeBtn.click();
+      await this.page.waitForTimeout(1000);
+    }
+  }
+
+  /**
+   * Check if Error Only toggle is visible
+   * @returns {Promise<boolean>}
+   */
+  async isErrorOnlyToggleVisible() {
+    return await this.page.locator(this.errorOnlyToggle).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Toggle Error Only filter
+   */
+  async toggleErrorOnlyFilter() {
+    await this.page.locator(this.errorOnlyToggle).click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  /**
+   * Check if Range Filter Chip is visible
+   * @returns {Promise<boolean>}
+   */
+  async isRangeFilterChipVisible() {
+    return await this.page.locator(this.rangeFilterChip).first().isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Get count of Range Filter Chips
+   * @returns {Promise<number>}
+   */
+  async getRangeFilterChipCount() {
+    return await this.page.locator(this.rangeFilterChip).count();
+  }
+
+  /**
+   * Click close button on first Range Filter Chip
+   */
+  async closeFirstRangeFilterChip() {
+    const closeIcon = this.page.locator(this.rangeFilterChip).first().locator('.chip-close-icon, [name="close"]');
+    if (await closeIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await closeIcon.click();
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Check if Dimension Selector button is visible in Analysis Dashboard
+   * @returns {Promise<boolean>}
+   */
+  async isDimensionSelectorButtonVisible() {
+    return await this.page.locator(this.dimensionSelectorButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Click Dimension Selector button
+   */
+  async clickDimensionSelectorButton() {
+    await this.page.locator(this.dimensionSelectorButton).click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  /**
+   * Check if Traces Metrics Dashboard is visible
+   * @returns {Promise<boolean>}
+   */
+  async isTracesMetricsDashboardVisible() {
+    return await this.page.locator(this.tracesMetricsDashboard).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Perform brush selection on metrics chart (simulated via click and drag)
+   * This requires the metrics dashboard to be visible
+   * @param {string} chartSelector - Selector for the chart to brush
+   */
+  async performBrushSelectionOnChart(chartSelector = 'canvas') {
+    // Find the chart canvas in the metrics dashboard
+    const chart = this.page.locator(this.tracesMetricsDashboard).locator(chartSelector).first();
+
+    if (await chart.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const box = await chart.boundingBox();
+      if (box) {
+        // Perform a brush selection (drag from left to right on the chart)
+        const startX = box.x + box.width * 0.2;
+        const endX = box.x + box.width * 0.8;
+        const y = box.y + box.height / 2;
+
+        await this.page.mouse.move(startX, y);
+        await this.page.mouse.down();
+        await this.page.mouse.move(endX, y, { steps: 10 });
+        await this.page.mouse.up();
+
+        await this.page.waitForTimeout(1000);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Wait for Analysis Dashboard to load completely
+   */
+  async waitForAnalysisDashboardLoad() {
+    // Wait for loading spinner to disappear
+    const spinner = this.page.locator('.q-spinner-hourglass, .q-spinner');
+    try {
+      if (await spinner.isVisible({ timeout: 1000 })) {
+        await spinner.waitFor({ state: 'hidden', timeout: 30000 });
+      }
+    } catch {
+      // Spinner might not appear or already hidden
+    }
+
+    // Wait for dashboard content
+    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
   }
 
 }
