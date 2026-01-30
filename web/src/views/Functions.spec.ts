@@ -304,9 +304,9 @@ describe('Functions.vue', () => {
       
       const testValue = { message: 'test message' };
       (wrapper.vm as any).sendToAiChat(testValue);
-      
+
       expect(wrapper.emitted('sendToAiChat')).toBeTruthy();
-      expect(wrapper.emitted('sendToAiChat')?.[0]).toEqual([testValue]);
+      expect(wrapper.emitted('sendToAiChat')?.[0]).toEqual([testValue, false]); // includes append parameter
     });
   });
 
