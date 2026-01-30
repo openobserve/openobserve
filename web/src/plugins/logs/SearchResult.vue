@@ -776,19 +776,15 @@ export default defineComponent({
     const detailTableInitialTab = ref<string>("json");
     const { findRelatedTelemetry } = useServiceCorrelation();
 
-    // Debug: computed to check why dialog isn't showing
+    // Flag to prevent duplicate correlation API calls
+    const correlationFetchInProgress = ref(false);
+
     const shouldShowInlineDialog = computed(() => {
-      const result =
+      return (
         showCorrelation.value &&
         correlationDashboardProps.value &&
-        !searchObj.meta.showDetailTab;
-      console.log("[SearchResult] shouldShowInlineDialog:", {
-        showCorrelation: showCorrelation.value,
-        hasProps: !!correlationDashboardProps.value,
-        showDetailTab: searchObj.meta.showDetailTab,
-        result,
-      });
-      return result;
+        !searchObj.meta.showDetailTab
+      );
     });
 
     const patternsColumns = [
@@ -983,16 +979,13 @@ export default defineComponent({
     };
 
     const openCorrelationFromLog = async (logData: any) => {
-      console.log(
-        "[SearchResult] openCorrelationFromLog called with logData:",
-        logData,
-      );
-      console.log(
-        "[SearchResult] Current stream:",
-        searchObj.data.stream.selectedStream[0],
-      );
+      // Prevent duplicate calls - if a fetch is already in progress, skip
+      if (correlationFetchInProgress.value) {
+        return;
+      }
 
       try {
+        correlationFetchInProgress.value = true;
         correlationLoading.value = true;
         correlationError.value = null; // Clear any previous error
 
@@ -1002,8 +995,6 @@ export default defineComponent({
           fields: logData,
         };
         correlationContext.value = context;
-
-        console.log("[SearchResult] Calling findRelatedTelemetry...");
 
         // Fetch correlation data
         const result = await findRelatedTelemetry(
@@ -1044,20 +1035,6 @@ export default defineComponent({
           logsCount: result.correlationData.related_streams.logs.length,
         });
 
-        // Check if there are any metric streams
-        if (result.correlationData.related_streams.metrics.length === 0) {
-          console.warn(
-            "[SearchResult] No metric streams found for correlation",
-          );
-          correlationError.value = `No metric streams found for service "${result.correlationData.service_name}"`;
-          $q.notify({
-            type: "info",
-            message: `No metric streams found for service "${result.correlationData.service_name}"`,
-            timeout: 3000,
-          });
-          return;
-        }
-
         // Prepare props for the dashboard
         // Calculate time range: ±5 minutes from log timestamp
         // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
@@ -1071,33 +1048,20 @@ export default defineComponent({
           endTimeMicros = currentTimeMicros;
         }
 
-        // Check if there are any metrics to show
-        if (
-          !result.correlationData.related_streams.metrics ||
-          result.correlationData.related_streams.metrics.length === 0
-        ) {
-          correlationError.value =
-            "No correlated metrics found for this service";
-          $q.notify({
-            type: "info",
-            message: "No correlated metrics found for this service",
-            timeout: 3000,
-          });
-          return;
-        }
-
         // Extract FTS fields from stream settings
         const ftsFields =
           searchObj.data.stream.selectedStreamFields
             ?.filter((field: any) => field.ftsKey === true)
             .map((field: any) => field.name) || [];
 
+        // Always set correlation props, even if metrics array is empty
+        // This prevents re-fetching when switching between tabs
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
           matchedDimensions: result.correlationData.matched_dimensions,
           additionalDimensions:
             result.correlationData.additional_dimensions || {},
-          metricStreams: result.correlationData.related_streams.metrics,
+          metricStreams: result.correlationData.related_streams.metrics || [],
           logStreams: result.correlationData.related_streams.logs || [],
           traceStreams: result.correlationData.related_streams.traces || [],
           sourceStream: searchObj.data.stream.selectedStream[0],
@@ -1109,6 +1073,21 @@ export default defineComponent({
             endTime: endTimeMicros,
           },
         };
+
+        // Show info notification if no metrics found (but don't prevent setting props)
+        if (
+          !result.correlationData.related_streams.metrics ||
+          result.correlationData.related_streams.metrics.length === 0
+        ) {
+          console.warn(
+            "[SearchResult] No metric streams found for correlation",
+          );
+          $q.notify({
+            type: "info",
+            message: `No metric streams found for service "${result.correlationData.service_name}"`,
+            timeout: 3000,
+          });
+        }
 
         // For inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)
@@ -1137,6 +1116,7 @@ export default defineComponent({
         correlationDashboardProps.value = null;
       } finally {
         correlationLoading.value = false;
+        correlationFetchInProgress.value = false;
       }
     };
 
@@ -1266,6 +1246,7 @@ export default defineComponent({
       // User will need to click a correlation tab again for the new log
       correlationDashboardProps.value = null;
       correlationLoading.value = false;
+      correlationError.value = null;
     };
 
     const addSearchTerm = (

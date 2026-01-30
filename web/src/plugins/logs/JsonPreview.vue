@@ -582,8 +582,12 @@ export default {
     };
 
     const setViewTraceBtn = () => {
+      // Hide view traces button when service_streams_enabled is true
+      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
+
       showViewTraceBtn.value =
         !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
+        !serviceStreamsEnabled && // Hide when service streams is enabled
         props.value[
           store.state.organizationData?.organizationSettings
             ?.trace_id_field_name
