@@ -1285,14 +1285,16 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     } else {
         "HTTP"
     };
-    log::info!("Starting Script Server {scheme} server at: {haddr}");
 
-    // Build the router for script server
+    // Build the router for action server
     let app = create_action_server_router()
+        .layer(config::axum::middlewares::AccessLogLayer::new(
+            config::axum::middlewares::get_http_access_log_format(),
+        ))
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
-        .layer(CompressionLayer::new());
+        .layer(TraceLayer::new_for_http());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -1357,7 +1359,7 @@ pub fn create_action_server_router() -> axum::Router {
     let cfg = get_config();
     let base_uri = &cfg.common.base_uri;
 
-    // Create script server routes with authentication
+    // Create action server routes with authentication
     // Routes match action_manager.rs expected URLs: /api/{org_id}/v1/job[/{id}]
     let api_routes = Router::new()
         .route(
