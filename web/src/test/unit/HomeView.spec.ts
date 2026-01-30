@@ -658,6 +658,7 @@ describe("HomeView.vue", () => {
 
       const compressedSize = 50;
 
+      // Set up the mock BEFORE creating the wrapper so it's used on mount
       orgService.get_organization_summary.mockResolvedValue({
         data: {
           streams: {
@@ -779,6 +780,7 @@ describe("HomeView.vue", () => {
         }
       };
 
+      // Set up the mock BEFORE creating the wrapper so it's used on mount
       orgService.get_organization_summary.mockResolvedValue(mockData);
 
       wrapper = createWrapper();
@@ -828,13 +830,16 @@ describe("HomeView.vue", () => {
     });
 
     it("should not call getSummary on mount when no organization", () => {
+      // Set empty organization and clear mocks to prevent watcher from being counted
       store.state.selectedOrganization = {};
+      vi.clearAllMocks(); // Clear the mock call history after changing the store
+
       orgService.get_organization_summary.mockResolvedValue({
         data: { streams: { num_streams: 0 } }
       });
-      
+
       wrapper = createWrapper();
-      
+
       expect(orgService.get_organization_summary).not.toHaveBeenCalled();
     });
   });
