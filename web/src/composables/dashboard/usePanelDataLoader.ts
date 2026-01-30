@@ -2421,6 +2421,7 @@ export const usePanelDataLoader = (
       "panelSchema.layout",
       "panelSchema.htmlContent",
       "panelSchema.markdownContent",
+      "panelSchema.customChartResult", // Ignore computed result field
     ];
 
     log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey);
@@ -2433,14 +2434,42 @@ export const usePanelDataLoader = (
       omit(tempPanelCacheKey, keysToIgnore),
     );
 
-    // check if it is stale or not
+    // Helper function to normalize variables data for cache comparison
+    // Removes runtime-only fields that don't affect query results
+    const normalizeVariablesForCache = (variables: any[]) => {
+      if (!variables || !Array.isArray(variables)) return variables;
+      return variables.map((v) => ({
+        name: v.name,
+        type: v.type,
+        value: v.value,
+        scope: v.scope,
+        multiSelect: v.multiSelect,
+        query_data: v.query_data,
+        // Exclude: options, isLoading, isVariableLoadingPending, isVariablePartialLoaded
+        // These are runtime state and don't affect the query result
+      }));
+    };
+
+    const currentCacheKey = omit(getCacheKey(), keysToIgnore);
+    const savedCacheKey = omit(tempPanelCacheKey, keysToIgnore);
+
+    // Normalize variables in both keys before comparison
+    const normalizedCurrentKey = {
+      ...currentCacheKey,
+      variablesData: normalizeVariablesForCache(currentCacheKey.variablesData),
+    };
+    const normalizedSavedKey = {
+      ...savedCacheKey,
+      variablesData: normalizeVariablesForCache(savedCacheKey.variablesData),
+    };
+
+    const cacheKeysMatch = isEqual(normalizedCurrentKey, normalizedSavedKey);
+
+    // Check if it is stale or not
     if (
       tempPanelCacheValue &&
       Object.keys(tempPanelCacheValue).length > 0 &&
-      isEqual(
-        omit(getCacheKey(), keysToIgnore),
-        omit(tempPanelCacheKey, keysToIgnore),
-      )
+      cacheKeysMatch
     ) {
       // const cache = getPanelCache();
       state.data = tempPanelCacheValue.data;
