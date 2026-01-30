@@ -55,6 +55,22 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
 
   test.afterEach(async ({ page }, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
+
+    // Cleanup: Wait for any pending operations to complete
+    await page.waitForTimeout(1000);
+
+    // Clear any open dialogs or menus
+    try {
+      const dialog = page.locator('.q-dialog');
+      if (await dialog.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+
+    testLogger.info('Test cleanup completed');
   });
 
   /**
