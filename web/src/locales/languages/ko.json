@@ -109,7 +109,9 @@
     "chunkLoadError": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
     "chunkLoadErrorMsg": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
     "id": "신분증",
-    "getStarted": "시작하기"
+    "getStarted": "시작하기",
+    "reset": "초기화",
+    "retry": "재시도"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -303,7 +305,8 @@
     "hide": "숨기기",
     "show": "쇼",
     "editor": "에디터",
-    "webUrlNotConfigured": "관리자가 ZO_WEB_URL을 구성할 때까지 URL 공유는 비활성화됩니다."
+    "webUrlNotConfigured": "관리자가 ZO_WEB_URL을 구성할 때까지 URL 공유는 비활성화됩니다.",
+    "showHideColumns": "열 표시/숨기기"
   },
   "menu": {
     "home": "홈",
@@ -695,7 +698,9 @@
     "license_already_active_title": "라이선스가 이미 활성화됨",
     "license_already_active_msg": "라이선스가 아직 활성 상태입니다.새 라이선스 키로 업데이트하시겠습니까?",
     "yes_update_license": "예, 라이선스 업데이트",
-    "no_keep_current": "아니요, 최신 상태로 유지"
+    "no_keep_current": "아니요, 최신 상태로 유지",
+    "feature_correlation_management": "상관관계 관리",
+    "feature_log_patterns": "로그 패턴"
   },
   "login": {
     "userid": "사용자 ID",
@@ -2676,7 +2681,57 @@
     "stable": "안정적",
     "stableTooltip": "안정된 차원은 카디널리티가 낮으며 상관관계 키 계산에 사용됩니다.",
     "normalize": "표준화",
-    "noSemanticGroupsInCategory": "카테고리에 시맨틱 그룹이 없습니다: {category}"
+    "noSemanticGroupsInCategory": "카테고리에 시맨틱 그룹이 없습니다: {category}",
+    "correlatedLogsV2": "로그 V2",
+    "clickToLoadLogsV2": "상호 관련된 로그를 로드하려면 클릭 (V2)",
+    "logs": {
+      "title": "상관관계가 있는 로그",
+      "filters": {
+        "title": "상관관계 필터 편집",
+        "description": "측정기준 필터를 조정하여 상관관계 쿼리를 세분화하세요.일치하는 측정기준은 안정적인 식별자이지만, 포드 재시작 시 추가 측정기준이 변경될 수 있습니다.",
+        "matchedDimensions": "일치하는 치수 (안정적)",
+        "matchedDimensionsTooltip": "이러한 차원은 포드 재시작 시 일관되게 유지되는 안정적인 식별자이며 관련 텔레메트리를 매칭하는 데 사용됩니다.",
+        "additionalDimensions": "추가 치수 (불안정)",
+        "additionalDimensionsTooltip": "이러한 크기는 파드를 재시작할 때 변경될 수 있다 (예: pod_name, container_id).'모든 값'으로 설정하여 검색 범위를 넓힐 수 있습니다.",
+        "stableDimension": "안정된 치수",
+        "unstableDimension": "불안정 - 재시작 시 변경",
+        "setToAll": "모든 값으로 설정",
+        "showingAll": "모든 값 표시",
+        "wildcardHelp": "필터링에서 이 차원을 무시하려면 '모든 값'을 사용하십시오.",
+        "noAdditionalDimensions": "추가 치수를 사용할 수 없습니다."
+      },
+      "loading": "상관관계가 있는 로그를 로드하는 중...",
+      "loadingDetails": "상관관계가 있는 스트림에서 로그를 가져오는 중...",
+      "error": "로그를 로드하지 못했습니다.",
+      "noData": "상관관계가 있는 로그를 찾을 수 없음",
+      "noDataDetails": "상관관계 필터와 일치하는 로그를 찾을 수 없습니다.",
+      "resetFilters": "필터 재설정",
+      "editFilters": "필터 편집",
+      "editTimeRange": "시간 범위 편집",
+      "selectValue": "값 선택",
+      "stableDimension": "안정적인 치수 - 포드 재시작 시에도 일관됨",
+      "unstableDimension": "불안정한 치수 - 포드 재시작 시 변경될 수 있음",
+      "resultsCount": "{stream} ({time} ms) 에서 찾은 로그 {개수} 개",
+      "timeRange": {
+        "title": "시간 범위 조정",
+        "sourceTime": "소스 로그 시간",
+        "window": "타임 윈도우",
+        "minute1": "±1분",
+        "minute5": "±5분 (기본값)",
+        "minute15": "±15분",
+        "minute30": "±30분",
+        "hour1": "±1시간",
+        "custom": "사용자 지정",
+        "customStart": "사용자 지정 시작 시간",
+        "customEnd": "사용자 지정 종료 시간",
+        "currentRange": "현재 시간 범위",
+        "start": "스타트",
+        "end": "종료",
+        "duration": "지속",
+        "startBeforeEnd": "시작 시간은 종료 시간 이전이어야 합니다.",
+        "endAfterStart": "종료 시간은 시작 시간 이후여야 합니다."
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",
@@ -2719,5 +2774,11 @@
     "contactSupport": "지원팀에 문의",
     "tryAgain": "다시 시도하세요",
     "activationTimeout": "활성화 제한 시간이 초과되었습니다.문제가 지속되면 지원팀에 문의하세요."
+  },
+  "validation": {
+    "required": "이 필드는 필수입니다.",
+    "invalidFormat": "잘못된 형식",
+    "mustBeGreaterThan": "{value} 보다 커야 합니다.",
+    "mustBeLessThan": "{value} 보다 작아야 합니다."
   }
 }

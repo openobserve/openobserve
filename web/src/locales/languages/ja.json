@@ -109,7 +109,9 @@
     "chunkLoadError": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
     "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
     "id": "ID",
-    "getStarted": "始めよう"
+    "getStarted": "始めよう",
+    "reset": "リセット",
+    "retry": "リトライ"
   },
   "search": {
     "metrics": "メトリクス",
@@ -303,7 +305,8 @@
     "hide": "隠す",
     "show": "ショー",
     "editor": "エディター",
-    "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。"
+    "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
+    "showHideColumns": "列を表示/非表示"
   },
   "menu": {
     "home": "ホーム",
@@ -695,7 +698,9 @@
     "license_already_active_title": "ライセンスはすでにアクティブです",
     "license_already_active_msg": "ライセンスはまだ有効です。新しいライセンスキーで更新しますか?",
     "yes_update_license": "はい、ライセンスを更新してください",
-    "no_keep_current": "いいえ、最新の状態に保つ"
+    "no_keep_current": "いいえ、最新の状態に保つ",
+    "feature_correlation_management": "相関管理",
+    "feature_log_patterns": "ログパターン"
   },
   "login": {
     "userid": "ユーザーID",
@@ -2669,7 +2674,57 @@
     "stable": "安定した",
     "stableTooltip": "安定ディメンションはカーディナリティが低く、相関キーの計算に使用されます。",
     "normalize": "ノーマライズ",
-    "noSemanticGroupsInCategory": "カテゴリにセマンティックグループはありません:{category}"
+    "noSemanticGroupsInCategory": "カテゴリにセマンティックグループはありません:{category}",
+    "correlatedLogsV2": "ログ V2",
+    "clickToLoadLogsV2": "クリックして相関ログを読み込む (V2)",
+    "logs": {
+      "title": "相関ログ",
+      "filters": {
+        "title": "相関フィルターの編集",
+        "description": "ディメンションフィルターを調整して相関クエリを絞り込みます。一致するディメンションは安定した識別子ですが、その他のディメンションはポッドの再起動時に変わる可能性があります。",
+        "matchedDimensions": "寸法の一致 (安定)",
+        "matchedDimensionsTooltip": "これらのディメンションは安定した識別子であり、ポッドを再起動しても一貫性があり、関連するテレメトリとの照合に使用されます。",
+        "additionalDimensions": "その他の寸法 (不安定)",
+        "additionalDimensionsTooltip": "これらのディメンションは、ポッドの再起動時に変更される場合があります（たとえば、pod_name、container_id）。これらを「All Values」に設定すると、検索範囲を広げることができます。",
+        "stableDimension": "安定した寸法",
+        "unstableDimension": "不安定-再起動時に変化する",
+        "setToAll": "[すべての値に設定]",
+        "showingAll": "すべての値を表示",
+        "wildcardHelp": "フィルタリング時にこのディメンションを無視するには、「すべての値」を使用してください",
+        "noAdditionalDimensions": "追加ディメンションはありません"
+      },
+      "loading": "相関ログをロード中...",
+      "loadingDetails": "相関ストリームからログを取得中...",
+      "error": "ログを読み込めませんでした",
+      "noData": "相関ログが見つかりません",
+      "noDataDetails": "相関フィルターに一致するログは見つかりませんでした。",
+      "resetFilters": "フィルターをリセット",
+      "editFilters": "[フィルタを編集]",
+      "editTimeRange": "時間範囲を編集",
+      "selectValue": "値を選択",
+      "stableDimension": "安定したディメンション-ポッドを再起動しても一貫性があります",
+      "unstableDimension": "不安定なディメンション-ポッドの再起動時に変化する可能性があります",
+      "resultsCount": "{count} 個のログが {stream} で見つかりました ({time} ms)",
+      "timeRange": {
+        "title": "時間範囲を調整",
+        "sourceTime": "ソースログ時間",
+        "window": "タイムウィンドウ",
+        "minute1": "±1 分",
+        "minute5": "±5 分 (デフォルト)",
+        "minute15": "±15 分",
+        "minute30": "±30 分",
+        "hour1": "±1 時間",
+        "custom": "カスタム",
+        "customStart": "カスタム開始時間",
+        "customEnd": "カスタム終了時間",
+        "currentRange": "現在の時間範囲",
+        "start": "[開始]",
+        "end": "終了",
+        "duration": "所要時間",
+        "startBeforeEnd": "開始時刻は終了時刻より前でなければなりません",
+        "endAfterStart": "終了時刻は開始時刻より後である必要があります"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
@@ -2712,5 +2767,11 @@
     "contactSupport": "サポートに連絡",
     "tryAgain": "もう一度試す",
     "activationTimeout": "アクティベーションタイムアウト。問題が解決しない場合は、サポートに連絡してください。"
+  },
+  "validation": {
+    "required": "このフィールドは必須です",
+    "invalidFormat": "形式が無効です",
+    "mustBeGreaterThan": "{value} より大きくなければなりません",
+    "mustBeLessThan": "{value} より小さくなければなりません"
   }
 }

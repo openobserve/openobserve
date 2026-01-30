@@ -54,9 +54,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.table')"
           />
           <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+          <!-- OLD: Dashboard Panel Tab (hidden by default, enable via console: enableOldLogsTab()) -->
+          <q-tab
+            v-if="
+              serviceStreamsEnabled &&
+              config.isEnterprise === 'true' &&
+              showOldLogsTab
+            "
+            name="correlated-logs"
+            :label="t('correlation.correlatedLogs')"
+          />
+          <!-- NEW: Logs Tab with TanStack Table -->
           <q-tab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-logs"
+            name="correlated-logs-v2"
             :label="t('correlation.correlatedLogs')"
           />
           <q-tab
@@ -117,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="sidebar"
             hide-view-related
             :highlight-query="highlightQuery"
+            :should-wrap-values="shouldWrapValues"
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
@@ -293,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'tw:whitespace-nowrap'
                         : 'tw:whitespace-pre-wrap'
                     "
-                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" /></pre>
+                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" :disable-truncation="true" /></pre>
                 </div>
               </q-td>
             </template>
@@ -325,6 +337,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+          </div>
+        </div>
+      </q-tab-panel>
+
+      <!-- NEW: Correlated Logs V2 Tab Panel (Custom Component) -->
+      <q-tab-panel name="correlated-logs-v2" class="q-pa-none full-height">
+        <CorrelatedLogsTable
+          v-if="correlationProps"
+          :service-name="correlationProps.serviceName"
+          :matched-dimensions="correlationProps.matchedDimensions"
+          :additional-dimensions="correlationProps.additionalDimensions"
+          :log-streams="correlationProps.logStreams"
+          :source-stream="correlationProps.sourceStream"
+          :source-type="correlationProps.sourceType"
+          :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
+          :time-range="correlationProps.timeRange"
+          :hide-view-related-button="true"
+          :hide-search-term-actions="true"
+          @sendToAiChat="sendToAiChat"
+          @addSearchTerm="addSearchTerm"
+        />
+        <!-- Loading/Empty state when no data -->
+        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+          <div class="tw:text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogsV2') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -466,6 +506,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 
 const defaultValue: any = () => {
@@ -476,7 +517,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard, CorrelatedLogsTable },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -564,6 +605,23 @@ export default defineComponent({
     const {fnParsedSQL, hasAggregation} = logsUtils();
 
     const $q = useQuasar();
+
+    // Control visibility of old dashboard panel tab (hidden by default)
+    const showOldLogsTab = ref(false);
+
+    // Expose function to browser console for testing/verification
+    if (typeof window !== "undefined") {
+      (window as any).enableOldLogsTab = () => {
+        showOldLogsTab.value = true;
+        console.log(
+          "[DetailTable] Old Correlated Logs tab enabled. Refresh the sidebar to see it.",
+        );
+      };
+      (window as any).disableOldLogsTab = () => {
+        showOldLogsTab.value = false;
+        console.log("[DetailTable] Old Correlated Logs tab disabled.");
+      };
+    }
 
     // Watch for initialTab prop changes to update tab
     watch(
@@ -728,6 +786,15 @@ export default defineComponent({
       emit("sendToAiChat", value);
       emit("closeTable");
     };
+
+    const addSearchTerm = (
+      field: string | number,
+      fieldValue: string | number | boolean,
+      action: string,
+    ) => {
+      emit("add:searchterm", field, fieldValue, action);
+    };
+
     const closeTable = () => {
       emit("closeTable");
     };
@@ -760,6 +827,7 @@ export default defineComponent({
       viewTrace,
       hasAggregationQuery,
       sendToAiChat,
+      addSearchTerm,
       closeTable,
       showCorrelation,
       statusColor,
@@ -768,6 +836,7 @@ export default defineComponent({
       tablePagination,
       serviceStreamsEnabled,
       config,
+      showOldLogsTab,
     };
   },
   async created() {

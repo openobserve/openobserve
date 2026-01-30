@@ -17,7 +17,7 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use config::{
     meta::alerts::{
@@ -25,7 +25,7 @@ use config::{
         deduplication::GlobalDeduplicationConfig,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentGraphStats, IncidentServiceGraph, IncidentTopology, IncidentWithAlerts,
+            IncidentTopology, IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -84,12 +84,44 @@ pub async fn correlate_alert_to_incident(
     let org_config = match super::org_config::get_deduplication_config(&alert.org_id).await {
         Ok(Some(config)) if config.enabled => config,
         Ok(Some(_)) | Ok(None) => {
-            // No org config or disabled - use default semantic groups
-            GlobalDeduplicationConfig::default()
+            // No org config or disabled - use enterprise default semantic groups
+            #[cfg(feature = "enterprise")]
+            {
+                GlobalDeduplicationConfig {
+                    enabled: false,
+                    alert_dedup_enabled: false,
+                    semantic_field_groups:
+                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
+                        ),
+                    time_window_minutes: None,
+                    alert_fingerprint_groups: vec![],
+                    fqn_priority_dimensions: vec![],
+                }
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                GlobalDeduplicationConfig::default()
+            }
         }
         Err(e) => {
             log::warn!("Failed to fetch org config for incident correlation: {e}, using defaults",);
-            GlobalDeduplicationConfig::default()
+            #[cfg(feature = "enterprise")]
+            {
+                GlobalDeduplicationConfig {
+                    enabled: false,
+                    alert_dedup_enabled: false,
+                    semantic_field_groups:
+                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
+                        ),
+                    time_window_minutes: None,
+                    alert_fingerprint_groups: vec![],
+                    fqn_priority_dimensions: vec![],
+                }
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                GlobalDeduplicationConfig::default()
+            }
         }
     };
 
@@ -492,7 +524,41 @@ pub async fn get_incident_with_alerts(
     let incident_org_id = incident.org_id.clone();
 
     // Convert to config types
-    let incident_data = model_to_incident(incident).await?;
+    let mut incident_data = model_to_incident(incident).await?;
+
+    // Fix alert_count from actual triggers (source of truth)
+    // This heals any inconsistencies from race conditions or historical bugs
+    let actual_count = incident_alerts.len() as i32;
+    if incident_data.alert_count != actual_count {
+        log::warn!(
+            "[incidents] Incident {} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            incident_id,
+            incident_data.alert_count,
+            actual_count
+        );
+        incident_data.alert_count = actual_count;
+    }
+
+    // Fix topology node alert_counts from actual triggers
+    if let Some(ref mut topology) = incident_data.topology_context {
+        for node in &mut topology.nodes {
+            let actual_node_count = incident_alerts
+                .iter()
+                .filter(|t| t.alert_id == node.alert_id)
+                .count() as u32;
+
+            if node.alert_count != actual_node_count {
+                log::debug!(
+                    "[incidents] Topology node {} in incident {} count mismatch: stored={}, actual={}",
+                    node.alert_id,
+                    incident_id,
+                    node.alert_count,
+                    actual_node_count
+                );
+                node.alert_count = actual_node_count;
+            }
+        }
+    }
 
     // Convert incident_alerts to triggers
     let triggers: Vec<IncidentAlert> = incident_alerts
@@ -559,25 +625,29 @@ pub async fn list_incidents(
 
     let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
 
-    let incidents_list = incidents
+    // Get actual alert counts from junction table (source of truth)
+    let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
+    let actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
+
+    let incidents_list: Vec<Incident> = incidents
         .into_iter()
         .map(|i| {
-            let incident_id = i.id.clone();
-            let topology_context = i.topology_context.as_ref().and_then(|v| {
-                match serde_json::from_value(v.clone()) {
-                    Ok(topology) => Some(topology),
-                    Err(e) => {
-                        log::error!(
-                            "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
-                            incident_id,
-                            e,
-                            v
-                        );
-                        None
-                    }
-                }
-            });
-            model_to_incident_with_topology(i, topology_context)
+            let mut incident = model_to_incident_with_topology(i.clone(), None);
+
+            // Fix alert_count from actual triggers (self-healing for corrupted data)
+            if let Some(&actual_count) = actual_counts.get(&i.id)
+                && incident.alert_count != actual_count
+            {
+                log::debug!(
+                    "[incidents] List: Incident {} alert_count mismatch: stored={}, actual={}",
+                    i.id,
+                    incident.alert_count,
+                    actual_count
+                );
+                incident.alert_count = actual_count;
+            }
+
+            incident
         })
         .collect();
 
@@ -918,60 +988,6 @@ fn model_to_incident_with_topology(
         created_at: db_model.created_at,
         updated_at: db_model.updated_at,
     }
-}
-
-/// Get alert flow graph for an incident
-///
-/// Returns the pre-built alert flow graph showing how alerts cascaded
-/// across services over time. Graph is built incrementally as alerts fire.
-pub async fn get_service_graph(
-    org_id: &str,
-    incident_id: &str,
-) -> Result<Option<IncidentServiceGraph>, anyhow::Error> {
-    // Check if incident exists
-    if infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
-        .is_none()
-    {
-        return Ok(None);
-    }
-
-    // Get topology from DB
-    let topology = infra::table::alert_incidents::get_topology(org_id, incident_id).await?;
-
-    // If no topology, return empty graph
-    let topology = match topology {
-        Some(t) => t,
-        None => {
-            return Ok(Some(IncidentServiceGraph::default()));
-        }
-    };
-
-    // Calculate stats from nodes before moving topology
-    let total_services = topology
-        .nodes
-        .iter()
-        .map(|n| &n.service_name)
-        .collect::<HashSet<_>>()
-        .len();
-    let total_alerts: u32 = topology.nodes.iter().map(|n| n.alert_count).sum();
-    let services_with_alerts = topology
-        .nodes
-        .iter()
-        .map(|n| &n.service_name)
-        .collect::<HashSet<_>>()
-        .len();
-
-    // Return topology directly
-    Ok(Some(IncidentServiceGraph {
-        nodes: topology.nodes,
-        edges: topology.edges,
-        stats: IncidentGraphStats {
-            total_services,
-            total_alerts,
-            services_with_alerts,
-        },
-    }))
 }
 
 /// Update incident status
