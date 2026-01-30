@@ -479,6 +479,7 @@ class="field_list" no-hover>
                         v-model="searchObj.meta.showHistogram"
                         size="xs"
                         flat
+                        class="o2-toggle-button-xs"
                         :class="
                           store.state.theme === 'dark'
                             ? 'o2-toggle-button-xs-dark'
@@ -523,6 +524,7 @@ class="field_list" no-hover>
                             ? 'o2-toggle-button-xs-dark'
                             : 'o2-toggle-button-xs-light'
                         "
+                        class="o2-toggle-button-xs"
                         @click.stop
                       />
                     </div>
@@ -562,6 +564,7 @@ class="field_list" no-hover>
                             ? 'o2-toggle-button-xs-dark'
                             : 'o2-toggle-button-xs-light'
                         "
+                        class="o2-toggle-button-xs"
                         @click.stop="handleQuickMode"
                       />
                     </div>
