@@ -44,11 +44,14 @@ const QUERIER_ROUTES: [(&str, usize); 25] = [
                                                * values */
     ("service_streams", 2), // /api/{org_id}/service_streams/...
 ];
-const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
+const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
     "/_search_partition",
     "/_search_stream",
     "/_values_stream",
+    "/_search_multi_stream",
+    "/_search_partition_multi",
+    "/_search_multi",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query_exemplars",
 ];
@@ -95,7 +98,7 @@ pub fn is_querier_route(path: &str) -> bool {
 #[inline]
 pub fn is_querier_route_by_body(path: &str) -> bool {
     let path = remove_base_uri(path);
-    QUERIER_ROUTES_BY_BODY.iter().any(|x| path.contains(x))
+    QUERIER_ROUTES_BY_BODY.iter().any(|x| path.ends_with(x))
 }
 
 #[inline]

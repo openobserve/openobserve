@@ -25,7 +25,10 @@ use config::{
     META_ORG_ID, RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
-        search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
+        search::{
+            MultiSearchPartitionRequest, MultiStreamRequest, Request as SearchRequest,
+            SearchPartitionRequest, ValuesRequest,
+        },
     },
     router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::{json, rand::get_rand_element},
@@ -64,8 +67,12 @@ enum QuerierPayload {
     PromQL(HashMap<String, String>),
     /// Search request JSON
     Search(Box<SearchRequest>),
+    /// Search request JSON
+    MultiSearch(Box<MultiStreamRequest>),
     /// Search partition request JSON
     SearchPartition(Box<SearchPartitionRequest>),
+    /// Search partition request JSON
+    MultiSearchPartition(Box<MultiSearchPartitionRequest>),
     /// Values stream request JSON
     Values(Box<ValuesRequest>),
 }
@@ -296,7 +303,13 @@ async fn proxy_with_body_routing(
         QuerierPayload::Empty => client.get(&target.full_url).headers(headers),
         QuerierPayload::PromQL(form) => client.post(&target.full_url).headers(headers).form(&form),
         QuerierPayload::Search(json) => client.post(&target.full_url).headers(headers).json(&*json),
+        QuerierPayload::MultiSearch(json) => {
+            client.post(&target.full_url).headers(headers).json(&*json)
+        }
         QuerierPayload::SearchPartition(json) => {
+            client.post(&target.full_url).headers(headers).json(&*json)
+        }
+        QuerierPayload::MultiSearchPartition(json) => {
             client.post(&target.full_url).headers(headers).json(&*json)
         }
         QuerierPayload::Values(json) => client.post(&target.full_url).headers(headers).json(&*json),
@@ -346,6 +359,23 @@ async fn parse_querier_payload(
             ))
         }
 
+        // Multi stream Search endpoints
+        s if s.ends_with("/_search_multi") || s.ends_with("/_search_multi_stream") => {
+            let body = read_payload_bytes(req, "multi search").await?;
+            let query = json::from_slice::<MultiStreamRequest>(&body).map_err(|_| {
+                (StatusCode::BAD_REQUEST, "Failed to parse search request").into_response()
+            })?;
+            Some((
+                // Only use the first sql query for routing
+                query
+                    .sql
+                    .first()
+                    .map(|q| q.sql.to_string())
+                    .unwrap_or_default(),
+                QuerierPayload::MultiSearch(Box::new(query)),
+            ))
+        }
+
         // Search partition endpoint
         s if s.ends_with("/_search_partition") => {
             let body = read_payload_bytes(req, "search partition").await?;
@@ -359,6 +389,22 @@ async fn parse_querier_payload(
             Some((
                 query.sql.to_string(),
                 QuerierPayload::SearchPartition(Box::new(query)),
+            ))
+        }
+
+        // Search partition endpoint
+        s if s.ends_with("/_search_partition_multi") => {
+            let body = read_payload_bytes(req, "multi search partition").await?;
+            let query = json::from_slice::<MultiSearchPartitionRequest>(&body).map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse search partition request",
+                )
+                    .into_response()
+            })?;
+            Some((
+                query.sql.first().cloned().unwrap_or_default(),
+                QuerierPayload::MultiSearchPartition(Box::new(query)),
             ))
         }
 
