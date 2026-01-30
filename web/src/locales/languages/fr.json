@@ -2682,8 +2682,6 @@
     "stableTooltip": "Les dimensions stables ont une faible cardinalité et sont utilisées pour le calcul des clés de corrélation",
     "normalize": "Normaliser",
     "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}",
-    "correlatedLogsV2": "Journaux V2",
-    "clickToLoadLogsV2": "Cliquez pour charger les journaux corrélés (V2)",
     "logs": {
       "title": "Journaux corrélés",
       "filters": {

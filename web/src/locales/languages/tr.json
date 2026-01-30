@@ -2682,8 +2682,6 @@
     "stableTooltip": "Kararlı boyutlar düşük kardinaliteye sahiptir ve korelasyon anahtarı hesaplaması için kullanılır",
     "normalize": "Normalleştir",
     "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}",
-    "correlatedLogsV2": "Günlükler V2",
-    "clickToLoadLogsV2": "İlişkili günlükleri yüklemek için tıklayın (V2)",
     "logs": {
       "title": "İlişkili Günlükler",
       "filters": {

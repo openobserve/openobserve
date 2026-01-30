@@ -2678,8 +2678,6 @@
     "stableTooltip": "稳定维度基数低，用于关联键计算",
     "normalize": "正常化",
     "noSemanticGroupsInCategory": "类别中没有语义组：{category}",
-    "correlatedLogsV2": "日志 V2",
-    "clickToLoadLogsV2": "点击加载相关日志 (V2)",
     "logs": {
       "title": "关联日志",
       "filters": {

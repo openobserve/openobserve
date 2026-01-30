@@ -2621,11 +2621,9 @@
     "metricsTooltip": "Select metric streams to display",
     "selectMetrics": "Select Metric Streams",
     "correlatedLogs": "Logs",
-    "correlatedLogsV2": "Logs V2",
     "correlatedMetrics": "Metrics",
     "correlatedTraces": "Traces",
     "clickToLoadLogs": "Click to load correlated logs",
-    "clickToLoadLogsV2": "Click to load correlated logs (V2)",
     "clickToLoadMetrics": "Click to load correlated metrics",
     "clickToLoadTraces": "Click to load correlated traces",
     "logs": {

@@ -2682,8 +2682,6 @@
     "stableTooltip": "Le dimensioni stabili hanno una bassa cardinalità e vengono utilizzate per il calcolo delle chiavi di correlazione",
     "normalize": "Normalizza",
     "noSemanticGroupsInCategory": "Nessun gruppo semantico nella categoria: {category}",
-    "correlatedLogsV2": "Registri V2",
-    "clickToLoadLogsV2": "Fai clic per caricare i log correlati (V2)",
     "logs": {
       "title": "Log correlati",
       "filters": {

@@ -2682,8 +2682,6 @@
     "stableTooltip": "Stabile Dimensionen haben eine niedrige Kardinalität und werden für die Berechnung von Korrelationsschlüsseln verwendet.",
     "normalize": "Normalisieren",
     "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}",
-    "correlatedLogsV2": "Protokolle V2",
-    "clickToLoadLogsV2": "Klicken Sie hier, um korrelierte Protokolle zu laden (V2)",
     "logs": {
       "title": "Korrelierte Protokolle",
       "filters": {
