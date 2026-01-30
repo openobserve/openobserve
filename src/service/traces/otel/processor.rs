@@ -31,7 +31,7 @@ use super::{
     },
     pricing,
 };
-use crate::common::meta::traces::Event;
+use crate::{common::meta::traces::Event, service::traces::otel::extractors::ObservationType};
 
 pub struct OtelIngestionProcessor {
     model_extractor: ModelExtractor,
@@ -155,6 +155,7 @@ impl OtelIngestionProcessor {
                 let output_tokens = usage.get("output").cloned().unwrap_or_default();
 
                 if (input_tokens > 0 || output_tokens > 0)
+                    && matches!(obs_type, ObservationType::Generation)
                     && let Some((input_cost, output_cost, total_cost)) =
                         pricing::calculate_cost(model_name, input_tokens, output_tokens)
                 {
