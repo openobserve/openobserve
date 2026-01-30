@@ -30,7 +30,7 @@ self.onmessage = async (event) => {
         type: 'end',
         traceId,
       });
-      
+
       delete activeBuffers[traceId];
       break;
 
@@ -51,19 +51,19 @@ function processChunk(traceId, chunk) {
   try {
     // Add chunk to buffer
     buffer += chunk;
-        
+
     // Process complete messages
     const messages = buffer.split('\n\n');
     // Keep the last potentially incomplete message in buffer
     buffer = messages.pop() || '';
     activeBuffers[traceId] = buffer;
-    
+
     const lines = messages.filter(line => line.trim());
-    
+
     // Process each complete line
     for (let i = 0; i < lines.length; i++) {
       try {
-        const msgLines = lines[i].split('\n');          
+        const msgLines = lines[i].split('\n');
         // Check if this is an event line
 
         if(msgLines.length > 1){
@@ -77,6 +77,7 @@ function processChunk(traceId, chunk) {
             try {
               // Try to parse as JSON
               const json = JSON.parse(data);
+
               // Send message based on event type
               self.postMessage({
                 type: eventType,
@@ -130,4 +131,4 @@ function processChunk(traceId, chunk) {
       data: { message: 'Stream processing error', error: error.toString() },
     });
   }
-} 
+}

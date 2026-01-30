@@ -345,10 +345,17 @@ impl Iterator for ResponseChunkIterator {
             let hit = &self.remaining_hits[0];
             let hit_size = crate::utils::json::estimate_json_bytes(hit);
 
+            // If a single hit exceeds chunk size, handle it carefully
             if hit_size > self.chunk_size {
-                return Some(ResponseChunk::Hits {
-                    hits: vec![hit.to_owned()],
-                });
+                // If we already have hits in current chunk, return them first
+                // to preserve order and avoid losing data
+                if !current_chunk.is_empty() {
+                    break;
+                }
+                // Otherwise, send the oversized hit alone and remove from queue
+                // CRITICAL: Must pop_front() to avoid infinite loop of duplicates
+                let hit = self.remaining_hits.pop_front().unwrap();
+                return Some(ResponseChunk::Hits { hits: vec![hit] });
             }
 
             // If adding this hit would exceed target size, break
@@ -2499,6 +2506,131 @@ mod tests {
         } else {
             panic!("First chunk should be metadata");
         }
+    }
+
+    #[test]
+    fn test_response_chunk_iterator_oversized_hit_preserves_order() {
+        // This test verifies the fix for the critical bug where oversized hits
+        // would cause data loss and break ordering
+        //
+        // Scenario:
+        // - chunk_size = 1000 bytes
+        // - 10 small hits (total ~900 bytes)
+        // - 1 oversized hit (>1000 bytes)
+        // - 2 more small hits
+        //
+        // Expected behavior:
+        // 1. Metadata chunk
+        // 2. Chunk with 10 small hits
+        // 3. Chunk with 1 oversized hit (alone)
+        // 4. Chunk with 2 remaining small hits
+
+        let mut response = Response::new(0, 13);
+
+        // Create 10 small hits (~50 bytes each, total ~500 bytes)
+        for i in 1..=10 {
+            response.hits.push(json::json!({
+                "id": i,
+                "data": "small_hit_data"
+            }));
+        }
+
+        // Create 1 oversized hit (way bigger than chunk_size)
+        // Create a large string to exceed chunk size
+        let large_data = "x".repeat(2000); // 2000 bytes > 1000 byte chunk_size
+        response.hits.push(json::json!({
+            "id": 11,
+            "data": large_data,
+            "oversized": true
+        }));
+
+        // Create 2 more small hits
+        response.hits.push(json::json!({
+            "id": 12,
+            "data": "small_hit_after_oversized"
+        }));
+        response.hits.push(json::json!({
+            "id": 13,
+            "data": "small_hit_after_oversized"
+        }));
+
+        response.total = 13;
+
+        // Use small chunk size to trigger the oversized hit scenario
+        let iterator = ResponseChunkIterator::new(response, Some(1000));
+        let chunks: Vec<ResponseChunk> = iterator.collect();
+
+        // Verify we have the expected number of chunks
+        // 1 metadata + at least 3 hit chunks (small batch, oversized, remaining small)
+        assert!(
+            chunks.len() >= 4,
+            "Should have at least 4 chunks (metadata + 3 hit chunks), got {}",
+            chunks.len()
+        );
+
+        // Chunk 0: Metadata
+        if let ResponseChunk::Metadata { response } = &chunks[0] {
+            assert!(response.hits.is_empty());
+            assert_eq!(response.total, 13);
+        } else {
+            panic!("First chunk should be metadata");
+        }
+
+        // Verify all hits are present and in order
+        let mut all_hits = Vec::new();
+        for chunk in &chunks[1..] {
+            if let ResponseChunk::Hits { hits } = chunk {
+                all_hits.extend(hits.clone());
+            }
+        }
+
+        // Should have all 13 hits
+        assert_eq!(all_hits.len(), 13, "All hits should be present");
+
+        // Verify order is preserved (id should be 1 to 13)
+        for (idx, hit) in all_hits.iter().enumerate() {
+            let expected_id = idx + 1;
+            let actual_id = hit.get("id").and_then(|v| v.as_u64()).unwrap() as usize;
+            assert_eq!(
+                actual_id, expected_id,
+                "Hit order broken: expected id {}, got {}",
+                expected_id, actual_id
+            );
+        }
+
+        // Find the chunk containing the oversized hit (id=11)
+        let mut found_oversized_chunk = false;
+        for chunk in &chunks[1..] {
+            if let ResponseChunk::Hits { hits } = chunk {
+                if hits.len() == 1 {
+                    if let Some(id) = hits[0].get("id").and_then(|v| v.as_u64()) {
+                        if id == 11 {
+                            // Verify this is indeed the oversized hit
+                            assert!(
+                                hits[0]
+                                    .get("oversized")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false),
+                                "Chunk with single hit should contain the oversized hit"
+                            );
+                            found_oversized_chunk = true;
+
+                            // Verify the oversized hit is sent alone (preserving order)
+                            assert_eq!(
+                                hits.len(),
+                                1,
+                                "Oversized hit should be sent alone in its own chunk"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        assert!(
+            found_oversized_chunk,
+            "Should find a chunk with the oversized hit sent alone"
+        );
     }
 
     #[test]
