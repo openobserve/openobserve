@@ -248,6 +248,8 @@ describe("IdentityAccessManagement.vue Component", () => {
 
   describe("Tab Filtering Tests - RBAC", () => {
     it("should include RBAC tabs when rbac_enabled is true", async () => {
+      vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
+      vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
       store.state.zoConfig.rbac_enabled = true;
       store.state.zoConfig.service_account_enabled = true;
 
@@ -392,18 +394,41 @@ describe("IdentityAccessManagement.vue Component", () => {
 
   describe("Route Watcher Tests", () => {
     it("should redirect to users when accessing quota as non-meta org", async () => {
-      const routerPushSpy = vi.spyOn(router, "push");
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
 
-      // Simulate route change to quota
-      await router.push({
-        name: "quota",
-        query: { org_identifier: "test-org" },
+      // Simulate route change to quota by updating the currentRoute
+      // Since the route doesn't exist in test router, we mock the navigation
+      Object.defineProperty(router, "currentRoute", {
+        get: () => ({
+          value: {
+            name: "quota",
+            query: { org_identifier: "test-org" },
+          },
+        }),
+        configurable: true,
+      });
+
+      // Trigger the watcher by mounting a new instance
+      const testWrapper = mount(IdentityAccessManagement, {
+        global: {
+          provide: { store: store },
+          plugins: [i18n, router],
+          stubs: { RouterView: true, RouteTabs: true },
+        },
       });
 
       await flushPromises();
+      await nextTick();
 
       // Should redirect to users since isMetaOrg is false (mocked)
-      expect(routerPushSpy).toHaveBeenCalled();
+      expect(routerPushSpy).toHaveBeenCalledWith({
+        name: "users",
+        query: {
+          org_identifier: "test-org",
+        },
+      });
+
+      testWrapper.unmount();
     });
   });
 

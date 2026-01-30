@@ -28,12 +28,14 @@ vi.mock("@/constants/config", () => ({
 }));
 
 // Mock BillingService
-const mockListSubscription = vi.fn();
 vi.mock("@/services/billings", () => ({
   default: {
-    list_subscription: mockListSubscription
+    list_subscription: vi.fn()
   }
 }));
+
+// Import the mocked module to access the mock function
+import BillingService from "@/services/billings";
 
 // Mock router
 const mockRouter = {
@@ -623,11 +625,15 @@ describe("TrialPeriod.vue", () => {
 
     it("should call list_subscription when isCloud is true", async () => {
       // Mock successful response with non-AWS provider
-      mockListSubscription.mockResolvedValue({
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
         data: {
           provider: "stripe"
-        }
-      });
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
 
       const testStore = {
         state: {
@@ -648,17 +654,21 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockListSubscription).toHaveBeenCalledTimes(1);
-      expect(mockListSubscription).toHaveBeenCalledWith("test-org-123");
+      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-123");
     });
 
     it("should set showTrialPeriodMsg to false when provider is AWS", async () => {
       // Mock response with AWS provider
-      mockListSubscription.mockResolvedValue({
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
         data: {
           provider: "aws"
-        }
-      });
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
 
       const testStore = {
         state: {
@@ -683,17 +693,21 @@ describe("TrialPeriod.vue", () => {
       await new Promise(resolve => setTimeout(resolve, 0));
 
       // Should be set to false after AWS provider is detected
-      expect(mockListSubscription).toHaveBeenCalledWith("test-org-456");
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-456");
       expect(wrapper.vm.showTrialPeriodMsg).toBe(false);
     });
 
     it("should keep showTrialPeriodMsg true when provider is not AWS", async () => {
       // Mock response with non-AWS provider
-      mockListSubscription.mockResolvedValue({
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
         data: {
           provider: "stripe"
-        }
-      });
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
 
       const testStore = {
         state: {
@@ -714,16 +728,20 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockListSubscription).toHaveBeenCalledWith("test-org-789");
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-789");
       // Should remain true for non-AWS providers
       expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
     });
 
     it("should keep showTrialPeriodMsg true when provider is undefined", async () => {
       // Mock response without provider field
-      mockListSubscription.mockResolvedValue({
-        data: {}
-      });
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: {},
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
 
       const testStore = {
         state: {
@@ -744,7 +762,7 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockListSubscription).toHaveBeenCalledWith("test-org-999");
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-999");
       // Should remain true when provider is not specified
       expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
     });
@@ -752,7 +770,7 @@ describe("TrialPeriod.vue", () => {
     it("should handle list_subscription error gracefully", async () => {
       // Mock error response
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockListSubscription.mockRejectedValue(new Error("Network error"));
+      vi.mocked(BillingService.list_subscription).mockRejectedValue(new Error("Network error"));
 
       const testStore = {
         state: {
@@ -773,7 +791,7 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockListSubscription).toHaveBeenCalledWith("test-org-error");
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-error");
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Failed to fetch billing info:",
         expect.any(Error)
@@ -786,9 +804,13 @@ describe("TrialPeriod.vue", () => {
 
     it("should handle list_subscription with null data", async () => {
       // Mock response with null data
-      mockListSubscription.mockResolvedValue({
-        data: null
-      });
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
+        data: null,
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
 
       const testStore = {
         state: {
@@ -809,17 +831,21 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockListSubscription).toHaveBeenCalledWith("test-org-null");
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-null");
       // Should remain true when data is null
       expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
     });
 
     it("should call list_subscription with correct organization identifier", async () => {
-      mockListSubscription.mockResolvedValue({
+      vi.mocked(BillingService.list_subscription).mockResolvedValue({
         data: {
           provider: "gcp"
-        }
-      });
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any
+      } as any);
 
       const testStore = {
         state: {
@@ -840,8 +866,8 @@ describe("TrialPeriod.vue", () => {
       await wrapper.vm.$nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockListSubscription).toHaveBeenCalledTimes(1);
-      expect(mockListSubscription).toHaveBeenCalledWith("specific-org-identifier-12345");
+      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("specific-org-identifier-12345");
     });
   });
 
