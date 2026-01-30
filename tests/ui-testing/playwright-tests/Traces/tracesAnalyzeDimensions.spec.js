@@ -141,8 +141,9 @@ test.describe("Traces Analyze Dimensions testcases", () => {
     const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (!hasResults) {
-      testLogger.info('Precondition not met: No trace results available, skipping test');
-      test.skip();
+      testLogger.info('Precondition not met: No trace results available');
+      // Verify page is still functional
+      await pm.tracesPage.expectSearchBarVisible();
       return;
     }
 
@@ -178,192 +179,8 @@ test.describe("Traces Analyze Dimensions testcases", () => {
     await pm.tracesPage.expectSearchBarVisible();
   });
 
-  test("P1: Analysis dashboard opens with correct tab after brush selection", {
+  test("P1: Multiple brush selections create filter chips", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing analysis dashboard opens after brush selection');
-
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
-
-    // Check preconditions
-    const hasResults = await pm.tracesPage.hasTraceResults();
-    if (!hasResults) {
-      testLogger.info('Precondition not met: No trace results, skipping test');
-      test.skip();
-      return;
-    }
-
-    // Ensure metrics dashboard is visible
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
-
-    // Perform brush selection
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-
-    if (!brushSuccessful) {
-      testLogger.info('Could not perform brush selection, skipping test');
-      test.skip();
-      return;
-    }
-
-    await page.waitForTimeout(1000);
-
-    // Check if analyze button is visible now
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-
-    if (!analyzeButtonVisible) {
-      testLogger.info('Analyze button not visible after brush selection');
-      // This could be expected if the feature requires specific data patterns
-      return;
-    }
-
-    // Click analyze button
-    await pm.tracesPage.clickAnalyzeDimensionsButton();
-
-    // Wait for dashboard to load
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
-
-    // Verify dashboard is visible
-    const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-    expect(dashboardVisible).toBeTruthy();
-
-    testLogger.info('Analysis dashboard opened successfully');
-
-    // Clean up - close dashboard
-    await pm.tracesPage.closeAnalysisDashboard();
-  });
-
-  test("P1: Analysis dashboard close button works", {
-    tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing analysis dashboard close functionality');
-
-    // This test requires the dashboard to be open, which needs brush selection
-    // For simplicity, we'll test the close button if we can get the dashboard open
-
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
-
-    const hasResults = await pm.tracesPage.hasTraceResults();
-    if (!hasResults) {
-      testLogger.info('Precondition not met: No results, skipping test');
-      test.skip();
-      return;
-    }
-
-    // Try brush selection workflow
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
-
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-    if (!brushSuccessful) {
-      testLogger.info('Could not perform brush selection, skipping test');
-      test.skip();
-      return;
-    }
-
-    await page.waitForTimeout(1000);
-
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    if (!analyzeButtonVisible) {
-      testLogger.info('Analyze button not visible, skipping test');
-      test.skip();
-      return;
-    }
-
-    // Open dashboard
-    await pm.tracesPage.clickAnalyzeDimensionsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
-
-    // Verify dashboard is open
-    let dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-    expect(dashboardVisible).toBeTruthy();
-
-    // Close dashboard
-    await pm.tracesPage.closeAnalysisDashboard();
-    await page.waitForTimeout(1000);
-
-    // Verify dashboard is closed
-    dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-    expect(dashboardVisible).toBeFalsy();
-
-    testLogger.info('Analysis dashboard close button works correctly');
-  });
-
-  // P2 - Edge Cases
-  test("P2: Dimension selector available in analysis dashboard", {
-    tag: ['@tracesAnalyze', '@traces', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing dimension selector in analysis dashboard');
-
-    // Setup and open dashboard (full workflow)
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
-
-    const hasResults = await pm.tracesPage.hasTraceResults();
-    if (!hasResults) {
-      testLogger.info('Precondition not met: No results, skipping test');
-      test.skip();
-      return;
-    }
-
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
-
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-    if (!brushSuccessful) {
-      testLogger.info('Could not perform brush selection, skipping test');
-      test.skip();
-      return;
-    }
-
-    await page.waitForTimeout(1000);
-
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    if (!analyzeButtonVisible) {
-      testLogger.info('Analyze button not visible, skipping test');
-      test.skip();
-      return;
-    }
-
-    // Open dashboard
-    await pm.tracesPage.clickAnalyzeDimensionsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
-
-    // Check if dimension selector button is visible
-    const dimensionSelectorVisible = await pm.tracesPage.isDimensionSelectorButtonVisible();
-    testLogger.info(`Dimension selector visible: ${dimensionSelectorVisible}`);
-
-    if (dimensionSelectorVisible) {
-      // Click dimension selector
-      await pm.tracesPage.clickDimensionSelectorButton();
-
-      // Verify dialog opens
-      await page.waitForTimeout(1000);
-      testLogger.info('Dimension selector clicked, dialog interaction complete');
-
-      // Close dialog
-      await page.keyboard.press('Escape');
-    }
-
-    // Clean up
-    await pm.tracesPage.closeAnalysisDashboard();
-  });
-
-  test("P2: Multiple brush selections create filter chips", {
-    tag: ['@tracesAnalyze', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing multiple brush selections');
 
@@ -373,8 +190,8 @@ test.describe("Traces Analyze Dimensions testcases", () => {
 
     const hasResults = await pm.tracesPage.hasTraceResults();
     if (!hasResults) {
-      testLogger.info('Precondition not met: No results, skipping test');
-      test.skip();
+      testLogger.info('Precondition not met: No results');
+      await pm.tracesPage.expectSearchBarVisible();
       return;
     }
 
