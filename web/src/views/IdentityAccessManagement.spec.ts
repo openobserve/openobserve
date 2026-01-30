@@ -22,7 +22,7 @@ import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { nextTick, ref } from "vue";
+import { nextTick, ref, computed } from "vue";
 import config from "@/aws-exports";
 
 installQuasar({
@@ -394,22 +394,30 @@ describe("IdentityAccessManagement.vue Component", () => {
 
   describe("Route Watcher Tests", () => {
     it("should redirect to users when accessing quota as non-meta org", async () => {
-      // Create a reactive route ref
+      // Create a reactive current route
       const currentRoute = ref({
         name: "users",
         query: { org_identifier: "test-org" },
+        params: {},
+        path: "/users",
+        fullPath: "/users?org_identifier=test-org",
+        matched: [],
+        meta: {},
+        redirectedFrom: undefined,
+        hash: "",
       });
 
-      // Mock router with reactive currentRoute
+      // Create mock router
+      const mockPush = vi.fn().mockResolvedValue(undefined);
       const testRouter: any = {
         ...router,
-        currentRoute: currentRoute,
-        push: vi.fn().mockResolvedValue(undefined),
+        currentRoute,
+        push: mockPush,
+        options: router.options,
+        install: router.install,
       };
 
-      const routerPushSpy = testRouter.push;
-
-      // Mount component with mocked router
+      // Mount with the test router
       const testWrapper = mount(IdentityAccessManagement, {
         global: {
           provide: { store: store },
@@ -421,17 +429,18 @@ describe("IdentityAccessManagement.vue Component", () => {
       await flushPromises();
       await nextTick();
 
-      // Change route to quota to trigger the watcher
-      currentRoute.value = {
-        name: "quota",
-        query: { org_identifier: "test-org" },
-      };
+      // Clear calls from initial mount
+      mockPush.mockClear();
 
-      await flushPromises();
+      // Update the route to quota
+      currentRoute.value.name = "quota";
+
+      // Trigger reactivity
       await nextTick();
+      await flushPromises();
 
-      // Should redirect to users since isMetaOrg is false (mocked)
-      expect(routerPushSpy).toHaveBeenCalledWith({
+      // Verify redirect was called
+      expect(mockPush).toHaveBeenCalledWith({
         name: "users",
         query: {
           org_identifier: "test-org",
