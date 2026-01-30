@@ -44,10 +44,8 @@ impl InputOutputExtractor {
         }
 
         // Langfuse (support both dot and underscore formats)
-        if let Some(input) = attributes.get(LangfuseAttributes::OBSERVATION_INPUT) {
-            let output = attributes
-                .get(LangfuseAttributes::OBSERVATION_OUTPUT)
-                .cloned();
+        if let Some(input) = attributes.get(LangfuseAttributes::INPUT) {
+            let output = attributes.get(LangfuseAttributes::OUTPUT).cloned();
             return (Some(input.clone()), output);
         }
 
@@ -209,8 +207,8 @@ impl InputOutputExtractor {
             GenAiAttributes::TOOL_CALL_ARGUMENTS,
             GenAiAttributes::TOOL_CALL_RESULT,
             // Langfuse (both dot and underscore formats)
-            LangfuseAttributes::OBSERVATION_INPUT,
-            LangfuseAttributes::OBSERVATION_OUTPUT,
+            LangfuseAttributes::INPUT,
+            LangfuseAttributes::OUTPUT,
         ];
 
         // Check exact matches

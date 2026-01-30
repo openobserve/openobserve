@@ -188,43 +188,41 @@ pub struct LangfuseAttributes;
 
 impl LangfuseAttributes {
     // Observation Type
-    pub const OBSERVATION_TYPE: &'static str = "langfuse.observation.type";
+    pub const TYPE: &'static str = "langfuse.observation.type";
 
     // Input/Output
-    pub const OBSERVATION_INPUT: &'static str = "langfuse.observation.input";
-    pub const OBSERVATION_OUTPUT: &'static str = "langfuse.observation.output";
+    pub const INPUT: &'static str = "langfuse.observation.input";
+    pub const OUTPUT: &'static str = "langfuse.observation.output";
 
     // Model
-    pub const OBSERVATION_MODEL: &'static str = "langfuse.observation.model.name";
+    pub const MODEL: &'static str = "langfuse.observation.model.name";
 
     // Model Parameters
-    pub const OBSERVATION_MODEL_PARAMETERS: &'static str = "langfuse.observation.model.parameters";
+    pub const MODEL_PARAMETERS: &'static str = "langfuse.observation.model.parameters";
 
     // Usage Details
-    pub const OBSERVATION_USAGE_DETAILS: &'static str = "langfuse.observation.usage_details";
+    pub const USAGE_DETAILS: &'static str = "langfuse.observation.usage_details";
 
     // Cost Details
-    pub const OBSERVATION_COST_DETAILS: &'static str = "langfuse.observation.cost_details";
+    pub const COST_DETAILS: &'static str = "langfuse.observation.cost_details";
 
     // Prompt Name
-    pub const OBSERVATION_PROMPT_NAME: &'static str = "langfuse.observation.prompt.name";
+    pub const PROMPT_NAME: &'static str = "langfuse.observation.prompt.name";
 
     // Metadata (contains tool info and other metadata)
-    pub const OBSERVATION_METADATA: &'static str = "langfuse.observation.metadata";
+    pub const METADATA: &'static str = "langfuse.observation.metadata";
 
     // Custom tool metadata attributes (not in official spec but seen in user data)
-    pub const OBSERVATION_METADATA_TOOL_NAME: &'static str =
-        "langfuse.observation.metadata.tool.name";
-    pub const OBSERVATION_METADATA_TOOL_ID: &'static str = "langfuse.observation.metadata.tool.id";
+    pub const METADATA_TOOL_NAME: &'static str = "langfuse.observation.metadata.tool.name";
+    pub const METADATA_TOOL_ID: &'static str = "langfuse.observation.metadata.tool.id";
 
     // Session ID metadata attributes
-    pub const OBSERVATION_METADATA_LANGFUSE_SESSION_ID: &'static str =
+    pub const METADATA_LANGFUSE_SESSION_ID: &'static str =
         "langfuse.observation.metadata.langfuse_session_id";
-    pub const OBSERVATION_METADATA_SESSION_ID: &'static str =
-        "langfuse.observation.metadata.session_id";
+    pub const METADATA_SESSION_ID: &'static str = "langfuse.observation.metadata.session_id";
 
     // Source metadata attribute
-    pub const OBSERVATION_METADATA_SOURCE: &'static str = "langfuse.observation.metadata.source";
+    pub const METADATA_SOURCE: &'static str = "langfuse.observation.metadata.source";
 }
 
 /// Other Framework Attributes

@@ -34,7 +34,7 @@ impl ToolExtractor {
         }
 
         // Check Langfuse attributes
-        if let Some(value) = attributes.get(LangfuseAttributes::OBSERVATION_METADATA_TOOL_NAME)
+        if let Some(value) = attributes.get(LangfuseAttributes::METADATA_TOOL_NAME)
             && let Some(s) = value.as_str()
         {
             return Some(s.to_string());
@@ -56,7 +56,7 @@ impl ToolExtractor {
         }
 
         // Check Langfuse attributes
-        if let Some(value) = attributes.get(LangfuseAttributes::OBSERVATION_METADATA_TOOL_ID)
+        if let Some(value) = attributes.get(LangfuseAttributes::METADATA_TOOL_ID)
             && let Some(s) = value.as_str()
         {
             return Some(s.to_string());

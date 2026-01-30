@@ -31,8 +31,6 @@
 //! - **Model Information**: Extracts model names, parameters, and configuration.
 //! - **Usage Tracking**: Parses token counts and usage metrics.
 //! - **Cost Tracking**: Extracts cost information when available.
-//! - **Multi-Framework Support**: Supports OpenTelemetry Gen-AI conventions, Vercel AI SDK,
-//!   OpenInference, Logfire, LiveKit, MLFlow, TraceLoop, and more.
 //!
 //! # Architecture
 //!
@@ -90,15 +88,7 @@
 //! # Supported Frameworks
 //!
 //! - **OpenTelemetry Gen-AI**: Standard gen-ai semantic conventions
-//! - **Vercel AI SDK**: Full support for AI SDK attributes and events
-//! - **OpenInference**: OpenInference semantic conventions
-//! - **Logfire**: Pydantic AI integration
-//! - **LiveKit**: LiveKit agents
-//! - **MLFlow**: MLFlow tracking
 //! - **TraceLoop**: TraceLoop SDK
-//! - **SmolAgents**: SmolAgents framework
-//! - **Google Vertex AI**: Vertex AI Agent Developer Kit
-//! - **LlamaIndex**: LlamaIndex integration
 //!
 //! # References
 //!
@@ -107,9 +97,11 @@
 
 pub mod attributes;
 pub mod extractors;
+pub mod pricing;
 pub mod processor;
 
 pub use extractors::{ObservationType, ScopeInfo, map_to_observation_type};
+pub use pricing::calculate_cost;
 pub use processor::OtelIngestionProcessor;
 
 #[cfg(test)]

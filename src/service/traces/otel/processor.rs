@@ -29,6 +29,7 @@ use super::{
         PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor, ToolExtractor,
         UsageExtractor, map_to_observation_type,
     },
+    pricing,
 };
 use crate::common::meta::traces::Event;
 
@@ -137,6 +138,38 @@ impl OtelIngestionProcessor {
         span_attributes
             .retain(|key, _| !self.input_output_extractor.is_input_output_attribute(key));
 
+        // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
+        if input.is_some() || output.is_some() {
+            if !usage.contains_key("total") {
+                let input = usage.get("input").cloned().unwrap_or_default();
+                let output = usage.get("output").cloned().unwrap_or_default();
+                let total = input + output;
+                usage.insert("total".to_string(), total);
+            }
+
+            // Calculate cost from tokens if cost is missing but we have model and usage
+            if let Some(ref model_name) = model_name
+                && cost.is_empty()
+            {
+                let input_tokens = usage.get("input").cloned().unwrap_or_default();
+                let output_tokens = usage.get("output").cloned().unwrap_or_default();
+
+                if (input_tokens > 0 || output_tokens > 0)
+                    && let Some((input_cost, output_cost, total_cost)) =
+                        pricing::calculate_cost(model_name, input_tokens, output_tokens)
+                {
+                    cost.insert("input".to_string(), input_cost);
+                    cost.insert("output".to_string(), output_cost);
+                    cost.insert("total".to_string(), total_cost);
+                }
+            } else if !cost.contains_key("total") {
+                let input = cost.get("input").cloned().unwrap_or_default();
+                let output = cost.get("output").cloned().unwrap_or_default();
+                let total = input + output;
+                cost.insert("total".to_string(), total);
+            }
+        }
+
         // Add enriched fields
         span_attributes.insert(
             O2Attributes::OBSERVATION_TYPE.to_string(),
@@ -152,22 +185,6 @@ impl OtelIngestionProcessor {
                 O2Attributes::PROVIDER_NAME.to_string(),
                 json::json!(provider),
             );
-        }
-
-        // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
-        if input.is_some() || output.is_some() {
-            if !usage.contains_key("total") {
-                let input = usage.get("input").cloned().unwrap_or_default();
-                let output = usage.get("output").cloned().unwrap_or_default();
-                let total = input + output;
-                usage.insert("total".to_string(), total);
-            }
-            if !cost.contains_key("total") {
-                let input = cost.get("input").cloned().unwrap_or_default();
-                let output = cost.get("output").cloned().unwrap_or_default();
-                let total = input + output;
-                cost.insert("total".to_string(), total);
-            }
         }
 
         if let Some(input_val) = input {
@@ -454,5 +471,193 @@ mod tests {
         assert!(span_attrs.contains_key("langfuse_observation_metadata_tool_id"));
         assert!(span_attrs.contains_key("langfuse_observation_type"));
         assert!(span_attrs.contains_key("operation_name"));
+    }
+
+    #[test]
+    fn test_process_span_calculates_cost_from_tokens() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4o"));
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\"}]"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(500));
+        // No cost attributes provided
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Cost should be automatically calculated
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+
+        // gpt-4o: $2.50/1M input, $10.00/1M output
+        // 1000 tokens input = 1000/1M * $2.50 = $0.0025
+        // 500 tokens output = 500/1M * $10.00 = $0.005
+        // Total = $0.0075
+        assert_eq!(cost.get("input").and_then(|v| v.as_f64()), Some(0.0025));
+        assert_eq!(cost.get("output").and_then(|v| v.as_f64()), Some(0.005));
+        assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.0075));
+    }
+
+    #[test]
+    fn test_process_span_calculates_cost_for_claude_sonnet() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("claude-sonnet-4-5"),
+        );
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\"}]"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(50000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(10000));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Cost should be calculated with default tier (< 200k tokens)
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+
+        // claude-sonnet-4-5 default tier: $3.00/1M input, $15.00/1M output
+        // 50000 tokens input = 50000/1M * $3.00 = $0.15
+        // 10000 tokens output = 10000/1M * $15.00 = $0.15
+        // Total = $0.30
+        let input_cost = cost.get("input").and_then(|v| v.as_f64()).unwrap();
+        let output_cost = cost.get("output").and_then(|v| v.as_f64()).unwrap();
+        let total_cost = cost.get("total").and_then(|v| v.as_f64()).unwrap();
+        assert!((input_cost - 0.15).abs() < 1e-10);
+        assert!((output_cost - 0.15).abs() < 1e-10);
+        assert!((total_cost - 0.30).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_process_span_calculates_cost_for_claude_sonnet_extended_context() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("claude-sonnet-4-5"),
+        );
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\"}]"),
+        );
+        // Extended context: > 200k tokens
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(250000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(10000));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Cost should be calculated with extended context tier
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+
+        // claude-sonnet-4-5 extended tier: $6.00/1M input, $22.50/1M output
+        // 250000 tokens input = 250000/1M * $6.00 = $1.5
+        // 10000 tokens output = 10000/1M * $22.50 = $0.225
+        // Total = $1.725
+        let input_cost = cost.get("input").and_then(|v| v.as_f64()).unwrap();
+        let output_cost = cost.get("output").and_then(|v| v.as_f64()).unwrap();
+        let total_cost = cost.get("total").and_then(|v| v.as_f64()).unwrap();
+        assert!((input_cost - 1.5).abs() < 1e-10);
+        assert!((output_cost - 0.225).abs() < 1e-10);
+        assert!((total_cost - 1.725).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_process_span_preserves_existing_cost() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4o"));
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\"}]"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(500));
+        // Cost already provided
+        span_attrs.insert("gen_ai.usage.cost".to_string(), json::json!(0.999));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Existing cost should be preserved (not recalculated)
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+        assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.999));
+    }
+
+    #[test]
+    fn test_process_span_no_cost_calculation_for_unknown_model() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("unknown-model-xyz-2024"),
+        );
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\"}]"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(500));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Cost should not be calculated for unknown model
+        // Cost details should be empty
+        if span_attrs.contains_key(O2Attributes::COST_DETAILS) {
+            let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+            // Should be an empty object
+            assert!(cost.as_object().unwrap().is_empty());
+        }
     }
 }

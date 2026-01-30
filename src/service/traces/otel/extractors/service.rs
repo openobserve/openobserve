@@ -33,7 +33,7 @@ impl ServiceNameExtractor {
         // Priority order for service name sources
         let service_name_sources = [
             // Langfuse source metadata
-            LangfuseAttributes::OBSERVATION_METADATA_SOURCE,
+            LangfuseAttributes::METADATA_SOURCE,
             // Add more sources here as needed
         ];
 

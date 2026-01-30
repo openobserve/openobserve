@@ -144,7 +144,7 @@ pub fn map_to_observation_type(
 
     // Langfuse Span Kind
     if let Some(span_kind) = attributes
-        .get(LangfuseAttributes::OBSERVATION_TYPE)
+        .get(LangfuseAttributes::TYPE)
         .and_then(|v| v.as_str())
     {
         match span_kind.to_uppercase().as_str() {

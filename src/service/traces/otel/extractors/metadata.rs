@@ -49,8 +49,8 @@ impl MetadataExtractor {
             OtelAttributes::SESSION_ID,
             GenAiAttributes::CONVERSATION_ID,
             VercelAiSdkAttributes::TELEMETRY_METADATA_SESSION_ID,
-            LangfuseAttributes::OBSERVATION_METADATA_LANGFUSE_SESSION_ID,
-            LangfuseAttributes::OBSERVATION_METADATA_SESSION_ID,
+            LangfuseAttributes::METADATA_LANGFUSE_SESSION_ID,
+            LangfuseAttributes::METADATA_SESSION_ID,
         ];
 
         for key in &session_id_keys {

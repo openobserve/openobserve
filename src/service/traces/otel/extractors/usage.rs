@@ -104,7 +104,7 @@ impl UsageExtractor {
         }
 
         // Langfuse usage_details (support both dot and underscore formats)
-        if let Some(val) = attributes.get(LangfuseAttributes::OBSERVATION_USAGE_DETAILS)
+        if let Some(val) = attributes.get(LangfuseAttributes::USAGE_DETAILS)
             && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
         {
             for (k, v) in parsed {
@@ -129,7 +129,7 @@ impl UsageExtractor {
         }
 
         // Langfuse cost_details (support both dot and underscore formats)
-        if let Some(val) = attributes.get(LangfuseAttributes::OBSERVATION_COST_DETAILS)
+        if let Some(val) = attributes.get(LangfuseAttributes::COST_DETAILS)
             && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
         {
             for (k, v) in parsed {

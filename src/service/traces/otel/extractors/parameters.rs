@@ -75,7 +75,7 @@ impl ParametersExtractor {
         }
 
         // Langfuse model parameters (support both dot and underscore formats)
-        if let Some(val) = attributes.get(LangfuseAttributes::OBSERVATION_MODEL_PARAMETERS)
+        if let Some(val) = attributes.get(LangfuseAttributes::MODEL_PARAMETERS)
             && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
         {
             for (k, v) in parsed {
