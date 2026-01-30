@@ -392,7 +392,7 @@ const highlightQuery = computed(() => {
 
 /**
  * Get filter options for a dimension
- * Returns the current value + wildcard option
+ * Returns the current value + wildcard option + original value
  */
 const getFilterOptions = (
   key: string,
@@ -400,9 +400,27 @@ const getFilterOptions = (
 ): Array<{ label: string; value: string }> => {
   const uniqueValues = new Set<string>();
 
-  // Always include current value and wildcard
-  if (currentValue) uniqueValues.add(currentValue);
+  // Always include wildcard option
   uniqueValues.add(SELECT_ALL_VALUE);
+
+  // Get the original value from matched or additional dimensions
+  const originalValue =
+    matchedDimensions.value[key] || additionalDimensions.value[key];
+
+  // Always include original value if it exists and is not SELECT_ALL_VALUE
+  if (originalValue && originalValue !== SELECT_ALL_VALUE) {
+    uniqueValues.add(originalValue);
+  }
+
+  // Include current value if it's different from original and SELECT_ALL_VALUE
+  // This preserves previously selected values in the dropdown
+  if (
+    currentValue &&
+    currentValue !== SELECT_ALL_VALUE &&
+    currentValue !== originalValue
+  ) {
+    uniqueValues.add(currentValue);
+  }
 
   // Add available dimension values if they exist
   if (availableDimensions.value[key]) {
