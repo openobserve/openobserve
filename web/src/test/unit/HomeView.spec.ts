@@ -548,6 +548,252 @@ describe("HomeView.vue", () => {
     });
   });
 
+  describe("Compressed Size Tile - Cloud Conditional Rendering", () => {
+    it("should not render compressed size tile when isCloud is 'false'", async () => {
+      // Mock with isCloud = 'false'
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
+
+      // Mock response with data
+      orgService.get_organization_summary.mockResolvedValue({
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 50,
+            total_records: 1000,
+            total_index_size: 25
+          },
+          alerts: { num_realtime: 1, num_scheduled: 1 },
+          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isCloud).toBe("false");
+      expect(wrapper.vm.config.isCloud).toBe("false");
+
+      // Check that compressed size tile is not in the DOM
+      const compressedTileText = wrapper.text();
+      expect(compressedTileText).not.toContain("Total Data Compressed");
+    });
+
+    it("should render compressed size tile when isCloud is 'true'", async () => {
+      // Mock with isCloud = 'true'
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
+
+      // Mock response with data including compressed size
+      orgService.get_organization_summary.mockResolvedValue({
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 75,
+            total_records: 1000,
+            total_index_size: 25
+          },
+          alerts: { num_realtime: 1, num_scheduled: 1 },
+          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      });
+
+      // Create a fresh wrapper instance with cloud config
+      const cloudWrapper = mount(HomeView, {
+        global: {
+          plugins: [
+            [
+              Quasar,
+              {
+                plugins: [Notify]
+              }
+            ],
+            i18n,
+            store
+          ],
+          mocks: {
+            $router: mockRouter,
+            $route: mockRoute
+          },
+          stubs: {
+            'router-link': {
+              template: '<a><slot /></a>',
+              props: ['to']
+            },
+            'q-page': {
+              template: '<div class="q-page"><slot /></div>'
+            },
+            'q-btn': {
+              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            },
+            'q-separator': {
+              template: '<hr class="q-separator" />'
+            },
+            'TrialPeriod': {
+              name: "TrialPeriod",
+              template: '<div class="trial-period">Trial Period</div>'
+            }
+          }
+        }
+      });
+
+      await flushPromises();
+
+      expect(cloudWrapper.vm.config.isCloud).toBe("true");
+
+      // Check that compressed size tile is rendered in the DOM
+      const compressedTileText = cloudWrapper.text();
+      expect(compressedTileText).toContain("Total Data Compressed");
+
+      cloudWrapper.unmount();
+    });
+
+    it("should display compressed size value when tile is rendered in cloud mode", async () => {
+      // Mock with isCloud = 'true'
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
+
+      const compressedSize = 50;
+
+      orgService.get_organization_summary.mockResolvedValue({
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: compressedSize,
+            total_records: 1000,
+            total_index_size: 25
+          },
+          alerts: { num_realtime: 1, num_scheduled: 1 },
+          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      });
+
+      const cloudWrapper = mount(HomeView, {
+        global: {
+          plugins: [
+            [
+              Quasar,
+              {
+                plugins: [Notify]
+              }
+            ],
+            i18n,
+            store
+          ],
+          mocks: {
+            $router: mockRouter,
+            $route: mockRoute
+          },
+          stubs: {
+            'router-link': {
+              template: '<a><slot /></a>',
+              props: ['to']
+            },
+            'q-page': {
+              template: '<div class="q-page"><slot /></div>'
+            },
+            'q-btn': {
+              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            },
+            'q-separator': {
+              template: '<hr class="q-separator" />'
+            },
+            'TrialPeriod': {
+              name: "TrialPeriod",
+              template: '<div class="trial-period">Trial Period</div>'
+            }
+          }
+        }
+      });
+
+      await flushPromises();
+      await nextTick();
+
+      expect(cloudWrapper.vm.summary.compressed_size_raw).toBe(compressedSize);
+      expect(cloudWrapper.vm.formattedAnimatedCompressedSize).toBeDefined();
+
+      cloudWrapper.unmount();
+    });
+
+    it("should not render compressed size tile when isCloud is any value other than 'true'", async () => {
+      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null];
+
+      for (const testValue of testValues) {
+        // Mock with different isCloud values
+        vi.mocked(await import("../../aws-exports")).default.isCloud = testValue;
+
+        orgService.get_organization_summary.mockResolvedValue({
+          data: {
+            streams: {
+              num_streams: 5,
+              total_storage_size: 100,
+              total_compressed_size: 50,
+              total_records: 1000,
+              total_index_size: 25
+            },
+            alerts: { num_realtime: 1, num_scheduled: 1 },
+            pipelines: { num_realtime: 1, num_scheduled: 1 },
+            total_dashboards: 1,
+            total_functions: 1
+          }
+        });
+
+        const testWrapper = createWrapper();
+        await flushPromises();
+
+        expect(testWrapper.vm.config.isCloud).toBe(testValue);
+
+        // Compressed size tile should not be rendered unless value is exactly 'true'
+        if (testValue !== "true") {
+          const compressedTileText = testWrapper.text();
+          expect(compressedTileText).not.toContain("Total Data Compressed");
+        }
+
+        testWrapper.unmount();
+      }
+    });
+
+    it("should handle compressed size data properly when tile is conditionally rendered", async () => {
+      // Test non-cloud mode - no compressed tile
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
+
+      const mockData = {
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 75,
+            total_records: 1000,
+            total_index_size: 25
+          },
+          alerts: { num_realtime: 1, num_scheduled: 1 },
+          pipelines: { num_realtime: 1, num_scheduled: 1 },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      };
+
+      orgService.get_organization_summary.mockResolvedValue(mockData);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Data should still be loaded even if tile is not rendered
+      expect(wrapper.vm.summary.compressed_size_raw).toBe(75);
+      expect(wrapper.vm.summary.compressed_data).toBeDefined();
+
+      // But tile should not be visible
+      const compressedTileText = wrapper.text();
+      expect(compressedTileText).not.toContain("Total Data Compressed");
+    });
+  });
+
   describe("Navigation and Routing", () => {
     it("should have router available", () => {
       wrapper = createWrapper();
