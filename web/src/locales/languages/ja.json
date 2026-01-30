@@ -38,6 +38,8 @@
     "goHome": "ホームに移動",
     "name": "名前",
     "add": "追加",
+    "selectAll": "すべて選択",
+    "deselectAll": "すべて選択解除",
     "details": "詳細",
     "tags": "タグ",
     "process": "プロセス",
@@ -1960,6 +1962,8 @@
     "searchMetric": "メトリクスを検索",
     "searchLabel": "検索指標ラベル",
     "add": "追加",
+    "selectAll": "すべて選択",
+    "deselectAll": "すべて選択解除",
     "cancel": "キャンセル",
     "promqlLabel": "PromQL",
     "runQuery": "クエリを実行",
@@ -2675,8 +2679,6 @@
     "stableTooltip": "安定ディメンションはカーディナリティが低く、相関キーの計算に使用されます。",
     "normalize": "ノーマライズ",
     "noSemanticGroupsInCategory": "カテゴリにセマンティックグループはありません:{category}",
-    "correlatedLogsV2": "ログ V2",
-    "clickToLoadLogsV2": "クリックして相関ログを読み込む (V2)",
     "logs": {
       "title": "相関ログ",
       "filters": {
