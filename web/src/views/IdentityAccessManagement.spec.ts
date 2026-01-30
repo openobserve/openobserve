@@ -407,8 +407,10 @@ describe("IdentityAccessManagement.vue Component", () => {
         hash: "",
       });
 
-      // Create mock router
+      // Create mock push function
       const mockPush = vi.fn().mockResolvedValue(undefined);
+
+      // Create test router with reactive route
       const testRouter: any = {
         ...router,
         currentRoute,
@@ -417,11 +419,15 @@ describe("IdentityAccessManagement.vue Component", () => {
         install: router.install,
       };
 
-      // Mount with the test router
+      // Mock useRouter to return our test router
+      const vueRouter = await import("vue-router");
+      const useRouterSpy = vi.spyOn(vueRouter, "useRouter").mockReturnValue(testRouter);
+
+      // Mount component
       const testWrapper = mount(IdentityAccessManagement, {
         global: {
           provide: { store: store },
-          plugins: [i18n, testRouter],
+          plugins: [i18n, router],
           stubs: { RouterView: true, RouteTabs: true },
         },
       });
@@ -429,15 +435,26 @@ describe("IdentityAccessManagement.vue Component", () => {
       await flushPromises();
       await nextTick();
 
-      // Clear calls from initial mount
+      // Clear calls from initial mount (watcher has immediate: true)
       mockPush.mockClear();
 
-      // Update the route to quota
-      currentRoute.value.name = "quota";
+      // Update the entire route object to trigger watcher
+      currentRoute.value = {
+        name: "quota",
+        query: { org_identifier: "test-org" },
+        params: {},
+        path: "/quota",
+        fullPath: "/quota?org_identifier=test-org",
+        matched: [],
+        meta: {},
+        redirectedFrom: undefined,
+        hash: "",
+      };
 
-      // Trigger reactivity
+      // Wait for watcher to trigger
       await nextTick();
       await flushPromises();
+      await nextTick();
 
       // Verify redirect was called
       expect(mockPush).toHaveBeenCalledWith({
@@ -448,6 +465,7 @@ describe("IdentityAccessManagement.vue Component", () => {
       });
 
       testWrapper.unmount();
+      useRouterSpy.mockRestore();
     });
   });
 
