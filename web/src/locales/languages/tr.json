@@ -1942,7 +1942,11 @@
     "preview": "Önizleme",
     "test": "Testi",
     "saved": "Hedef başarıyla kaydedildi",
-    "saveError": "Hedef kaydedilemedi"
+    "saveError": "Hedef kaydedilemedi",
+    "customWebhook": "Özel (Webhook)",
+    "customEmail": "Özel (E-posta)",
+    "customAction": "Özel (Eylem)",
+    "custom": "Özel"
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",

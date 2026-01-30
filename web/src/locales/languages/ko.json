@@ -1942,7 +1942,11 @@
     "preview": "시사",
     "test": "테스트",
     "saved": "목적지가 성공적으로 저장되었습니다.",
-    "saveError": "대상 저장 실패"
+    "saveError": "대상 저장 실패",
+    "customWebhook": "사용자 지정 (웹후크)",
+    "customEmail": "사용자 지정 (이메일)",
+    "customAction": "사용자 지정 (액션)",
+    "custom": "사용자 지정"
   },
   "metrics": {
     "searchMetric": "지표 검색",

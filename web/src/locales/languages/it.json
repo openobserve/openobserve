@@ -1942,7 +1942,11 @@
     "preview": "Anteprima",
     "test": "Test",
     "saved": "Destinazione salvata con successo",
-    "saveError": "Impossibile salvare la destinazione"
+    "saveError": "Impossibile salvare la destinazione",
+    "customWebhook": "Personalizzato (Webhook)",
+    "customEmail": "Personalizzato (email)",
+    "customAction": "Personalizzato (azione)",
+    "custom": "Personalizzato"
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",

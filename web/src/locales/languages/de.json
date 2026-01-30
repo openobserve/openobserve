@@ -1942,7 +1942,11 @@
     "preview": "Vorschau",
     "test": "Testen",
     "saved": "Ziel wurde erfolgreich gespeichert",
-    "saveError": "Ziel konnte nicht gespeichert werden"
+    "saveError": "Ziel konnte nicht gespeichert werden",
+    "customWebhook": "Benutzerdefiniert (Webhook)",
+    "customEmail": "Benutzerdefiniert (E-Mail)",
+    "customAction": "Benutzerdefiniert (Aktion)",
+    "custom": "Benutzerdefiniert"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",
