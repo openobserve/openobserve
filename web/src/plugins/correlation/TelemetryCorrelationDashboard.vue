@@ -1551,6 +1551,19 @@ const getDimensionOptions = (key: string, currentValue: string) => {
     });
   }
 
+  // Add the current value if it's different from both original and SELECT_ALL_VALUE
+  // This preserves previously selected values in the dropdown
+  if (
+    currentValue &&
+    currentValue !== SELECT_ALL_VALUE &&
+    currentValue !== originalValue
+  ) {
+    options.push({
+      label: currentValue,
+      value: currentValue,
+    });
+  }
+
   return options;
 };
 

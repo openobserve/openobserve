@@ -38,6 +38,8 @@
     "goHome": "Vá para casa",
     "name": "Nome",
     "add": "Adicionar",
+    "selectAll": "Selecionar tudo",
+    "deselectAll": "Desmarcar tudo",
     "details": "Detalhes",
     "tags": "Etiquetas",
     "process": "Processo",
@@ -1946,6 +1948,8 @@
     "searchMetric": "Pesquisar uma métrica",
     "searchLabel": "Rótulo métrico de pesquisa",
     "add": "Adicionar",
+    "selectAll": "Selecionar tudo",
+    "deselectAll": "Desmarcar tudo",
     "cancel": "Cancelar",
     "promqlLabel": "PromQL",
     "runQuery": "Executar consulta",
@@ -2682,8 +2686,6 @@
     "stableTooltip": "As dimensões estáveis têm baixa cardinalidade e são usadas para o cálculo da chave de correlação.",
     "normalize": "Normalizar",
     "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}",
-    "correlatedLogsV2": "Registros V2",
-    "clickToLoadLogsV2": "Clique para carregar registros correlacionados (V2)",
     "logs": {
       "title": "Registros correlacionados",
       "filters": {

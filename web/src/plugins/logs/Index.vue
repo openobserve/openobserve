@@ -1992,6 +1992,25 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Watch AI chat state and adjust splitter to give more space when chat is open
+    const originalSplitterValue = ref(searchObj.config.splitterModel);
+    watch(
+      () => store.state.isAiChatEnabled,
+      (isEnabled) => {
+        // Only adjust splitter if field list is shown
+        if (searchObj.meta.showFields) {
+          if (isEnabled) {
+            // AI chat opened - save current value and set splitter to 25
+            originalSplitterValue.value = searchObj.config.splitterModel;
+            searchObj.config.splitterModel = 25;
+          } else {
+            // AI chat closed - restore original splitter value
+            searchObj.config.splitterModel = originalSplitterValue.value;
+          }
+        }
+      }
+    );
+
     const handleRunQueryFn = async (clear_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // Set the shouldRefreshWithoutCache flag
@@ -2519,8 +2538,8 @@ export default defineComponent({
 
     // [END] Context Provider Setup
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
     };
 
     const clearAllTimeouts = () => {
