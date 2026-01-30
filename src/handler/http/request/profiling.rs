@@ -49,6 +49,17 @@ pub async fn memory_profile() -> Result<String, String> {
     std::fs::write(&filename, pprof_data)
         .map_err(|e| format!("Failed to write profile file: {e}"))?;
 
+    // dump flamegraph
+    let pprof_data = prof_ctl
+        .dump_flamegraph()
+        .map_err(|e| format!("Failed to dump pprof: {e}"))?;
+
+    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let filename = format!("memory_profile_graph{}.svg", timestamp);
+
+    std::fs::write(&filename, pprof_data)
+        .map_err(|e| format!("Failed to write profile file: {e}"))?;
+
     log::info!("Memory profile dumped to: {}", filename);
     Ok(filename)
 }
