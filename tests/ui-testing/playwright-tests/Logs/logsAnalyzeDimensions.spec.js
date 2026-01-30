@@ -184,8 +184,8 @@ test.describe("Logs Analyze Dimensions testcases", () => {
 
       testLogger.info('Dimension selector dialog opened successfully');
 
-      // Close dialog by clicking outside or pressing escape
-      await page.keyboard.press('Escape');
+      // Close dialog by pressing escape
+      await pm.logsPage.closeDimensionSelectorDialog();
     } else {
       testLogger.info('Dimension selector not visible (may be disabled in custom SQL mode)');
     }
