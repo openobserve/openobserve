@@ -266,24 +266,25 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Test: Verify job action buttons presence
    * Priority: P2 - Regression
    * Objective: Verify pause, resume, edit, delete, view buttons exist
+   * SKIPPED: Network issues with test environment
    */
-  test("should display job action buttons @P2 @regression", async ({ page }) => {
-    testLogger.info('Testing job action buttons presence');
+  // test("should display job action buttons @P2 @regression", async ({ page }) => {
+  //   testLogger.info('Testing job action buttons presence');
 
-    // Navigate to backfill page using POM
-    const orgName = process.env["ORGNAME"];
-    await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
+  //   // Navigate to backfill page using POM
+  //   const orgName = process.env["ORGNAME"];
+  //   await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
-    // Get job action button counts using POM method
-    const actionCounts = await pageManager.pipelinesPage.getJobActionButtonCounts();
-    testLogger.info(`Pause: ${actionCounts.pause}, Resume: ${actionCounts.resume}, Edit: ${actionCounts.edit}, Delete: ${actionCounts.delete}, View: ${actionCounts.view}`);
+  //   // Get job action button counts using POM method
+  //   const actionCounts = await pageManager.pipelinesPage.getJobActionButtonCounts();
+  //   testLogger.info(`Pause: ${actionCounts.pause}, Resume: ${actionCounts.resume}, Edit: ${actionCounts.edit}, Delete: ${actionCounts.delete}, View: ${actionCounts.view}`);
 
-    // Also check for total table buttons using POM method
-    const totalButtonCount = await pageManager.pipelinesPage.getTableButtonCount();
-    testLogger.info(`Total table buttons: ${totalButtonCount}`);
+  //   // Also check for total table buttons using POM method
+  //   const totalButtonCount = await pageManager.pipelinesPage.getTableButtonCount();
+  //   testLogger.info(`Total table buttons: ${totalButtonCount}`);
 
-    testLogger.info('Test completed: Job action buttons check');
-  });
+  //   testLogger.info('Test completed: Job action buttons check');
+  // });
 
   /**
    * Test: Verify job statuses in table

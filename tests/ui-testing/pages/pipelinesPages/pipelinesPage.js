@@ -2758,6 +2758,359 @@ export class PipelinesPage {
         }
         testLogger.info('Filtered history by date range', { startDate, endDate });
     }
+
+    // ============================================================================
+    // ADDITIONAL BACKFILL PAGE METHODS
+    // Added to fix missing POM methods in pipeline-backfill.spec.js
+    // ============================================================================
+
+    /** @returns {import('@playwright/test').Locator} Status badges in backfill/history tables */
+    get statusBadges() {
+        return this.page.locator('.q-badge, .status-badge, [data-test*="status"], .q-chip');
+    }
+
+    /** @returns {import('@playwright/test').Locator} Job rows in backfill table */
+    get jobRows() {
+        return this.page.locator('[data-test*="backfill-row"], [data-test*="job-row"], table tbody tr');
+    }
+
+    /**
+     * Check if clear filters button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isClearFiltersBtnVisible() {
+        const clearBtn = this.page.locator('[data-test*="clear-filter"], button:has-text("Clear"), [data-test*="reset"]').first();
+        return await clearBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click clear filters button
+     */
+    async clickClearFiltersBtn() {
+        const clearBtn = this.page.locator('[data-test*="clear-filter"], button:has-text("Clear"), [data-test*="reset"]').first();
+        if (await clearBtn.isVisible().catch(() => false)) {
+            await clearBtn.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Clicked clear filters button');
+        } else {
+            testLogger.info('Clear filters button not found');
+        }
+    }
+
+    /**
+     * Check if backfill refresh button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isBackfillRefreshBtnVisible() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click backfill refresh button
+     */
+    async clickBackfillRefreshBtn() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        if (await refreshBtn.isVisible().catch(() => false)) {
+            await refreshBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked backfill refresh button');
+        } else {
+            testLogger.info('Backfill refresh button not found');
+        }
+    }
+
+    /**
+     * Check if backfill jobs table is visible
+     * @returns {Promise<boolean>} True if table is visible
+     */
+    async isBackfillJobsTableVisible() {
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], table, .q-table').first();
+        return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if generic table is visible (fallback)
+     * @returns {Promise<boolean>} True if any table is visible
+     */
+    async isGenericTableVisible() {
+        const tableLocator = this.page.locator('table, .q-table, [role="table"]').first();
+        return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click back button on backfill page
+     */
+    async clickBackfillBackBtn() {
+        const backBtn = this.page.locator('[data-test*="back-btn"], [data-test*="back"], button:has-text("Back"), .back-btn').first();
+        if (await backBtn.isVisible().catch(() => false)) {
+            await backBtn.click();
+            await this.page.waitForLoadState('networkidle');
+            testLogger.info('Clicked backfill back button');
+        } else {
+            await this.page.goBack();
+            testLogger.info('Used browser back navigation');
+        }
+    }
+
+    /**
+     * Filter by pipeline name
+     */
+    async filterByPipeline() {
+        const pipelineFilter = this.page.locator('[data-test*="pipeline-filter"], [data-test*="pipeline-select"], .q-select').first();
+        if (await pipelineFilter.isVisible().catch(() => false)) {
+            await pipelineFilter.click();
+            await this.page.waitForTimeout(500);
+            // Select first available option
+            const option = this.page.locator('.q-item, [role="option"]').first();
+            if (await option.isVisible().catch(() => false)) {
+                await option.click();
+            }
+            testLogger.info('Filtered by pipeline');
+        } else {
+            testLogger.info('Pipeline filter not found');
+        }
+    }
+
+    /**
+     * Get count of progress bars in backfill table
+     * @returns {Promise<number>} Count of progress bars
+     */
+    async getProgressBarCount() {
+        const progressBars = await this.page.locator('.q-linear-progress, progress, [data-test*="progress"]').all();
+        return progressBars.length;
+    }
+
+    /**
+     * Get job action button counts
+     * @returns {Promise<{pause: number, resume: number, cancel: number, total: number}>} Button counts
+     */
+    async getJobActionButtonCounts() {
+        const pauseCount = await this.page.locator('button:has-text("Pause"), [data-test*="pause"]').count();
+        const resumeCount = await this.page.locator('button:has-text("Resume"), [data-test*="resume"]').count();
+        const cancelCount = await this.page.locator('button:has-text("Cancel"), [data-test*="cancel"]').count();
+        return {
+            pause: pauseCount,
+            resume: resumeCount,
+            cancel: cancelCount,
+            total: pauseCount + resumeCount + cancelCount
+        };
+    }
+
+    /**
+     * Get count of buttons in table
+     * @returns {Promise<number>} Count of buttons
+     */
+    async getTableButtonCount() {
+        const buttons = await this.page.locator('table button, .q-table button').all();
+        return buttons.length;
+    }
+
+    /**
+     * Get count of jobs with specific status
+     * @param {string} status - Status to count (e.g., 'Completed', 'Running', 'Failed')
+     * @returns {Promise<number>} Count of jobs with status
+     */
+    async getJobStatusCount(status) {
+        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), .q-badge:has-text("${status}"), .status-badge:has-text("${status}")`).all();
+        return statusElements.length;
+    }
+
+    /**
+     * Get count of error indicators
+     * @returns {Promise<number>} Count of error indicators
+     */
+    async getErrorIndicatorCount() {
+        const errorIndicators = await this.page.locator('[data-test*="error"], .error-indicator, .text-negative, .q-icon[color="negative"]').all();
+        return errorIndicators.length;
+    }
+
+    /**
+     * Click first error indicator
+     */
+    async clickFirstErrorIndicator() {
+        const errorIndicator = this.page.locator('[data-test*="error"], .error-indicator, .text-negative').first();
+        if (await errorIndicator.isVisible().catch(() => false)) {
+            await errorIndicator.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Clicked first error indicator');
+        }
+    }
+
+    /**
+     * Check if error dialog is visible
+     * @returns {Promise<boolean>} True if dialog is visible
+     */
+    async isErrorDialogVisible() {
+        const dialog = this.page.locator('.q-dialog, [role="dialog"], [data-test*="error-dialog"]').first();
+        return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Close error dialog
+     */
+    async closeErrorDialog() {
+        const closeBtn = this.page.locator('.q-dialog button:has-text("Close"), .q-dialog button:has-text("OK"), .q-dialog [data-test*="close"]').first();
+        if (await closeBtn.isVisible().catch(() => false)) {
+            await closeBtn.click();
+            await this.page.waitForTimeout(300);
+            testLogger.info('Closed error dialog');
+        }
+    }
+
+    /**
+     * Check if empty backfill message is visible
+     * @returns {Promise<boolean>} True if message is visible
+     */
+    async isEmptyBackfillMessageVisible() {
+        const emptyMsg = this.page.locator('[data-test*="empty"], [data-test*="no-data"]').first();
+        const textMsg = this.page.getByText(/no.*jobs|no.*data|empty|no records/i).first();
+        return await emptyMsg.isVisible({ timeout: 3000 }).catch(() => false) ||
+               await textMsg.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    // ============================================================================
+    // ADDITIONAL HISTORY PAGE METHODS
+    // Added to fix missing POM methods in pipeline-history.spec.js
+    // ============================================================================
+
+    /**
+     * Check if history date picker is visible
+     * @returns {Promise<boolean>} True if date picker is visible
+     */
+    async isHistoryDatePickerVisible() {
+        const datePicker = this.page.locator('[data-test*="date-picker"], [data-test*="date-range"], .date-picker, .q-date').first();
+        return await datePicker.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history search select is visible
+     * @returns {Promise<boolean>} True if search select is visible
+     */
+    async isHistorySearchSelectVisible() {
+        const searchSelect = this.page.locator('[data-test*="search-select"], [data-test*="pipeline-select"], .q-select, select').first();
+        return await searchSelect.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history manual search button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isHistoryManualSearchBtnVisible() {
+        const searchBtn = this.page.locator('[data-test*="search-btn"], button:has-text("Search"), button:has-text("Run")').first();
+        return await searchBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history refresh button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isHistoryRefreshBtnVisible() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click history back button
+     */
+    async clickHistoryBackBtn() {
+        const backBtn = this.page.locator('[data-test*="back-btn"], [data-test*="back"], button:has-text("Back"), .back-btn').first();
+        if (await backBtn.isVisible().catch(() => false)) {
+            await backBtn.click();
+            await this.page.waitForLoadState('networkidle');
+            testLogger.info('Clicked history back button');
+        } else {
+            await this.page.goBack();
+            testLogger.info('Used browser back navigation');
+        }
+    }
+
+    /**
+     * Click history refresh button
+     */
+    async clickHistoryRefreshBtn() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        if (await refreshBtn.isVisible().catch(() => false)) {
+            await refreshBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked history refresh button');
+        } else {
+            testLogger.info('History refresh button not found');
+        }
+    }
+
+    /**
+     * Check if column header is visible
+     * @param {string} columnName - Name of the column
+     * @returns {Promise<boolean>} True if column is visible
+     */
+    async isColumnHeaderVisible(columnName) {
+        const columnHeader = this.page.locator(`th:has-text("${columnName}"), [data-test*="column"]:has-text("${columnName}")`).first();
+        return await columnHeader.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click history search select
+     */
+    async clickHistorySearchSelect() {
+        const searchSelect = this.page.locator('[data-test*="search-select"], [data-test*="pipeline-select"], .q-select').first();
+        if (await searchSelect.isVisible().catch(() => false)) {
+            await searchSelect.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Clicked history search select');
+        }
+    }
+
+    /**
+     * Select first option in dropdown
+     */
+    async selectFirstOption() {
+        const option = this.page.locator('.q-item, [role="option"], .q-menu .q-item').first();
+        if (await option.isVisible().catch(() => false)) {
+            await option.click();
+            await this.page.waitForTimeout(300);
+            testLogger.info('Selected first option');
+        }
+    }
+
+    /**
+     * Click history manual search button
+     */
+    async clickHistoryManualSearchBtn() {
+        const searchBtn = this.page.locator('[data-test*="search-btn"], button:has-text("Search"), button:has-text("Run")').first();
+        if (await searchBtn.isVisible().catch(() => false)) {
+            await searchBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked history manual search button');
+        }
+    }
+
+    /**
+     * Get status counts from history/backfill page
+     * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
+     */
+    async getStatusCounts() {
+        const successCount = await this.page.locator('.q-badge:has-text("Success"), .q-badge:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
+        const errorCount = await this.page.locator('.q-badge:has-text("Error"), .q-badge:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
+        const warningCount = await this.page.locator('.q-badge:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
+        return {
+            success: successCount,
+            error: errorCount,
+            warning: warningCount
+        };
+    }
+
+    /**
+     * Check if empty state message is visible
+     * @returns {Promise<boolean>} True if message is visible
+     */
+    async isEmptyStateMessageVisible() {
+        const emptyMsg = this.page.locator('[data-test*="empty"], [data-test*="no-data"], .empty-state').first();
+        const textMsg = this.page.getByText(/no.*history|no.*data|empty|no records/i).first();
+        return await emptyMsg.isVisible({ timeout: 3000 }).catch(() => false) ||
+               await textMsg.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
     // SCHEDULED PIPELINE TAB METHODS - POM Compliance Fix
     // These methods replace raw selectors in spec files for PromQL/SQL tab switching
     // ============================================================================
