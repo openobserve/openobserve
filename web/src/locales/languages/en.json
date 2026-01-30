@@ -58,6 +58,8 @@
     "goHome": "Go home",
     "name": "Name",
     "add": "Add",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
     "details": "Details",
     "tags": "Tags",
     "process": "Process",

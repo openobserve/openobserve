@@ -38,6 +38,8 @@
     "goHome": "Ir a inicio",
     "name": "Nombre",
     "add": "Agregar",
+    "selectAll": "Seleccionar todo",
+    "deselectAll": "Deseleccionar todo",
     "details": "Detalles",
     "tags": "Etiquetas",
     "process": "Proceso",
