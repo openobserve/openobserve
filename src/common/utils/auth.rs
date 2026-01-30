@@ -335,7 +335,10 @@ where
             } else {
                 path_columns[0].to_string()
             }
-        } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
+        } else if url_len == 2
+            || (url_len > 2 && path_columns[1].eq("settings"))
+            || (url_len > 2 && path_columns[1] == "sourcemaps")
+        {
             // for settings (including settings/v2), the post/delete require PUT permissions,
             // GET needs LIST permissions. This handles:
             // - /org/settings (v1 settings API)

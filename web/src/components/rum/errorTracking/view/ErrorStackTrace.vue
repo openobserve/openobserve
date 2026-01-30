@@ -19,33 +19,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="col-12">
       <div class="tags-title text-bold q-mb-xs">{{ t("rum.errorStack") }}</div>
       <div class="q-mb-sm">{{ error_stack[0] }}</div>
-      <div class="error-stacks">
-        <template v-for="(stack, index) in error_stack" :key="stack">
-          <div
-            v-if="index"
-            class="error_stack q-px-sm"
-            :style="{
-              'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
-              'border-radius':
-                Number(index) === error_stack.length - 1
-                  ? '0 0 4px 4px'
-                  : Number(index) === 1
-                  ? '4px 4px 0 0'
-                  : '',
-            }"
-          >
-            {{ stack }}
+
+      <!-- Tabs for Pretty and Raw views -->
+      <q-tabs
+        v-model="activeTab"
+        dense
+        class="text-grey q-mb-xs"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+      >
+        <q-tab name="raw" label="Raw" />
+        <q-tab name="pretty" label="Pretty" />
+      </q-tabs>
+
+      <q-separator class="q-mb-sm" />
+
+      <!-- Tab panels -->
+      <q-tab-panels v-model="activeTab" animated>
+        <!-- Raw view -->
+        <q-tab-panel name="raw" class="q-pa-none">
+          <div class="error-stacks">
+            <template v-for="(stack, index) in error_stack" :key="stack">
+              <div
+                v-if="index"
+                class="error_stack q-px-sm"
+                :style="{
+                  'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
+                  'border-radius':
+                    Number(index) === error_stack.length - 1
+                      ? '0 0 4px 4px'
+                      : Number(index) === 1
+                      ? '4px 4px 0 0'
+                      : '',
+                }"
+              >
+                {{ stack }}
+              </div>
+            </template>
           </div>
-        </template>
-      </div>
+        </q-tab-panel>
+
+        <!-- Pretty formatted view -->
+        <q-tab-panel name="pretty" class="q-pa-none">
+          <PrettyStackTrace v-if="activeTab === 'pretty'" :error_stack="error_stack" :error="error" />
+        </q-tab-panel>
+      </q-tab-panels>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
+import { ref } from "vue";
+import PrettyStackTrace from "./PrettyStackTrace.vue";
+
 const { t } = useI18n();
-const props = defineProps({
+
+defineProps({
   error_stack: {
     type: Array,
     required: true,
@@ -55,9 +86,11 @@ const props = defineProps({
     required: true,
   },
 });
+
+const activeTab = ref("raw");
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .tags-title {
   font-size: 16px;
 }

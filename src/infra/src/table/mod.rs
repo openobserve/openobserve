@@ -49,6 +49,7 @@ pub mod service_streams;
 pub mod service_streams_dimensions;
 pub mod sessions;
 pub mod short_urls;
+pub mod source_maps;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
