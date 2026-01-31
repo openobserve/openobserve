@@ -111,6 +111,9 @@
     "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
     "id": "ID",
     "getStarted": "始めよう",
+    "copy": "[コピー]",
+    "copySuccess": "クリップボードにコピー",
+    "copyError": "クリップボードへのコピーに失敗しました",
     "reset": "リセット",
     "retry": "リトライ"
   },
@@ -307,7 +310,11 @@
     "show": "ショー",
     "editor": "エディター",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
-    "showHideColumns": "列を表示/非表示"
+    "showHideColumns": "列を表示/非表示",
+    "buildQuery": "ビルド",
+    "enableSqlModeForBuild": "SQL モードを有効にして、クエリビルダーを使用するストリームを 1 つ選択してください",
+    "applyToSearch": "検索に適用",
+    "complexQueryDetected": "複雑なクエリが検出されました。カスタムモードを使用する。"
   },
   "menu": {
     "home": "ホーム",
@@ -1496,7 +1503,9 @@
     "SQL": "SQL",
     "builder": "ビルダー",
     "custom": "カスタム",
-    "sqlBuilder": "SQL ビルダー"
+    "sqlBuilder": "SQL ビルダー",
+    "generatedSql": "生成された SQL",
+    "enterCustomSql": "カスタム SQL クエリを入力してください..."
   },
   "home": {
     "streams": "ストリーム",

@@ -112,7 +112,10 @@
     "id": "KİMLİK",
     "getStarted": "Başlayın",
     "reset": "Sıfırla",
-    "retry": "Tekrar dene"
+    "retry": "Tekrar dene",
+    "copy": "Kopyalama",
+    "copySuccess": "Panoya kopyalandı",
+    "copyError": "Panoya kopyalanamadı"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -307,7 +310,11 @@
     "show": "Göster",
     "editor": "Editör",
     "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır.",
-    "showHideColumns": "Sütunları Göster/Gizle"
+    "showHideColumns": "Sütunları Göster/Gizle",
+    "buildQuery": "İnşa",
+    "enableSqlModeForBuild": "Lütfen SQL modunu etkinleştirin ve sorgu oluşturucuyu kullanmak için tek bir akış seçin",
+    "applyToSearch": "Aramaya Uygula",
+    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -1479,7 +1486,9 @@
     "SQL": "SQL",
     "builder": "inşaatçı",
     "custom": "Özel",
-    "sqlBuilder": "SQL Oluşturucu"
+    "sqlBuilder": "SQL Oluşturucu",
+    "generatedSql": "Oluşturulan SQL",
+    "enterCustomSql": "Özel SQL sorgunuzu girin..."
   },
   "home": {
     "streams": "Akışlar",

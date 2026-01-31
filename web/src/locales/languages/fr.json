@@ -112,7 +112,10 @@
     "id": "IDENTIFIANT",
     "getStarted": "Commencez",
     "reset": "Réinitialiser",
-    "retry": "Réessayez"
+    "retry": "Réessayez",
+    "copy": "Copier",
+    "copySuccess": "Copié dans le presse-papiers",
+    "copyError": "Impossible de copier dans le presse-papiers"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -307,7 +310,11 @@
     "show": "Afficher",
     "editor": "Rédacteur",
     "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
-    "showHideColumns": "Afficher/masquer les colonnes"
+    "showHideColumns": "Afficher/masquer les colonnes",
+    "buildQuery": "Construisez",
+    "enableSqlModeForBuild": "Activez le mode SQL et sélectionnez un seul flux pour utiliser le générateur de requêtes",
+    "applyToSearch": "Appliquer à la recherche",
+    "complexQueryDetected": "Requête complexe détectée. Utilisation du mode personnalisé."
   },
   "menu": {
     "home": "Accueil",
@@ -1479,7 +1486,9 @@
     "SQL": "SQL",
     "builder": "Constructeur",
     "custom": "Personnalisé",
-    "sqlBuilder": "Générateur SQL"
+    "sqlBuilder": "Générateur SQL",
+    "generatedSql": "SQL généré",
+    "enterCustomSql": "Entrez votre requête SQL personnalisée..."
   },
   "home": {
     "streams": "Ruisseaux",

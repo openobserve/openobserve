@@ -112,7 +112,10 @@
     "id": "ID",
     "getStarted": "Inizia",
     "reset": "Reimposta",
-    "retry": "Riprova"
+    "retry": "Riprova",
+    "copy": "Copia",
+    "copySuccess": "Copiato negli appunti",
+    "copyError": "Copia negli appunti non riuscita"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -307,7 +310,11 @@
     "show": "Mostra",
     "editor": "Redattore",
     "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
-    "showHideColumns": "Mostra/nascondi colonne"
+    "showHideColumns": "Mostra/nascondi colonne",
+    "buildQuery": "Costruisci",
+    "enableSqlModeForBuild": "Abilita la modalità SQL e seleziona un singolo stream per utilizzare Query Builder",
+    "applyToSearch": "Applica alla ricerca",
+    "complexQueryDetected": "È stata rilevata una query complessa. Utilizzo della modalità personalizzata."
   },
   "menu": {
     "home": "Home",
@@ -1479,7 +1486,9 @@
     "SQL": "SQL",
     "builder": "Costruttore",
     "custom": "Personalizzato",
-    "sqlBuilder": "SQL Builder"
+    "sqlBuilder": "SQL Builder",
+    "generatedSql": "SQL generato",
+    "enterCustomSql": "Inserisci la tua query SQL personalizzata..."
   },
   "home": {
     "streams": "Stream",

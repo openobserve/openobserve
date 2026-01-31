@@ -112,7 +112,10 @@
     "id": "CARTEIRA DE IDENTIDADE",
     "getStarted": "Comece",
     "reset": "Redefinir",
-    "retry": "Tente novamente"
+    "retry": "Tente novamente",
+    "copy": "Copiar",
+    "copySuccess": "Copiado para a prancheta",
+    "copyError": "Falha ao copiar para a área de transferência"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -307,7 +310,11 @@
     "show": "Mostra",
     "editor": "Editor",
     "webUrlNotConfigured": "O URL de compartilhamento é desativado até que ZO_WEB_URL seja configurado pelo administrador.",
-    "showHideColumns": "Mostrar/ocultar colunas"
+    "showHideColumns": "Mostrar/ocultar colunas",
+    "buildQuery": "Construir",
+    "enableSqlModeForBuild": "Ative o modo SQL e selecione um único fluxo para usar o construtor de consultas",
+    "applyToSearch": "Aplicar para pesquisar",
+    "complexQueryDetected": "Consulta complexa detectada. Usando o modo personalizado."
   },
   "menu": {
     "home": "Início",
@@ -1479,7 +1486,9 @@
     "SQL": "SQL",
     "builder": "Construtor",
     "custom": "Personalizado",
-    "sqlBuilder": "Construtor de SQL"
+    "sqlBuilder": "Construtor de SQL",
+    "generatedSql": "SQL gerado",
+    "enterCustomSql": "Insira sua consulta SQL personalizada..."
   },
   "home": {
     "streams": "Transmissões",
