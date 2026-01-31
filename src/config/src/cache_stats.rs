@@ -48,7 +48,10 @@ where
         let cap = 0; // DashMap doesn't expose capacity
         let mem_size: usize = self
             .iter()
-            .map(|entry| entry.key().len() + std::mem::size_of::<V>())
+            .map(|entry| {
+                // Account for String heap data + String struct overhead + value size
+                entry.key().len() + std::mem::size_of::<String>() + std::mem::size_of::<V>()
+            })
             .sum();
         (len, cap, mem_size)
     }
@@ -93,7 +96,11 @@ where
 // ============================================================================
 
 /// Generic implementation for RwLock<HashMap<K, V>>
-/// This handles all HashMap types including those with String keys and custom types
+///
+/// Note: For accurate String key memory tracking, use RwHashMap (DashMap) instead.
+/// This implementation uses std::mem::size_of which only measures stack size.
+/// For String keys, it misses heap allocations. For String values, it also misses
+/// heap allocations. This is a known limitation of generic memory estimation.
 impl<K, V, S> CacheStatsAsync for RwLock<HashMap<K, V, S>>
 where
     K: Sized + Send + Sync + std::hash::Hash + Eq,
@@ -104,6 +111,7 @@ where
         let map = self.read().await;
         let len = map.len();
         let cap = map.capacity();
+        // Note: This only accounts for stack size, not heap allocations
         let mem_size: usize = map
             .iter()
             .map(|(_k, _v)| std::mem::size_of::<K>() + std::mem::size_of::<V>())
@@ -281,10 +289,14 @@ mod tests {
 
         let (len, _cap, mem_size) = map.stats();
         assert_eq!(len, 2);
-        // mem_size should be: 2 keys (4 + 4 bytes for strings) + 2 values (4 bytes each)
+        // mem_size: String heap data + String struct + value size for each entry
         assert_eq!(
             mem_size,
-            4 + std::mem::size_of::<i32>() + 4 + std::mem::size_of::<i32>()
+            4 + std::mem::size_of::<String>()
+                + std::mem::size_of::<i32>()
+                + 4
+                + std::mem::size_of::<String>()
+                + std::mem::size_of::<i32>()
         );
     }
 
@@ -349,6 +361,7 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
+        // Note: Generic HashMap impl only counts stack size
         let expected_mem = (std::mem::size_of::<String>() + std::mem::size_of::<i32>()) * 2;
         assert_eq!(mem_size, expected_mem);
     }
@@ -512,6 +525,7 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 1);
         assert!(cap >= 1);
+        // Note: Generic HashMap impl only counts stack size
         let expected_mem = std::mem::size_of::<String>() + std::mem::size_of::<i32>();
         assert_eq!(mem_size, expected_mem);
     }
@@ -530,7 +544,10 @@ mod tests {
 
         let (len, _cap, mem_size) = CACHE.stats();
         assert_eq!(len, 1);
-        assert_eq!(mem_size, 4 + std::mem::size_of::<i32>());
+        assert_eq!(
+            mem_size,
+            4 + std::mem::size_of::<String>() + std::mem::size_of::<i32>()
+        );
     }
 
     #[tokio::test]
@@ -544,6 +561,7 @@ mod tests {
         let (len, cap, mem_size) = CACHE.stats().await;
         assert_eq!(len, 1);
         assert!(cap >= 1);
+        // Note: Generic HashMap impl only counts stack size
         let expected_mem = std::mem::size_of::<String>() + std::mem::size_of::<i32>();
         assert_eq!(mem_size, expected_mem);
     }
@@ -560,9 +578,12 @@ mod tests {
 
         let (len, _cap, mem_size) = map.stats();
         assert_eq!(len, 2);
+        // String heap data + String struct + value size for each entry
         let expected = "short".len()
+            + std::mem::size_of::<String>()
             + std::mem::size_of::<Vec<u8>>()
             + "a_longer_key".len()
+            + std::mem::size_of::<String>()
             + std::mem::size_of::<Vec<u8>>();
         assert_eq!(mem_size, expected);
     }
@@ -575,6 +596,7 @@ mod tests {
 
         let (len, _cap, mem_size) = map.stats().await;
         assert_eq!(len, 1);
+        // Note: Generic HashMap impl only counts stack size
         let expected = std::mem::size_of::<String>() + std::mem::size_of::<String>();
         assert_eq!(mem_size, expected);
     }

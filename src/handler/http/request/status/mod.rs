@@ -734,9 +734,9 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::service::db::file_list::DEPULICATE_FILES.stats();
+    let (len, cap, mem_size) = crate::service::db::file_list::DEDUPLICATE_FILES.stats();
     stats.insert(
-        "DEPULICATE_FILES",
+        "DEDUPLICATE_FILES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
