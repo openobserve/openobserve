@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             
-            <div class="tile" v-if="config.isCloud == 'true'">
+            <div class="tile" v-if="config.isCloud == 'false'">
               <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
                role="article"
