@@ -58,6 +58,7 @@ export {
   DASHBOARD_PRESET,
   METRICS_PRESET,
   LOGS_PRESET,
+  BUILD_PRESET,
 
   // Functions
   getPresetByPageType,

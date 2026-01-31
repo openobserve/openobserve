@@ -24,8 +24,9 @@ import type { Ref } from "vue";
  * - 'dashboard': Full-featured panel editor with variables, save/discard
  * - 'metrics': PromQL-focused metrics visualization with auto-refresh
  * - 'logs': Simplified logs visualization receiving external data
+ * - 'build': Full-page query builder for logs (like Add Panel)
  */
-export type PanelEditorPageType = "dashboard" | "metrics" | "logs";
+export type PanelEditorPageType = "dashboard" | "metrics" | "logs" | "build";
 
 // ============================================================================
 // DateTime Types
@@ -280,6 +281,25 @@ export interface PanelEditorProps {
    * @default false
    */
   editMode?: boolean;
+
+  // ---- Build Mode Options ----
+  /**
+   * Whether to show SQL/PromQL and Builder/Custom mode toggle.
+   * @default false (dashboard, metrics, logs), true (build)
+   */
+  showQueryTypeSelector?: boolean;
+
+  /**
+   * Whether to show the generated SQL display section.
+   * @default false (dashboard, metrics, logs), true (build)
+   */
+  showGeneratedQueryDisplay?: boolean;
+
+  /**
+   * Whether to hide the chart preview area.
+   * @default false (dashboard, metrics, logs), true (build)
+   */
+  hideChartPreview?: boolean;
 }
 
 // ============================================================================
@@ -444,6 +464,12 @@ export interface PanelEditorConfig {
   showLastRefreshedTime: boolean;
   showOutdatedWarning: boolean;
   showAddToDashboardButton: boolean;
+  /** Whether to show SQL/PromQL and Builder/Custom mode toggle (build mode) */
+  showQueryTypeSelector: boolean;
+  /** Whether to show the generated SQL display section (build mode) */
+  showGeneratedQueryDisplay: boolean;
+  /** Whether to hide the chart preview area (build mode) */
+  hideChartPreview: boolean;
 }
 
 /**
@@ -457,6 +483,9 @@ export const DASHBOARD_PRESET: PanelEditorConfig = {
   showLastRefreshedTime: true,
   showOutdatedWarning: true,
   showAddToDashboardButton: false, // Dashboard has Save button instead
+  showQueryTypeSelector: false,
+  showGeneratedQueryDisplay: false,
+  hideChartPreview: false,
 };
 
 /**
@@ -470,6 +499,9 @@ export const METRICS_PRESET: PanelEditorConfig = {
   showLastRefreshedTime: true,
   showOutdatedWarning: true,
   showAddToDashboardButton: true, // Show inside chart area
+  showQueryTypeSelector: false,
+  showGeneratedQueryDisplay: false,
+  hideChartPreview: false,
 };
 
 /**
@@ -483,6 +515,25 @@ export const LOGS_PRESET: PanelEditorConfig = {
   showLastRefreshedTime: false,
   showOutdatedWarning: true,
   showAddToDashboardButton: true, // Show inside chart area
+  showQueryTypeSelector: false,
+  showGeneratedQueryDisplay: false,
+  hideChartPreview: false,
+};
+
+/**
+ * Preset configuration for build query page.
+ * Full-page query builder for logs (like Add Panel).
+ */
+export const BUILD_PRESET: PanelEditorConfig = {
+  showQueryEditor: false, // Uses GeneratedQueryDisplay instead
+  showQueryBuilder: true, // Show X/Y/Breakdown builder
+  showVariablesSelector: false,
+  showLastRefreshedTime: false,
+  showOutdatedWarning: false,
+  showAddToDashboardButton: false,
+  showQueryTypeSelector: true, // Show SQL/PromQL and Builder/Custom toggle
+  showGeneratedQueryDisplay: true, // Show generated SQL section
+  hideChartPreview: false, // Show chart preview (like Add Panel)
 };
 
 /**
@@ -500,6 +551,8 @@ export function getPresetByPageType(
       return METRICS_PRESET;
     case "logs":
       return LOGS_PRESET;
+    case "build":
+      return BUILD_PRESET;
     default:
       return DASHBOARD_PRESET;
   }
@@ -525,6 +578,11 @@ export function resolveConfig(props: PanelEditorProps): PanelEditorConfig {
       props.showOutdatedWarning ?? preset.showOutdatedWarning,
     showAddToDashboardButton:
       props.showAddToDashboardButton ?? preset.showAddToDashboardButton,
+    showQueryTypeSelector:
+      props.showQueryTypeSelector ?? preset.showQueryTypeSelector,
+    showGeneratedQueryDisplay:
+      props.showGeneratedQueryDisplay ?? preset.showGeneratedQueryDisplay,
+    hideChartPreview: props.hideChartPreview ?? preset.hideChartPreview,
   };
 }
 

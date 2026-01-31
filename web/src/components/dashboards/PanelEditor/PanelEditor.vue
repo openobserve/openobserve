@@ -133,6 +133,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <q-separator v-if="resolvedConfig.showQueryBuilder" />
 
+                  <!-- Query Type Selector (build mode) - Auto/Custom toggle -->
+                  <div
+                    v-if="resolvedConfig.showQueryTypeSelector"
+                    class="tw:flex tw:justify-end tw:items-center tw:px-3 tw:py-2 tw:bg-gray-50 dark:tw:bg-gray-800"
+                  >
+                    <QueryTypeSelector />
+                  </div>
+
+                  <!-- Generated Query Display (build mode) -->
+                  <GeneratedQueryDisplay
+                    v-if="resolvedConfig.showGeneratedQueryDisplay"
+                    :query="currentQuery"
+                    :isCustomMode="isCustomQueryMode"
+                    @update:query="onGeneratedQueryUpdate"
+                  />
+
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
                     v-if="
@@ -266,7 +282,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Chart Area -->
-                  <div class="col tw:relative">
+                  <div
+                    v-if="!resolvedConfig.hideChartPreview"
+                    class="col tw:relative"
+                  >
                     <div :class="chartAreaClass">
                       <PanelSchemaRenderer
                         v-if="chartData"
@@ -662,7 +681,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, defineAsyncComponent, toRef } from "vue";
+import { ref, computed, provide, defineAsyncComponent, toRef, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
@@ -715,6 +734,12 @@ const CustomChartEditor = defineAsyncComponent(
 const CustomChartTypeSelector = defineAsyncComponent(
   () =>
     import("@/components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue"),
+);
+const GeneratedQueryDisplay = defineAsyncComponent(
+  () => import("./GeneratedQueryDisplay.vue"),
+);
+const QueryTypeSelector = defineAsyncComponent(
+  () => import("@/components/dashboards/addPanel/QueryTypeSelector.vue"),
 );
 
 // ============================================================================
@@ -835,6 +860,8 @@ const contentHeight = computed(() => {
       return "calc(100vh - 106px)";
     case "logs":
       return "calc(100% - 36px)";
+    case "build":
+      return "calc(100vh - 60px)";
     default:
       return "calc(100vh - 110px)";
   }
@@ -971,9 +998,23 @@ const searchType = computed(() => {
       return "ui";
     case "logs":
       return "ui";
+    case "build":
+      return "ui";
     default:
       return "dashboards";
   }
+});
+
+// Current query for GeneratedQueryDisplay
+const currentQuery = computed(() => {
+  const queryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
+  return dashboardPanelData.data.queries[queryIndex]?.query || "";
+});
+
+// Whether in custom query mode
+const isCustomQueryMode = computed(() => {
+  const queryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
+  return dashboardPanelData.data.queries[queryIndex]?.customQuery || false;
 });
 
 // Resolved variables data
@@ -1017,6 +1058,13 @@ const handleDataZoom = (event: any) => {
     start: result.start.getTime(),
     end: result.end.getTime(),
   });
+};
+
+const onGeneratedQueryUpdate = (newQuery: string) => {
+  const queryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
+  if (dashboardPanelData.data.queries[queryIndex]) {
+    dashboardPanelData.data.queries[queryIndex].query = newQuery;
+  }
 };
 
 const handleCustomChartTemplateSelected = (templateCode: string) => {
@@ -1096,6 +1144,7 @@ defineExpose({
   limitNumberOfSeriesWarningMessage,
   errorMessage,
 });
+
 </script>
 
 <style lang="scss" scoped>

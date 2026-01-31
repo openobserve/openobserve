@@ -80,8 +80,10 @@ export const usePanelDataLoader = (
   shouldRefreshWithoutCache?: any,
 ) => {
   const log = (...args: any[]) => {
-    if (false) {
-      console.log(panelSchema?.value?.title + ": ", ...args);
+    // Enable for debugging build mode (set to true temporarily when debugging)
+    const DEBUG_LOGS = false;
+    if (DEBUG_LOGS) {
+      console.log('[BUILD-DEBUG] ' + panelSchema?.value?.title + ": ", ...args);
     }
   };
   let runCount = 0;
@@ -1944,7 +1946,23 @@ export const usePanelDataLoader = (
   };
 
   const hasAtLeastOneQuery = () =>
-    panelSchema.value.queries?.some((q: any) => q?.query);
+    panelSchema.value.queries?.some((q: any) => {
+      // For custom query mode, check if query string exists
+      if (q?.customQuery) {
+        return !!q?.query;
+      }
+      // For builder mode (customQuery: false), check if fields are configured
+      const fields = q?.fields;
+      if (fields) {
+        const hasXFields = fields.x?.length > 0;
+        const hasYFields = fields.y?.length > 0;
+        const hasStream = !!fields.stream;
+        // Need at least stream and some axis fields
+        return hasStream && (hasXFields || hasYFields);
+      }
+      // Fallback to checking query string
+      return !!q?.query;
+    });
 
   // [START] variables management
 

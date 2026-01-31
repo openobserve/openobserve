@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
-            v-show="searchObj.meta.logsVisualizeToggle != 'visualize'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs' || searchObj.meta.logsVisualizeToggle == 'patterns'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -318,6 +318,21 @@ size="md" />
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
             ></VisualizeLogsQuery>
           </div>
+          <div
+            v-if="searchObj.meta.logsVisualizeToggle == 'build'"
+            class="build-container"
+            :style="{ '--splitter-height': `${splitterModel}vh` }"
+          >
+            <BuildQueryPage
+              ref="buildQueryPageRef"
+              :searchQuery="searchObj.data.query"
+              :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
+              :selectedDateTime="selectedDateTime"
+              @apply="onBuildApply"
+              @cancel="onBuildCancel"
+              @queryGenerated="onBuildQueryGenerated"
+            />
+          </div>
         </template>
       </q-splitter>
     </div>
@@ -465,6 +480,9 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     VisualizeLogsQuery: defineAsyncComponent(
       () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+    ),
+    BuildQueryPage: defineAsyncComponent(
+      () => import("@/plugins/logs/BuildQueryPage.vue"),
     ),
     SearchHistory: defineAsyncComponent(
       () => import("@/plugins/logs/SearchHistory.vue"),
@@ -664,6 +682,7 @@ export default defineComponent({
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const buildQueryPageRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
@@ -2103,6 +2122,27 @@ export default defineComponent({
         // Extract patterns when user clicks run query in patterns mode
         await extractPatternsForCurrentQuery(clear_cache);
       }
+
+      if (searchObj.meta.logsVisualizeToggle == "build") {
+        // Run query in build mode - same approach as visualization
+        const dateTime =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod,
+              )
+            : cloneDeep(searchObj.data.datetime);
+
+        // Set datetime in build page's dashboardPanelData (same as visualization)
+        if (buildQueryPageRef.value?.dashboardPanelData) {
+          buildQueryPageRef.value.dashboardPanelData.meta.dateTime = {
+            start_time: new Date(dateTime.startTime),
+            end_time: new Date(dateTime.endTime),
+          };
+        }
+
+        // Trigger PanelEditor's runQuery
+        buildQueryPageRef.value?.runQuery(clear_cache);
+      }
     };
 
     const handleChartApiError = (errorMessage: any) => {
@@ -2110,6 +2150,43 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    // Build Query Page handlers
+    const onBuildApply = (query: string) => {
+      // Apply the generated query from build page
+      searchObj.data.query = query;
+      searchObj.meta.logsVisualizeToggle = "logs";
+      handleRunQueryFn();
+    };
+
+    const onBuildCancel = () => {
+      // Cancel and return to logs view
+      searchObj.meta.logsVisualizeToggle = "logs";
+    };
+
+    const onBuildQueryGenerated = (query: string) => {
+      // Sync generated query to logs composables so user can see it
+      if (query) {
+        searchObj.data.query = query;
+      }
+    };
+
+    // Selected date time for BuildQueryPage
+    const selectedDateTime = computed(() => {
+      const dateTime =
+        searchObj.data.datetime.type === "relative"
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod,
+            )
+          : cloneDeep(searchObj.data.datetime);
+
+      return {
+        start_time: new Date(dateTime.startTime),
+        end_time: new Date(dateTime.endTime),
+        valueType: searchObj.data.datetime.type,
+        relativeTimePeriod: searchObj.data.datetime.relativeTimePeriod,
+      };
+    });
 
     // [START] cancel running queries
 
@@ -2620,6 +2697,11 @@ export default defineComponent({
       getHistogramData,
       extractPatternsForCurrentQuery,
       patternsState,
+      buildQueryPageRef,
+      onBuildApply,
+      onBuildCancel,
+      onBuildQueryGenerated,
+      selectedDateTime,
     };
   },
   computed: {
