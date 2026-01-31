@@ -2357,7 +2357,8 @@
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
     "timeRangeUpdated": "Seçilen zaman aralığı bu izi içermiyordu. Zaman aralığı, izlemenin zaman damgasıyla eşleşecek şekilde güncellendi.",
-    "fetchingMoreTraces": "Daha fazla iz getiriyor..."
+    "fetchingMoreTraces": "Daha fazla iz getiriyor...",
+    "showErrorOnly": "Yalnızca Hatayı Göster"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

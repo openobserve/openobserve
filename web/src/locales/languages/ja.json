@@ -2378,7 +2378,8 @@
     "collapseFields": "フィールドを折りたたむ",
     "openFields": "オープンフィールド",
     "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
-    "fetchingMoreTraces": "さらにトレースを取得中..."
+    "fetchingMoreTraces": "さらにトレースを取得中...",
+    "showErrorOnly": "エラーのみ表示"
   },
   "actions": {
     "testAction": "アクションをテスト",

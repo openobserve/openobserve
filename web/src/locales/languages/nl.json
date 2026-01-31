@@ -2357,7 +2357,8 @@
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
     "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
-    "fetchingMoreTraces": "Nog meer sporen ophalen..."
+    "fetchingMoreTraces": "Nog meer sporen ophalen...",
+    "showErrorOnly": "Alleen fout weergeven"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

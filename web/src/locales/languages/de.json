@@ -2357,7 +2357,8 @@
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
     "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
-    "fetchingMoreTraces": "Weitere Spuren werden abgerufen..."
+    "fetchingMoreTraces": "Weitere Spuren werden abgerufen...",
+    "showErrorOnly": "Nur Fehler anzeigen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
