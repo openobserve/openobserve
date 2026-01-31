@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
@@ -89,40 +88,44 @@ export default defineComponent({
     // Use topology_context directly from props
     const graphData = computed(() => props.topologyContext);
 
-    // D3-Force simulation to compute stable node positions
-    const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
-      const nodesCopy = nodes.map(n => ({ ...n }));
-      const edgesCopy = edges.map(e => ({
-        source: e.source,
-        target: e.target,
-        ...e,
-      }));
+    // Compute hierarchical layout positions based on chronological order
+    const computeHierarchicalLayout = (
+      nodes: any[],
+      edges: any[],
+      width = 1000,
+      height = 800,
+    ) => {
+      // Sort nodes chronologically by their original index (which represents alert fired time)
+      const sortedNodes = [...nodes].sort((a, b) => {
+        const indexA = a.originalIndex ?? parseInt(a.id);
+        const indexB = b.originalIndex ?? parseInt(b.id);
+        return indexA - indexB;
+      });
 
-      const simulation = forceSimulation(nodesCopy)
-        .force('charge', forceManyBody().strength(-200).distanceMax(1200)) // Minimal repulsion for very tight clustering
-        .force('link', forceLink(edgesCopy)
-          .id((d: any) => d.id)
-          .distance(100) // Reduced from 250 to 100 for much closer nodes
-          .strength(0.8) // Increased from 0.6 to pull nodes together more
-          .iterations(3)
-        )
-        .force('center', forceCenter(width / 2, height / 2).strength(0.1)) // Increased from 0.05 for stronger centering
-        .force('x', forceX(width / 2).strength(0.15)) // Increased for tighter clustering
-        .force('y', forceY(height / 2).strength(0.15)) // Increased for tighter clustering
-        .force('collision', forceCollide()
-          .radius((d: any) => (d.symbolSize || 60) / 2 + 30) // Reduced padding from 80 to 30
-          .strength(1.0)
-          .iterations(2)
-        )
-        .velocityDecay(0.35)
-        .stop();
+      // Calculate the number of levels (we'll use time-based levels)
+      // For simplicity, distribute nodes evenly across horizontal space based on chronological order
+      const nodeCount = sortedNodes.length;
+      const nodesPerColumn = Math.ceil(Math.sqrt(nodeCount)); // Square root distribution
+      const columnCount = Math.ceil(nodeCount / nodesPerColumn);
 
-      // Run simulation for 5000 iterations to stabilize
-      for (let i = 0; i < 5000; i++) {
-        simulation.tick();
-      }
+      // Position nodes in a left-to-right, top-to-bottom grid based on chronological order
+      const positionedNodes = nodes.map((node) => {
+        const sortedIndex = sortedNodes.findIndex((n) => n.id === node.id);
+        const column = Math.floor(sortedIndex / nodesPerColumn);
+        const row = sortedIndex % nodesPerColumn;
 
-      return simulation.nodes().map(n => ({ ...n }));
+        // Calculate positions with padding
+        const horizontalSpacing = width / (columnCount + 1);
+        const verticalSpacing = height / (nodesPerColumn + 1);
+
+        return {
+          ...node,
+          x: horizontalSpacing * (column + 1),
+          y: verticalSpacing * (row + 1),
+        };
+      });
+
+      return positionedNodes;
     };
 
     // No longer need to load graph via API - data comes from props
@@ -170,7 +173,7 @@ export default defineComponent({
         originalEdge: edge,
       }));
 
-      // Compute force-directed layout positions using D3 with smaller area for tighter clustering
+      // Compute hierarchical layout positions
       // Only compute if we don't have cached positions for these nodes
       let positionedNodes;
       const hasAllPositions = preparedNodes.every(n => nodePositions.value.has(n.id));
@@ -183,8 +186,14 @@ export default defineComponent({
           y: nodePositions.value.get(n.id)!.y,
         }));
       } else {
-        // Compute new positions and cache them
-        positionedNodes = computeForceLayout(preparedNodes, preparedEdges, 300, 300);
+        // Compute new positions and cache them using hierarchical layout
+        // Use larger dimensions for better spacing
+        positionedNodes = computeHierarchicalLayout(
+          preparedNodes,
+          preparedEdges,
+          1200,
+          800,
+        );
         positionedNodes.forEach((node: any) => {
           nodePositions.value.set(node.id, { x: node.x, y: node.y });
         });
@@ -246,7 +255,7 @@ export default defineComponent({
             ? (isDarkMode.value ? "#a78bfa" : "#8b5cf6") // purple for temporal
             : (isDarkMode.value ? "#6b7280" : "#9ca3af"), // gray for service dependency
           width: edge.edge_type === "temporal" ? 3 : 2,
-          curveness: 0.2,
+          curveness: 0, // Straight lines for hierarchical layout
           type: edge.edge_type === "temporal" ? "dashed" : "solid",
         },
         symbol: ["none", "arrow"],
@@ -272,7 +281,7 @@ export default defineComponent({
         series: [
           {
             type: "graph",
-            layout: "none", // Use none since we pre-computed positions with D3
+            layout: "none", // Use none since we pre-computed positions with hierarchical layout
             roam: true,
             draggable: true,
             focusNodeAdjacency: true,
