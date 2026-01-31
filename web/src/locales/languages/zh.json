@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "分析各个维度的追踪率模式",
     "analyzeTooltipLogs": "分析当前时间范围内的维度分布",
     "rateLabel": "频率：",
-    "timeRangeLabel": "时间范围："
+    "timeRangeLabel": "时间范围：",
+    "analyzeTooltipTraces": "分析跟踪维度的速率、延迟和错误模式",
+    "insightsButtonLabel": "见解"
   },
   "errorInsights": {
     "title": "标题",

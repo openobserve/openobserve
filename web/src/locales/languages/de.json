@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "Analysieren Sie Trace-Muster über Dimensionen hinweg",
     "analyzeTooltipLogs": "Analysieren Sie die Dimensionsverteilung für den aktuellen Zeitraum",
     "rateLabel": "Rate:",
-    "timeRangeLabel": "Zeitbereich:"
+    "timeRangeLabel": "Zeitbereich:",
+    "analyzeTooltipTraces": "Analysieren Sie die Trace-Dimensionen auf Rate, Latenz und Fehlermuster",
+    "insightsButtonLabel": "Einblicke"
   },
   "errorInsights": {
     "title": "Einblicke",

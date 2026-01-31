@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "차원 전반의 트레이스 레이트 패턴 분석",
     "analyzeTooltipLogs": "현재 시간 범위의 차원 분포 분석",
     "rateLabel": "요금:",
-    "timeRangeLabel": "시간 범위:"
+    "timeRangeLabel": "시간 범위:",
+    "analyzeTooltipTraces": "속도, 지연 및 오류 패턴에 대한 트레이스 차원 분석",
+    "insightsButtonLabel": "인사이트"
   },
   "errorInsights": {
     "title": "인사이트",

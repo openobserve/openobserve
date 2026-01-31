@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "Analysez les modèles de taux de trace sur toutes les dimensions",
     "analyzeTooltipLogs": "Analyser la distribution des dimensions pour la plage de temps actuelle",
     "rateLabel": "Tarif :",
-    "timeRangeLabel": "Plage de temps :"
+    "timeRangeLabel": "Plage de temps :",
+    "analyzeTooltipTraces": "Analysez les dimensions des traces pour déterminer le taux, la latence et les modèles d'erreur",
+    "insightsButtonLabel": "Perspectives"
   },
   "errorInsights": {
     "title": "Perspectives",

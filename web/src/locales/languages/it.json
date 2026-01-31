@@ -2628,7 +2628,9 @@
     "analyzeTooltip": "Analizza i modelli di frequenza di tracciamento tra le dimensioni",
     "analyzeTooltipLogs": "Analizza la distribuzione delle dimensioni per l'intervallo di tempo corrente",
     "rateLabel": "Tariffa:",
-    "timeRangeLabel": "Intervallo di tempo:"
+    "timeRangeLabel": "Intervallo di tempo:",
+    "analyzeTooltipTraces": "Analizza le dimensioni delle tracce per individuare velocità, latenza e modelli di errore",
+    "insightsButtonLabel": "Approfondimenti"
   },
   "errorInsights": {
     "title": "Approfondimenti",

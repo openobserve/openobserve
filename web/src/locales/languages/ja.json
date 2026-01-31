@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "さまざまなディメンションにわたるトレースレートパターンを分析",
     "analyzeTooltipLogs": "現在の時間範囲のディメンション分布を分析",
     "rateLabel": "レート:",
-    "timeRangeLabel": "時間範囲:"
+    "timeRangeLabel": "時間範囲:",
+    "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
+    "insightsButtonLabel": "インサイト"
   },
   "errorInsights": {
     "title": "インサイト",

@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "Boyutlardaki izleme hızı modellerini analiz edin",
     "analyzeTooltipLogs": "Geçerli zaman aralığı için boyut dağılımını analiz edin",
     "rateLabel": "Oranı:",
-    "timeRangeLabel": "Zaman Aralığı:"
+    "timeRangeLabel": "Zaman Aralığı:",
+    "analyzeTooltipTraces": "Hız, gecikme süresi ve hata kalıpları için izleme boyutlarını analiz edin",
+    "insightsButtonLabel": "İçgörüler"
   },
   "errorInsights": {
     "title": "İçgörüler",

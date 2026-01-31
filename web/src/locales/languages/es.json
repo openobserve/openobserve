@@ -2628,7 +2628,9 @@
     "analyzeTooltip": "Analice los patrones de velocidad de rastreo en todas las dimensiones",
     "analyzeTooltipLogs": "Analice la distribución de dimensiones para el rango de tiempo actual",
     "rateLabel": "Tarifa:",
-    "timeRangeLabel": "Intervalo de tiempo:"
+    "timeRangeLabel": "Intervalo de tiempo:",
+    "analyzeTooltipTraces": "Analice las dimensiones de seguimiento para determinar la velocidad, la latencia y los patrones de error",
+    "insightsButtonLabel": "Perspectivas"
   },
   "errorInsights": {
     "title": "Perspectivas",

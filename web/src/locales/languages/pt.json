@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "Analise padrões de taxa de rastreamento em todas as dimensões",
     "analyzeTooltipLogs": "Analise a distribuição de dimensões para o intervalo de tempo atual",
     "rateLabel": "Tarifa:",
-    "timeRangeLabel": "Intervalo de tempo:"
+    "timeRangeLabel": "Intervalo de tempo:",
+    "analyzeTooltipTraces": "Analise as dimensões do rastreamento para padrões de taxa, latência e erro",
+    "insightsButtonLabel": "Percepções"
   },
   "errorInsights": {
     "title": "Percepções",

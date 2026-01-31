@@ -2630,7 +2630,9 @@
     "analyzeTooltip": "Analyseer traceersnelheidspatronen in verschillende dimensies",
     "analyzeTooltipLogs": "Analyseer de dimensieverdeling voor het huidige tijdbereik",
     "rateLabel": "Tarief:",
-    "timeRangeLabel": "Tijdbereik:"
+    "timeRangeLabel": "Tijdbereik:",
+    "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
+    "insightsButtonLabel": "Inzichten"
   },
   "errorInsights": {
     "title": "Inzichten",
