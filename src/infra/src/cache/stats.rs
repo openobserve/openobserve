@@ -99,6 +99,18 @@ mod tests {
 
     #[test]
     fn test_get_stream_stats_len() {
+        let val = StreamStats {
+            created_at: 1667978841102,
+            doc_time_min: 1667978841102,
+            doc_time_max: 1667978845374,
+            doc_num: 5000,
+            file_num: 1,
+            storage_size: 200.0,
+            compressed_size: 3.0,
+            index_size: 120000.0,
+        };
+
+        set_stream_stats("nexus", "default", StreamType::Logs, val.clone());
         let stats = get_stats();
         let (len, cap, mem_size) = get_cache_stats();
         assert_eq!(len, stats.len());
