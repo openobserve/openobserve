@@ -125,6 +125,7 @@ import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnit
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
+import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -155,7 +156,7 @@ export default defineComponent({
     rowsPerPage: {
       required: false,
       type: Number,
-      default: 10,
+      default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
     },
   },
   emits: ["row-click"],
@@ -349,7 +350,7 @@ export default defineComponent({
       }
 
       const defaultOptions = [10, 20, 50, 100, 250, 500, 1000];
-      const configuredRows = props.rowsPerPage || 10;
+      const configuredRows = props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
 
       const options = new Set(defaultOptions);
       if (configuredRows > 0) {
@@ -362,7 +363,7 @@ export default defineComponent({
     });
 
     const pagination = ref({
-      rowsPerPage: props.showPagination ? props.rowsPerPage || 10 : 0,
+      rowsPerPage: props.showPagination ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
       page: 1,
     });
 
@@ -372,7 +373,7 @@ export default defineComponent({
         // Force reset pagination when toggle or config changes
         pagination.value = {
           ...pagination.value,
-          rowsPerPage: newShowPagination ? newRowsPerPage || 10 : 0,
+          rowsPerPage: newShowPagination ? newRowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
           page: 1, // Reset to first page
         };
       },
