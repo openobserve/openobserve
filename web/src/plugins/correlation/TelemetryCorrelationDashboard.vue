@@ -1303,6 +1303,13 @@ const dashboardChartsRef = ref<any>(null);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 
+// Panel data caching for hide/unhide optimization
+const panelDataCache = ref<Map<string, { panel: any; timestamp: number }>>(new Map());
+const PANEL_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
+let streamChangeDebounceTimeout: any = null; // Debounce timeout for batching multiple hide/unhide operations
+const STREAM_CHANGE_DEBOUNCE_MS = 300; // 300ms debounce delay
+let wasEmptyBeforeChange = false; // Track if we're transitioning from empty state
+
 // Trace correlation state
 const tracesLoading = ref(false);
 const tracesError = ref<string | null>(null);
@@ -1839,6 +1846,7 @@ const loadDashboard = async () => {
 /**
  * Add new metric panels without re-rendering existing ones
  * This is called when user adds new metrics to avoid reloading all panels
+ * Uses cached panel data if available to avoid refetching
  */
 const addMetricPanels = async (addedStreams: StreamInfo[]) => {
   if (!dashboardData.value || !dashboardData.value.tabs?.[0]?.panels) {
@@ -1851,44 +1859,76 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
     // Get current panels
     const currentPanels = dashboardData.value.tabs[0].panels;
     const existingCount = currentPanels.length;
-
-    // Fetch schemas for new streams only
-    const newStreamNames = addedStreams.map((s) => s.stream_name);
-    const newSchemas = await fetchMetricSchemas(newStreamNames);
-
-    // Build config for new panels
-    const config: MetricsCorrelationConfig = {
-      serviceName: props.serviceName,
-      matchedDimensions: activeDimensions.value,
-      metricStreams: addedStreams,
-      logStreams: props.logStreams,
-      traceStreams: props.traceStreams,
-      orgIdentifier: currentOrgIdentifier.value,
-      timeRange: props.timeRange,
-      sourceStream: props.sourceStream,
-      sourceType: props.sourceType,
-      availableDimensions: props.availableDimensions,
-      metricSchemas: newSchemas,
-    };
-
-    // Generate panels for new streams only
-    const newDashboard = generateDashboard(addedStreams, config);
-    const newPanels = newDashboard.tabs[0].panels;
-
-    // Update layout positions for new panels to appear after existing ones
     const timestamp = Date.now();
-    newPanels.forEach((panel: any, index: number) => {
-      const absoluteIndex = existingCount + index;
-      // Use completely unique ID with timestamp to avoid collision
-      const uniqueId = `${panel.layout.i}_${timestamp}_${absoluteIndex}`;
+
+    // Separate streams into cached and new ones
+    const cachedPanels: any[] = [];
+    const streamsNeedingGeneration: StreamInfo[] = [];
+
+    addedStreams.forEach((stream) => {
+      const cached = panelDataCache.value.get(stream.stream_name);
+      if (cached && (timestamp - cached.timestamp) < PANEL_CACHE_DURATION) {
+        // Use cached panel data (no API call needed)
+        cachedPanels.push({ stream, cachedPanel: cached.panel });
+      } else {
+        // Need to generate new panel (will fetch data)
+        streamsNeedingGeneration.push(stream);
+        // Clean up stale cache entry
+        panelDataCache.value.delete(stream.stream_name);
+      }
+    });
+
+    let newPanels: any[] = [];
+
+    // Generate panels for streams that need fresh data
+    if (streamsNeedingGeneration.length > 0) {
+      const newStreamNames = streamsNeedingGeneration.map((s) => s.stream_name);
+      const newSchemas = await fetchMetricSchemas(newStreamNames);
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: props.serviceName,
+        matchedDimensions: activeDimensions.value,
+        metricStreams: streamsNeedingGeneration,
+        logStreams: props.logStreams,
+        traceStreams: props.traceStreams,
+        orgIdentifier: currentOrgIdentifier.value,
+        timeRange: props.timeRange,
+        sourceStream: props.sourceStream,
+        sourceType: props.sourceType,
+        availableDimensions: props.availableDimensions,
+        metricSchemas: newSchemas,
+      };
+
+      const newDashboard = generateDashboard(streamsNeedingGeneration, config);
+      newPanels = newDashboard.tabs[0].panels;
+    }
+
+    // Combine cached panels with newly generated ones
+    // Deep clone cached panels to avoid modifying the cache
+    const allPanelsToAdd = [
+      ...cachedPanels.map(cp => JSON.parse(JSON.stringify(cp.cachedPanel))),
+      ...newPanels
+    ];
+
+    // Find the maximum Y position from existing panels to place new panels below
+    let maxY = 0;
+    currentPanels.forEach((p: any) => {
+      if (p.layout) {
+        const panelBottom = (p.layout.y || 0) + (p.layout.h || 16);
+        if (panelBottom > maxY) maxY = panelBottom;
+      }
+    });
+
+    // Update layout positions for all panels being added
+    allPanelsToAdd.forEach((panel: any, index: number) => {
+      const uniqueId = `${panel.layout.i}_${timestamp}_${index}`;
+      // Preserve original layout properties (w, h) from generateDashboard or cache
       panel.layout = {
-        x: (absoluteIndex % 3) * 64,
-        y: Math.floor(absoluteIndex / 3) * 16,
-        w: 64,
-        h: 16,
+        ...panel.layout,
+        x: (index % 3) * 64,
+        y: maxY + Math.floor(index / 3) * 16,
         i: uniqueId,
       };
-      // Update panel ID to match
       panel.id = `${panel.id}_${timestamp}`;
     });
 
@@ -1898,7 +1938,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       tabs: [
         {
           ...dashboardData.value.tabs[0],
-          panels: [...currentPanels, ...newPanels],
+          panels: [...currentPanels, ...allPanelsToAdd],
         },
         ...dashboardData.value.tabs.slice(1),
       ],
@@ -1906,13 +1946,25 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
     dashboardData.value = updatedDashboard;
 
-    // DON'T increment dashboardRenderKey - let Vue's reactivity handle it
-    // Since each panel has a unique ID, Vue will only render the new panels
-
-    // Wait for DOM to update, then refresh GridStack to position new panels
+    // Wait for DOM to fully update before refreshing GridStack
     await nextTick();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    await nextTick();
+
     if (dashboardChartsRef.value?.refreshGridStack) {
       await dashboardChartsRef.value.refreshGridStack();
+
+      // Additional refresh after a short delay to ensure proper layout
+      setTimeout(async () => {
+        if (dashboardChartsRef.value?.refreshGridStack) {
+          await dashboardChartsRef.value.refreshGridStack();
+        }
+      }, 100);
+    }
+
+    // Log cache usage for debugging
+    if (cachedPanels.length > 0) {
+      console.log(`[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`);
     }
   } catch (err: any) {
     console.error(
@@ -2564,7 +2616,7 @@ watch(
   selectedMetricStreams,
   (newStreams, oldStreams) => {
     // Skip if this is the initial load (already handled by isOpen watcher)
-    if (!oldStreams || oldStreams.length === 0 || !initialLoadCompleted.value) {
+    if (!oldStreams || !initialLoadCompleted.value) {
       return;
     }
 
@@ -2577,29 +2629,83 @@ watch(
       return;
     }
 
-    // Determine which streams were added vs removed
-    const oldStreamNames = new Set(oldStreams.map((s) => s.stream_name));
-    const newStreamNames = new Set(newStreams.map((s) => s.stream_name));
-
-    const addedStreams = newStreams.filter(
-      (s) => !oldStreamNames.has(s.stream_name),
-    );
-    const removedStreams = oldStreams.filter(
-      (s) => !newStreamNames.has(s.stream_name),
-    );
-
-    if (isOpen.value && newStreams.length > 0) {
-      if (removedStreams.length > 0) {
-        // If streams were removed, we need full reload to remove panels
-        dashboardData.value = null;
-        nextTick(() => {
-          loadDashboard();
-        });
-      } else if (addedStreams.length > 0) {
-        // If only added, append new panels without regenerating existing ones
-        addMetricPanels(addedStreams);
-      }
+    // Track if we're starting from empty state
+    if (oldStreams.length === 0 && newStreams.length > 0) {
+      wasEmptyBeforeChange = true;
     }
+
+    // Clear any pending debounced operation
+    if (streamChangeDebounceTimeout) {
+      clearTimeout(streamChangeDebounceTimeout);
+    }
+
+    // Debounce the stream change to batch multiple hide/unhide operations
+    streamChangeDebounceTimeout = setTimeout(() => {
+      streamChangeDebounceTimeout = null;
+
+      // Check actual current state when timeout fires (not captured values)
+      const currentStreams = selectedMetricStreams.value;
+      const currentPanels = dashboardData.value?.tabs?.[0]?.panels || [];
+
+      // Get current panel stream names
+      const currentPanelStreamNames = new Set(
+        currentPanels.map((p: any) => {
+          // Extract stream name from panel id or layout
+          const match = p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+          return match ? match[1] : null;
+        }).filter(Boolean)
+      );
+
+      // If no dashboard or transitioning from empty, do full reload
+      if (!dashboardData.value || wasEmptyBeforeChange || currentPanels.length === 0) {
+        wasEmptyBeforeChange = false;
+        if (isOpen.value && currentStreams.length > 0) {
+          dashboardData.value = null;
+          loadDashboard();
+        }
+        return;
+      }
+
+      // Determine which streams need to be added based on current state
+      const streamsToAdd = currentStreams.filter(
+        (s) => !currentPanelStreamNames.has(s.stream_name)
+      );
+
+      // Determine which panels need to be removed based on current state
+      const currentStreamNames = new Set(currentStreams.map(s => s.stream_name));
+      const panelsToRemove = currentPanels.filter((p: any) => {
+        const match = p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+        const streamName = match ? match[1] : null;
+        return streamName && !currentStreamNames.has(streamName);
+      });
+
+      // Cache panels before removal
+      if (panelsToRemove.length > 0) {
+        panelsToRemove.forEach((panel: any) => {
+          const match = panel.id?.match(/^(.+?)_\d+$/) || panel.layout?.i?.match(/^(.+?)_/);
+          const streamName = match ? match[1] : null;
+          if (streamName) {
+            panelDataCache.value.set(streamName, {
+              panel: JSON.parse(JSON.stringify(panel)),
+              timestamp: Date.now(),
+            });
+          }
+        });
+      }
+
+      if (isOpen.value && currentStreams.length > 0) {
+        if (panelsToRemove.length > 0) {
+          // If panels need to be removed, do full reload
+          dashboardData.value = null;
+          nextTick(() => {
+            loadDashboard();
+          });
+        } else if (streamsToAdd.length > 0) {
+          // If only adding, use optimized append
+          addMetricPanels(streamsToAdd);
+        }
+      }
+    }, STREAM_CHANGE_DEBOUNCE_MS);
   },
   { deep: true },
 );
