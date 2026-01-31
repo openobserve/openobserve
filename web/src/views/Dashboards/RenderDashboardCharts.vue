@@ -202,6 +202,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="panel-variables-container q-px-xs q-py-xs"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
+                      <!-- Panel Time Picker (NEW) -->
+                      <div
+                        v-if="hasPanelTime(item) && panelTimeValues[item.id]"
+                        class="panel-time-picker-wrapper q-mb-sm"
+                        :data-test="`dashboard-panel-${item.id}-time-picker`"
+                      >
+                        <DateTimePickerDashboard
+                          v-model="panelTimeValues[item.id]"
+                          :auto-apply-dashboard="false"
+                          size="sm"
+                          class="panel-time-picker-widget"
+                          @update:modelValue="onPanelTimeApply(item.id)"
+                          :data-test="`panel-time-picker-${item.id}`"
+                        />
+                      </div>
+
                       <VariablesValueSelector
                         v-if="
                           variablesManager &&
@@ -274,6 +290,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
+import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
 import { useRoute } from "vue-router";
 import {
   checkIfVariablesAreLoaded,
@@ -360,6 +377,7 @@ export default defineComponent({
 
   components: {
     PanelContainer,
+    DateTimePickerDashboard,
     NoPanel,
     VariablesValueSelector,
     ViewPanel,
@@ -1201,6 +1219,297 @@ export default defineComponent({
       return variablesManager;
     };
 
+    // ===== Panel Time Configuration (NEW FEATURE) =====
+    // Panel time values for all panels (map: panelId -> time value)
+    const panelTimeValues = ref<Record<string, any>>({});
+
+    // Track panels that are initializing (to prevent spurious change events)
+    const panelsInitializing = ref<Set<string>>(new Set());
+
+    // Check if a specific panel has time enabled
+    const hasPanelTime = (panel: any) => {
+      return !!panel?.config?.allow_panel_time;
+    };
+
+    // Initialize panel time values for panels with panel-level time enabled
+    const initializePanelTimes = () => {
+      panels.value?.forEach((panel: any) => {
+        // Only initialize picker for panels that have allow_panel_time enabled
+        if (hasPanelTime(panel)) {
+          const panelId = panel.id;
+
+          console.log('[RenderDashboard] Initializing time picker for panel:', panelId, {
+            hasURLParam: !!route.query[`panel-time-${panelId}`],
+            hasConfig: !!panel.config?.panel_time_range,
+            config: panel.config?.panel_time_range,
+          });
+
+          // Mark this panel as initializing to prevent change events
+          panelsInitializing.value.add(panelId);
+
+          // Priority 1: Check URL params (highest priority - user override via URL)
+          const urlPanelTime = getPanelTimeFromURL(panelId);
+          if (urlPanelTime) {
+            console.log('[RenderDashboard] Using URL time for picker:', panelId, urlPanelTime);
+            panelTimeValues.value[panelId] = urlPanelTime;
+            // Unmark after delay
+            setTimeout(() => panelsInitializing.value.delete(panelId), 500);
+            return;
+          }
+
+          // Priority 2: Check panel config - USE THIS to preserve relative/absolute format
+          const configTime = panel.config?.panel_time_range;
+          if (configTime) {
+            // Panel has its own time range → initialize picker with it (preserves relative/absolute)
+            console.log('[RenderDashboard] Using config time for picker:', panelId, configTime);
+
+            // IMPORTANT: Only include fields relevant to the type
+            // Don't mix relative and absolute fields - the picker gets confused
+            let pickerValue;
+            if (configTime.type === 'relative') {
+              pickerValue = {
+                type: 'relative',
+                valueType: 'relative',
+                relativeTimePeriod: configTime.relativeTimePeriod,
+              };
+              panelTimeValues.value[panelId] = pickerValue;
+              console.log('[RenderDashboard] ✅ Set RELATIVE time for picker:', panelId, pickerValue);
+              console.log('[RenderDashboard] panelTimeValues after set:', JSON.parse(JSON.stringify(panelTimeValues.value)));
+            } else {
+              pickerValue = {
+                type: 'absolute',
+                valueType: 'absolute',
+                startTime: configTime.startTime,
+                endTime: configTime.endTime,
+              };
+              panelTimeValues.value[panelId] = pickerValue;
+              console.log('[RenderDashboard] ✅ Set ABSOLUTE time for picker:', panelId, pickerValue);
+            }
+
+            // CRITICAL: Also update URL on initial load (so URL reflects panel's configured time)
+            // This ensures the URL is correct when page first loads
+            console.log('[RenderDashboard] 🔗 Setting URL on initial load for panel:', panelId);
+            updateURLWithPanelTime(panelId, pickerValue);
+
+            // Unmark after delay
+            setTimeout(() => {
+              panelsInitializing.value.delete(panelId);
+              console.log('[RenderDashboard] ✅ Initialization complete for panel:', panelId);
+            }, 500);
+            return;
+          }
+
+          // Priority 3: Check if ViewDashboard computed a time for this panel (fallback)
+          if (props.currentTimeObj && props.currentTimeObj[panelId]) {
+            const timeObj = convertTimeObjToPickerFormat(props.currentTimeObj[panelId]);
+            if (timeObj) {
+              console.log('[RenderDashboard] Using computed time for picker:', panelId, timeObj);
+              panelTimeValues.value[panelId] = timeObj;
+              setTimeout(() => panelsInitializing.value.delete(panelId), 500);
+              return;
+            }
+          }
+
+          // Priority 4: Panel has allow_panel_time enabled but no panel_time_range
+          // (This is "Use global time" mode - panel_time_mode = "global")
+          // Initialize picker with current global time for display purposes
+          if (props.currentTimeObj && props.currentTimeObj['__global']) {
+            console.log('[RenderDashboard] Using global time for picker:', panelId);
+            panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(
+              props.currentTimeObj['__global']
+            );
+            setTimeout(() => panelsInitializing.value.delete(panelId), 500);
+          }
+        }
+      });
+    };
+
+    // Get panel time from URL params
+    const getPanelTimeFromURL = (panelId: string) => {
+      const relativeParam = route.query[`panel-time-${panelId}`];
+      const fromParam = route.query[`panel-time-${panelId}-from`];
+      const toParam = route.query[`panel-time-${panelId}-to`];
+
+      if (relativeParam) {
+        return {
+          type: 'relative',
+          valueType: 'relative',
+          relativeTimePeriod: relativeParam,
+        };
+      }
+
+      if (fromParam && toParam) {
+        return {
+          type: 'absolute',
+          valueType: 'absolute',
+          startTime: parseInt(fromParam as string),
+          endTime: parseInt(toParam as string),
+        };
+      }
+
+      return null;
+    };
+
+    // Convert time object (from ViewDashboard) to picker format
+    const convertTimeObjToPickerFormat = (timeObj: any) => {
+      if (!timeObj || !timeObj.start_time || !timeObj.end_time) {
+        return null;
+      }
+
+      // Time object from ViewDashboard has start_time and end_time as Date objects
+      return {
+        type: 'absolute',
+        valueType: 'absolute',
+        startTime: timeObj.start_time.getTime(),
+        endTime: timeObj.end_time.getTime(),
+      };
+    };
+
+    // Convert global time object to picker format
+    const convertGlobalTimeToPickerFormat = (globalTime: any) => {
+      // First try to convert from time object
+      const fromTimeObj = convertTimeObjToPickerFormat(globalTime);
+      if (fromTimeObj) {
+        return fromTimeObj;
+      }
+
+      // Check if it's relative or absolute from route
+      if (route.query.period) {
+        return {
+          type: 'relative',
+          valueType: 'relative',
+          relativeTimePeriod: route.query.period,
+        };
+      } else if (route.query.from && route.query.to) {
+        return {
+          type: 'absolute',
+          valueType: 'absolute',
+          startTime: parseInt(route.query.from as string),
+          endTime: parseInt(route.query.to as string),
+        };
+      }
+
+      // Default
+      return {
+        type: 'relative',
+        valueType: 'relative',
+        relativeTimePeriod: '15m',
+      };
+    };
+
+    // Handle panel time change (NON-auto-apply mode - wait for refresh button)
+    const onPanelTimeChange = async (panelId: string) => {
+      console.log('[Panel Time] 🔔 onPanelTimeChange called for panel:', panelId);
+      console.log('[Panel Time] Initializing panels:', Array.from(panelsInitializing.value));
+      console.log('[Panel Time] Current panelTimeValues:', panelTimeValues.value);
+
+      // GUARD: Skip if panel is initializing (prevents spurious change events during mount)
+      if (panelsInitializing.value.has(panelId)) {
+        console.log('[Panel Time] ❌ Ignoring change during initialization for panel:', panelId);
+        return;
+      }
+
+      // When time changes in the panel time picker:
+      // 1. Update URL with new panel time (tracks pending change)
+      // 2. DO NOT fire refresh - wait for user to click refresh button
+      // This follows the same pattern as variables - changes are not auto-applied
+
+      try {
+        const timeValue = panelTimeValues.value[panelId];
+        if (!timeValue) {
+          console.log('[Panel Time] ❌ No timeValue found for panel:', panelId);
+          return;
+        }
+
+        console.log('[Panel Time] ✅ Time changed for panel:', panelId, JSON.stringify(timeValue));
+
+        // Update URL params to track the pending change
+        // The actual refresh will happen when user clicks the refresh button
+        updateURLWithPanelTime(panelId, timeValue);
+
+        console.log('[Panel Time] ⏳ Time change tracked in URL, waiting for refresh button click');
+      } catch (error) {
+        console.error('[Panel Time] ❌ Error changing panel time:', error);
+      }
+    };
+
+    // Handle Apply button click on panel time picker
+    // SIMPLIFIED: Just sync URL and use existing refresh panel functionality
+    const onPanelTimeApply = async (panelId: string) => {
+      console.log('[Panel Time Apply] 🚀 Apply clicked for panel:', panelId);
+
+      try {
+        const timeValue = panelTimeValues.value[panelId];
+        if (!timeValue) {
+          console.log('[Panel Time Apply] ❌ No timeValue found for panel:', panelId);
+          return;
+        }
+
+        console.log('[Panel Time Apply] ✅ Applying time for panel:', panelId, JSON.stringify(timeValue));
+
+        // 1. Update URL with new panel time parameters
+        console.log('[Panel Time Apply] 🔗 Updating URL...');
+        updateURLWithPanelTime(panelId, timeValue);
+
+        // 2. Use existing refresh panel functionality (dashboard-panel-refresh-panel-btn)
+        // This already does everything we need:
+        // - Commits all variables (global, tab, panel)
+        // - Refreshes only this specific panel
+        // - Handles all edge cases properly
+        console.log('[Panel Time Apply] 🔄 Using existing refresh panel functionality...');
+        refreshPanelRequest(panelId, false);
+
+        console.log('[Panel Time Apply] ✅ Apply completed successfully');
+      } catch (error) {
+        console.error('[Panel Time Apply] ❌ Error applying panel time:', error);
+      }
+    };
+
+    // Update URL with panel time params
+    const updateURLWithPanelTime = (panelId: string, timeValue: any) => {
+      console.log('[URL Update] 🔗 Updating URL for panel:', panelId);
+      console.log('[URL Update] Current route.query:', route.query);
+      console.log('[URL Update] Time value to set:', timeValue);
+
+      const query = { ...route.query };
+
+      // Remove old panel time params
+      delete query[`panel-time-${panelId}`];
+      delete query[`panel-time-${panelId}-from`];
+      delete query[`panel-time-${panelId}-to`];
+
+      // Add new params based on type
+      if (timeValue.type === 'relative' || timeValue.valueType === 'relative') {
+        query[`panel-time-${panelId}`] = timeValue.relativeTimePeriod;
+        console.log('[URL Update] ✅ Setting relative time param:', `panel-time-${panelId}`, '=', timeValue.relativeTimePeriod);
+      } else if (timeValue.type === 'absolute' || timeValue.valueType === 'absolute') {
+        query[`panel-time-${panelId}-from`] = timeValue.startTime.toString();
+        query[`panel-time-${panelId}-to`] = timeValue.endTime.toString();
+        console.log('[URL Update] ✅ Setting absolute time params');
+      }
+
+      console.log('[URL Update] New query object:', query);
+
+      // Update URL without reloading
+      router.replace({ query });
+      console.log('[URL Update] ✅ Router replace called');
+    };
+
+    // Initialize panel times when component is mounted
+    onMounted(() => {
+      initializePanelTimes();
+    });
+
+    // Re-initialize when panels change
+    watch(panels, () => {
+      initializePanelTimes();
+    }, { deep: true });
+
+    // Re-initialize when currentTimeObj changes (ViewDashboard computed new times)
+    watch(() => props.currentTimeObj, () => {
+      initializePanelTimes();
+    }, { deep: true });
+
     return {
       store,
       addPanelData,
@@ -1238,6 +1547,11 @@ export default defineComponent({
       commitAllVariables,
       getUrlParams,
       getVariablesManager,
+      // Panel time configuration (NEW)
+      panelTimeValues,
+      hasPanelTime,
+      onPanelTimeChange,
+      onPanelTimeApply,
     };
   },
   methods: {

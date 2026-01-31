@@ -93,6 +93,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <!-- NEW: Panel Time Configuration -->
+    <div class="q-mb-sm">
+      <div class="text-bold q-mb-sm">
+        {{ t("dashboard.panelTimeSettings") }}
+      </div>
+
+      <!-- Toggle to enable panel-level time -->
+      <q-checkbox
+        v-model="allowPanelTime"
+        :label="t('dashboard.allowPanelTime')"
+        data-test="dashboard-config-allow-panel-time"
+        @update:model-value="onTogglePanelTime"
+      />
+
+      <!-- Show mode selection when enabled -->
+      <div v-if="allowPanelTime" class="q-mt-sm q-ml-lg">
+        <q-option-group
+          v-model="panelTimeMode"
+          :options="panelTimeModeOptions"
+          color="primary"
+          @update:model-value="onPanelTimeModeChange"
+        />
+
+        <div class="text-caption text-grey-7 q-mt-xs">
+          <q-icon name="info" size="14px" />
+          <span v-if="panelTimeMode === 'global'">
+            {{ t("dashboard.panelTimeGlobalHint") }}
+          </span>
+          <span v-else>
+            {{ t("dashboard.panelTimeIndividualHint") }}
+          </span>
+        </div>
+
+        <!-- NEW: Date Time Picker for Individual Panel Time -->
+        <div v-if="panelTimeMode === 'individual'" class="q-mt-md">
+          <div class="text-caption text-weight-medium q-mb-sm">
+            {{ t("dashboard.panelTimeRange") }}
+            <q-icon name="info" size="14px">
+              <q-tooltip>{{ t("dashboard.panelTimeRangeTooltip") }}</q-tooltip>
+            </q-icon>
+          </div>
+          <DateTimePickerDashboard
+            ref="panelTimePickerRef"
+            v-model="panelTimeValue"
+            :auto-apply-dashboard="true"
+            data-test="dashboard-config-panel-time-picker"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="space"></div>
+
     <!-- PromQL Chart-Specific Configuration -->
     <PromQLChartConfig
       v-if="promqlMode"
@@ -1851,7 +1904,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount } from "vue";
+import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1859,6 +1912,7 @@ import ColorBySeries from "./ColorBySeries.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
@@ -1871,7 +1925,7 @@ import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import PromQLChartConfig from "./PromQLChartConfig.vue";
 import { useStore } from "vuex";
 
-import { markRaw, watchEffect } from "vue";
+import { markRaw, watchEffect, watch } from "vue";
 import {
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
@@ -1892,6 +1946,7 @@ export default defineComponent({
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
+    DateTimePickerDashboard,
     ColorPaletteDropDown,
     BackGroundColorConfig,
     OverrideConfig,
@@ -2522,6 +2577,135 @@ export default defineComponent({
       );
     });
 
+    // Panel time configuration
+    const allowPanelTime = ref(
+      !!dashboardPanelData.data.config?.allow_panel_time
+    );
+
+    // Panel time mode: "global" or "individual"
+    const panelTimeMode = ref(
+      dashboardPanelData.data.config?.panel_time_mode || 'global'
+    );
+
+    // Mode options
+    const panelTimeModeOptions = computed(() => [
+      {
+        label: t('dashboard.useGlobalTime'),
+        value: 'global',
+      },
+      {
+        label: t('dashboard.useIndividualTime'),
+        value: 'individual',
+      },
+    ]);
+
+    // Toggle panel time on/off
+    const onTogglePanelTime = (enabled: boolean) => {
+      dashboardPanelData.data.config.allow_panel_time = enabled;
+
+      if (enabled) {
+        // Default to global mode
+        dashboardPanelData.data.config.panel_time_mode = 'global';
+        panelTimeMode.value = 'global';
+      } else {
+        // Clear panel time settings
+        dashboardPanelData.data.config.panel_time_mode = undefined;
+        dashboardPanelData.data.config.panel_time_range = undefined;
+      }
+    };
+
+    // Change panel time mode
+    const onPanelTimeModeChange = (mode: string) => {
+      dashboardPanelData.data.config.panel_time_mode = mode;
+
+      if (mode === 'individual') {
+        // INDIVIDUAL MODE: Initialize panel_time_range if not set
+        // User will set the actual time using the date time picker
+        if (!dashboardPanelData.data.config.panel_time_range) {
+          dashboardPanelData.data.config.panel_time_range = {
+            type: 'relative',
+            relativeTimePeriod: '15m',
+          };
+        }
+
+        // Initialize panel time picker value - ONLY include fields relevant to the type
+        const configTime = dashboardPanelData.data.config.panel_time_range;
+        const timeType = configTime.type || 'relative';
+
+        if (timeType === 'relative') {
+          panelTimeValue.value = {
+            type: 'relative',
+            valueType: 'relative',
+            relativeTimePeriod: configTime.relativeTimePeriod,
+          };
+        } else {
+          panelTimeValue.value = {
+            type: 'absolute',
+            valueType: 'absolute',
+            startTime: configTime.startTime,
+            endTime: configTime.endTime,
+          };
+        }
+      } else {
+        // GLOBAL MODE: DON'T save panel_time_range
+        // Clear panel_time_range when switching to global
+        // Panel will use dashboard.defaultDatetimeDuration at runtime
+        dashboardPanelData.data.config.panel_time_range = undefined;
+      }
+    };
+
+    // Panel time picker value
+    const panelTimeValue = ref<any>(null);
+
+    // Initialize panel time picker value if panel already has individual time configured
+    if (
+      dashboardPanelData.data.config?.allow_panel_time &&
+      dashboardPanelData.data.config?.panel_time_mode === 'individual' &&
+      dashboardPanelData.data.config?.panel_time_range
+    ) {
+      // ONLY include fields relevant to the type
+      const configTime = dashboardPanelData.data.config.panel_time_range;
+      const timeType = configTime.type || 'relative';
+
+      if (timeType === 'relative') {
+        panelTimeValue.value = {
+          type: 'relative',
+          valueType: 'relative',
+          relativeTimePeriod: configTime.relativeTimePeriod,
+        };
+      } else {
+        panelTimeValue.value = {
+          type: 'absolute',
+          valueType: 'absolute',
+          startTime: configTime.startTime,
+          endTime: configTime.endTime,
+        };
+      }
+    }
+
+    // Watch for changes to panel time picker and sync to config
+    watch(panelTimeValue, (newValue) => {
+      if (newValue && panelTimeMode.value === 'individual') {
+        // Store panel time range - ONLY save fields relevant to the type
+        const timeType = newValue.valueType || newValue.type;
+
+        if (timeType === 'relative') {
+          // For relative time, ONLY save type and relativeTimePeriod
+          dashboardPanelData.data.config.panel_time_range = {
+            type: 'relative',
+            relativeTimePeriod: newValue.relativeTimePeriod,
+          };
+        } else {
+          // For absolute time, ONLY save type, startTime, and endTime
+          dashboardPanelData.data.config.panel_time_range = {
+            type: 'absolute',
+            startTime: newValue.startTime,
+            endTime: newValue.endTime,
+          };
+        }
+      }
+    }, { deep: true });
+
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
       if (
@@ -2590,6 +2774,13 @@ export default defineComponent({
       shouldShowLegendHeightUnitContainer,
       shouldApplyChartAlign,
       shouldShowGridlines,
+      // Panel time configuration
+      allowPanelTime,
+      panelTimeMode,
+      panelTimeModeOptions,
+      onTogglePanelTime,
+      onPanelTimeModeChange,
+      panelTimeValue,
     };
   },
 });
