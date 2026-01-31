@@ -1867,10 +1867,9 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT LIKE \'%$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
-        exact: true,
-      })
+      page.locator('.inspector-query-editor').filter({
+        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT LIKE \'%$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+      }).last()
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
