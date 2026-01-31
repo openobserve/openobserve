@@ -181,14 +181,24 @@ export function useLatencyInsightsDashboard() {
         : "count(_timestamp)";
 
       // Check if we should use single query or comparison query
-      // Use single query when time ranges are the same (no brush selection / baseline-only mode)
+      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For LOGS: Check if time ranges are the same (no brush selection)
+      const hasTimeBasedFilter =
+        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
+        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
+        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+
       const isSameTimeRange =
+        config.streamType === "logs" &&
         config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
 
+      // Use single query (baseline-only) when:
+      // - TRACES: No time-based filter exists
+      // - LOGS: Time ranges are the same (no brush selection)
+      const useBaselineOnly = config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
 
-      // If time ranges are the same (no brush selection), show single query instead of comparison
-      if (isSameTimeRange) {
+      if (useBaselineOnly) {
         const singleQuery = `
           SELECT
             COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
@@ -237,11 +247,24 @@ export function useLatencyInsightsDashboard() {
       // Error % = (error_traces / total_traces) * 100
 
       // Check if we should use single query (baseline-only mode)
+      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For LOGS: Check if time ranges are the same (no brush selection)
+      const hasTimeBasedFilter =
+        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
+        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
+        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+
       const isSameTimeRange =
+        config.streamType === "logs" &&
         config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
 
-      if (isSameTimeRange) {
+      // Use single query (baseline-only) when:
+      // - TRACES: No time-based filter exists
+      // - LOGS: Time ranges are the same (no brush selection)
+      const useBaselineOnly = config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
+
+      if (useBaselineOnly) {
         // Baseline-only mode: single query without comparison
         const singleQuery = `
           SELECT
@@ -289,11 +312,24 @@ export function useLatencyInsightsDashboard() {
       // Latency Analysis: Compare percentile latencies by dimension
 
       // Check if we should use single query (baseline-only mode)
+      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For LOGS: Check if time ranges are the same (no brush selection)
+      const hasTimeBasedFilter =
+        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
+        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
+        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+
       const isSameTimeRange =
+        config.streamType === "logs" &&
         config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
 
-      if (isSameTimeRange) {
+      // Use single query (baseline-only) when:
+      // - TRACES: No time-based filter exists
+      // - LOGS: Time ranges are the same (no brush selection)
+      const useBaselineOnly = config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
+
+      if (useBaselineOnly) {
         // Baseline-only mode: single query without comparison
         const singleQuery = `
           SELECT
