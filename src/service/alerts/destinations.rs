@@ -73,17 +73,36 @@ async fn ensure_prebuilt_template(
             template_def.is_default = false;
 
             // Save to database
-            db::alerts::templates::set(template_def)
-                .await
-                .map_err(|e| {
+            // Note: With unique constraint on (org, name), concurrent creates will fail
+            // gracefully with a database constraint violation
+            match db::alerts::templates::set(template_def).await {
+                Ok(_) => {}
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    // Check if this is a duplicate key error (race condition)
+                    if error_msg.contains("UNIQUE constraint")
+                        || error_msg.contains("duplicate key")
+                        || error_msg.contains("Duplicate entry")
+                    {
+                        // Template was created by another concurrent request
+                        // This is expected behavior with the race condition fix
+                        log::info!(
+                            "Template '{}' for org '{}' already exists (concurrent creation)",
+                            template_name,
+                            org_id
+                        );
+                        return Ok(template_name);
+                    }
+                    // Other database errors should still fail
                     log::error!(
                         "Failed to create template '{}' for org '{}': {}",
                         template_name,
                         org_id,
                         e
                     );
-                    DestinationError::TemplateCreationFailed(e.to_string())
-                })?;
+                    return Err(DestinationError::TemplateCreationFailed(error_msg));
+                }
+            }
 
             log::info!(
                 "Successfully created template '{}' for org '{}'",
@@ -221,6 +240,14 @@ pub async fn save(
                 }
             }
         }
+    }
+
+    // Validate that alert destinations have a template
+    // Templates are REQUIRED for alert destinations to format alert messages
+    if let Module::Alert { template, .. } = &destination.module
+        && (template.is_none() || template.as_ref().is_some_and(|t| t.is_empty()))
+    {
+        return Err(DestinationError::TemplateNotFound);
     }
 
     let saved = db::alerts::destinations::set(destination).await?;
@@ -591,5 +618,59 @@ mod tests {
 
         // Clean up
         let _ = db::alerts::destinations::delete(org_id, "custom_webhook").await;
+    }
+
+    /// Test that alert destinations cannot be created without a template
+    #[tokio::test]
+    async fn test_alert_destination_requires_template() {
+        let org_id = "test_org_no_template";
+
+        // Try to create an alert destination without a template
+        let dest = Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: "test_no_template".to_string(),
+            module: Module::Alert {
+                template: None, // No template!
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://example.com/webhook".to_string(),
+                    method: HTTPType::POST,
+                    ..Default::default()
+                }),
+            },
+        };
+
+        // Attempt to save should fail with TemplateNotFound error
+        let result = save("test_no_template", dest, true).await;
+        assert!(result.is_err(), "Should fail when template is None");
+        assert!(
+            matches!(result.unwrap_err(), DestinationError::TemplateNotFound),
+            "Should return TemplateNotFound error"
+        );
+
+        // Try with empty string template
+        let dest_empty = Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: "test_empty_template".to_string(),
+            module: Module::Alert {
+                template: Some("".to_string()), // Empty template!
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://example.com/webhook".to_string(),
+                    method: HTTPType::POST,
+                    ..Default::default()
+                }),
+            },
+        };
+
+        let result_empty = save("test_empty_template", dest_empty, true).await;
+        assert!(result_empty.is_err(), "Should fail when template is empty");
+        assert!(
+            matches!(
+                result_empty.unwrap_err(),
+                DestinationError::TemplateNotFound
+            ),
+            "Should return TemplateNotFound error for empty template"
+        );
     }
 }

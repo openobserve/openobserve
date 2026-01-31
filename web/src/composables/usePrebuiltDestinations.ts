@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 
@@ -735,6 +735,11 @@ export function usePrebuiltDestinations() {
       isLoading.value = false;
     }
   }
+
+  // Watch for organization changes and clear cache
+  watch(organizationIdentifier, () => {
+    systemTemplatesCache.value.clear();
+  });
 
   // Return composable interface
   return {
