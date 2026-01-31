@@ -483,22 +483,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Correlated Logs Tab Panel -->
     <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
-      <TelemetryCorrelationDashboard
+      <CorrelatedLogsTable
         v-if="correlationProps"
-        mode="embedded-tabs"
-        external-active-tab="logs"
         :service-name="correlationProps.serviceName"
         :matched-dimensions="correlationProps.matchedDimensions"
         :additional-dimensions="correlationProps.additionalDimensions"
-        :metric-streams="correlationProps.metricStreams"
         :log-streams="correlationProps.logStreams"
-        :trace-streams="correlationProps.traceStreams"
         :source-stream="correlationProps.sourceStream"
         :source-type="correlationProps.sourceType"
         :available-dimensions="correlationProps.availableDimensions"
         :fts-fields="correlationProps.ftsFields"
         :time-range="correlationProps.timeRange"
-        @close="activeTab = 'tags'"
+        :hide-view-related-button="true"
+        :hide-search-term-actions="false"
       />
       <!-- Loading/Empty state when no data -->
       <div
@@ -584,6 +581,7 @@ import { useRouter } from "vue-router";
 import { onMounted } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
@@ -615,6 +613,7 @@ export default defineComponent({
   components: {
     LogsHighLighting,
     TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
   },
   emits: [
     "close",
@@ -1268,6 +1267,11 @@ export default defineComponent({
       () => {
         correlationProps.value = null;
         correlationError.value = null;
+
+        // If we're already on a correlation tab, reload the data for the new span
+        if (activeTab.value === "correlated-logs" || activeTab.value === "correlated-metrics") {
+          loadCorrelation();
+        }
       },
       { deep: true },
     );
