@@ -41,10 +41,6 @@ pub trait MemorySize {
     fn mem_size(&self) -> usize;
 }
 
-// ============================================================================
-// Memory size implementations
-// ============================================================================
-
 macro_rules! impl_memory_size_primitive {
     ($($t:ty),+) => {
         $(impl MemorySize for $t {
@@ -69,7 +65,7 @@ impl_memory_size_variable!(String, &str, bytes::Bytes);
 
 impl MemorySize for str {
     fn mem_size(&self) -> usize {
-        self.len()
+        self.len() + std::mem::size_of::<usize>()
     }
 }
 
@@ -183,14 +179,14 @@ where
     }
 }
 
-impl<K, V, S> MemorySize for dashmap::DashMap<K, V, S>
+impl<K, V, S> MemorySize for DashMap<K, V, S>
 where
     K: MemorySize + Sized + std::hash::Hash + Eq,
     V: MemorySize + Sized,
     S: std::hash::BuildHasher + Clone,
 {
     fn mem_size(&self) -> usize {
-        std::mem::size_of::<dashmap::DashMap<K, V, S>>()
+        std::mem::size_of::<DashMap<K, V, S>>()
             + self
                 .iter()
                 .map(|entry| entry.key().mem_size() + entry.value().mem_size())
@@ -198,71 +194,43 @@ where
     }
 }
 
-// ============================================================================
-// DashMap implementations (RwHashMap)
-// ============================================================================
-
-/// Implementation for DashMap with String keys
-impl<V, S> CacheStats for DashMap<String, V, S>
+impl<V, S> MemorySize for DashSet<V, S>
 where
+    V: MemorySize + Sized + std::hash::Hash + Eq,
+    S: std::hash::BuildHasher + Clone,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<DashSet<V, S>>() + self.iter().map(|v| v.mem_size()).sum::<usize>()
+    }
+}
+
+impl<K, V, S> CacheStats for DashMap<K, V, S>
+where
+    K: Sized + MemorySize + std::hash::Hash + Eq,
     V: Sized + MemorySize,
     S: std::hash::BuildHasher + Clone,
 {
     fn stats(&self) -> (usize, usize, usize) {
         let len = self.len();
         let cap = 0; // DashMap doesn't expose capacity
-        let mem_size: usize = self
-            .iter()
-            .map(|entry| entry.key().mem_size() + entry.value().mem_size())
-            .sum();
+        let mem_size = self.mem_size();
         (len, cap, mem_size)
     }
 }
 
-/// Implementation for DashMap with &str keys (fallback for any AsRef<str>)
-impl<V, S> CacheStats for DashMap<&str, V, S>
+impl<V, S> CacheStats for DashSet<V, S>
 where
-    V: Sized + MemorySize,
-    S: std::hash::BuildHasher + Clone,
-{
-    fn stats(&self) -> (usize, usize, usize) {
-        let len = self.len();
-        let cap = 0;
-        let mem_size: usize = self
-            .iter()
-            .map(|entry| entry.key().mem_size() + entry.value().mem_size())
-            .sum();
-        (len, cap, mem_size)
-    }
-}
-
-// ============================================================================
-// DashSet implementations (RwHashSet)
-// ============================================================================
-
-/// Implementation for DashSet with String keys
-impl<S> CacheStats for DashSet<String, S>
-where
+    V: Sized + MemorySize + std::hash::Hash + Eq,
     S: std::hash::BuildHasher + Clone,
 {
     fn stats(&self) -> (usize, usize, usize) {
         let len = self.len();
         let cap = 0; // DashSet doesn't expose capacity
-        let mem_size: usize = self.iter().map(|entry| entry.key().mem_size()).sum();
+        let mem_size = self.mem_size();
         (len, cap, mem_size)
     }
 }
 
-// ============================================================================
-// RwLock<HashMap> implementations (RwAHashMap)
-// ============================================================================
-
-/// Generic implementation for RwLock<HashMap<K, V>>
-///
-/// Note: For accurate String key memory tracking, use RwHashMap (DashMap) instead.
-/// This implementation uses std::mem::size_of which only measures stack size.
-/// For String keys, it misses heap allocations. For String values, it also misses
-/// heap allocations. This is a known limitation of generic memory estimation.
 impl<K, V, S> CacheStatsAsync for RwLock<HashMap<K, V, S>>
 where
     K: Sized + Send + Sync + std::hash::Hash + Eq + MemorySize,
@@ -273,70 +241,55 @@ where
         let map = self.read().await;
         let len = map.len();
         let cap = map.capacity();
-        // Note: This only accounts for stack size, not heap allocations
-        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
+        let mem_size = std::mem::size_of::<HashMap<K, V, S>>()
+            + map
+                .iter()
+                .map(|(k, v)| k.mem_size() + v.mem_size())
+                .sum::<usize>();
         (len, cap, mem_size)
     }
 }
 
-// ============================================================================
-// RwLock<HashSet> implementations (RwAHashSet)
-// ============================================================================
-
-/// Implementation for RwLock<HashSet<String>>
-impl CacheStatsAsync for RwLock<HashSet<String>> {
+impl<K> CacheStatsAsync for RwLock<HashSet<K>>
+where
+    K: Sized + Send + Sync + std::hash::Hash + Eq + MemorySize,
+{
     async fn stats(&self) -> (usize, usize, usize) {
         let set = self.read().await;
         let len = set.len();
         let cap = set.capacity();
-        let mem_size: usize = set.iter().map(|k| k.mem_size()).sum();
+        let mem_size =
+            std::mem::size_of::<HashSet<K>>() + set.iter().map(|v| v.mem_size()).sum::<usize>();
         (len, cap, mem_size)
     }
 }
 
-/// Implementation for RwLock<HashSet<PathBuf>>
-impl CacheStatsAsync for RwLock<HashSet<PathBuf>> {
-    async fn stats(&self) -> (usize, usize, usize) {
-        let set = self.read().await;
-        let len = set.len();
-        let cap = set.capacity();
-        let mem_size: usize = set.iter().map(|k| k.mem_size()).sum();
-        (len, cap, mem_size)
-    }
-}
-
-/// Implementation for HashSet<String>
-impl CacheStats for HashSet<String> {
+impl<K> CacheStats for HashSet<K>
+where
+    K: Sized + std::hash::Hash + Eq + MemorySize,
+{
     fn stats(&self) -> (usize, usize, usize) {
         let len = self.len();
         let cap = self.capacity();
-        let mem_size = std::mem::size_of::<HashSet<String>>()
-            + self.iter().map(|k| k.mem_size()).sum::<usize>();
-
+        let mem_size = self.mem_size();
         (len, cap, mem_size)
     }
 }
 
-// ============================================================================
-// RwLock<Vec> implementations
-// ============================================================================
-
-/// Implementation for RwLock<Vec<String>>
-impl CacheStatsAsync for RwLock<Vec<String>> {
+impl<V> CacheStatsAsync for RwLock<Vec<V>>
+where
+    V: Sized + Send + Sync + MemorySize,
+{
     async fn stats(&self) -> (usize, usize, usize) {
         let vec = self.read().await;
         let len = vec.len();
         let cap = vec.capacity();
-        let mem_size: usize = vec.iter().map(|s| s.mem_size()).sum();
+        let mem_size =
+            std::mem::size_of::<Vec<V>>() + vec.iter().map(|v| v.mem_size()).sum::<usize>();
         (len, cap, mem_size)
     }
 }
 
-// ============================================================================
-// RwLock<BTreeMap> implementations (RwBTreeMap)
-// ============================================================================
-
-/// Implementation for RwLock<BTreeMap<K, V>> where K can be displayed as string
 impl<K, V> CacheStatsAsync for RwLock<BTreeMap<K, V>>
 where
     K: Ord + Send + Sync + MemorySize,
@@ -346,18 +299,18 @@ where
         let map = self.read().await;
         let len = map.len();
         let cap = 0; // BTreeMap doesn't have capacity
-        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
+        let mem_size = std::mem::size_of::<BTreeMap<K, V>>()
+            + map
+                .iter()
+                .map(|(k, v)| k.mem_size() + v.mem_size())
+                .sum::<usize>();
         (len, cap, mem_size)
     }
 }
 
-// ============================================================================
-// RwLock<IndexMap> implementations (FxIndexMap wrapped in RwLock)
-// ============================================================================
-
-/// Implementation for RwLock<IndexMap<String, V>>
-impl<V, S> CacheStatsAsync for RwLock<IndexMap<String, V, S>>
+impl<K, V, S> CacheStatsAsync for RwLock<IndexMap<K, V, S>>
 where
+    K: Sized + Send + Sync + MemorySize + std::hash::Hash + Eq,
     V: Sized + Send + Sync + MemorySize,
     S: std::hash::BuildHasher + Send + Sync,
 {
@@ -365,19 +318,20 @@ where
         let map = self.read().await;
         let len = map.len();
         let cap = map.capacity();
-        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
+        let mem_size = std::mem::size_of::<IndexMap<K, V, S>>()
+            + map
+                .iter()
+                .map(|(k, v)| k.mem_size() + v.mem_size())
+                .sum::<usize>();
         (len, cap, mem_size)
     }
 }
 
-// ============================================================================
-// Arc-wrapped implementations
-// ============================================================================
-
-/// Implementation for Arc<RwLock<HashMap<String, V>>>
-impl<V> CacheStatsAsync for Arc<RwLock<HashMap<String, V>>>
+impl<K, V, S> CacheStatsAsync for Arc<RwLock<HashMap<K, V, S>>>
 where
+    K: Sized + Send + Sync + std::hash::Hash + Eq + MemorySize,
     V: Sized + Send + Sync + MemorySize,
+    S: std::hash::BuildHasher + Send + Sync,
 {
     async fn stats(&self) -> (usize, usize, usize) {
         self.as_ref().stats().await
@@ -408,25 +362,6 @@ where
     }
 }
 
-// ============================================================================
-// Additional implementations for specific types
-// ============================================================================
-
-// Implementation for RwLock<IndexMap> with PathBuf keys (for IMMUTABLES)
-impl<V, S> CacheStatsAsync for RwLock<IndexMap<PathBuf, V, S>>
-where
-    V: Sized + Send + Sync + MemorySize,
-    S: std::hash::BuildHasher + Send + Sync + Default,
-{
-    async fn stats(&self) -> (usize, usize, usize) {
-        let map = self.read().await;
-        let len = map.len();
-        let cap = map.capacity();
-        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
-        (len, cap, mem_size)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -440,40 +375,49 @@ mod tests {
         let map: DashMap<String, i32> = DashMap::new();
         let (len, _cap, mem_size) = map.stats();
         assert_eq!(len, 0);
-        assert_eq!(mem_size, 0);
+        assert_eq!(mem_size, std::mem::size_of::<DashMap<String, i32>>());
     }
 
     #[test]
     fn test_dashmap_string_with_data() {
         let map: DashMap<String, i32> = DashMap::new();
-        map.insert("key1".to_string(), 42);
-        map.insert("key2".to_string(), 100);
+        let key1 = "key1".to_string();
+        let key2 = "key2".to_string();
+        map.insert(key1.clone(), 42);
+        map.insert(key2.clone(), 100);
 
         let (len, _cap, mem_size) = map.stats();
         assert_eq!(len, 2);
-        // mem_size: String heap data + String struct + value size for each entry
         assert_eq!(
             mem_size,
-            4 + std::mem::size_of::<String>()
-                + std::mem::size_of::<i32>()
-                + 4
-                + std::mem::size_of::<String>()
-                + std::mem::size_of::<i32>()
+            std::mem::size_of::<DashMap<String, i32>>()
+                + key1.mem_size()
+                + 42.mem_size()
+                + key2.mem_size()
+                + 100.mem_size()
         );
     }
 
     #[test]
     fn test_dashmap_str_with_data() {
         let map: DashMap<&str, i32> = DashMap::new();
-        map.insert("key1", 42);
-        map.insert("key2", 100);
+        let key1 = "key1";
+        let key2 = "key2";
+        let val1 = 42;
+        let val2 = 100;
+        map.insert(key1, val1);
+        map.insert(key2, val2);
 
         let (len, _cap, mem_size) = map.stats();
         assert_eq!(len, 2);
-        assert_eq!(
-            mem_size,
-            4 + std::mem::size_of::<i32>() + 4 + std::mem::size_of::<i32>()
-        );
+
+        // For &str keys in DashMap, the implementation uses the fat pointer size + len
+        let expected = std::mem::size_of::<DashMap<&str, i32>>()
+            + (std::mem::size_of::<&str>() + key1.len())
+            + val1.mem_size()
+            + (std::mem::size_of::<&str>() + key2.len())
+            + val2.mem_size();
+        assert_eq!(mem_size, expected);
     }
 
     // ============================================================================
@@ -485,7 +429,7 @@ mod tests {
         let set: DashSet<String> = DashSet::new();
         let (len, _cap, mem_size) = set.stats();
         assert_eq!(len, 0);
-        assert_eq!(mem_size, 0);
+        assert_eq!(mem_size, std::mem::size_of::<DashSet<String>>());
     }
 
     #[test]
@@ -497,7 +441,11 @@ mod tests {
 
         let (len, _cap, mem_size) = set.stats();
         assert_eq!(len, 3);
-        assert_eq!(mem_size, 4 + 4 + 10); // "key1" + "key2" + "longer_key"
+        let expected = std::mem::size_of::<DashSet<String>>()
+            + "key1".to_string().mem_size()
+            + "key2".to_string().mem_size()
+            + "longer_key".to_string().mem_size();
+        assert_eq!(mem_size, expected);
     }
 
     // ============================================================================
@@ -509,7 +457,7 @@ mod tests {
         let map: RwLock<HashMap<String, i32>> = RwLock::new(HashMap::new());
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 0);
-        assert_eq!(mem_size, 0);
+        assert_eq!(mem_size, std::mem::size_of::<HashMap<String, i32>>());
         assert_eq!(cap, 0);
     }
 
@@ -523,8 +471,11 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
-        // Note: Generic HashMap impl only counts stack size
-        let expected_mem = (std::mem::size_of::<String>() + std::mem::size_of::<i32>()) * 2;
+        let expected_mem = std::mem::size_of::<HashMap<String, i32>>()
+            + "key1".to_string().mem_size()
+            + 42.mem_size()
+            + "key2".to_string().mem_size()
+            + 100.mem_size();
         assert_eq!(mem_size, expected_mem);
     }
 
@@ -538,7 +489,11 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
-        let expected_mem = (std::mem::size_of::<u64>() + std::mem::size_of::<String>()) * 2;
+        let expected_mem = std::mem::size_of::<HashMap<u64, String>>()
+            + 1u64.mem_size()
+            + "value1".to_string().mem_size()
+            + 2u64.mem_size()
+            + "value2".to_string().mem_size();
         assert_eq!(mem_size, expected_mem);
     }
 
@@ -552,7 +507,7 @@ mod tests {
         let (len, cap, mem_size) = set.stats().await;
         assert_eq!(len, 0);
         assert_eq!(cap, 0);
-        assert_eq!(mem_size, 0);
+        assert_eq!(mem_size, std::mem::size_of::<HashSet<String>>());
     }
 
     #[tokio::test]
@@ -565,7 +520,10 @@ mod tests {
         let (len, cap, mem_size) = set.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
-        assert_eq!(mem_size, 4 + 4); // "key1" + "key2"
+        let expected = std::mem::size_of::<HashSet<String>>()
+            + "key1".to_string().mem_size()
+            + "key2".to_string().mem_size();
+        assert_eq!(mem_size, expected);
     }
 
     #[tokio::test]
@@ -578,7 +536,10 @@ mod tests {
         let (len, cap, mem_size) = set.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
-        assert_eq!(mem_size, "/path/to/file1".len() + "/path/to/file2".len());
+        let expected = std::mem::size_of::<HashSet<PathBuf>>()
+            + PathBuf::from("/path/to/file1").mem_size()
+            + PathBuf::from("/path/to/file2").mem_size();
+        assert_eq!(mem_size, expected);
     }
 
     // ============================================================================
@@ -591,7 +552,7 @@ mod tests {
         let (len, cap, mem_size) = vec.stats().await;
         assert_eq!(len, 0);
         assert_eq!(cap, 0);
-        assert_eq!(mem_size, 0);
+        assert_eq!(mem_size, std::mem::size_of::<Vec<String>>());
     }
 
     #[tokio::test]
@@ -602,7 +563,10 @@ mod tests {
         let (len, cap, mem_size) = vec.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
-        assert_eq!(mem_size, 5 + 5); // "hello" + "world"
+        let expected = std::mem::size_of::<Vec<String>>()
+            + "hello".to_string().mem_size()
+            + "world".to_string().mem_size();
+        assert_eq!(mem_size, expected);
     }
 
     // ============================================================================
@@ -615,7 +579,7 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 0);
         assert_eq!(cap, 0); // BTreeMap doesn't have capacity
-        assert_eq!(mem_size, 0);
+        assert_eq!(mem_size, std::mem::size_of::<BTreeMap<String, i32>>());
     }
 
     #[tokio::test]
@@ -628,7 +592,11 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 2);
         assert_eq!(cap, 0); // BTreeMap doesn't have capacity
-        let expected_mem = (4 + std::mem::size_of::<i32>()) + (4 + std::mem::size_of::<i32>());
+        let expected_mem = std::mem::size_of::<BTreeMap<String, i32>>()
+            + "key1".to_string().mem_size()
+            + 42.mem_size()
+            + "key2".to_string().mem_size()
+            + 100.mem_size();
         assert_eq!(mem_size, expected_mem);
     }
 
@@ -642,7 +610,7 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 0);
         assert_eq!(cap, 0);
-        assert_eq!(mem_size, 0);
+        assert_eq!(mem_size, std::mem::size_of::<IndexMap<String, i32>>());
     }
 
     #[tokio::test]
@@ -655,7 +623,11 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
-        let expected_mem = (4 + std::mem::size_of::<i32>()) + (4 + std::mem::size_of::<i32>());
+        let expected_mem = std::mem::size_of::<IndexMap<String, i32>>()
+            + "key1".to_string().mem_size()
+            + 42.mem_size()
+            + "key2".to_string().mem_size()
+            + 100.mem_size();
         assert_eq!(mem_size, expected_mem);
     }
 
@@ -669,8 +641,11 @@ mod tests {
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 2);
         assert!(cap >= 2);
-        let expected_mem = ("/path/file1".len() + std::mem::size_of::<i32>())
-            + ("/path/file2".len() + std::mem::size_of::<i32>());
+        let expected_mem = std::mem::size_of::<IndexMap<PathBuf, i32>>()
+            + PathBuf::from("/path/file1").mem_size()
+            + 42.mem_size()
+            + PathBuf::from("/path/file2").mem_size()
+            + 100.mem_size();
         assert_eq!(mem_size, expected_mem);
     }
 
@@ -681,14 +656,17 @@ mod tests {
     #[tokio::test]
     async fn test_arc_rwlock_hashmap() {
         let mut inner_map = HashMap::new();
-        inner_map.insert("key1".to_string(), 42);
+        let key1 = "key1".to_string();
+        let val1 = 42;
+        inner_map.insert(key1.clone(), val1);
         let map = Arc::new(RwLock::new(inner_map));
 
         let (len, cap, mem_size) = map.stats().await;
         assert_eq!(len, 1);
         assert!(cap >= 1);
         // Note: Generic HashMap impl only counts stack size
-        let expected_mem = std::mem::size_of::<String>() + std::mem::size_of::<i32>();
+        let expected_mem =
+            std::mem::size_of::<HashMap<String, i32>>() + key1.mem_size() + val1.mem_size();
         assert_eq!(mem_size, expected_mem);
     }
 
@@ -706,10 +684,10 @@ mod tests {
 
         let (len, _cap, mem_size) = CACHE.stats();
         assert_eq!(len, 1);
-        assert_eq!(
-            mem_size,
-            4 + std::mem::size_of::<String>() + std::mem::size_of::<i32>()
-        );
+        let expected = std::mem::size_of::<DashMap<String, i32>>()
+            + "key1".to_string().mem_size()
+            + 42.mem_size();
+        assert_eq!(mem_size, expected);
     }
 
     #[tokio::test]
@@ -723,8 +701,9 @@ mod tests {
         let (len, cap, mem_size) = CACHE.stats().await;
         assert_eq!(len, 1);
         assert!(cap >= 1);
-        // Note: Generic HashMap impl only counts stack size
-        let expected_mem = std::mem::size_of::<String>() + std::mem::size_of::<i32>();
+        let expected_mem = std::mem::size_of::<HashMap<String, i32>>()
+            + "key1".to_string().mem_size()
+            + 42.mem_size();
         assert_eq!(mem_size, expected_mem);
     }
 
@@ -735,18 +714,20 @@ mod tests {
     #[test]
     fn test_dashmap_string_memory_size_accuracy() {
         let map: DashMap<String, Vec<u8>> = DashMap::new();
-        map.insert("short".to_string(), vec![1, 2, 3]);
-        map.insert("a_longer_key".to_string(), vec![4, 5, 6, 7, 8]);
+        let key1 = "short".to_string();
+        let val1 = vec![1, 2, 3];
+        let key2 = "a_longer_key".to_string();
+        let val2 = vec![4, 5, 6, 7, 8];
+        map.insert(key1.clone(), val1.clone());
+        map.insert(key2.clone(), val2.clone());
 
         let (len, _cap, mem_size) = map.stats();
         assert_eq!(len, 2);
-        // String heap data + String struct + value size for each entry
-        let expected = "short".len()
-            + std::mem::size_of::<String>()
-            + std::mem::size_of::<Vec<u8>>()
-            + "a_longer_key".len()
-            + std::mem::size_of::<String>()
-            + std::mem::size_of::<Vec<u8>>();
+        let expected = std::mem::size_of::<DashMap<String, Vec<u8>>>()
+            + key1.mem_size()
+            + val1.mem_size()
+            + key2.mem_size()
+            + val2.mem_size();
         assert_eq!(mem_size, expected);
     }
 
@@ -758,8 +739,9 @@ mod tests {
 
         let (len, _cap, mem_size) = map.stats().await;
         assert_eq!(len, 1);
-        // Note: Generic HashMap impl only counts stack size
-        let expected = std::mem::size_of::<String>() + std::mem::size_of::<String>();
+        let expected = std::mem::size_of::<HashMap<String, String>>()
+            + "key".to_string().mem_size()
+            + "value".to_string().mem_size();
         assert_eq!(mem_size, expected);
     }
 }
