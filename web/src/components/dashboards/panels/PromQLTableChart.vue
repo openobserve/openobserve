@@ -30,10 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="{ rows: filteredTableRows, columns: tableColumns }"
         :wrap-cells="config.wrap_table_cells"
         :value-mapping="config.mappings ?? []"
+        :show-pagination="config.show_pagination"
+        :rows-per-page="config.rows_per_page"
         @row-click="$emit('row-click', $event)"
       >
-        <template #bottom v-if="showLegendFooter">
-          <div class="row items-center full-width" style="width: 100%">
+        <!-- Override bottom slot to add legend filter alongside native pagination -->
+        <template #bottom="scope" v-if="showLegendFooter">
+          <div class="row items-center full-width">
             <div class="row items-center q-gutter-sm q-pl-md">
               <q-select
                 v-model="selectedLegend"
@@ -51,8 +54,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-select>
             </div>
             <q-space />
-            <div class="q-pr-md text-body2">
-              1-{{ filteredTableRows.length }} of {{ filteredTableRows.length }}
+            <!-- Use the native pagination component from q-table -->
+            <component :is="'div'" v-html="scope.pagination" v-if="false" />
+            <!-- Manual pagination display matching q-table's default -->
+            <div class="row items-center q-gutter-sm q-pr-md">
+              <span class="text-caption">Rows per page:</span>
+              <q-select
+                :model-value="scope.pagination.rowsPerPage"
+                @update:model-value="scope.setRowsPerPage"
+                :options="[10, 20, 50, 100, 250, 500, 1000, 0]"
+                :option-label="(opt) => (opt === 0 ? 'All' : opt)"
+                borderless
+                dense
+                options-dense
+                class="q-table__select"
+              /><span class="q-table__separator">|</span>
+              <span class="text-caption">
+                {{
+                  scope.pagination.rowsPerPage === 0
+                    ? `1-${filteredTableRows.length} of ${filteredTableRows.length}`
+                    : `${(scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1}-${Math.min(
+                        scope.pagination.page * scope.pagination.rowsPerPage,
+                        filteredTableRows.length,
+                      )} of ${filteredTableRows.length}`
+                }}
+              </span>
+              <q-btn
+                v-if="scope.pagesNumber > 1"
+                icon="first_page"
+                color="grey-8"
+                round
+                dense
+                flat
+                :disable="scope.isFirstPage"
+                @click="scope.firstPage"
+              />
+              <q-btn
+                v-if="scope.pagesNumber > 1"
+                icon="chevron_left"
+                color="grey-8"
+                round
+                dense
+                flat
+                :disable="scope.isFirstPage"
+                @click="scope.prevPage"
+              />
+              <q-btn
+                v-if="scope.pagesNumber > 1"
+                icon="chevron_right"
+                color="grey-8"
+                round
+                dense
+                flat
+                :disable="scope.isLastPage"
+                @click="scope.nextPage"
+              />
+              <q-btn
+                v-if="scope.pagesNumber > 1"
+                icon="last_page"
+                color="grey-8"
+                round
+                dense
+                flat
+                :disable="scope.isLastPage"
+                @click="scope.lastPage"
+              />
             </div>
           </div>
         </template>
@@ -143,11 +209,8 @@ export default defineComponent({
     // Determine if legend footer should be shown
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
-      // Show legend footer in both "single" and "expanded_timeseries" modes when there are multiple series
-      return (
-        (tableMode === "single" || tableMode === "expanded_timeseries") &&
-        legendOptions.value.length > 1
-      );
+      // Show legend footer in both "single" and "expanded_timeseries" modes
+      return tableMode === "single" || tableMode === "expanded_timeseries";
     });
 
     // Filter rows based on selected legend

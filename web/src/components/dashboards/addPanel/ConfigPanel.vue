@@ -311,6 +311,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'o2-toggle-button-lg-light'
       "
     />
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.show_pagination"
+      label="Pagination"
+      data-test="dashboard-config-show-pagination"
+      class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-lg-dark'
+          : 'o2-toggle-button-lg-light'
+      "
+    />
+
+    <div class="space"></div>
+
+    <q-input
+      v-if="
+        dashboardPanelData.data.type == 'table' &&
+        dashboardPanelData.data.config.show_pagination
+      "
+      v-model.number="dashboardPanelData.data.config.rows_per_page"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      dense
+      label-slot
+      data-test="dashboard-config-rows-per-page"
+      borderless
+      hide-bottom-space
+      type="number"
+      min="1"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Rows per page
+          <div>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-rows-per-page-info"
+            />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              Set the default number of records to display per page
+            </q-tooltip>
+          </div>
+        </div>
+      </template>
+    </q-input>
 
     <div class="space"></div>
 
@@ -767,7 +825,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
       <div
         v-if="
-          promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'
+          promqlMode &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'
         "
         class="q-py-md showLabelOnTop"
         style="font-weight: 600"
@@ -967,7 +1027,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <CommonAutoComplete
-        v-if="promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'"
+        v-if="
+          promqlMode &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'
+        "
         :label="t('common.legend')"
         v-model="
           dashboardPanelData.data.queries[
@@ -1476,12 +1540,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-rotate"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 4px">
               <span>Label Rotate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer;"
+                style="cursor: pointer"
                 data-test="dashboard-config-axis-label-rotate-info"
               >
                 <q-tooltip
@@ -1491,9 +1555,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bg-grey-8"
                 >
                   <div>
-                    Rotate the x-axis label text by a chosen angle (in degrees) to improve readability when labels are long or crowded.
+                    Rotate the x-axis label text by a chosen angle (in degrees)
+                    to improve readability when labels are long or crowded.
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for
+                    time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -1501,7 +1567,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-input
-          v-model.number="dashboardPanelData.data.config.axis_label_truncate_width"
+          v-model.number="
+            dashboardPanelData.data.config.axis_label_truncate_width
+          "
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1520,12 +1588,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-truncate-width"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 4px">
               <span>Label Truncate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer;"
+                style="cursor: pointer"
                 data-test="dashboard-config-axis-label-truncate-info"
               >
                 <q-tooltip
@@ -1537,7 +1605,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     Truncate x-axis labels to the specified width (in pixels).
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for
+                    time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -2562,7 +2631,7 @@ export default defineComponent({
 // Ensure label icons are always interactive
 :deep(.q-field__label) {
   pointer-events: auto !important;
-  
+
   .q-icon {
     pointer-events: auto !important;
   }
@@ -2602,6 +2671,7 @@ export default defineComponent({
   font-weight: bold;
   color: white;
 }
+
 .unit-container {
   display: flex;
   height: 36px;
