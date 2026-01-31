@@ -27,8 +27,8 @@ use axum_extra::extract::{
     cookie::{Cookie, SameSite},
 };
 use config::{
-    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
-    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    CacheStats, CacheStatsAsync, Config, META_ORG_ID, QUICK_MODEL_FIELDS,
+    SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{
@@ -41,7 +41,10 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     cache, cluster, file_list,
-    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
+    schema::{
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_STATS_EXISTS,
+    },
 };
 use serde::Serialize;
 use time;
@@ -471,32 +474,66 @@ pub async fn cache_status() -> impl IntoResponse {
     stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
 
     let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
-    stats.insert("STREAM_SCHEMA", json::json!({"stream_num": stream_num,"stream_schema_num": stream_schema_num, "mem_size": mem_size}));
+    stats.insert("STREAMS", json::json!({"stream_num": stream_num,"schema_num": stream_schema_num, "mem_size": mem_size}));
 
-    let stream_num = cache::stats::get_stream_stats_len();
-    let mem_size = cache::stats::get_stream_stats_in_memory_size();
+    // Use trait-based approach for cache statistics
+    // From src/infra/src/cache/stats.rs
+    let (len, cap, mem_size) = cache::stats::get_cache_stats();
     stats.insert(
         "STREAM_STATS",
-        json::json!({"stream_num": stream_num, "mem_size": mem_size}),
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let mem_file_num = cache::file_data::memory::len().await;
-    let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::Data).await;
-    let (disk_max_size, disk_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::Data).await;
-    let disk_result_file_num =
-        cache::file_data::disk::len(cache::file_data::disk::FileType::Result).await;
-    let (disk_result_max_size, disk_result_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::Result).await;
+    // Schema caches - from src/infra/src/schema/mod.rs
+    let (len, cap, mem_size) = STREAM_SCHEMAS.stats().await;
     stats.insert(
-        "FILE_DATA",
-        json::json!({
-            "memory":{"cache_files":mem_file_num, "cache_limit":mem_max_size,"cache_bytes": mem_cur_size},
-            "disk":{"cache_files":disk_file_num, "cache_limit":disk_max_size,"cache_bytes": disk_cur_size},
-            "results":{"cache_files":disk_result_file_num, "cache_limit":disk_result_max_size,"cache_bytes": disk_result_cur_size}
-        }),
+        "STREAM_SCHEMAS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
+
+    let (len, cap, mem_size) = STREAM_SCHEMAS_LATEST.stats().await;
+    stats.insert(
+        "STREAM_SCHEMAS_LATEST",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = STREAM_SETTINGS.stats().await;
+    stats.insert(
+        "STREAM_SETTINGS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = STREAM_RECORD_ID_GENERATOR.stats();
+    stats.insert(
+        "STREAM_RECORD_ID_GENERATOR",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = STREAM_STATS_EXISTS.stats();
+    stats.insert(
+        "STREAM_STATS_EXISTS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // File data caches - from src/infra/src/cache/file_data/
+    let (disk_data_total_size, disk_data_used_size, disk_data_items) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Data).await;
+    let (disk_result_total_size, disk_result_used_size, disk_result_items) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Result).await;
+    let (disk_aggregation_total_size, disk_aggregation_used_size, disk_aggregation_items) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Aggregation).await;
+    let (mem_total_size, mem_used_size, mem_items) = cache::file_data::memory::stats().await;
+    stats.insert(
+            "FILE_DATA",
+            json::json!({
+                "disk": {
+                    "file_data":{"total_size": disk_data_total_size, "used_size": disk_data_used_size, "items": disk_data_items},
+                    "result_cache":{"total_size": disk_result_total_size, "used_size": disk_result_used_size, "items": disk_result_items},
+                    "aggregation_cache":{"total_size": disk_aggregation_total_size, "used_size": disk_aggregation_used_size, "items": disk_aggregation_items},
+                },
+                "memory":{"total_size": mem_total_size, "used_size": mem_used_size, "items": mem_items}
+            }),
+        );
 
     let file_list_num = file_list::len().await;
     let file_list_last_update_at = file_list::get_max_update_at().await.unwrap_or_default();
@@ -534,6 +571,206 @@ pub async fn cache_status() -> impl IntoResponse {
         "CARDINALITY",
         json::json!({"total_count": total_count, "expired_count": expired_count}),
     );
+
+    // query cache
+    let (len, cap, mem_size) = crate::service::promql::search::get_cache_stats().await;
+    stats.insert(
+        "PROMQL_QUERY_CACHE",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Config caches from src/common/infra/config.rs
+    let (len, cap, mem_size) = crate::common::infra::config::KVS.stats();
+    stats.insert(
+        "KVS_CACHE",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::QUERY_FUNCTIONS.stats();
+    stats.insert(
+        "QUERY_FUNCTIONS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ALERTS_TEMPLATES.stats();
+    stats.insert(
+        "ALERTS_TEMPLATES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::DESTINATIONS.stats();
+    stats.insert(
+        "DESTINATIONS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ENRICHMENT_TABLES.stats();
+    stats.insert(
+        "ENRICHMENT_TABLES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ORGANIZATION_SETTING
+        .stats()
+        .await;
+    stats.insert(
+        "ORGANIZATION_SETTING",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ORGANIZATIONS.stats().await;
+    stats.insert(
+        "ORGANIZATIONS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::METRIC_CLUSTER_MAP
+        .stats()
+        .await;
+    stats.insert(
+        "METRIC_CLUSTER_MAP",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::METRIC_CLUSTER_LEADER
+        .stats()
+        .await;
+    stats.insert(
+        "METRIC_CLUSTER_LEADER",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::STREAM_ALERTS.stats().await;
+    stats.insert(
+        "STREAM_ALERTS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ALERTS.stats().await;
+    stats.insert(
+        "ALERTS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::REALTIME_ALERT_TRIGGERS
+        .stats()
+        .await;
+    stats.insert(
+        "REALTIME_ALERT_TRIGGERS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::STREAM_EXECUTABLE_PIPELINES
+        .stats()
+        .await;
+    stats.insert(
+        "STREAM_EXECUTABLE_PIPELINES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::PIPELINE_STREAM_MAPPING
+        .stats()
+        .await;
+    stats.insert(
+        "PIPELINE_STREAM_MAPPING",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::SCHEDULED_PIPELINES
+        .stats()
+        .await;
+    stats.insert(
+        "SCHEDULED_PIPELINES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::SYSTEM_SETTINGS.stats().await;
+    stats.insert(
+        "SYSTEM_SETTINGS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Cluster caches (5) from src/infra/src/cluster/mod.rs
+    let (len, cap, mem_size) = infra::cluster::QUERIER_INTERACTIVE_CONSISTENT_HASH
+        .stats()
+        .await;
+    stats.insert(
+        "QUERIER_INTERACTIVE_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::QUERIER_BACKGROUND_CONSISTENT_HASH
+        .stats()
+        .await;
+    stats.insert(
+        "QUERIER_BACKGROUND_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::COMPACTOR_CONSISTENT_HASH.stats().await;
+    stats.insert(
+        "COMPACTOR_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::FLATTEN_COMPACTOR_CONSISTENT_HASH
+        .stats()
+        .await;
+    stats.insert(
+        "FLATTEN_COMPACTOR_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::NODES_HEALTH_CHECK.stats().await;
+    stats.insert(
+        "NODES_HEALTH_CHECK",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // File list caches (2) from src/service/db/file_list/mod.rs
+    let (len, cap, mem_size) = crate::service::db::file_list::DELETED_FILES.stats();
+    stats.insert(
+        "DELETED_FILES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::service::db::file_list::DEPULICATE_FILES.stats();
+    stats.insert(
+        "DEPULICATE_FILES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Organization streams cache from src/service/db/compact/organization.rs line 21
+    let (len, cap, mem_size) = crate::service::db::compact::organization::STREAMS.stats();
+    stats.insert(
+        "COMPACT_ORGANIZATION_STREAMS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Ingester caches (conditional on role)
+    let is_ingester =
+        cfg.common.node_role.contains("ingester") || cfg.common.node_role.contains("all");
+    if is_ingester {
+        use ingester;
+
+        let (len, cap, mem_size) = ingester::WAL_PARQUET_METADATA.stats().await;
+        stats.insert(
+            "INGESTER_WAL_METADATA",
+            json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+        );
+
+        let (len, cap, mem_size) = ingester::get_immutables_cache_stats().await;
+        stats.insert(
+            "INGESTER_IMMUTABLES",
+            json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+        );
+
+        let (len, cap, mem_size) = ingester::get_processing_tables_cache_stats().await;
+        stats.insert(
+            "INGESTER_PROCESSING_TABLES",
+            json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+        );
+    }
 
     axum::Json(stats)
 }

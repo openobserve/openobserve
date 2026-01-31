@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@
 #![feature(macro_metavar_expr_concat)]
 
 pub mod axum;
+pub mod cache_stats;
 pub mod cluster;
 pub mod config;
 pub mod config_path_manager;
@@ -27,6 +28,7 @@ pub mod prebuilt_loader;
 pub mod router;
 pub mod utils;
 
+pub use cache_stats::{CacheStats, CacheStatsAsync};
 pub use config::*;
 
 pub async fn init() -> Result<(), anyhow::Error> {

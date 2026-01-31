@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    RwHashMap,
+    CacheStats, RwHashMap,
     meta::stream::{FileMeta, StreamStats, StreamType},
 };
 use once_cell::sync::Lazy;
 
-const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
 static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(Default::default);
 
 #[inline]
@@ -88,17 +87,10 @@ pub fn incr_stream_stats(key: &str, val: &FileMeta) -> Result<(), anyhow::Error>
     Ok(())
 }
 
+/// Get cache statistics in standardized format: (len, capacity, memory_size)
 #[inline]
-pub fn get_stream_stats_len() -> usize {
-    STATS.len()
-}
-
-#[inline]
-pub fn get_stream_stats_in_memory_size() -> usize {
-    STATS
-        .iter()
-        .map(|v| v.key().len() + STREAM_STATS_MEM_SIZE)
-        .sum()
+pub fn get_cache_stats() -> (usize, usize, usize) {
+    STATS.stats()
 }
 
 #[cfg(test)]
@@ -108,8 +100,14 @@ mod tests {
     #[test]
     fn test_get_stream_stats_len() {
         let stats = get_stats();
-        assert_eq!(get_stream_stats_len(), stats.len());
+        let (len, cap, mem_size) = get_cache_stats();
+        assert_eq!(len, stats.len());
+        assert_eq!(cap, 0);
+        assert!(mem_size > 0);
+    }
 
+    #[test]
+    fn test_get_set_stream_stats() {
         let val = StreamStats {
             created_at: 1667978841102,
             doc_time_min: 1667978841102,
