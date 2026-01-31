@@ -24,9 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
-      :rows-per-page-options="
-        showPagination ? [rowsPerPage ||10, 20, 50, 100, 250, 500, 1000, 0] : [0]
-      "
+      :rows-per-page-options="paginationOptions"
       :virtual-scroll-sticky-size-start="48"
       dense
       :wrap-cells="wrapCells"
@@ -122,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useNotifications from "@/composables/useNotifications";
 import { useStickyColumns } from "@/composables/useStickyColumns";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -344,6 +342,25 @@ export default defineComponent({
     };
 
     // Pagination logic
+    // Dynamic available rows options
+    const paginationOptions = computed(() => {
+      if (!props.showPagination) {
+        return [0];
+      }
+
+      const defaultOptions = [10, 20, 50, 100, 250, 500, 1000];
+      const configuredRows = props.rowsPerPage || 10;
+
+      const options = new Set(defaultOptions);
+      if (configuredRows > 0) {
+        options.add(configuredRows);
+      }
+
+      const sorted = Array.from(options).sort((a, b) => a - b);
+      sorted.push(0);
+      return sorted;
+    });
+
     const pagination = ref({
       rowsPerPage: props.showPagination ? props.rowsPerPage || 10 : 0,
       page: 1,
@@ -363,6 +380,7 @@ export default defineComponent({
 
     return {
       pagination,
+      paginationOptions,
       downloadTableAsCSV,
       downloadTableAsJSON,
       tableRef,
