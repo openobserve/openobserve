@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <template #bottom="scope" v-if="showLegendFooter">
           <div class="row items-center full-width">
-            <div class="row items-center q-gutter-sm q-pl-md">
+            <div class="row items-center q-gutter-xs">
               <q-select
                 v-model="selectedLegend"
                 :options="legendOptions"
@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 emit-value
                 map-options
-                style="min-width: 300px; max-width: 500px"
-                placeholder="Select series to filter"
+                style="min-width: 200px; max-width: 400px"
+                placeholder="Select series"
               >
                 <template v-slot:prepend>
                   <q-icon name="filter_list" size="xs" />
@@ -54,11 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-select>
             </div>
             <q-space />
-            <!-- Use the native pagination component from q-table -->
-            <component :is="'div'" v-html="scope.pagination" v-if="false" />
-            <!-- Manual pagination display matching q-table's default -->
-            <div class="row items-center q-gutter-sm q-pr-md">
-              <span class="text-caption">Rows per page:</span>
+            <!-- Records per page dropdown: only when pagination is enabled in config -->
+            <div
+              v-if="config.show_pagination"
+              class="row items-center q-gutter-sm"
+            >
+              <span class="text-caption">Records per page:</span>
               <q-select
                 :model-value="scope.pagination.rowsPerPage"
                 @update:model-value="scope.setRowsPerPage"
@@ -68,17 +69,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 options-dense
                 class="q-table__select"
-              /><span class="q-table__separator">|</span>
-              <span class="text-caption">
-                {{
-                  scope.pagination.rowsPerPage === 0
+              />
+            </div>
+            <!-- Count: always visible (with or without pagination) -->
+            <span class="text-caption q-pa-sm">
+              {{
+                config.show_pagination
+                  ? scope.pagination.rowsPerPage === 0
                     ? `1-${filteredTableRows.length} of ${filteredTableRows.length}`
                     : `${(scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1}-${Math.min(
                         scope.pagination.page * scope.pagination.rowsPerPage,
                         filteredTableRows.length,
                       )} of ${filteredTableRows.length}`
-                }}
-              </span>
+                  : `1-${filteredTableRows.length} of ${filteredTableRows.length}`
+              }}
+            </span>
+            <!-- Navigation arrows: only when pagination is enabled -->
+            <template v-if="config.show_pagination">
               <q-btn
                 v-if="scope.pagesNumber > 1"
                 icon="first_page"
@@ -119,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable="scope.isLastPage"
                 @click="scope.lastPage"
               />
-            </div>
+            </template>
           </div>
         </template>
       </TableRenderer>

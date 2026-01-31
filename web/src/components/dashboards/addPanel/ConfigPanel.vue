@@ -345,6 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       borderless
       hide-bottom-space
       type="number"
+      placeholder="Auto"
       min="1"
     >
       <template v-slot:label>

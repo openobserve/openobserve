@@ -144,7 +144,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       sticky_first_column: false,
       column_order: [],
       show_pagination: false,
-      rows_per_page: 10,
+      rows_per_page: null,
     },
     htmlContent: "",
     markdownContent: "",
