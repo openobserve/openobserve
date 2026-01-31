@@ -48,14 +48,20 @@ export interface LatencyInsightsConfig {
   durationFilter?: {
     start: number;
     end: number;
+    timeStart?: number;
+    timeEnd?: number;
   };
   rateFilter?: {
     start: number;
     end: number;
+    timeStart?: number;
+    timeEnd?: number;
   };
   errorFilter?: {
     start: number;
     end: number;
+    timeStart?: number;
+    timeEnd?: number;
   };
   baseFilter?: string;
   dimensions: string[]; // List of dimension names to analyze
@@ -271,6 +277,13 @@ export function useLatencyInsightsAnalysis() {
     config: LatencyInsightsConfig
   ): Promise<DimensionAnalysis> => {
     try {
+      // Check if we have any time-based filters - if not, we're in baseline-only mode
+      // A filter is considered active only if it has timeStart and timeEnd
+      const hasFilters =
+        (config.durationFilter?.timeStart && config.durationFilter?.timeEnd) ||
+        (config.rateFilter?.timeStart && config.rateFilter?.timeEnd) ||
+        (config.errorFilter?.timeStart && config.errorFilter?.timeEnd);
+
       // Get baseline distribution (WITHOUT duration filter - all traces)
       const baselineDistQuery = buildDistributionQuery(
         dimensionName,
@@ -287,24 +300,6 @@ export function useLatencyInsightsAnalysis() {
         config.streamType,
         config.orgIdentifier,
         config.baselineTimeRange
-      );
-
-      // Get selected distribution (WITH duration filter - only slow traces)
-      const selectedDistQuery = buildDistributionQuery(
-        dimensionName,
-        config.streamName,
-        config.selectedTimeRange,
-        config.durationFilter,
-        config.baseFilter,
-        true // DO apply duration filter for selected
-      );
-
-      const selectedDistResult = await executeQuery(
-        selectedDistQuery,
-        config.streamName,
-        config.streamType,
-        config.orgIdentifier,
-        config.selectedTimeRange
       );
 
       // Get baseline population stats (WITHOUT duration filter)
@@ -325,52 +320,90 @@ export function useLatencyInsightsAnalysis() {
         config.baselineTimeRange
       );
 
-      // Get selected population stats (WITH duration filter)
-      const selectedPopQuery = buildPopulationQuery(
-        dimensionName,
-        config.streamName,
-        config.selectedTimeRange,
-        config.durationFilter,
-        config.baseFilter,
-        true // DO apply duration filter for selected
-      );
-
-      const selectedPopResult = await executeQuery(
-        selectedPopQuery,
-        config.streamName,
-        config.streamType,
-        config.orgIdentifier,
-        config.selectedTimeRange
-      );
-
-      // Calculate distributions
+      // Calculate baseline distribution
       const baselineTotalCount = baselinePopResult.hits?.[0]?.total_count || 0;
-      const selectedTotalCount = selectedPopResult.hits?.[0]?.total_count || 0;
-
       const baselineDistribution = calculateDistribution(
         baselineDistResult.hits || [],
         baselineTotalCount
       );
 
-      const selectedDistribution = calculateDistribution(
-        selectedDistResult.hits || [],
-        selectedTotalCount
-      );
+      let data: ValueDistribution[];
+      let selectedPopulation = 0;
+      let differenceScore = 0;
 
-      // Merge distributions
-      const data = mergeDistributions(baselineDistribution, selectedDistribution);
+      if (!hasFilters) {
+        // Baseline-only mode: Show only baseline data (no comparison)
+        data = Array.from(baselineDistribution.entries()).map(([value, stats]) => ({
+          value,
+          baselineCount: stats.count,
+          baselinePercent: stats.percent,
+          selectedCount: 0,
+          selectedPercent: 0,
+        }));
 
-      // Calculate population percentages
+        // Sort by baseline percentage
+        data.sort((a, b) => b.baselinePercent - a.baselinePercent);
+      } else {
+        // Comparison mode: Query selected data and compare with baseline
+
+        // Get selected distribution (WITH duration filter - only slow traces)
+        const selectedDistQuery = buildDistributionQuery(
+          dimensionName,
+          config.streamName,
+          config.selectedTimeRange,
+          config.durationFilter,
+          config.baseFilter,
+          true // DO apply duration filter for selected
+        );
+
+        const selectedDistResult = await executeQuery(
+          selectedDistQuery,
+          config.streamName,
+          config.streamType,
+          config.orgIdentifier,
+          config.selectedTimeRange
+        );
+
+        // Get selected population stats (WITH duration filter)
+        const selectedPopQuery = buildPopulationQuery(
+          dimensionName,
+          config.streamName,
+          config.selectedTimeRange,
+          config.durationFilter,
+          config.baseFilter,
+          true // DO apply duration filter for selected
+        );
+
+        const selectedPopResult = await executeQuery(
+          selectedPopQuery,
+          config.streamName,
+          config.streamType,
+          config.orgIdentifier,
+          config.selectedTimeRange
+        );
+
+        const selectedTotalCount = selectedPopResult.hits?.[0]?.total_count || 0;
+        const selectedDistribution = calculateDistribution(
+          selectedDistResult.hits || [],
+          selectedTotalCount
+        );
+
+        // Merge distributions for comparison
+        data = mergeDistributions(baselineDistribution, selectedDistribution);
+
+        // Calculate selected population
+        const selectedPopulatedCount = selectedPopResult.hits?.[0]?.populated_count || 0;
+        selectedPopulation =
+          selectedTotalCount > 0 ? selectedPopulatedCount / selectedTotalCount : 0;
+
+        // Calculate difference score for ranking
+        differenceScore = calculateDifferenceScore(data);
+      }
+
+      // Calculate baseline population percentage
       const baselinePopulatedCount = baselinePopResult.hits?.[0]?.populated_count || 0;
-      const selectedPopulatedCount = selectedPopResult.hits?.[0]?.populated_count || 0;
-
       const baselinePopulation =
         baselineTotalCount > 0 ? baselinePopulatedCount / baselineTotalCount : 0;
-      const selectedPopulation =
-        selectedTotalCount > 0 ? selectedPopulatedCount / selectedTotalCount : 0;
-
-      // Calculate difference score for ranking
-      const differenceScore = calculateDifferenceScore(data);
 
       return {
         dimensionName,
