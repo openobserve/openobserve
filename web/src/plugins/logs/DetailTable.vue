@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="sidebar"
             hide-view-related
             :highlight-query="highlightQuery"
+            :should-wrap-values="shouldWrapValues"
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
@@ -293,38 +294,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'tw:whitespace-nowrap'
                         : 'tw:whitespace-pre-wrap'
                     "
-                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" /></pre>
+                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" :disable-truncation="true" /></pre>
                 </div>
               </q-td>
             </template>
           </q-table>
         </q-card-section>
       </q-tab-panel>
-      <!-- Correlated Logs Tab Panel -->
+
+      <!-- Correlated Logs Tab Panel (Custom Component) -->
       <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
-        <TelemetryCorrelationDashboard
+        <CorrelatedLogsTable
           v-if="correlationProps"
-          mode="embedded-tabs"
-          external-active-tab="logs"
           :service-name="correlationProps.serviceName"
           :matched-dimensions="correlationProps.matchedDimensions"
           :additional-dimensions="correlationProps.additionalDimensions"
-          :metric-streams="correlationProps.metricStreams"
           :log-streams="correlationProps.logStreams"
-          :trace-streams="correlationProps.traceStreams"
           :source-stream="correlationProps.sourceStream"
           :source-type="correlationProps.sourceType"
           :available-dimensions="correlationProps.availableDimensions"
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
-          @close="tab = 'json'"
+          :hide-view-related-button="true"
+          :hide-search-term-actions="true"
+          @sendToAiChat="sendToAiChat"
+          @addSearchTerm="addSearchTerm"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+        <div
+          v-else
+          class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
+        >
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+            <q-spinner-hourglass
+              v-if="correlationLoading"
+              color="primary"
+              size="3rem"
+              class="tw:mb-4"
+            />
+            <div
+              v-else-if="correlationError"
+              class="tw:text-base tw:text-red-500"
+            >
+              {{ correlationError }}
+            </div>
+            <div v-else class="tw:text-base tw:text-gray-500">
+              {{ t("correlation.clickToLoadLogs") }}
+            </div>
           </div>
         </div>
       </q-tab-panel>
@@ -466,6 +482,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 
 const defaultValue: any = () => {
@@ -476,7 +493,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard, CorrelatedLogsTable },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -587,9 +604,6 @@ export default defineComponent({
           tab.value.startsWith("correlated-") &&
           !props.correlationProps
         ) {
-          console.log(
-            "[DetailTable] rowData available + correlation tab active, emitting load-correlation",
-          );
           // Emit the original modelValue (not flattened rowData) as it has _timestamp
           emit("load-correlation", props.modelValue);
         }
@@ -600,7 +614,6 @@ export default defineComponent({
     // Watch for tab changes - load correlation data when user clicks a correlation tab
     watch(tab, (newTab, oldTab) => {
       const isCorrelationTab = newTab.startsWith("correlated-");
-      const wasCorrelationTab = oldTab?.startsWith("correlated-");
 
       // Only emit if switching TO a correlation tab AND we don't have data yet
       // Skip if this is the initial load (oldTab is undefined) as rowData watcher handles it
@@ -611,9 +624,6 @@ export default defineComponent({
         rowData.value &&
         Object.keys(rowData.value).length > 0
       ) {
-        console.log(
-          "[DetailTable] User clicked correlation tab, emitting load-correlation",
-        );
         // Emit the original modelValue (not flattened rowData) as it has _timestamp
         emit("load-correlation", props.modelValue);
       }
@@ -724,10 +734,19 @@ export default defineComponent({
       emit("view-trace");
     };
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
       emit("closeTable");
     };
+
+    const addSearchTerm = (
+      field: string | number,
+      fieldValue: string | number | boolean,
+      action: string,
+    ) => {
+      emit("add:searchterm", field, fieldValue, action);
+    };
+
     const closeTable = () => {
       emit("closeTable");
     };
@@ -760,6 +779,7 @@ export default defineComponent({
       viewTrace,
       hasAggregationQuery,
       sendToAiChat,
+      addSearchTerm,
       closeTable,
       showCorrelation,
       statusColor,

@@ -1418,11 +1418,15 @@ pub async fn search_multi_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
-    let search_span = setup_tracing_with_trace_id(
-        &trace_id,
-        tracing::info_span!("service::search::search_multi_stream_h2"),
-    )
-    .await;
+    // Create search_span as a child of http_span by entering http_span first
+    let search_span = {
+        let _guard = http_span.enter();
+        setup_tracing_with_trace_id(
+            &trace_id,
+            tracing::info_span!("service::search::search_multi_stream_h2"),
+        )
+        .await
+    };
 
     // Spawn the multi-stream search task
     tokio::spawn(process_search_stream_request_multi(

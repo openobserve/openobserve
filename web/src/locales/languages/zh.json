@@ -38,6 +38,8 @@
     "goHome": "回到主页",
     "name": "姓名",
     "add": "添加",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
     "details": "详情",
     "tags": "标签",
     "process": "处理",
@@ -109,7 +111,9 @@
     "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
     "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。",
     "id": "身份证",
-    "getStarted": "开始吧"
+    "getStarted": "开始吧",
+    "reset": "重置",
+    "retry": "重试"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -303,7 +307,8 @@
     "hide": "隐藏",
     "show": "显示",
     "editor": "编辑器",
-    "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。"
+    "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
+    "showHideColumns": "显示/隐藏列"
   },
   "menu": {
     "home": "主页",
@@ -695,7 +700,9 @@
     "license_already_active_title": "许可证已激活",
     "license_already_active_msg": "您的许可证仍然有效。你想用新的许可证密钥对其进行更新吗？",
     "yes_update_license": "是的，更新许可证",
-    "no_keep_current": "不，保持最新状态"
+    "no_keep_current": "不，保持最新状态",
+    "feature_correlation_management": "关联管理",
+    "feature_log_patterns": "日志模式"
   },
   "login": {
     "userid": "账号",
@@ -1937,6 +1944,8 @@
     "searchMetric": "搜索指标",
     "searchLabel": "搜索指标",
     "add": "添加",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
     "cancel": "取消",
     "promqlLabel": "PromQL",
     "runQuery": "查询",
@@ -2672,7 +2681,55 @@
     "stable": "稳定",
     "stableTooltip": "稳定维度基数低，用于关联键计算",
     "normalize": "正常化",
-    "noSemanticGroupsInCategory": "类别中没有语义组：{category}"
+    "noSemanticGroupsInCategory": "类别中没有语义组：{category}",
+    "logs": {
+      "title": "关联日志",
+      "filters": {
+        "title": "编辑关联过滤器",
+        "description": "调整维度筛选条件以优化您的关联查询。匹配的维度是稳定的标识符，而其他维度可能会在 pod 重启时发生变化。",
+        "matchedDimensions": "匹配的尺寸（稳定）",
+        "matchedDimensionsTooltip": "这些维度是稳定的标识符，在 pod 重启期间保持一致，用于匹配相关的遥测。",
+        "additionalDimensions": "其他尺寸（不稳定）",
+        "additionalDimensionsTooltip": "这些维度可能会在 pod 重启时发生变化（例如 pod_name、container_id）。您可以将它们设置为 “所有值” 以扩大搜索范围。",
+        "stableDimension": "稳定的尺寸",
+        "unstableDimension": "不稳定-重启时发生变化",
+        "setToAll": "设置为所有值",
+        "showingAll": "显示所有值",
+        "wildcardHelp": "在筛选时使用 “所有值” 忽略此维度",
+        "noAdditionalDimensions": "没有其他尺寸可用"
+      },
+      "loading": "正在加载相关日志...",
+      "loadingDetails": "正在从相关流中获取日志...",
+      "error": "加载日志失败",
+      "noData": "未找到相关日志",
+      "noDataDetails": "未找到与关联过滤器匹配的日志。",
+      "resetFilters": "重置筛选条件",
+      "editFilters": "编辑筛选器",
+      "editTimeRange": "编辑时间范围",
+      "selectValue": "选择值",
+      "stableDimension": "尺寸稳定-在 pod 重启后保持一致",
+      "unstableDimension": "尺寸不稳定-在 pod 重启时可能会改变",
+      "resultsCount": "在 {stream} 中找到的 {count} 个日志（{时间} 毫秒）",
+      "timeRange": {
+        "title": "调整时间范围",
+        "sourceTime": "源日志时间",
+        "window": "时间窗口",
+        "minute1": "±1 分钟",
+        "minute5": "±5 分钟（默认）",
+        "minute15": "±15 分钟",
+        "minute30": "±30 分钟",
+        "hour1": "±1 小时",
+        "custom": "自定义",
+        "customStart": "自定义开始时间",
+        "customEnd": "自定义结束时间",
+        "currentRange": "当前时间范围",
+        "start": "开始",
+        "end": "结束",
+        "duration": "持续时间",
+        "startBeforeEnd": "开始时间必须早于结束时间",
+        "endAfterStart": "结束时间必须晚于开始时间"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",
@@ -2680,5 +2737,46 @@
     "clearChatTitle": "清除聊天",
     "clearChatMessage": "你确定要清除这个对话吗？",
     "copiedToClipboard": "已复制到剪贴板"
+  },
+  "awsMarketplace": {
+    "title": "AWS 市场注册",
+    "subtitle": "完成 OpenObserve 订阅设置",
+    "invalidLink": "注册链接无效",
+    "invalidLinkDescription": "此注册链接无效或已过期。请再次从 AWS Marketplace 订阅。",
+    "goToMarketplace": "前往 AWS 市场",
+    "newUser": "OpenObserve 的新手",
+    "newUserDescription": "创建新账户和组织",
+    "createAccount": "创建账户",
+    "existingUser": "已经有账号了吗？",
+    "existingUserDescription": "登录使用 AWS 账单创建新组织",
+    "login": "登录",
+    "loggedInAs": "以身份登录",
+    "createNewOrg": "创建新组织",
+    "createNewOrgDescription": "使用 AWS Marketplace 账单创建新组织",
+    "orgName": "组织名称",
+    "createOrganization": "创建组织",
+    "linkToExisting": "链接到现有组织",
+    "linkToExistingDescription": "将 AWS 账单关联到您的一个免费套餐组织",
+    "selectOrganization": "选择组织",
+    "linkAwsBilling": "关联 AWS 账单",
+    "settingUp": "正在设置您的订阅...",
+    "pleaseWait": "我们正在配置您的账户，请稍候。",
+    "waitingConfirmation": "等待 AWS 确认",
+    "waitingDescription": "您的订阅已激活。这通常需要不到一分钟。",
+    "customerId": "客户 ID",
+    "subscriptionActivated": "订阅已激活！",
+    "activatedDescription": "您的 AWS 商城订阅现已激活。",
+    "goToDashboard": "前往控制面板",
+    "paymentFailed": "付款失败",
+    "paymentFailedDescription": "您的 AWS 商城付款出现问题。请检查您的 AWS 账户或联系 AWS 支持。",
+    "contactSupport": "联系支持部门",
+    "tryAgain": "再试一次",
+    "activationTimeout": "激活超时。如果问题仍然存在，请联系支持部门。"
+  },
+  "validation": {
+    "required": "此字段为必填字段",
+    "invalidFormat": "格式无效",
+    "mustBeGreaterThan": "必须大于 {值}",
+    "mustBeLessThan": "必须小于 {值}"
   }
 }

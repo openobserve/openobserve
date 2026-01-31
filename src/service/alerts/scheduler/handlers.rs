@@ -346,6 +346,21 @@ async fn handle_alert_triggers(
                     &trigger.module_key
                 );
             }
+
+            if let Err(e) = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::Alert,
+                &trigger.module_key,
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to remove alert from scheduled_jobs due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    &trigger.module_key
+                );
+            }
+
             return Ok(());
         }
     }
@@ -1213,6 +1228,21 @@ async fn handle_report_triggers(
                     report_name
                 );
             }
+
+            if let Err(e) = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::Report,
+                &trigger.module_key,
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to remove report from scheduled_jobs due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    report_name
+                );
+            }
+
             return Ok(());
         }
     }
@@ -1518,6 +1548,21 @@ async fn handle_derived_stream_triggers(
                     pipeline.name
                 );
             }
+
+            if let Err(e) = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::DerivedStream,
+                &trigger.module_key,
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to remove pipeline from scheduled_jobs due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    pipeline.name
+                );
+            }
+
             return Ok(());
         }
     }

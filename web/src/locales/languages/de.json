@@ -38,6 +38,8 @@
     "goHome": "Zur Startseite",
     "name": "Name",
     "add": "Hinzufügen",
+    "selectAll": "Alle auswählen",
+    "deselectAll": "Alle abwählen",
     "details": "Einzelheiten",
     "tags": "Schlagworte",
     "process": "Prozess",
@@ -109,7 +111,9 @@
     "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "id": "ID",
-    "getStarted": "Fangen Sie an"
+    "getStarted": "Fangen Sie an",
+    "reset": "Zurücksetzen",
+    "retry": "Erneut versuchen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -303,7 +307,8 @@
     "hide": "Verstecken",
     "show": "Zeige",
     "editor": "Redakteur",
-    "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde."
+    "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
+    "showHideColumns": "Spalten ein-/ausblenden"
   },
   "menu": {
     "home": "Startseite",
@@ -695,7 +700,9 @@
     "license_already_active_title": "Lizenz ist bereits aktiv",
     "license_already_active_msg": "Ihre Lizenz ist noch aktiv. Möchten Sie sie mit dem neuen Lizenzschlüssel aktualisieren?",
     "yes_update_license": "Ja, Lizenz aktualisieren",
-    "no_keep_current": "Nein, auf dem Laufenden bleiben"
+    "no_keep_current": "Nein, auf dem Laufenden bleiben",
+    "feature_correlation_management": "Korrelationsmanagement",
+    "feature_log_patterns": "Muster protokollieren"
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -1941,6 +1948,8 @@
     "searchMetric": "Suchen Sie nach einer Metrik",
     "searchLabel": "Metriklabel suchen",
     "add": "Hinzufügen",
+    "selectAll": "Alle auswählen",
+    "deselectAll": "Alle abwählen",
     "cancel": "Abbrechen",
     "promqlLabel": "PromMQL",
     "runQuery": "Abfrage ausführen",
@@ -2676,7 +2685,55 @@
     "stable": "Stabil",
     "stableTooltip": "Stabile Dimensionen haben eine niedrige Kardinalität und werden für die Berechnung von Korrelationsschlüsseln verwendet.",
     "normalize": "Normalisieren",
-    "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}"
+    "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}",
+    "logs": {
+      "title": "Korrelierte Protokolle",
+      "filters": {
+        "title": "Korrelationsfilter bearbeiten",
+        "description": "Passen Sie Dimensionsfilter an, um Ihre Korrelationsabfrage zu verfeinern. Übereinstimmende Dimensionen sind stabile Identifikatoren, während sich zusätzliche Dimensionen bei Pod-Neustarts ändern können.",
+        "matchedDimensions": "Passende Abmessungen (stabil)",
+        "matchedDimensionsTooltip": "Bei diesen Dimensionen handelt es sich um stabile Identifikatoren, die bei Pod-Neustarts konsistent bleiben und verwendet werden, um die entsprechenden Telemetriedaten abzugleichen.",
+        "additionalDimensions": "Zusätzliche Abmessungen (instabil)",
+        "additionalDimensionsTooltip": "Diese Dimensionen können sich bei Pod-Neustarts ändern (z. B. pod_name, container_id). Sie können sie auf „Alle Werte“ setzen, um die Suche zu erweitern.",
+        "stableDimension": "Stabile Abmessung",
+        "unstableDimension": "Instabil — Änderungen beim Neustart",
+        "setToAll": "Auf alle Werte setzen",
+        "showingAll": "Alle Werte anzeigen",
+        "wildcardHelp": "Verwenden Sie „Alle Werte“, um diese Dimension beim Filtern zu ignorieren",
+        "noAdditionalDimensions": "Keine zusätzlichen Abmessungen verfügbar"
+      },
+      "loading": "Korrelierte Protokolle werden geladen...",
+      "loadingDetails": "Logs aus korrelierten Streams werden abgerufen...",
+      "error": "Protokolle konnten nicht geladen werden",
+      "noData": "Keine korrelierten Protokolle gefunden",
+      "noDataDetails": "Es wurden keine Protokolle gefunden, die den Korrelationsfiltern entsprechen.",
+      "resetFilters": "Filter zurücksetzen",
+      "editFilters": "Filter bearbeiten",
+      "editTimeRange": "Zeitbereich bearbeiten",
+      "selectValue": "Wählen Sie einen Wert",
+      "stableDimension": "Stabile Dimension — konsistent bei Pod-Neustarts",
+      "unstableDimension": "Instabile Dimension — kann sich beim Neustart des Pods ändern",
+      "resultsCount": "{count} Logs gefunden in {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Zeitbereich anpassen",
+        "sourceTime": "Zeit des Quellprotokolls",
+        "window": "Zeitfenster",
+        "minute1": "±1 Minute",
+        "minute5": "±5 Minuten (Standard)",
+        "minute15": "±15 Minuten",
+        "minute30": "±30 Minuten",
+        "hour1": "±1 Stunde",
+        "custom": "Benutzerdefiniert",
+        "customStart": "Benutzerdefinierte Startzeit",
+        "customEnd": "Benutzerdefinierte Endzeit",
+        "currentRange": "Aktueller Zeitbereich",
+        "start": "Starten",
+        "end": "Ende",
+        "duration": "Dauer",
+        "startBeforeEnd": "Die Startzeit muss vor der Endzeit liegen",
+        "endAfterStart": "Die Endzeit muss nach der Startzeit liegen"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",
@@ -2684,5 +2741,46 @@
     "clearChatTitle": "Chat löschen",
     "clearChatMessage": "Bist du sicher, dass du das Gespräch beenden willst?",
     "copiedToClipboard": "In die Zwischenablage kopiert"
+  },
+  "awsMarketplace": {
+    "title": "AWS Marketplace-Registrierung",
+    "subtitle": "Vervollständigen Sie die Einrichtung Ihres OpenObserve-Abonnements",
+    "invalidLink": "Ungültiger Registrierungslink",
+    "invalidLinkDescription": "Dieser Registrierungslink ist ungültig oder abgelaufen. Bitte abonnieren Sie erneut im AWS Marketplace.",
+    "goToMarketplace": "Gehen Sie zum AWS Marketplace",
+    "newUser": "Neu bei OpenObserve?",
+    "newUserDescription": "Neues Konto und Organisation erstellen",
+    "createAccount": "Konto erstellen",
+    "existingUser": "Hast du schon ein Konto?",
+    "existingUserDescription": "Melden Sie sich an, um eine neue Organisation mit AWS-Abrechnung zu erstellen",
+    "login": "Einloggen",
+    "loggedInAs": "Eingeloggt als",
+    "createNewOrg": "Neue Organisation erstellen",
+    "createNewOrgDescription": "Erstellen Sie eine neue Organisation mit AWS Marketplace-Abrechnung",
+    "orgName": "Name der Organisation",
+    "createOrganization": "Organisation erstellen",
+    "linkToExisting": "Link zur bestehenden Organisation",
+    "linkToExistingDescription": "Verknüpfen Sie die AWS-Abrechnung mit einer Ihrer Organisationen mit kostenlosem Nutzungskontingent",
+    "selectOrganization": "Wählen Sie Organisation",
+    "linkAwsBilling": "AWS-Abrechnung verknüpfen",
+    "settingUp": "Ihr Abonnement wird eingerichtet...",
+    "pleaseWait": "Bitte warten Sie, bis wir Ihr Konto konfiguriert haben.",
+    "waitingConfirmation": "Warten auf die AWS-Bestätigung",
+    "waitingDescription": "Ihr Abonnement wird aktiviert. Dies dauert normalerweise weniger als eine Minute.",
+    "customerId": "Kunden-ID",
+    "subscriptionActivated": "Abonnement aktiviert!",
+    "activatedDescription": "Ihr AWS Marketplace-Abonnement ist jetzt aktiv.",
+    "goToDashboard": "Gehe zum Dashboard",
+    "paymentFailed": "Zahlung fehlgeschlagen",
+    "paymentFailedDescription": "Es gab ein Problem mit Ihrer AWS Marketplace-Zahlung. Bitte überprüfen Sie Ihr AWS-Konto oder wenden Sie sich an den AWS-Support.",
+    "contactSupport": "Support kontaktieren",
+    "tryAgain": "Versuchen Sie es erneut",
+    "activationTimeout": "Aktivierungs-Timeout. Bitte wenden Sie sich an den Support, falls das Problem weiterhin besteht."
+  },
+  "validation": {
+    "required": "Dieses Feld ist erforderlich",
+    "invalidFormat": "Ungültiges Format",
+    "mustBeGreaterThan": "Muss größer als {value} sein",
+    "mustBeLessThan": "Muss kleiner als {value} sein"
   }
 }

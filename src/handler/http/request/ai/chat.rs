@@ -63,6 +63,7 @@ use crate::{
         extractors::Headers,
         models::ai::{PromptRequest, PromptResponse},
         request::search::search_stream::report_to_audit,
+        router::X_O2_ASSISTANT_SESSION_ID,
     },
 };
 
@@ -291,8 +292,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
 #[derive(Debug, Deserialize)]
 pub struct TraceInfo {
     pub user_id: String,
-    #[serde(default)]
-    pub traceparent: String,
+    pub traceparent: Option<String>,
     #[serde(default)]
     pub authorization: Option<String>,
 }
@@ -300,9 +300,11 @@ pub struct TraceInfo {
 impl TraceInfo {
     /// Extract trace_id from traceparent header if present, otherwise generate UUID v7
     fn get_trace_id(&self) -> String {
-        if !self.traceparent.is_empty() {
+        if let Some(traceparent) = &self.traceparent
+            && !traceparent.is_empty()
+        {
             // Parse traceparent format: 00-{trace_id}-{span_id}-{flags}
-            let parts: Vec<&str> = self.traceparent.split('-').collect();
+            let parts: Vec<&str> = traceparent.split('-').collect();
             if parts.len() >= 3 {
                 let trace_id = parts[1].to_string();
                 // Validate trace_id (32 hex chars, not all zeros)
@@ -370,6 +372,44 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
     let trace_id = auth_data.get_trace_id();
     let user_id = auth_data.user_id.clone();
+
+    let mut forward_headers = std::collections::HashMap::new();
+
+    // Extract and validate session ID (UUID v7 format: 8-4-4-4-12 hex digits)
+    if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+        && let Ok(val) = session_id.to_str()
+    {
+        if val.len() == 36 && val.chars().filter(|&c| c == '-').count() == 4 {
+            forward_headers.insert(
+                X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                val.to_string(),
+            );
+        } else {
+            log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
+        }
+    }
+
+    if let Some(traceparent) = &auth_data.traceparent
+        && !traceparent.is_empty()
+    {
+        forward_headers.insert("traceparent".to_string(), traceparent.clone());
+    }
+
+    if let Some(user_agent) = parts.headers.get("user-agent")
+        && let Ok(val) = user_agent.to_str()
+    {
+        forward_headers.insert("user-agent".to_string(), val.to_string());
+    }
+
+    // Log correlation context for debugging
+    log::info!(
+        "[trace_id:{}] AI chat request: user_id={}, session_id={}",
+        trace_id,
+        user_id,
+        forward_headers
+            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            .unwrap_or(&"none".to_string())
+    );
 
     // Parse JSON body
     let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
@@ -529,9 +569,14 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         .await;
 
         // Create streaming response
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
         let s = stream! {
-            // Call the agent service
-            let response = match client.query_stream(agent_type, query_req).await {
+            // Call the agent service with forwarded headers
+            let response = match client.query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref()).await {
                 Ok(r) => r,
                 Err(e) => {
                     log::error!(

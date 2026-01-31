@@ -38,6 +38,8 @@
     "goHome": "Vá para casa",
     "name": "Nome",
     "add": "Adicionar",
+    "selectAll": "Selecionar tudo",
+    "deselectAll": "Desmarcar tudo",
     "details": "Detalhes",
     "tags": "Etiquetas",
     "process": "Processo",
@@ -109,7 +111,9 @@
     "chunkLoadError": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "id": "CARTEIRA DE IDENTIDADE",
-    "getStarted": "Comece"
+    "getStarted": "Comece",
+    "reset": "Redefinir",
+    "retry": "Tente novamente"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -303,7 +307,8 @@
     "hide": "Esconder",
     "show": "Mostra",
     "editor": "Editor",
-    "webUrlNotConfigured": "O URL de compartilhamento é desativado até que ZO_WEB_URL seja configurado pelo administrador."
+    "webUrlNotConfigured": "O URL de compartilhamento é desativado até que ZO_WEB_URL seja configurado pelo administrador.",
+    "showHideColumns": "Mostrar/ocultar colunas"
   },
   "menu": {
     "home": "Início",
@@ -695,7 +700,9 @@
     "license_already_active_title": "A licença já está ativa",
     "license_already_active_msg": "Sua licença ainda está ativa. Você quer atualizá-lo com a nova chave de licença?",
     "yes_update_license": "Sim, atualize a licença",
-    "no_keep_current": "Não, mantenha-se atualizado"
+    "no_keep_current": "Não, mantenha-se atualizado",
+    "feature_correlation_management": "Gerenciamento de correlações",
+    "feature_log_patterns": "Padrões de registro"
   },
   "login": {
     "userid": "ID do usuário",
@@ -1941,6 +1948,8 @@
     "searchMetric": "Pesquisar uma métrica",
     "searchLabel": "Rótulo métrico de pesquisa",
     "add": "Adicionar",
+    "selectAll": "Selecionar tudo",
+    "deselectAll": "Desmarcar tudo",
     "cancel": "Cancelar",
     "promqlLabel": "PromQL",
     "runQuery": "Executar consulta",
@@ -2676,7 +2685,55 @@
     "stable": "Estável",
     "stableTooltip": "As dimensões estáveis têm baixa cardinalidade e são usadas para o cálculo da chave de correlação.",
     "normalize": "Normalizar",
-    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}"
+    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}",
+    "logs": {
+      "title": "Registros correlacionados",
+      "filters": {
+        "title": "Editar filtros de correlação",
+        "description": "Ajuste os filtros de dimensão para refinar sua consulta de correlação. As dimensões correspondentes são identificadores estáveis, enquanto dimensões adicionais podem mudar na reinicialização do pod.",
+        "matchedDimensions": "Dimensões combinadas (estáveis)",
+        "matchedDimensionsTooltip": "Essas dimensões são identificadores estáveis que permanecem consistentes nas reinicializações do pod e são usadas para corresponder à telemetria relacionada.",
+        "additionalDimensions": "Dimensões adicionais (instáveis)",
+        "additionalDimensionsTooltip": "Essas dimensões podem mudar na reinicialização do pod (por exemplo, pod_name, container_id). Você pode configurá-los como “Todos os valores” para ampliar a pesquisa.",
+        "stableDimension": "Dimensão estável",
+        "unstableDimension": "Instável - alterações na reinicialização",
+        "setToAll": "Definir para todos os valores",
+        "showingAll": "Mostrando todos os valores",
+        "wildcardHelp": "Use 'Todos os valores' para ignorar essa dimensão na filtragem",
+        "noAdditionalDimensions": "Não há dimensões adicionais disponíveis"
+      },
+      "loading": "Carregando registros correlacionados...",
+      "loadingDetails": "Buscando registros de fluxos correlacionados...",
+      "error": "Falha ao carregar registros",
+      "noData": "Nenhum registro correlacionado encontrado",
+      "noDataDetails": "Nenhum registro encontrado que corresponda aos filtros de correlação.",
+      "resetFilters": "Redefinir filtros",
+      "editFilters": "Editar filtros",
+      "editTimeRange": "Editar intervalo de tempo",
+      "selectValue": "Selecione o valor",
+      "stableDimension": "Dimensão estável - consistente nas reinicializações do pod",
+      "unstableDimension": "Dimensão instável - pode mudar na reinicialização do pod",
+      "resultsCount": "{count} registros encontrados em {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Ajuste o intervalo de tempo",
+        "sourceTime": "Hora do registro de origem",
+        "window": "Janela de tempo",
+        "minute1": "±1 minuto",
+        "minute5": "±5 minutos (padrão)",
+        "minute15": "±15 minutos",
+        "minute30": "±30 minutos",
+        "hour1": "±1 hora",
+        "custom": "Personalizado",
+        "customStart": "Horário de início personalizado",
+        "customEnd": "Horário de término personalizado",
+        "currentRange": "Intervalo de tempo atual",
+        "start": "Iniciar",
+        "end": "Fim",
+        "duration": "Duração",
+        "startBeforeEnd": "A hora de início deve ser antes da hora de término",
+        "endAfterStart": "A hora de término deve ser após a hora de início"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
@@ -2684,5 +2741,46 @@
     "clearChatTitle": "Limpar bate-papo",
     "clearChatMessage": "Tem certeza de que deseja encerrar essa conversa?",
     "copiedToClipboard": "Copiado para a prancheta"
+  },
+  "awsMarketplace": {
+    "title": "Registro no AWS Marketplace",
+    "subtitle": "Conclua a configuração da sua assinatura do OpenObserve",
+    "invalidLink": "Link de registro inválido",
+    "invalidLinkDescription": "Este link de registro é inválido ou expirou. Inscreva-se novamente no AWS Marketplace.",
+    "goToMarketplace": "Acesse o AWS Marketplace",
+    "newUser": "Novo no OpenObserve?",
+    "newUserDescription": "Crie uma nova conta e organização",
+    "createAccount": "Criar conta",
+    "existingUser": "Já tem uma conta?",
+    "existingUserDescription": "Faça login para criar uma nova organização com o faturamento da AWS",
+    "login": "Login",
+    "loggedInAs": "Logado como",
+    "createNewOrg": "Criar nova organização",
+    "createNewOrgDescription": "Crie uma nova organização com o faturamento do AWS Marketplace",
+    "orgName": "Nome da organização",
+    "createOrganization": "Criar organização",
+    "linkToExisting": "Link para a organização existente",
+    "linkToExistingDescription": "Vincule o faturamento da AWS a uma de suas organizações de nível gratuito",
+    "selectOrganization": "Selecione a organização",
+    "linkAwsBilling": "Vincular o faturamento da AWS",
+    "settingUp": "Configurando sua assinatura...",
+    "pleaseWait": "Aguarde enquanto configuramos sua conta.",
+    "waitingConfirmation": "Aguardando a confirmação da AWS",
+    "waitingDescription": "Sua assinatura está sendo ativada. Isso geralmente leva menos de um minuto.",
+    "customerId": "ID do cliente",
+    "subscriptionActivated": "Assinatura ativada!",
+    "activatedDescription": "Sua assinatura do AWS Marketplace agora está ativa.",
+    "goToDashboard": "Vá para o painel",
+    "paymentFailed": "Falha no pagamento",
+    "paymentFailedDescription": "Houve um problema com seu pagamento do AWS Marketplace. Verifique sua conta da AWS ou entre em contato com o suporte da AWS.",
+    "contactSupport": "Contate o suporte",
+    "tryAgain": "Tente novamente",
+    "activationTimeout": "Tempo limite de ativação. Entre em contato com o suporte se o problema persistir."
+  },
+  "validation": {
+    "required": "Este campo é obrigatório",
+    "invalidFormat": "Formato inválido",
+    "mustBeGreaterThan": "Deve ser maior que {value}",
+    "mustBeLessThan": "Deve ser menor que {value}"
   }
 }

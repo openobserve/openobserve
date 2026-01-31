@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty State -->
     <div
-      v-else-if="!graphData || graphData.nodes.length === 0"
+      v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
       class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
     >
       <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
@@ -36,24 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Service Graph Unavailable
         </div>
         <div class="tw-text-xs tw-mt-1" :class="isDarkMode ? 'tw-text-gray-500' : 'tw-text-gray-400'">
-          Topology data is being generated in the background.
+          No topology data available for this incident.
         </div>
       </div>
-      <q-btn
-        outline
-        color="primary"
-        size="sm"
-        no-caps
-        @click="loadGraph"
-        :loading="loading"
-      >
-        Refresh to Check Again
-      </q-btn>
     </div>
 
     <!-- Graph Canvas using ECharts -->
     <div
-      v-if="!loading && graphData && graphData.nodes.length > 0"
+      v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
       style="width: 100%; height: 100%;"
     >
       <ChartRenderer
@@ -66,12 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onMounted } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import incidentsService, { IncidentServiceGraph, AlertNode } from "@/services/incidents";
+import { AlertNode } from "@/services/incidents";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 
 export default defineComponent({
@@ -81,26 +70,24 @@ export default defineComponent({
     DropzoneBackground,
   },
   props: {
-    orgId: {
-      type: String,
-      required: true,
-    },
-    incidentId: {
-      type: String,
-      required: true,
+    topologyContext: {
+      type: Object as () => { nodes: AlertNode[]; edges: any[] } | null,
+      required: false,
+      default: null,
     },
   },
   setup(props) {
     const store = useStore();
-    const $q = useQuasar();
 
     const loading = ref(false);
-    const graphData = ref<IncidentServiceGraph | null>(null);
     const chartRendererRef = ref<any>(null);
     const chartKey = ref(0);
     const nodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
 
     const isDarkMode = computed(() => store.state.theme === "dark");
+
+    // Use topology_context directly from props
+    const graphData = computed(() => props.topologyContext);
 
     // D3-Force simulation to compute stable node positions
     const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
@@ -138,32 +125,10 @@ export default defineComponent({
       return simulation.nodes().map(n => ({ ...n }));
     };
 
-    const loadGraph = async () => {
-      loading.value = true;
-      try {
-        const response = await incidentsService.getServiceGraph(props.orgId, props.incidentId);
-        graphData.value = response.data;
-        // Don't increment chartKey to preserve node positions
-      } catch (error: any) {
-        console.error("Failed to load service graph:", error);
-
-        // Handle different error cases
-        if (error?.response?.status === 403) {
-          // Enterprise feature not available
-          $q.notify({
-            type: "warning",
-            message: "Service Graph is an enterprise feature",
-          });
-        } else if (error?.response?.status !== 404) {
-          $q.notify({
-            type: "negative",
-            message: "Failed to load service graph",
-          });
-        }
-        // For 404, just show empty state (topology not yet available)
-      } finally {
-        loading.value = false;
-      }
+    // No longer need to load graph via API - data comes from props
+    const loadGraph = () => {
+      // Increment chartKey to force re-render if topology_context changes
+      chartKey.value++;
     };
 
     const getNodeColor = (node: AlertNode, index: number): string => {
@@ -183,7 +148,7 @@ export default defineComponent({
     };
 
     const chartData = computed(() => {
-      if (!graphData.value || graphData.value.nodes.length === 0) {
+      if (!graphData.value || !graphData.value.nodes || graphData.value.nodes.length === 0) {
         return { options: {}, notMerge: true };
       }
 
@@ -333,17 +298,16 @@ export default defineComponent({
       return { options, notMerge: !hasAllPositions }; // Merge when using cached positions
     });
 
-    // Watch for incident changes
+    // Watch for topology_context changes
     watch(
-      () => props.incidentId,
+      () => props.topologyContext,
       () => {
+        // Clear cached positions when topology changes
+        nodePositions.value.clear();
         loadGraph();
-      }
+      },
+      { deep: true }
     );
-
-    onMounted(() => {
-      loadGraph();
-    });
 
     return {
       loading,

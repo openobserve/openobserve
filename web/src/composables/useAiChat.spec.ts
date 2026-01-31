@@ -547,17 +547,57 @@ describe('useAiChat', () => {
     it('should work with context handler that returns null', async () => {
       const mockResponse = { ok: true, json: vi.fn() };
       mockFetch.mockResolvedValue(mockResponse);
-      
+
       const mockHandler = vi.fn().mockResolvedValue(null);
       aiChatComposable.registerAiChatHandler(mockHandler);
-      
+
       await aiChatComposable.fetchAiChat(mockMessages, 'gpt-4', 'test-org');
-      
+
       const callArgs = mockFetch.mock.calls[0][1];
       const requestBody = JSON.parse(callArgs.body);
       const lastMessage = requestBody.messages[requestBody.messages.length - 1];
-      
+
       expect(lastMessage.content).toBe('How are you?');
+    });
+
+    it('should include x-o2-assistant-session-id header when sessionId is provided', async () => {
+      const mockResponse = { ok: true, json: vi.fn() };
+      mockFetch.mockResolvedValue(mockResponse);
+
+      const sessionId = '01234567-89ab-cdef-0123-456789abcdef';
+
+      await aiChatComposable.fetchAiChat(mockMessages, 'gpt-4', 'test-org', undefined, undefined, sessionId);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'x-o2-assistant-session-id': sessionId
+          })
+        })
+      );
+    });
+
+    it('should not include x-o2-assistant-session-id header when sessionId is not provided', async () => {
+      const mockResponse = { ok: true, json: vi.fn() };
+      mockFetch.mockResolvedValue(mockResponse);
+
+      await aiChatComposable.fetchAiChat(mockMessages, 'gpt-4', 'test-org');
+
+      const callArgs = mockFetch.mock.calls[0][1];
+
+      expect(callArgs.headers).not.toHaveProperty('x-o2-assistant-session-id');
+    });
+
+    it('should not include x-o2-assistant-session-id header when sessionId is undefined', async () => {
+      const mockResponse = { ok: true, json: vi.fn() };
+      mockFetch.mockResolvedValue(mockResponse);
+
+      await aiChatComposable.fetchAiChat(mockMessages, 'gpt-4', 'test-org', undefined, undefined, undefined);
+
+      const callArgs = mockFetch.mock.calls[0][1];
+
+      expect(callArgs.headers).not.toHaveProperty('x-o2-assistant-session-id');
     });
   });
 

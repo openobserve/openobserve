@@ -38,6 +38,8 @@
     "goHome": "Rentrez chez vous",
     "name": "Nom",
     "add": "Ajouter",
+    "selectAll": "Tout sélectionner",
+    "deselectAll": "Tout désélectionner",
     "details": "Détails",
     "tags": "Balises",
     "process": "Procédé",
@@ -109,7 +111,9 @@
     "chunkLoadError": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer.",
     "chunkLoadErrorMsg": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer.",
     "id": "IDENTIFIANT",
-    "getStarted": "Commencez"
+    "getStarted": "Commencez",
+    "reset": "Réinitialiser",
+    "retry": "Réessayez"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -303,7 +307,8 @@
     "hide": "Masquer",
     "show": "Afficher",
     "editor": "Rédacteur",
-    "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur."
+    "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
+    "showHideColumns": "Afficher/masquer les colonnes"
   },
   "menu": {
     "home": "Accueil",
@@ -695,7 +700,9 @@
     "license_already_active_title": "Licence déjà active",
     "license_already_active_msg": "Votre licence est toujours active. Voulez-vous le mettre à jour avec la nouvelle clé de licence ?",
     "yes_update_license": "Oui, mettre à jour la licence",
-    "no_keep_current": "Non, restez au courant"
+    "no_keep_current": "Non, restez au courant",
+    "feature_correlation_management": "Gestion des corrélations",
+    "feature_log_patterns": "Modèles de journaux"
   },
   "login": {
     "userid": "ID utilisateur",
@@ -1941,6 +1948,8 @@
     "searchMetric": "Rechercher une métrique",
     "searchLabel": "Étiquette de mesure de recherche",
     "add": "Ajouter",
+    "selectAll": "Tout sélectionner",
+    "deselectAll": "Tout désélectionner",
     "cancel": "Annuler",
     "promqlLabel": "ProMQL",
     "runQuery": "Exécuter une requête",
@@ -2676,7 +2685,55 @@
     "stable": "Stable",
     "stableTooltip": "Les dimensions stables ont une faible cardinalité et sont utilisées pour le calcul des clés de corrélation",
     "normalize": "Normaliser",
-    "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}"
+    "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}",
+    "logs": {
+      "title": "Journaux corrélés",
+      "filters": {
+        "title": "Modifier les filtres de corrélation",
+        "description": "Ajustez les filtres dimensionnels pour affiner votre requête de corrélation. Les dimensions correspondantes sont des identifiants stables, tandis que les dimensions supplémentaires peuvent changer lors du redémarrage du pod.",
+        "matchedDimensions": "Dimensions assorties (stables)",
+        "matchedDimensionsTooltip": "Ces dimensions sont des identifiants stables qui restent cohérents lors des redémarrages des pods et sont utilisées pour correspondre à la télémétrie associée.",
+        "additionalDimensions": "Dimensions supplémentaires (instables)",
+        "additionalDimensionsTooltip": "Ces dimensions peuvent changer lors du redémarrage du pod (par exemple, pod_name, container_id). Vous pouvez les régler sur « Toutes les valeurs » pour élargir la recherche.",
+        "stableDimension": "Dimension stable",
+        "unstableDimension": "Instable : modifications au redémarrage",
+        "setToAll": "Régler sur toutes les valeurs",
+        "showingAll": "Afficher toutes les valeurs",
+        "wildcardHelp": "Utilisez « Toutes les valeurs » pour ignorer cette dimension lors du filtrage",
+        "noAdditionalDimensions": "Aucune autre dimension disponible"
+      },
+      "loading": "Chargement de journaux corrélés...",
+      "loadingDetails": "Récupération de journaux à partir de flux corrélés...",
+      "error": "Impossible de charger les journaux",
+      "noData": "Aucun journal corrélé n'a été trouvé",
+      "noDataDetails": "Aucun journal correspondant aux filtres de corrélation n'a été trouvé.",
+      "resetFilters": "Réinitialiser les filtres",
+      "editFilters": "Modifier les filtres",
+      "editTimeRange": "Modifier la plage horaire",
+      "selectValue": "Sélectionnez une valeur",
+      "stableDimension": "Dimension stable : constante lors des redémarrages des modules",
+      "unstableDimension": "Dimension instable : peut changer au redémarrage du pod",
+      "resultsCount": "{count} journaux trouvés dans {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Ajuster la plage horaire",
+        "sourceTime": "Durée du journal de la source",
+        "window": "Fenêtre horaire",
+        "minute1": "±1 minute",
+        "minute5": "±5 minutes (par défaut)",
+        "minute15": "±15 minutes",
+        "minute30": "±30 minutes",
+        "hour1": "±1 heure",
+        "custom": "Personnalisé",
+        "customStart": "Heure de début personnalisée",
+        "customEnd": "Heure de fin personnalisée",
+        "currentRange": "Plage horaire actuelle",
+        "start": "Démarrer",
+        "end": "Fin",
+        "duration": "Durée",
+        "startBeforeEnd": "L'heure de début doit être antérieure à l'heure de fin",
+        "endAfterStart": "L'heure de fin doit être postérieure à l'heure de début"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
@@ -2684,5 +2741,46 @@
     "clearChatTitle": "Effacer le chat",
     "clearChatMessage": "Êtes-vous sûr de vouloir effacer cette conversation ?",
     "copiedToClipboard": "Copié dans le presse-papiers"
+  },
+  "awsMarketplace": {
+    "title": "Inscription à AWS Marketplace",
+    "subtitle": "Terminez la configuration de votre abonnement OpenObserve",
+    "invalidLink": "Lien d'inscription non valide",
+    "invalidLinkDescription": "Ce lien d'inscription n'est pas valide ou a expiré. Veuillez vous inscrire à nouveau sur AWS Marketplace.",
+    "goToMarketplace": "Accédez à AWS Marketplace",
+    "newUser": "Vous êtes nouveau sur OpenObserve ?",
+    "newUserDescription": "Créer un nouveau compte et une nouvelle organisation",
+    "createAccount": "Créer un compte",
+    "existingUser": "Vous avez déjà un compte ?",
+    "existingUserDescription": "Connectez-vous pour créer une nouvelle organisation avec AWS Billing",
+    "login": "Se connecter",
+    "loggedInAs": "Connecté en tant que",
+    "createNewOrg": "Créer une nouvelle organisation",
+    "createNewOrgDescription": "Créez une nouvelle organisation grâce à la facturation AWS Marketplace",
+    "orgName": "Nom de l'organisation",
+    "createOrganization": "Créer une organisation",
+    "linkToExisting": "Lien vers l'organisation existante",
+    "linkToExistingDescription": "Associez la facturation AWS à l'une de vos organisations de niveau gratuit",
+    "selectOrganization": "Sélectionnez une organisation",
+    "linkAwsBilling": "Lien vers AWS Billing",
+    "settingUp": "Configuration de votre abonnement...",
+    "pleaseWait": "Veuillez patienter pendant que nous configurons votre compte.",
+    "waitingConfirmation": "En attente de confirmation par AWS",
+    "waitingDescription": "Votre abonnement est en cours d'activation. Cela prend généralement moins d'une minute.",
+    "customerId": "ID client",
+    "subscriptionActivated": "Abonnement activé !",
+    "activatedDescription": "Votre abonnement AWS Marketplace est désormais actif.",
+    "goToDashboard": "Accédez au tableau de bord",
+    "paymentFailed": "Echec du paiement",
+    "paymentFailedDescription": "Un problème est survenu lors de votre paiement sur AWS Marketplace. Vérifiez votre compte AWS ou contactez le support AWS.",
+    "contactSupport": "Contacter le service d'assistance",
+    "tryAgain": "Essayez à nouveau",
+    "activationTimeout": "Délai d'activation. Veuillez contacter le support si le problème persiste."
+  },
+  "validation": {
+    "required": "Ce champ est obligatoire",
+    "invalidFormat": "Format non valide",
+    "mustBeGreaterThan": "Doit être supérieur à {value}",
+    "mustBeLessThan": "Doit être inférieur à {value}"
   }
 }
