@@ -1415,7 +1415,15 @@
     "noColumnsOrdered": "Keine Spalten angeordnet",
     "columnsDefaultOrder": "Die Spalten werden in ihrer Standardreihenfolge angezeigt",
     "moveUp": "Steigen Sie auf",
-    "moveDown": "Gehe nach unten"
+    "moveDown": "Gehe nach unten",
+    "panelTimeSettings": "Zeiteinstellungen für das Panel",
+    "allowPanelTime": "Zeit auf Panelebene zulassen",
+    "useGlobalTime": "Globale Zeit verwenden",
+    "useIndividualTime": "Nutze individuelle Zeit",
+    "panelTimeGlobalHint": "Das Panel verfolgt die globale Dashboard-Zeit. Durch Änderungen der globalen Uhrzeit wird dieses Panel aktualisiert.",
+    "panelTimeIndividualHint": "Das Panel verwendet seinen eigenen Zeitbereich. Stellen Sie die Uhrzeit mit der Datumsauswahl unten ein. Globale Zeitänderungen wirken sich nicht auf dieses Panel aus.",
+    "panelTimeRange": "Zeitbereich des Panels",
+    "panelTimeRangeTooltip": "Dieser Zeitbereich gilt nur für dieses Panel. Andere Panels verwenden ihre eigenen konfigurierten Zeiten oder die globale Dashboard-Uhrzeit."
   },
   "panel": {
     "header": "Panel",

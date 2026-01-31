@@ -1415,7 +1415,15 @@
     "noColumnsOrdered": "Aucune colonne ordonnée",
     "columnsDefaultOrder": "Les colonnes seront affichées dans leur ordre par défaut",
     "moveUp": "Monter",
-    "moveDown": "Déplacer vers le bas"
+    "moveDown": "Déplacer vers le bas",
+    "panelTimeSettings": "Réglages de l'heure du panneau",
+    "allowPanelTime": "Laisser passer du temps au niveau du panneau",
+    "useGlobalTime": "Utiliser l'heure mondiale",
+    "useIndividualTime": "Utilisez le temps individuel",
+    "panelTimeGlobalHint": "Le panneau suivra l'heure globale du tableau de bord. Les modifications apportées à l'heure mondiale mettront à jour ce panneau.",
+    "panelTimeIndividualHint": "Le panneau utilisera sa propre plage de temps. Réglez l'heure à l'aide du sélecteur de date ci-dessous. Les changements d'heure globaux n'affecteront pas ce panneau.",
+    "panelTimeRange": "Plage horaire du panneau",
+    "panelTimeRangeTooltip": "Cette plage de temps s'applique uniquement à ce panneau. Les autres panneaux utiliseront leurs propres heures configurées ou l'heure globale du tableau de bord."
   },
   "panel": {
     "header": "Panneau",

@@ -1415,7 +1415,15 @@
     "noColumnsOrdered": "정렬된 컬럼 없음",
     "columnsDefaultOrder": "열은 기본 순서로 표시됩니다.",
     "moveUp": "위로 이동",
-    "moveDown": "아래로 이동"
+    "moveDown": "아래로 이동",
+    "panelTimeSettings": "패널 시간 설정",
+    "allowPanelTime": "패널 레벨 시간 허용",
+    "useGlobalTime": "글로벌 타임 사용",
+    "useIndividualTime": "개별 시간 사용",
+    "panelTimeGlobalHint": "패널은 글로벌 대시보드 시간을 추적합니다.글로벌 시간을 변경하면 이 패널이 업데이트됩니다.",
+    "panelTimeIndividualHint": "패널은 자체 시간 범위를 사용합니다.아래 날짜 선택기를 사용하여 시간을 설정합니다.글로벌 시간 변경은 이 패널에 영향을 주지 않습니다.",
+    "panelTimeRange": "패널 시간 범위",
+    "panelTimeRangeTooltip": "이 시간 범위는 이 패널에만 적용됩니다.다른 패널은 자체적으로 구성된 시간 또는 글로벌 대시보드 시간을 사용합니다."
   },
   "panel": {
     "header": "패널",

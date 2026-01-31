@@ -1415,7 +1415,15 @@
     "noColumnsOrdered": "No hay columnas ordenadas",
     "columnsDefaultOrder": "Las columnas se mostrarán en su orden predeterminado",
     "moveUp": "Muévete hacia arriba",
-    "moveDown": "Muévete hacia abajo"
+    "moveDown": "Muévete hacia abajo",
+    "panelTimeSettings": "Configuración de tiempo del panel",
+    "allowPanelTime": "Permitir tiempo a nivel de panel",
+    "useGlobalTime": "Usa la hora global",
+    "useIndividualTime": "Usa el tiempo individual",
+    "panelTimeGlobalHint": "El panel realizará un seguimiento del tiempo global del panel de control. Los cambios en la hora global actualizarán este panel.",
+    "panelTimeIndividualHint": "El panel utilizará su propio intervalo de tiempo. Configure la hora con el selector de fechas que aparece a continuación. Los cambios de hora globales no afectarán a este panel.",
+    "panelTimeRange": "Rango de tiempo del panel",
+    "panelTimeRangeTooltip": "Este intervalo de tiempo solo se aplica a este panel. Otros paneles utilizarán sus propias horas configuradas o la hora global del panel de control."
   },
   "panel": {
     "header": "Panel",

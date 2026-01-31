@@ -1415,7 +1415,15 @@
     "noColumnsOrdered": "未订购任何列",
     "columnsDefaultOrder": "列将按其默认顺序显示",
     "moveUp": "向上移动",
-    "moveDown": "向下移动"
+    "moveDown": "向下移动",
+    "panelTimeSettings": "小组讨论时间设置",
+    "allowPanelTime": "允许面板关卡时间",
+    "useGlobalTime": "使用全球时间",
+    "useIndividualTime": "使用个人时间",
+    "panelTimeGlobalHint": "面板将跟踪全球仪表板时间。对全球时间的更改将更新此面板。",
+    "panelTimeIndividualHint": "小组将使用自己的时间范围。使用下面的日期选择器设置时间。全球时间更改不会影响此面板。",
+    "panelTimeRange": "小组讨论时间范围",
+    "panelTimeRangeTooltip": "此时间范围仅适用于此面板。其他面板将使用自己配置的时间或全球仪表板时间。"
   },
   "panel": {
     "header": "面板",
