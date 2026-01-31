@@ -924,8 +924,6 @@ export default defineComponent({
     // ======= [END] dashboard PrintMode =======
 
     onMounted(async () => {
-      console.log('[BUILD-DEBUG] PanelSchemaRenderer mounted');
-      console.log('[BUILD-DEBUG] panelSchema:', props.panelSchema);
       // fetch all panels
       await fetchAllPanels();
       panelsList.value = panelsList.value;

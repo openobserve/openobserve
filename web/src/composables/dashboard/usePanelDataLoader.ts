@@ -80,10 +80,10 @@ export const usePanelDataLoader = (
   shouldRefreshWithoutCache?: any,
 ) => {
   const log = (...args: any[]) => {
-    // Enable for debugging build mode (set to true temporarily when debugging)
+    // Enable for debugging (set to true temporarily when debugging)
     const DEBUG_LOGS = false;
     if (DEBUG_LOGS) {
-      console.log('[BUILD-DEBUG] ' + panelSchema?.value?.title + ": ", ...args);
+      console.log(panelSchema?.value?.title + ": ", ...args);
     }
   };
   let runCount = 0;

@@ -288,9 +288,6 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const runQuery = (withoutCache = false): void => {
     try {
-      console.log('[BUILD-DEBUG] usePanelEditor.runQuery called');
-      console.log('[BUILD-DEBUG] dashboardPanelData.data:', JSON.stringify(dashboardPanelData.data, null, 2));
-
       // Set cache flag
       shouldRefreshWithoutCache.value = withoutCache;
 
@@ -301,7 +298,6 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
       // Copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-      console.log('[BUILD-DEBUG] chartData.value after assignment:', chartData.value);
 
       // Refresh the date time picker if available
       if (dateTimePickerRef?.value) {
