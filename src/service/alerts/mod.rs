@@ -814,14 +814,15 @@ impl ConditionGroupExt for config::meta::alerts::ConditionGroup {
 impl ConditionGroupExt for config::meta::alerts::ConditionItem {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool {
         match self {
-            config::meta::alerts::ConditionItem::Condition {
-                column,
-                operator,
-                value,
-                ignore_case,
-                ..
-            } => {
-                evaluate_condition(row, column, operator, value, ignore_case.unwrap_or(false)).await
+            config::meta::alerts::ConditionItem::Condition(v) => {
+                evaluate_condition(
+                    row,
+                    &v.column,
+                    &v.operator,
+                    &v.value,
+                    v.ignore_case.unwrap_or(false),
+                )
+                .await
             }
             config::meta::alerts::ConditionItem::Group { conditions, .. } => {
                 evaluate_condition_items(conditions, row).await
@@ -988,19 +989,13 @@ async fn condition_item_to_sql(
     schema: &Schema,
 ) -> Result<String, anyhow::Error> {
     match item {
-        config::meta::alerts::ConditionItem::Condition {
-            column,
-            operator,
-            value,
-            ignore_case,
-            ..
-        } => {
+        config::meta::alerts::ConditionItem::Condition(v) => {
             // Create a Condition struct to use with build_expr
             let condition = config::meta::alerts::Condition {
-                column: column.clone(),
-                operator: *operator,
-                value: value.clone(),
-                ignore_case: ignore_case.unwrap_or(false),
+                column: v.column.clone(),
+                operator: v.operator,
+                value: v.value.clone(),
+                ignore_case: v.ignore_case.unwrap_or(false),
             };
 
             let data_type = match schema.field_with_name(&condition.column) {
@@ -1260,7 +1255,9 @@ fn build_expr(
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::{
-        meta::alerts::{ConditionGroup, ConditionItem, LogicalOperator, Operator},
+        meta::alerts::{
+            ConditionGroup, ConditionItem, ConditionItemCondition, LogicalOperator, Operator,
+        },
         utils::json::Value,
     };
 
@@ -1280,20 +1277,20 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
-                },
-                ConditionItem::Condition {
+                }),
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "service".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("api".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // AND before this item
-                },
+                }),
             ],
         };
 
@@ -1315,20 +1312,20 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
-                },
-                ConditionItem::Condition {
+                }),
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "status".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::Or, // OR before this item
-                },
+                }),
             ],
         };
 
@@ -1352,31 +1349,31 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
-                },
+                }),
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::And, // AND before this group
                     conditions: vec![
-                        ConditionItem::Condition {
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "service".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("api".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::And, /* Not used (first item in
                                                                      * group) */
-                        },
-                        ConditionItem::Condition {
+                        }),
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "service".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("web".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::Or, // OR before this item
-                        },
+                        }),
                     ],
                 },
             ],
@@ -1404,20 +1401,20 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "count".to_string(),
                     operator: Operator::GreaterThan,
                     value: Value::Number(serde_json::Number::from(100)),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
-                },
-                ConditionItem::Condition {
+                }),
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "temperature".to_string(),
                     operator: Operator::GreaterThanEquals,
                     value: Value::Number(serde_json::Number::from_f64(50.5).unwrap()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // AND before this item
-                },
+                }),
             ],
         };
 
@@ -1435,13 +1432,13 @@ mod tests {
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![ConditionItem::Condition {
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
                 column: "message".to_string(),
                 operator: Operator::Contains,
                 value: Value::String("error".to_string()),
                 ignore_case: None,
                 logical_operator: LogicalOperator::And,
-            }],
+            })],
         };
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
@@ -1473,13 +1470,13 @@ mod tests {
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![ConditionItem::Condition {
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
                 column: "level".to_string(),
                 operator: Operator::EqualTo,
                 value: Value::String("error".to_string()),
                 ignore_case: None,
                 logical_operator: LogicalOperator::And,
-            }],
+            })],
         };
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
@@ -1503,27 +1500,27 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // Not used (first item)
-                },
-                ConditionItem::Condition {
+                }),
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "status".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("active".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // AND before this item
-                },
-                ConditionItem::Condition {
+                }),
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "service".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("api".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::Or, // OR before this item
-                },
+                }),
             ],
         };
 
@@ -1547,13 +1544,13 @@ mod tests {
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![ConditionItem::Condition {
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
                 column: "nonexistent".to_string(),
                 operator: Operator::EqualTo,
                 value: Value::String("error".to_string()),
                 ignore_case: None,
                 logical_operator: LogicalOperator::And,
-            }],
+            })],
         };
 
         let result = condition_group.to_sql(&schema).await;
@@ -1579,30 +1576,30 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "kubernetes_docker_id".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // Ignored because next is Group
-                },
+                }),
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::Or, // OR before this group
                     conditions: vec![
-                        ConditionItem::Condition {
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "kubernetes_container_image".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("test".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::And,
-                        },
-                        ConditionItem::Condition {
+                        }),
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "kubernetes_host".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("test2".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::And,
-                        },
+                        }),
                     ],
                 },
             ],
@@ -1681,30 +1678,30 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "kubernetes_docker_id".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::Or, // OR with next item
-                },
+                }),
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::And, // AND inside the group
                     conditions: vec![
-                        ConditionItem::Condition {
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "kubernetes_container_image".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("test".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::And, // AND with next in group
-                        },
-                        ConditionItem::Condition {
+                        }),
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "kubernetes_host".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("test2".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::And,
-                        },
+                        }),
                     ],
                 },
             ],
@@ -1751,30 +1748,30 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "kubernetes_docker_id".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
+                }),
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::Or,
-                    conditions: vec![ConditionItem::Condition {
+                    conditions: vec![ConditionItem::Condition(ConditionItemCondition {
                         column: "kubernetes_container_image".to_string(),
                         operator: Operator::EqualTo,
                         value: Value::String("test".to_string()),
                         ignore_case: None,
                         logical_operator: LogicalOperator::And,
-                    }],
+                    })],
                 },
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "kubernetes_host".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("test2".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
+                }),
             ],
         };
 
@@ -1798,30 +1795,30 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "kubernetes_docker_id".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("test".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
+                }),
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::Or,
-                    conditions: vec![ConditionItem::Condition {
+                    conditions: vec![ConditionItem::Condition(ConditionItemCondition {
                         column: "kubernetes_container_image".to_string(),
                         operator: Operator::EqualTo,
                         value: Value::String("test".to_string()),
                         ignore_case: None,
                         logical_operator: LogicalOperator::And,
-                    }],
+                    })],
                 },
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "kubernetes_host".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("test2".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
+                }),
             ],
         };
 
@@ -1890,58 +1887,58 @@ mod tests {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "A".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("match".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // Not used (first)
-                },
+                }),
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::Or, // OR before this group
                     conditions: vec![
-                        ConditionItem::Condition {
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "B".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("match".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::And, // Not used (first in group)
-                        },
-                        ConditionItem::Condition {
+                        }),
+                        ConditionItem::Condition(ConditionItemCondition {
                             column: "C".to_string(),
                             operator: Operator::EqualTo,
                             value: Value::String("match".to_string()),
                             ignore_case: None,
                             logical_operator: LogicalOperator::And, // AND before this
-                        },
+                        }),
                         ConditionItem::Group {
                             logical_operator: LogicalOperator::Or, // OR before this nested group
                             conditions: vec![
-                                ConditionItem::Condition {
+                                ConditionItem::Condition(ConditionItemCondition {
                                     column: "D".to_string(),
                                     operator: Operator::EqualTo,
                                     value: Value::String("match".to_string()),
                                     ignore_case: None,
                                     logical_operator: LogicalOperator::And,
-                                },
-                                ConditionItem::Condition {
+                                }),
+                                ConditionItem::Condition(ConditionItemCondition {
                                     column: "E".to_string(),
                                     operator: Operator::EqualTo,
                                     value: Value::String("match".to_string()),
                                     ignore_case: None,
                                     logical_operator: LogicalOperator::And, // AND before this
-                                },
+                                }),
                             ],
                         },
                     ],
                 },
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "F".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("match".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And, // AND before this
-                },
+                }),
             ],
         };
 

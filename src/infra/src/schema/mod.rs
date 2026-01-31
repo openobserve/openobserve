@@ -23,6 +23,7 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
+    stats::MemorySize,
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
@@ -801,6 +802,15 @@ impl SchemaCache {
         }
         size += std::mem::size_of::<String>() + self.hash_key.len();
         size
+    }
+}
+
+impl MemorySize for SchemaCache {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<SchemaCache>()
+            + self.schema.size()
+            + self.fields_map.mem_size()
+            + self.hash_key.mem_size()
     }
 }
 

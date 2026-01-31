@@ -16,7 +16,6 @@
 #![feature(macro_metavar_expr_concat)]
 
 pub mod axum;
-pub mod cache_stats;
 pub mod cluster;
 pub mod config;
 pub mod config_path_manager;
@@ -26,9 +25,9 @@ pub mod meta;
 pub mod metrics;
 pub mod prebuilt_loader;
 pub mod router;
+pub mod stats;
 pub mod utils;
 
-pub use cache_stats::{CacheStats, CacheStatsAsync};
 pub use config::*;
 
 pub async fn init() -> Result<(), anyhow::Error> {

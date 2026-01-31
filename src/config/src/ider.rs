@@ -24,6 +24,8 @@ use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
 use uuid::Uuid;
 
+use crate::stats::MemorySize;
+
 static IDER: LazyLock<Mutex<SnowflakeIdGenerator>> = LazyLock::new(|| {
     let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
     log::info!("init ider with machine_id: {machine_id}");
@@ -165,6 +167,12 @@ pub struct SnowflakeIdGenerator {
 
     /// auto-increment record.
     idx: u16,
+}
+
+impl MemorySize for SnowflakeIdGenerator {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<SnowflakeIdGenerator>()
+    }
 }
 
 /// The `SnowflakeIdBucket` type is snowflake-id-bucket it easy to get id also have a id buffer.

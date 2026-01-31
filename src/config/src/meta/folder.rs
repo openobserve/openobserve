@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,23 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::stats::MemorySize;
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(default)]
 pub struct Folder {
     pub folder_id: String,
     pub name: String,
     pub description: String,
+}
+
+impl MemorySize for Folder {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Folder>()
+            + self.folder_id.mem_size()
+            + self.name.mem_size()
+            + self.description.mem_size()
+    }
 }
 
 /// Indicates the type of data that the folder can contain.

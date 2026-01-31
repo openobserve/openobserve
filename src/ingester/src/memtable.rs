@@ -22,7 +22,7 @@ use std::{
 };
 
 use arrow_schema::Schema;
-use config::{metrics, utils::time::now_micros};
+use config::{metrics, stats::MemorySize, utils::time::now_micros};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 
@@ -125,5 +125,11 @@ impl MemTable {
             self.json_bytes_written.load(Ordering::SeqCst) as usize,
             self.arrow_bytes_written.load(Ordering::SeqCst) as usize,
         )
+    }
+}
+
+impl MemorySize for MemTable {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<MemTable>() + self.streams.mem_size()
     }
 }

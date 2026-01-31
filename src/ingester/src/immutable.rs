@@ -18,7 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use config::{CacheStatsAsync, RwAHashSet, metrics};
+use config::{
+    RwAHashSet, metrics,
+    stats::{CacheStatsAsync, MemorySize},
+};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::{fs, sync::mpsc};
@@ -41,6 +44,12 @@ pub(crate) struct Immutable {
     idx: usize,
     key: WriterKey,
     memtable: MemTable,
+}
+
+impl MemorySize for Immutable {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Immutable>() + self.key.mem_size() + self.memtable.mem_size()
+    }
 }
 
 pub async fn read_from_immutable(

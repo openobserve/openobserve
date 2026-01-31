@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    CacheStats, RwHashMap,
+    RwHashMap,
     meta::stream::{FileMeta, StreamStats, StreamType},
+    stats::CacheStats,
 };
 use once_cell::sync::Lazy;
 

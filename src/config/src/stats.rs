@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{any::Any, collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use dashmap::{DashMap, DashSet};
 use hashbrown::{HashMap, HashSet};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
+
+use crate::utils::schema_ext::SchemaExt;
+
+const ARC_SIZE: usize = std::mem::size_of::<Arc<dyn Any>>();
 
 /// Trait for getting cache statistics (async version)
 /// Returns (len, capacity, memory_size_estimate)
@@ -33,6 +37,167 @@ pub trait CacheStats {
     fn stats(&self) -> (usize, usize, usize);
 }
 
+pub trait MemorySize {
+    fn mem_size(&self) -> usize;
+}
+
+// ============================================================================
+// Memory size implementations
+// ============================================================================
+
+macro_rules! impl_memory_size_primitive {
+    ($($t:ty),+) => {
+        $(impl MemorySize for $t {
+            fn mem_size(&self) -> usize {
+                std::mem::size_of::<$t>()
+            }
+        })+
+    };
+}
+impl_memory_size_primitive!(usize, u64, i64, i32, u8, bool, f64);
+
+macro_rules! impl_memory_size_variable {
+    ($($t:ty),+) => {
+        $(impl MemorySize for $t {
+            fn mem_size(&self) -> usize {
+                std::mem::size_of::<$t>() + self.len()
+            }
+        })+
+    };
+}
+impl_memory_size_variable!(String, &str, bytes::Bytes);
+
+impl MemorySize for str {
+    fn mem_size(&self) -> usize {
+        self.len()
+    }
+}
+
+impl MemorySize for PathBuf {
+    fn mem_size(&self) -> usize {
+        self.to_str().mem_size()
+    }
+}
+
+impl MemorySize for svix_ksuid::Ksuid {
+    fn mem_size(&self) -> usize {
+        self.to_string().mem_size()
+    }
+}
+
+impl MemorySize for arrow_schema::Schema {
+    fn mem_size(&self) -> usize {
+        self.size()
+    }
+}
+
+impl<T: MemorySize + ?Sized> MemorySize for Arc<T> {
+    fn mem_size(&self) -> usize {
+        ARC_SIZE + self.as_ref().mem_size()
+    }
+}
+
+impl<T: MemorySize + Sized> MemorySize for Option<T> {
+    fn mem_size(&self) -> usize {
+        self.as_ref().map(|v| v.mem_size()).unwrap_or(0)
+    }
+}
+
+impl<V> MemorySize for Vec<V>
+where
+    V: MemorySize + Sized,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Vec<V>>() + self.iter().map(|v| v.mem_size()).sum::<usize>()
+    }
+}
+
+impl<K, V> MemorySize for (K, V)
+where
+    K: MemorySize + Sized,
+    V: MemorySize + Sized,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<(K, V)>() + self.0.mem_size() + self.1.mem_size()
+    }
+}
+
+impl<K, V> MemorySize for HashMap<K, V>
+where
+    K: MemorySize + Sized,
+    V: MemorySize + Sized,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<HashMap<K, V>>()
+            + self
+                .iter()
+                .map(|(k, v)| k.mem_size() + v.mem_size())
+                .sum::<usize>()
+    }
+}
+
+impl<K> MemorySize for HashSet<K>
+where
+    K: MemorySize + Sized,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<HashSet<K>>() + self.iter().map(|k| k.mem_size()).sum::<usize>()
+    }
+}
+
+impl<K, V> MemorySize for std::collections::HashMap<K, V>
+where
+    K: MemorySize + Sized,
+    V: MemorySize + Sized,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<std::collections::HashMap<K, V>>()
+            + self
+                .iter()
+                .map(|(k, v)| k.mem_size() + v.mem_size())
+                .sum::<usize>()
+    }
+}
+
+impl<K> MemorySize for std::collections::HashSet<K>
+where
+    K: MemorySize + Sized,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<std::collections::HashSet<K>>()
+            + self.iter().map(|k| k.mem_size()).sum::<usize>()
+    }
+}
+
+impl<K, V> MemorySize for std::collections::BTreeMap<K, V>
+where
+    K: MemorySize + Sized,
+    V: MemorySize + Sized,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<std::collections::BTreeMap<K, V>>()
+            + self
+                .iter()
+                .map(|(k, v)| k.mem_size() + v.mem_size())
+                .sum::<usize>()
+    }
+}
+
+impl<K, V, S> MemorySize for dashmap::DashMap<K, V, S>
+where
+    K: MemorySize + Sized + std::hash::Hash + Eq,
+    V: MemorySize + Sized,
+    S: std::hash::BuildHasher + Clone,
+{
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<dashmap::DashMap<K, V, S>>()
+            + self
+                .iter()
+                .map(|entry| entry.key().mem_size() + entry.value().mem_size())
+                .sum::<usize>()
+    }
+}
+
 // ============================================================================
 // DashMap implementations (RwHashMap)
 // ============================================================================
@@ -40,7 +205,7 @@ pub trait CacheStats {
 /// Implementation for DashMap with String keys
 impl<V, S> CacheStats for DashMap<String, V, S>
 where
-    V: Sized,
+    V: Sized + MemorySize,
     S: std::hash::BuildHasher + Clone,
 {
     fn stats(&self) -> (usize, usize, usize) {
@@ -48,10 +213,7 @@ where
         let cap = 0; // DashMap doesn't expose capacity
         let mem_size: usize = self
             .iter()
-            .map(|entry| {
-                // Account for String heap data + String struct overhead + value size
-                entry.key().len() + std::mem::size_of::<String>() + std::mem::size_of::<V>()
-            })
+            .map(|entry| entry.key().mem_size() + entry.value().mem_size())
             .sum();
         (len, cap, mem_size)
     }
@@ -60,7 +222,7 @@ where
 /// Implementation for DashMap with &str keys (fallback for any AsRef<str>)
 impl<V, S> CacheStats for DashMap<&str, V, S>
 where
-    V: Sized,
+    V: Sized + MemorySize,
     S: std::hash::BuildHasher + Clone,
 {
     fn stats(&self) -> (usize, usize, usize) {
@@ -68,7 +230,7 @@ where
         let cap = 0;
         let mem_size: usize = self
             .iter()
-            .map(|entry| entry.key().len() + std::mem::size_of::<V>())
+            .map(|entry| entry.key().mem_size() + entry.value().mem_size())
             .sum();
         (len, cap, mem_size)
     }
@@ -86,7 +248,7 @@ where
     fn stats(&self) -> (usize, usize, usize) {
         let len = self.len();
         let cap = 0; // DashSet doesn't expose capacity
-        let mem_size: usize = self.iter().map(|entry| entry.key().len()).sum();
+        let mem_size: usize = self.iter().map(|entry| entry.key().mem_size()).sum();
         (len, cap, mem_size)
     }
 }
@@ -103,8 +265,8 @@ where
 /// heap allocations. This is a known limitation of generic memory estimation.
 impl<K, V, S> CacheStatsAsync for RwLock<HashMap<K, V, S>>
 where
-    K: Sized + Send + Sync + std::hash::Hash + Eq,
-    V: Sized + Send + Sync,
+    K: Sized + Send + Sync + std::hash::Hash + Eq + MemorySize,
+    V: Sized + Send + Sync + MemorySize,
     S: std::hash::BuildHasher + Send + Sync,
 {
     async fn stats(&self) -> (usize, usize, usize) {
@@ -112,10 +274,7 @@ where
         let len = map.len();
         let cap = map.capacity();
         // Note: This only accounts for stack size, not heap allocations
-        let mem_size: usize = map
-            .iter()
-            .map(|(_k, _v)| std::mem::size_of::<K>() + std::mem::size_of::<V>())
-            .sum();
+        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
         (len, cap, mem_size)
     }
 }
@@ -130,17 +289,30 @@ impl CacheStatsAsync for RwLock<HashSet<String>> {
         let set = self.read().await;
         let len = set.len();
         let cap = set.capacity();
-        let mem_size: usize = set.iter().map(|k| k.len()).sum();
+        let mem_size: usize = set.iter().map(|k| k.mem_size()).sum();
         (len, cap, mem_size)
     }
 }
 
+/// Implementation for RwLock<HashSet<PathBuf>>
 impl CacheStatsAsync for RwLock<HashSet<PathBuf>> {
     async fn stats(&self) -> (usize, usize, usize) {
         let set = self.read().await;
         let len = set.len();
         let cap = set.capacity();
-        let mem_size: usize = set.iter().map(|k| k.to_string_lossy().len()).sum();
+        let mem_size: usize = set.iter().map(|k| k.mem_size()).sum();
+        (len, cap, mem_size)
+    }
+}
+
+/// Implementation for HashSet<String>
+impl CacheStats for HashSet<String> {
+    fn stats(&self) -> (usize, usize, usize) {
+        let len = self.len();
+        let cap = self.capacity();
+        let mem_size = std::mem::size_of::<HashSet<String>>()
+            + self.iter().map(|k| k.mem_size()).sum::<usize>();
+
         (len, cap, mem_size)
     }
 }
@@ -155,7 +327,7 @@ impl CacheStatsAsync for RwLock<Vec<String>> {
         let vec = self.read().await;
         let len = vec.len();
         let cap = vec.capacity();
-        let mem_size: usize = vec.iter().map(|s| s.len()).sum();
+        let mem_size: usize = vec.iter().map(|s| s.mem_size()).sum();
         (len, cap, mem_size)
     }
 }
@@ -167,17 +339,14 @@ impl CacheStatsAsync for RwLock<Vec<String>> {
 /// Implementation for RwLock<BTreeMap<K, V>> where K can be displayed as string
 impl<K, V> CacheStatsAsync for RwLock<BTreeMap<K, V>>
 where
-    K: Ord + ToString + Send + Sync,
-    V: Sized + Send + Sync,
+    K: Ord + Send + Sync + MemorySize,
+    V: Sized + Send + Sync + MemorySize,
 {
     async fn stats(&self) -> (usize, usize, usize) {
         let map = self.read().await;
         let len = map.len();
         let cap = 0; // BTreeMap doesn't have capacity
-        let mem_size: usize = map
-            .keys()
-            .map(|k| k.to_string().len() + std::mem::size_of::<V>())
-            .sum();
+        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
         (len, cap, mem_size)
     }
 }
@@ -189,17 +358,14 @@ where
 /// Implementation for RwLock<IndexMap<String, V>>
 impl<V, S> CacheStatsAsync for RwLock<IndexMap<String, V, S>>
 where
-    V: Sized + Send + Sync,
+    V: Sized + Send + Sync + MemorySize,
     S: std::hash::BuildHasher + Send + Sync,
 {
     async fn stats(&self) -> (usize, usize, usize) {
         let map = self.read().await;
         let len = map.len();
         let cap = map.capacity();
-        let mem_size: usize = map
-            .iter()
-            .map(|(k, _v)| k.len() + std::mem::size_of::<V>())
-            .sum();
+        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
         (len, cap, mem_size)
     }
 }
@@ -211,7 +377,7 @@ where
 /// Implementation for Arc<RwLock<HashMap<String, V>>>
 impl<V> CacheStatsAsync for Arc<RwLock<HashMap<String, V>>>
 where
-    V: Sized + Send + Sync,
+    V: Sized + Send + Sync + MemorySize,
 {
     async fn stats(&self) -> (usize, usize, usize) {
         self.as_ref().stats().await
@@ -247,20 +413,16 @@ where
 // ============================================================================
 
 // Implementation for RwLock<IndexMap> with PathBuf keys (for IMMUTABLES)
-use std::path::PathBuf;
 impl<V, S> CacheStatsAsync for RwLock<IndexMap<PathBuf, V, S>>
 where
-    V: Sized + Send + Sync,
+    V: Sized + Send + Sync + MemorySize,
     S: std::hash::BuildHasher + Send + Sync + Default,
 {
     async fn stats(&self) -> (usize, usize, usize) {
         let map = self.read().await;
         let len = map.len();
         let cap = map.capacity();
-        let mem_size: usize = map
-            .iter()
-            .map(|(k, _v)| k.as_os_str().len() + std::mem::size_of::<V>())
-            .sum();
+        let mem_size: usize = map.iter().map(|(k, v)| k.mem_size() + v.mem_size()).sum();
         (len, cap, mem_size)
     }
 }

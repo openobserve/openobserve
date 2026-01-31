@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use arrow_schema::Schema;
 use axum::{
     body::Body,
     extract::Query,
@@ -27,8 +26,8 @@ use axum_extra::extract::{
     cookie::{Cookie, SameSite},
 };
 use config::{
-    CacheStats, CacheStatsAsync, Config, META_ORG_ID, QUICK_MODEL_FIELDS,
-    SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{
@@ -36,7 +35,8 @@ use config::{
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
     },
-    utils::{base64, json, schema_ext::SchemaExt},
+    stats::{CacheStats, CacheStatsAsync},
+    utils::{base64, json},
 };
 use hashbrown::HashMap;
 use infra::{
@@ -473,8 +473,11 @@ pub async fn cache_status() -> impl IntoResponse {
     stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
 
-    let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
-    stats.insert("STREAMS", json::json!({"stream_num": stream_num,"schema_num": stream_schema_num, "mem_size": mem_size}));
+    let (stream_num, stream_schema_num) = get_stream_schema_status().await;
+    stats.insert(
+        "STREAMS",
+        json::json!({"stream_num": stream_num,"schema_num": stream_schema_num}),
+    );
 
     // Use trait-based approach for cache statistics
     // From src/infra/src/cache/stats.rs
@@ -885,29 +888,16 @@ pub async fn config_runtime() -> impl IntoResponse {
     )
 }
 
-async fn get_stream_schema_status() -> (usize, usize, usize) {
+async fn get_stream_schema_status() -> (usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
-    let mut mem_size = std::mem::size_of::<HashMap<String, Vec<Schema>>>();
     let r = STREAM_SCHEMAS.read().await;
-    for (key, val) in r.iter() {
+    for (_key, val) in r.iter() {
         stream_num += 1;
-        mem_size += std::mem::size_of::<Vec<Schema>>();
-        mem_size += std::mem::size_of::<String>() + key.len();
-        for schema in val.iter() {
-            stream_schema_num += 1;
-            mem_size += std::mem::size_of::<i64>();
-            mem_size += schema.1.size();
-        }
+        stream_schema_num += val.len();
     }
     drop(r);
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    for (key, schema) in r.iter() {
-        mem_size += std::mem::size_of::<String>() + key.len();
-        mem_size += schema.size();
-    }
-    drop(r);
-    (stream_num, stream_schema_num, mem_size)
+    (stream_num, stream_schema_num)
 }
 
 #[cfg(feature = "enterprise")]
@@ -1606,6 +1596,7 @@ pub async fn cache_reload(
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::Schema;
     use serde_json;
 
     use super::*;
@@ -1774,10 +1765,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_stream_schema_status_empty() {
-        let (_stream_num, _stream_schema_num, mem_size) = get_stream_schema_status().await;
-
-        // Should return some values, even if caches are empty
-        assert!(mem_size > 0); // At least the size of empty HashMap
+        let mut w = STREAM_SCHEMAS.write().await;
+        w.insert("test".to_string(), vec![(1, Schema::empty())]);
+        drop(w);
+        let (stream_num, stream_schema_num) = get_stream_schema_status().await;
+        assert!(stream_num > 0);
+        assert!(stream_schema_num > 0);
     }
 
     #[test]
@@ -1993,14 +1986,6 @@ mod tests {
         // Should not panic and should produce valid cookie
         assert_eq!(cookie.name(), "valid_cookie");
         assert!(!cookie.value().is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_get_stream_schema_status_returns_valid_data() {
-        let (_stream_num, _stream_schema_num, mem_size) = get_stream_schema_status().await;
-
-        // All values should be non-negative integers
-        assert!(mem_size > 0); // Memory size should always be positive
     }
 
     #[test]
