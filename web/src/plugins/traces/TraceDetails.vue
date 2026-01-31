@@ -1697,7 +1697,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-$sidebarWidth: 60%;
+$sidebarWidth: 84%;
 $separatorWidth: 2px;
 $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
@@ -1728,23 +1728,24 @@ $traceChartCollapseHeight: 42px;
   box-sizing: border-box;
 }
 .histogram-container-full {
-  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .histogram-container {
-  width: calc(100% - $sidebarWidth - $separatorWidth);
-}
-
-.histogram-sidebar-inner {
-  width: $sidebarWidth;
-  flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
   flex: 1;
   min-height: 0;
 }
 
+.histogram-sidebar-inner {
+  flex: 0 0 $sidebarWidth;
+  max-width: $sidebarWidth;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
 .histogram-spans-container {
-  flex: 1;
   min-height: 0;
   position: relative;
   padding-bottom: 0.5rem;
@@ -1805,8 +1806,17 @@ html:has(.trace-details) {
   overflow: hidden !important;
 }
 
-.trace-content-scroll {
+.histogram-container .trace-content-scroll {
+  flex: 0 0 calc(16% - 2px) !important;
+  max-width: calc(16% - 2px) !important;
+}
+
+.histogram-container-full .trace-content-scroll {
   flex: 1 !important;
+  max-width: 100% !important;
+}
+
+.trace-content-scroll {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   min-height: 0 !important;
