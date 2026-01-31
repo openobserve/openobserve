@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-select
                 :model-value="scope.pagination.rowsPerPage"
                 @update:model-value="scope.setRowsPerPage"
-                :options="[10, 20, 50, 100, 250, 500, 1000, 0]"
+                :options="paginationOptions"
                 :option-label="(opt) => (opt === 0 ? 'All' : opt)"
                 borderless
                 dense
@@ -233,6 +233,25 @@ export default defineComponent({
       return filtered;
     });
 
+    // Dynamic pagination options
+    const paginationOptions = computed(() => {
+      const defaultOptions = [10, 20, 50, 100, 250, 500, 1000];
+      const configuredRows = Number(props.config?.rows_per_page);
+
+      const options = new Set(defaultOptions);
+      if (configuredRows && configuredRows > 0) {
+        options.add(configuredRows);
+      }
+
+      // Sort numerically
+      const sortedOptions = Array.from(options).sort((a, b) => a - b);
+
+      // Add 'All' option (0) at the end
+      sortedOptions.push(0);
+
+      return sortedOptions;
+    });
+
     const pagination = ref({
       rowsPerPage: 0, // 0 = show all rows (like SQL table)
     });
@@ -274,6 +293,7 @@ export default defineComponent({
       tableRows,
       filteredTableRows,
       pagination,
+      paginationOptions,
       selectedLegend,
       legendOptions,
       showLegendFooter,
