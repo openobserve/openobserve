@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 content-class="tab_content"
               />
               <q-route-tab
+                v-if="showInvoiceTab"
                 exact
                 name="invoice_history"
                 :to="
