@@ -338,6 +338,7 @@ mod tests {
 
     /// Test that ensure_prebuilt_template creates a new template when it doesn't exist
     #[tokio::test]
+    #[ignore] // Test requires full infrastructure (NATS/DB)
     async fn test_ensure_prebuilt_template_creates_new() {
         let org_id = "test_org_create";
         let prebuilt_type = "slack";
@@ -366,6 +367,7 @@ mod tests {
 
     /// Test that ensure_prebuilt_template reuses existing template
     #[tokio::test]
+    #[ignore] // Test requires full infrastructure (NATS/DB)
     async fn test_ensure_prebuilt_template_reuses_existing() {
         let org_id = "test_org_reuse";
         let prebuilt_type = "slack";
