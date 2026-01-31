@@ -10,6 +10,8 @@
 
 This document outlines the implementation for **panel-level time range/date-time picker** configuration in OpenObserve dashboards, similar to Splunk and Grafana. Based on team discussion, panels will have their own time pickers that can be set independently or synchronized with global dashboard time.
 
+**IMPORTANT:** This is a **NEW ADD-ON feature**. The existing global time logic with `defaultDatetimeDuration` already works perfectly - we are **NOT changing it**. We are only **adding** new functionality when a panel has `panel_time_range` configured. All existing panels without this config will continue to work exactly as before with zero changes.
+
 ### Key Requirements (Updated Based on Discussion)
 
 1. ✅ **Config UI with Toggle**
@@ -129,15 +131,50 @@ Based on team discussion, here are the finalized requirements:
 └─────────────────────────────────────┘
 ```
 
-**Behavior:**
-- **Toggle OFF**: Panel uses global dashboard time (default)
-- **Toggle ON + "Use global time"**: Panel explicitly tracks global time (stored as config)
-- **Toggle ON + "Use individual time"**: Panel uses custom time from its date time picker
+**Three States:**
 
-**Why "Use global time" option?**
-- Allows panel to explicitly track global time even if URL has panel-specific time
-- User can temporarily override panel time via URL, then reset to global
-- Clear distinction between "not configured" vs "configured to follow global"
+**State 1: Toggle OFF (Default)**
+- Panel uses global dashboard time
+- Backend: No panel time config saved (or `allow_panel_time: false`)
+- Runtime: Uses `defaultDatetimeDuration` from dashboard config
+
+**State 2: Toggle ON + "Use global time"**
+- Panel explicitly configured to use global time
+- Backend saves:
+  - `allow_panel_time: true`
+  - `panel_time_mode: "global"`
+  - `panel_time_range: undefined` (NOT saved or null)
+- Runtime: Uses `defaultDatetimeDuration` from dashboard config
+- Useful for: Tracking explicit user choice (vs default), URL override handling
+
+**State 3: Toggle ON + "Use individual time"**
+- Panel uses custom time range
+- Backend saves:
+  - `allow_panel_time: true`
+  - `panel_time_mode: "individual"`
+  - `panel_time_range: {...}` (actual PanelTimeRange with time values)
+- Runtime: Uses `panel_time_range`, **ignores global time changes**
+
+**CRITICAL - Runtime Logic (Simple Check):**
+```javascript
+// At runtime, DON'T mix global and panel time sources
+// Simple check based on panel_time_range existence:
+
+if (panel.config.panel_time_range !== undefined &&
+    panel.config.panel_time_range !== null) {
+  // Panel has its own time → use it
+  timeRange = panel.config.panel_time_range
+  // DON'T sync with global, DON'T look at defaultDatetimeDuration
+} else {
+  // Panel doesn't have its own time → use global
+  timeRange = dashboard.defaultDatetimeDuration
+}
+```
+
+**Two Data Sources (Don't Confuse Them):**
+- **Global:** `dashboard.defaultDatetimeDuration` - for panels without `panel_time_range`
+- **Panel:** `panel.config.panel_time_range` - only for individual panels
+- **Rule:** If `panel_time_range` exists → use it, otherwise → use global
 
 ### Requirement 2: Create New Date Time Picker for Panel-Level Time
 
@@ -269,22 +306,36 @@ Date time picker is shown for each panel that has panel-level time enabled.
 
 When user clicks the **global refresh button**:
 - **All panels refresh simultaneously**
-- **Each panel uses its own effective time:**
-  - Panels with individual time configured → use their panel-specific time
-  - Panels without individual time → use global dashboard time
+- **Each panel uses its effective time based on simple check:**
+  - If panel has `panel_time_range` → use that (panel's own time)
+  - If panel doesn't have `panel_time_range` → use `defaultDatetimeDuration` (global)
 - This allows mixed time ranges to coexist and all refresh together
 
 **Example:**
-```
-Dashboard has global time: Last 15m
-Panel A: Individual time set to Last 1h
-Panel B: Individual time set to Last 7d
-Panel C: No individual time (uses global)
+```javascript
+// Dashboard config
+dashboard.defaultDatetimeDuration = { type: "relative", relativeTimePeriod: "15m" }
 
-When global refresh clicked:
-→ Panel A refreshes with Last 1h data
-→ Panel B refreshes with Last 7d data
-→ Panel C refreshes with Last 15m data (global)
+// Panel configs
+Panel A: { panel_time_range: { type: "relative", relativeTimePeriod: "1h" } }
+Panel B: { panel_time_range: { type: "relative", relativeTimePeriod: "7d" } }
+Panel C: { panel_time_range: undefined }  // or not set
+
+// When global refresh clicked:
+Panel A: Uses panel_time_range → fires API with Last 1h
+Panel B: Uses panel_time_range → fires API with Last 7d
+Panel C: Uses defaultDatetimeDuration → fires API with Last 15m (global)
+```
+
+**Simple Logic Per Panel:**
+```javascript
+function getEffectiveTimeForPanel(panel, dashboard) {
+  if (panel.config.panel_time_range) {
+    return panel.config.panel_time_range;  // Panel's own time
+  } else {
+    return dashboard.defaultDatetimeDuration;  // Global time
+  }
+}
 ```
 
 ### Yellow Refresh Button Indicator
@@ -364,6 +415,49 @@ When global refresh clicked:
 
 ## Implementation Details
 
+### Key Principle: Add-On Feature (Don't Touch Existing Global Logic)
+
+**IMPORTANT:** This is a **NEW ADD-ON feature** for panel-level time. The existing global time logic already works perfectly with `defaultDatetimeDuration` - **DON'T change it!**
+
+**Simple Addition to Existing Code:**
+```javascript
+// Add this simple conditional check to existing panel rendering logic:
+if (panel.config.panel_time_range) {
+  // NEW FEATURE: Panel has individual time configured
+  // Add new code here to use panel-specific time
+  timeRange = panel.config.panel_time_range;
+} else {
+  // EXISTING CODE: Keep all existing global time logic unchanged
+  // Global time already works fine - don't modify anything here
+  // Just use the existing global time flow
+  timeRange = (existing global time logic);
+}
+```
+
+**What This Means:**
+- ✅ **Add:** New conditional check: `if (panel.config.panel_time_range)`
+- ✅ **Add:** New logic inside the `if` block to handle panel time
+- ❌ **Don't change:** Existing global time flow (works fine)
+- ❌ **Don't refactor:** Current code that uses `defaultDatetimeDuration`
+
+**Two Scenarios:**
+1. **Panel has `panel_time_range` (NEW):**
+   - This is the new feature
+   - Add new code to use panel time
+   - This panel ignores global time changes
+
+2. **Panel doesn't have `panel_time_range` (EXISTING):**
+   - Keep existing behavior unchanged
+   - Uses existing global time logic
+   - No changes needed to existing code
+
+**When is panel_time_range saved?**
+- **Toggle OFF** → panel_time_range = undefined → **uses existing global logic (no changes)**
+- **Toggle ON + "Use Global"** → panel_time_range = undefined → **uses existing global logic (no changes)**
+- **Toggle ON + "Use Individual"** → panel_time_range = {...} → **NEW: uses panel time (add new logic)**
+
+---
+
 ### 1. Backend Schema
 
 **File:** `d:\openobserve\src\config\src\meta\dashboards\v8\mod.rs`
@@ -381,15 +475,17 @@ pub struct PanelConfig {
     pub allow_panel_time: Option<bool>,
 
     /// Panel time mode: "global" or "individual"
-    /// - "global": Panel tracks global dashboard time explicitly
-    /// - "individual": Panel uses its own custom time range
+    /// - "global": Panel explicitly configured to use global (NO panel_time_range saved)
+    /// - "individual": Panel uses its own time (panel_time_range IS saved)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub panel_time_mode: Option<String>,
 
-    /// Panel-level time range (only used when panel_time_mode = "individual")
-    /// Reuses existing DateTimeOptions struct
+    /// Panel-level time range (ONLY saved when panel_time_mode = "individual")
+    /// - If this exists (not None) → use it at runtime, ignore defaultDatetimeDuration
+    /// - If this is None → use defaultDatetimeDuration from dashboard config
+    /// PanelTimeRange struct
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub panel_time_range: Option<DateTimeOptions>,
+    pub panel_time_range: Option<PanelTimeRange>,
 
     // ... rest of fields ...
 }
@@ -419,11 +515,22 @@ interface PanelConfig {
 
 **States:**
 
-| allow_panel_time | panel_time_mode | panel_time_range | Behavior |
+| allow_panel_time | panel_time_mode | panel_time_range | Runtime Behavior |
 |-----------------|----------------|------------------|----------|
-| `false`/`undefined` | - | - | Use global time (default) |
-| `true` | `"global"` | - | Track global time explicitly |
-| `true` | `"individual"` | `{...}` | Use custom panel time |
+| `false`/`undefined` | - | `undefined` | Use `defaultDatetimeDuration` (global) |
+| `true` | `"global"` | `undefined` | Use `defaultDatetimeDuration` (global, explicitly chosen) |
+| `true` | `"individual"` | `{...}` (saved) | Use `panel_time_range` (panel's own time) |
+
+**CRITICAL - Runtime Logic:**
+```javascript
+// Simple check at runtime - don't look at allow_panel_time or panel_time_mode
+// Only check: does panel_time_range exist?
+if (panel.config.panel_time_range) {
+  timeRange = panel.config.panel_time_range;  // Use panel time
+} else {
+  timeRange = dashboard.defaultDatetimeDuration;  // Use global time
+}
+```
 
 ---
 
@@ -529,18 +636,20 @@ export default defineComponent({
       dashboardPanelData.data.config.panel_time_mode = mode;
 
       if (mode === 'individual') {
-        // Initialize with current global time if not set
+        // INDIVIDUAL MODE: Save panel_time_range
+        // Initialize with default time if not set
         if (!dashboardPanelData.data.config.panel_time_range) {
-          // Get current time from AddPanel's date time picker
-          // This will be set by the main date time picker in AddPanel
+          // User will set the actual time using the NEW date time picker that appears
           dashboardPanelData.data.config.panel_time_range = {
             type: 'relative',
             relativeTimePeriod: '15m',
           };
         }
       } else {
-        // Clear individual time range when switching to global
-        // Keep allow_panel_time = true to track global explicitly
+        // GLOBAL MODE: DON'T save panel_time_range
+        // Clear panel_time_range when switching to global
+        // Panel will use dashboard.defaultDatetimeDuration at runtime
+        // Keep allow_panel_time = true to track explicit choice
         dashboardPanelData.data.config.panel_time_range = undefined;
       }
     };
@@ -668,7 +777,7 @@ import PanelContainer from '@/components/dashboards/PanelContainer.vue';
 
 const props = defineProps({
   panels: Array,  // Array of panel configurations
-  globalTimeObj: Object,  // Global time range
+  globalTimeObj: Object,  // Global time range (computed from dashboard.defaultDatetimeDuration)
   // ... other props
 });
 
@@ -698,36 +807,37 @@ const setPanelTimePickerRef = (panelId: string, el: any) => {
   }
 };
 
-// Initialize all panel time values
+// Initialize all panel time values (for UI pickers)
 const initializePanelTimes = () => {
   props.panels?.forEach((panel: any) => {
+    // Only initialize picker for panels that have allow_panel_time enabled
     if (hasPanelTime(panel)) {
       const panelId = panel.id;
 
-      // Priority 1: Check URL params
+      // Priority 1: Check URL params (for picker display)
       const urlPanelTime = getPanelTimeFromURL(panelId);
       if (urlPanelTime) {
         panelTimeValues.value[panelId] = urlPanelTime;
         return;
       }
 
-      // Priority 2: Check panel config
-      const timeMode = getPanelTimeMode(panel);
-      if (timeMode === 'individual') {
-        const configTime = panel.config?.panel_time_range;
-        if (configTime) {
-          panelTimeValues.value[panelId] = {
-            type: configTime.type,
-            valueType: configTime.type,
-            relativeTimePeriod: configTime.relativeTimePeriod,
-            startTime: configTime.startTime,
-            endTime: configTime.endTime,
-          };
-          return;
-        }
+      // Priority 2: Check panel config - simple check for panel_time_range
+      const configTime = panel.config?.panel_time_range;
+      if (configTime) {
+        // Panel has its own time range → initialize picker with it
+        panelTimeValues.value[panelId] = {
+          type: configTime.type,
+          valueType: configTime.type,
+          relativeTimePeriod: configTime.relativeTimePeriod,
+          startTime: configTime.startTime,
+          endTime: configTime.endTime,
+        };
+        return;
       }
 
-      // Priority 3: Use global time (converted to picker format)
+      // Priority 3: Panel has allow_panel_time enabled but no panel_time_range
+      // (This is "Use global time" mode - panel_time_mode = "global")
+      // Initialize picker with current global time for display purposes
       if (props.globalTimeObj) {
         panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(props.globalTimeObj);
       }
@@ -856,25 +966,42 @@ const updateURLWithPanelTime = (panelId: string, timeValue: any) => {
 };
 
 // Get effective panel time range (for passing to PanelContainer)
+// ADD-ON FEATURE: Simple check - if panel has panel_time_range, use it; otherwise use existing global logic
 const getPanelTimeRange = (panelId: string) => {
   const panel = props.panels?.find((p: any) => p.id === panelId);
 
-  if (!panel || !hasPanelTime(panel)) {
+  if (!panel) {
+    return props.globalTimeObj;  // Existing global logic
+  }
+
+  // NEW FEATURE: Check if panel has its own time range
+  if (panel.config?.panel_time_range) {
+    // ===== NEW CODE: Panel has individual time configured =====
+    // Calculate from panel time picker value (which might be from URL, config, or user changes)
+    const panelTimeValue = panelTimeValues.value[panelId];
+    if (panelTimeValue) {
+      return calculateTimeFromPickerValue(panelTimeValue);
+    }
+    // Fallback: calculate directly from config (if picker value not yet initialized)
+    return calculateTimeFromPickerValue({
+      type: panel.config.panel_time_range.type,
+      valueType: panel.config.panel_time_range.type,
+      relativeTimePeriod: panel.config.panel_time_range.relativeTimePeriod,
+      startTime: panel.config.panel_time_range.startTime,
+      endTime: panel.config.panel_time_range.endTime,
+    });
+    // ===== END NEW CODE =====
+  } else {
+    // ===== EXISTING CODE: Use global time (DON'T CHANGE) =====
+    // Panel doesn't have panel_time_range → use existing global logic
+    // This handles all existing scenarios:
+    // - Panels that never had panel time configured
+    // - allow_panel_time = false (toggle off)
+    // - allow_panel_time = true + panel_time_mode = "global" (explicitly chose global)
+    // props.globalTimeObj already works with defaultDatetimeDuration
     return props.globalTimeObj;
+    // ===== END EXISTING CODE =====
   }
-
-  const timeMode = getPanelTimeMode(panel);
-  if (timeMode === 'global') {
-    return props.globalTimeObj;
-  }
-
-  // Individual mode - calculate from panel time picker value
-  const panelTimeValue = panelTimeValues.value[panelId];
-  if (panelTimeValue) {
-    return calculateTimeFromPickerValue(panelTimeValue);
-  }
-
-  return props.globalTimeObj;
 };
 
 // Calculate time object from picker value
@@ -924,10 +1051,14 @@ watch(() => props.panels, () => {
   initializePanelTimes();
 }, { deep: true });
 
-// Watch for global time changes (update panels that use global mode)
+// Watch for global time changes (update panels that DON'T have panel_time_range)
+// props.globalTimeObj is computed from dashboard.defaultDatetimeDuration
 watch(() => props.globalTimeObj, (newGlobalTime) => {
   props.panels?.forEach((panel: any) => {
-    if (hasPanelTime(panel) && getPanelTimeMode(panel) === 'global') {
+    // SIMPLE CHECK: Only update panels that DON'T have their own panel_time_range
+    // If panel has panel_time_range → ignore global time changes
+    // If panel doesn't have panel_time_range → update picker to show new global time
+    if (hasPanelTime(panel) && !panel.config?.panel_time_range) {
       const panelId = panel.id;
       panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(newGlobalTime);
     }
@@ -938,10 +1069,14 @@ watch(() => props.globalTimeObj, (newGlobalTime) => {
 const onGlobalRefresh = async () => {
   // IMPORTANT: When global refresh is clicked:
   // - All panels should refresh
-  // - Each panel uses its own time (panel-level if configured, otherwise global)
+  // - Each panel uses simple check logic:
+  //   → If panel has panel_time_range: use it (panel's own time)
+  //   → If panel doesn't have panel_time_range: use defaultDatetimeDuration (global time)
+  // - Don't mix panel_time_range and defaultDatetimeDuration sources
 
   const refreshPromises = props.panels?.map((panel: any) => {
     const panelId = panel.id;
+    // getPanelTimeRange() does simple check: panel_time_range exists? use it : use global
     const effectiveTime = getPanelTimeRange(panelId);
     return refreshPanelData(panelId, effectiveTime);
   });
@@ -2689,16 +2824,43 @@ This implementation provides a comprehensive solution for panel-level time range
 ✅ **URL Sync on Apply** - URL parameters update when Apply button or yellow refresh button is clicked
 ✅ **Code Reusability** - Reuses existing global time conversion functions, no code duplication
 ✅ **Comprehensive Testing** - 47 E2E test cases
+✅ **Simple Runtime Logic** - Clear separation: panel_time_range exists? use it : use defaultDatetimeDuration
 
 ### Key Advantages
 
-1. **Familiar UX** - Pattern matches panel variables (already understood by users)
-2. **Flexible** - Three modes: disabled, track global, individual
-3. **Shareable** - Full URL parameter support including fullscreen URLs
-4. **Scalable** - Handles many panels efficiently
-5. **Maintainable** - Clean architecture, reusable components
-6. **Well-Tested** - Extensive E2E test coverage across all scenarios
-7. **Complete** - Includes view panel, full screen, print mode, export/import
+1. **Add-On Feature** - Existing global time logic works fine, only add new code for panel time
+2. **Simple & Clear** - Runtime logic: simple `if (panel_time_range)` check
+3. **No Refactoring Needed** - Don't touch existing code that uses defaultDatetimeDuration
+4. **No Confusion** - Two separate data sources: defaultDatetimeDuration (existing) and panel_time_range (new)
+5. **Familiar UX** - Pattern matches panel variables (already understood by users)
+6. **Flexible** - Three modes: disabled, track global, individual
+7. **Shareable** - Full URL parameter support including fullscreen URLs
+8. **Scalable** - Handles many panels efficiently
+9. **Maintainable** - Clean architecture, reusable components, no mixing of time sources
+10. **Well-Tested** - Extensive E2E test coverage across all scenarios
+11. **Complete** - Includes view panel, full screen, print mode, export/import
+
+### Critical Design Decision: Add-On, Not Refactor
+
+**This is a NEW feature addition, not a refactor:**
+- ✅ **Add:** New conditional check `if (panel.config.panel_time_range)`
+- ✅ **Add:** New logic to handle panel-specific time
+- ❌ **Don't change:** Existing global time flow (works fine with defaultDatetimeDuration)
+- ❌ **Don't refactor:** Current code paths for global time
+
+**How it works:**
+```javascript
+// Simple addition to existing code:
+if (panel.config.panel_time_range) {
+  // NEW: Use panel time
+} else {
+  // EXISTING: Use global time (no changes to existing code)
+}
+```
+
+**Result:**
+- Panels without `panel_time_range` → work exactly as before (no changes)
+- Panels with `panel_time_range` → new feature (panel-specific time)
 
 ### Implementation Scope
 
