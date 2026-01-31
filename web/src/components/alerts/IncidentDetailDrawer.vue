@@ -624,7 +624,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: 'calc(40% - 6.4px)'
+                  height: 'calc(35% - 6.4px)'
                 }"
               >
                 <!-- Header -->
@@ -711,7 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="{
                   height: incidentDetails?.topology_context?.nodes?.length
                     ? 'calc(35% - 5.6px)'
-                    : 'calc(60% - 8px)',
+                    : 'calc(65% - 8px)',
                   minHeight: 0,
                   flexShrink: 0
                 }"
@@ -770,7 +770,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="sortedAlertsByTriggerCount?.length"
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: 'calc(25% - 4px)'
+                  height: 'calc(30% - 4px)'
                 }"
               >
                 <!-- Header -->
@@ -1697,17 +1697,26 @@ export default defineComponent({
           }
         },
         legend: {
+          type: 'scroll',
+          orient: 'horizontal',
+          bottom: 0,
           data: Array.from(alertNames),
           textStyle: {
             color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
           },
-          top: 10
+          pageButtonItemGap: 5,
+          pageButtonGap: 20,
+          pageIconColor: store.state.theme === 'dark' ? '#DCDCDC' : '#232323',
+          pageIconInactiveColor: store.state.theme === 'dark' ? '#666666' : '#CCCCCC',
+          pageTextStyle: {
+            color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+          }
         },
         grid: {
           left: '3%',
           right: '4%',
-          bottom: '3%',
-          top: '60',
+          bottom: '50',
+          top: '40',
           containLabel: true
         },
         xAxis: {
