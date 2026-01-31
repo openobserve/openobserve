@@ -278,11 +278,13 @@ export function useLatencyInsightsAnalysis() {
   ): Promise<DimensionAnalysis> => {
     try {
       // Check if we have any time-based filters - if not, we're in baseline-only mode
-      // A filter is considered active only if it has timeStart and timeEnd
+      // A filter is considered active only if:
+      // 1. The filter object exists (not undefined), AND
+      // 2. It has both timeStart and timeEnd set (indicating a brush selection was made)
       const hasFilters =
-        (config.durationFilter?.timeStart && config.durationFilter?.timeEnd) ||
-        (config.rateFilter?.timeStart && config.rateFilter?.timeEnd) ||
-        (config.errorFilter?.timeStart && config.errorFilter?.timeEnd);
+        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
+        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
+        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
 
       // Get baseline distribution (WITHOUT duration filter - all traces)
       const baselineDistQuery = buildDistributionQuery(

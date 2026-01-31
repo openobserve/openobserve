@@ -346,12 +346,16 @@ export function useLatencyInsightsDashboard() {
 
     // Check if we're using comparison mode (baseline vs selected) or single query mode
     // Comparison mode is enabled when:
-    // 1. Any filter with time-based selection exists (timeStart/timeEnd in filters), OR
+    // 1. Any filter with time-based selection exists (filter object + timeStart/timeEnd), OR
     // 2. For logs: time ranges differ (brush selection made)
+    //
+    // A filter is active only if:
+    // - The filter object exists (not undefined), AND
+    // - It has both timeStart and timeEnd set (indicating a brush selection was made)
     const hasTimeBasedFilter =
-      (config.durationFilter?.timeStart && config.durationFilter?.timeEnd) ||
-      (config.rateFilter?.timeStart && config.rateFilter?.timeEnd) ||
-      (config.errorFilter?.timeStart && config.errorFilter?.timeEnd);
+      (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
+      (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
+      (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
     const isSameTimeRange =
       config.streamType === "logs" &&
       config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
