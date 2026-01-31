@@ -21,11 +21,10 @@ This document outlines the implementation for **panel-level time range/date-time
    - Similar to panel variables, add date time picker for each panel
    - Visible in dashboard view mode (like variable selector)
    - Users can change panel time without entering edit mode
-   - **Time picker updates when selected, but panel data does NOT refresh automatically**
-   - **Panel data refreshes only when user clicks the existing refresh button**
-   - **Panel refresh button icon turns yellow when time changed but not yet refreshed** (like variables)
-   - **Only individual panel refresh button changes color, not global refresh**
-   - **URL parameter syncs AFTER refresh button is clicked** (not immediately on picker change)
+   - **Panel date time picker shown in RenderDashboardCharts** (not PanelContainer)
+   - **When time changed but not applied → refresh button turns YELLOW**
+   - **TWO ways to apply:** Click Apply on picker OR click yellow refresh button
+   - **Both actions:** Fire API call, update URL, refresh panel, clear yellow indicator
 
 3. ✅ **URL Parameter Sync**
    - Panel-level time synced to URL (like panel variables with `var-*`)
@@ -140,24 +139,30 @@ Based on team discussion, here are the finalized requirements:
 - User can temporarily override panel time via URL, then reset to global
 - Clear distinction between "not configured" vs "configured to follow global"
 
-### Requirement 2: Reuse AddPanel Date Time Picker
+### Requirement 2: Create New Date Time Picker for Panel-Level Time
 
-**Location:** AddPanel.vue (panel edit view)
+**Location:** AddPanel.vue / ConfigPanel.vue (panel edit view)
 
-The existing date time picker in AddPanel view should be used for:
-- Setting initial panel time range during creation
-- Editing panel time range when "Use individual time" is selected
-- Preview how panel will look with selected time range
+When "Use individual time" is selected, create a **NEW date time picker component** (same as "comparison against" picker) for setting panel-level time:
 
 **Behavior:**
-- When "Use individual time" is selected in ConfigPanel
-- The main date time picker in AddPanel becomes the "Panel Time Picker"
-- Label changes to indicate it's for this panel only
-- Time range stored in panel config
+- When "Use individual time" radio button is selected:
+  1. Display a NEW date time picker component (not reusing existing one)
+  2. Use same DateTimePickerDashboard component as "comparison against" feature
+  3. Label: "Panel Time Range"
+  4. User selects time range (e.g., "Last 1h", "Last 7d", absolute dates)
+  5. Selected value is saved in panel config as `panel_time_range`
+  6. This becomes the default panel time when viewing dashboard
+
+**Key Points:**
+- ✅ **New/separate picker** - Create dedicated date time picker for panel-level time
+- ✅ **Same as comparison picker** - Use same component type as "comparison against" feature
+- ✅ **Save to config** - Value stored in `panel.config.panel_time_range`
+- ✅ **Initial baseline** - Saved time used as initial panel time in view mode
 
 ### Requirement 3: Panel Date Time Picker in View Mode
 
-**Location:** PanelContainer.vue (panel header in dashboard view)
+**Location:** RenderDashboardCharts.vue (**NOT PanelContainer.vue**)
 
 Similar to panel variables, add a date time picker widget to each panel that has panel-level time enabled:
 
@@ -175,16 +180,17 @@ Similar to panel variables, add a date time picker widget to each panel that has
 - Only visible when panel has `allowPanelTime: true`
 - Shows current panel time range
 - Clicking opens date time picker dropdown
-- **Selecting time updates the picker value but does NOT refresh panel data**
-- **Panel refresh button icon turns yellow when time changed but not yet refreshed** (like variables)
-- **Only clicking the refresh button refreshes panel with new time**
-- **URL parameter syncs AFTER refresh button is clicked** (not on picker change)
-- Refresh button reads current panel time picker value, updates URL, and icon color returns to normal
+- **Date time picker is shown in RenderDashboardCharts.vue** (not in panel header/PanelContainer)
+- **When time changed but Apply not clicked → refresh button turns YELLOW**
+- **TWO ways to apply time change:**
+  - **Option A:** Click Apply on date time picker → fires API, updates URL, clears yellow
+  - **Option B:** Click yellow refresh button → fires API, updates URL, clears yellow
+- **Both options have the same effect** - apply change, fire API, update URL, clear indicator
 
-**Position Options:**
-- Option A: Panel header (right side, next to panel menu)
-- Option B: Below panel title (like variable selectors)
-- Recommended: **Option A** for consistency with global time picker
+**Position:**
+- Date time picker placed in RenderDashboardCharts area, above or near the corresponding panel
+- Similar to how panel variables are displayed
+- Enables better coordination with dashboard-level state management
 
 ### Requirement 4: URL Parameter Sync
 
@@ -219,6 +225,80 @@ Example:
 1. Panel-specific URL param (highest)
 2. Panel config setting
 3. Global dashboard time (fallback)
+
+---
+
+## Key Behaviors
+
+### Apply Button + Yellow Refresh Button Pattern
+
+**IMPORTANT:** The behavior uses BOTH Apply button and yellow refresh button indicator:
+
+#### In AddPanel/ConfigPanel (Configuration Mode)
+- **NEW date time picker** is created when "Use individual time" is selected (same as "comparison against" picker)
+- This picker is for **saving panel-level time to config**
+- When user clicks **Apply** or **Save** on the panel → saves `panel_time_range` to panel config
+- No API call is fired - this just saves the configuration
+
+#### In RenderDashboardCharts (View Mode)
+Date time picker is shown for each panel that has panel-level time enabled.
+
+**When user changes time but doesn't click Apply:**
+- Picker value updates
+- **Panel refresh button turns YELLOW** (unsaved change indicator)
+- Panel data does NOT refresh yet
+- URL does NOT update yet
+
+**User has TWO options to apply the change:**
+
+**Option A: Click Apply on date time picker**
+1. **Immediately fires API call** to refresh panel with new time
+2. **Updates URL** with new panel time parameters
+3. **Clears yellow indicator** (refresh button returns to normal color)
+4. Panel displays new data
+
+**Option B: Click yellow refresh button**
+1. **Immediately fires API call** to refresh panel with new time
+2. **Updates URL** with new panel time parameters
+3. **Clears yellow indicator** (refresh button returns to normal color)
+4. Panel displays new data
+
+**Both options have the same effect** - they apply the time change, fire API, update URL, and clear the yellow indicator.
+
+### Global Refresh Behavior
+
+When user clicks the **global refresh button**:
+- **All panels refresh simultaneously**
+- **Each panel uses its own effective time:**
+  - Panels with individual time configured → use their panel-specific time
+  - Panels without individual time → use global dashboard time
+- This allows mixed time ranges to coexist and all refresh together
+
+**Example:**
+```
+Dashboard has global time: Last 15m
+Panel A: Individual time set to Last 1h
+Panel B: Individual time set to Last 7d
+Panel C: No individual time (uses global)
+
+When global refresh clicked:
+→ Panel A refreshes with Last 1h data
+→ Panel B refreshes with Last 7d data
+→ Panel C refreshes with Last 15m data (global)
+```
+
+### Yellow Refresh Button Indicator
+
+**When does the refresh button turn yellow?**
+- User changes panel time picker value
+- Apply button on picker has NOT been clicked yet
+- Refresh button has NOT been clicked yet
+- Compares current picker value with last applied value
+
+**When does yellow clear?**
+- User clicks Apply button on picker
+- User clicks the yellow refresh button
+- Both trigger the same update flow
 
 ---
 
@@ -268,16 +348,15 @@ Example:
 
 4. **Refresh Button Pattern**
    - Panel time picker selection does NOT auto-refresh panel data
-   - User must click existing panel refresh button to apply new time
-   - Prevents excessive API calls and accidental data refreshes
-   - **Refresh button icon turns yellow when time changed but not yet refreshed** (like panel variables)
-   - **Only individual panel refresh button changes color, not global refresh**
-   - **URL updates AFTER refresh button is clicked** (not on picker change)
-   - Refresh button reads current panel time picker value, updates URL, and icon color returns to normal
+   - **When time changed but not applied → refresh button turns YELLOW**
+   - **User has TWO options:** Click Apply on picker OR click yellow refresh button
+   - **Both actions have same effect:** Fire API, update URL, refresh panel, clear yellow
+   - Prevents excessive API calls - changes only applied when user explicitly confirms (Apply or refresh)
 
 5. **Visual Clarity**
-   - Panel time picker visible in view mode = obvious difference
-   - Existing refresh button applies the selected time
+   - Panel time picker visible in RenderDashboardCharts = obvious difference
+   - Yellow refresh button = clear indicator of unsaved time change
+   - Two action paths = flexibility (Apply button for immediate action, refresh button for familiar pattern)
    - No need for extra badges or indicators
    - Consistent with variable selector UX
 
@@ -541,68 +620,41 @@ watch(dateTimeValue, (newValue) => {
 
 ### 3. Panel Date Time Picker (View Mode)
 
-**File:** `d:\openobserve\web\src\components\dashboards\PanelContainer.vue`
+**File:** `d:\openobserve\web\src\views\Dashboards\RenderDashboardCharts.vue`
 
-Add a date time picker widget to panel header (similar to variable selector):
+Add a date time picker widget for each panel that has panel-level time enabled (similar to variable selector):
+
+**IMPORTANT:** The date time picker is placed in RenderDashboardCharts.vue, NOT in PanelContainer.vue. This allows better coordination with dashboard-level state management and refresh logic.
 
 ```vue
 <template>
-  <div class="panel-container">
-    <!-- Panel Header -->
-    <div class="panel-header">
-      <div class="panel-title">{{ data.title }}</div>
-
-      <div class="panel-controls">
-        <!-- NEW: Panel Time Picker (only if panel time enabled) -->
-        <div
-          v-if="hasPanelTime"
-          class="panel-time-picker"
-          data-test="panel-time-picker"
-        >
-          <DateTimePickerDashboard
-            ref="panelDateTimePicker"
-            v-model="panelTimeValue"
-            :auto-apply-dashboard="false"
-            size="xs"
-            class="panel-time-picker-widget"
-            @update:model-value="onPanelTimePickerChange"
-          />
-        </div>
-
-        <!-- Existing refresh button - turns yellow when panel time changed -->
-        <q-btn
-          icon="refresh"
-          flat
-          round
-          dense
-          size="sm"
-          @click="onRefreshPanel"
-          :loading="isRefreshing"
-          :color="hasUnsavedTimeChange ? 'warning' : undefined"
-          data-test="panel-refresh-button"
-        >
-          <q-tooltip>
-            {{ hasUnsavedTimeChange ? 'Apply time change and refresh' : 'Refresh panel' }}
-          </q-tooltip>
-        </q-btn>
-
-        <!-- Existing panel menu ... -->
-        <q-btn-dropdown
-          class="panel-menu-btn"
-          icon="more_vert"
-          size="sm"
-        >
-          <!-- Existing menu items ... -->
-        </q-btn-dropdown>
+  <div class="render-dashboard-charts">
+    <div
+      v-for="panel in panels"
+      :key="panel.id"
+      class="dashboard-panel-wrapper"
+    >
+      <!-- NEW: Panel Time Picker (only if panel has time enabled) -->
+      <div
+        v-if="hasPanelTime(panel)"
+        class="panel-time-picker-container"
+        data-test="panel-time-picker"
+      >
+        <DateTimePickerDashboard
+          :ref="el => setPanelTimePickerRef(panel.id, el)"
+          v-model="panelTimeValues[panel.id]"
+          :auto-apply-dashboard="true"
+          size="xs"
+          class="panel-time-picker-widget"
+          @apply="onPanelTimeApply(panel.id)"
+        />
       </div>
-    </div>
 
-    <!-- Panel Content -->
-    <div class="panel-content">
-      <PanelSchemaRenderer
-        :panelSchema="data"
-        :selectedTimeObj="effectivePanelTime"
-        <!-- ... other props ... -->
+      <!-- Panel Container (existing) -->
+      <PanelContainer
+        :data="panel"
+        :selectedTimeDate="getPanelTimeRange(panel.id)"
+        @refresh-panel="onRefreshPanel(panel.id)"
       />
     </div>
   </div>
@@ -612,82 +664,75 @@ Add a date time picker widget to panel header (similar to variable selector):
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import DateTimePickerDashboard from '@/components/DateTimePickerDashboard.vue';
+import PanelContainer from '@/components/dashboards/PanelContainer.vue';
 
 const props = defineProps({
-  data: Object,  // Panel data
+  panels: Array,  // Array of panel configurations
   globalTimeObj: Object,  // Global time range
   // ... other props
 });
 
-const emit = defineEmits(['update:panel-time']);
-
 const route = useRoute();
 const router = useRouter();
 
-// Check if panel has time enabled
-const hasPanelTime = computed(() =>
-  !!props.data?.config?.allow_panel_time
-);
+// Panel time values for all panels (map: panelId -> time value)
+const panelTimeValues = ref({});
+
+// Panel time picker refs
+const panelTimePickerRefs = ref({});
+
+// Check if a specific panel has time enabled
+const hasPanelTime = (panel: any) => {
+  return !!panel?.config?.allow_panel_time;
+};
 
 // Get panel time mode
-const panelTimeMode = computed(() =>
-  props.data?.config?.panel_time_mode || 'global'
-);
+const getPanelTimeMode = (panel: any) => {
+  return panel?.config?.panel_time_mode || 'global';
+};
 
-// Panel time value for picker
-const panelTimeValue = ref(null);
-
-// Last applied time (for tracking unsaved changes)
-const lastAppliedTimeValue = ref(null);
-
-// Check if time has been changed but not yet refreshed (yellow indicator)
-const hasUnsavedTimeChange = computed(() => {
-  if (!panelTimeValue.value || !lastAppliedTimeValue.value) return false;
-
-  // Compare current picker value with last applied value
-  if (panelTimeValue.value.type !== lastAppliedTimeValue.value.type) return true;
-
-  if (panelTimeValue.value.type === 'relative') {
-    return panelTimeValue.value.relativeTimePeriod !== lastAppliedTimeValue.value.relativeTimePeriod;
-  } else {
-    return panelTimeValue.value.startTime !== lastAppliedTimeValue.value.startTime ||
-           panelTimeValue.value.endTime !== lastAppliedTimeValue.value.endTime;
+// Set panel time picker ref
+const setPanelTimePickerRef = (panelId: string, el: any) => {
+  if (el) {
+    panelTimePickerRefs.value[panelId] = el;
   }
-});
+};
 
-// Initialize panel time value
-const initializePanelTime = () => {
-  const panelId = props.data?.id;
+// Initialize all panel time values
+const initializePanelTimes = () => {
+  props.panels?.forEach((panel: any) => {
+    if (hasPanelTime(panel)) {
+      const panelId = panel.id;
 
-  // Priority 1: Check URL params
-  const urlPanelTime = getPanelTimeFromURL(panelId);
-  if (urlPanelTime) {
-    panelTimeValue.value = urlPanelTime;
-    lastAppliedTimeValue.value = { ...urlPanelTime }; // Set as applied
-    return;
-  }
+      // Priority 1: Check URL params
+      const urlPanelTime = getPanelTimeFromURL(panelId);
+      if (urlPanelTime) {
+        panelTimeValues.value[panelId] = urlPanelTime;
+        return;
+      }
 
-  // Priority 2: Check panel config
-  if (panelTimeMode.value === 'individual') {
-    const configTime = props.data?.config?.panel_time_range;
-    if (configTime) {
-      panelTimeValue.value = {
-        type: configTime.type,
-        valueType: configTime.type,
-        relativeTimePeriod: configTime.relativeTimePeriod,
-        startTime: configTime.startTime,
-        endTime: configTime.endTime,
-      };
-      lastAppliedTimeValue.value = { ...panelTimeValue.value }; // Set as applied
-      return;
+      // Priority 2: Check panel config
+      const timeMode = getPanelTimeMode(panel);
+      if (timeMode === 'individual') {
+        const configTime = panel.config?.panel_time_range;
+        if (configTime) {
+          panelTimeValues.value[panelId] = {
+            type: configTime.type,
+            valueType: configTime.type,
+            relativeTimePeriod: configTime.relativeTimePeriod,
+            startTime: configTime.startTime,
+            endTime: configTime.endTime,
+          };
+          return;
+        }
+      }
+
+      // Priority 3: Use global time (converted to picker format)
+      if (props.globalTimeObj) {
+        panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(props.globalTimeObj);
+      }
     }
-  }
-
-  // Priority 3: Use global time (converted to picker format)
-  if (props.globalTimeObj) {
-    panelTimeValue.value = convertGlobalTimeToPickerFormat(props.globalTimeObj);
-    lastAppliedTimeValue.value = { ...panelTimeValue.value }; // Set as applied
-  }
+  });
 };
 
 // Get panel time from URL params
@@ -742,39 +787,51 @@ const convertGlobalTimeToPickerFormat = (globalTime: any) => {
   };
 };
 
-// Handle panel time picker change (update picker value only, don't refresh or update URL)
-const onPanelTimePickerChange = (newValue: any) => {
-  // NOTE: Do NOT update URL here - URL syncs only after refresh button is clicked
-  // NOTE: Do NOT refresh panel here - Panel will refresh only when user clicks refresh button
-  // The picker value is already updated by v-model binding
-  // Yellow indicator will show automatically via hasUnsavedTimeChange computed property
-};
-
-// Handle refresh button click
-const isRefreshing = ref(false);
-const onRefreshPanel = async () => {
-  isRefreshing.value = true;
+// Handle panel time Apply button click (user clicked Apply on DateTimePickerDashboard)
+const onPanelTimeApply = async (panelId: string) => {
+  // IMPORTANT: When user clicks Apply on the date time picker, immediately:
+  // 1. Fire API call to refresh panel with new time
+  // 2. Update URL with new panel time
 
   try {
-    const panelId = props.data?.id;
+    const timeValue = panelTimeValues.value[panelId];
 
-    // Get current panel time from picker
-    const currentPanelTime = calculateTimeFromPickerValue(panelTimeValue.value);
+    // Calculate time object from picker value
+    const currentPanelTime = calculateTimeFromPickerValue(timeValue);
 
-    // Update URL params NOW (after refresh button is clicked)
-    updateURLWithPanelTime(panelId, panelTimeValue.value);
+    // Update URL params (sync URL after Apply is clicked)
+    updateURLWithPanelTime(panelId, timeValue);
 
-    // Update last applied time (clears yellow indicator)
-    lastAppliedTimeValue.value = { ...panelTimeValue.value };
-
-    // Emit event to parent to refresh panel with current time
-    emit('refresh-panel', panelId, currentPanelTime);
-
-    // Or directly trigger panel data reload
-    // await loadPanelData(currentPanelTime);
-  } finally {
-    isRefreshing.value = false;
+    // Fire API call to refresh panel with new time
+    await refreshPanelData(panelId, currentPanelTime);
+  } catch (error) {
+    console.error('Error applying panel time:', error);
   }
+};
+
+// Handle individual panel refresh button click
+const onRefreshPanel = async (panelId: string) => {
+  // When user clicks the panel refresh button (not Apply on picker),
+  // refresh the panel with its current effective time
+
+  try {
+    const panel = props.panels?.find((p: any) => p.id === panelId);
+    const effectiveTime = getPanelTimeRange(panelId);
+
+    await refreshPanelData(panelId, effectiveTime);
+  } catch (error) {
+    console.error('Error refreshing panel:', error);
+  }
+};
+
+// Refresh panel data with given time range
+const refreshPanelData = async (panelId: string, timeRange: any) => {
+  // Call the panel's data loading function with the time range
+  // This triggers the API call to fetch new data
+
+  // Implementation will depend on existing panel data loading logic
+  // Typically this would emit an event or call a store action
+  emit('refresh-panel', { panelId, timeRange });
 };
 
 // Update URL with panel time params
@@ -798,23 +855,27 @@ const updateURLWithPanelTime = (panelId: string, timeValue: any) => {
   router.replace({ query });
 };
 
-// Compute effective panel time (for passing to PanelSchemaRenderer)
-const effectivePanelTime = computed(() => {
-  if (!hasPanelTime.value) {
+// Get effective panel time range (for passing to PanelContainer)
+const getPanelTimeRange = (panelId: string) => {
+  const panel = props.panels?.find((p: any) => p.id === panelId);
+
+  if (!panel || !hasPanelTime(panel)) {
     return props.globalTimeObj;
   }
 
-  if (panelTimeMode.value === 'global') {
+  const timeMode = getPanelTimeMode(panel);
+  if (timeMode === 'global') {
     return props.globalTimeObj;
   }
 
-  // Individual mode - calculate from panelTimeValue
-  if (panelTimeValue.value) {
-    return calculateTimeFromPickerValue(panelTimeValue.value);
+  // Individual mode - calculate from panel time picker value
+  const panelTimeValue = panelTimeValues.value[panelId];
+  if (panelTimeValue) {
+    return calculateTimeFromPickerValue(panelTimeValue);
   }
 
   return props.globalTimeObj;
-});
+};
 
 // Calculate time object from picker value
 const calculateTimeFromPickerValue = (pickerValue: any) => {
@@ -855,15 +916,38 @@ const calculateRelativeTime = (endTime: Date, period: string): Date => {
 
 // Initialize on mount
 onMounted(() => {
-  initializePanelTime();
+  initializePanelTimes();
 });
 
-// Watch for global time changes (if in global mode)
-watch(() => props.globalTimeObj, () => {
-  if (hasPanelTime.value && panelTimeMode.value === 'global') {
-    initializePanelTime();
-  }
+// Watch for panels changes (when dashboard loads or updates)
+watch(() => props.panels, () => {
+  initializePanelTimes();
 }, { deep: true });
+
+// Watch for global time changes (update panels that use global mode)
+watch(() => props.globalTimeObj, (newGlobalTime) => {
+  props.panels?.forEach((panel: any) => {
+    if (hasPanelTime(panel) && getPanelTimeMode(panel) === 'global') {
+      const panelId = panel.id;
+      panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(newGlobalTime);
+    }
+  });
+}, { deep: true });
+
+// Handle global refresh - refreshes all panels with their respective times
+const onGlobalRefresh = async () => {
+  // IMPORTANT: When global refresh is clicked:
+  // - All panels should refresh
+  // - Each panel uses its own time (panel-level if configured, otherwise global)
+
+  const refreshPromises = props.panels?.map((panel: any) => {
+    const panelId = panel.id;
+    const effectiveTime = getPanelTimeRange(panelId);
+    return refreshPanelData(panelId, effectiveTime);
+  });
+
+  await Promise.all(refreshPromises || []);
+};
 </script>
 
 <style scoped>
@@ -896,9 +980,8 @@ watch(() => props.globalTimeObj, () => {
 }
 
 /*
-  Note: Refresh button color is controlled by :color prop
-  When hasUnsavedTimeChange = true, refresh button uses color="warning" (yellow)
-  This matches the panel variables behavior where refresh icon turns yellow
+  Note: Styling for panel time picker widgets shown in RenderDashboardCharts
+  Placed above or near the corresponding panel for visual clarity
 */
 </style>
 ```
@@ -1462,13 +1545,15 @@ const exitFullScreen = () => {
                        │
            ┌───────────▼──────────────────────┐
            │ RenderDashboardCharts            │
-           │ Distributes to each panel        │
+           │ - Shows panel time picker(s)     │
+           │ - Distributes to each panel      │
+           │ - Handles Apply → API call       │
            └───────────┬──────────────────────┘
                        │
            ┌───────────▼──────────────────────┐
            │ PanelContainer                   │
-           │ - Shows panel time picker        │
-           │ - Passes effectivePanelTime      │
+           │ - Renders panel content          │
+           │ - Receives effectivePanelTime    │
            └───────────┬──────────────────────┘
                        │
            ┌───────────▼──────────────────────┐
@@ -1507,19 +1592,15 @@ const exitFullScreen = () => {
 
 ```
 1. User views dashboard
-2. Panel shows date time picker widget (because allow_panel_time = true)
+2. Date time picker is shown in RenderDashboardCharts for panels with panel time enabled
 3. User clicks panel date time picker
 4. User selects new time range (e.g., "Last 7 days")
-5. onPanelTimePickerChange() triggered
-6. Panel picker shows "Last 7 days"
-7. Panel refresh button icon turns YELLOW (hasUnsavedTimeChange = true)
-8. Panel data does NOT refresh yet
-9. URL does NOT update yet
-10. User clicks panel refresh button (yellow icon)
-11. onRefreshPanel() reads current panel time picker value
-12. URL updated with panel-time-<panelId>=7d (NOW)
-13. Refresh button icon color returns to normal (lastAppliedTimeValue updated)
-14. Panel reloads with new time range (7 days)
+5. User clicks **Apply** button on date time picker
+6. onPanelTimeApply() triggered
+7. **API call fires immediately** to refresh panel with new time (7 days)
+8. **URL updated immediately** with panel-time-<panelId>=7d
+9. Panel data loads and displays with new 7-day time range
+10. No yellow indicator needed - Apply triggers immediate action
 ```
 
 #### Flow 3: Share Dashboard with Panel Times
@@ -1886,31 +1967,34 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify NO date time picker widget in panel header
 - Panel uses global time
 
-**E2E-011: Change Panel Time via View Mode Picker - Relative**
+**E2E-011: Change Panel Time via View Mode Picker - Relative (Apply Button)**
 - Load dashboard with panel having panel time enabled
+- Panel time picker is visible in RenderDashboardCharts area (not in panel header)
 - Click panel date time picker
 - Select "Last 7 days"
-- Verify picker shows "Last 7 days"
-- **Verify panel refresh button icon turns yellow** (unsaved change indicator)
+- **Verify panel refresh button icon turns YELLOW** (unsaved change indicator)
 - **Verify panel data does NOT refresh yet** (still showing old data)
 - **Verify URL has NOT updated yet**
-- Click panel refresh button (yellow icon)
-- **Verify refresh button icon returns to normal color**
-- **Verify URL updated with panel-time-<panelId>=7d**
+- Click **Apply** button on date time picker
+- **Verify API call fires immediately** (panel data loading indicator appears)
+- **Verify refresh button icon returns to normal color** (yellow cleared)
+- **Verify URL immediately updates with panel-time-<panelId>=7d**
 - Verify panel refreshes with new time range
 - Verify panel shows data for last 7 days
 
-**E2E-012: Change Panel Time via View Mode Picker - Absolute**
+**E2E-012: Change Panel Time via View Mode Picker - Absolute (Yellow Refresh Button)**
 - Load dashboard with panel having panel time enabled
+- Panel time picker is visible in RenderDashboardCharts area (not in panel header)
 - Click panel date time picker
 - Select absolute date range (e.g., Jan 1-15, 2024)
 - Verify picker shows selected dates
-- **Verify panel refresh button icon turns yellow** (unsaved change indicator)
+- **Verify panel refresh button icon turns YELLOW** (unsaved change indicator)
 - **Verify panel data does NOT refresh yet** (still showing old data)
 - **Verify URL has NOT updated yet**
-- Click panel refresh button (yellow icon)
-- **Verify refresh button icon returns to normal color**
-- **Verify URL updated with panel-time-<panelId>-from and -to params**
+- Click **yellow refresh button** (not Apply button this time - testing alternative path)
+- **Verify API call fires immediately** (panel data loading indicator appears)
+- **Verify refresh button icon returns to normal color** (yellow cleared)
+- **Verify URL immediately updates with panel-time-<panelId>-from and -to params**
 - Verify panel refreshes with new time range
 - Verify panel shows data for selected dates
 
@@ -2207,16 +2291,16 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Save dashboard
 - Verify panel config removed from backend
 
-**E2E-044: Dashboard Refresh with Panel Times**
-- Configure Panel A with "Last 1h"
-- Configure Panel B with "Last 7d"
-- Click global refresh button (or individual panel refresh buttons)
-- Verify Panel A refreshes with 1h data
-- Verify Panel B refreshes with 7d data
-- Each panel respects its own time range
-- Change Panel A time picker to "Last 24h" (don't click refresh)
-- Click global refresh button
-- Verify Panel A refreshes with new 24h data (reads current picker value)
+**E2E-044: Global Refresh with Mixed Panel Times**
+- Configure Panel A with "Last 1h" (individual time)
+- Configure Panel B with "Last 7d" (individual time)
+- Configure Panel C with no panel time (uses global "Last 15m")
+- Click **global refresh button**
+- **Verify all panels refresh simultaneously**
+- **Verify Panel A refreshes with 1h data** (uses its panel time)
+- **Verify Panel B refreshes with 7d data** (uses its panel time)
+- **Verify Panel C refreshes with 15m data** (uses global time)
+- Each panel respects its own effective time range during global refresh
 
 **E2E-045: Print Dashboard with Panel Times**
 - Configure panels with different times
@@ -2226,53 +2310,72 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Print or export to PDF
 - Verify output shows panel times
 
-**E2E-046: Panel Refresh Button with Time Change**
+**E2E-046: Two Paths to Apply Time Change**
 - Load dashboard with Panel A having panel time enabled
 - Panel shows data for "Last 1h"
 - Note current URL (has `panel-time-panelA=1h`)
 - Verify Panel A refresh button is normal color (not yellow)
+
+**Test Path A: Apply Button**
 - Change panel time picker to "Last 7d"
-- Verify picker shows "Last 7d"
-- **Verify panel refresh button icon turns yellow** (unsaved change indicator)
-- **Verify panel data still shows 1h data (no auto-refresh)**
-- **Verify URL still shows `panel-time-panelA=1h`** (not updated yet)
-- Click panel refresh button (yellow icon)
-- **Verify refresh button icon returns to normal color**
-- **Verify URL now shows `panel-time-panelA=7d`** (updated on refresh)
-- Verify panel data refreshes and now shows 7d data
-- Change picker to "Last 1h" again
-- **Verify refresh button icon turns yellow again**
-- **Do NOT click refresh**
-- Verify panel data still shows 7d data (picker change didn't refresh)
-- Verify URL still shows `7d` (not updated until refresh)
-- Click refresh button (yellow icon)
-- **Verify refresh button icon returns to normal color**
-- **Verify URL now shows `panel-time-panelA=1h`**
-- Verify panel data now shows 1h data
+- **Verify refresh button icon turns YELLOW**
+- **Verify panel data unchanged** (still 1h data)
+- **Verify URL unchanged** (still 1h)
+- Click **Apply** button on date time picker
+- **Verify API call fires** (loading indicator)
+- **Verify refresh button returns to normal color**
+- **Verify URL updated to panel-time-panelA=7d**
+- **Verify panel shows 7d data**
+
+**Test Path B: Yellow Refresh Button**
+- Change panel time picker to "Last 24h"
+- **Verify refresh button icon turns YELLOW**
+- **Verify panel data unchanged** (still 7d data from previous step)
+- **Verify URL unchanged** (still 7d)
+- Click **yellow refresh button**
+- **Verify API call fires** (loading indicator)
+- **Verify refresh button returns to normal color**
+- **Verify URL updated to panel-time-panelA=24h**
+- **Verify panel shows 24h data**
 
 **E2E-047: Yellow Refresh Button Indicator Behavior**
 - Load dashboard with Panel A having panel time enabled
 - Panel shows "Last 1h"
 - Verify Panel A refresh button is normal color (not yellow)
-- Change picker to "Last 7d"
-- **Verify Panel A refresh button icon turns yellow** (warning color)
+- **Verify global refresh button remains normal color**
+
+**Change without applying:**
+- Change picker to "Last 7d" but **DO NOT click Apply or refresh**
+- **Verify Panel A refresh button icon turns YELLOW** (warning color)
 - **Verify global refresh button remains normal color** (only panel button changes)
 - Verify other panels' refresh buttons remain normal color
-- Change picker to "Last 1h" again (back to original applied value)
-- **Verify refresh button icon returns to normal color** (back to original value)
+- **Verify panel data is unchanged** (still showing 1h data)
+- **Verify URL is unchanged** (still shows panel-time-panelA=1h)
+
+**Revert to original value:**
+- Change picker back to "Last 1h" (original value)
+- **Verify refresh button icon returns to normal color** (matches last applied value)
+
+**Change again and reload:**
 - Change picker to "Last 7d" again
-- **Verify refresh button icon turns yellow**
+- **Verify refresh button icon turns YELLOW**
 - Reload page (F5)
-- **Verify refresh button is normal color** (reverted to saved value from URL)
-- Verify picker shows saved URL value
-- Change picker to different time
-- **Verify refresh button icon turns yellow**
+- **Verify refresh button is normal color** (reverted to saved URL value)
+- Verify picker shows saved URL value (Last 1h)
+
+**Persist across modals:**
+- Change picker to "Last 7d"
+- **Verify refresh button icon turns YELLOW**
 - Open View Panel modal
-- **Verify modal refresh button icon is yellow** (persists in modal)
+- **Verify modal refresh button icon is YELLOW** (persists in modal)
 - Close modal
-- **Verify dashboard refresh button icon is still yellow** (persists)
-- Click refresh button
+- **Verify dashboard refresh button icon is still YELLOW** (persists)
+
+**Clear yellow by applying:**
+- Click yellow refresh button (or Apply button)
 - **Verify refresh button icon returns to normal color**
+- **Verify URL updated**
+- **Verify panel data refreshed**
 
 ---
 
@@ -2447,15 +2550,15 @@ tests/
 
 | File | Type | Changes | Lines Est. |
 |------|------|---------|-----------|
-| `web/src/components/dashboards/addPanel/ConfigPanel.vue` | Edit | Add toggle, radio buttons, logic | ~100 |
-| `web/src/views/Dashboards/addPanel/AddPanel.vue` | Edit | Update date picker label, wire to config | ~50 |
-| `web/src/components/dashboards/PanelContainer.vue` | Edit | Add panel time picker widget, yellow refresh button | ~200 |
+| `web/src/components/dashboards/addPanel/ConfigPanel.vue` | Edit | Add toggle, radio buttons, NEW date time picker for individual time | ~120 |
+| `web/src/views/Dashboards/addPanel/AddPanel.vue` | Edit | Update to support new individual time picker | ~50 |
+| `web/src/views/Dashboards/RenderDashboardCharts.vue` | Edit | Add panel time pickers, Apply→API call logic, global refresh handling | ~220 |
 | `web/src/views/Dashboards/ViewDashboard.vue` | Edit | Add URL parsing, time computation, **reuse existing time conversion functions** | ~150 |
 | `web/src/components/dashboards/ViewPanel.vue` (or modal) | Edit | Add panel time picker to view modal | ~80 |
 | `web/src/components/dashboards/FullScreenPanel.vue` (or route) | Edit | Add panel time picker to full screen | ~100 |
 | `web/src/locales/en-US.json` | Edit | Add i18n translations | ~10 |
 
-**Total New/Modified Code:** ~690 lines
+**Total New/Modified Code:** ~730 lines
 
 **Note:** No new utility files needed - reusing existing time conversion functions from global dashboard code.
 
@@ -2580,10 +2683,10 @@ This implementation provides a comprehensive solution for panel-level time range
 ✅ **Clear Priority System** - URL > Config > Global
 ✅ **User-Friendly** - Visual date time picker widget, clear UI
 ✅ **View Panel & Full Screen Support** - Panel time preserved in all viewing modes
-✅ **Refresh Button Pattern** - Time picker updates on selection, refresh button applies the change
-✅ **Yellow Refresh Icon** - Refresh button turns yellow when time changed but not yet refreshed (like variables)
+✅ **Dual Apply Pattern** - TWO ways to apply time change: Click Apply on picker OR click yellow refresh button
+✅ **Yellow Refresh Icon** - Refresh button turns yellow when time changed but not yet applied (like variables)
 ✅ **Individual Panel Indicator** - Only affected panel's refresh button changes color, not global refresh
-✅ **URL Sync on Refresh** - URL parameters update after refresh button is clicked
+✅ **URL Sync on Apply** - URL parameters update when Apply button or yellow refresh button is clicked
 ✅ **Code Reusability** - Reuses existing global time conversion functions, no code duplication
 ✅ **Comprehensive Testing** - 47 E2E test cases
 
