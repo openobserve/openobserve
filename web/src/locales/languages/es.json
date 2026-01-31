@@ -1942,7 +1942,11 @@
     "preview": "Vista previa",
     "test": "Prueba",
     "saved": "El destino se guardó correctamente",
-    "saveError": "No se pudo guardar el destino"
+    "saveError": "No se pudo guardar el destino",
+    "customWebhook": "Personalizado (Webhook)",
+    "customEmail": "Personalizado (correo electrónico)",
+    "customAction": "Personalizado (acción)",
+    "custom": "Personalizado"
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",

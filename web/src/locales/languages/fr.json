@@ -1942,7 +1942,11 @@
     "preview": "Aperçu",
     "test": "Testez",
     "saved": "Destination enregistrée avec succès",
-    "saveError": "Impossible d'enregistrer la destination"
+    "saveError": "Impossible d'enregistrer la destination",
+    "customWebhook": "Personnalisé (Webhook)",
+    "customEmail": "Personnalisé (e-mail)",
+    "customAction": "Personnalisé (Action)",
+    "custom": "Personnalisé"
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",
