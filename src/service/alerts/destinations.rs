@@ -348,7 +348,11 @@ mod tests {
         // Ensure template - should create new one
         let result = ensure_prebuilt_template(org_id, prebuilt_type).await;
 
-        assert!(result.is_ok(), "Should successfully create template");
+        assert!(
+            result.is_ok(),
+            "Should successfully create template, error: {:?}",
+            result.as_ref().err()
+        );
         let template_name = result.unwrap();
         assert_eq!(template_name, "prebuilt_slack");
 
@@ -372,7 +376,11 @@ mod tests {
 
         // Create template first time
         let result1 = ensure_prebuilt_template(org_id, prebuilt_type).await;
-        assert!(result1.is_ok());
+        assert!(
+            result1.is_ok(),
+            "Should successfully create template on first call, error: {:?}",
+            result1.as_ref().err()
+        );
 
         // Get template ID to verify it's the same one later
         let template1 = db::alerts::templates::get(org_id, &template_name)
@@ -381,7 +389,11 @@ mod tests {
 
         // Try to ensure template again - should reuse existing
         let result2 = ensure_prebuilt_template(org_id, prebuilt_type).await;
-        assert!(result2.is_ok());
+        assert!(
+            result2.is_ok(),
+            "Should successfully reuse existing template, error: {:?}",
+            result2.as_ref().err()
+        );
         assert_eq!(result2.unwrap(), template_name);
 
         // Verify it's the same template (not recreated)
@@ -624,6 +636,10 @@ mod tests {
     #[tokio::test]
     async fn test_alert_destination_requires_template() {
         let org_id = "test_org_no_template";
+
+        // Clean up any leftover state
+        let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
+        let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
 
         // Try to create an alert destination without a template
         let dest = Destination {
