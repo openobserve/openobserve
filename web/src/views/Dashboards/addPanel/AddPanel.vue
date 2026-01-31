@@ -808,6 +808,7 @@ import {
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -1639,17 +1640,50 @@ export default defineComponent({
 
     const updateDateTime = (value: object) => {
       if (selectedDate.value && dateTimePickerRef?.value) {
-        const date = dateTimePickerRef.value?.getConsumableDateTime();
+        // CRITICAL FIX (Issue 4): Check if panel has its own time configured
+        // If panel has panel_time_range, use that for rendering instead of global time
+        const panelTimeRange = dashboardPanelData.data.config?.panel_time_range;
 
-        dashboardPanelData.meta.dateTime = {
-          start_time: new Date(date.startTime),
-          end_time: new Date(date.endTime),
-        };
+        let effectiveTime;
 
+        if (panelTimeRange) {
+          // Panel has its own time range configured
+          if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
+            // Convert relative time to absolute time
+            const result = getConsumableRelativeTime(panelTimeRange.relativeTimePeriod);
+            if (result) {
+              effectiveTime = {
+                start_time: new Date(result.startTime),
+                end_time: new Date(result.endTime),
+              };
+            }
+          } else if (panelTimeRange.type === 'absolute') {
+            // Use absolute time directly
+            effectiveTime = {
+              start_time: new Date(panelTimeRange.startTime),
+              end_time: new Date(panelTimeRange.endTime),
+            };
+          }
+        }
+
+        // If panel doesn't have its own time or conversion failed, use global time
+        if (!effectiveTime) {
+          const date = dateTimePickerRef.value?.getConsumableDateTime();
+          effectiveTime = {
+            start_time: new Date(date.startTime),
+            end_time: new Date(date.endTime),
+          };
+        }
+
+        // Set the effective time for chart rendering
+        dashboardPanelData.meta.dateTime = effectiveTime;
+
+        // Use global time for variables (as variables should use global time context)
         dateTimeForVariables.value = {
           start_time: new Date(selectedDate.value.startTime),
           end_time: new Date(selectedDate.value.endTime),
         };
+
         router.replace({
           query: {
             ...route.query,
