@@ -60,6 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
+          :show-pagination="panelSchema.config?.show_pagination"
+          :rows-per-page="panelSchema.config?.rows_per_page"
         />
         <div
           v-else-if="panelSchema.type == 'html'"

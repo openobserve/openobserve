@@ -22,9 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         { 'no-position-absolute': store.state.printMode },
         { 'wrap-enabled': wrapCells },
       ]"
-      virtual-scroll
+      :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
-      :rows-per-page-options="[0]"
+      :rows-per-page-options="
+        showPagination ? [rowsPerPage ||10, 20, 50, 100, 250, 500, 1000, 0] : [0]
+      "
       :virtual-scroll-sticky-size-start="48"
       dense
       :wrap-cells="wrapCells"
@@ -104,7 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
       <template v-slot:bottom="scope" v-if="$slots.bottom">
-        <slot name="bottom" v-bind="scope" />
+        <slot
+          name="bottom"
+          v-bind="{
+            ...scope,
+            setRowsPerPage: (val: number) => (pagination.rowsPerPage = val),
+          }"
+        />
       </template>
     </q-table>
   </div>
@@ -114,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useNotifications from "@/composables/useNotifications";
 import { useStickyColumns } from "@/composables/useStickyColumns";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -140,6 +148,16 @@ export default defineComponent({
       required: false,
       type: Object,
       default: () => [],
+    },
+    showPagination: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    rowsPerPage: {
+      required: false,
+      type: Number,
+      default: 10,
     },
   },
   emits: ["row-click"],
@@ -325,10 +343,26 @@ export default defineComponent({
         .catch(() => {});
     };
 
+    // Pagination logic
+    const pagination = ref({
+      rowsPerPage: props.showPagination ? props.rowsPerPage || 10 : 0,
+      page: 1,
+    });
+
+    watch(
+      () => [props.showPagination, props.rowsPerPage],
+      ([newShowPagination, newRowsPerPage]) => {
+        // Force reset pagination when toggle or config changes
+        pagination.value = {
+          ...pagination.value,
+          rowsPerPage: newShowPagination ? newRowsPerPage || 10 : 0,
+          page: 1, // Reset to first page
+        };
+      },
+    );
+
     return {
-      pagination: ref({
-        rowsPerPage: 0,
-      }),
+      pagination,
       downloadTableAsCSV,
       downloadTableAsJSON,
       tableRef,
@@ -402,7 +436,6 @@ export default defineComponent({
     overflow-wrap: break-word;
     white-space: normal !important;
   }
-
 }
 
 .copy-cell-td {
