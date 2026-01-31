@@ -51,6 +51,7 @@ pub struct ListFoldersResponseBody {
 pub enum FolderType {
     Dashboards,
     Alerts,
+    Reports,
 }
 
 /// Common folder fields used in HTTP request and response bodies.
@@ -96,6 +97,7 @@ impl From<FolderType> for config::meta::folder::FolderType {
         match value {
             FolderType::Dashboards => Self::Dashboards,
             FolderType::Alerts => Self::Alerts,
+            FolderType::Reports => Self::Reports,
         }
     }
 }

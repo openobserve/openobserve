@@ -619,8 +619,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/reports/{name}/trigger", put(dashboards::reports::trigger_report))
 
         // Timed annotations
-        .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations))
-        .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations).delete(dashboards::timed_annotations::delete_annotations))
+        .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations).delete(dashboards::timed_annotations::delete_annotations))
+        .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}", delete(dashboards::timed_annotations::delete_annotation_panels))
 
         // Folders (v2)
