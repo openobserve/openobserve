@@ -650,6 +650,7 @@ pub fn service_routes() -> Router {
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
+        .route("/{org_id}/alerts/templates/system/prebuilt", get(alerts::templates::get_system_templates))
         .route("/{org_id}/alerts/templates/{template_name}", get(alerts::templates::get_template).put(alerts::templates::update_template).delete(alerts::templates::delete_template))
         .route("/{org_id}/alerts/templates/bulk", delete(alerts::templates::delete_template_bulk))
 

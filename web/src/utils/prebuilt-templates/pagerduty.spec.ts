@@ -18,7 +18,7 @@ import { pagerdutyTemplate, pagerdutyConfig, pagerdutyDestinationType } from '@/
 describe('pagerduty template', () => {
   describe('pagerdutyTemplate', () => {
     it('has correct name', () => {
-      expect(pagerdutyTemplate.name).toBe('system-prebuilt-pagerduty');
+      expect(pagerdutyTemplate.name).toBe('prebuilt_pagerduty');
     });
 
     it('has type as http', () => {
@@ -47,7 +47,7 @@ describe('pagerduty template', () => {
 
   describe('pagerdutyConfig', () => {
     it('references correct template name', () => {
-      expect(pagerdutyConfig.templateName).toBe('system-prebuilt-pagerduty');
+      expect(pagerdutyConfig.templateName).toBe('prebuilt_pagerduty');
     });
 
     it('has correct headers', () => {

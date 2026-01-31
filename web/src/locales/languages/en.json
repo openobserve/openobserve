@@ -2160,7 +2160,11 @@
     "preview": "Preview",
     "test": "Test",
     "saved": "Destination saved successfully",
-    "saveError": "Failed to save destination"
+    "saveError": "Failed to save destination",
+    "customWebhook": "Custom (Webhook)",
+    "customEmail": "Custom (Email)",
+    "customAction": "Custom (Action)",
+    "custom": "Custom"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",

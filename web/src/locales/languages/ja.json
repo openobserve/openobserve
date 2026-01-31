@@ -1952,7 +1952,11 @@
     "preview": "プレビュー",
     "test": "テスト",
     "saved": "目的地は正常に保存されました",
-    "saveError": "送信先を保存できませんでした"
+    "saveError": "送信先を保存できませんでした",
+    "customWebhook": "カスタム (ウェブフック)",
+    "customEmail": "カスタム (電子メール)",
+    "customAction": "カスタム (アクション)",
+    "custom": "カスタム"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

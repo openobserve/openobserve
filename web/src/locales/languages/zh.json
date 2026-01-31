@@ -1938,7 +1938,11 @@
     "preview": "预览",
     "test": "测试",
     "saved": "目的地已成功保存",
-    "saveError": "保存目标失败"
+    "saveError": "保存目标失败",
+    "customWebhook": "自定义（Webhook）",
+    "customEmail": "自定义（电子邮件）",
+    "customAction": "自定义（操作）",
+    "custom": "自定义"
   },
   "metrics": {
     "searchMetric": "搜索指标",

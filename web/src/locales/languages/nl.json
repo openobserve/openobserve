@@ -1942,7 +1942,11 @@
     "preview": "voorsmaak",
     "test": "Test",
     "saved": "Bestemming succesvol opgeslagen",
-    "saveError": "Het opslaan van de bestemming is mislukt"
+    "saveError": "Het opslaan van de bestemming is mislukt",
+    "customWebhook": "Op maat (Webhook)",
+    "customEmail": "Aangepast (e-mail)",
+    "customAction": "Aangepast (actie)",
+    "custom": "Op maat"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",

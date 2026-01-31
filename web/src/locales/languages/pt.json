@@ -1942,7 +1942,11 @@
     "preview": "prévia",
     "test": "Teste",
     "saved": "Destino salvo com sucesso",
-    "saveError": "Falha ao salvar o destino"
+    "saveError": "Falha ao salvar o destino",
+    "customWebhook": "Personalizado (Webhook)",
+    "customEmail": "Personalizado (e-mail)",
+    "customAction": "Personalizado (Ação)",
+    "custom": "Personalizado"
   },
   "metrics": {
     "searchMetric": "Pesquisar uma métrica",

@@ -137,6 +137,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::templates::save_template,
         request::alerts::templates::update_template,
         request::alerts::templates::delete_template,
+        request::alerts::templates::get_system_templates,
         request::alerts::destinations::list_destinations,
         request::alerts::destinations::get_destination,
         request::alerts::destinations::save_destination,
