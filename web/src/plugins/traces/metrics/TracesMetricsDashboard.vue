@@ -16,70 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="traces-metrics-dashboard tw:w-full tw:pt-2 tw:px-1">
-    <!-- Filters Section -->
+    <!-- Insights Button (always visible, no filter chips) -->
     <div
       v-if="show"
-      class="filters-section tw:flex tw:items-center tw:gap-2 tw:px-1 tw:flex-wrap"
+      class="filters-section tw:flex tw:items-center tw:gap-2 tw:px-1 tw:flex-wrap tw:mb-2"
     >
-      <span class="filters-label tw:text-sm tw:font-semibold">Filters:</span>
-      <!-- Error Only Toggle -->
-      <div
-        class="tw:flex tw:items-center tw:justify-center tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
-      >
-        <q-toggle
-          v-model="showErrorOnly"
-          class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-          size="xs"
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-xs-dark'
-              : 'o2-toggle-button-xs-light'
-          "
-          data-test="error-only-toggle"
-        />
-        <q-icon name="error" size="1.1rem"
-class="tw:mx-1 tw:text-red-500" />
-        <q-tooltip>Show Error Only</q-tooltip>
-      </div>
-
-      <!-- Range Filter Chips -->
-      <div
-        v-for="[panelId, filter] in rangeFilters"
-        :key="panelId"
-        class="filter-chip tw:h-[2rem] tw:px-[0.375rem]"
-        data-test="range-filter-chip"
-      >
-        <span class="chip-label"
-          >{{ filter.panelTitle }}
-          <span v-if="filter.panelTitle === 'Rate' || filter.panelTitle === 'Errors'">
-            : {{ t('latencyInsights.timeRangeSelected') }}
-          </span>
-          <span v-if="filter.panelTitle === 'Duration'">
-            <span v-if="filter.start !== null && filter.end !== null">
-              {{ formatTimeWithSuffix(filter.start) }} -
-              {{ formatTimeWithSuffix(filter.end) }}
-            </span>
-            <span v-else-if="filter.start !== null">
-              >= {{ formatTimeWithSuffix(filter.start) }}
-            </span>
-            <span v-else-if="filter.end !== null">
-              <= {{ formatTimeWithSuffix(filter.end) }}
-            </span>
-            <span v-if="filter.timeStart && filter.timeEnd">
-              | {{ t('latencyInsights.timeRangeSelected') }}
-            </span>
-          </span>
-        </span>
-        <q-icon
-          name="close"
-          size="0.87rem"
-          class="chip-close-icon"
-          @click="removeRangeFilter(panelId)"
-        />
-      </div>
-
-      <!-- Insights Button (always visible) -->
       <q-btn
         outline
         dense
@@ -187,6 +128,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "time-range-selected", range: { start: number; end: number }): void;
+  (e: "filters-updated", filters: string[]): void;
 }>();
 
 const { showErrorNotification } = useNotifications();
@@ -446,7 +388,36 @@ const createRangeFilter = (data, start = null, end = null, timeStart = null, tim
     });
     // Increment version to trigger reactivity
     rangeFiltersVersion.value++;
+
+    // Emit filters to parent to update Query Editor
+    emitFiltersToQueryEditor();
   }
+};
+
+// Build filter strings from current range filters and emit to parent
+const emitFiltersToQueryEditor = () => {
+  const filters: string[] = [];
+
+  searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
+    if (rangeFilter.panelTitle === "Duration") {
+      // Duration filter: use microseconds values from Y-axis
+      if (rangeFilter.start !== null && rangeFilter.end !== null) {
+        filters.push(
+          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+        );
+      } else if (rangeFilter.start !== null) {
+        filters.push(`duration >= ${rangeFilter.start}`);
+      } else if (rangeFilter.end !== null) {
+        filters.push(`duration <= ${rangeFilter.end}`);
+      }
+    } else if (rangeFilter.panelTitle === "Errors") {
+      // Error filter: just add span_status check
+      filters.push("span_status = 'ERROR'");
+    }
+    // Note: Rate filter only affects time range, not query filter
+  });
+
+  emit("filters-updated", filters);
 };
 
 const onDataZoom = ({
@@ -503,6 +474,9 @@ const removeRangeFilter = (panelId: string) => {
   searchObj.meta.metricsRangeFilters.delete(panelId);
   // Increment version to trigger reactivity
   rangeFiltersVersion.value++;
+
+  // Emit updated filters to parent to update Query Editor
+  emitFiltersToQueryEditor();
 };
 
 const formatTimestamp = (timestamp: number) => {

@@ -2477,6 +2477,7 @@
     "viewRelated": "View Related",
     "backToLogs": "Back to Logs",
     "RedMetrics": "RED Metrics",
+    "showErrorOnly": "Show Error Only",
     "loadingStream": "Loading Stream...",
     "noTracesFound": "Result not found.",
     "configureFullTextSearch": "to configure a full text search field to the stream.",
