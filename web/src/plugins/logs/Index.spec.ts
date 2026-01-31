@@ -949,4 +949,120 @@ describe("Logs Index", async () => {
       });
     });
   });
+
+  /**
+   * Build Query Page Support Tests - Index.vue
+   * PR Reference: https://github.com/openobserve/openobserve/pull/10305
+   *
+   * Tests for the new Build Query Page toggle feature:
+   * 1. Build toggle visibility and interaction
+   * 2. Build page handlers (onBuildApply, onBuildCancel, onBuildQueryGenerated)
+   * 3. selectedDateTime computed property
+   * 4. BuildQueryPage ref and integration
+   */
+  describe("Build Query Page Support", () => {
+    describe("Build toggle state", () => {
+      it("should have logsVisualizeToggle initialized to 'logs'", () => {
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+      });
+
+      it("should update toggle state to 'build'", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
+      });
+
+      it("should show logs view when toggle is 'logs'", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+        await flushPromises();
+        // The thirdLevel section should be visible for 'logs' toggle
+        const thirdLevel = wrapper.find('#thirdLevel');
+        expect(thirdLevel.exists()).toBe(true);
+      });
+    });
+
+    describe("Build page handlers", () => {
+      it("should have onBuildApply handler defined", () => {
+        expect(wrapper.vm.onBuildApply).toBeDefined();
+        expect(typeof wrapper.vm.onBuildApply).toBe("function");
+      });
+
+      it("should update query and switch to logs on onBuildApply", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+
+        const testQuery = 'SELECT * FROM "test_stream"';
+        wrapper.vm.onBuildApply(testQuery);
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.data.query).toBe(testQuery);
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+      });
+
+      it("should have onBuildCancel handler defined", () => {
+        expect(wrapper.vm.onBuildCancel).toBeDefined();
+        expect(typeof wrapper.vm.onBuildCancel).toBe("function");
+      });
+
+      it("should switch to logs view on onBuildCancel", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+
+        wrapper.vm.onBuildCancel();
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+      });
+
+      it("should have onBuildQueryGenerated handler defined", () => {
+        expect(wrapper.vm.onBuildQueryGenerated).toBeDefined();
+        expect(typeof wrapper.vm.onBuildQueryGenerated).toBe("function");
+      });
+
+      it("should sync generated query on onBuildQueryGenerated", async () => {
+        const testQuery = 'SELECT histogram(_timestamp) FROM "logs"';
+        wrapper.vm.onBuildQueryGenerated(testQuery);
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.data.query).toBe(testQuery);
+      });
+
+      it("should not update query if onBuildQueryGenerated receives empty string", async () => {
+        const originalQuery = wrapper.vm.searchObj.data.query;
+        wrapper.vm.onBuildQueryGenerated("");
+        await flushPromises();
+
+        // Query should remain unchanged when empty string is passed
+        expect(wrapper.vm.searchObj.data.query).toBe(originalQuery);
+      });
+    });
+
+    describe("selectedDateTime computed", () => {
+      it("should have selectedDateTime computed property defined", () => {
+        expect(wrapper.vm.selectedDateTime).toBeDefined();
+      });
+
+      it("should return datetime object with start_time and end_time", () => {
+        const dateTime = wrapper.vm.selectedDateTime;
+        expect(dateTime).toHaveProperty("start_time");
+        expect(dateTime).toHaveProperty("end_time");
+      });
+
+      it("should include valueType in selectedDateTime", () => {
+        const dateTime = wrapper.vm.selectedDateTime;
+        expect(dateTime).toHaveProperty("valueType");
+      });
+
+      it("should include relativeTimePeriod in selectedDateTime", () => {
+        const dateTime = wrapper.vm.selectedDateTime;
+        expect(dateTime).toHaveProperty("relativeTimePeriod");
+      });
+    });
+
+    describe("BuildQueryPage ref", () => {
+      it("should have buildQueryPageRef defined", () => {
+        expect(wrapper.vm.buildQueryPageRef).toBeDefined();
+      });
+    });
+  });
 });
