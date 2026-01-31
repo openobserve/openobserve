@@ -178,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @addFieldToTable="handleAddFieldToTable"
           @closeColumn="handleCloseColumn"
           @expandRow="handleExpandRow"
+          @view-trace="handleViewTrace"
           @show-correlation="handleNestedCorrelation"
           data-test="logs-tenstack-table"
         />
@@ -286,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
@@ -294,6 +296,7 @@ import { date, copyToClipboard, useQuasar } from "quasar";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
+import { searchState } from "@/composables/useLogs/searchState";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -311,7 +314,9 @@ const emit = defineEmits<{
 // Composables
 const { t } = useI18n();
 const store = useStore();
+const router = useRouter();
 const $q = useQuasar();
+const { searchObj } = searchState();
 
 // Use correlated logs composable
 const {
@@ -929,6 +934,39 @@ const handleExpandRow = (row: any) => {
   } else {
     expandedRows.value.push(row);
   }
+};
+
+const handleViewTrace = (log: any) => {
+  console.log("[CorrelatedLogsTable] View trace clicked:", log);
+
+  // 15 mins +- from the log timestamp
+  const from = log[store.state.zoConfig.timestamp_column] - 900000000;
+  const to = log[store.state.zoConfig.timestamp_column] + 900000000;
+  const refresh = 0;
+
+  const query: any = {
+    name: "traceDetails",
+    query: {
+      stream: searchObj.meta.selectedTraceStream,
+      from,
+      to,
+      refresh,
+      org_identifier: store.state.selectedOrganization.identifier,
+      trace_id:
+        log[
+          store.state.organizationData.organizationSettings
+            .trace_id_field_name
+        ],
+      reload: "true",
+    },
+  };
+
+  query["span_id"] =
+    log[
+      store.state.organizationData.organizationSettings.span_id_field_name
+    ];
+
+  router.push(query);
 };
 
 const handleNestedCorrelation = (row: any) => {

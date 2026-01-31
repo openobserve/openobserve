@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-open="store.state.isAiChatEnabled"
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
+          :appendMode="aiChatAppendMode"
         />
       </div>
     </div>
@@ -315,6 +316,7 @@ export default defineComponent({
     );
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
+    const aiChatAppendMode = ref(true);
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
 
@@ -1062,15 +1064,22 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (value: any) => {
+    const sendToAiChat = (value: any, append: boolean = true) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
-      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
-      //so to force trigger we do this
+
+      // Set the append mode
+      aiChatAppendMode.value = append;
+
+      // Always clear and set to trigger the watcher in O2AIChat
       aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
+        // Clear it after another tick so it doesn't accumulate in parent
+        nextTick(() => {
+          aiChatInputContext.value = "";
+        });
       });
     };
 
@@ -1134,6 +1143,7 @@ export default defineComponent({
       removeFirstTimeLogin,
       sendToAiChat,
       aiChatInputContext,
+      aiChatAppendMode,
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
