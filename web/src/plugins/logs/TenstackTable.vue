@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     cell.column.columnDef.id ===
                     store.state.zoConfig.timestamp_column
                   "
-                  class="tw:absolute tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                  class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
                   @send-to-ai-chat="
                     sendToAiChat(JSON.stringify(cell.row.original), true)
                   "
@@ -1034,7 +1034,7 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
+const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
   if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -1046,14 +1046,14 @@ const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
     //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
     //otherwise we need to filter the row based on the columns that user have applied
     if (checkIfSourceColumnPresent(props.columns)) {
-      emits("sendToAiChat", JSON.stringify(row));
+      emits("sendToAiChat", JSON.stringify(row), append);
     } else {
       //we need to filter the row based on the columns that user have applied
       const filteredRow = filterRowBasedOnColumns(row, props.columns);
-      emits("sendToAiChat", JSON.stringify(filteredRow));
+      emits("sendToAiChat", JSON.stringify(filteredRow), append);
     }
   } else {
-    emits("sendToAiChat", value);
+    emits("sendToAiChat", value, append);
   }
 };
 

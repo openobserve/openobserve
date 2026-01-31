@@ -38,7 +38,7 @@ pub fn config_node_to_proto(node: ConfigNode) -> NodeDetails {
             Role::Router => ProtoRole::Router as i32,
             Role::AlertManager => ProtoRole::AlertManager as i32,
             Role::FlattenCompactor => ProtoRole::FlattenCompactor as i32,
-            Role::ScriptServer => ProtoRole::ScriptServer as i32,
+            Role::ActionServer => ProtoRole::ScriptServer as i32,
         })
         .collect();
 
@@ -97,7 +97,7 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
             r if r == ProtoRole::Router as i32 => Some(Role::Router),
             r if r == ProtoRole::AlertManager as i32 => Some(Role::AlertManager),
             r if r == ProtoRole::FlattenCompactor as i32 => Some(Role::FlattenCompactor),
-            r if r == ProtoRole::ScriptServer as i32 => Some(Role::ScriptServer),
+            r if r == ProtoRole::ScriptServer as i32 => Some(Role::ActionServer),
             _ => None,
         })
         .collect();

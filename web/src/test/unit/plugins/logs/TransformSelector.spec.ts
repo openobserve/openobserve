@@ -410,8 +410,16 @@ describe("TransformSelector.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should disable everything when in visualize mode", () => {
+    /**
+     * VRL Visualization Support Tests - Updated behavior
+     * PR Reference: https://github.com/openobserve/openobserve/pull/9295
+     *
+     * BEFORE: Transform selector was disabled in visualize mode
+     * AFTER: Transform selector is now enabled in visualize mode to support VRL functions
+     */
+    it("should NOT disable toggle in visualize mode when transformType is set (VRL support)", () => {
       mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "function";
 
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
@@ -435,6 +443,93 @@ describe("TransformSelector.vue", () => {
         },
       });
 
+      // With VRL support, toggle should be enabled when transformType is set
+      // The disable condition is now only: !searchObj.data.transformType
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should still disable toggle when no transformType regardless of visualize mode", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = ""; // Empty - no transform type
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": {
+              template: '<div class="toggle" :disable="$attrs.disable" />',
+            },
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": { template: "<div><slot /></div>" },
+            "q-btn": true,
+            "q-icon": true,
+            "q-tooltip": true,
+          },
+        },
+      });
+
+      // Toggle should be disabled when no transformType
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should NOT disable save button in visualize mode when transformType is function (VRL support)", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "function";
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": true,
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": { template: "<div><slot /></div>" },
+            "q-btn": {
+              template: '<button :disable="$attrs.disable" />',
+            },
+            "q-icon": true,
+            "q-tooltip": true,
+          },
+        },
+      });
+
+      // Save button should be enabled for function type even in visualize mode
+      // The disable condition is now only: searchObj.data.transformType !== 'function'
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should NOT disable dropdown in visualize mode (VRL support)", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "function";
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": true,
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": {
+              template: '<div class="dropdown" :disable="$attrs.disable"><slot /></div>',
+            },
+            "q-btn": true,
+            "q-icon": true,
+            "q-tooltip": true,
+          },
+        },
+      });
+
+      // Dropdown disable condition was completely removed
       expect(wrapper.exists()).toBe(true);
     });
   });
@@ -635,6 +730,157 @@ describe("TransformSelector.vue", () => {
 
       const btnGroup = wrapper.find(".btn-group");
       expect(btnGroup.classes()).toContain("dark-theme");
+    });
+  });
+
+  /**
+   * VRL Visualization Support Tests - Computed Properties
+   * PR Reference: https://github.com/openobserve/openobserve/pull/9295
+   *
+   * Tests for the changes to transformsLabel and getTransformLabelTooltip computed properties
+   * that removed the visualization mode restrictions.
+   */
+  describe("VRL Visualization Support - Computed Properties", () => {
+    it("should NOT show 'not supported for visualization' in transformsLabel (removed)", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "function";
+      mockSearchObj.data.selectedTransform = null;
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": true,
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": {
+              template: '<div :label="$attrs.label"><slot /></div>',
+            },
+            "q-btn": true,
+            "q-icon": true,
+            "q-tooltip": true,
+          },
+        },
+      });
+
+      // transformsLabel should show "Function" not the visualization restriction message
+      // The line "if (searchObj.meta.logsVisualizeToggle === 'visualize') return t(...)" was removed
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should show standard function label in visualize mode (VRL support)", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "function";
+      mockSearchObj.data.selectedTransform = null;
+      mockIsActionsEnabled.value = true;
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": true,
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": { template: "<div><slot /></div>" },
+            "q-btn": true,
+            "q-icon": true,
+            "q-tooltip": true,
+          },
+        },
+      });
+
+      // Label should be "Function" in visualize mode now
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should show standard action label in visualize mode (VRL support)", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "action";
+      mockSearchObj.data.selectedTransform = null;
+      mockIsActionsEnabled.value = true;
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": true,
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": { template: "<div><slot /></div>" },
+            "q-btn": true,
+            "q-icon": true,
+            "q-tooltip": true,
+          },
+        },
+      });
+
+      // Label should be "Action" in visualize mode now
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should show standard tooltip in visualize mode (VRL support)", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "function";
+      mockSearchObj.meta.showTransformEditor = false;
+      mockIsActionsEnabled.value = true;
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": true,
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": { template: "<div><slot /></div>" },
+            "q-btn": true,
+            "q-icon": true,
+            "q-tooltip": { template: "<div class='tooltip'><slot /></div>" },
+          },
+        },
+      });
+
+      // Tooltip should show "Show Function Editor" not visualization restriction message
+      // The line "if (searchObj.meta.logsVisualizeToggle === 'visualize') return t(...)" was removed
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should show 'Save' tooltip for function type in visualize mode (VRL support)", () => {
+      mockSearchObj.meta.logsVisualizeToggle = "visualize";
+      mockSearchObj.data.transformType = "function";
+
+      const wrapper = mount(TransformSelector, {
+        props: defaultProps,
+        global: {
+          plugins: [store, i18n, Quasar],
+          mocks: {
+            $q,
+          },
+          stubs: {
+            "q-toggle": true,
+            "q-btn-group": { template: "<div><slot /></div>" },
+            "q-btn-dropdown": { template: "<div><slot /></div>" },
+            "q-btn": true,
+            "q-icon": true,
+            "q-tooltip": { template: "<div class='tooltip'><slot /></div>" },
+          },
+        },
+      });
+
+      // Save button tooltip should show "Save" not "Not supported for visualization"
+      // The ternary check for logsVisualizeToggle === 'visualize' was removed
+      expect(wrapper.exists()).toBe(true);
     });
   });
 });

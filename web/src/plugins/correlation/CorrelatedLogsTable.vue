@@ -53,17 +53,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="view_column"
               class="o2-secondary-button"
               data-test="column-visibility-dropdown"
-              auto-close
               :disable="!hasResults"
             >
               <q-list class="column-visibility-list">
+                <!-- Select All / Deselect All -->
                 <q-item
-                  v-for="field in availableFields"
+                  dense
+                  clickable
+                  @click="toggleSelectAll"
+                  class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  data-test="select-all-columns"
+                >
+                  <q-item-section avatar>
+                    <q-checkbox
+                      :model-value="areAllColumnsSelected"
+                      :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
+                      @update:model-value="toggleSelectAll"
+                      dense
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label class="tw:font-semibold">
+                      {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+
+                <!-- Draggable Column Items -->
+                <q-item
+                  v-for="(field, index) in orderedFields"
                   :key="field"
                   dense
                   clickable
                   @click="toggleColumnVisibility(field)"
                   :disable="field === '_timestamp'"
+                  draggable="true"
+                  @dragstart="handleDragStart($event, index)"
+                  @dragover.prevent
+                  @drop="handleDrop($event, index)"
+                  :class="{ 'dragging': draggedIndex === index }"
+                  :data-test="`column-item-${field}`"
+                  class="column-item"
                 >
                   <q-item-section avatar>
                     <q-checkbox
@@ -75,6 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ field }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-icon
+                      name="drag_indicator"
+                      size="xs"
+                      class="drag-handle tw:cursor-move"
+                    />
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -141,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @addFieldToTable="handleAddFieldToTable"
           @closeColumn="handleCloseColumn"
           @expandRow="handleExpandRow"
+          @view-trace="handleViewTrace"
           @show-correlation="handleNestedCorrelation"
           data-test="logs-tenstack-table"
         />
@@ -249,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
@@ -257,6 +296,7 @@ import { date, copyToClipboard, useQuasar } from "quasar";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
+import { searchState } from "@/composables/useLogs/searchState";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -274,7 +314,9 @@ const emit = defineEmits<{
 // Composables
 const { t } = useI18n();
 const store = useStore();
+const router = useRouter();
 const $q = useQuasar();
+const { searchObj } = searchState();
 
 // Use correlated logs composable
 const {
@@ -304,6 +346,66 @@ const wrapTableCells = ref(false);
 const expandedRows = ref<any[]>([]);
 const selectedFields = ref<any[]>([]);
 const visibleColumns = ref<Set<string>>(new Set());
+const columnOrder = ref<string[]>([]);
+const draggedIndex = ref<number | null>(null);
+
+// Storage keys for persisting state
+const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
+const STORAGE_KEY_ORDER = "correlatedLogs_columnOrder";
+
+// Load saved column state from localStorage
+const loadColumnState = () => {
+  try {
+    const savedColumns = localStorage.getItem(STORAGE_KEY_COLUMNS);
+    const savedOrder = localStorage.getItem(STORAGE_KEY_ORDER);
+
+    if (savedColumns) {
+      const parsed = JSON.parse(savedColumns);
+      visibleColumns.value = new Set(parsed);
+    }
+
+    if (savedOrder) {
+      columnOrder.value = JSON.parse(savedOrder);
+    }
+  } catch (error) {
+    console.warn("[CorrelatedLogsTable] Failed to load column state:", error);
+  }
+};
+
+// Save column state to localStorage
+const saveColumnState = () => {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY_COLUMNS,
+      JSON.stringify(Array.from(visibleColumns.value))
+    );
+    localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(columnOrder.value));
+  } catch (error) {
+    console.warn("[CorrelatedLogsTable] Failed to save column state:", error);
+  }
+};
+
+// Load state on component mount
+onMounted(() => {
+  loadColumnState();
+});
+
+// Watch for changes and save to localStorage
+watch(
+  visibleColumns,
+  () => {
+    saveColumnState();
+  },
+  { deep: true }
+);
+
+watch(
+  columnOrder,
+  () => {
+    saveColumnState();
+  },
+  { deep: true }
+);
 
 // Pending dimensions - for the apply button pattern
 const pendingFilters = ref<Record<string, string>>({ ...currentFilters.value });
@@ -392,7 +494,7 @@ const highlightQuery = computed(() => {
 
 /**
  * Get filter options for a dimension
- * Returns the current value + wildcard option
+ * Returns the current value + wildcard option + original value
  */
 const getFilterOptions = (
   key: string,
@@ -400,9 +502,27 @@ const getFilterOptions = (
 ): Array<{ label: string; value: string }> => {
   const uniqueValues = new Set<string>();
 
-  // Always include current value and wildcard
-  if (currentValue) uniqueValues.add(currentValue);
+  // Always include wildcard option
   uniqueValues.add(SELECT_ALL_VALUE);
+
+  // Get the original value from matched or additional dimensions
+  const originalValue =
+    matchedDimensions.value[key] || additionalDimensions.value[key];
+
+  // Always include original value if it exists and is not SELECT_ALL_VALUE
+  if (originalValue && originalValue !== SELECT_ALL_VALUE) {
+    uniqueValues.add(originalValue);
+  }
+
+  // Include current value if it's different from original and SELECT_ALL_VALUE
+  // This preserves previously selected values in the dropdown
+  if (
+    currentValue &&
+    currentValue !== SELECT_ALL_VALUE &&
+    currentValue !== originalValue
+  ) {
+    uniqueValues.add(currentValue);
+  }
 
   // Add available dimension values if they exist
   if (availableDimensions.value[key]) {
@@ -451,7 +571,48 @@ const availableFields = computed(() => {
   });
 });
 
-// Watch for new fields and initialize visibleColumns
+// Ordered fields based on user's drag-and-drop arrangement
+const orderedFields = computed(() => {
+  if (columnOrder.value.length === 0) {
+    // Initialize order from availableFields
+    return availableFields.value;
+  }
+
+  // Filter out fields that are no longer available and add new fields
+  const currentFields = new Set(availableFields.value);
+  const ordered = columnOrder.value.filter((field) => currentFields.has(field));
+
+  // Add any new fields that aren't in the order yet
+  availableFields.value.forEach((field) => {
+    if (!ordered.includes(field)) {
+      ordered.push(field);
+    }
+  });
+
+  return ordered;
+});
+
+// Check if all columns (except timestamp) are selected
+const areAllColumnsSelected = computed(() => {
+  const selectableFields = availableFields.value.filter(
+    (field) => field !== "_timestamp"
+  );
+  if (selectableFields.length === 0) return false;
+
+  return selectableFields.every((field) => visibleColumns.value.has(field));
+});
+
+// Check if some columns are selected (for indeterminate state)
+const areSomeColumnsSelected = computed(() => {
+  const selectableFields = availableFields.value.filter(
+    (field) => field !== "_timestamp"
+  );
+  if (selectableFields.length === 0) return false;
+
+  return selectableFields.some((field) => visibleColumns.value.has(field));
+});
+
+// Watch for new fields and initialize visibleColumns and columnOrder
 // By default, only show timestamp (which will trigger source column display)
 watch(
   availableFields,
@@ -463,14 +624,18 @@ watch(
         visibleColumns.value = new Set([timestampField]);
       }
     }
+    // Initialize column order if not set
+    if (fields.length > 0 && columnOrder.value.length === 0) {
+      columnOrder.value = [...fields];
+    }
   },
   { immediate: true },
 );
 
-// Generate table columns dynamically from visible fields
+// Generate table columns dynamically from visible fields in custom order
 const tableColumns = computed<ColumnDef<any>[]>(() => {
-  // Filter out hidden columns
-  const visibleFields = availableFields.value.filter((field) =>
+  // Filter out hidden columns, respecting custom order
+  const visibleFields = orderedFields.value.filter((field) =>
     visibleColumns.value.has(field),
   );
 
@@ -591,10 +756,10 @@ const formatTimeRange = (range: {
 watch(
   tableColumns,
   (columns) => {
-    selectedFields.value = columns.map((col) => ({
-      name: col.name,
+    selectedFields.value = columns.map((col: any) => ({
+      name: col.name || col.id,
       type: "Utf8",
-    }));
+    })) as any;
   },
   { immediate: true },
 );
@@ -720,6 +885,48 @@ const toggleColumnVisibility = (field: string) => {
   visibleColumns.value = new Set(visibleColumns.value);
 };
 
+// Toggle all columns (select all / deselect all)
+const toggleSelectAll = () => {
+  const selectableFields = availableFields.value.filter(
+    (field) => field !== "_timestamp"
+  );
+
+  if (areAllColumnsSelected.value) {
+    // Deselect all (except timestamp)
+    visibleColumns.value = new Set(["_timestamp"]);
+  } else {
+    // Select all
+    visibleColumns.value = new Set(availableFields.value);
+  }
+};
+
+// Handle drag start for column reordering
+const handleDragStart = (event: DragEvent, index: number) => {
+  draggedIndex.value = index;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+  }
+};
+
+// Handle drop for column reordering
+const handleDrop = (event: DragEvent, dropIndex: number) => {
+  event.preventDefault();
+
+  if (draggedIndex.value === null || draggedIndex.value === dropIndex) {
+    draggedIndex.value = null;
+    return;
+  }
+
+  // Reorder the columnOrder array
+  const newOrder = [...orderedFields.value];
+  const draggedField = newOrder[draggedIndex.value];
+  newOrder.splice(draggedIndex.value, 1);
+  newOrder.splice(dropIndex, 0, draggedField);
+
+  columnOrder.value = newOrder;
+  draggedIndex.value = null;
+};
+
 const handleExpandRow = (row: any) => {
   const index = expandedRows.value.findIndex((r) => r === row);
   if (index >= 0) {
@@ -727,6 +934,39 @@ const handleExpandRow = (row: any) => {
   } else {
     expandedRows.value.push(row);
   }
+};
+
+const handleViewTrace = (log: any) => {
+  console.log("[CorrelatedLogsTable] View trace clicked:", log);
+
+  // 15 mins +- from the log timestamp
+  const from = log[store.state.zoConfig.timestamp_column] - 900000000;
+  const to = log[store.state.zoConfig.timestamp_column] + 900000000;
+  const refresh = 0;
+
+  const query: any = {
+    name: "traceDetails",
+    query: {
+      stream: searchObj.meta.selectedTraceStream,
+      from,
+      to,
+      refresh,
+      org_identifier: store.state.selectedOrganization.identifier,
+      trace_id:
+        log[
+          store.state.organizationData.organizationSettings
+            .trace_id_field_name
+        ],
+      reload: "true",
+    },
+  };
+
+  query["span_id"] =
+    log[
+      store.state.organizationData.organizationSettings.span_id_field_name
+    ];
+
+  router.push(query);
 };
 
 const handleNestedCorrelation = (row: any) => {
@@ -823,6 +1063,36 @@ watch(
 // Smooth transitions
 .tw\:overflow-auto {
   scroll-behavior: smooth;
+}
+
+// Column visibility list styling
+.column-visibility-list {
+  max-height: 400px;
+  overflow-y: auto;
+  min-width: 250px;
+
+  .column-item {
+    cursor: grab;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: var(--o2-hover-bg);
+    }
+
+    &.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+
+    .drag-handle {
+      opacity: 0.4;
+      transition: opacity 0.2s ease;
+    }
+
+    &:hover .drag-handle {
+      opacity: 0.8;
+    }
+  }
 }
 
 // Responsive adjustments
