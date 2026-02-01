@@ -912,15 +912,15 @@ fn calculate_deltas_multi(
     let mut deltas = Vec::new();
     let mut cache_duration = 0_i64;
 
-    let mut current_start_time = start_time;
-    let mut current_end_time = start_time;
+    let mut current_start_time = end_time;
+    let mut current_end_time = end_time;
 
-    // sort the results by response start time
+    // sort the results by response end time descending
     let mut results = results.to_vec();
-    results.sort_by(|a, b| a.response_start_time.cmp(&b.response_start_time));
+    results.sort_by(|a, b| b.response_end_time.cmp(&a.response_end_time));
     for meta in results {
         cache_duration += meta.response_end_time - meta.response_start_time;
-        current_end_time = meta.response_end_time;
+        current_start_time = meta.response_start_time;
         calculate_deltas(
             &ResultCacheMeta {
                 start_time: meta.response_start_time,
@@ -933,11 +933,11 @@ fn calculate_deltas_multi(
             histogram_interval,
             &mut deltas,
         );
-        current_start_time = current_end_time;
+        current_end_time = current_start_time;
     }
 
-    // Check if there is a gap at the end
-    if current_end_time < end_time {
+    // Check if there is a gap at the start
+    if current_start_time > start_time {
         calculate_deltas(
             &ResultCacheMeta {
                 start_time: current_start_time,
@@ -945,8 +945,8 @@ fn calculate_deltas_multi(
                 is_aggregate,
                 is_descending,
             },
-            current_start_time,
-            end_time,
+            start_time,
+            current_end_time,
             histogram_interval,
             &mut deltas,
         );
