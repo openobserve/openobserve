@@ -61,6 +61,12 @@ pub enum DestinationError {
     #[cfg(feature = "enterprise")]
     #[error("Invalid action id: {0}")]
     InvalidActionId(anyhow::Error),
+    #[error("Prebuilt template not found for type: {0}")]
+    PrebuiltTemplateNotFound(String),
+    #[error("Failed to create template: {0}")]
+    TemplateCreationFailed(String),
+    #[error("Failed to retrieve template: {0}")]
+    TemplateRetrievalFailed(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {

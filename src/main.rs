@@ -1285,6 +1285,7 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     } else {
         "HTTP"
     };
+    log::info!("Starting Action Server {scheme} server at: {haddr}");
 
     // Build the router for action server
     let app = create_action_server_router()

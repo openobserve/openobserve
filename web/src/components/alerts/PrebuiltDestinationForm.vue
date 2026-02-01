@@ -297,7 +297,8 @@ limitations under the License.
           </template>
         </q-input>
       </div>
-      <div class="col-6 q-py-xs">
+      <!-- CC and Subject fields hidden - not supported by backend Email struct -->
+      <!-- <div class="col-6 q-py-xs">
         <q-input
           v-model="credentials.ccRecipients"
           data-test="email-cc-input"
@@ -334,7 +335,7 @@ limitations under the License.
             </span>
           </template>
         </q-input>
-      </div>
+      </div> -->
     </template>
 
     <!-- Opsgenie Fields -->

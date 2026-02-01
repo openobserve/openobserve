@@ -20,7 +20,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
-use crate::meta::search::SearchEventType;
+use crate::{meta::search::SearchEventType, stats::MemorySize};
 
 /// Custom deserializer that accepts either a comma-separated string or a string array
 fn deserialize_string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
@@ -89,6 +89,12 @@ pub struct ClusterLeader {
     pub last_received: i64,
     #[serde(default)]
     pub updated_by: String, // instance id of ingestor
+}
+
+impl MemorySize for ClusterLeader {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ClusterLeader>() + self.name.mem_size() + self.updated_by.mem_size()
+    }
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/f5fcaa3872ce03808567fabc56afc9cf61c732cb/model/textparse/interface.go#L106-L119

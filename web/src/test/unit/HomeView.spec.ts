@@ -645,7 +645,7 @@ describe("HomeView.vue", () => {
   });
 
   describe("Compressed Size Tile - Cloud Conditional Rendering", () => {
-    it("should not render compressed size tile when isCloud is 'false'", async () => {
+    it("should render compressed size tile when isCloud is 'false'", async () => {
       // Mock with isCloud = 'false'
       vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
 
@@ -672,12 +672,12 @@ describe("HomeView.vue", () => {
       expect(wrapper.vm.isCloud).toBe("false");
       expect(wrapper.vm.config.isCloud).toBe("false");
 
-      // Check that compressed size tile is not in the DOM
+      // Check that compressed size tile is in the DOM
       const compressedTileText = wrapper.text();
-      expect(compressedTileText).not.toContain("Total Data Compressed");
+      expect(compressedTileText).toContain("Total Data Compressed");
     });
 
-    it("should render compressed size tile when isCloud is 'true'", async () => {
+    it("should not render compressed size tile when isCloud is 'true'", async () => {
       // Mock with isCloud = 'true'
       vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
 
@@ -749,9 +749,9 @@ describe("HomeView.vue", () => {
 
       expect(cloudWrapper.vm.config.isCloud).toBe("true");
 
-      // Check that compressed size tile is rendered in the DOM
+      // Check that compressed size tile is not rendered in the DOM
       const compressedTileText = cloudWrapper.text();
-      expect(compressedTileText).toContain("Total Data Compressed");
+      expect(compressedTileText).not.toContain("Total Data Compressed");
 
       cloudWrapper.unmount();
     });
@@ -834,8 +834,8 @@ describe("HomeView.vue", () => {
       cloudWrapper.unmount();
     });
 
-    it("should not render compressed size tile when isCloud is any value other than 'true'", async () => {
-      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null];
+    it("should only render compressed size tile when isCloud is exactly 'false'", async () => {
+      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null, "true"];
 
       for (const testValue of testValues) {
         // Mock with different isCloud values
@@ -870,9 +870,11 @@ describe("HomeView.vue", () => {
 
         expect(testWrapper.vm.config.isCloud).toBe(testValue);
 
-        // Compressed size tile should not be rendered unless value is exactly 'true'
-        if (testValue !== "true") {
-          const compressedTileText = testWrapper.text();
+        // Compressed size tile should only be rendered when value is exactly 'false'
+        const compressedTileText = testWrapper.text();
+        if (testValue === "false") {
+          expect(compressedTileText).toContain("Total Data Compressed");
+        } else {
           expect(compressedTileText).not.toContain("Total Data Compressed");
         }
 
@@ -881,7 +883,7 @@ describe("HomeView.vue", () => {
     });
 
     it("should handle compressed size data properly when tile is conditionally rendered", async () => {
-      // Test non-cloud mode - no compressed tile
+      // Test self-hosted mode (isCloud = false) - compressed tile should be visible
       vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
 
       const mockData = {
@@ -915,13 +917,13 @@ describe("HomeView.vue", () => {
       await flushPromises();
       await nextTick();
 
-      // Data should still be loaded even if tile is not rendered
+      // Data should be loaded and tile should be visible in self-hosted mode
       expect(wrapper.vm.summary.compressed_size_raw).toBe(75);
       expect(wrapper.vm.summary.compressed_data).toBeDefined();
 
-      // But tile should not be visible
+      // Tile should be visible in self-hosted mode (isCloud = false)
       const compressedTileText = wrapper.text();
-      expect(compressedTileText).not.toContain("Total Data Compressed");
+      expect(compressedTileText).toContain("Total Data Compressed");
     });
   });
 

@@ -19,7 +19,7 @@ import { PrebuiltConfig } from './types';
  * Provides predefined template and configuration for Discord webhook notifications
  */
 export const discordTemplate = {
-  name: 'system-prebuilt-discord',
+  name: 'prebuilt_discord',
   body: JSON.stringify({
     username: "OpenObserve Alerts",
     avatar_url: "https://openobserve.ai/favicon.ico",
@@ -73,7 +73,7 @@ export const discordTemplate = {
 };
 
 export const discordConfig: PrebuiltConfig = {
-  templateName: 'system-prebuilt-discord',
+  templateName: 'prebuilt_discord',
   templateBody: discordTemplate.body,
   headers: {
     'Content-Type': 'application/json'

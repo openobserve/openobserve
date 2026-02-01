@@ -41,14 +41,14 @@ const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 pub const NODES_KEY: &str = "/nodes/";
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
-static QUERIER_INTERACTIVE_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
+pub static QUERIER_INTERACTIVE_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
-static QUERIER_BACKGROUND_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
+pub static QUERIER_BACKGROUND_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
-static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
-static FLATTEN_COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
+pub static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
+pub static FLATTEN_COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
-static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
+pub static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
 
 pub async fn add_node_to_cache(node: Node) {
     NODES.write().await.insert(node.uuid.clone(), node);

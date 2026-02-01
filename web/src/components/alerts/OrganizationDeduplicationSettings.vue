@@ -215,7 +215,7 @@ const saving = ref(false);
 
 const localConfig = ref<OrganizationDeduplicationConfig>({
   enabled: true,
-  alert_dedup_enabled: props.config?.alert_dedup_enabled ?? true,
+  alert_dedup_enabled: props.config?.alert_dedup_enabled ?? false,
   alert_fingerprint_groups: props.config?.alert_fingerprint_groups ?? [],
   time_window_minutes: props.config?.time_window_minutes ?? undefined,
   semantic_field_groups: props.config?.semantic_field_groups ?? [],
@@ -295,7 +295,7 @@ const loadConfig = async () => {
       const config = response.data;
       localConfig.value = {
         enabled: config.enabled ?? true,
-        alert_dedup_enabled: config.alert_dedup_enabled ?? true,
+        alert_dedup_enabled: config.alert_dedup_enabled ?? false,
         alert_fingerprint_groups: config.alert_fingerprint_groups ?? [],
         time_window_minutes: config.time_window_minutes ?? undefined,
         semantic_field_groups: config.semantic_field_groups ?? [],
@@ -310,7 +310,7 @@ const loadConfig = async () => {
 
         localConfig.value = {
           enabled: true,
-          alert_dedup_enabled: true,
+          alert_dedup_enabled: false,
           alert_fingerprint_groups: [],
           time_window_minutes: undefined,
           semantic_field_groups: defaultGroups,
@@ -336,7 +336,7 @@ watch(
     if (newVal) {
       localConfig.value = {
         enabled: newVal.enabled ?? true,
-        alert_dedup_enabled: newVal.alert_dedup_enabled ?? true,
+        alert_dedup_enabled: newVal.alert_dedup_enabled ?? false,
         alert_fingerprint_groups: newVal.alert_fingerprint_groups ?? [],
         time_window_minutes: newVal.time_window_minutes ?? undefined,
         semantic_field_groups: newVal.semantic_field_groups ?? [],

@@ -25,6 +25,7 @@ use super::bitvec::BitVec;
 use crate::{
     get_config,
     meta::self_reporting::usage::Stats,
+    stats::MemorySize,
     utils::{
         hash::{Sum64, gxhash},
         json::{self, Value},
@@ -210,13 +211,10 @@ pub struct StreamParams {
     pub stream_type: StreamType,
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
-#[serde(default)]
-pub struct RemoteStreamParams {
-    #[schema(value_type = String)]
-    pub org_id: faststr::FastStr,
-    #[schema(value_type = String)]
-    pub destination_name: faststr::FastStr,
+impl MemorySize for StreamParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamParams>() + self.org_id.mem_size() + self.stream_name.mem_size()
+    }
 }
 
 impl Default for StreamParams {
@@ -256,6 +254,23 @@ impl StreamParams {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListStreamParams {
     pub list: Vec<StreamParams>,
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
+#[serde(default)]
+pub struct RemoteStreamParams {
+    #[schema(value_type = String)]
+    pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
+    pub destination_name: faststr::FastStr,
+}
+
+impl MemorySize for RemoteStreamParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<RemoteStreamParams>()
+            + self.org_id.mem_size()
+            + self.destination_name.mem_size()
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -310,6 +325,12 @@ pub struct FileMeta {
 impl FileMeta {
     pub fn is_empty(&self) -> bool {
         self.records == 0 && self.original_size == 0
+    }
+}
+
+impl MemorySize for FileMeta {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<FileMeta>()
     }
 }
 
@@ -559,6 +580,12 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
     }
 }
 
+impl MemorySize for StreamStats {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamStats>()
+    }
+}
+
 impl From<&FileMeta> for cluster_rpc::FileMeta {
     fn from(req: &FileMeta) -> Self {
         cluster_rpc::FileMeta {
@@ -734,6 +761,12 @@ impl PartialEq for DistinctField {
 }
 impl Eq for DistinctField {}
 
+impl MemorySize for DistinctField {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<DistinctField>() + self.name.mem_size()
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TimeRange {
     /// Start timestamp in microseconds
@@ -749,6 +782,13 @@ impl Display for TimeRange {
         write!(f, "{time_range_start} to {time_range_end}")
     }
 }
+
+impl MemorySize for TimeRange {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<TimeRange>()
+    }
+}
+
 impl TimeRange {
     pub fn new(start: i64, end: i64) -> Self {
         Self { start, end }
@@ -1102,6 +1142,19 @@ impl From<&str> for StreamSettings {
     }
 }
 
+impl MemorySize for StreamSettings {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamSettings>()
+            + self.partition_keys.mem_size()
+            + self.full_text_search_keys.mem_size()
+            + self.index_fields.mem_size()
+            + self.bloom_filter_fields.mem_size()
+            + self.defined_schema_fields.mem_size()
+            + self.distinct_value_fields.mem_size()
+            + self.extended_retention_days.mem_size()
+    }
+}
+
 #[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamPartition {
     pub field: String,
@@ -1160,6 +1213,12 @@ impl StreamPartition {
         } else {
             urlencoding::encode(&val).into_owned()
         }
+    }
+}
+
+impl MemorySize for StreamPartition {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamPartition>() + self.field.mem_size()
     }
 }
 
