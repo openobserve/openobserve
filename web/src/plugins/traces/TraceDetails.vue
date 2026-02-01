@@ -364,6 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ref="traceTreeRef"
                       :search-query="searchQuery"
                       :spanList="spanList"
+                      :selectedSpanId="selectedSpanId"
                       @toggle-collapse="toggleSpanCollapse"
                       @select-span="updateSelectedSpan"
                       @update-current-index="handleIndexUpdate"
