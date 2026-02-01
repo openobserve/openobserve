@@ -2358,7 +2358,8 @@
     "openFields": "Open velden",
     "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
     "fetchingMoreTraces": "Nog meer sporen ophalen...",
-    "showErrorOnly": "Alleen fout weergeven"
+    "showErrorOnly": "Alleen fout weergeven",
+    "openInTraces": "Openen in Traces"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
