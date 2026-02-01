@@ -258,7 +258,11 @@ async fn write_downsampled_vortex(
                 last_min_ts = get_min_timestamp(&batch_result);
 
                 // Write batch to current file (convert to Vortex array)
-                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false);
+                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false).map_err(|e| {
+                    DataFusionError::Execution(format!(
+                        "Failed to convert arrow array to vortex array: {e}"
+                    ))
+                })?;
                 writer.push(array).await?;
             }
 
