@@ -694,4 +694,105 @@ export default class DashboardVariablesScoped {
     const tooltip = this.page.locator('.q-tooltip, [role="tooltip"]').filter({ hasText: new RegExp(expectedText, 'i') });
     await expect(tooltip).toBeVisible({ timeout: 5000 });
   }
+
+  /**
+   * Change variable value and monitor dependent variable API calls
+   * This function is designed for dependency tests where changing one variable
+   * triggers API calls for dependent variables
+   *
+   * @param {string} variableName - Name of the variable to change
+   * @param {Object} options - Configuration options
+   * @param {number} options.optionIndex - Index of option to select (default: 0 for first option)
+   * @param {number} options.expectedAPICalls - Expected number of dependent variable API calls (default: 1)
+   * @param {number} options.timeout - Timeout for API monitoring (default: 15000)
+   * @returns {Promise<Object>} - API monitoring result with actualCount, calls, success, etc.
+   */
+  async changeVariableValueAndMonitorDependencies(variableName, options = {}) {
+    const {
+      optionIndex = 0,
+      expectedAPICalls = 1,
+      timeout = 15000
+    } = options;
+
+    // Dynamic import to avoid circular dependencies
+    const { monitorVariableAPICalls } = await import('../../playwright-tests/utils/variable-helpers.js');
+
+    // Wait for variable dropdown to be visible and ready
+    const varDropdown = this.page.getByLabel(variableName, { exact: true });
+    await varDropdown.waitFor({ state: "visible", timeout: 10000 });
+
+    // Ensure network is idle before clicking
+    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Start monitoring for values stream API call BEFORE opening dropdown
+    const valuesStreamPromise = waitForValuesStreamComplete(this.page, timeout);
+
+    // Start monitoring for dependent variable API calls BEFORE opening dropdown
+    // This ensures we capture any dependent variable updates
+    const apiMonitor = monitorVariableAPICalls(this.page, {
+      expectedCount: expectedAPICalls,
+      timeout: timeout
+    });
+
+    // Click dropdown to open menu
+    await varDropdown.click();
+
+    // Wait for the values stream to complete loading options
+    try {
+      await valuesStreamPromise;
+    } catch (error) {
+      throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
+    }
+
+    // Wait for dropdown menu to open and stabilize
+    const dropdownMenu = this.page.locator('.q-menu').first();
+    await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for options to be present in the dropdown
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000 }
+    );
+
+    // Add a small stabilization delay to ensure options are fully rendered
+    await this.page.waitForTimeout(500);
+
+    // Get the text of the target option before clicking
+    const targetOptionText = await this.page.evaluate((index) => {
+      const options = document.querySelectorAll('[role="option"]');
+      return options.length > index ? options[index].textContent.trim() : null;
+    }, optionIndex);
+
+    if (!targetOptionText) {
+      throw new Error(`Could not find option at index ${optionIndex} in dropdown for variable: ${variableName}`);
+    }
+
+    // Click the target option using evaluate to avoid detachment issues
+    await this.page.evaluate((index) => {
+      const options = document.querySelectorAll('[role="option"]');
+      if (options.length > index) {
+        options[index].click();
+      }
+    }, optionIndex);
+
+    // Wait for dropdown to close
+    await dropdownMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+    // Wait for any dependent variable API calls to complete
+    const apiResult = await apiMonitor;
+
+    // Verify the value actually changed by checking the input value
+    await this.page.waitForTimeout(500);
+    const currentValue = await varDropdown.inputValue().catch(() => '');
+
+    return {
+      ...apiResult,
+      selectedValue: targetOptionText,
+      currentValue: currentValue,
+      variableName: variableName
+    };
+  }
 }

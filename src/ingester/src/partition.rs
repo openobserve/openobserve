@@ -19,6 +19,7 @@ use arrow_schema::Schema;
 use config::{
     meta::stream::FileMeta,
     metrics,
+    stats::MemorySize,
     utils::{
         parquet::{generate_filename_with_time_range, new_parquet_writer},
         record_batch_ext::merge_record_batches,
@@ -282,6 +283,14 @@ impl Partition {
     }
 }
 
+impl MemorySize for Partition {
+    fn mem_size(&self) -> usize {
+        let schema_fields_size = self.schema_fields.mem_size();
+        let files_size = self.files.mem_size();
+        std::mem::size_of::<Partition>() + self.schema.size() + schema_fields_size + files_size
+    }
+}
+
 struct PartitionFile {
     data: Vec<Arc<RecordBatchEntry>>,
 }
@@ -314,5 +323,11 @@ impl PartitionFile {
                 .cloned()
                 .collect()),
         }
+    }
+}
+
+impl MemorySize for PartitionFile {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<PartitionFile>() + self.data.mem_size()
     }
 }

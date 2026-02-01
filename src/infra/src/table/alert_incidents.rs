@@ -18,8 +18,8 @@
 //! Provides CRUD operations for incidents and incident-alert associations.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 use svix_ksuid::KsuidLike;
 
@@ -231,6 +231,22 @@ pub async fn list(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let mut query = alert_incidents::Entity::find()
+        .select_only()
+        // Select all columns EXCEPT topology_context for performance
+        .column(alert_incidents::Column::Id)
+        .column(alert_incidents::Column::OrgId)
+        .column(alert_incidents::Column::CorrelationKey)
+        .column(alert_incidents::Column::Status)
+        .column(alert_incidents::Column::Severity)
+        .column(alert_incidents::Column::StableDimensions)
+        .column(alert_incidents::Column::FirstAlertAt)
+        .column(alert_incidents::Column::LastAlertAt)
+        .column(alert_incidents::Column::ResolvedAt)
+        .column(alert_incidents::Column::AlertCount)
+        .column(alert_incidents::Column::Title)
+        .column(alert_incidents::Column::AssignedTo)
+        .column(alert_incidents::Column::CreatedAt)
+        .column(alert_incidents::Column::UpdatedAt)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .order_by_desc(alert_incidents::Column::LastAlertAt);
 
@@ -257,6 +273,47 @@ pub async fn get_incident_alerts(
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Get actual alert counts for multiple incidents (source of truth)
+///
+/// Returns a HashMap of incident_id -> actual_count from junction table.
+/// Use this to fix denormalized alert_count fields that may be out of sync.
+pub async fn get_alert_counts(
+    incident_ids: &[String],
+) -> Result<std::collections::HashMap<String, i32>, errors::Error> {
+    use sea_orm::FromQueryResult;
+
+    if incident_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    #[derive(Debug, FromQueryResult)]
+    struct CountResult {
+        incident_id: String,
+        count: i64,
+    }
+
+    let results = alert_incident_alerts::Entity::find()
+        .filter(
+            alert_incident_alerts::Column::IncidentId
+                .is_in(incident_ids.iter().map(|s| s.as_str())),
+        )
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .column_as(alert_incident_alerts::Column::IncidentId.count(), "count")
+        .group_by(alert_incident_alerts::Column::IncidentId)
+        .into_model::<CountResult>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(results
+        .into_iter()
+        .map(|r| (r.incident_id, r.count as i32))
+        .collect())
 }
 
 /// Count open incidents for an org

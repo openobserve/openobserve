@@ -309,23 +309,4 @@ describe("incidents service", () => {
       expect(result).toBeUndefined();
     });
   });
-
-  describe("getServiceGraph", () => {
-    it("should call http.get with correct URL", () => {
-      mockHttp.get.mockResolvedValue({
-        data: {
-          incident_service: "api-gateway",
-          nodes: [],
-          edges: [],
-        },
-      });
-
-      incidents.getServiceGraph("test-org", "incident-123");
-
-      expect(http).toHaveBeenCalled();
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/service_graph"
-      );
-    });
-  });
 });

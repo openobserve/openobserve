@@ -21,7 +21,10 @@ use std::{
 use arrow::{array::Int64Array, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use config::utils::record_batch_ext::{RecordBatchExt, convert_json_to_record_batch};
+use config::{
+    stats::MemorySize,
+    utils::record_batch_ext::{RecordBatchExt, convert_json_to_record_batch},
+};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
@@ -171,6 +174,12 @@ impl RecordBatchEntry {
             min_ts,
             max_ts,
         })
+    }
+}
+
+impl MemorySize for RecordBatchEntry {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<RecordBatchEntry>() + self.data.size()
     }
 }
 

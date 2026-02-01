@@ -210,10 +210,31 @@ export default defineComponent({
     };
 
     /**
+     * Helper to get cookie value by name
+     */
+    const getCookie = (name: string): string | null => {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    };
+
+    /**
      * Redirect user to the page where user was redirected from
      * @param redirectURI
      */
     const redirectUser = () => {
+      // Check for AWS Marketplace token (set by backend as cookie) - redirect to setup if present
+      const awsMarketplaceToken = getCookie("aws_marketplace_token");
+      if (awsMarketplaceToken) {
+        router.push({ path: "/marketplace/aws/setup" });
+        return;
+      }
+       // Check for Azure Marketplace token - redirect to setup if present
+      const azureMarketplaceToken = window.sessionStorage.getItem("azure_marketplace_token");
+      if (azureMarketplaceToken) {
+        router.push({ path: "/marketplace/azure/register" });
+        return;
+      }
+
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
       if (redirectURI != null && redirectURI != "") {

@@ -455,21 +455,33 @@ describe("Login.vue", () => {
     });
 
     it("should redirect to sessionStorage URI when available", async () => {
-      mockSessionStorage.getItem.mockReturnValue("/dashboard");
+      // Mock azure_marketplace_token as null so it checks redirectURI
+      mockSessionStorage.getItem.mockImplementation((key: string) => {
+        if (key === "azure_marketplace_token") return null;
+        if (key === "redirectURI") return "/dashboard";
+        return null;
+      });
       const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.redirectUser();
 
+      expect(mockSessionStorage.getItem).toHaveBeenCalledWith("azure_marketplace_token");
       expect(mockSessionStorage.getItem).toHaveBeenCalledWith("redirectURI");
       expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("redirectURI");
       expect(pushSpy).toHaveBeenCalledWith({ path: "/dashboard" });
     });
 
     it("should redirect to external URL when redirectURI contains http", async () => {
-      mockSessionStorage.getItem.mockReturnValue("https://external.com");
+      // Mock azure_marketplace_token as null so it checks redirectURI
+      mockSessionStorage.getItem.mockImplementation((key: string) => {
+        if (key === "azure_marketplace_token") return null;
+        if (key === "redirectURI") return "https://external.com";
+        return null;
+      });
 
       wrapper.vm.redirectUser();
 
+      expect(mockSessionStorage.getItem).toHaveBeenCalledWith("azure_marketplace_token");
       expect(mockSessionStorage.getItem).toHaveBeenCalledWith("redirectURI");
       expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("redirectURI");
       expect(window.location.href).toBe("https://external.com");
@@ -494,7 +506,12 @@ describe("Login.vue", () => {
     });
 
     it("should always remove redirectURI from sessionStorage", async () => {
-      mockSessionStorage.getItem.mockReturnValue("/some-path");
+      // Mock azure_marketplace_token as null so it checks redirectURI
+      mockSessionStorage.getItem.mockImplementation((key: string) => {
+        if (key === "azure_marketplace_token") return null;
+        if (key === "redirectURI") return "/some-path";
+        return null;
+      });
 
       wrapper.vm.redirectUser();
 

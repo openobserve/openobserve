@@ -286,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 mode="expanded"
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
+                :hide-view-related="hideViewRelatedButton"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
@@ -352,6 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :column="cell.column"
                     :row="cell.row.original as any"
                     :selectedStreamFields="selectedStreamFields"
+                    :hide-search-term-actions="hideSearchTermActions"
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
@@ -380,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     cell.column.columnDef.id ===
                     store.state.zoConfig.timestamp_column
                   "
-                  class="tw:absolute tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                  class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
                   @send-to-ai-chat="
                     sendToAiChat(JSON.stringify(cell.row.original), true)
                   "
@@ -488,6 +490,14 @@ const props = defineProps({
   selectedStreamFields: {
     type: Array as PropType<StreamField[]>,
     default: () => [],
+  },
+  hideSearchTermActions: {
+    type: Boolean,
+    default: false,
+  },
+  hideViewRelatedButton: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -608,6 +618,25 @@ watch(
     deep: true,
   },
 );
+
+// watch(
+//   () => props.highlightQuery,
+//   async (newVal, oldVal) => {
+//     // Only re-process if highlightQuery actually changed and we have data
+//     if (newVal !== oldVal && props.columns?.length && tableRows.value?.length) {
+//       await nextTick();
+
+//       processHitsInChunks(
+//         tableRows.value,
+//         props.columns,
+//         true, // Clear cache to re-process with new highlight query
+//         props.highlightQuery,
+//         100,
+//         selectedStreamFtsKeys.value,
+//       );
+//     }
+//   },
+// );
 
 watch(
   () => columnOrder.value,
@@ -1005,7 +1034,7 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
+const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
   if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -1017,14 +1046,14 @@ const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
     //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
     //otherwise we need to filter the row based on the columns that user have applied
     if (checkIfSourceColumnPresent(props.columns)) {
-      emits("sendToAiChat", JSON.stringify(row));
+      emits("sendToAiChat", JSON.stringify(row), append);
     } else {
       //we need to filter the row based on the columns that user have applied
       const filteredRow = filterRowBasedOnColumns(row, props.columns);
-      emits("sendToAiChat", JSON.stringify(filteredRow));
+      emits("sendToAiChat", JSON.stringify(filteredRow), append);
     }
   } else {
-    emits("sendToAiChat", value);
+    emits("sendToAiChat", value, append);
   }
 };
 

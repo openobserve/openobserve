@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="viewModeOptions"
           dense
           unelevated
+          padding="0.325rem 0.5rem"
           class="tw:border tw:rounded"
         />
         <q-input

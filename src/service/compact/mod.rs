@@ -44,83 +44,12 @@ pub mod worker;
 
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    // check data retention
-    if cfg.compact.data_retention_days <= 0 {
-        return Ok(());
+    // generate retention jobs first
+    if let Err(e) = retention::generate_jobs().await {
+        log::error!("[COMPACTOR] generate retention job error: {e}");
     }
 
-    // check if current hour is allowed for retention
-    if !cfg.compact.retention_allowed_hours.is_empty() {
-        let current_hour = Utc::now().hour();
-        let allowed_hours: Vec<u32> = cfg
-            .compact
-            .retention_allowed_hours
-            .split(',')
-            .filter_map(|s| s.trim().parse::<u32>().ok())
-            .filter(|&h| h < 24)
-            .collect();
-
-        if !allowed_hours.is_empty() && !allowed_hours.contains(&current_hour) {
-            log::info!(
-                "[COMPACTOR] retention skipped: current hour {} is not in allowed hours {:?}",
-                current_hour,
-                allowed_hours
-            );
-            return Ok(());
-        }
-    }
-
-    let now = config::utils::time::now();
-    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-
-    let orgs = db::schema::list_organizations_from_cache().await;
-    for org_id in orgs {
-        for stream_type in ALL_STREAM_TYPES {
-            if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Filelist {
-                continue; // skip data retention for enrichment tables and filelist
-            }
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
-            for stream_name in streams {
-                let Some(node_name) =
-                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
-                else {
-                    continue; // no compactor node
-                };
-                if LOCAL_NODE.name.ne(&node_name) {
-                    continue; // not this node
-                }
-
-                let stream_settings =
-                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
-                        .await
-                        .unwrap_or_default();
-                let stream_data_retention_end = if stream_settings.data_retention > 0 {
-                    now - Duration::try_days(stream_settings.data_retention).unwrap()
-                } else {
-                    data_lifecycle_end
-                };
-
-                let extended_retention_days = &stream_settings.extended_retention_days;
-                // creates jobs to delete data
-                if let Err(e) = retention::generate_retention_job(
-                    &stream_data_retention_end,
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    extended_retention_days,
-                )
-                .await
-                {
-                    log::error!(
-                        "[COMPACTOR] lifecycle: generate_retention_job [{org_id}/{stream_type}/{stream_name}] error: {e}"
-                    );
-                }
-            }
-        }
-    }
-
-    // delete files
+    // then run the jobs to delete the data
     let jobs = db::compact::retention::list().await?;
     for job in jobs {
         let columns = job.split('/').collect::<Vec<&str>>();

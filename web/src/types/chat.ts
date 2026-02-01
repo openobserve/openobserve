@@ -26,6 +26,5 @@ export interface ChatHistoryEntry {
   timestamp: string;
   title: string;
   messages: ChatMessage[];
-  provider: string;
-  model: string;
+  sessionId?: string; // UUID v7 for tracking all API calls in this chat session
 } 

@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 28;
+pub const DB_SCHEMA_VERSION: u64 = 29;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2554,8 +2554,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.tracing_enabled = false;
     }
 
-    if local_node_role.contains(&cluster::Role::ScriptServer) {
-        // script server does not have external dep, so can ignore their config check
+    if local_node_role.contains(&cluster::Role::ActionServer) {
+        // action server does not have external dep, so can ignore their config check
         return Ok(());
     }
 

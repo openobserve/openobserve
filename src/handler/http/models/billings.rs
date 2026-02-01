@@ -39,6 +39,8 @@ pub struct ListSubscriptionResponseBody {
     pub subscription_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub customer_id: Option<String>,
+    /// Billing provider: "stripe" or "aws"
+    pub provider: String,
 }
 
 impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
@@ -46,6 +48,7 @@ impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
         Self {
             subscription_type: value.subscription_type.to_string(),
             customer_id: value.customer_id,
+            provider: value.provider.to_string(),
         }
     }
 }
