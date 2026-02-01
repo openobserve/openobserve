@@ -64,7 +64,62 @@ impl From<PipelineError> for HttpResponse {
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-mcp" = json!({
+            "description": r#"Create a data pipeline for processing and transforming data streams.
+
+PIPELINE STRUCTURE:
+- name: Pipeline name (required, lowercase)
+- source: { "source_type": "realtime" } for real-time pipelines
+- nodes: Array of processing nodes (required)
+- edges: Array of connections between nodes (required)
+
+NODE STRUCTURE (each node requires):
+- id: Unique identifier (use UUID format)
+- io_type: MUST be one of: "input" (source stream), "output" (destination stream), "default" (processing node like function/condition)
+- position: { "x": number, "y": number } for visual layout
+- data: Node configuration (structure depends on node_type)
+
+NODE DATA TYPES:
+1. Stream node (input/output): { "node_type": "stream", "org_id": "default", "stream_name": "your_stream", "stream_type": "logs"|"metrics"|"traces" }
+2. Function node: { "node_type": "function", "name": "function_name", "after_flatten": true|false }
+3. Condition node: { "node_type": "condition", "conditions": <condition_object> }
+
+CONDITION OPERATORS: =, !=, >, >=, <, <=, contains, not_contains
+
+CONDITION FORMATS:
+- Single condition: { "column": "field", "operator": "=", "value": "val", "ignore_case": false }
+- AND conditions: { "and": [<condition>, <condition>, ...] }
+- OR conditions: { "or": [<condition>, <condition>, ...] }
+- NOT condition: { "not": <condition> }
+- Nested: { "and": [{ "column": "a", "operator": "=", "value": "1" }, { "or": [{ "column": "b", "operator": ">", "value": "5" }, { "column": "c", "operator": "contains", "value": "err" }] }] }
+
+CONDITION EXAMPLES:
+- severity = "error": { "column": "severity", "operator": "=", "value": "error" }
+- level > 5: { "column": "level", "operator": ">", "value": "5" }
+- severity = "error" AND level > 5: { "and": [{ "column": "severity", "operator": "=", "value": "error" }, { "column": "level", "operator": ">", "value": "5" }] }
+
+EDGE STRUCTURE:
+- id: Format "e{source_id}-{target_id}"
+- source: Source node id
+- target: Target node id
+
+EXAMPLE - Simple pipeline with function:
+{
+  "name": "my_pipeline",
+  "source": { "source_type": "realtime" },
+  "nodes": [
+    { "id": "input-1", "io_type": "input", "position": {"x": 100, "y": 100}, "data": {"node_type": "stream", "org_id": "default", "stream_name": "source_stream", "stream_type": "logs"} },
+    { "id": "func-1", "io_type": "default", "position": {"x": 100, "y": 200}, "data": {"node_type": "function", "name": "my_function", "after_flatten": true} },
+    { "id": "output-1", "io_type": "output", "position": {"x": 100, "y": 300}, "data": {"node_type": "stream", "org_id": "default", "stream_name": "dest_stream", "stream_type": "logs"} }
+  ],
+  "edges": [
+    { "id": "einput-1-func-1", "source": "input-1", "target": "func-1" },
+    { "id": "efunc-1-output-1", "source": "func-1", "target": "output-1" }
+  ]
+}"#,
+            "category": "pipelines"
+        }))
     )
 )]
 #[post("/{org_id}/pipelines")]
