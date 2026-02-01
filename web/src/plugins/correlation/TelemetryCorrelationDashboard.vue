@@ -644,6 +644,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="correlation-dashboard-embedded">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
+      v-if="!props.hideDimensionFilters"
       :dimensions="pendingDimensions"
       :unstable-dimension-keys="unstableDimensionKeys"
       :get-dimension-options="getDimensionOptions"
@@ -1262,6 +1263,7 @@ interface Props {
   ftsFields?: string[]; // Full text search fields from the source stream (used for trace_id extraction from log body)
   mode?: "dialog" | "embedded-tabs"; // Render mode: 'dialog' = full dialog, 'embedded-tabs' = just tabs content for DetailTable
   externalActiveTab?: string; // For embedded-tabs mode, allows parent to control active tab
+  hideDimensionFilters?: boolean; // Hide dimension filters in embedded-tabs mode
 }
 
 const props = withDefaults(defineProps<Props>(), {
