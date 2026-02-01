@@ -496,6 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :time-range="correlationProps.timeRange"
         :hide-view-related-button="true"
         :hide-search-term-actions="false"
+        :hide-dimension-filters="true"
       />
       <!-- Loading/Empty state when no data -->
       <div
@@ -539,6 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :available-dimensions="correlationProps.availableDimensions"
         :fts-fields="correlationProps.ftsFields"
         :time-range="correlationProps.timeRange"
+        :hide-dimension-filters="true"
         @close="activeTab = 'tags'"
       />
       <!-- Loading/Empty state when no data -->
