@@ -66,7 +66,7 @@ pub(crate) async fn create_tables_from_files<F>(
 where
     F: Fn() + Clone,
 {
-    let mut tables = Vec::new();
+    let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
     let schema_ref = Arc::new(
         schema_ref
             .as_ref()
@@ -109,7 +109,7 @@ where
         && (schema == "enrich" || schema == "enrichment_tables")
     {
         let table = create_table(files, None).await?;
-        tables.push(table);
+        tables.extend(table);
         return Ok(tables);
     }
 
@@ -122,13 +122,13 @@ where
     // Create table for files without timestamp filter
     if !files_without_filter.is_empty() {
         let table = create_table(files_without_filter, None).await?;
-        tables.push(table);
+        tables.extend(table);
     }
 
     // Create table for files with timestamp filter
     if !files_with_filter.is_empty() {
         let table = create_table(files_with_filter, Some(query.time_range)).await?;
-        tables.push(table);
+        tables.extend(table);
     }
 
     Ok(tables)
