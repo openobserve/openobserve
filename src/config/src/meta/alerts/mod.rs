@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::search::SearchEventType,
+    stats::MemorySize,
     utils::{
         json::{Map, Value},
         rand::get_rand_num_within,
@@ -63,6 +64,12 @@ pub struct TriggerCondition {
 
 pub fn default_align_time() -> bool {
     true
+}
+
+impl MemorySize for TriggerCondition {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<TriggerCondition>() + self.timezone.mem_size()
+    }
 }
 
 /// Get the current timezone offset in minutes for a given IANA timezone string
@@ -327,6 +334,12 @@ pub struct CompareHistoricData {
     pub offset: String,
 }
 
+impl MemorySize for CompareHistoricData {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<CompareHistoricData>() + self.offset.mem_size()
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum FrequencyType {
     #[serde(rename = "cron")]
@@ -355,6 +368,20 @@ pub struct QueryCondition {
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
 
+impl MemorySize for QueryCondition {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<QueryCondition>()
+            + self.query_type.to_string().mem_size()
+            + self.conditions.mem_size()
+            + self.sql.mem_size()
+            + self.promql.mem_size()
+            + self.promql_condition.mem_size()
+            + self.aggregation.mem_size()
+            + self.vrl_function.mem_size()
+            + self.multi_time_range.mem_size()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 #[serde(untagged)]
 pub enum ConditionList {
@@ -372,6 +399,19 @@ pub enum ConditionList {
     #[serde(serialize_with = "serialize_legacy_conditions")]
     LegacyConditions(Vec<Condition>),
     EndCondition(Condition),
+}
+
+impl MemorySize for ConditionList {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ConditionList>()
+            + match self {
+                ConditionList::OrNode { or } => or.mem_size(),
+                ConditionList::AndNode { and } => and.mem_size(),
+                ConditionList::NotNode { not } => not.mem_size(),
+                ConditionList::LegacyConditions(conditions) => conditions.mem_size(),
+                ConditionList::EndCondition(condition) => condition.mem_size(),
+            }
+    }
 }
 
 // Custom serializer function to serialize LegacyConditions as AndNode
@@ -491,6 +531,15 @@ pub struct Aggregation {
     pub having: Condition,
 }
 
+impl MemorySize for Aggregation {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Aggregation>()
+            + self.group_by.mem_size()
+            + self.function.to_string().mem_size()
+            + self.having.mem_size()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum AggFunction {
     #[serde(rename = "avg")]
@@ -597,6 +646,14 @@ pub struct Condition {
     pub ignore_case: bool,
 }
 
+impl MemorySize for Condition {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Condition>()
+            + self.column.mem_size()
+            + self.value.to_string().mem_size()
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum Operator {
     #[serde(rename = "=")]
@@ -649,16 +706,7 @@ pub enum LogicalOperator {
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 #[serde(tag = "filterType", rename_all = "lowercase")]
 pub enum ConditionItem {
-    Condition {
-        column: String,
-        operator: Operator,
-        #[schema(value_type = Object)]
-        value: Value,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        ignore_case: Option<bool>,
-        #[serde(rename = "logicalOperator")]
-        logical_operator: LogicalOperator,
-    },
+    Condition(ConditionItemCondition),
     Group {
         #[serde(rename = "logicalOperator")]
         logical_operator: LogicalOperator,
@@ -666,13 +714,41 @@ pub enum ConditionItem {
     },
 }
 
+impl MemorySize for ConditionItem {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ConditionItem>()
+            + match self {
+                ConditionItem::Condition(v) => v.mem_size(),
+                ConditionItem::Group { conditions, .. } => conditions.mem_size(),
+            }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+pub struct ConditionItemCondition {
+    pub column: String,
+    pub operator: Operator,
+    #[schema(value_type = Object)]
+    pub value: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_case: Option<bool>,
+    #[serde(rename = "logicalOperator")]
+    pub logical_operator: LogicalOperator,
+}
+
+impl MemorySize for ConditionItemCondition {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ConditionItemCondition>()
+            + self.column.mem_size()
+            + self.value.to_string().mem_size()
+    }
+}
+
 impl ConditionItem {
     /// Get the logical operator for this condition item
     pub fn logical_operator(&self) -> &LogicalOperator {
         match self {
-            ConditionItem::Condition {
-                logical_operator, ..
-            } => logical_operator,
+            ConditionItem::Condition(v) => &v.logical_operator,
             ConditionItem::Group {
                 logical_operator, ..
             } => logical_operator,
@@ -687,6 +763,14 @@ pub struct ConditionGroup {
     #[serde(rename = "logicalOperator")]
     pub logical_operator: LogicalOperator,
     pub conditions: Vec<ConditionItem>,
+}
+
+impl MemorySize for ConditionGroup {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ConditionGroup>()
+            + self.filter_type.mem_size()
+            + self.conditions.mem_size()
+    }
 }
 
 impl ConditionGroup {
@@ -719,6 +803,16 @@ pub enum AlertConditionParams {
     V1(ConditionList),
     /// v2 format: Linear ConditionGroup (version: 2)
     V2(ConditionGroup),
+}
+
+impl MemorySize for AlertConditionParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<AlertConditionParams>()
+            + match self {
+                AlertConditionParams::V1(conditions) => conditions.mem_size(),
+                AlertConditionParams::V2(conditions) => conditions.mem_size(),
+            }
+    }
 }
 
 impl<'de> Deserialize<'de> for AlertConditionParams {
@@ -1624,13 +1718,13 @@ mod test {
 
     #[test]
     fn test_condition_item_logical_operator() {
-        let condition_item = ConditionItem::Condition {
+        let condition_item = ConditionItem::Condition(ConditionItemCondition {
             column: "status".to_string(),
             operator: Operator::EqualTo,
             value: Value::String("error".to_string()),
             ignore_case: None,
             logical_operator: LogicalOperator::And,
-        };
+        });
 
         assert_eq!(*condition_item.logical_operator(), LogicalOperator::And);
 
@@ -1649,20 +1743,20 @@ mod test {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "status".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
-                ConditionItem::Condition {
+                }),
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
+                }),
             ],
         };
         assert!(condition_group.validate().is_ok());
@@ -1672,20 +1766,20 @@ mod test {
             filter_type: "invalid".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![
-                ConditionItem::Condition {
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "status".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
-                ConditionItem::Condition {
+                }),
+                ConditionItem::Condition(ConditionItemCondition {
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
                     ignore_case: None,
                     logical_operator: LogicalOperator::And,
-                },
+                }),
             ],
         };
         assert!(invalid_condition_group.validate().is_err());

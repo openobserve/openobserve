@@ -40,11 +40,25 @@ export interface Incident {
 }
 
 export interface IncidentTopology {
-  service: string;
-  upstream_services: string[];
-  downstream_services: string[];
+  nodes: AlertNode[];
+  edges: AlertEdge[];
   related_incident_ids: string[];
   suggested_root_cause?: string;
+}
+
+export interface AlertNode {
+  alert_id: string;
+  alert_name: string;
+  service_name: string;
+  alert_count: number;
+  first_fired_at: number;
+  last_fired_at: number;
+}
+
+export interface AlertEdge {
+  from_node_index: number;
+  to_node_index: number;
+  edge_type: "temporal" | "service_dependency";
 }
 
 export interface IncidentAlert {
@@ -84,34 +98,7 @@ export interface IncidentCorrelatedStreams {
   logStreams: StreamInfo[];
   metricStreams: StreamInfo[];
   traceStreams: StreamInfo[];
-  correlationData: CorrelationResponse;
-}
-
-// Service Graph visualization types
-export interface IncidentServiceGraph {
-  incident_service: string;
-  root_cause_service?: string;
-  nodes: IncidentServiceNode[];
-  edges: IncidentServiceEdge[];
-  stats: IncidentGraphStats;
-}
-
-export interface IncidentServiceNode {
-  service_name: string;
-  alert_count: number;
-  is_root_cause: boolean;
-  is_primary: boolean;
-}
-
-export interface IncidentServiceEdge {
-  from: string;
-  to: string;
-}
-
-export interface IncidentGraphStats {
-  total_services: number;
-  total_alerts: number;
-  services_with_alerts: number;
+  correlationData: CorrelationResponse | null;
 }
 
 const incidents = {
@@ -153,8 +140,22 @@ const incidents = {
     status: "open" | "acknowledged" | "resolved"
   ) => {
     return http().patch<Incident>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/status`,
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
       { status }
+    );
+  },
+
+  /**
+   * Update incident details (title, severity, etc.)
+   */
+  updateIncident: (
+    org_identifier: string,
+    incident_id: string,
+    updates: { title?: string; severity?: string }
+  ) => {
+    return http().patch<Incident>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
+      updates
     );
   },
 
@@ -206,6 +207,19 @@ const incidents = {
     const response = await serviceStreamsApi.correlate(org_identifier, request);
     const correlationData = response.data;
 
+    // Handle null response when no service is found
+    if (!correlationData) {
+      return {
+        serviceName: "Unknown Service",
+        matchedDimensions: {},
+        additionalDimensions: dimensions,
+        logStreams: [],
+        metricStreams: [],
+        traceStreams: [],
+        correlationData: null,
+      };
+    }
+
     return {
       serviceName: correlationData.service_name,
       matchedDimensions: correlationData.matched_dimensions || {},
@@ -235,15 +249,6 @@ const incidents = {
       dimensions["traceId"] ||
       dimensions["trace.id"] ||
       dimensions["TraceId"]
-    );
-  },
-
-  /**
-   * Get service graph visualization data for an incident
-   */
-  getServiceGraph: (org_identifier: string, incident_id: string) => {
-    return http().get<IncidentServiceGraph>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/service_graph`
     );
   },
 };

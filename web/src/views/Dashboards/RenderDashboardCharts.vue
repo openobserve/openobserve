@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dashboardId="dashboardData.dashboardId"
             :panelId="viewPanelId"
             :selectedDateForViewPanel="selectedDateForViewPanel"
-            :initialVariableValues="variablesData"
+            :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
             :searchType="searchType"
             @close-panel="() => (showViewPanel = false)"
             @update:initial-variable-values="updateInitialVariableValues"

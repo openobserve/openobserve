@@ -44,11 +44,11 @@ use infra::{
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use super::db::enrichment_table;
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 use crate::service::db::re_pattern::process_association_changes;
 use crate::{
     common::meta::{
@@ -213,12 +213,12 @@ pub fn stream_res(
         stream_type,
     ));
 
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "vectorscan"))]
     let pattern_associations = vec![];
     // because this fn cannot be async, we cannot await on initializing the pattern
     // manager. So instead we do it in best-effort-way, where if it is already initialized,
     // we get the patterns, otherwise report them as empty
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     let pattern_associations = match PATTERN_MANAGER.get() {
         Some(m) => m.get_associations(_org_id, stream_type, stream_name),
         None => vec![],
@@ -861,7 +861,7 @@ pub async fn update_stream_settings(
         settings.partition_time_level = Some(partition_time_level);
     }
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         if let Err(e) = process_association_changes(
             org_id,
@@ -1033,7 +1033,7 @@ pub async fn stream_delete_inner(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         use super::db::re_pattern::remove_stream_associations_after_deletion;
         remove_stream_associations_after_deletion(org_id, stream_name, stream_type).await?;

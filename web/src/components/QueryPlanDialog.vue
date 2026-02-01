@@ -28,16 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
 
       <q-card-section class="query-plan-content full-height q-pa-none">
-        <q-splitter
-          v-model="splitterPosition"
-          class="full-height"
-        >
+        <q-splitter v-model="splitterPosition" class="full-height">
           <!-- Left Pane: SQL Query -->
           <template #before>
             <div class="sql-query-pane full-height">
               <div
                 class="pane-header q-pa-sm tw:px-[1rem] row items-center"
-                :class="store.state.theme === 'dark' ? 'pane-header-dark' : 'pane-header-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'pane-header-dark'
+                    : 'pane-header-light'
+                "
               >
                 <q-icon name="code" size="20px" class="q-mr-sm" />
                 <div class="text-subtitle1 text-weight-medium">SQL Query</div>
@@ -45,7 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator />
               <div
                 class="sql-query-content q-pa-md"
-                :class="store.state.theme === 'dark' ? 'sql-query-content-dark' : 'sql-query-content-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'sql-query-content-dark'
+                    : 'sql-query-content-light'
+                "
               >
                 <div class="sql-query-wrapper">
                   <pre class="sql-query-text">{{ sqlQuery }}</pre>
@@ -58,11 +63,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div class="explain-results-pane full-height">
               <div
-                class="pane-header q-pa-sm tw:px-[1rem]  row items-center"
-                :class="store.state.theme === 'dark' ? 'pane-header-dark' : 'pane-header-light'"
+                class="pane-header q-pa-sm tw:px-[1rem] row items-center"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'pane-header-dark'
+                    : 'pane-header-light'
+                "
               >
                 <div class="text-subtitle1 text-weight-medium">
-                  {{ showAnalyzeResults ? t("search.analyzeResults") : t("search.explainResults") }}
+                  {{
+                    showAnalyzeResults
+                      ? t("search.analyzeResults")
+                      : t("search.explainResults")
+                  }}
                 </div>
                 <q-space />
                 <q-btn
@@ -83,7 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-center">
                   <q-spinner-dots color="primary" size="50px" />
                   <div class="q-mt-md">
-                    {{ isAnalyzing ? t("search.runningAnalyze") : t("search.loadingPlan") }}
+                    {{
+                      isAnalyzing
+                        ? t("search.runningAnalyze")
+                        : t("search.loadingPlan")
+                    }}
                   </div>
                 </div>
               </div>
@@ -98,7 +115,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- EXPLAIN ANALYZE view -->
-              <div v-else-if="showAnalyzeResults" class="plan-container q-pa-md">
+              <div
+                v-else-if="showAnalyzeResults"
+                class="plan-container q-pa-md"
+              >
                 <!-- Metrics Summary Card -->
                 <MetricsSummaryCard
                   v-if="summaryMetrics"
@@ -218,7 +238,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
-    const { buildSearch } = useSearchStream();
+    const { getSearchQueryPayload } = useSearchStream();
 
     const loading = ref(false);
     const error = ref("");
@@ -290,8 +310,12 @@ export default defineComponent({
         // We need to nest Phase 1+ plans as children of Phase 0 RemoteExec
 
         // Separate phases
-        const phase0Hits = responseData.hits.filter((hit: any) => hit.phase === 0);
-        const phase1Hits = responseData.hits.filter((hit: any) => hit.phase === 1);
+        const phase0Hits = responseData.hits.filter(
+          (hit: any) => hit.phase === 0,
+        );
+        const phase1Hits = responseData.hits.filter(
+          (hit: any) => hit.phase === 1,
+        );
 
         if (phase0Hits.length > 0 && phase1Hits.length > 0) {
           // Parse phase 0
@@ -359,11 +383,19 @@ export default defineComponent({
         });
 
         // Fallback: if no plan_type, try to parse from combined text
-        if (!logicalPlan.value && !physicalPlan.value && responseData.hits.length > 0) {
-          const combined = responseData.hits.map((h: any) => h.plan || JSON.stringify(h)).join("\n");
+        if (
+          !logicalPlan.value &&
+          !physicalPlan.value &&
+          responseData.hits.length > 0
+        ) {
+          const combined = responseData.hits
+            .map((h: any) => h.plan || JSON.stringify(h))
+            .join("\n");
 
           // Try to split by plan_type markers
-          const logicalMatch = combined.match(/logical_plan[:\s]+(.+?)(?=physical_plan|$)/is);
+          const logicalMatch = combined.match(
+            /logical_plan[:\s]+(.+?)(?=physical_plan|$)/is,
+          );
           const physicalMatch = combined.match(/physical_plan[:\s]+(.+?)$/is);
 
           if (logicalMatch) {
@@ -380,27 +412,30 @@ export default defineComponent({
       // Parse Server-Sent Events format response
       // Format: event: <event_type>\ndata: <json>\n\n
       try {
-        const lines = sseText.split('\n');
-        let currentEvent = '';
+        const lines = sseText.split("\n");
+        let currentEvent = "";
         let result: any = null;
 
         for (const line of lines) {
           const trimmed = line.trim();
 
-          if (trimmed.startsWith('event:')) {
+          if (trimmed.startsWith("event:")) {
             currentEvent = trimmed.substring(6).trim();
-          } else if (trimmed.startsWith('data:')) {
+          } else if (trimmed.startsWith("data:")) {
             const dataContent = trimmed.substring(5).trim();
 
             // Skip progress events and done marker
-            if (dataContent === '[[DONE]]' || currentEvent === 'progress') {
+            if (dataContent === "[[DONE]]" || currentEvent === "progress") {
               continue;
             }
 
             try {
               const parsed = JSON.parse(dataContent);
               // Look for actual search results with hits
-              if (parsed && (parsed.hits !== undefined || parsed.total !== undefined)) {
+              if (
+                parsed &&
+                (parsed.hits !== undefined || parsed.total !== undefined)
+              ) {
                 result = parsed;
               }
             } catch (e) {
@@ -425,21 +460,9 @@ export default defineComponent({
       showAnalyzeResults.value = false;
 
       try {
-        // Save the current histogram state before calling buildSearch()
-        // This is necessary because buildSearch() modifies the global searchObj.data.histogram
-        // when histogram is turned off, which would clear the title on the logs page
-        const savedHistogram = searchObj.meta.showHistogram === false
-          ? JSON.parse(JSON.stringify(searchObj.data.histogram))
-          : null;
-
-        // Build the complete query using buildSearch()
-        const queryReq = buildSearch();
-
-        // Restore the histogram state after buildSearch() only if histogram is still off
-        // This prevents QueryPlanDialog from clearing the histogram title on the logs page
-        if (savedHistogram !== null && searchObj.meta.showHistogram === false) {
-          searchObj.data.histogram = savedHistogram;
-        }
+        // Build the complete query using getSearchQueryPayload()
+        // This method doesn't mutate searchObj, so no need to save/restore state
+        const queryReq = getSearchQueryPayload();
 
         if (!queryReq || !queryReq.query || !queryReq.query.sql) {
           error.value = t("search.errorFetchingPlan");
@@ -482,7 +505,10 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error fetching explain plan:", err);
-        error.value = err.response?.data?.message || err.message || t("search.errorFetchingPlan");
+        error.value =
+          err.response?.data?.message ||
+          err.message ||
+          t("search.errorFetchingPlan");
       } finally {
         loading.value = false;
       }
@@ -494,21 +520,9 @@ export default defineComponent({
       isAnalyzing.value = true;
 
       try {
-        // Save the current histogram state before calling buildSearch()
-        // This is necessary because buildSearch() modifies the global searchObj.data.histogram
-        // when histogram is turned off, which would clear the title on the logs page
-        const savedHistogram = searchObj.meta.showHistogram === false
-          ? JSON.parse(JSON.stringify(searchObj.data.histogram))
-          : null;
-
-        // Build the complete query using buildSearch()
-        const queryReq = buildSearch();
-
-        // Restore the histogram state after buildSearch() only if histogram is still off
-        // This prevents QueryPlanDialog from clearing the histogram title on the logs page
-        if (savedHistogram !== null && searchObj.meta.showHistogram === false) {
-          searchObj.data.histogram = savedHistogram;
-        }
+        // Build the complete query using getSearchQueryPayload()
+        // This method doesn't mutate searchObj, so no need to save/restore state
+        const queryReq = getSearchQueryPayload();
 
         if (!queryReq || !queryReq.query || !queryReq.query.sql) {
           error.value = t("search.errorRunningAnalyze");
@@ -554,7 +568,10 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error running analyze:", err);
-        error.value = err.response?.data?.message || err.message || t("search.errorRunningAnalyze");
+        error.value =
+          err.response?.data?.message ||
+          err.message ||
+          t("search.errorRunningAnalyze");
       } finally {
         loading.value = false;
         isAnalyzing.value = false;
@@ -580,7 +597,7 @@ export default defineComponent({
           // Reset to logical tab when opening
           activeTab.value = "logical";
         }
-      }
+      },
     );
 
     // Reset activeTab when switching between EXPLAIN and ANALYZE
@@ -591,7 +608,7 @@ export default defineComponent({
           // Switching back to EXPLAIN - reset to logical tab
           activeTab.value = "logical";
         }
-      }
+      },
     );
 
     // Add ESC key listener when dialog opens
@@ -603,7 +620,7 @@ export default defineComponent({
         } else {
           document.removeEventListener("keydown", handleEscKey);
         }
-      }
+      },
     );
 
     return {

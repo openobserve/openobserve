@@ -16,7 +16,10 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
-use config::utils::time::parse_str_to_time;
+use config::{
+    stats::MemorySize,
+    utils::time::{now_micros, parse_str_to_time},
+};
 use vector_enrichment::{Case, IndexHandle, Table};
 use vrl::value::{KeyString, ObjectMap, Value};
 
@@ -34,7 +37,14 @@ pub struct StreamTable {
     pub data: Arc<Vec<vrl::value::Value>>,
 }
 
-impl StreamTable {}
+impl MemorySize for StreamTable {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamTable>()
+            + self.org_id.mem_size()
+            + self.stream_name.mem_size()
+            + self.data.iter().map(|v| v.to_string().len()).sum::<usize>()
+    }
+}
 
 #[async_trait]
 impl Table for StreamTable {
@@ -187,11 +197,17 @@ pub async fn get_enrichment_table_inner(
 
     let values = if (db_stats.end_time > local_last_updated) || local_last_updated == 0 {
         log::debug!("get_enrichment_table: fetching from remote: {org_id}/{table_name}");
+        // Use current timestamp if end_time is 0 (no meta stats exist)
+        let end_time = if db_stats.end_time == 0 {
+            now_micros()
+        } else {
+            db_stats.end_time + 1 // search query end time is not inclusive
+        };
         enrichment_table::get_enrichment_table_data(
             org_id,
             table_name,
             apply_primary_region_if_specified,
-            db_stats.end_time + 1, // search query end time is not inclusive
+            end_time,
         )
         .await?
     } else {

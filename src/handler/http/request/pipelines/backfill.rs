@@ -5,13 +5,15 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! HTTP handlers for backfill job management (Enterprise only)
 
 use axum::{
     Json,
@@ -21,7 +23,9 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::backfill};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use crate::service::alerts::backfill;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillRequest {
@@ -43,6 +47,7 @@ pub struct BackfillResponse {
     pub message: String,
 }
 
+#[cfg(feature = "enterprise")]
 /// Create a backfill job
 ///
 /// Creates a new backfill job to fill gaps in summary streams.
@@ -121,6 +126,34 @@ pub async fn create_backfill(
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill",
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "CreateBackfillJob",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+    ),
+    request_body(
+        content = BackfillRequest,
+        description = "Backfill parameters"
+    ),
+    responses(
+        (status = 403, description = "Enterprise feature", body = ()),
+    ),
+)]
+pub async fn create_backfill(
+    Path((_org_id, _pipeline_id)): Path<(String, String)>,
+    Json(_req): Json<BackfillRequest>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(feature = "enterprise")]
 /// List all backfill jobs for an organization
 ///
 /// Returns a list of all backfill jobs in the specified organization.
@@ -160,6 +193,26 @@ pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines/backfill",
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "ListBackfillJobs",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+    ),
+    responses(
+        (status = 403, description = "Enterprise feature", body = ()),
+    ),
+)]
+pub async fn list_backfills(Path(_org_id): Path<String>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(feature = "enterprise")]
 /// Get backfill job status
 ///
 /// Returns the status of a specific backfill job.
@@ -194,7 +247,7 @@ pub async fn get_backfill(
                     job.pipeline_id,
                     pipeline_id
                 );
-                MetaHttpResponse::not_found(format!(
+                return MetaHttpResponse::not_found(format!(
                     "Backfill job {} not found for pipeline {}",
                     job_id, pipeline_id
                 ));
@@ -219,6 +272,30 @@ pub async fn get_backfill(
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "GetBackfillJob",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+        ("job_id" = String, Path, description = "Backfill job ID"),
+    ),
+    responses(
+        (status = 403, description = "Enterprise feature", body = ()),
+    ),
+)]
+pub async fn get_backfill(
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(feature = "enterprise")]
 /// Enable or disable a backfill job
 ///
 /// Enables (resumes) or disables (pauses) a backfill job.
@@ -307,6 +384,32 @@ pub async fn enable_backfill(
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable",
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "EnableBackfillJob",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+        ("job_id" = String, Path, description = "Backfill job ID"),
+        ("value" = bool, Query, description = "Enable (true) or disable (false) the backfill job"),
+    ),
+    responses(
+        (status = 403, description = "Enterprise feature", body = ()),
+    ),
+)]
+pub async fn enable_backfill(
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+    Query(_query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(feature = "enterprise")]
 /// Delete a backfill job
 ///
 /// Deletes a backfill job permanently.
@@ -387,6 +490,30 @@ pub async fn delete_backfill(
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "DeleteBackfillJob",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+        ("job_id" = String, Path, description = "Backfill job ID"),
+    ),
+    responses(
+        (status = 403, description = "Enterprise feature", body = ()),
+    ),
+)]
+pub async fn delete_backfill(
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(feature = "enterprise")]
 /// Update an existing backfill job
 #[utoipa::path(
     put,
@@ -474,4 +601,37 @@ pub async fn update_backfill(
             MetaHttpResponse::bad_request(e.to_string())
         }
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "UpdateBackfillJob",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+        ("job_id" = String, Path, description = "Backfill job ID"),
+    ),
+    request_body(
+        content = BackfillRequest,
+        description = "Backfill job parameters"
+    ),
+    responses(
+        (status = 403, description = "Enterprise feature", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn update_backfill(
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+    Json(_body): Json<BackfillRequest>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }

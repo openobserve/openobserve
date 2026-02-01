@@ -142,10 +142,9 @@ export class AlertsPage {
             searchAcrossFoldersToggle: '[data-test="alert-list-search-across-folders-toggle"]',
             alertDeleteOption: 'Delete',
 
-            // View Mode Buttons (Alerts / Incidents) - Uses AppTabs component with tab-{value} pattern
-            alertIncidentViewTabs: '[data-test="alert-incident-view-tabs"]',  // Container for view tabs
-            alertsViewTab: '[data-test="tab-alerts"]',
-            incidentsViewTab: '[data-test="tab-incidents"]',
+            // Sidebar menu items for navigation (Alerts and Incidents are now separate pages)
+            alertMenuItem: '[data-test="menu-link-\\/alerts-item"]',
+            incidentsMenuItem: '[data-test="menu-link-\\/incidents-item"]',
 
             // Incidents view locators
             incidentListTable: '[data-test="incident-list-table"]',
@@ -665,77 +664,49 @@ export class AlertsPage {
         await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
     }
 
-    // ==================== VIEW MODE NAVIGATION (ALERTS / INCIDENTS as separate pages) ====================
+    // ==================== ALERTS / INCIDENTS NAVIGATION ====================
+    // Alerts and Incidents are now separate pages accessible via sidebar menu
 
     /**
-     * Navigate to Alerts page with full URL (for initial navigation)
-     * Use this in beforeEach for initial page setup
-     * @param {string} baseUrl - Optional base URL, defaults to logData.alertUrl pattern
+     * Navigate to Alerts page via sidebar menu
      */
-    async navigateToAlertsPage(baseUrl = null) {
-        testLogger.info('Navigating to Alerts page (initial navigation)');
-        const orgId = process.env["ORGNAME"] || 'default';
-        const url = baseUrl ? `${baseUrl}?org_identifier=${orgId}` : `/web/alerts?org_identifier=${orgId}`;
-        await this.page.goto(url);
-        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        await this.waitForLoadingOverlayToDisappear();
-        await this.waitForAlertListPageReady();
-        testLogger.info('Alerts page loaded successfully');
-    }
-
-    /**
-     * Navigate to Alerts page (from another page)
-     * Note: Incidents is now a separate page, not a tab within Alerts
-     */
-    async clickAlertsTab() {
+    async navigateToAlertsPage() {
         testLogger.info('Navigating to Alerts page');
-        const orgId = process.env["ORGNAME"] || 'default';
-        await this.page.goto(`/web/alerts?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.locator(this.locators.alertMenuItem).click();
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
         await this.waitForAlertListPageReady();
         testLogger.info('Navigated to Alerts page');
     }
 
     /**
-     * Navigate to Incidents page
-     * Note: Incidents is now a separate page at /web/incidents
+     * Navigate to Incidents page via sidebar menu
+     * Note: Incidents menu item depends on service_graph_enabled config from the server.
+     * The menu item may take time to render while the config API response is processed.
      */
-    async clickIncidentsTab() {
+    async navigateToIncidentsPage() {
         testLogger.info('Navigating to Incidents page');
-        const orgId = process.env["ORGNAME"] || 'default';
-        await this.page.goto(`/web/incidents?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        // Wait for incidents page to be ready
-        await this.page.locator(this.locators.incidentListTable).waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+        // Wait for the incidents menu item to be available (may take time for config to load)
+        await this.page.locator(this.locators.incidentsMenuItem).waitFor({ state: 'visible', timeout: 30000 });
+        await this.page.locator(this.locators.incidentsMenuItem).click();
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+        await this.page.locator(this.locators.incidentList).waitFor({ state: 'visible', timeout: 30000 });
         testLogger.info('Navigated to Incidents page');
     }
 
     /**
-     * Wait for the current page to be ready
-     * Note: With separate pages, this just ensures the current page is loaded
+     * Verify sidebar menu items are visible for navigation.
+     * Note: The incidents menu item is an enterprise feature that depends on service_graph_enabled.
+     * It may take time to render while waiting for the config API response.
      */
-    async waitForViewTabsReady() {
-        // No tabs to wait for - just ensure page is loaded
-        // This method is kept for backward compatibility
-        testLogger.info('Waiting for page to be ready (no tabs in new UI)');
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    }
-
-    /**
-     * Verify we're on a valid alerts/incidents page
-     * Note: With separate pages, this verifies we're on the expected page
-     */
-    async expectViewModeTabsVisible() {
-        testLogger.info('Verifying page is valid (no tabs in new UI - checking page title)');
-        // Check for either alerts or incidents page title
-        const alertsTitle = this.page.locator('[data-test="alert-list-title"]');
-        const incidentsTitle = this.page.locator('[data-test="incidents-list-title"]');
-        const isAlertsPage = await alertsTitle.isVisible().catch(() => false);
-        const isIncidentsPage = await incidentsTitle.isVisible().catch(() => false);
-        if (!isAlertsPage && !isIncidentsPage) {
-            throw new Error('Not on a valid alerts or incidents page');
-        }
-        testLogger.info(`On ${isAlertsPage ? 'Alerts' : 'Incidents'} page`);
+    async expectSidebarMenuItemsVisible() {
+        testLogger.info('Verifying sidebar menu items are visible');
+        // Alerts menu should be visible quickly
+        await expect(this.page.locator(this.locators.alertMenuItem)).toBeVisible({ timeout: 10000 });
+        // Incidents menu depends on config API - use longer timeout and waitFor pattern
+        // The menu item is dynamically added after config loads with service_graph_enabled=true
+        await this.page.locator(this.locators.incidentsMenuItem).waitFor({ state: 'visible', timeout: 30000 });
+        await expect(this.page.locator(this.locators.incidentsMenuItem)).toBeVisible({ timeout: 5000 });
+        testLogger.info('Sidebar menu items verified');
     }
 
     /**

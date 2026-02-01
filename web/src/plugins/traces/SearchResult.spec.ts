@@ -500,12 +500,13 @@ describe("SearchResult", () => {
     it("should declare all required emits", () => {
       const expectedEmits = [
         "update:scroll",
-        "update:datetime", 
+        "update:datetime",
         "remove:searchTerm",
         "search:timeboxed",
         "get:traceDetails",
+        "metrics:filters-updated",
       ];
-      
+
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
     });
   });

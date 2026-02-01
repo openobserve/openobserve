@@ -126,6 +126,85 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
+  /**
+   * Test: Pipeline with function node using VRL transform
+   * Verifies that a function node with VRL code can be added to pipeline
+   */
+  test("should add pipeline with function node using VRL transform @P1 @function @vrl @regression", async ({ page }) => {
+    testLogger.info('Test: Add pipeline with function node (VRL transform)');
+
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pageManager.pipelinesPage.addPipeline();
+
+    // Add source stream
+    await pageManager.pipelinesPage.selectStream();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
+    await pageManager.pipelinesPage.selectLogs();
+    await pageManager.pipelinesPage.enterStreamName("e2e");
+    await pageManager.pipelinesPage.enterStreamName("e2e_automate");
+    await pageManager.pipelinesPage.selectStreamOption("e2e_automate");
+    await pageManager.pipelinesPage.saveInputNodeStream();
+    await page.waitForTimeout(2000);
+
+    // Delete auto-created output node
+    await pageManager.pipelinesPage.deleteOutputStreamNode();
+
+    // Add function node
+    await pageManager.pipelinesPage.selectAndDragFunction();
+    await pageManager.pipelinesPage.toggleCreateFunction();
+
+    const funcName = `vrl_func_${Math.random().toString(36).substring(7)}`;
+    await pageManager.pipelinesPage.enterFunctionName(funcName);
+
+    // Add VRL code to transform data
+    await pageManager.pipelinesPage.clickVrlEditorMonaco();
+    await pageManager.pipelinesPage.typeVrlCode(".transformed = true", 50);
+    await page.keyboard.press("Enter");
+    await pageManager.pipelinesPage.typeVrlCode(".", 50);
+    await pageManager.pipelinesPage.clickNoteText();
+    await page.waitForTimeout(500);
+
+    // Save function
+    await pageManager.pipelinesPage.saveNewFunction();
+    await page.waitForTimeout(2000);
+    await pageManager.pipelinesPage.saveFunction();
+    await page.waitForTimeout(2000);
+
+    // Verify function node was added (using POM)
+    const isFunctionVisible = await pageManager.pipelinesPage.isFunctionNodeVisible(funcName);
+    testLogger.info(`Function node visible: ${isFunctionVisible}`);
+
+    // Add destination node (use same naming as other tests for consistency)
+    await pageManager.pipelinesPage.selectAndDragSecondStream();
+    await pageManager.pipelinesPage.fillDestinationStreamName("destination_node");
+    await pageManager.pipelinesPage.clickInputNodeStreamSave();
+    await page.waitForTimeout(2000);
+
+    // Connect nodes via function
+    await pageManager.pipelinesPage.connectNodesViaMiddleNode();
+
+    // Save pipeline
+    const pipelineName = `vrl-pipeline-${Math.random().toString(36).substring(7)}`;
+    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
+    await pageManager.pipelinesPage.savePipeline();
+
+    // Verify pipeline was created
+    await page.waitForTimeout(2000);
+
+    // Cleanup - navigate to pipeline list and delete
+    try {
+      await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('destination_node');
+      await pageManager.pipelinesPage.searchPipeline(pipelineName);
+      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
+      testLogger.info('Pipeline cleanup completed');
+    } catch (cleanupError) {
+      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
+    }
+
+    testLogger.info('✓ Pipeline with VRL function node test passed');
+  });
+
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);

@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 27;
+pub const DB_SCHEMA_VERSION: u64 = 29;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -694,6 +694,8 @@ pub struct Auth {
     pub ext_auth_salt: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
+    #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
+    pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
     /// How often to run the background job that deletes expired sessions
     #[env_config(name = "ZO_SESSION_CLEANUP_INTERVAL", default = 3600)]
@@ -2614,8 +2616,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.tracing_enabled = false;
     }
 
-    if local_node_role.contains(&cluster::Role::ScriptServer) {
-        // script server does not have external dep, so can ignore their config check
+    if local_node_role.contains(&cluster::Role::ActionServer) {
+        // action server does not have external dep, so can ignore their config check
         return Ok(());
     }
 

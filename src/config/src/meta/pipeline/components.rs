@@ -18,18 +18,38 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::meta::{
-    alerts::{ConditionGroup, ConditionList, QueryCondition, TriggerCondition},
-    stream::{RemoteStreamParams, StreamParams, StreamType},
+use crate::{
+    meta::{
+        alerts::{ConditionGroup, ConditionList, QueryCondition, TriggerCondition},
+        stream::{RemoteStreamParams, StreamParams, StreamType},
+    },
+    stats::MemorySize,
 };
 
+/// Pipeline source type determines when the pipeline runs.
+/// Use "realtime" for processing data as it arrives, "scheduled" for periodic batch processing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(tag = "source_type")]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum PipelineSource {
+    /// Real-time pipeline: processes data immediately as it's ingested.
+    /// Example: { "source_type": "realtime" }
     Realtime(StreamParams),
+    /// Scheduled pipeline: runs periodically based on trigger_condition.
+    /// Example: { "source_type": "scheduled", "org_id": "default", "stream_type": "logs",
+    /// "query_condition": {...}, "trigger_condition": {...} }
     Scheduled(DerivedStream),
+}
+
+impl MemorySize for PipelineSource {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<PipelineSource>()
+            + match self {
+                PipelineSource::Realtime(stream_params) => stream_params.mem_size(),
+                PipelineSource::Scheduled(derived_stream) => derived_stream.mem_size(),
+            }
+    }
 }
 
 impl Default for PipelineSource {
@@ -79,18 +99,59 @@ impl DerivedStream {
     }
 }
 
+impl MemorySize for DerivedStream {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<DerivedStream>()
+            + self.org_id.mem_size()
+            + self.stream_type.to_string().mem_size()
+            + self.query_condition.mem_size()
+            + self.trigger_condition.mem_size()
+            + self.tz_offset.mem_size()
+            + self.delay.mem_size()
+            + self.start_at.mem_size()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Node {
+    /// Unique identifier for the node (use UUID format)
     pub id: String,
+    /// Node configuration. Structure depends on node_type:
+    /// - stream: { "node_type": "stream", "org_id": "org", "stream_name": "name", "stream_type":
+    ///   "logs"|"metrics"|"traces" }
+    /// - function: { "node_type": "function", "name": "func_name", "after_flatten": bool }
+    /// - condition: { "node_type": "condition", "conditions": {...} }
+    /// - query: { "node_type": "query", "org_id": "org", "stream_type": "logs", "query_condition":
+    ///   {...}, "trigger_condition": {...} }
+    /// - remote_stream: { "node_type": "remote_stream", "org_id": "org", "destination_name":
+    ///   "dest" }
     #[schema(value_type = Object)]
     pub data: NodeData,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, String>>,
+    /// Visual position for UI rendering
     position: Position,
+    /// Node role in the pipeline. MUST be one of:
+    /// - "input": Source stream node (first node in pipeline)
+    /// - "output": Destination stream node (last node in pipeline)
+    /// - "default": Processing node (function, condition, etc.)
+    #[schema(example = "input")]
     io_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     style: Option<NodeStyle>,
+}
+
+impl MemorySize for Node {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Node>()
+            + self.id.mem_size()
+            + self.data.mem_size()
+            + self.position.mem_size()
+            + self.meta.mem_size()
+            + self.io_type.mem_size()
+            + self.style.mem_size()
+    }
 }
 
 impl PartialEq for Node {
@@ -128,11 +189,25 @@ impl Node {
     }
 }
 
+/// Connection between two nodes in the pipeline
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Edge {
+    /// Edge identifier, format: "e{source_id}-{target_id}"
+    #[schema(example = "einput-1-func-1")]
     pub id: String,
+    /// Source node id (data flows from this node)
     pub source: String,
+    /// Target node id (data flows to this node)
     pub target: String,
+}
+
+impl MemorySize for Edge {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Edge>()
+            + self.id.mem_size()
+            + self.source.mem_size()
+            + self.target.mem_size()
+    }
 }
 
 impl Edge {
@@ -154,6 +229,19 @@ pub enum NodeData {
     Condition(ConditionParams),
 }
 
+impl MemorySize for NodeData {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<NodeData>()
+            + match self {
+                NodeData::RemoteStream(remote_stream_params) => remote_stream_params.mem_size(),
+                NodeData::Stream(stream_params) => stream_params.mem_size(),
+                NodeData::Query(derived_stream) => derived_stream.mem_size(),
+                NodeData::Function(function_params) => function_params.mem_size(),
+                NodeData::Condition(condition_params) => condition_params.mem_size(),
+            }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct FunctionParams {
@@ -165,12 +253,28 @@ pub struct FunctionParams {
     pub num_args: u8,
 }
 
+impl MemorySize for FunctionParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<FunctionParams>() + self.name.mem_size()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, ToSchema)]
 pub enum ConditionParams {
     /// v1 format: Tree-based ConditionList (default when no version field)
     V1 { conditions: ConditionList },
     /// v2 format: Linear ConditionGroup (version: 2)
     V2 { conditions: ConditionGroup },
+}
+
+impl MemorySize for ConditionParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ConditionParams>()
+            + match self {
+                ConditionParams::V1 { conditions } => conditions.mem_size(),
+                ConditionParams::V2 { conditions } => conditions.mem_size(),
+            }
+    }
 }
 
 // Custom deserializer to handle missing version field (defaults to V1 for backward compatibility)
@@ -246,10 +350,21 @@ struct Position {
     y: f32,
 }
 
+impl MemorySize for Position {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Position>()
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 struct NodeStyle {
     background_color: Option<String>,
+}
+
+impl MemorySize for NodeStyle {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<NodeStyle>() + self.background_color.mem_size()
+    }
 }
 
 #[cfg(test)]

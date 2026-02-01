@@ -59,6 +59,7 @@ use crate::service::{
 
 mod cache;
 pub mod grpc;
+pub use cache::get_cache_stats;
 
 pub async fn init() -> Result<()> {
     if !config::cluster::LOCAL_NODE.is_querier() {

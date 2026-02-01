@@ -29,6 +29,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::stats::MemorySize;
+
 /// Setting scope levels
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -197,6 +199,21 @@ pub struct SystemSetting {
     /// User who last updated this setting
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_by: Option<String>,
+}
+
+impl MemorySize for SystemSetting {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<SystemSetting>()
+            + self.org_id.mem_size()
+            + self.user_id.mem_size()
+            + self.setting_key.mem_size()
+            + self.setting_category.mem_size()
+            + self.setting_value.to_string().mem_size()
+            + self.description.mem_size()
+            + self.updated_at.mem_size()
+            + self.created_by.mem_size()
+            + self.updated_by.mem_size()
+    }
 }
 
 impl SystemSetting {

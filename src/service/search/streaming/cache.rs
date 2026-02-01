@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -383,7 +383,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     crate::service::search::cache::apply_regex_to_response(
         req,
         org_id,

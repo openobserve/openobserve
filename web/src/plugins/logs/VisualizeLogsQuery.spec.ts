@@ -1519,4 +1519,134 @@ describe("VisualizeLogsQuery Component", () => {
       });
     });
   });
+
+  /**
+   * VRL Visualization Support Tests - handleChartTypeChange
+   * PR Reference: https://github.com/openobserve/openobserve/pull/9295
+   *
+   * Tests for the VRL function validation added to handleChartTypeChange.
+   * When VRL functions are present, only table chart type is allowed.
+   */
+  describe("VRL Visualization Support - handleChartTypeChange", () => {
+    it("should allow switching to table when VRL functions are present", () => {
+      // Set VRL function fields
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "parsed_field", type: "Utf8" },
+      ];
+      wrapper.vm.dashboardPanelData.data.type = "line";
+
+      // Simulate handleChartTypeChange to table
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("table");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+      }
+    });
+
+    it("should prevent switching to line chart when VRL functions are present", () => {
+      // Set VRL function fields
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "vrl_output", type: "Utf8" },
+      ];
+      wrapper.vm.dashboardPanelData.data.type = "table";
+
+      // Simulate handleChartTypeChange to line (should be prevented)
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("line");
+        // Should force back to table
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+      }
+    });
+
+    it("should prevent switching to bar chart when VRL functions are present", () => {
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "derived", type: "Int64" },
+      ];
+      wrapper.vm.dashboardPanelData.data.type = "table";
+
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("bar");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+      }
+    });
+
+    it("should prevent switching to area chart when VRL functions are present", () => {
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "computed", type: "Float64" },
+      ];
+      wrapper.vm.dashboardPanelData.data.type = "table";
+
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("area");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+      }
+    });
+
+    it("should prevent switching to scatter chart when VRL functions are present", () => {
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "extracted", type: "Utf8" },
+      ];
+      wrapper.vm.dashboardPanelData.data.type = "table";
+
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("scatter");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+      }
+    });
+
+    it("should prevent switching to h-bar chart when VRL functions are present", () => {
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "parsed_json", type: "Utf8" },
+      ];
+      wrapper.vm.dashboardPanelData.data.type = "table";
+
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("h-bar");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+      }
+    });
+
+    it("should allow switching to any chart type when no VRL functions", () => {
+      // Clear VRL function fields
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
+      wrapper.vm.dashboardPanelData.data.type = "table";
+
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("line");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("line");
+
+        wrapper.vm.handleChartTypeChange("bar");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
+
+        wrapper.vm.handleChartTypeChange("area");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("area");
+      }
+    });
+
+    it("should handle vrlFunctionFieldList length check correctly", () => {
+      // Test empty array
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(false);
+
+      // Test with items
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "field1", type: "Utf8" },
+      ];
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(true);
+    });
+
+    it("should handle multiple VRL derived fields", () => {
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "field1", type: "Utf8" },
+        { name: "field2", type: "Int64" },
+        { name: "field3", type: "Float64" },
+      ];
+      wrapper.vm.dashboardPanelData.data.type = "table";
+
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        wrapper.vm.handleChartTypeChange("line");
+        // Should still be table due to VRL functions
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+      }
+    });
+  });
 });

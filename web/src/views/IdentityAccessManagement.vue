@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import RouteTabs from "@/components/RouteTabs.vue";
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -74,7 +74,7 @@ const collapseSidebar = () => {
   splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
 };
 
-const tabs = ref([
+const allTabs = [
   {
     dataTest: "iam-users-tab",
     name: "users",
@@ -159,7 +159,9 @@ const tabs = ref([
     label: t("iam.invitations"),
     class: "tab_content",
   },
-]);
+];
+
+const tabs = ref(allTabs);
 
 watch(
   () => router.currentRoute.value.name,
@@ -209,10 +211,13 @@ function setTabs() {
   const isEnterprise =
     config.isEnterprise == "true" || config.isCloud == "true";
 
+  // Filter service accounts based on config
+  const serviceAccountEnabled = store.state.zoConfig.service_account_enabled ?? true;
+
   if (isEnterprise) {
     //for cloud version we dont want service accounts and for enterprise version we need service accounts
     //so it will be available for entrerprise version
-    if (config.isCloud == "false") {
+    if (config.isCloud == "false" && serviceAccountEnabled) {
       cloud.push("serviceAccounts");
     }
 
@@ -220,7 +225,7 @@ function setTabs() {
       cloud.push("invitations");
     }
 
-    let filteredTabs = tabs.value.filter((tab) => cloud.includes(tab.name));
+    let filteredTabs = allTabs.filter((tab) => cloud.includes(tab.name));
 
     if (store.state.zoConfig.rbac_enabled) {
       if (isMetaOrg.value) {
@@ -228,13 +233,19 @@ function setTabs() {
       }
       filteredTabs = [
         ...filteredTabs,
-        ...tabs.value.filter((tab) => rbac.includes(tab.name)),
+        ...allTabs.filter((tab) => rbac.includes(tab.name)),
       ];
     }
 
     tabs.value = filteredTabs;
   } else {
-    tabs.value = tabs.value.filter((tab) => os.includes(tab.name));
+    // Filter based on os array and service account config
+    tabs.value = allTabs.filter((tab) => {
+      if (tab.name === "serviceAccounts" && !serviceAccountEnabled) {
+        return false;
+      }
+      return os.includes(tab.name);
+    });
   }
 }
 

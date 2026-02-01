@@ -229,7 +229,7 @@ test.describe("Dashboard Variables - Panel Level", () => {
     );
     // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    // open setting again if it was closed
+    // Ensure settings is closed and then re-open to add another variable
     await pm.dashboardSetting.closeSettingWindow();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -282,7 +282,6 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     // Add panel variable that depends on both global and tab using panel name
     await pm.dashboardSetting.openSetting();
-    await page.locator('[data-test="dashboard-settings-variable-tab"]').waitFor({ state: "visible", timeout: 10000 });
     await pm.dashboardSetting.openVariables();
     await scopedVars.addScopedVariable(
       panelVar,

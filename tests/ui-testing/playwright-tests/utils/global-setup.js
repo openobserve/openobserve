@@ -95,20 +95,27 @@ async function globalSetup() {
     await context.storageState({ path: authFile });
     testLogger.info('Authentication state saved successfully', { authFile });
     
-    // Perform global test data ingestion
-    testLogger.info('Starting global test data ingestion');
-    await performGlobalIngestion(page);
-    testLogger.info('Global test data ingestion completed');
+    // Skip data ingestion for cleanup-only runs
+    // Use precise regex to match only cleanup.spec.js (not some-cleanup.spec.js or cleanup.spec-backup.js)
+    const isCleanupOnly = process.argv.some(arg => /cleanup\.spec\.(js|ts)$/.test(arg));
+    if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
+      testLogger.info('Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
+    } else {
+      // Perform global test data ingestion
+      testLogger.info('Starting global test data ingestion');
+      await performGlobalIngestion(page);
+      testLogger.info('Global test data ingestion completed');
 
-    // Skip global metrics ingestion - it's now handled in test-specific beforeAll hooks
-    // This avoids 404 errors when OpenObserve metrics endpoint isn't ready during global setup
-    // await performMetricsIngestion();
-    testLogger.debug('Metrics ingestion skipped in global setup - will be handled in test beforeAll hooks');
+      // Skip global metrics ingestion - it's now handled in test-specific beforeAll hooks
+      // This avoids 404 errors when OpenObserve metrics endpoint isn't ready during global setup
+      // await performMetricsIngestion();
+      testLogger.debug('Metrics ingestion skipped in global setup - will be handled in test beforeAll hooks');
 
-    // Perform trace data ingestion
-    testLogger.info('Starting trace data ingestion');
-    await ingestTraces(page, 20); // Ingest 20 test traces
-    testLogger.info('Trace data ingestion completed');
+      // Perform trace data ingestion
+      testLogger.info('Starting trace data ingestion');
+      await ingestTraces(page, 20); // Ingest 20 test traces
+      testLogger.info('Trace data ingestion completed');
+    }
     
   } catch (error) {
     testLogger.error('Global setup failed', { error: error.message, stack: error.stack });

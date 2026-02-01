@@ -52,12 +52,17 @@ vi.mock("@/components/common/AppTabs.vue", () => ({
   },
 }));
 
-vi.mock("@/components/CodeQueryEditor.vue", () => ({
-  default: {
+vi.mock("@/components/CodeQueryEditor.vue", async () => {
+  const { defineComponent } = await import("vue");
+  const component = defineComponent({
     name: "QueryEditor",
     template: '<div data-test="query-editor"></div>',
-  },
-}));
+  });
+
+  return {
+    default: component,
+  };
+});
 
 // Mock axios
 vi.mock("axios", () => ({
@@ -158,6 +163,15 @@ describe("ImportDashboard.vue", () => {
     return mount(ImportDashboard, {
       global: {
         plugins: [store, router, i18n],
+        stubs: {
+          // Stub QueryEditor component properly
+          "QueryEditor": {
+            name: "QueryEditor",
+            template: '<div data-test="query-editor" class="query-editor"><slot /></div>',
+            props: ["debounceTime", "language", "editorId", "query"],
+            emits: ["update:query"],
+          },
+        },
       },
       ...options,
     });

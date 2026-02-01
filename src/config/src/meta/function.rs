@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ use vrl::{
     prelude::Function,
 };
 
-use crate::{meta::stream::StreamType, utils::json};
+use crate::{meta::stream::StreamType, stats::MemorySize, utils::json};
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
@@ -48,6 +48,16 @@ pub struct Transform {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streams: Option<Vec<StreamOrder>>,
+}
+
+impl MemorySize for Transform {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Transform>()
+            + self.function.mem_size()
+            + self.name.mem_size()
+            + self.params.mem_size()
+            + self.streams.mem_size()
+    }
 }
 
 impl Transform {
@@ -115,6 +125,12 @@ pub struct StreamOrder {
     pub apply_before_flattening: bool,
 }
 
+impl MemorySize for StreamOrder {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamOrder>() + self.stream.mem_size()
+    }
+}
+
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.function == other.function && self.params == other.params
@@ -156,6 +172,12 @@ pub struct VRLRuntimeConfig {
 pub struct VRLResultResolver {
     pub program: Program,
     pub fields: Vec<String>,
+}
+
+impl MemorySize for VRLResultResolver {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<VRLResultResolver>() + self.fields.mem_size()
+    }
 }
 
 #[cfg(test)]

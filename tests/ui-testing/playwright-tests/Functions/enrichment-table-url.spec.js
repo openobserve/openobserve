@@ -410,9 +410,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.cancelEnrichmentTableForm();
     });
 
-    // TODO: Re-enable when update form UI is investigated - the form doesn't show URL input
-    // without selecting update mode, and radio buttons aren't rendering consistently in CI
-    test.skip('@P1 Schema mismatch - URL Jobs dialog shows failed job', async () => {
+    test('@P1 Schema mismatch - URL Jobs dialog shows failed job', async () => {
         const tableName = generateTableName('schema_mismatch');
         currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Schema mismatch - ${tableName}`);
@@ -433,18 +431,23 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.verifyUpdateMode();
         testLogger.info('Edit form opened');
 
-        // Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
+        // Step 4: Select "Add new URL" mode to show the URL input field
+        // Default mode is "reload" which doesn't show URL input
+        await enrichmentPage.selectUpdateMode('append');
+        testLogger.info('Selected "Add new URL" update mode');
+
+        // Step 5: Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
         // enrichment_info.csv has 11 different columns, which will fail schema validation
-        // Using addUrlInEditMode instead of replaceUrlInEditMode to avoid update mode radio button issues
-        await enrichmentPage.addUrlInEditMode(DIFFERENT_SCHEMA_CSV_URL);
+        // Use fillNewUrlInput because in edit/append mode the label is "New CSV File URL"
+        await enrichmentPage.fillNewUrlInput(DIFFERENT_SCHEMA_CSV_URL);
         testLogger.info('Added URL with different schema CSV');
 
-        // Save the changes
+        // Step 6: Save the changes
         await enrichmentPage.clickSaveButton();
         await enrichmentPage.page.waitForLoadState('networkidle');
         testLogger.info('Save clicked - job processing async');
 
-        // Step 4: Wait for job to complete (poll until buttons appear or warning icon shows)
+        // Step 7: Wait for job to complete (poll until buttons appear or warning icon shows)
         testLogger.info('Waiting for URL job to complete (expecting schema mismatch failure)...');
         const jobResult = await enrichmentPage.waitForUrlJobToFinish(tableName, 12, 5000);
 
@@ -457,12 +460,12 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         // Assert job completed (or has visible warning) before proceeding
         expect(jobResult.completed, 'URL job should complete within 60s').toBe(true);
 
-        // Step 5: Click on status icon to open URL Jobs dialog
+        // Step 8: Click on status icon to open URL Jobs dialog
         await enrichmentPage.clickUrlStatusIcon(tableName);
         await enrichmentPage.waitForUrlJobsDialog(tableName);
         testLogger.info('URL Jobs dialog opened');
 
-        // Step 6: Verify job shows failed status due to schema mismatch
+        // Step 9: Verify job shows failed status due to schema mismatch
         const isDialogVisible = await enrichmentPage.isJobsDialogVisible();
         expect(isDialogVisible, 'URL Jobs dialog should be visible').toBe(true);
 
@@ -494,5 +497,91 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Cleanup handled by cleanup.spec.js
         testLogger.info('Test completed - Schema mismatch scenario verified');
+    });
+
+    /**
+     * Test: Enrichment table search functionality
+     * Verify search within enrichment table list works
+     */
+    test('@P1 should search enrichment tables in list @enrichment @search @regression', async () => {
+        const tableName = generateTableName('search_test');
+        currentTableName = tableName;
+        testLogger.info(`Test: Enrichment table search - ${tableName}`);
+
+        // Step 1: Create a test enrichment table
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('Test table created');
+
+        // Wait for table to appear and navigate to list
+        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForTimeout(2000);
+
+        // Step 2: Test search functionality using POM method
+        testLogger.info('Testing search functionality');
+
+        // Use POM method to search - it properly waits for search input
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.page.waitForTimeout(1000);
+
+        // PRIMARY ASSERTION: Table should be visible after search
+        // verifyTableRowVisible uses expect() internally - throws if not visible
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        testLogger.info('Table visible after search: verified');
+
+        testLogger.info('✓ Enrichment table search test completed');
+    });
+
+    /**
+     * Test: Enrichment table data source options
+     * Verify data source options (From URL, Upload File) are available
+     */
+    test('@P0 should allow data source selection @enrichment @csv @regression', async () => {
+        testLogger.info('Test: Data source selection options');
+
+        // Navigate to add enrichment table
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.page.waitForTimeout(1000);
+
+        // Check for radio group with source options (using POM)
+        const radioGroup = enrichmentPage.getDataSourceRadioGroup().first();
+        // Use waitFor since isVisible() doesn't support timeout parameter
+        const hasRadioGroup = await radioGroup.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+
+        testLogger.info(`Radio group visible: ${hasRadioGroup}`);
+
+        if (hasRadioGroup) {
+            // Check for "From URL" option (using POM)
+            const urlOption = enrichmentPage.page.getByText('From URL', { exact: true });
+            const hasUrlOption = await urlOption.isVisible().catch(() => false);
+            testLogger.info(`'From URL' option visible: ${hasUrlOption}`);
+
+            // Check for "Upload File" option (using POM)
+            const fileOption = enrichmentPage.page.getByText('Upload File', { exact: true });
+            const hasFileOption = await fileOption.isVisible().catch(() => false);
+            testLogger.info(`'Upload File' option visible: ${hasFileOption}`);
+
+            // PRIMARY ASSERTION: At least one source option should be available
+            expect(hasUrlOption || hasFileOption).toBeTruthy();
+
+            // If both options available, test switching between them (using POM)
+            if (hasUrlOption && hasFileOption) {
+                await enrichmentPage.clickUploadFileOption();
+                testLogger.info('Switched to Upload File option');
+
+                await enrichmentPage.clickFromUrlOption();
+                testLogger.info('Switched back to From URL option');
+            }
+        } else {
+            // Fallback: Check if form is at least visible (using POM)
+            const formVisible = await enrichmentPage.getFormInput().isVisible().catch(() => false);
+            testLogger.info(`Form input visible: ${formVisible}`);
+            expect(formVisible).toBeTruthy();
+        }
+
+        // Cancel form
+        await enrichmentPage.cancelEnrichmentTableForm();
+
+        testLogger.info('✓ Data source selection test completed');
     });
 });

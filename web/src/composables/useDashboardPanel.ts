@@ -141,6 +141,8 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       visible_columns: [],
       hidden_columns: [],
       sticky_columns: [],
+      sticky_first_column: false,
+      column_order: [],
     },
     htmlContent: "",
     markdownContent: "",
@@ -2857,6 +2859,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     projections: string[];
     timeseries_field: string | null;
   }): string => {
+    // If VRL functions are present, always default to table chart
+    if (dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0) {
+      return "table";
+    }
+
     if (
       extractedFields.timeseries_field &&
       extractedFields.group_by.length <= 2

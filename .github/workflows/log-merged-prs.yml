@@ -8,12 +8,15 @@ jobs:
   log_to_sheet:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check PR title
         id: check_title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          title="${{ github.event.pull_request.title }}"
-          if [[ "$title" =~ ^(FEAT|PERF|feat|perf): ]]; then
+          if [[ "$PR_TITLE" =~ ^(FEAT|PERF|feat|perf): ]]; then
             echo "match=true" >> $GITHUB_OUTPUT
           else
             echo "match=false" >> $GITHUB_OUTPUT
@@ -23,12 +26,17 @@ jobs:
         if: steps.check_title.outputs.match == 'true'
         env:
           PR_LOG_SHEET_WEBHOOK_URL: ${{ secrets.PR_LOG_SHEET_WEBHOOK_URL }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
+          jq -n \
+            --arg title "$PR_TITLE" \
+            --arg author "$PR_AUTHOR" \
+            --arg url "$PR_URL" \
+            --arg branch "$PR_BRANCH" \
+            '{title: $title, author: $author, url: $url, branch: $branch}' | \
           curl -X POST -H 'Content-Type: application/json' \
-          -d '{
-            "title": "${{ github.event.pull_request.title }}",
-            "author": "${{ github.event.pull_request.user.login }}",
-            "url": "${{ github.event.pull_request.html_url }}",
-            "branch": "${{ github.event.pull_request.base.ref }}"
-          }' \
-          $PR_LOG_SHEET_WEBHOOK_URL
+            -d @- \
+            "$PR_LOG_SHEET_WEBHOOK_URL"
