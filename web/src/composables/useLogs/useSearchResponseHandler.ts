@@ -173,20 +173,23 @@ export const useSearchResponseHandler = () => {
     }
   };
 
+
   const handleStreamingHits = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
+    const hits = response.content?.results?.hits || [];
+
     if (
       (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
       !appendResult
     ) {
       clearCache();
-      searchObj.data.queryResults.hits = response.content.results.hits;
+      searchObj.data.queryResults.hits = hits;
     } else if (appendResult) {
-      searchObj.data.queryResults.hits.push(...response.content.results.hits);
+      searchObj.data.queryResults.hits.push(...hits);
     }
 
     if (searchObj.meta.refreshInterval == 0) {

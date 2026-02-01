@@ -16,6 +16,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[cfg(feature = "enterprise")]
+pub mod action_server;
 pub mod actions;
 #[cfg(feature = "enterprise")]
 pub mod ai;
@@ -48,8 +50,6 @@ pub mod ratelimit;
 #[cfg(feature = "enterprise")]
 pub mod re_pattern;
 pub mod rum;
-#[cfg(feature = "enterprise")]
-pub mod script_server;
 pub mod search;
 pub mod service_accounts;
 pub mod service_streams;

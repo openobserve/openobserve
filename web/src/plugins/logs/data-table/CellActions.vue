@@ -14,7 +14,7 @@
       icon="content_copy"
     />
     <q-btn
-      v-if="isStreamField"
+      v-if="isStreamField && !hideSearchTermActions"
       class="q-mr-xs"
       size="6px"
       @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
@@ -27,7 +27,7 @@
       </q-icon>
     </q-btn>
     <q-btn
-      v-if="isStreamField"
+      v-if="isStreamField && !hideSearchTermActions"
       size="6px"
       @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
       title="Exclude Term"
@@ -71,6 +71,10 @@ const props = defineProps({
     type: Array as PropType<Array<{ name: string; isSchemaField: boolean }>>,
     required: true,
     default: () => [],
+  },
+  hideSearchTermActions: {
+    type: Boolean,
+    default: false,
   },
 });
 

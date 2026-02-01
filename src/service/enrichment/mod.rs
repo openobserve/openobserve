@@ -16,7 +16,10 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
-use config::utils::time::{now_micros, parse_str_to_time};
+use config::{
+    stats::MemorySize,
+    utils::time::{now_micros, parse_str_to_time},
+};
 use vector_enrichment::{Case, IndexHandle, Table};
 use vrl::value::{KeyString, ObjectMap, Value};
 
@@ -34,7 +37,14 @@ pub struct StreamTable {
     pub data: Arc<Vec<vrl::value::Value>>,
 }
 
-impl StreamTable {}
+impl MemorySize for StreamTable {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamTable>()
+            + self.org_id.mem_size()
+            + self.stream_name.mem_size()
+            + self.data.iter().map(|v| v.to_string().len()).sum::<usize>()
+    }
+}
 
 #[async_trait]
 impl Table for StreamTable {

@@ -18,7 +18,7 @@ import { slackTemplate, slackConfig, slackDestinationType } from '@/utils/prebui
 describe('slack template', () => {
   describe('slackTemplate', () => {
     it('has correct name', () => {
-      expect(slackTemplate.name).toBe('system-prebuilt-slack');
+      expect(slackTemplate.name).toBe('prebuilt_slack');
     });
 
     it('has type as http', () => {
@@ -46,7 +46,7 @@ describe('slack template', () => {
 
   describe('slackConfig', () => {
     it('references correct template name', () => {
-      expect(slackConfig.templateName).toBe('system-prebuilt-slack');
+      expect(slackConfig.templateName).toBe('prebuilt_slack');
     });
 
     it('has correct headers', () => {

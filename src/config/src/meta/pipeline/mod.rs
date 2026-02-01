@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ use crate::{
         function::VRLResultResolver,
         stream::{StreamParams, StreamType},
     },
+    stats::MemorySize,
     utils::json,
 };
 
@@ -56,6 +57,18 @@ pub struct Pipeline {
     pub source: PipelineSource,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
+}
+
+impl MemorySize for Pipeline {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Pipeline>()
+            + self.id.mem_size()
+            + self.org.mem_size()
+            + self.name.mem_size()
+            + self.source.mem_size()
+            + self.nodes.mem_size()
+            + self.edges.mem_size()
+    }
 }
 
 impl Pipeline {
