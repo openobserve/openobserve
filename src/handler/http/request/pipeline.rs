@@ -86,7 +86,21 @@ NODE STRUCTURE (each node requires):
 NODE DATA TYPES:
 1. Stream node (input/output): { "node_type": "stream", "org_id": "default", "stream_name": "your_stream", "stream_type": "logs"|"metrics"|"traces" }
 2. Function node: { "node_type": "function", "name": "function_name", "after_flatten": true|false }
-3. Condition node: { "node_type": "condition", "conditions": { "column": "field", "operator": "=", "value": "val" } }
+3. Condition node: { "node_type": "condition", "conditions": <condition_object> }
+
+CONDITION OPERATORS: =, !=, >, >=, <, <=, contains, not_contains
+
+CONDITION FORMATS:
+- Single condition: { "column": "field", "operator": "=", "value": "val", "ignore_case": false }
+- AND conditions: { "and": [<condition>, <condition>, ...] }
+- OR conditions: { "or": [<condition>, <condition>, ...] }
+- NOT condition: { "not": <condition> }
+- Nested: { "and": [{ "column": "a", "operator": "=", "value": "1" }, { "or": [{ "column": "b", "operator": ">", "value": "5" }, { "column": "c", "operator": "contains", "value": "err" }] }] }
+
+CONDITION EXAMPLES:
+- severity = "error": { "column": "severity", "operator": "=", "value": "error" }
+- level > 5: { "column": "level", "operator": ">", "value": "5" }
+- severity = "error" AND level > 5: { "and": [{ "column": "severity", "operator": "=", "value": "error" }, { "column": "level", "operator": ">", "value": "5" }] }
 
 EDGE STRUCTURE:
 - id: Format "e{source_id}-{target_id}"

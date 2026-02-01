@@ -520,6 +520,10 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
+    // Throttle save during streaming to prevent data loss on page reload
+    const lastStreamingSaveTime = ref<number>(0);
+    const STREAMING_SAVE_INTERVAL = 3000; // Save at most every 3 seconds during streaming
+
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
       "Analyzing...",
@@ -885,6 +889,8 @@ export default defineComponent({
                         contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
                       });
                       pendingToolCalls.value = []; // Clear pending
+                      // Save immediately when assistant message is first created to prevent data loss on reload
+                      await throttledStreamingSave(true);
                     } else {
                       // Update existing assistant message's total content
                       lastMessage.content = currentStreamingMessage.value;
@@ -903,6 +909,8 @@ export default defineComponent({
                         // Add new text block (after tool call - new segment)
                         lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
                       }
+                      // Throttled save during streaming to preserve progress
+                      await throttledStreamingSave();
                     }
                     messageComplete = true;
                     await scrollToBottom();
@@ -1030,6 +1038,8 @@ export default defineComponent({
                       contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
                     });
                     pendingToolCalls.value = []; // Clear pending
+                    // Save immediately when assistant message is first created
+                    await throttledStreamingSave(true);
                   } else {
                     lastMessage.content = currentStreamingMessage.value;
 
@@ -1042,6 +1052,8 @@ export default defineComponent({
                     } else {
                       lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
                     }
+                    // Throttled save during streaming
+                    await throttledStreamingSave();
                   }
                   messageComplete = true;
                   await scrollToBottom();
@@ -1134,6 +1146,19 @@ export default defineComponent({
       }
       finally {
         saveHistoryLoading.value = false;
+      }
+    };
+
+    /**
+     * Throttled save for streaming - saves at most every STREAMING_SAVE_INTERVAL ms
+     * This prevents data loss if the user reloads the page during streaming
+     * @param force - If true, saves immediately regardless of throttle (used for first assistant message)
+     */
+    const throttledStreamingSave = async (force: boolean = false) => {
+      const now = Date.now();
+      if (force || (now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL)) {
+        lastStreamingSaveTime.value = now;
+        await saveToHistory();
       }
     };
 
