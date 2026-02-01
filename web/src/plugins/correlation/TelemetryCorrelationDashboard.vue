@@ -781,11 +781,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
             :show-back-button="false"
-            :show-timeline="true"
+            :show-timeline="false"
             :show-log-stream-selector="false"
             :show-share-button="false"
             :show-close-button="false"
+            :show-expand-button="true"
             :enable-correlation-links="true"
+            :initial-timeline-expanded="false"
           />
         </div>
 
