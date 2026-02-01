@@ -305,21 +305,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Traces Tab Panel -->
         <q-tab-panel name="traces" class="tw:p-0">
           <!-- Refresh Button -->
-          <div
-            v-if="traceCorrelationMode !== null"
-            class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-          >
-            <q-btn
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadCorrelatedTraces"
-              :loading="tracesLoading"
-              size="sm"
-            />
-          </div>
 
           <!-- Loading State -->
           <div
@@ -363,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="
               traceCorrelationMode === 'direct' && traceSpanList.length > 0
             "
-            class="tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
           >
             <TraceDetails
               mode="embedded"
@@ -377,11 +362,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :start-time-prop="computedTraceStartTime"
               :end-time-prop="computedTraceEndTime"
               :show-back-button="false"
-              :show-timeline="true"
+              :show-timeline="false"
               :show-log-stream-selector="false"
               :show-share-button="false"
               :show-close-button="false"
+              :show-expand-button="true"
               :enable-correlation-links="true"
+              :initial-timeline-expanded="false"
             />
           </div>
 
@@ -745,7 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="activeTab == 'traces'" class="tw:h-full">
         <!-- Refresh Button -->
-        <div
+        <!-- <div
           v-if="traceCorrelationMode !== null"
           class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
         >
@@ -759,7 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="tracesLoading"
             size="sm"
           />
-        </div>
+        </div> -->
 
         <!-- Loading State -->
         <div
@@ -799,7 +786,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             traceCorrelationMode === 'direct' && traceSpanList.length > 0
           "
-          class="tw:h-full tw:overflow-hidden"
+          class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
         >
           <TraceDetails
             mode="embedded"
@@ -811,11 +798,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
             :show-back-button="false"
-            :show-timeline="true"
+            :show-timeline="false"
             :show-log-stream-selector="false"
             :show-share-button="false"
             :show-close-button="false"
+            :show-expand-button="true"
             :enable-correlation-links="true"
+            :initial-timeline-expanded="false"
           />
         </div>
 
@@ -2701,6 +2690,16 @@ watch(
     overflow: auto;
     min-height: 0;
     background: #f5f5f5 !important;
+  }
+}
+
+.telemetry-correlation-traces {
+  :deep(.trace-details-content) {
+    padding: 0 !important;
+  }
+
+  :deep(.trace-combined-header-wrapper) {
+    margin-bottom: 0 !important;
   }
 }
 

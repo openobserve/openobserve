@@ -28,9 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="trace-combined-header-wrapper card-container">
-        <div
-          class="full-width flex items-center toolbar flex justify-between q-pb-sm"
-        >
+        <div class="full-width flex items-center toolbar flex justify-between">
           <div class="flex items-center">
             <!-- Back button - only show in standalone mode if explicitly enabled -->
             <div
@@ -43,16 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="arrow_back_ios_new" size="14px" />
             </div>
 
-            <!-- Close button for embedded mode -->
-            <div
-              v-if="mode === 'embedded'"
-              data-test="trace-details-close-embedded-btn"
-              class="flex justify-center items-center q-mr-sm cursor-pointer trace-back-btn"
-              title="Close"
-              @click="handleBackOrClose"
-            >
-              <q-icon name="close" size="14px" />
-            </div>
             <div
               data-test="trace-details-operation-name"
               class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
@@ -61,22 +49,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ traceTree[0]["operationName"] }}
             </div>
             <div class="q-mr-lg flex items-center text-body2">
-              <div class="flex items-center">
-                Trace ID:
-                <div
-                  data-test="trace-details-trace-id"
-                  class="toolbar-trace-id ellipsis q-pl-xs"
-                  :title="effectiveSpanList[0]['trace_id']"
-                >
-                  {{ effectiveSpanList[0]["trace_id"] }}
-                </div>
+              <span class="text-grey-7">Trace ID:</span>
+
+              <!-- Clickable trace ID (embedded mode - no ellipsis) -->
+              <div
+                v-if="mode === 'embedded'"
+                data-test="trace-details-trace-id"
+                class="toolbar-trace-id q-pl-xs cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                :title="`Open ${effectiveSpanList[0]['trace_id']} in Traces`"
+                @click="handleExpandToFullView"
+              >
+                {{ effectiveSpanList[0]["trace_id"] }}
               </div>
+
+              <!-- Non-clickable with ellipsis (standalone mode) -->
+              <div
+                v-else
+                data-test="trace-details-trace-id"
+                class="toolbar-trace-id tw:m-w-[5rem] ellipsis q-pl-xs"
+                :title="effectiveSpanList[0]['trace_id']"
+              >
+                {{ effectiveSpanList[0]["trace_id"] }}
+              </div>
+
+              <!-- Open in new icon (embedded mode only) -->
+              <q-icon
+                v-if="mode === 'embedded' && showExpandButton"
+                class="cursor-pointer q-ml-xs hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                size="14px"
+                name="open_in_new"
+                title="Open in Traces"
+                @click="handleExpandToFullView"
+                data-test="trace-details-trace-id-open-btn"
+              />
+
+              <!-- Copy button (both modes) -->
               <q-icon
                 data-test="trace-details-copy-trace-id-btn"
-                class="cursor-pointer trace-copy-icon"
+                class="cursor-pointer trace-copy-icon q-ml-xs"
                 size="12px"
                 name="content_copy"
-                title="Copy"
+                title="Copy Trace ID"
                 @click="copyTraceId"
               />
             </div>
@@ -193,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-center">
             <div
-              class="flex justify-center items-center tw:pl-2 trace-search-container"
+              class="o2-input flex justify-center items-center tw:pl-2 trace-search-container"
             >
               <q-input
                 data-test="trace-details-search-input"
@@ -243,6 +256,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="`sm`"
               />
             </div>
+            <!-- Expand button - for embedded mode -->
+            <q-btn
+              v-if="mode === 'embedded' && showExpandButton"
+              data-test="trace-details-expand-btn"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
+              icon="open_in_new"
+              size="xs"
+              @click="handleExpandToFullView"
+              flat
+            >
+              <q-tooltip>
+                {{ t("traces.openInTraces") }}
+              </q-tooltip>
+            </q-btn>
             <!-- Share button - conditional -->
             <share-button
               v-if="mode === 'standalone' && showShareButton"
@@ -412,6 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
+                  :parent-mode="mode"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -547,7 +575,10 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
-
+    showExpandButton: {
+      type: Boolean,
+      default: false,
+    },
     // Correlation-specific props
     enableCorrelationLinks: {
       type: Boolean,
@@ -1818,6 +1849,24 @@ export default defineComponent({
       }
     };
 
+    const handleExpandToFullView = () => {
+      // Navigate to full trace details page from embedded mode
+      if (props.mode !== "embedded") return;
+
+      const query: any = {
+        trace_id: effectiveTraceId.value,
+        stream: effectiveStreamName.value,
+        from: effectiveTimeRange.value.from.toString(),
+        to: effectiveTimeRange.value.to.toString(),
+        org_identifier: effectiveOrgIdentifier.value,
+      };
+
+      router.push({
+        name: "traces",
+        query,
+      });
+    };
+
     const routeToTracesList = () => {
       // Only navigate if in standalone mode
       if (props.mode !== "standalone") return;
@@ -1892,6 +1941,7 @@ export default defineComponent({
       traceDetails,
       updateSelectedSpan,
       routeToTracesList,
+      handleExpandToFullView,
       openTraceLink,
       convertTimeFromNsToMs,
       searchQuery,
@@ -1936,7 +1986,7 @@ export default defineComponent({
 <style scoped lang="scss">
 $sidebarWidth: 84%;
 $separatorWidth: 2px;
-$toolbarHeight: 50px;
+$toolbarHeight: 36px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 210px;
 $appNavbarHeight: 57px;
@@ -2026,10 +2076,6 @@ $traceChartCollapseHeight: 42px;
   .q-field .q-field__control {
     padding: 0px 8px;
   }
-}
-
-.toolbar-trace-id {
-  max-width: 80px;
 }
 
 .toolbar-operation-name {

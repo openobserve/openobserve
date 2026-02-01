@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="flex">
-      <div class="text-right flex items-center justify-end q-mr-sm">
+      <div class="text-right flex items-center justify-end q-mx-sm">
         <div
           class="flex items-center justify-end"
           data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn
+        v-if="parentMode === 'standalone'"
         class="q-mx-xs view-span-logs-btn tw:border tw:py-[0.3rem]!"
         size="10px"
         icon="search"
@@ -610,6 +611,10 @@ export default defineComponent({
     serviceStreamsEnabled: {
       type: Boolean,
       default: false,
+    },
+    parentMode: {
+      type: String,
+      default: "standalone",
     },
   },
   components: {
