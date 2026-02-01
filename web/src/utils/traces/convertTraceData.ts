@@ -246,25 +246,24 @@ export const convertServiceGraphToTree = (
       .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
 
-    // Calculate node metrics - direction-aware based on tree position
+    // Simple: show only incoming requests from parent in this tree path
     let totalRequests: number;
     let failedRequests: number;
     let errorRate: number;
 
     if (incomingEdge) {
-      // Child node: use the incoming edge's metrics (traffic via this specific edge)
+      // Non-root: show incoming from parent
       totalRequests = incomingEdge.total_requests ?? 0;
       failedRequests = incomingEdge.failed_requests ?? 0;
       errorRate = incomingEdge.error_rate ?? 0;
     } else {
-      // Root node: sum of all outgoing edges (traffic flowing from this node)
+      // Root: sum of outgoing edges
       totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
       failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
-      // If no outgoing edges, fall back to node's own error_rate
-      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : (node.error_rate ?? 0);
+      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
     }
 
-    // Calculate connections count (incoming + outgoing edges)
+    // Calculate connections count
     const incomingEdges = incomingEdgesMap.get(nodeId) || [];
     const connectionCount = incomingEdges.length + outgoingEdges.length;
 
