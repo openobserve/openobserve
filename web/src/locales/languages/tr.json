@@ -2357,7 +2357,8 @@
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
     "timeRangeUpdated": "Seçilen zaman aralığı bu izi içermiyordu. Zaman aralığı, izlemenin zaman damgasıyla eşleşecek şekilde güncellendi.",
-    "fetchingMoreTraces": "Daha fazla iz getiriyor..."
+    "fetchingMoreTraces": "Daha fazla iz getiriyor...",
+    "showErrorOnly": "Yalnızca Hatayı Göster"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -2630,7 +2631,9 @@
     "analyzeTooltip": "Boyutlardaki izleme hızı modellerini analiz edin",
     "analyzeTooltipLogs": "Geçerli zaman aralığı için boyut dağılımını analiz edin",
     "rateLabel": "Oranı:",
-    "timeRangeLabel": "Zaman Aralığı:"
+    "timeRangeLabel": "Zaman Aralığı:",
+    "analyzeTooltipTraces": "Hız, gecikme süresi ve hata kalıpları için izleme boyutlarını analiz edin",
+    "insightsButtonLabel": "İçgörüler"
   },
   "errorInsights": {
     "title": "İçgörüler",

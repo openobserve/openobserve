@@ -2355,7 +2355,8 @@
     "collapseFields": "Campos colapsados",
     "openFields": "Campos abiertos",
     "timeRangeUpdated": "El intervalo de tiempo seleccionado no incluía este seguimiento. El intervalo de tiempo se actualizó para que coincida con la marca de tiempo del rastreo.",
-    "fetchingMoreTraces": "Buscando más rastros..."
+    "fetchingMoreTraces": "Buscando más rastros...",
+    "showErrorOnly": "Mostrar solo error"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -2628,7 +2629,9 @@
     "analyzeTooltip": "Analice los patrones de velocidad de rastreo en todas las dimensiones",
     "analyzeTooltipLogs": "Analice la distribución de dimensiones para el rango de tiempo actual",
     "rateLabel": "Tarifa:",
-    "timeRangeLabel": "Intervalo de tiempo:"
+    "timeRangeLabel": "Intervalo de tiempo:",
+    "analyzeTooltipTraces": "Analice las dimensiones de seguimiento para determinar la velocidad, la latencia y los patrones de error",
+    "insightsButtonLabel": "Perspectivas"
   },
   "errorInsights": {
     "title": "Perspectivas",

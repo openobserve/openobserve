@@ -2357,7 +2357,8 @@
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
     "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
-    "fetchingMoreTraces": "Nog meer sporen ophalen..."
+    "fetchingMoreTraces": "Nog meer sporen ophalen...",
+    "showErrorOnly": "Alleen fout weergeven"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -2630,7 +2631,9 @@
     "analyzeTooltip": "Analyseer traceersnelheidspatronen in verschillende dimensies",
     "analyzeTooltipLogs": "Analyseer de dimensieverdeling voor het huidige tijdbereik",
     "rateLabel": "Tarief:",
-    "timeRangeLabel": "Tijdbereik:"
+    "timeRangeLabel": "Tijdbereik:",
+    "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
+    "insightsButtonLabel": "Inzichten"
   },
   "errorInsights": {
     "title": "Inzichten",
