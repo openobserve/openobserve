@@ -353,26 +353,17 @@ async fn gc() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn stats() -> (usize, usize) {
+pub async fn stats() -> (usize, usize, usize) {
     let mut total_size = 0;
     let mut used_size = 0;
+    let mut item_len = 0;
     for file in FILES.iter() {
         let r = file.read().await;
-        let cur_size = r.size();
         total_size += get_config().memory_cache.max_size;
-        used_size += cur_size;
+        used_size += r.size();
+        item_len += r.len();
     }
-    (total_size, used_size)
-}
-
-#[inline]
-pub async fn len() -> usize {
-    let mut total = 0;
-    for file in FILES.iter() {
-        let r = file.read().await;
-        total += r.len();
-    }
-    total
+    (total_size, used_size, item_len)
 }
 
 #[inline]
@@ -504,5 +495,144 @@ mod tests {
         assert_eq!(file_data.get(file_key2, None).await.unwrap(), content);
         // get first key, should get error
         assert!(file_data.get(file_key1, None).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_stats_basic() {
+        // Test that stats function returns correct tuple structure
+        let (total_size, used_size, _item_len) = stats().await;
+
+        // used_size should not exceed total_size
+        assert!(used_size <= total_size);
+
+        // total_size should be equal to max_size * bucket_num
+        let cfg = get_config();
+        let expected_total = cfg.memory_cache.max_size * cfg.memory_cache.bucket_num;
+        assert_eq!(total_size, expected_total);
+    }
+
+    #[tokio::test]
+    async fn test_stats_with_data() {
+        // Get initial stats
+        let (initial_total, initial_used, initial_len) = stats().await;
+
+        // Add data to cache
+        let test_key = format!(
+            "files/default/logs/memory/2022/10/03/10/{}_test_stats.parquet",
+            config::utils::time::now_micros()
+        );
+        let content = Bytes::from("Test content for stats function");
+
+        // Use the set function to add data
+        let bucket_id = gxhash::new().sum64(&test_key);
+        let bucket_id = (bucket_id as usize) % FILES.len();
+        let mut file_data = FILES[bucket_id].write().await;
+        let _ = file_data.set(&test_key, content.clone()).await;
+        drop(file_data);
+
+        // Get stats after adding data
+        let (after_total, after_used, after_len) = stats().await;
+
+        // Verify that used_size and item_len increased
+        assert!(after_used >= initial_used);
+        assert!(after_len >= initial_len);
+
+        // Total size should remain the same
+        assert_eq!(after_total, initial_total);
+    }
+
+    #[tokio::test]
+    async fn test_stats_aggregates_across_buckets() {
+        // This test verifies that stats correctly aggregates data across all bucket files
+        let test_id = config::utils::time::now_micros();
+        let content = Bytes::from("Test content for aggregation");
+
+        // Get initial stats
+        let (_, initial_used, initial_len) = stats().await;
+
+        // Add data to multiple buckets by using different keys
+        for i in 0..3 {
+            let file_key = format!(
+                "files/default/logs/memory/2022/10/03/10/{}_{}_test.parquet",
+                test_id, i
+            );
+
+            let bucket_id = gxhash::new().sum64(&file_key);
+            let bucket_id = (bucket_id as usize) % FILES.len();
+            let mut file_data = FILES[bucket_id].write().await;
+            let _ = file_data.set(&file_key, content.clone()).await;
+            drop(file_data);
+        }
+
+        // Get stats after adding data to multiple buckets
+        let (_, after_used, after_len) = stats().await;
+
+        // Verify that stats increased
+        assert!(after_used >= initial_used);
+        assert!(after_len >= initial_len);
+    }
+
+    #[tokio::test]
+    async fn test_stats_consistency() {
+        // Verify that stats returns valid values across multiple calls
+        // Note: In a concurrent test environment, values may increase due to other tests
+        let (total1, used1, len1) = stats().await;
+        let (total2, used2, len2) = stats().await;
+
+        // Total size should remain consistent (based on config)
+        assert_eq!(total1, total2);
+
+        // Used size and length should not decrease (may increase due to concurrent tests)
+        assert!(used2 >= used1 || used1 - used2 < 1000); // Allow minor decrease due to GC
+        assert!(len2 >= len1 || len1 - len2 < 10); // Allow minor decrease due to GC
+    }
+
+    #[tokio::test]
+    async fn test_stats_empty_cache() {
+        // Test stats on a fresh FileData instance
+        let file_data = FileData::with_cache_strategy_and_max_size("lru", 1024);
+
+        let size = file_data.size();
+        let len = file_data.len();
+
+        // For an empty cache:
+        assert_eq!(size, 0); // Should have no data
+        assert_eq!(len, 0); // Should have no items
+    }
+
+    #[tokio::test]
+    async fn test_stats_with_different_sized_data() {
+        // Test that stats correctly accounts for different sized data
+        let test_id = config::utils::time::now_micros();
+
+        // Get initial stats
+        let (_, initial_used, initial_len) = stats().await;
+
+        // Add small data
+        let small_key = format!("files/test/{}_small.parquet", test_id);
+        let small_content = Bytes::from("Small");
+        let bucket_id = gxhash::new().sum64(&small_key);
+        let bucket_id = (bucket_id as usize) % FILES.len();
+        let mut file_data = FILES[bucket_id].write().await;
+        let _ = file_data.set(&small_key, small_content.clone()).await;
+        drop(file_data);
+
+        // Add large data
+        let large_key = format!("files/test/{}_large.parquet", test_id);
+        let large_content = Bytes::from(vec![0u8; 1000]);
+        let bucket_id = gxhash::new().sum64(&large_key);
+        let bucket_id = (bucket_id as usize) % FILES.len();
+        let mut file_data = FILES[bucket_id].write().await;
+        let _ = file_data.set(&large_key, large_content.clone()).await;
+        drop(file_data);
+
+        // Get stats after adding both small and large data
+        let (_, after_used, after_len) = stats().await;
+
+        // Verify that stats increased by at least the size of the data
+        let min_expected_increase =
+            small_key.len() + small_content.len() + large_key.len() + large_content.len();
+        assert!(after_used >= initial_used + min_expected_increase);
+        assert!(after_len >= initial_len + 2); // Added 2 items
     }
 }

@@ -67,6 +67,7 @@ def org_id():
 @pytest.fixture(scope="session", autouse=True)
 def ingest_data():
     """Ingest data into the openobserve running instance."""
+    import time
 
     # Use v2 session for consistent auth header
     session = _create_session_inner_v2()
@@ -91,5 +92,22 @@ def ingest_data():
     logging.info("Camel case data ingested successfully, status code: %s", resp2.status_code)
     assert resp2.status_code == 200, \
         f"Failed to ingest camel case test data: {resp2.status_code} - {resp2.text[:500]}"
+
+    # Flush data to ensure it's indexed
+    flush_url = f"{BASE_URL}node/flush"
+    logging.info("Flushing data to ensure indexing...")
+    flush_resp = session.put(flush_url)
+
+    if flush_resp.status_code == 200:
+        logging.info("Data flushed successfully")
+    elif flush_resp.status_code == 404:
+        # Node is not an ingester in local mode, data will be indexed automatically
+        logging.info("Flush not needed (local mode), waiting for auto-indexing...")
+        time.sleep(3)
+    else:
+        logging.warning("Flush request returned status %s: %s", flush_resp.status_code, flush_resp.text[:200])
+
+    # Give a small buffer for flush to complete
+    time.sleep(2)
 
     return True

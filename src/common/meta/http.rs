@@ -121,6 +121,24 @@ impl HttpResponse {
             .into_response()
     }
 
+    pub fn created(msg: impl ToString) -> Response {
+        (
+            StatusCode::CREATED,
+            Json(Self::message(StatusCode::CREATED, msg.to_string())),
+        )
+            .into_response()
+    }
+
+    pub fn found(loc: impl ToString, cookie: Option<String>) -> Response {
+        let mut builder = Response::builder()
+            .status(StatusCode::FOUND)
+            .header("Location", loc.to_string());
+        if let Some(c) = cookie {
+            builder = builder.header("Set-Cookie", c)
+        }
+        builder.body(().into()).unwrap()
+    }
+
     /// Send a BadRequest response in json format and associate the
     /// provided error as `error` field.
     pub fn bad_request(error: impl ToString) -> Response {

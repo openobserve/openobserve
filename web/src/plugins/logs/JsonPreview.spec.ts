@@ -362,7 +362,7 @@ describe("JsonPreview Component", () => {
     it("should emit sendToAiChat event", () => {
       wrapper.vm.sendToAiChat("test data");
       expect(wrapper.emitted('sendToAiChat')).toBeTruthy();
-      expect(wrapper.emitted('sendToAiChat')[0]).toEqual(["test data"]);
+      expect(wrapper.emitted('sendToAiChat')[0]).toEqual(["test data", true]); // includes append parameter
       expect(wrapper.emitted('closeTable')).toBeTruthy();
     });
   });

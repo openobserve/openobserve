@@ -187,8 +187,33 @@ function formatTimestamp(timestamp?: number | string): string {
 }
 
 function getFailureMessage(result: TestResult): string {
+  // First, try to show the actual backend error message
+  if (result.responseBody) {
+    try {
+      const parsed = JSON.parse(result.responseBody);
+      // Common error message fields from various APIs
+      const errorMessage = parsed.error || parsed.message || parsed.errors || parsed.detail;
+      if (errorMessage) {
+        // If it's a string, return it directly
+        if (typeof errorMessage === 'string') {
+          return `Test failed: ${errorMessage}`;
+        }
+        // If it's an array, join the messages
+        if (Array.isArray(errorMessage)) {
+          return `Test failed: ${errorMessage.join(', ')}`;
+        }
+      }
+    } catch {
+      // If parsing fails, try to use responseBody as-is if it's short enough
+      if (result.responseBody.length < 100) {
+        return `Test failed: ${result.responseBody}`;
+      }
+    }
+  }
+
+  // If we have an error message, show it directly
   if (result.error) {
-    // Check for common error patterns
+    // Check for common error patterns that need specific guidance
     if (result.error.includes('ENOTFOUND') || result.error.includes('DNS')) {
       return t('alerts.testErrorDNS');
     }
@@ -202,9 +227,11 @@ function getFailureMessage(result: TestResult): string {
       return t('alerts.testErrorSSL');
     }
 
-    return t('alerts.testErrorGeneric');
+    // For other errors, show the actual error message
+    return `Test failed: ${result.error}`;
   }
 
+  // Fall back to generic messages based on status code
   if (result.statusCode) {
     if (result.statusCode >= 400 && result.statusCode < 500) {
       return t('alerts.testErrorClientError');

@@ -64,6 +64,10 @@ pub mod ui;
 
 pub const ERROR_HEADER: &str = "X-Error-Message";
 
+/// Custom header name for O2 Assistant session tracking (UUID v7)
+pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =
+    header::HeaderName::from_static("x-o2-assistant-session-id");
+
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
     CorsLayer::new()
@@ -80,11 +84,12 @@ pub fn cors_layer() -> CorsLayer {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
-            header::HeaderName::from_lowercase(b"traceparent").unwrap(),
-            header::HeaderName::from_lowercase(b"tracestate").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-span-id").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-trace-id").unwrap(),
-            header::HeaderName::from_lowercase(b"x-openobserve-sampled").unwrap(),
+            header::HeaderName::from_static("traceparent"),
+            header::HeaderName::from_static("tracestate"),
+            header::HeaderName::from_static("x-openobserve-span-id"),
+            header::HeaderName::from_static("x-openobserve-trace-id"),
+            header::HeaderName::from_static("x-openobserve-sampled"),
+            X_O2_ASSISTANT_SESSION_ID,
         ])
         .allow_origin(AllowOrigin::mirror_request())
         .allow_credentials(true)
@@ -376,7 +381,7 @@ pub fn proxy_routes(enable_auth: bool) -> Router {
         router = router.layer(middleware::from_fn(proxy_auth_middleware));
     }
 
-    router.layer(cors_layer())
+    router
 }
 
 /// Create basic routes (health, auth, etc.)
@@ -390,7 +395,17 @@ pub fn basic_routes() -> Router {
     {
         router = router.nest(
             "/webhook",
-            Router::new().route("/stripe", post(cloud::billings::handle_stripe_event)),
+            Router::new()
+                .route("/stripe", post(cloud::billings::handle_stripe_event))
+                .route("/azure", post(cloud::billings::handle_azure_event)),
+        );
+
+        // AWS Marketplace registration endpoint - receives POST from AWS Marketplace
+        // Must be publicly accessible (no auth) as users haven't logged in yet
+        // Using /marketplace path to avoid conflict with authenticated /api scope
+        router = router.route(
+            "/marketplace/aws/register",
+            post(cloud::aws_marketplace::aws_marketplace_register),
         );
     }
 
@@ -438,7 +453,7 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
-    router.layer(cors_layer())
+    router
 }
 
 /// Create config routes
@@ -449,7 +464,6 @@ pub fn config_routes() -> Router {
         .route("/logout", get(status::logout))
         .route("/runtime", get(status::config_runtime))
         .route("/reload", get(status::config_reload))
-        .layer(cors_layer())
 }
 
 #[cfg(feature = "enterprise")]
@@ -461,9 +475,8 @@ pub fn config_routes() -> Router {
         .route("/reload", get(status::config_reload))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
-        .route("/dex_refresh", post(status::refresh_token_with_dex))
+        .route("/dex_refresh", get(status::refresh_token_with_dex))
         .route("/token", post(users::service_accounts::exchange_token))
-        .layer(cors_layer())
 }
 
 /// Create main API service routes
@@ -494,7 +507,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/settings", get(organization::settings::get).post(organization::settings::create))
         .route("/{org_id}/settings/logo", post(organization::settings::upload_logo).delete(organization::settings::delete_logo))
-        .route("/{org_id}/settings/logo_text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
+        .route("/{org_id}/settings/logo/text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
 
         // System settings v2
         .route("/{org_id}/settings/v2", get(organization::system_settings::list_settings).post(organization::system_settings::set_org_setting))
@@ -534,8 +547,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
         .route("/{org_id}/{stream_name}/_multi", post(logs::ingest::multi))
         .route("/{org_id}/{stream_name}/_json", post(logs::ingest::json))
-        .route("/{org_id}/{stream_name}/_kinesis_firehose", post(logs::ingest::handle_kinesis_request))
-        .route("/{org_id}/{stream_name}/_sub", post(logs::ingest::handle_gcp_request))
         .route("/{org_id}/_hec", post(logs::ingest::hec))
         .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
@@ -606,8 +617,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/reports/{name}/trigger", put(dashboards::reports::trigger_report))
 
         // Timed annotations
-        .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations))
-        .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations).delete(dashboards::timed_annotations::delete_annotations))
+        .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations).delete(dashboards::timed_annotations::delete_annotations))
+        .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}", delete(dashboards::timed_annotations::delete_annotation_panels))
 
         // Folders (v2)
@@ -633,11 +644,11 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph", get(alerts::incidents::get_incident_service_graph))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
+        .route("/{org_id}/alerts/templates/system/prebuilt", get(alerts::templates::get_system_templates))
         .route("/{org_id}/alerts/templates/{template_name}", get(alerts::templates::get_template).put(alerts::templates::update_template).delete(alerts::templates::delete_template))
         .route("/{org_id}/alerts/templates/bulk", delete(alerts::templates::delete_template_bulk))
 
@@ -823,6 +834,18 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/extend_trial_period",
                 put(organization::org::extend_trial_period),
+            )
+            .route(
+                "/{org_id}/aws-marketplace/link-subscription",
+                post(cloud::aws_marketplace::link_subscription),
+            )
+            .route(
+                "/{org_id}/aws-marketplace/activation-status",
+                get(cloud::aws_marketplace::activation_status),
+            )
+            .route(
+                "/{org_id}/azure-marketplace/link-subscription",
+                post(cloud::azure_marketplace::link_subscription),
             );
     }
 
@@ -835,24 +858,22 @@ pub fn service_routes() -> Router {
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
         .layer(middleware::from_fn(auth_middleware))
-        .layer(middleware::from_fn(
-            move |mut request: Request, next: Next| {
-                let server = server.clone();
-                async move {
-                    request.headers_mut().insert(
-                        header::HeaderName::from_static("x-api-node"),
-                        header::HeaderValue::from_str(&server)
-                            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-                    );
-                    next.run(request).await
-                }
-            },
-        ))
-        .layer(cors_layer())
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,
         ))
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            let server = server.clone();
+            async move {
+                let mut response = next.run(request).await;
+                response.headers_mut().insert(
+                    header::HeaderName::from_static("x-api-node"),
+                    header::HeaderValue::from_str(&server)
+                        .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+                );
+                response
+            }
+        }))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -860,7 +881,7 @@ pub fn other_service_routes() -> Router {
     // AWS routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let aws_routes = Router::new()
         .route(
-            "/{org_id}/_kinesis_firehose",
+            "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
         .layer(middleware::from_fn(aws_auth_middleware))
@@ -871,7 +892,10 @@ pub fn other_service_routes() -> Router {
 
     // GCP routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let gcp_routes = Router::new()
-        .route("/{org_id}/_sub", post(logs::ingest::handle_gcp_request))
+        .route(
+            "/{org_id}/{stream_name}/_sub",
+            post(logs::ingest::handle_gcp_request),
+        )
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
@@ -885,7 +909,6 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
-        .layer(cors_layer())
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,

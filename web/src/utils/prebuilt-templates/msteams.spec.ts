@@ -18,7 +18,7 @@ import { msteamsTemplate, msteamsConfig, msteamsDestinationType } from '@/utils/
 describe('msteams template', () => {
   describe('msteamsTemplate', () => {
     it('has correct name', () => {
-      expect(msteamsTemplate.name).toBe('system-prebuilt-msteams');
+      expect(msteamsTemplate.name).toBe('prebuilt_msteams');
     });
 
     it('has type as http', () => {
@@ -42,7 +42,7 @@ describe('msteams template', () => {
 
   describe('msteamsConfig', () => {
     it('references correct template name', () => {
-      expect(msteamsConfig.templateName).toBe('system-prebuilt-msteams');
+      expect(msteamsConfig.templateName).toBe('prebuilt_msteams');
     });
 
     it('has correct headers', () => {

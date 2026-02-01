@@ -16,55 +16,58 @@ import { PrebuiltConfig } from './types';
 
 /**
  * Slack prebuilt destination configuration
- * Provides predefined template and configuration for Slack webhook notifications
+ * Provides predefined configuration for Slack webhook notifications
+ * Note: Template body is now managed by backend, this is just for fallback/reference
  */
-export const slackTemplate = {
-  name: 'system-prebuilt-slack',
-  body: JSON.stringify({
-    text: "🚨 *Alert: {alert_name}*",
-    blocks: [
-      {
-        type: "header",
-        text: {
-          type: "plain_text",
-          text: "🚨 {alert_name}"
-        }
-      },
-      {
-        type: "section",
-        fields: [
-          { type: "mrkdwn", text: "*Stream:*\n{stream_name}" },
-          { type: "mrkdwn", text: "*Type:*\n{stream_type}" },
-          { type: "mrkdwn", text: "*Status:*\n🔴 Firing" },
-          { type: "mrkdwn", text: "*Count:*\n{alert_count}" }
-        ]
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: "*Threshold Exceeded:* {alert_operator} {alert_threshold}"
-        }
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: { type: "plain_text", text: "View in OpenObserve" },
-            url: "{alert_url}"
-          }
-        ]
+const slackTemplateBody = JSON.stringify({
+  text: "🚨 *Alert: {alert_name}*",
+  blocks: [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "🚨 {alert_name}"
       }
-    ]
-  }, null, 2),
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: "*Stream:*\n{stream_name}" },
+        { type: "mrkdwn", text: "*Type:*\n{stream_type}" },
+        { type: "mrkdwn", text: "*Status:*\n🔴 Firing" },
+        { type: "mrkdwn", text: "*Count:*\n{alert_count}" }
+      ]
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "*Threshold Exceeded:* {alert_operator} {alert_threshold}"
+      }
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "View in OpenObserve" },
+          url: "{alert_url}"
+        }
+      ]
+    }
+  ]
+}, null, 2);
+
+export const slackTemplate = {
+  name: 'prebuilt_slack',
+  body: slackTemplateBody,
   type: 'http' as const,
   isDefault: false
 };
 
 export const slackConfig: PrebuiltConfig = {
-  templateName: 'system-prebuilt-slack',
-  templateBody: slackTemplate.body,
+  templateName: 'prebuilt_slack',
+  templateBody: slackTemplateBody,
   headers: {
     'Content-Type': 'application/json'
   },

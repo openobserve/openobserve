@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::function::RESULT_ARRAY, utils::json};
+use config::{meta::function::RESULT_ARRAY, stats::MemorySize, utils::json};
 use rquickjs::{Context, Runtime};
 
 thread_local! {
@@ -57,6 +57,12 @@ thread_local! {
 pub struct JSRuntimeConfig {
     pub function: String,
     pub params: Vec<String>,
+}
+
+impl MemorySize for JSRuntimeConfig {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<JSRuntimeConfig>() + self.function.mem_size() + self.params.mem_size()
+    }
 }
 
 /// Initialize a new JS runtime for the current thread

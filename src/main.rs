@@ -237,12 +237,12 @@ async fn main() -> Result<(), anyhow::Error> {
             .expect("Failed to install rustls crypto provider");
     }
 
-    // init script server
+    // init action server
     #[cfg(feature = "enterprise")]
-    if config::cluster::LOCAL_NODE.is_script_server() && config::cluster::LOCAL_NODE.is_standalone()
+    if config::cluster::LOCAL_NODE.is_action_server() && config::cluster::LOCAL_NODE.is_standalone()
     {
-        log::info!("Starting script server");
-        return init_script_server().await;
+        log::info!("Starting action server");
+        return init_action_server().await;
     }
 
     // init backend jobs
@@ -1263,7 +1263,7 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
 }
 
 #[cfg(feature = "enterprise")]
-async fn init_script_server() -> Result<(), anyhow::Error> {
+async fn init_action_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
 
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -1285,14 +1285,17 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     } else {
         "HTTP"
     };
-    log::info!("Starting Script Server {scheme} server at: {haddr}");
+    log::info!("Starting Action Server {scheme} server at: {haddr}");
 
-    // Build the router for script server
-    let app = create_script_server_router()
+    // Build the router for action server
+    let app = create_action_server_router()
+        .layer(config::axum::middlewares::AccessLogLayer::new(
+            config::axum::middlewares::get_http_access_log_format(),
+        ))
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
-        .layer(CompressionLayer::new());
+        .layer(TraceLayer::new_for_http());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -1345,27 +1348,33 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(feature = "enterprise")]
-pub fn create_script_server_router() -> axum::Router {
+pub fn create_action_server_router() -> axum::Router {
     use axum::{
         Router,
         extract::DefaultBodyLimit,
         middleware,
-        routing::{delete, get, patch, post},
+        routing::{get, post},
     };
-    use openobserve::handler::http::{request::script_server, router::cors_layer};
+    use openobserve::handler::http::{request::action_server, router::cors_layer};
 
     let cfg = get_config();
     let base_uri = &cfg.common.base_uri;
 
-    // Create script server routes with authentication
+    // Create action server routes with authentication
+    // Routes match action_manager.rs expected URLs: /api/{org_id}/v1/job[/{id}]
     let api_routes = Router::new()
-        .route("/{org_id}/job", post(script_server::create_job))
-        .route("/{org_id}/job/{name}", delete(script_server::delete_job))
-        .route("/{org_id}/app/{name}", get(script_server::get_app_details))
-        .route("/{org_id}/apps", get(script_server::list_deployed_apps))
-        .route("/{org_id}/action/{id}", patch(script_server::patch_action))
+        .route(
+            "/{org_id}/v1/job",
+            post(action_server::create_job).get(action_server::list_deployed_apps),
+        )
+        .route(
+            "/{org_id}/v1/job/{name}",
+            get(action_server::get_app_details)
+                .delete(action_server::delete_job)
+                .put(action_server::patch_action),
+        )
         .layer(middleware::from_fn(
-            openobserve::handler::http::auth::script_server::auth_middleware,
+            openobserve::handler::http::auth::action_server::auth_middleware,
         ))
         .layer(cors_layer());
 
