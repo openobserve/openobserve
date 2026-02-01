@@ -580,7 +580,7 @@ import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
-import { onMounted } from "vue";
+import { onMounted, defineAsyncComponent } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
@@ -616,6 +616,9 @@ export default defineComponent({
     LogsHighLighting,
     TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
+    TelemetryCorrelationDashboard: defineAsyncComponent(
+      () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
+    ),
   },
   emits: [
     "close",
@@ -1271,7 +1274,10 @@ export default defineComponent({
         correlationError.value = null;
 
         // If we're already on a correlation tab, reload the data for the new span
-        if (activeTab.value === "correlated-logs" || activeTab.value === "correlated-metrics") {
+        if (
+          activeTab.value === "correlated-logs" ||
+          activeTab.value === "correlated-metrics"
+        ) {
           loadCorrelation();
         }
       },
