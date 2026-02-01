@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Header with Inline Filters -->
     <div
+      v-if="!props.hideDimensionFilters"
       class="correlation-controls tw:p-0 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
@@ -1117,6 +1118,6 @@ watch(
 
 <style lang="scss">
 .logs-table-container .container {
-  height: calc(100vh - 170px) !important;
+  height: calc(100vh - 115px) !important;
 }
 </style>

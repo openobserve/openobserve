@@ -24,7 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flexWrap: 'nowrap',
         }"
         class="flex span-row"
-        :class="spanHoveredIndex === index ? 'span-row-highlight' : ''"
+        :class="{
+          'span-row-highlight': spanHoveredIndex === index,
+          'span-row-selected': span.spanId === selectedSpanId
+        }"
         :data-test="`trace-tree-span-container-${span.spanId}`"
         @mouseover="() => (spanHoveredIndex = index)"
         @mouseout="() => (spanHoveredIndex = -1)"
@@ -268,6 +271,10 @@ export default defineComponent({
     spanList: {
       type: Array,
       default: () => [],
+    },
+    selectedSpanId: {
+      type: String,
+      default: "",
     },
   },
   emits: [
@@ -635,6 +642,24 @@ export default defineComponent({
       top: 0;
       height: 1.875rem;
       background-color: rgba(0, 123, 255, 0.2);
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .operation-name-container {
+      background-color: transparent !important;
+    }
+  }
+
+  &.span-row-selected {
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 1.875rem;
+      background-color: rgba(0, 123, 255, 0.35);
       pointer-events: none;
       z-index: 999;
     }

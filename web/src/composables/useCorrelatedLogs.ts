@@ -38,6 +38,7 @@ export interface CorrelatedLogsProps {
   timeRange: TimeRange;
   hideViewRelatedButton?: boolean;
   hideSearchTermActions?: boolean;
+  hideDimensionFilters?: boolean;
 }
 
 export interface LogEntry {

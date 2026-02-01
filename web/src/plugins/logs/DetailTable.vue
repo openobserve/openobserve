@@ -317,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :time-range="correlationProps.timeRange"
           :hide-view-related-button="true"
           :hide-search-term-actions="true"
+          :hide-dimension-filters="true"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />
@@ -362,6 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :available-dimensions="correlationProps.availableDimensions"
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
+          :hide-dimension-filters="true"
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
@@ -391,6 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :available-dimensions="correlationProps.availableDimensions"
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
+          :hide-dimension-filters="true"
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
