@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,7 @@ pub mod meta;
 pub mod metrics;
 pub mod prebuilt_loader;
 pub mod router;
+pub mod stats;
 pub mod utils;
 
 pub use config::*;

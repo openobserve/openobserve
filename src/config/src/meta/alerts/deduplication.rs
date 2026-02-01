@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ use utoipa::ToSchema;
 // SemanticFieldGroup has been moved to config::meta::correlation::SemanticFieldGroup
 // Import it for use within this module only (for GlobalDeduplicationConfig)
 use crate::meta::correlation::SemanticFieldGroup;
+use crate::stats::MemorySize;
 
 /// Organization-level deduplication configuration (Global settings)
 ///
@@ -126,6 +127,12 @@ pub struct DeduplicationConfig {
     pub grouping: Option<GroupingConfig>,
 }
 
+impl MemorySize for DeduplicationConfig {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<DeduplicationConfig>() + self.fingerprint_fields.mem_size()
+    }
+}
+
 /// Configuration for alert grouping
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct GroupingConfig {
@@ -144,6 +151,12 @@ pub struct GroupingConfig {
     /// Initial wait time before sending first notification (seconds)
     #[serde(default = "default_group_wait")]
     pub group_wait_seconds: i64,
+}
+
+impl MemorySize for GroupingConfig {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<GroupingConfig>()
+    }
 }
 
 impl Default for GroupingConfig {

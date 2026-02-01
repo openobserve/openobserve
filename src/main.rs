@@ -1280,11 +1280,12 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     // Setup the namespace
     o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
-    // let scheme = if cfg.http.tls_enabled {
-    //     "HTTPS"
-    // } else {
-    //     "HTTP"
-    // };
+    let scheme = if cfg.http.tls_enabled {
+        "HTTPS"
+    } else {
+        "HTTP"
+    };
+    log::info!("Starting Action Server {scheme} server at: {haddr}");
 
     // Build the router for action server
     let app = create_action_server_router()
