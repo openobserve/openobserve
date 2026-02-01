@@ -731,23 +731,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="activeTab == 'traces'" class="tw:h-full">
-        <!-- Refresh Button -->
-        <!-- <div
-          v-if="traceCorrelationMode !== null"
-          class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-        >
-          <q-btn
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadCorrelatedTraces"
-            :loading="tracesLoading"
-            size="sm"
-          />
-        </div> -->
-
         <!-- Loading State -->
         <div
           v-if="tracesLoading"
@@ -798,13 +781,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
             :show-back-button="false"
-            :show-timeline="false"
+            :show-timeline="true"
             :show-log-stream-selector="false"
             :show-share-button="false"
             :show-close-button="false"
-            :show-expand-button="true"
             :enable-correlation-links="true"
-            :initial-timeline-expanded="false"
           />
         </div>
 

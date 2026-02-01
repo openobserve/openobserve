@@ -583,7 +583,6 @@ import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import { onMounted, defineAsyncComponent } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
-import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -619,7 +618,6 @@ export default defineComponent({
   },
   components: {
     LogsHighLighting,
-    TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),

@@ -256,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="`sm`"
               />
             </div>
+            <<<<<<< HEAD
             <!-- Expand button - for embedded mode -->
             <q-btn
               v-if="mode === 'embedded' && showExpandButton"
@@ -270,6 +271,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("traces.openInTraces") }}
               </q-tooltip>
             </q-btn>
+            ======= >>>>>>> a9406fd38 (fix: implemented trace tree in logs
+            correlation)
             <!-- Share button - conditional -->
             <share-button
               v-if="mode === 'standalone' && showShareButton"
