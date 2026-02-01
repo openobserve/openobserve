@@ -301,16 +301,16 @@ arrow-json = "57.1.0"
 arrow-schema = { version = "57.1.0", features = ["serde"] }
 parquet = { version = "57.1.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
-vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
-vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
-vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
-vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
-vortex = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473", features = [
+vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
+vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
+vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
+vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
+vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
+vortex = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b", features = [
     "tokio",
 ] }
-vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
-vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473", features = [
+vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
+vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b", features = [
     "roaring",
 ] }
 # vortex-scan = { version = "0.58.0" }

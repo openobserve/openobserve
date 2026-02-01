@@ -278,11 +278,11 @@ mod tests {
         let array =
             VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable)).into_array();
 
-        println!("Original array encoding: {}", array.encoding().id());
+        println!("Original array encoding: {}", array.encoding_id());
         println!("Original array nbytes: {}", array.nbytes());
 
         let compressed = compressor.compress(&array).unwrap();
-        println!("Compressed encoding: {}", compressed.encoding().id());
+        println!("Compressed encoding: {}", compressed.encoding_id());
         println!("Compressed nbytes: {}", compressed.nbytes());
         println!(
             "Compression ratio: {:.2}%",
@@ -297,11 +297,11 @@ mod tests {
         let array =
             VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable)).into_array();
 
-        println!("Original array encoding: {}", array.encoding().id());
+        println!("Original array encoding: {}", array.encoding_id());
         println!("Original array nbytes: {}", array.nbytes());
 
         let compressed = compressor.compress(&array).unwrap();
-        println!("Compressed encoding: {}", compressed.encoding().id());
+        println!("Compressed encoding: {}", compressed.encoding_id());
         println!("Compressed nbytes: {}", compressed.nbytes());
         println!(
             "Compression ratio: {:.2}%",
@@ -313,11 +313,11 @@ mod tests {
         use vortex_array::arrays::PrimitiveArray;
         let array: PrimitiveArray = vec![1i32, 2, 3, 4, 5].into_iter().collect();
 
-        println!("Original array encoding: {}", array.encoding().id());
+        println!("Original array encoding: {}", array.encoding_id());
         println!("Original array nbytes: {}", array.nbytes());
 
         let compressed = compressor.compress(array.as_ref()).unwrap();
-        println!("Compressed encoding: {}", compressed.encoding().id());
+        println!("Compressed encoding: {}", compressed.encoding_id());
         println!("Compressed nbytes: {}", compressed.nbytes());
     }
 }

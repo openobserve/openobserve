@@ -1684,6 +1684,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "786a307d683a5bf92e6fd5fd69a7eb613751668d1d8d67d802846dfe367c62c8"
 dependencies = [
  "memchr",
+ "regex-automata",
  "serde",
 ]
 
@@ -2331,6 +2332,18 @@ dependencies = [
  "vortex-io",
  "vortex-session",
  "vrl",
+]
+
+[[package]]
+name = "console"
+version = "0.15.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "054ccb5b10f9f2cbf51eb355ca1d05c2d279ce1804688d0db74b4733a5aeafd8"
+dependencies = [
+ "encode_unicode",
+ "libc",
+ "once_cell",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4526,6 +4539,18 @@ dependencies = [
  "log",
  "regex-automata",
  "regex-syntax",
+]
+
+[[package]]
+name = "goldenfile"
+version = "1.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ef8d7e733be5a2b7b473a8bf6865d6dda7911ca010241f459439bac27df0013"
+dependencies = [
+ "scopeguard",
+ "similar-asserts",
+ "tempfile",
+ "yansi",
 ]
 
 [[package]]
@@ -8612,6 +8637,12 @@ checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 
 [[package]]
 name = "relative-path"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
+name = "relative-path"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bca40a312222d8ba74837cb474edef44b37f561da5f773981007a10bbaa992b0"
@@ -8864,7 +8895,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8bf7840285c321c3ab20e752a9afb95548c75cd7f4632a0627cea3507e310c1"
 dependencies = [
  "hashbrown 0.16.1",
- "relative-path",
+ "relative-path 2.0.1",
  "rquickjs-sys",
 ]
 
@@ -8895,6 +8926,46 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rstest"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+dependencies = [
+ "futures-timer",
+ "futures-util",
+ "rstest_macros",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro-crate 3.2.0",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path 1.9.3",
+ "rustc_version",
+ "syn 2.0.114",
+ "unicode-ident",
+]
+
+[[package]]
+name = "rstest_reuse"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3a8fb4672e840a587a66fc577a5491375df51ddb88f2a2c2a792598c326fe14"
+dependencies = [
+ "quote",
+ "rand 0.8.5",
+ "syn 2.0.114",
 ]
 
 [[package]]
@@ -9713,6 +9784,26 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "similar"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
+dependencies = [
+ "bstr",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "similar-asserts"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5b441962c817e33508847a22bd82f03a30cff43642dc2fae8b050566121eb9a"
+dependencies = [
+ "console",
+ "similar",
+]
 
 [[package]]
 name = "simple_asn1"
@@ -11517,7 +11608,7 @@ dependencies = [
 [[package]]
 name = "vortex"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "vortex-alp",
  "vortex-array",
@@ -11525,6 +11616,7 @@ dependencies = [
  "vortex-buffer",
  "vortex-bytebool",
  "vortex-compute",
+ "vortex-cuda-macros",
  "vortex-datetime-parts",
  "vortex-decimal-byte-parts",
  "vortex-dtype",
@@ -11547,7 +11639,6 @@ dependencies = [
  "vortex-session",
  "vortex-sparse",
  "vortex-utils",
- "vortex-vector",
  "vortex-zigzag",
  "vortex-zstd",
 ]
@@ -11555,7 +11646,7 @@ dependencies = [
 [[package]]
 name = "vortex-alp"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -11570,13 +11661,12 @@ dependencies = [
  "vortex-scalar",
  "vortex-session",
  "vortex-utils",
- "vortex-vector",
 ]
 
 [[package]]
 name = "vortex-array"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arcref",
  "arrow-arith",
@@ -11593,6 +11683,7 @@ dependencies = [
  "flatbuffers",
  "futures",
  "getrandom 0.3.4",
+ "goldenfile",
  "humansize",
  "inventory",
  "itertools 0.14.0",
@@ -11604,6 +11695,8 @@ dependencies = [
  "pin-project-lite",
  "prost 0.14.1",
  "rand 0.9.2",
+ "rstest",
+ "rstest_reuse",
  "rustc-hash",
  "simdutf8",
  "termtree",
@@ -11624,7 +11717,7 @@ dependencies = [
 [[package]]
 name = "vortex-btrblocks"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "getrandom 0.3.4",
  "itertools 0.14.0",
@@ -11653,7 +11746,7 @@ dependencies = [
 [[package]]
 name = "vortex-buffer"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-buffer",
  "bitvec",
@@ -11666,7 +11759,7 @@ dependencies = [
 [[package]]
 name = "vortex-bytebool"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "num-traits",
  "vortex-array",
@@ -11680,7 +11773,7 @@ dependencies = [
 [[package]]
 name = "vortex-compute"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -11699,9 +11792,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-cuda-macros"
+version = "0.1.0"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
 name = "vortex-datafusion"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-schema",
  "async-trait",
@@ -11732,7 +11835,7 @@ dependencies = [
 [[package]]
 name = "vortex-datetime-parts"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
@@ -11747,7 +11850,7 @@ dependencies = [
 [[package]]
 name = "vortex-decimal-byte-parts"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
@@ -11762,8 +11865,9 @@ dependencies = [
 [[package]]
 name = "vortex-dtype"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
+ "arcref",
  "arrow-buffer",
  "arrow-schema",
  "flatbuffers",
@@ -11780,13 +11884,14 @@ dependencies = [
  "vortex-error",
  "vortex-flatbuffers",
  "vortex-proto",
+ "vortex-session",
  "vortex-utils",
 ]
 
 [[package]]
 name = "vortex-error"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-schema",
  "flatbuffers",
@@ -11800,7 +11905,7 @@ dependencies = [
 [[package]]
 name = "vortex-fastlanes"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrayref",
  "fastlanes",
@@ -11816,13 +11921,12 @@ dependencies = [
  "vortex-mask",
  "vortex-scalar",
  "vortex-session",
- "vortex-vector",
 ]
 
 [[package]]
 name = "vortex-file"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "async-trait",
  "bytes",
@@ -11867,16 +11971,17 @@ dependencies = [
 [[package]]
 name = "vortex-flatbuffers"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "flatbuffers",
  "vortex-buffer",
+ "vortex-error",
 ]
 
 [[package]]
 name = "vortex-fsst"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "fsst-rs",
  "num-traits",
@@ -11887,13 +11992,13 @@ dependencies = [
  "vortex-error",
  "vortex-mask",
  "vortex-scalar",
- "vortex-vector",
+ "vortex-session",
 ]
 
 [[package]]
 name = "vortex-io"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "async-compat",
  "async-fs",
@@ -11911,6 +12016,7 @@ dependencies = [
  "smol",
  "tokio",
  "tracing",
+ "vortex-array",
  "vortex-buffer",
  "vortex-error",
  "vortex-metrics",
@@ -11921,7 +12027,7 @@ dependencies = [
 [[package]]
 name = "vortex-ipc"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "bytes",
  "flatbuffers",
@@ -11933,12 +12039,13 @@ dependencies = [
  "vortex-dtype",
  "vortex-error",
  "vortex-flatbuffers",
+ "vortex-session",
 ]
 
 [[package]]
 name = "vortex-layout"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arcref",
  "async-stream",
@@ -11975,14 +12082,13 @@ dependencies = [
  "vortex-sequence",
  "vortex-session",
  "vortex-utils",
- "vortex-vector",
  "vortex-zstd",
 ]
 
 [[package]]
 name = "vortex-mask"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-buffer",
  "itertools 0.14.0",
@@ -11993,7 +12099,7 @@ dependencies = [
 [[package]]
 name = "vortex-metrics"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "getrandom 0.3.4",
  "parking_lot 0.12.5",
@@ -12004,7 +12110,7 @@ dependencies = [
 [[package]]
 name = "vortex-pco"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "pco",
  "prost 0.14.1",
@@ -12014,12 +12120,13 @@ dependencies = [
  "vortex-error",
  "vortex-mask",
  "vortex-scalar",
+ "vortex-session",
 ]
 
 [[package]]
 name = "vortex-proto"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "prost 0.14.1",
  "prost-types 0.14.1",
@@ -12028,7 +12135,7 @@ dependencies = [
 [[package]]
 name = "vortex-runend"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-array",
  "itertools 0.14.0",
@@ -12046,7 +12153,7 @@ dependencies = [
 [[package]]
 name = "vortex-scalar"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-array",
  "bytes",
@@ -12059,17 +12166,18 @@ dependencies = [
  "vortex-error",
  "vortex-mask",
  "vortex-proto",
+ "vortex-session",
  "vortex-utils",
- "vortex-vector",
 ]
 
 [[package]]
 name = "vortex-scan"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "async-trait",
  "bit-vec",
  "futures",
  "itertools 0.14.0",
@@ -12091,7 +12199,7 @@ dependencies = [
 [[package]]
 name = "vortex-sequence"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
@@ -12103,15 +12211,16 @@ dependencies = [
  "vortex-proto",
  "vortex-runend",
  "vortex-scalar",
- "vortex-vector",
 ]
 
 [[package]]
 name = "vortex-session"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
+ "arcref",
  "dashmap",
+ "parking_lot 0.12.5",
  "vortex-error",
  "vortex-utils",
 ]
@@ -12119,7 +12228,7 @@ dependencies = [
 [[package]]
 name = "vortex-sparse"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -12130,13 +12239,12 @@ dependencies = [
  "vortex-error",
  "vortex-mask",
  "vortex-scalar",
- "vortex-vector",
 ]
 
 [[package]]
 name = "vortex-utils"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "dashmap",
  "hashbrown 0.16.1",
@@ -12146,7 +12254,7 @@ dependencies = [
 [[package]]
 name = "vortex-vector"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "num-traits",
  "paste",
@@ -12160,7 +12268,7 @@ dependencies = [
 [[package]]
 name = "vortex-zigzag"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "vortex-array",
  "vortex-buffer",
@@ -12174,7 +12282,7 @@ dependencies = [
 [[package]]
 name = "vortex-zstd"
 version = "0.1.0"
-source = "git+https://github.com/haohuaijin/vortex?rev=0df286cb11ffcf032742dc8e6cf5f0a568b63473#0df286cb11ffcf032742dc8e6cf5f0a568b63473"
+source = "git+https://github.com/haohuaijin/vortex?rev=469e31fd4e2b27d2c5b2008bedca6bec83c10e6b#469e31fd4e2b27d2c5b2008bedca6bec83c10e6b"
 dependencies = [
  "itertools 0.14.0",
  "prost 0.14.1",
@@ -12184,7 +12292,6 @@ dependencies = [
  "vortex-error",
  "vortex-mask",
  "vortex-scalar",
- "vortex-vector",
  "zstd",
 ]
 

@@ -205,7 +205,11 @@ pub async fn merge_parquet_files(
                     let mut writer = write_options.writer(&mut buf, dtype);
 
                     while let Some(batch) = rx.recv().await {
-                        let array: ArrayRef = ArrayRef::from_arrow(batch, false);
+                        let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
+                            DataFusionError::Execution(format!(
+                                "Failed to convert arrow array to vortex array: {e}"
+                            ))
+                        })?;
                         writer.push(array).await?;
                     }
 
