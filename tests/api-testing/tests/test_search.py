@@ -1427,13 +1427,13 @@ def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base
 
 def test_e2e_camel_case_edge_cases(create_session, base_url):
     """Test edge cases for camel case tokenization like numbers, special characters."""
-    
+
     session = create_session
-    url = base_url  
+    url = base_url
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
 
     # Test cases for edge case scenarios
     test_cases = [
@@ -1479,7 +1479,7 @@ def test_e2e_camel_case_edge_cases(create_session, base_url):
         json_data = {
             "query": {
                 "sql": f"SELECT * FROM \"stream_pytest_data\" WHERE match_all('{test_case['search_term']}')",
-                "start_time": three_days_ago,
+                "start_time": one_hour_ago,
                 "end_time": end_time,
                 "from": 0,
                 "size": 50,
@@ -1512,13 +1512,13 @@ def test_e2e_camel_case_edge_cases(create_session, base_url):
 
 def test_e2e_camel_case_backward_compatibility(create_session, base_url):
     """Test that existing non-camel case searches still work correctly."""
-    
+
     session = create_session
     url = base_url
-    org_id = "default" 
+    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
 
     # Test existing search patterns to ensure backward compatibility
     compatibility_tests = [
@@ -1544,7 +1544,7 @@ def test_e2e_camel_case_backward_compatibility(create_session, base_url):
         json_data = {
             "query": {
                 "sql": f"SELECT * FROM \"stream_pytest_data\" WHERE match_all('{test_case['search_term']}')",
-                "start_time": three_days_ago,
+                "start_time": one_hour_ago,
                 "end_time": end_time,
                 "from": 0,
                 "size": 50,
@@ -1575,12 +1575,12 @@ def test_e2e_camel_case_full_token_search(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
 
     json_data = {
         "query": {
             "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('DbException')",
-            "start_time": three_days_ago,
+            "start_time": one_hour_ago,
             "end_time": end_time,
             "size": 100
         }
@@ -1606,12 +1606,12 @@ def test_e2e_camel_case_atomic_token_search(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
-    
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+
     json_data = {
         "query": {
             "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('UserAccountService')",
-            "start_time": three_days_ago,
+            "start_time": one_hour_ago,
             "end_time": end_time,
             "size": 100
         }
@@ -1637,12 +1637,12 @@ def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
-    
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+
     json_data = {
         "query": {
             "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('XMLHttpRequest')",
-            "start_time": three_days_ago,
+            "start_time": one_hour_ago,
             "end_time": end_time,
             "size": 100
         }
@@ -1668,12 +1668,12 @@ def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
-    
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+
     json_data = {
         "query": {
             "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('OAuth2TokenHandler')",
-            "start_time": three_days_ago,
+            "start_time": one_hour_ago,
             "end_time": end_time,
             "size": 100
         }
@@ -1699,12 +1699,12 @@ def test_e2e_camel_case_multi_token_search(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
 
     json_data = {
         "query": {
             "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('UserManagementService')",
-            "start_time": three_days_ago,
+            "start_time": one_hour_ago,
             "end_time": end_time,
             "size": 100
         }

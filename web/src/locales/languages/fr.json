@@ -2357,7 +2357,8 @@
     "collapseFields": "Effondrer les champs",
     "openFields": "Champs ouverts",
     "timeRangeUpdated": "La plage de temps sélectionnée n'incluait pas cette trace. La plage horaire a été mise à jour pour correspondre à l'horodatage de la trace.",
-    "fetchingMoreTraces": "À la recherche de nouvelles traces..."
+    "fetchingMoreTraces": "À la recherche de nouvelles traces...",
+    "showErrorOnly": "Afficher uniquement l'erreur"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -2630,7 +2631,9 @@
     "analyzeTooltip": "Analysez les modèles de taux de trace sur toutes les dimensions",
     "analyzeTooltipLogs": "Analyser la distribution des dimensions pour la plage de temps actuelle",
     "rateLabel": "Tarif :",
-    "timeRangeLabel": "Plage de temps :"
+    "timeRangeLabel": "Plage de temps :",
+    "analyzeTooltipTraces": "Analysez les dimensions des traces pour déterminer le taux, la latence et les modèles d'erreur",
+    "insightsButtonLabel": "Perspectives"
   },
   "errorInsights": {
     "title": "Perspectives",

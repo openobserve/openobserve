@@ -2378,7 +2378,8 @@
     "collapseFields": "フィールドを折りたたむ",
     "openFields": "オープンフィールド",
     "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
-    "fetchingMoreTraces": "さらにトレースを取得中..."
+    "fetchingMoreTraces": "さらにトレースを取得中...",
+    "showErrorOnly": "エラーのみ表示"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -2630,7 +2631,9 @@
     "analyzeTooltip": "さまざまなディメンションにわたるトレースレートパターンを分析",
     "analyzeTooltipLogs": "現在の時間範囲のディメンション分布を分析",
     "rateLabel": "レート:",
-    "timeRangeLabel": "時間範囲:"
+    "timeRangeLabel": "時間範囲:",
+    "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
+    "insightsButtonLabel": "インサイト"
   },
   "errorInsights": {
     "title": "インサイト",
