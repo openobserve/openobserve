@@ -612,6 +612,22 @@ const getPipeline = () => {
         (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
       );
 
+      if (!_pipeline) {
+        q.notify({
+          message: t("pipeline.pipelineNotFound"),
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        });
+        router.replace({
+          name: "pipelines",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+
       _pipeline.edges.forEach((edge: any) => {
         edge.markerEnd = {
           type: MarkerType.ArrowClosed,
@@ -634,24 +650,22 @@ const getPipeline = () => {
         node.type = node.io_type;
       });
 
-      if (!_pipeline) {
-        q.notify({
-          message: t("pipeline.pipelineNotFound"),
-          color: "negative",
-          position: "bottom",
-          timeout: 3000,
-        });
-        router.replace({
-          name: "pipelines",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
-
       pipelineObj.currentSelectedPipeline = _pipeline;
       pipelineObj.pipelineWithoutChange = JSON.parse(JSON.stringify(_pipeline));
+    })
+    .catch((error) => {
+      q.notify({
+        message: error?.message || t("pipeline.failedToLoadPipeline"),
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+      router.replace({
+        name: "pipelines",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     });
 };
 
