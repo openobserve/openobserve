@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Tabs Navigation -->
     <q-separator />
-    <div class="row q-pt-sm">
+    <div class="row q-pt-sm q-px-sm">
       <div class="col-12">
         <q-tabs v-model="activeTab" shrink align="left">
           <q-tab
@@ -114,16 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="event-detail-network-tab"
             name="network"
             label="Network"
-          />
-          <q-tab
-            data-test="event-detail-console-tab"
-            name="console"
-            label="Console"
-          />
-          <q-tab
-            data-test="event-detail-performance-tab"
-            name="performance"
-            label="Performance"
           />
           <q-tab
             data-test="event-detail-attributes-tab"
@@ -491,6 +481,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Attributes Tab -->
       <q-tab-panel name="attributes" class="q-pa-sm" data-test="attributes-tab">
+        <div class="tw:flex tw:justify-start">
+          <q-btn
+            :label="t('common.copyToClipboard')"
+            dense
+            size="sm"
+            no-caps
+            class="q-px-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
+            icon="content_copy"
+            @click="copyAttributesToClipboard"
+            data-test="attributes-copy-btn"
+          />
+        </div>
         <div
           class="tw:p-2 tw:rounded tw:overflow-x-auto tw:font-mono tw:text-[10px]"
           data-test="raw-event-json"
@@ -522,6 +524,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useQuasar, copyToClipboard } from "quasar";
+import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import {
   outlinedAccountTree,
@@ -565,6 +569,8 @@ const emit = defineEmits(["close", "resource-selected"]);
 
 const store = useStore();
 const router = useRouter();
+const q = useQuasar();
+const { t } = useI18n();
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);
@@ -578,6 +584,24 @@ const {
   formatResourceDuration,
   getEventTypeClass,
 } = useEventFormatters();
+
+const copyAttributesToClipboard = () => {
+  copyToClipboard(JSON.stringify(props.rawEvent, null, 2))
+    .then(() => {
+      q.notify({
+        type: "positive",
+        message: t("common.copyToClipboard") + " - " + t("common.success"),
+        timeout: 1500,
+      });
+    })
+    .catch(() => {
+      q.notify({
+        type: "negative",
+        message: "Error while copying content.",
+        timeout: 1500,
+      });
+    });
+};
 
 const networkResources = computed(() => {
   return relatedResources.value.filter((item) => item.type === "resource");
