@@ -1010,8 +1010,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs Tab Content -->
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+          <!-- Refresh Button (shown when logs data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.logStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
             <span class="tw-text-xs tw-text-gray-500">Showing correlated logs from incident timeframe</span>
             <q-btn
               flat
@@ -1032,35 +1032,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-text-base">Loading correlated logs...</div>
           </div>
 
-          <!-- Error State -->
-          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">Failed to load correlated logs</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+          <!-- Error/No Data State -->
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+            <q-icon
+              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
+            <div class="text-h6 q-mt-md">
+              {{ correlationError || 'No correlated logs found' }}
+            </div>
+            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            </div>
             <q-btn
+              v-if="correlationError && !correlationError.includes('FQN priority')"
               color="primary"
               outline
-              size="sm"
+              size="md"
               @click="refreshCorrelation"
               icon="refresh"
               label="Retry"
+              class="q-mt-md"
             />
-          </div>
-
-          <!-- No Data State -->
-          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-4">No correlated logs found</div>
-            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
-              Try searching manually using these dimensions:
-            </div>
-            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
-              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
-                <span class="label-text">{{ key }}:</span>
-                <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
-              </div>
-            </div>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1081,8 +1075,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Metrics Tab Content -->
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+          <!-- Refresh Button (shown when metrics data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.metricStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
             <span class="tw-text-xs tw-text-gray-500">Showing correlated metrics from incident timeframe</span>
             <q-btn
               flat
@@ -1103,35 +1097,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
 
-          <!-- Error State -->
-          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">Failed to load correlated metrics</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+          <!-- Error/No Data State -->
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+            <q-icon
+              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
+            <div class="text-h6 q-mt-md">
+              {{ correlationError || 'No correlated metrics found' }}
+            </div>
+            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            </div>
             <q-btn
+              v-if="correlationError && !correlationError.includes('FQN priority')"
               color="primary"
               outline
-              size="sm"
+              size="md"
               @click="refreshCorrelation"
               icon="refresh"
               label="Retry"
+              class="q-mt-md"
             />
-          </div>
-
-          <!-- No Data State -->
-          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-4">No correlated metrics found</div>
-            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
-              Try searching manually using these dimensions:
-            </div>
-            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
-              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
-                <span class="label-text">{{ key }}:</span>
-                <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
-              </div>
-            </div>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1152,8 +1140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Traces Tab Content -->
         <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+          <!-- Refresh Button (shown when traces data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
             <span class="tw-text-xs tw-text-gray-500">Showing correlated traces from incident timeframe</span>
             <q-btn
               flat
@@ -1174,35 +1162,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
 
-          <!-- Error State -->
-          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">Failed to load correlated traces</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+          <!-- Error/No Data State -->
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+            <q-icon
+              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
+            <div class="text-h6 q-mt-md">
+              {{ correlationError || 'No correlated traces found' }}
+            </div>
+            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            </div>
             <q-btn
+              v-if="correlationError && !correlationError.includes('FQN priority')"
               color="primary"
               outline
-              size="sm"
+              size="md"
               @click="refreshCorrelation"
               icon="refresh"
               label="Retry"
+              class="q-mt-md"
             />
-          </div>
-
-          <!-- No Data State -->
-          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-4">No correlated traces found</div>
-            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
-              Try searching manually using these dimensions:
-            </div>
-            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
-              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
-                <span class="label-text">{{ key }}:</span>
-                <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
-              </div>
-            </div>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1246,6 +1228,9 @@ import incidentsService, {
   IncidentAlert,
   IncidentCorrelatedStreams,
 } from "@/services/incidents";
+import http from "@/services/http";
+import streamService from "@/services/stream";
+import serviceStreamsApi from "@/services/service_streams";
 import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -1518,6 +1503,36 @@ export default defineComponent({
           org,
           incidentDetails.value
         );
+
+        // Check if correlation failed (null response or no data)
+        if (!correlationData.value?.correlationData &&
+            (!correlationData.value?.logStreams?.length &&
+             !correlationData.value?.metricStreams?.length &&
+             !correlationData.value?.traceStreams?.length)) {
+          // Fetch FQN priority config to check if it was modified after incident creation
+          try {
+            const fqnConfigResponse = await http().get(
+              `/api/${org}/settings/v2/fqn_priority_dimensions`
+            );
+            const fqnConfig = fqnConfigResponse.data;
+
+            // Compare timestamps (both in microseconds)
+            if (fqnConfig.updated_at > incidentDetails.value.created_at) {
+              correlationError.value =
+                "FQN priority was modified since this incident was created, cannot correlate";
+              console.warn(
+                `[Incident Correlation] FQN config updated at ${fqnConfig.updated_at}, incident created at ${incidentDetails.value.created_at}`
+              );
+            } else {
+              // Not a config issue - try building fallback correlation
+              await buildFallbackCorrelation(org, incidentDetails.value);
+            }
+          } catch (configError) {
+            // If can't fetch config, try fallback anyway
+            console.error("Failed to fetch FQN config:", configError);
+            await buildFallbackCorrelation(org, incidentDetails.value);
+          }
+        }
       } catch (error: any) {
         console.error("Failed to load correlated streams:", error);
         correlationError.value =
@@ -1526,6 +1541,136 @@ export default defineComponent({
           "Failed to load correlated telemetry";
       } finally {
         correlationLoading.value = false;
+      }
+    };
+
+    // Build fallback correlation using first alert's stream schema
+    const buildFallbackCorrelation = async (org: string, incident: Incident) => {
+      try {
+        console.log("[Fallback Correlation] Building local correlation from first alert's stream");
+
+        // Get first alert to determine source stream
+        const firstAlert = triggers.value?.[0];
+        if (!firstAlert) {
+          console.warn("[Fallback Correlation] No alerts found in incident");
+          return;
+        }
+
+        // Determine stream type (default to logs if not specified)
+        const streamType = "logs"; // Could be extracted from alert metadata if available
+        const streamName = "default"; // Using default stream - could get from alert if stored
+
+        // Get stream schema
+        const schemaResponse = await streamService.schema(org, streamName, streamType);
+        const schema = schemaResponse.data;
+
+        // Get semantic groups
+        const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
+        const semanticGroups = semanticGroupsResponse.data;
+
+        // Map incident dimensions to field names in schema
+        // Schema response has .schema array with {name, type} objects
+        const schemaFields = new Set(
+          (schema.schema || schema.fields || []).map((f: any) => f.name)
+        );
+
+        console.log("[Fallback Correlation] Incident dimensions:", incident.stable_dimensions);
+        console.log("[Fallback Correlation] Total schema fields:", schemaFields.size);
+        console.log("[Fallback Correlation] Sample schema fields:", Array.from(schemaFields).slice(0, 10));
+
+        const filters: Record<string, string> = {};
+
+        for (const [dimId, dimValue] of Object.entries(incident.stable_dimensions)) {
+          // Find semantic group
+          const group = semanticGroups.find((g: any) => g.id === dimId);
+
+          console.log(`[Fallback Correlation] Processing ${dimId} = ${dimValue}`);
+
+          if (!group) {
+            console.warn(`[Fallback Correlation] No semantic group found for: ${dimId}`);
+            continue;
+          }
+
+          if (!group.fields || group.fields.length === 0) {
+            console.warn(`[Fallback Correlation] Semantic group ${dimId} has empty fields array`);
+            continue;
+          }
+
+          console.log(`[Fallback Correlation] Trying field variants for ${dimId}:`, group.fields.slice(0, 5));
+
+          // Collect ALL matching field names and pick the best one
+          const matchingFields = [];
+          for (const fieldName of group.fields) {
+            if (schemaFields.has(fieldName)) {
+              matchingFields.push(fieldName);
+            }
+          }
+
+          if (matchingFields.length > 0) {
+            // Prefer shorter field names without prefixes
+            const bestField = matchingFields.sort((a, b) => {
+              // Penalize long prefixes
+              const aPenalty = a.startsWith('service_') ? 1000 :
+                               a.startsWith('resource_') ? 500 :
+                               a.startsWith('attributes_') ? 300 : 0;
+              const bPenalty = b.startsWith('service_') ? 1000 :
+                               b.startsWith('resource_') ? 500 :
+                               b.startsWith('attributes_') ? 300 : 0;
+
+              // Then by length (shorter = better)
+              return (a.length + aPenalty) - (b.length + bPenalty);
+            })[0];
+
+            filters[bestField] = dimValue;
+            console.log(`[Fallback Correlation] ✅ Mapped ${dimId} → ${bestField} = ${dimValue} (from ${matchingFields.length} options: ${matchingFields.slice(0, 3).join(', ')})`);
+          } else {
+            console.warn(`[Fallback Correlation] ❌ No matching field in schema for ${dimId}`);
+          }
+        }
+
+        if (Object.keys(filters).length === 0) {
+          console.warn("[Fallback Correlation] No dimensions could be mapped to stream fields");
+          return;
+        }
+
+        console.log("[Fallback Correlation] Mapped filters:", filters);
+        console.log("[Fallback Correlation] Schema fields:", Array.from(schemaFields));
+        console.log("[Fallback Correlation] Stream type:", streamType);
+
+        // Build StreamInfo object
+        const streamInfo = {
+          stream_name: streamName,
+          stream_type: streamType === 'logs' ? 'Logs' : streamType === 'metrics' ? 'Metrics' : 'Traces',
+          filters
+        };
+
+        // Build correlation response with only the source stream type
+        correlationData.value = {
+          serviceName: `dimension-match-${incident.stable_dimensions.service || 'unknown'}`,
+          matchedDimensions: incident.stable_dimensions,
+          additionalDimensions: {},
+          logStreams: streamType === 'logs' ? [streamInfo] : [],
+          metricStreams: streamType === 'metrics' ? [streamInfo] : [],
+          traceStreams: streamType === 'traces' ? [streamInfo] : [],
+          correlationData: {
+            service_name: `dimension-match-${incident.stable_dimensions.service || 'unknown'}`,
+            matched_dimensions: incident.stable_dimensions,
+            additional_dimensions: {},
+            related_streams: {
+              logs: streamType === 'logs' ? [streamInfo] : [],
+              metrics: streamType === 'metrics' ? [streamInfo] : [],
+              traces: streamType === 'traces' ? [streamInfo] : [],
+            },
+            correlation_method: "frontend-fallback"
+          }
+        };
+
+        console.log("[Fallback Correlation] Built correlation data:", correlationData.value);
+        console.log("[Fallback Correlation] Log streams:", correlationData.value.logStreams);
+        console.log("[Fallback Correlation] Filters being passed:", correlationData.value.logStreams[0]?.filters);
+      } catch (fallbackError) {
+        console.error("[Fallback Correlation] Failed to build fallback:", fallbackError);
+        // Don't set error - let tabs show "No correlated X found"
       }
     };
 
