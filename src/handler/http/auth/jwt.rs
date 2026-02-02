@@ -488,15 +488,36 @@ async fn map_group_to_custom_role(
             std::collections::HashMap::new()
         };
 
-        // Always create default org; additionally create custom orgs if needed
+        // Always create default org (system org)
         let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
-        if use_custom_orgs && !custom_orgs.is_empty() {
-            for org_name in custom_orgs.keys() {
-                if org_name != &dex_cfg.default_org {
-                    let _ = organization::check_and_create_org(org_name).await;
+
+        // For custom claim parsing, validate that orgs exist (do NOT auto-create)
+        // Filter out non-existent orgs and log errors for them
+        let custom_orgs: std::collections::HashMap<String, Vec<String>> = if use_custom_orgs
+            && !custom_orgs.is_empty()
+        {
+            let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
+                std::collections::HashMap::new();
+            for (org_id, roles) in custom_orgs {
+                if org_id == dex_cfg.default_org {
+                    // Default org is always valid
+                    valid_orgs.insert(org_id, roles);
+                } else if organization::get_org(&org_id).await.is_some() {
+                    // Org exists, include it
+                    valid_orgs.insert(org_id, roles);
+                } else {
+                    // Org does not exist, log error
+                    log::error!(
+                        "SSO claim parser: organization '{}' does not exist, skipping assignment",
+                        org_id
+                    );
+                    publish_org_not_found_error(&org_id, user_email).await;
                 }
             }
-        }
+            valid_orgs
+        } else {
+            custom_orgs
+        };
 
         if openfga_cfg.enabled {
             // Always add user to default org
@@ -645,10 +666,29 @@ async fn map_group_to_custom_role(
             map
         };
 
-        // Create any new organizations
-        for org_name in custom_orgs.keys() {
-            let _ = organization::check_and_create_org(org_name).await;
-        }
+        // Validate that orgs exist (do NOT auto-create for custom claim parsing)
+        // Filter out non-existent orgs and log errors for them
+        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
+            let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
+                std::collections::HashMap::new();
+            for (org_id, roles) in custom_orgs {
+                if org_id == dex_cfg.default_org {
+                    // Default org is always valid
+                    valid_orgs.insert(org_id, roles);
+                } else if organization::get_org(&org_id).await.is_some() {
+                    // Org exists, include it
+                    valid_orgs.insert(org_id, roles);
+                } else {
+                    // Org does not exist, log error
+                    log::error!(
+                        "SSO claim parser: organization '{}' does not exist, skipping assignment",
+                        org_id
+                    );
+                    publish_org_not_found_error(&org_id, user_email).await;
+                }
+            }
+            valid_orgs
+        };
 
         // Get existing user and update their organizations list
         let existing_org_names: std::collections::HashSet<String> = existing_user
@@ -760,6 +800,32 @@ fn format_role_name(org_id: &str, role: &str) -> String {
 #[cfg(feature = "enterprise")]
 pub fn format_role_name_only(role: &str) -> String {
     RE_ROLE_NAME.replace_all(role, "_").to_string()
+}
+
+/// Publishes an error to the errors stream when an org from the claim parser doesn't exist
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
+    use chrono::Utc;
+    use config::meta::{
+        self_reporting::error::{ErrorData, ErrorSource, SsoClaimParserError},
+        stream::StreamParams,
+    };
+
+    let error_data = ErrorData {
+        _timestamp: Utc::now().timestamp_micros(),
+        stream_params: StreamParams::default(),
+        error_source: ErrorSource::SsoClaimParser(SsoClaimParserError {
+            function_name: "claim_parser".to_string(),
+            error_type: "validation_error".to_string(),
+            error: format!(
+                "Organization '{}' does not exist. The org must be pre-existing for SSO claim parser assignments.",
+                org_id
+            ),
+            claims_json: Some(format!("{{\"user_email\": \"{}\"}}", user_email)),
+        }),
+    };
+
+    crate::service::self_reporting::publish_error(error_data).await;
 }
 
 #[cfg(feature = "cloud")]
