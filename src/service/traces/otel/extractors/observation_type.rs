@@ -21,9 +21,9 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use super::super::attributes::{GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes};
 use crate::service::traces::otel::attributes::{
-    FrameworkAttributes, LLMAttributes, LangfuseAttributes,
+    FrameworkAttributes, GenAiAttributes, LLMAttributes, LangfuseAttributes,
+    OpenInferenceAttributes, VercelAiSdkAttributes,
 };
 
 /// Observation types supported by OpenObserve
@@ -204,6 +204,65 @@ pub fn map_to_observation_type(
 
     // Default: return Span
     ObservationType::Span
+}
+
+/// Detect if a span is an LLM trace based on attributes, and scope
+/// This function checks only a few key attributes FIRST to quickly identify LLM traces
+/// and avoid unnecessary processing overhead for non-LLM traces.
+pub fn is_llm_trace(attributes: &HashMap<String, json::Value>, scope_name: Option<&str>) -> bool {
+    // Fast path: Check the most common LLM indicators first
+    // These are the attributes most likely to appear in LLM traces
+
+    // 1. Gen-AI operation name
+    if attributes.contains_key(GenAiAttributes::OPERATION_NAME)
+        || attributes.contains_key(GenAiAttributes::REQUEST_MODEL)
+        || attributes.contains_key(GenAiAttributes::INPUT_MESSAGES)
+    {
+        return true;
+    }
+
+    // 2. LLM request type
+    if attributes.contains_key(LLMAttributes::REQUEST_TYPE) {
+        return true;
+    }
+
+    // 3. Vercel AI SDK model id
+    if attributes.contains_key(VercelAiSdkAttributes::MODEL_ID)
+        || attributes.contains_key(VercelAiSdkAttributes::PROMPT)
+        || attributes.contains_key(VercelAiSdkAttributes::PROMPT_MESSAGES)
+    {
+        return true;
+    }
+
+    // 4. OpenInference LLM model name
+    if attributes.contains_key(OpenInferenceAttributes::LLM_MODEL_NAME) {
+        return true;
+    }
+
+    // 5. Langfuse model name
+    if attributes.contains_key(LangfuseAttributes::TYPE) {
+        return true;
+    }
+
+    // 6. Most common model attributes (very common in LLM traces)
+    if attributes.contains_key(FrameworkAttributes::GCP_VERTEX_AGENT_LLM_REQUEST)
+        || attributes.contains_key(FrameworkAttributes::LOGFIRE_PROMPT)
+        || attributes.contains_key(FrameworkAttributes::MLFLOW_SPAN_INPUTS)
+        || attributes.contains_key(FrameworkAttributes::TRACELOOP_SPAN_KIND)
+        || attributes.contains_key(FrameworkAttributes::INPUT)
+        || attributes.contains_key(FrameworkAttributes::INPUT_VALUE)
+    {
+        return true;
+    }
+
+    // 7. Scope name check
+    if scope_name == Some("ai") {
+        return true;
+    }
+
+    // If none of the common indicators are found, it's likely not an LLM trace
+    // Return false early to avoid checking all the other attributes
+    false
 }
 
 #[cfg(test)]
@@ -422,5 +481,53 @@ mod tests {
 
         let result = map_to_observation_type(&attrs, &resource_attrs, None);
         assert_eq!(result, ObservationType::Embedding);
+    }
+
+    #[test]
+    fn test_is_llm_trace_gen_ai_operation() {
+        let attrs = make_attributes(vec![("gen_ai.operation.name", "chat")]);
+
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_llm_request_type() {
+        let attrs = make_attributes(vec![("llm.request.type", "completion")]);
+
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_model_attribute() {
+        let attrs = make_attributes(vec![("gen_ai.request.model", "gpt-4")]);
+
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_vercel_ai_sdk() {
+        let attrs = make_attributes(vec![("ai.model.id", "gpt-4")]);
+
+        assert!(is_llm_trace(&attrs, Some("ai")));
+    }
+
+    #[test]
+    fn test_is_llm_trace_gen_ai_events() {
+        let attrs = HashMap::new();
+        assert!(!is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_input_output_attributes() {
+        let attrs = make_attributes(vec![("gen_ai.input.messages", r#"[{"role":"user"}]"#)]);
+
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_non_llm() {
+        let attrs = make_attributes(vec![("http.method", "GET"), ("http.status_code", "200")]);
+
+        assert!(!is_llm_trace(&attrs, None));
     }
 }

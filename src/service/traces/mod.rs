@@ -77,7 +77,7 @@ use crate::{
         },
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
-        traces::otel::OtelIngestionProcessor,
+        traces::otel::{OtelIngestionProcessor, is_llm_trace},
     },
 };
 
@@ -310,7 +310,9 @@ pub async fn handle_otlp_request(
                 // Use span attributes as service_name fallback if service_name is not explicitly
                 // set This handles the case where service.name is not present in
                 // resource attributes
-                if cfg.common.traces_otel_llm_transform_enabled
+                let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
+                let is_llm_span = is_llm_trace(&span_att_map, scope_name);
+                if is_llm_span
                     && !service_name_explicitly_set
                     && let Some(val) = otel_processor.extract_service_name_from_span(&span_att_map)
                 {
@@ -344,8 +346,7 @@ pub async fn handle_otlp_request(
 
                 // Enrich span attributes with OTEL processor if enabled
                 // This adds AI/ML observability fields like model_name, usage_details, etc.
-                if cfg.common.traces_otel_llm_transform_enabled {
-                    let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
+                if is_llm_span {
                     otel_processor.process_span(
                         &mut span_att_map,
                         &service_att_map,

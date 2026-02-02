@@ -30,7 +30,7 @@ pub mod utils;
 pub use input_output::InputOutputExtractor;
 pub use metadata::MetadataExtractor;
 pub use model::ModelExtractor;
-pub use observation_type::{ObservationType, ScopeInfo, map_to_observation_type};
+pub use observation_type::{ObservationType, ScopeInfo, is_llm_trace, map_to_observation_type};
 pub use parameters::ParametersExtractor;
 pub use prompt::PromptExtractor;
 pub use provider::ProviderExtractor;

@@ -100,7 +100,7 @@ pub mod extractors;
 pub mod pricing;
 pub mod processor;
 
-pub use extractors::{ObservationType, ScopeInfo, map_to_observation_type};
+pub use extractors::{ObservationType, ScopeInfo, is_llm_trace, map_to_observation_type};
 pub use pricing::calculate_cost;
 pub use processor::OtelIngestionProcessor;
 
