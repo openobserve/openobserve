@@ -141,14 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <QueryTypeSelector />
                   </div>
 
-                  <!-- Generated Query Display (build mode) -->
-                  <GeneratedQueryDisplay
-                    v-if="resolvedConfig.showGeneratedQueryDisplay"
-                    :query="currentQuery"
-                    :isCustomMode="isCustomQueryMode"
-                    @update:query="onGeneratedQueryUpdate"
-                  />
-
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
                     v-if="
@@ -681,7 +673,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, defineAsyncComponent, toRef, onMounted } from "vue";
+import { ref, computed, provide, defineAsyncComponent, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
@@ -735,9 +727,6 @@ const CustomChartTypeSelector = defineAsyncComponent(
   () =>
     import("@/components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue"),
 );
-const GeneratedQueryDisplay = defineAsyncComponent(
-  () => import("./GeneratedQueryDisplay.vue"),
-);
 const QueryTypeSelector = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/QueryTypeSelector.vue"),
 );
@@ -778,7 +767,7 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const { dashboardPanelData, resetAggregationFunction } = useDashboardPanelData(
+const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery } = useDashboardPanelData(
   pageKey.value,
 );
 
@@ -1005,18 +994,6 @@ const searchType = computed(() => {
   }
 });
 
-// Current query for GeneratedQueryDisplay
-const currentQuery = computed(() => {
-  const queryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
-  return dashboardPanelData.data.queries[queryIndex]?.query || "";
-});
-
-// Whether in custom query mode
-const isCustomQueryMode = computed(() => {
-  const queryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
-  return dashboardPanelData.data.queries[queryIndex]?.customQuery || false;
-});
-
 // Resolved variables data
 const resolvedVariablesData = computed(() => {
   if (props.variablesData) {
@@ -1060,12 +1037,6 @@ const handleDataZoom = (event: any) => {
   });
 };
 
-const onGeneratedQueryUpdate = (newQuery: string) => {
-  const queryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
-  if (dashboardPanelData.data.queries[queryIndex]) {
-    dashboardPanelData.data.queries[queryIndex].query = newQuery;
-  }
-};
 
 const handleCustomChartTemplateSelected = (templateCode: string) => {
   dashboardPanelData.data.customChartContent = templateCode;
@@ -1111,6 +1082,57 @@ const handleChartTypeSelection = async (selection: any) => {
 
   showCustomChartTypeSelector.value = false;
 };
+
+// ============================================================================
+// Field Change Watchers (Auto SQL Generation)
+// ============================================================================
+
+// Watch for builder field changes to auto-generate SQL query
+// This is the centralized watcher that replaces duplicate watchers in AddPanel, Metrics, and BuildQueryPage
+watch(
+  () => [
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.stream,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.x,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.y,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.breakdown,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.z,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.filter,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.latitude,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.longitude,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.weight,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.source,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.target,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.value,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.name,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.value_for_maps,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config?.limit,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins,
+    dashboardPanelData.data.type,
+  ],
+  async () => {
+    // Only auto-generate SQL if in builder mode (customQuery = false)
+    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery) {
+      await makeAutoSQLQuery();
+
+      // Emit the generated query for pages that need to sync it (e.g., BuildQueryPage -> SearchBar)
+      const generatedQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query;
+      if (generatedQuery) {
+        emit("queryGenerated", generatedQuery);
+      }
+    }
+  },
+  { deep: true }
+);
+
+// Watch for customQuery mode changes to notify parent
+watch(
+  () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery,
+  (isCustomMode) => {
+    emit("customQueryModeChanged", isCustomMode ?? false);
+  },
+  { immediate: true }
+);
 
 // ============================================================================
 // Expose

@@ -331,6 +331,7 @@ size="md" />
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
+              @customQueryModeChanged="onCustomQueryModeChanged"
             />
           </div>
         </template>
@@ -1593,6 +1594,11 @@ export default defineComponent({
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         try {
+          // Reset buildModeQueryEditorDisabled when not in build mode
+          if (searchObj.meta.logsVisualizeToggle !== "build") {
+            searchObj.meta.buildModeQueryEditorDisabled = false;
+          }
+
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
             // Enable quick mode automatically when switching to visualization if:
             // 1. SQL mode is disabled OR
@@ -2165,10 +2171,17 @@ export default defineComponent({
     };
 
     const onBuildQueryGenerated = (query: string) => {
-      // Sync generated query to logs composables so user can see it
+      // Sync generated query to logs composables so user can see it in the editor
       if (query) {
         searchObj.data.query = query;
+        searchObj.data.editorValue = query; // Also update editor display
       }
+    };
+
+    const onCustomQueryModeChanged = (isCustomMode: boolean) => {
+      // Disable query editor in build mode when customQuery is false (builder mode)
+      // In builder mode, query is auto-generated from fields - user shouldn't edit directly
+      searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
     };
 
     // Selected date time for BuildQueryPage
@@ -2701,6 +2714,7 @@ export default defineComponent({
       onBuildApply,
       onBuildCancel,
       onBuildQueryGenerated,
+      onCustomQueryModeChanged,
       selectedDateTime,
     };
   },

@@ -1177,6 +1177,7 @@ class="q-pr-sm q-pt-xs" />
                     : ''
                 "
                 language="sql"
+                :readOnly="searchObj.meta.logsVisualizeToggle === 'build' && searchObj.meta.buildModeQueryEditorDisabled"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
               />

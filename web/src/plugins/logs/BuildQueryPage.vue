@@ -25,6 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :showAddToDashboardButton="true"
       @addToDashboard="showAddToDashboardDialog = true"
       @chartApiError="handleChartApiError"
+      @queryGenerated="onQueryGenerated"
+      @customQueryModeChanged="onCustomQueryModeChanged"
     />
 
     <!-- Query Mode Toggle - Bottom Right Corner -->
@@ -101,6 +103,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   /** Emitted when SQL query is generated from builder fields */
   (e: "queryGenerated", query: string): void;
+  /** Emitted when customQuery mode changes (true = custom mode, false = builder mode) */
+  (e: "customQueryModeChanged", isCustomMode: boolean): void;
 }>();
 
 // ============================================================================
@@ -111,7 +115,7 @@ const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 
 // Get dashboard panel data for build page
-const { dashboardPanelData, resetDashboardPanelData, makeAutoSQLQuery, updateGroupedFields } =
+const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields } =
   useDashboardPanelData("build");
 
 // Provide page key for child components
@@ -234,12 +238,30 @@ watch(
   { deep: true }
 );
 
+// NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue
+// PanelEditor emits 'queryGenerated' and 'customQueryModeChanged' which we forward to parent
+
+// ============================================================================
+// PanelEditor Event Handlers (forward to parent)
+// ============================================================================
+
+const onQueryGenerated = (query: string) => {
+  // Forward the generated query to parent (Index.vue -> SearchBar)
+  emit("queryGenerated", query);
+};
+
+const onCustomQueryModeChanged = (isCustomMode: boolean) => {
+  // Forward the custom query mode change to parent
+  emit("customQueryModeChanged", isCustomMode);
+};
+
 // ============================================================================
 // Lifecycle
 // ============================================================================
 
 onMounted(() => {
   initializeFromQuery();
+  // Note: PanelEditor's watcher (with immediate: true) will emit initial customQueryModeChanged
 });
 
 // ============================================================================
@@ -248,23 +270,17 @@ onMounted(() => {
 
 /**
  * Run the query in PanelEditor
+ * PanelEditor handles SQL generation via its watcher and emits queryGenerated
  */
 const runQuery = async (withoutCache?: boolean) => {
-  // Generate SQL from fields if in builder mode (customQuery: false)
+  // Ensure stream fields are loaded before running query in builder mode
   if (!dashboardPanelData.data.queries[0].customQuery) {
-    // Ensure stream fields are loaded before generating SQL
     if (!dashboardPanelData.meta.streamFields?.groupedFields?.length) {
       await updateGroupedFields();
     }
-    await makeAutoSQLQuery();
   }
 
-  // Sync generated query back to logs composables
-  const generatedQuery = dashboardPanelData.data.queries[0].query;
-  if (generatedQuery) {
-    emit("queryGenerated", generatedQuery);
-  }
-
+  // PanelEditor will generate SQL and emit queryGenerated
   panelEditorRef.value?.runQuery(withoutCache);
 };
 

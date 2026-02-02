@@ -349,6 +349,18 @@ export interface PanelEditorEmits {
    * Emitted when metadata is updated (for QueryInspector in dashboard mode).
    */
   (e: "metaDataUpdated", metadata: any): void;
+
+  /**
+   * Emitted when SQL query is auto-generated from builder fields.
+   * Useful for syncing query to parent (e.g., logs SearchBar).
+   */
+  (e: "queryGenerated", query: string): void;
+
+  /**
+   * Emitted when customQuery mode changes.
+   * true = custom mode (user edits query), false = builder mode (auto-generated).
+   */
+  (e: "customQueryModeChanged", isCustomMode: boolean): void;
 }
 
 // ============================================================================
