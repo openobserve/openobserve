@@ -47,10 +47,35 @@ export interface LLMData {
 }
 
 /**
+ * Check if a value is meaningful (not null, undefined, 0, empty string, or empty array/object)
+ */
+function hasValue(value: any): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value).length > 0;
+  return Boolean(value);
+}
+
+/**
  * Check if a trace/span has LLM data
+ * Returns true only if at least one LLM field exists AND has a meaningful value
  */
 export function isLLMTrace(data: any): boolean {
-  return !!(data && (data._o2_llm_provider_name || data._o2_llm_input || data.llm_input || data.llm_usage));
+  if (!data) return false;
+
+  // Check OpenObserve v2 fields
+  if (hasValue(data._o2_llm_provider_name)) return true;
+  if (hasValue(data._o2_llm_input)) return true;
+  if (hasValue(data._o2_llm_output)) return true;
+
+  // Check legacy fields
+  if (hasValue(data.llm_input)) return true;
+  if (hasValue(data.llm_output)) return true;
+  if (hasValue(data.llm_usage)) return true;
+
+  return false;
 }
 
 /**
