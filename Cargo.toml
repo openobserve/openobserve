@@ -40,7 +40,7 @@ tokio-console = ["dep:console-subscriber"]
 
 [profile.release]
 debug = false
-strip = false
+strip = true
 
 [profile.release-prod]
 inherits = "release"
