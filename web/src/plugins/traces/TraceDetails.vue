@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="trace-details-content"
       v-if="
         traceTree.length &&
-        spanList.length &&
+        effectiveSpanList.length &&
         !(
           searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta
@@ -28,18 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="trace-combined-header-wrapper card-container">
-        <div
-          class="full-width flex items-center toolbar flex justify-between q-pb-sm"
-        >
+        <div class="full-width flex items-center toolbar flex justify-between">
           <div class="flex items-center">
+            <!-- Back button - only show in standalone mode if explicitly enabled -->
             <div
+              v-if="mode === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
               class="flex justify-center items-center q-mr-sm cursor-pointer trace-back-btn"
               title="Traces List"
-              @click="routeToTracesList"
+              @click="handleBackOrClose"
             >
               <q-icon name="arrow_back_ios_new" size="14px" />
             </div>
+
             <div
               data-test="trace-details-operation-name"
               class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
@@ -48,32 +49,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ traceTree[0]["operationName"] }}
             </div>
             <div class="q-mr-lg flex items-center text-body2">
-              <div class="flex items-center">
-                Trace ID:
-                <div
-                  data-test="trace-details-trace-id"
-                  class="toolbar-trace-id ellipsis q-pl-xs"
-                  :title="spanList[0]['trace_id']"
-                >
-                  {{ spanList[0]["trace_id"] }}
-                </div>
+              <span class="text-grey-7">Trace ID:</span>
+
+              <!-- Clickable trace ID (embedded mode - no ellipsis) -->
+              <div
+                v-if="mode === 'embedded'"
+                data-test="trace-details-trace-id"
+                class="toolbar-trace-id q-pl-xs cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                :title="`Open ${effectiveSpanList[0]['trace_id']} in Traces`"
+                @click="handleExpandToFullView"
+              >
+                {{ effectiveSpanList[0]["trace_id"] }}
               </div>
+
+              <!-- Non-clickable with ellipsis (standalone mode) -->
+              <div
+                v-else
+                data-test="trace-details-trace-id"
+                class="toolbar-trace-id tw:m-w-[5rem] ellipsis q-pl-xs"
+                :title="effectiveSpanList[0]['trace_id']"
+              >
+                {{ effectiveSpanList[0]["trace_id"] }}
+              </div>
+
+              <!-- Open in new icon (embedded mode only) -->
+              <q-icon
+                v-if="mode === 'embedded' && showExpandButton"
+                class="cursor-pointer q-ml-xs hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                size="14px"
+                name="open_in_new"
+                title="Open in Traces"
+                @click="handleExpandToFullView"
+                data-test="trace-details-trace-id-open-btn"
+              />
+
+              <!-- Copy button (both modes) -->
               <q-icon
                 data-test="trace-details-copy-trace-id-btn"
-                class="cursor-pointer trace-copy-icon"
+                class="cursor-pointer trace-copy-icon q-ml-xs"
                 size="12px"
                 name="content_copy"
-                title="Copy"
+                title="Copy Trace ID"
                 @click="copyTraceId"
               />
             </div>
 
             <div data-test="trace-details-spans-count" class="q-pb-xs q-mr-lg">
-              Spans: {{ spanList.length }}
+              Spans: {{ effectiveSpanList.length }}
             </div>
 
             <!-- TODO OK: Create component for this usecase multi select with button -->
-            <div class="o2-input flex items-center trace-logs-selector">
+            <div
+              v-if="showLogStreamSelector"
+              class="o2-input flex items-center trace-logs-selector"
+            >
               <q-select
                 data-test="trace-details-log-streams-select"
                 v-model="searchObj.data.traceDetails.selectedLogStreams"
@@ -177,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-center">
             <div
-              class="flex justify-center items-center tw:pl-2 trace-search-container"
+              class="o2-input flex justify-center items-center tw:pl-2 trace-search-container"
             >
               <q-input
                 data-test="trace-details-search-input"
@@ -227,18 +256,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="`sm`"
               />
             </div>
+            <!-- Expand button - for embedded mode -->
+            <q-btn
+              v-if="mode === 'embedded' && showExpandButton"
+              data-test="trace-details-expand-btn"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
+              icon="open_in_new"
+              size="xs"
+              @click="handleExpandToFullView"
+              flat
+            >
+              <q-tooltip>
+                {{ t("traces.openInTraces") }}
+              </q-tooltip>
+            </q-btn>
+            <!-- Share button - conditional -->
             <share-button
+              v-if="mode === 'standalone' && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
               button-size="xs"
             />
+            <!-- Close button - conditional -->
             <q-btn
+              v-if="mode === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
               class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
               icon="cancel"
               size="xs"
-              @click="routeToTracesList"
+              @click="handleBackOrClose"
             >
               <q-tooltip>
                 {{ t("common.cancel") }}
@@ -247,74 +294,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="q-my-sm" />
+        <!-- Timeline section - conditional -->
+        <template v-if="showTimeline">
+          <q-separator class="q-my-sm" />
 
-        <div class="flex justify-between items-end q-pr-sm q-pb-sm">
-          <div
-            data-test="trace-details-toggle-timeline-btn"
-            class="trace-chart-btn flex items-center no-wrap cursor-pointer"
-            @click="toggleTimeline"
-          >
-            <q-icon
-              name="expand_more"
-              :class="!isTimelineExpanded ? 'rotate-270' : ''"
-              size="22px"
-              class="cursor-pointer text-grey-10"
-            />
+          <div class="flex justify-between items-end q-pr-sm q-pb-sm">
             <div
-              data-test="trace-details-visual-title"
-              class="text-subtitle2 text-bold"
+              data-test="trace-details-toggle-timeline-btn"
+              class="trace-chart-btn flex items-center no-wrap cursor-pointer"
+              @click="toggleTimeline"
             >
-              {{
-                activeVisual === "timeline"
-                  ? "Trace Timeline"
-                  : "Trace Service Map"
-              }}
+              <q-icon
+                name="expand_more"
+                :class="!isTimelineExpanded ? 'rotate-270' : ''"
+                size="22px"
+                class="cursor-pointer text-grey-10"
+              />
+              <div
+                data-test="trace-details-visual-title"
+                class="text-subtitle2 text-bold"
+              >
+                {{
+                  activeVisual === "timeline"
+                    ? "Trace Timeline"
+                    : "Trace Service Map"
+                }}
+              </div>
+            </div>
+
+            <div
+              v-if="isTimelineExpanded"
+              class="rounded-borders visual-selector-container"
+              :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            >
+              <template v-for="visual in traceVisuals" :key="visual.value">
+                <q-btn
+                  :data-test="`trace-details-visual-${visual.value}-btn`"
+                  :color="visual.value === activeVisual ? 'primary' : ''"
+                  :flat="visual.value === activeVisual ? false : true"
+                  dense
+                  no-caps
+                  size="11px"
+                  class="q-px-sm visual-selection-btn tw:rounded-[0.25rem]"
+                  @click="activeVisual = visual.value"
+                >
+                  <q-icon><component :is="visual.icon" /></q-icon>
+                  {{ visual.label }}</q-btn
+                >
+              </template>
             </div>
           </div>
-
           <div
-            v-if="isTimelineExpanded"
-            class="rounded-borders visual-selector-container"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            v-show="isTimelineExpanded"
+            class="chart-container-inner q-px-sm q-pb-sm"
+            :key="isTimelineExpanded.toString()"
           >
-            <template v-for="visual in traceVisuals" :key="visual.value">
-              <q-btn
-                :data-test="`trace-details-visual-${visual.value}-btn`"
-                :color="visual.value === activeVisual ? 'primary' : ''"
-                :flat="visual.value === activeVisual ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-sm visual-selection-btn tw:rounded-[0.25rem]"
-                @click="activeVisual = visual.value"
-              >
-                <q-icon><component :is="visual.icon" /></q-icon>
-                {{ visual.label }}</q-btn
-              >
-            </template>
+            <ChartRenderer
+              data-test="trace-details-timeline-chart"
+              v-if="activeVisual === 'timeline'"
+              class="trace-details-chart trace-chart-height"
+              id="trace_details_gantt_chart"
+              :data="ChartData"
+              @updated:chart="updateChart"
+            />
+            <ChartRenderer
+              data-test="trace-details-service-map-chart"
+              v-else
+              :data="traceServiceMap"
+              class="trace-chart-height"
+            />
           </div>
-        </div>
-        <div
-          v-show="isTimelineExpanded"
-          class="chart-container-inner q-px-sm q-pb-sm"
-          :key="isTimelineExpanded.toString()"
-        >
-          <ChartRenderer
-            data-test="trace-details-timeline-chart"
-            v-if="activeVisual === 'timeline'"
-            class="trace-details-chart trace-chart-height"
-            id="trace_details_gantt_chart"
-            :data="ChartData"
-            @updated:chart="updateChart"
-          />
-          <ChartRenderer
-            data-test="trace-details-service-map-chart"
-            v-else
-            :data="traceServiceMap"
-            class="trace-chart-height"
-          />
-        </div>
+        </template>
       </div>
       <div style="display: flex; flex: 1; min-height: 0">
         <div
@@ -389,6 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
+                  :parent-mode="mode"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -401,8 +452,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else-if="
-        searchObj.data.traceDetails.isLoadingTraceDetails ||
-        searchObj.data.traceDetails.isLoadingTraceMeta
+        shouldFetchData &&
+        (searchObj.data.traceDetails.isLoadingTraceDetails ||
+          searchObj.data.traceDetails.isLoadingTraceMeta)
       "
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
@@ -425,6 +477,7 @@ import {
   defineComponent,
   ref,
   type Ref,
+  type PropType,
   onMounted,
   watch,
   defineAsyncComponent,
@@ -468,9 +521,68 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "TraceDetails",
   props: {
-    traceId: {
+    // Mode control
+    mode: {
+      type: String as PropType<"standalone" | "embedded">,
+      default: "standalone",
+      validator: (value: string) => ["standalone", "embedded"].includes(value),
+    },
+
+    // Data props (used in embedded mode)
+    traceIdProp: {
       type: String,
       default: "",
+    },
+    streamNameProp: {
+      type: String,
+      default: "",
+    },
+    spanListProp: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    startTimeProp: {
+      type: Number,
+      default: 0,
+    },
+    endTimeProp: {
+      type: Number,
+      default: 0,
+    },
+
+    // UI visibility controls
+    showBackButton: {
+      type: Boolean,
+      default: true,
+    },
+    showHeader: {
+      type: Boolean,
+      default: true,
+    },
+    showTimeline: {
+      type: Boolean,
+      default: true,
+    },
+    showLogStreamSelector: {
+      type: Boolean,
+      default: true,
+    },
+    showShareButton: {
+      type: Boolean,
+      default: true,
+    },
+    showCloseButton: {
+      type: Boolean,
+      default: true,
+    },
+    showExpandButton: {
+      type: Boolean,
+      default: false,
+    },
+    // Correlation-specific props
+    enableCorrelationLinks: {
+      type: Boolean,
+      default: false,
     },
   },
   components: {
@@ -486,7 +598,7 @@ export default defineComponent({
     ),
   },
 
-  emits: ["searchQueryUpdated"],
+  emits: ["searchQueryUpdated", "close", "spanSelected"],
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
@@ -601,6 +713,67 @@ export default defineComponent({
       return rumSpan || null;
     });
 
+    // Computed properties for mode-based priority logic
+    const effectiveTraceId = computed(() => {
+      if (props.mode === "embedded") {
+        return props.traceIdProp;
+      }
+      // Standalone mode - get from URL
+      return (router.currentRoute.value.query.trace_id as string) || "";
+    });
+
+    const effectiveStreamName = computed(() => {
+      if (props.mode === "embedded") {
+        return props.streamNameProp;
+      }
+      // Standalone mode - get from URL
+      return (
+        (router.currentRoute.value.query.stream as string) ||
+        searchObj.data.stream.selectedStream.value ||
+        ""
+      );
+    });
+
+    const effectiveTimeRange = computed(() => {
+      if (props.mode === "embedded") {
+        return {
+          from: props.startTimeProp,
+          to: props.endTimeProp,
+        };
+      }
+      // Standalone mode - get from URL
+      return {
+        from: Number(router.currentRoute.value.query.from),
+        to: Number(router.currentRoute.value.query.to),
+      };
+    });
+
+    const effectiveOrgIdentifier = computed(() => {
+      if (props.mode === "embedded") {
+        return store.state.selectedOrganization?.identifier;
+      }
+      // Standalone mode - get from URL (for sharing links)
+      return (
+        (router.currentRoute.value?.query?.org_identifier as string) ||
+        store.state.selectedOrganization?.identifier
+      );
+    });
+
+    // Check if we should fetch data or use provided span list
+    const shouldFetchData = computed(() => {
+      return (
+        props.mode === "standalone" ||
+        (props.mode === "embedded" && props.spanListProp.length === 0)
+      );
+    });
+
+    const effectiveSpanList = computed(() => {
+      if (props.mode === "embedded" && props.spanListProp.length > 0) {
+        return props.spanListProp;
+      }
+      return searchObj.data.traceDetails.spanList;
+    });
+
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
     const searchResults = ref(0);
@@ -652,6 +825,30 @@ export default defineComponent({
       },
     );
 
+    // Watch for external span list changes in embedded mode
+    watch(
+      () => props.spanListProp,
+      (newSpanList) => {
+        if (props.mode === "embedded" && newSpanList.length > 0) {
+          searchObj.data.traceDetails.spanList = newSpanList;
+          updateServiceColors();
+          buildTracesTree();
+        }
+      },
+      { deep: true },
+    );
+
+    // Watch for trace ID changes in embedded mode
+    watch(
+      () => props.traceIdProp,
+      (newTraceId) => {
+        if (props.mode === "embedded" && newTraceId && shouldFetchData.value) {
+          resetTraceDetails();
+          setupTraceDetails();
+        }
+      },
+    );
+
     const backgroundStyle = computed(() => {
       return {
         background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
@@ -671,13 +868,22 @@ export default defineComponent({
       searchObj.data.traceDetails.isLoadingTraceMeta = false;
     };
 
-    const setupTraceDetails = async () => {
-      showTraceDetails.value = false;
-      searchObj.data.traceDetails.showSpanDetails = false;
-      searchObj.data.traceDetails.selectedSpanId = "";
+    // Helper to extract service names from span list
+    const extractServiceNames = (spans: any[]) => {
+      const serviceMap = new Map<string, number>();
+      spans.forEach((span) => {
+        const service = span.service_name;
+        serviceMap.set(service, (serviceMap.get(service) || 0) + 1);
+      });
 
-      await getTraceMeta();
-      await getStreams("logs", false)
+      return Array.from(serviceMap.entries()).map(([service_name, count]) => ({
+        service_name,
+        count,
+      }));
+    };
+
+    const loadLogStreams = async () => {
+      return getStreams("logs", false)
         .then((res: any) => {
           logStreams.value = res.list.map((option: any) => option.name);
           filteredStreamOptions.value = JSON.parse(
@@ -691,6 +897,48 @@ export default defineComponent({
         })
         .catch(() => Promise.reject())
         .finally(() => {});
+    };
+
+    const setupTraceDetails = async () => {
+      showTraceDetails.value = false;
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = "";
+
+      // If embedded mode with span list provided, skip fetching
+      if (props.mode === "embedded" && props.spanListProp.length > 0) {
+        // Use provided span list directly
+        searchObj.data.traceDetails.spanList = props.spanListProp;
+
+        // Set up minimal trace metadata from span list
+        if (props.spanListProp.length > 0) {
+          const firstSpan = props.spanListProp[0];
+          const serviceNames = extractServiceNames(props.spanListProp);
+          (searchObj.data.traceDetails.selectedTrace as any) = {
+            trace_id: props.traceIdProp || firstSpan.trace_id,
+            trace_start_time: Math.min(
+              ...props.spanListProp.map((s) => s.start_time / 1000),
+            ),
+            trace_end_time: Math.max(
+              ...props.spanListProp.map((s) => s.end_time / 1000),
+            ),
+            service_name: serviceNames,
+            services: {},
+          };
+        }
+
+        updateServiceColors();
+        buildTracesTree();
+
+        // Load log streams
+        await loadLogStreams();
+        return;
+      }
+
+      // Standalone mode - fetch from API
+      if (props.mode === "standalone") {
+        await getTraceMeta();
+        await loadLogStreams();
+      }
     };
 
     onMounted(() => {
@@ -733,26 +981,20 @@ export default defineComponent({
         let filter = (router.currentRoute.value.query.filter as string) || "";
 
         if (filter?.length)
-          filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
-        else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
+          filter += ` and trace_id='${effectiveTraceId.value}'`;
+        else filter += `trace_id='${effectiveTraceId.value}'`;
 
-        const streamName =
-          (router.currentRoute.value.query.stream as string) ||
-          searchObj.data.stream.selectedStream.value;
-
-        const orgIdentifier =
-          (router.currentRoute.value?.query?.org_identifier as string) ||
-          store.state.selectedOrganization?.identifier;
+        const timeRange = effectiveTimeRange.value;
 
         searchService
           .get_traces({
-            org_identifier: orgIdentifier,
-            start_time: Number(router.currentRoute.value.query.from) - 10000,
-            end_time: Number(router.currentRoute.value.query.to) + 10000,
+            org_identifier: effectiveOrgIdentifier.value,
+            start_time: timeRange.from - 10000,
+            end_time: timeRange.to + 10000,
             filter: filter || "",
             size: 1,
             from: 0,
-            stream_name: streamName,
+            stream_name: effectiveStreamName.value,
           })
           .then(async (res: any) => {
             const trace = getTracesMetaData(res.data.hits)[0];
@@ -787,7 +1029,7 @@ export default defineComponent({
             }
 
             getTraceDetails({
-              stream: streamName,
+              stream: effectiveStreamName.value,
               trace_id: trace.trace_id,
               from: startTime - 10000,
               to: endTime + 10000,
@@ -1592,9 +1834,43 @@ export default defineComponent({
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
+
+      // Emit event for embedded mode
+      if (props.mode === "embedded") {
+        emit("spanSelected", spanMap.value[spanId]);
+      }
+    };
+
+    const handleBackOrClose = () => {
+      if (props.mode === "embedded") {
+        emit("close");
+      } else {
+        routeToTracesList();
+      }
+    };
+
+    const handleExpandToFullView = () => {
+      // Navigate to full trace details page from embedded mode
+      if (props.mode !== "embedded") return;
+
+      const query: any = {
+        trace_id: effectiveTraceId.value,
+        stream: effectiveStreamName.value,
+        from: effectiveTimeRange.value.from.toString(),
+        to: effectiveTimeRange.value.to.toString(),
+        org_identifier: effectiveOrgIdentifier.value,
+      };
+
+      router.push({
+        name: "traces",
+        query,
+      });
     };
 
     const routeToTracesList = () => {
+      // Only navigate if in standalone mode
+      if (props.mode !== "standalone") return;
+
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
 
@@ -1665,6 +1941,7 @@ export default defineComponent({
       traceDetails,
       updateSelectedSpan,
       routeToTracesList,
+      handleExpandToFullView,
       openTraceLink,
       convertTimeFromNsToMs,
       searchQuery,
@@ -1692,6 +1969,15 @@ export default defineComponent({
       // Correlation props
       currentTraceStreamName,
       serviceStreamsEnabled,
+      // New computed properties for mode-based priority
+      effectiveTraceId,
+      effectiveStreamName,
+      effectiveTimeRange,
+      effectiveOrgIdentifier,
+      shouldFetchData,
+      effectiveSpanList,
+      // New event handlers
+      handleBackOrClose,
     };
   },
 });
@@ -1700,7 +1986,7 @@ export default defineComponent({
 <style scoped lang="scss">
 $sidebarWidth: 84%;
 $separatorWidth: 2px;
-$toolbarHeight: 50px;
+$toolbarHeight: 36px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 210px;
 $appNavbarHeight: 57px;
@@ -1790,10 +2076,6 @@ $traceChartCollapseHeight: 42px;
   .q-field .q-field__control {
     padding: 0px 8px;
   }
-}
-
-.toolbar-trace-id {
-  max-width: 80px;
 }
 
 .toolbar-operation-name {
