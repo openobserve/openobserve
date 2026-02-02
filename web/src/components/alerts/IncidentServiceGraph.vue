@@ -89,7 +89,7 @@ export default defineComponent({
     // Use topology_context directly from props
     const graphData = computed(() => props.topologyContext);
 
-    // D3-Force simulation to compute stable node positions
+    // D3-Force simulation to compute stable node positions with left-to-right layout
     const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
       const nodesCopy = nodes.map(n => ({ ...n }));
       const edgesCopy = edges.map(e => ({
@@ -98,23 +98,63 @@ export default defineComponent({
         ...e,
       }));
 
+      // Calculate depth/level for each node (for left-to-right positioning)
+      const nodeDepth = new Map<string, number>();
+      nodesCopy.forEach(n => nodeDepth.set(n.id, 0));
+
+      // Build adjacency list from temporal edges to determine hierarchy
+      const temporalEdges = edgesCopy.filter(e => e.originalEdge?.edge_type === 'temporal');
+      const visited = new Set<string>();
+
+      // BFS to calculate depth
+      const queue: Array<{ id: string; depth: number }> = [];
+
+      // Find root nodes (nodes with no incoming temporal edges)
+      const hasIncoming = new Set(temporalEdges.map(e => typeof e.target === 'string' ? e.target : e.target.id));
+      nodesCopy.forEach(n => {
+        if (!hasIncoming.has(n.id)) {
+          queue.push({ id: n.id, depth: 0 });
+        }
+      });
+
+      while (queue.length > 0) {
+        const { id, depth } = queue.shift()!;
+        if (visited.has(id)) continue;
+        visited.add(id);
+        nodeDepth.set(id, depth);
+
+        // Find outgoing temporal edges
+        temporalEdges.forEach(edge => {
+          const sourceId = typeof edge.source === 'string' ? edge.source : edge.source.id;
+          const targetId = typeof edge.target === 'string' ? edge.target : edge.target.id;
+          if (sourceId === id) {
+            queue.push({ id: targetId, depth: depth + 1 });
+          }
+        });
+      }
+
       const simulation = forceSimulation(nodesCopy)
-        .force('charge', forceManyBody().strength(-200).distanceMax(1200)) // Minimal repulsion for very tight clustering
+        .force('charge', forceManyBody().strength(-400).distanceMax(1200))
         .force('link', forceLink(edgesCopy)
           .id((d: any) => d.id)
-          .distance(100) // Reduced from 250 to 100 for much closer nodes
-          .strength(0.8) // Increased from 0.6 to pull nodes together more
-          .iterations(3)
-        )
-        .force('center', forceCenter(width / 2, height / 2).strength(0.1)) // Increased from 0.05 for stronger centering
-        .force('x', forceX(width / 2).strength(0.15)) // Increased for tighter clustering
-        .force('y', forceY(height / 2).strength(0.15)) // Increased for tighter clustering
-        .force('collision', forceCollide()
-          .radius((d: any) => (d.symbolSize || 60) / 2 + 30) // Reduced padding from 80 to 30
-          .strength(1.0)
+          .distance(180)
+          .strength(0.5)
           .iterations(2)
         )
-        .velocityDecay(0.35)
+        .force('x', forceX((d: any) => {
+          // Position nodes left-to-right based on their depth
+          const depth = nodeDepth.get(d.id) || 0;
+          const maxDepth = Math.max(...Array.from(nodeDepth.values()));
+          const spacing = maxDepth > 0 ? width / (maxDepth + 1) : width / 2;
+          return spacing * (depth + 1);
+        }).strength(1.5)) // Strong horizontal positioning
+        .force('y', forceY(height / 2).strength(0.1)) // Weak vertical centering
+        .force('collision', forceCollide()
+          .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
+          .strength(1.0)
+          .iterations(3)
+        )
+        .velocityDecay(0.4)
         .stop();
 
       // Run simulation for 5000 iterations to stabilize
@@ -143,8 +183,7 @@ export default defineComponent({
     };
 
     const getNodeSize = (node: AlertNode): number => {
-      const size = 30 + node.alert_count * 5;
-      return Math.min(size, 100); // Cap at 100 to prevent oversized nodes
+      return 60; // Fixed size for all nodes
     };
 
     const chartData = computed(() => {
@@ -156,7 +195,7 @@ export default defineComponent({
 
       // Prepare nodes for D3-force simulation
       const preparedNodes = nodes.map((node, index) => ({
-        name: `${node.alert_name}\n${node.service_name}`,
+        name: node.alert_name, // Show only alert name for cleaner labels
         id: index.toString(),
         symbolSize: getNodeSize(node),
         originalNode: node,
@@ -170,7 +209,7 @@ export default defineComponent({
         originalEdge: edge,
       }));
 
-      // Compute force-directed layout positions using D3 with smaller area for tighter clustering
+      // Compute force-directed layout positions using D3 with left-to-right layout
       // Only compute if we don't have cached positions for these nodes
       let positionedNodes;
       const hasAllPositions = preparedNodes.every(n => nodePositions.value.has(n.id));
@@ -183,8 +222,8 @@ export default defineComponent({
           y: nodePositions.value.get(n.id)!.y,
         }));
       } else {
-        // Compute new positions and cache them
-        positionedNodes = computeForceLayout(preparedNodes, preparedEdges, 300, 300);
+        // Compute new positions and cache them with wider canvas for left-to-right layout
+        positionedNodes = computeForceLayout(preparedNodes, preparedEdges, 1200, 400);
         positionedNodes.forEach((node: any) => {
           nodePositions.value.set(node.id, { x: node.x, y: node.y });
         });
@@ -214,6 +253,11 @@ export default defineComponent({
             fontSize: 11,
             color: isDarkMode.value ? "#e5e7eb" : "#374151",
             formatter: `{b}`,
+            backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+            borderRadius: 4,
+            padding: [4, 8],
+            shadowColor: "rgba(0, 0, 0, 0.3)",
+            shadowBlur: 4,
           },
           tooltip: {
             formatter: () => {
@@ -238,26 +282,62 @@ export default defineComponent({
         };
       });
 
-      const echartsEdges = edges.map((edge) => ({
-        source: edge.from_node_index.toString(),
-        target: edge.to_node_index.toString(),
-        lineStyle: {
-          color: edge.edge_type === "temporal"
-            ? (isDarkMode.value ? "#a78bfa" : "#8b5cf6") // purple for temporal
-            : (isDarkMode.value ? "#6b7280" : "#9ca3af"), // gray for service dependency
-          width: edge.edge_type === "temporal" ? 3 : 2,
-          curveness: 0.2,
-          type: edge.edge_type === "temporal" ? "dashed" : "solid",
-        },
-        symbol: ["none", "arrow"],
-        symbolSize: [0, 10],
-        label: {
-          show: true,
-          formatter: edge.edge_type === "temporal" ? "time →" : "",
-          fontSize: 10,
-          color: isDarkMode.value ? "#a78bfa" : "#8b5cf6",
-        },
-      }));
+      const echartsEdges = edges.map((edge) => {
+        const sourceNode = nodes[edge.from_node_index];
+        const targetNode = nodes[edge.to_node_index];
+
+        return {
+          source: edge.from_node_index.toString(),
+          target: edge.to_node_index.toString(),
+          lineStyle: {
+            color: edge.edge_type === "temporal"
+              ? (isDarkMode.value ? "#a78bfa" : "#8b5cf6") // purple for temporal
+              : (isDarkMode.value ? "#6b7280" : "#9ca3af"), // gray for service dependency
+            width: edge.edge_type === "temporal" ? 3 : 2,
+            curveness: 0.2,
+            type: "solid",
+          },
+          symbol: ["none", "arrow"],
+          symbolSize: [0, 10],
+          label: {
+            show: false, // Hide edge labels for cleaner visualization
+          },
+          tooltip: {
+            formatter: () => {
+              let html = `<div style="padding: 8px; font-size: 12px; text-align: center;">`;
+              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: #a78bfa;">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
+
+              if (edge.edge_type === "temporal") {
+                const sourceTime = new Date(sourceNode.first_fired_at / 1000);
+                const targetTime = new Date(targetNode.first_fired_at / 1000);
+                const timeDiff = Math.abs(targetTime.getTime() - sourceTime.getTime());
+
+                // Format time difference
+                const seconds = Math.floor(timeDiff / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const hours = Math.floor(minutes / 60);
+                const days = Math.floor(hours / 24);
+
+                let timeStr = "";
+                if (days > 0) timeStr = `${days}d ${hours % 24}h`;
+                else if (hours > 0) timeStr = `${hours}h ${minutes % 60}m`;
+                else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
+                else timeStr = `${seconds}s`;
+
+                html += `<span style="color: #a78bfa;">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
+                html += `From: ${sourceTime.toLocaleString()}<br/>`;
+                html += `To: ${targetTime.toLocaleString()}<br/>`;
+                html += `<br/><span style="color: #a78bfa;">Temporal correlation</span>`;
+              } else {
+                html += `<span style="color: #9ca3af;">Service dependency</span>`;
+              }
+
+              html += `</div>`;
+              return html;
+            },
+          },
+        };
+      });
 
       const options = {
         tooltip: {
