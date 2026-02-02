@@ -1550,15 +1550,15 @@ export default defineComponent({
         console.log("[Fallback Correlation] Building local correlation from first alert's stream");
 
         // Get first alert to determine source stream
-        const firstAlert = triggers.value?.[0];
+        const firstAlert = alerts.value?.[0];
         if (!firstAlert) {
           console.warn("[Fallback Correlation] No alerts found in incident");
           return;
         }
 
-        // Determine stream type (default to logs if not specified)
-        const streamType = "logs"; // Could be extracted from alert metadata if available
-        const streamName = "default"; // Using default stream - could get from alert if stored
+        // Use actual stream type and name from the alert
+        const streamType = firstAlert.stream_type || "logs";
+        const streamName = firstAlert.stream_name || "default";
 
         // Get stream schema
         const schemaResponse = await streamService.schema(org, streamName, streamType);
