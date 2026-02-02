@@ -263,6 +263,11 @@ const initializeFromQuery = async () => {
         dashboardPanelData.data.queries[0].fields.filter = panelFields.filter;
         dashboardPanelData.data.queries[0].customQuery = false;
 
+        // Apply parsed JOINs to builder
+        if (panelFields.joins && panelFields.joins.length > 0) {
+          dashboardPanelData.data.queries[0].joins = panelFields.joins;
+        }
+
         // Auto-select chart type based on fields:
         // - If only Y-axis fields (no X-axis, no breakdown) → use "metric" chart
         if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {

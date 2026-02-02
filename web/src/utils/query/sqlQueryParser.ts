@@ -32,6 +32,8 @@ export interface ParsedField {
   column: string;
   alias: string;
   aggregationFunction: string | null;
+  /** Stream alias for JOIN queries (e.g., "stream_0") */
+  streamAlias?: string | null;
 }
 
 export interface ParsedFilter {
@@ -42,6 +44,19 @@ export interface ParsedFilter {
   value?: string;
   values?: string[];
   conditions?: ParsedFilter[];
+}
+
+export interface JoinCondition {
+  leftField: { streamAlias: string | null; field: string };
+  rightField: { streamAlias: string | null; field: string };
+  operation: string;
+}
+
+export interface ParsedJoin {
+  stream: string;
+  streamAlias: string;
+  joinType: string;
+  conditions: JoinCondition[];
 }
 
 export interface ParsedQuery {
@@ -57,6 +72,8 @@ export interface ParsedQuery {
   breakdownFields: ParsedField[];
   /** Filter conditions */
   filters: ParsedFilter;
+  /** JOIN clauses */
+  joins: ParsedJoin[];
   /** Whether this is a custom (unparseable) query */
   customQuery: boolean;
   /** Original raw query */
@@ -239,6 +256,7 @@ export async function parseSQL(
       logicalOperator: "AND",
       conditions: [],
     },
+    joins: [],
     customQuery: true,
     rawQuery: query,
   };
@@ -264,8 +282,8 @@ export async function parseSQL(
     // Extract stream name
     const stream = await getStreamFromQuery(query);
 
-    // Extract fields and filters
-    const { fields, filters, streamName } = await getFieldsFromQuery(query);
+    // Extract fields, filters, and joins
+    const { fields, filters, streamName, joins } = await getFieldsFromQuery(query);
 
     // If no fields extracted, use custom mode
     if (!fields || fields.length === 0) {
@@ -273,6 +291,7 @@ export async function parseSQL(
         ...defaultResult,
         stream: stream || streamName || "",
         filters: filters as ParsedFilter,
+        joins: joins || [],
       };
     }
 
@@ -303,6 +322,7 @@ export async function parseSQL(
       yFields,
       breakdownFields,
       filters: filters as ParsedFilter,
+      joins: joins || [],
       customQuery: false,
       rawQuery: query,
     };
@@ -317,7 +337,7 @@ export async function parseSQL(
 /**
  * Convert parsed query to dashboard panel data format
  * @param parsed The parsed query
- * @returns Panel fields structure
+ * @returns Panel fields structure with joins
  */
 export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   stream: string;
@@ -326,6 +346,7 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   y: any[];
   breakdown: any[];
   filter: any;
+  joins: any[];
 } {
   const mapFieldToPanel = (field: ParsedField, index: number, axis: string) => {
     // Field structure must match dashboard builder format with functionName and args
@@ -341,7 +362,8 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
           type: "field",
           value: {
             field: field.column,
-            streamAlias: null,
+            // Use streamAlias from parsed field for JOIN queries
+            streamAlias: field.streamAlias || null,
           },
         },
       ],
@@ -370,6 +392,7 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
     y: parsed.yFields.map((f, i) => mapFieldToPanel(f, i, "y")),
     breakdown: breakdownFields.map((f, i) => mapFieldToPanel(f, i, "z")),
     filter: parsed.filters,
+    joins: parsed.joins || [],
   };
 }
 
