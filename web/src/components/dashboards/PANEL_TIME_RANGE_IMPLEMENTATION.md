@@ -1,8 +1,21 @@
 # Panel-Level Time Range Configuration - Implementation Guide
 
-**Version:** 3.0 (Final Requirements)
-**Date:** 2026-01-30
-**Status:** Ready for Implementation
+**Version:** 3.1 (Updated - Reflects Actual Implementation)
+**Date:** 2026-02-02
+**Status:** Implementation Complete - E2E Tests Pending
+
+---
+
+## Document Update Notice
+
+**⚠️ Documentation Updated to Match Actual Implementation**
+
+This document has been revised to reflect the **actual implemented behavior**:
+- **Removed:** Yellow refresh button indicator behavior (not implemented)
+- **Updated:** Apply button is the only way to apply time changes
+- **Clarified:** Auto-apply is disabled, user must explicitly click Apply
+- **Added:** Data-test attributes for E2E testing
+- **Updated:** E2E test count from 47 to 45 tests (removed 2 yellow button tests)
 
 ---
 
@@ -24,9 +37,8 @@ This document outlines the implementation for **panel-level time range/date-time
    - Visible in dashboard view mode (like variable selector)
    - Users can change panel time without entering edit mode
    - **Panel date time picker shown in RenderDashboardCharts** (not PanelContainer)
-   - **When time changed but not applied → refresh button turns YELLOW**
-   - **TWO ways to apply:** Click Apply on picker OR click yellow refresh button
-   - **Both actions:** Fire API call, update URL, refresh panel, clear yellow indicator
+   - **When Apply button clicked:** Fire API call, update URL, refresh panel immediately
+   - **Auto-apply disabled:** Users must click Apply to apply time changes
 
 3. ✅ **URL Parameter Sync**
    - Panel-level time synced to URL (like panel variables with `var-*`)
@@ -218,11 +230,9 @@ Similar to panel variables, add a date time picker widget to each panel that has
 - Shows current panel time range
 - Clicking opens date time picker dropdown
 - **Date time picker is shown in RenderDashboardCharts.vue** (not in panel header/PanelContainer)
-- **When time changed but Apply not clicked → refresh button turns YELLOW**
-- **TWO ways to apply time change:**
-  - **Option A:** Click Apply on date time picker → fires API, updates URL, clears yellow
-  - **Option B:** Click yellow refresh button → fires API, updates URL, clears yellow
-- **Both options have the same effect** - apply change, fire API, update URL, clear indicator
+- **Auto-apply disabled:** Set `:auto-apply-dashboard="false"` on panel time picker
+- **When Apply button clicked:** Fires API call, updates URL, refreshes panel immediately
+- User must explicitly click Apply to apply time changes
 
 **Position:**
 - Date time picker placed in RenderDashboardCharts area, above or near the corresponding panel
@@ -267,9 +277,9 @@ Example:
 
 ## Key Behaviors
 
-### Apply Button + Yellow Refresh Button Pattern
+### Apply Button Pattern
 
-**IMPORTANT:** The behavior uses BOTH Apply button and yellow refresh button indicator:
+**IMPORTANT:** Panel time changes require explicit Apply button click:
 
 #### In AddPanel/ConfigPanel (Configuration Mode)
 - **NEW date time picker** is created when "Use individual time" is selected (same as "comparison against" picker)
@@ -280,27 +290,17 @@ Example:
 #### In RenderDashboardCharts (View Mode)
 Date time picker is shown for each panel that has panel-level time enabled.
 
-**When user changes time but doesn't click Apply:**
+**When user changes time in picker:**
 - Picker value updates
-- **Panel refresh button turns YELLOW** (unsaved change indicator)
 - Panel data does NOT refresh yet
 - URL does NOT update yet
+- User must click Apply to apply changes
 
-**User has TWO options to apply the change:**
-
-**Option A: Click Apply on date time picker**
+**When user clicks Apply button on date time picker:**
 1. **Immediately fires API call** to refresh panel with new time
 2. **Updates URL** with new panel time parameters
-3. **Clears yellow indicator** (refresh button returns to normal color)
-4. Panel displays new data
-
-**Option B: Click yellow refresh button**
-1. **Immediately fires API call** to refresh panel with new time
-2. **Updates URL** with new panel time parameters
-3. **Clears yellow indicator** (refresh button returns to normal color)
-4. Panel displays new data
-
-**Both options have the same effect** - they apply the time change, fire API, update URL, and clear the yellow indicator.
+3. Panel displays new data
+4. Picker closes (standard date time picker behavior)
 
 ### Global Refresh Behavior
 
@@ -338,18 +338,19 @@ function getEffectiveTimeForPanel(panel, dashboard) {
 }
 ```
 
-### Yellow Refresh Button Indicator
+### Panel Time Picker Behavior
 
-**When does the refresh button turn yellow?**
-- User changes panel time picker value
-- Apply button on picker has NOT been clicked yet
-- Refresh button has NOT been clicked yet
-- Compares current picker value with last applied value
+**When user changes panel time picker value:**
+- Picker value updates in UI
+- Panel data does NOT refresh automatically
+- URL does NOT update yet
+- User must click Apply button to apply changes
 
-**When does yellow clear?**
-- User clicks Apply button on picker
-- User clicks the yellow refresh button
-- Both trigger the same update flow
+**When user clicks Apply button:**
+- API call fires immediately to fetch panel data
+- URL updates with new panel time parameters
+- Panel refreshes with new time range data
+- Picker closes (standard behavior)
 
 ---
 
@@ -397,19 +398,18 @@ function getEffectiveTimeForPanel(panel, dashboard) {
    - URL params can override panel config
    - Enables sharing and bookmarking
 
-4. **Refresh Button Pattern**
+4. **Apply Button Pattern**
    - Panel time picker selection does NOT auto-refresh panel data
-   - **When time changed but not applied → refresh button turns YELLOW**
-   - **User has TWO options:** Click Apply on picker OR click yellow refresh button
-   - **Both actions have same effect:** Fire API, update URL, refresh panel, clear yellow
-   - Prevents excessive API calls - changes only applied when user explicitly confirms (Apply or refresh)
+   - **Auto-apply disabled:** Set `:auto-apply-dashboard="false"` on panel time picker
+   - **User must click Apply:** Changes only applied when user clicks Apply button
+   - **Immediate action on Apply:** Fires API, updates URL, refreshes panel
+   - Prevents excessive API calls - changes only applied when user explicitly confirms
 
 5. **Visual Clarity**
    - Panel time picker visible in RenderDashboardCharts = obvious difference
-   - Yellow refresh button = clear indicator of unsaved time change
-   - Two action paths = flexibility (Apply button for immediate action, refresh button for familiar pattern)
+   - Apply button required = explicit user action for time changes
    - No need for extra badges or indicators
-   - Consistent with variable selector UX
+   - Consistent with standard date time picker UX
 
 ---
 
@@ -1981,13 +1981,12 @@ These existing tests already cover the time conversion logic that will be reused
 - [ ] Panel without panel time enabled has no picker widget
 - [ ] Panel with "use global" mode has picker but tracks global
 - [ ] Change panel time via picker → verify picker value updates
-- [ ] **Verify panel refresh button icon turns yellow** (unsaved change)
-- [ ] **Verify global refresh button remains normal color** (only panel button changes)
 - [ ] **Verify panel data does NOT auto-refresh after picker change**
-- [ ] **Verify URL does NOT update yet** (only after refresh)
-- [ ] Click panel refresh button (yellow icon) → verify icon returns to normal color
-- [ ] **Verify URL updates NOW** (after refresh clicked)
-- [ ] Verify panel data refreshes with new time
+- [ ] **Verify URL does NOT update yet** (only after Apply clicked)
+- [ ] Click **Apply button** on date time picker
+- [ ] **Verify URL updates immediately**
+- [ ] **Verify API call fires immediately**
+- [ ] **Verify panel data refreshes with new time**
 
 **URL Parameters:**
 - [ ] Load dashboard with `panel-time-<id>=1h` → verify panel uses 1h
@@ -2010,11 +2009,87 @@ These existing tests already cover the time conversion logic that will be reused
 
 ---
 
+### Data-Test Attributes for E2E Testing
+
+To enable reliable E2E testing and distinguish between multiple date time picker instances, the following data-test attributes have been added:
+
+#### Date Time Pickers
+
+**Global Dashboard Date Time Picker:**
+```html
+<DateTimePickerDashboard
+  data-test="dashboard-global-date-time-picker"
+  ...
+/>
+```
+- Location: ViewDashboard.vue (dashboard header)
+- Purpose: Global dashboard time selection
+- Usage: `page.locator('[data-test="dashboard-global-date-time-picker"]')`
+
+**Panel-Level Time Picker (Wrapper):**
+```html
+<div :data-test="`dashboard-panel-${item.id}-time-picker`">
+  <DateTimePickerDashboard ... />
+</div>
+```
+- Location: RenderDashboardCharts.vue (above each panel)
+- Purpose: Container for panel time picker
+- Usage: `page.locator('[data-test="dashboard-panel-panel123-time-picker"]')`
+
+**Panel-Level Time Picker (Component):**
+```html
+<DateTimePickerDashboard
+  :data-test="`panel-time-picker-${item.id}`"
+  ...
+/>
+```
+- Location: RenderDashboardCharts.vue (inside panel time picker wrapper)
+- Purpose: Individual panel date time picker component
+- Usage: `page.locator('[data-test="panel-time-picker-panel123"]')`
+
+**ViewPanel Modal Date Time Picker:**
+```html
+<DateTimePickerDashboard
+  data-test="dashboard-viewpanel-date-time-picker"
+  ...
+/>
+```
+- Location: ViewPanel.vue (modal header)
+- Purpose: Time picker in View Panel modal
+- Usage: `page.locator('[data-test="dashboard-viewpanel-date-time-picker"]')`
+
+#### Configuration UI
+
+**Allow Panel Time Toggle:**
+```html
+<q-checkbox
+  data-test="dashboard-config-allow-panel-time"
+  ...
+/>
+```
+- Location: ConfigPanel.vue
+- Purpose: Toggle to enable/disable panel-level time
+- Usage: `page.locator('[data-test="dashboard-config-allow-panel-time"]')`
+
+#### Panel-Level Variables (Existing)
+
+**Panel Variables Selector:**
+```html
+<div :data-test="`dashboard-panel-${item.id}-variables`">
+  ...
+</div>
+```
+- Location: RenderDashboardCharts.vue
+- Purpose: Panel-level variable selectors
+- Usage: `page.locator('[data-test="dashboard-panel-panel123-variables"]')`
+
+---
+
 ### E2E Test Cases
 
 Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress, or similar testing frameworks.
 
-**Total E2E Test Cases: 47**
+**Total E2E Test Cases: 45** (E2E-046 and E2E-047 removed - yellow icon behavior not implemented)
 
 #### Category 1: Basic Configuration (8 test cases)
 
@@ -2102,34 +2177,29 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify NO date time picker widget in panel header
 - Panel uses global time
 
-**E2E-011: Change Panel Time via View Mode Picker - Relative (Apply Button)**
+**E2E-011: Change Panel Time via View Mode Picker - Relative**
 - Load dashboard with panel having panel time enabled
-- Panel time picker is visible in RenderDashboardCharts area (not in panel header)
+- Panel time picker visible using `data-test="panel-time-picker-{panelId}"`
 - Click panel date time picker
 - Select "Last 7 days"
-- **Verify panel refresh button icon turns YELLOW** (unsaved change indicator)
 - **Verify panel data does NOT refresh yet** (still showing old data)
 - **Verify URL has NOT updated yet**
 - Click **Apply** button on date time picker
 - **Verify API call fires immediately** (panel data loading indicator appears)
-- **Verify refresh button icon returns to normal color** (yellow cleared)
-- **Verify URL immediately updates with panel-time-<panelId>=7d**
+- **Verify URL immediately updates with panel-time-{panelId}=7d**
 - Verify panel refreshes with new time range
 - Verify panel shows data for last 7 days
 
-**E2E-012: Change Panel Time via View Mode Picker - Absolute (Yellow Refresh Button)**
+**E2E-012: Change Panel Time via View Mode Picker - Absolute**
 - Load dashboard with panel having panel time enabled
-- Panel time picker is visible in RenderDashboardCharts area (not in panel header)
 - Click panel date time picker
 - Select absolute date range (e.g., Jan 1-15, 2024)
 - Verify picker shows selected dates
-- **Verify panel refresh button icon turns YELLOW** (unsaved change indicator)
 - **Verify panel data does NOT refresh yet** (still showing old data)
 - **Verify URL has NOT updated yet**
-- Click **yellow refresh button** (not Apply button this time - testing alternative path)
+- Click **Apply** button on date time picker
 - **Verify API call fires immediately** (panel data loading indicator appears)
-- **Verify refresh button icon returns to normal color** (yellow cleared)
-- **Verify URL immediately updates with panel-time-<panelId>-from and -to params**
+- **Verify URL immediately updates with panel-time-{panelId}-from and -to params**
 - Verify panel refreshes with new time range
 - Verify panel shows data for selected dates
 
@@ -2198,17 +2268,15 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Load dashboard with panel having panel time enabled
 - Click panel date time picker
 - Select "Last 1h"
-- **Verify panel refresh button icon turns yellow** (unsaved change)
-- **Verify URL has NOT updated yet** (only updates after refresh)
 - **Verify panel data has NOT refreshed yet**
-- Click panel refresh button (yellow icon)
-- **Verify refresh button icon returns to normal color**
-- **Verify URL NOW updates with `panel-time-<panelId>=1h`**
+- **Verify URL has NOT updated yet**
+- Click **Apply button** on date time picker
+- **Verify URL immediately updates with `panel-time-{panelId}=1h`**
+- **Verify API call fires immediately**
 - Verify panel data refreshes
 - Copy URL
 - Open URL in new tab
 - Verify panel picker shows "Last 1h"
-- Verify refresh button is normal color (not yellow, time is already applied)
 - Panel data loads with "Last 1h" on initial load
 
 **E2E-020: Load Dashboard with Panel Time URL Parameter**
@@ -2355,16 +2423,14 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Panel has individual time "Last 1h"
 - Change time to "Last 7d" in modal picker
 - Verify picker shows "Last 7d"
-- **Verify modal refresh button icon turns yellow** (unsaved change)
 - **Verify panel data does NOT refresh yet**
 - **Verify URL has NOT updated yet**
-- Click refresh button in modal header (yellow icon)
-- **Verify refresh button icon returns to normal color**
+- Click **Apply button** on date time picker
+- **Verify API call fires immediately**
 - Verify panel data refreshes with 7 days in modal
-- **Verify URL updated with new time NOW**
+- **Verify URL updated with new time**
 - Close modal
 - Verify Panel A in dashboard picker shows "Last 7d"
-- Verify Panel A refresh button is normal color (not yellow, already applied)
 
 **E2E-038: Full Screen Panel with Panel Time**
 - Load dashboard with Panel A having individual time "Last 1h"
@@ -2379,16 +2445,14 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Panel has individual time "Last 1h"
 - Change time to "Last 24h" in full screen picker
 - Verify picker shows "Last 24h"
-- **Verify refresh button icon turns yellow** (unsaved change)
 - **Verify panel data does NOT refresh yet**
 - **Verify URL has NOT updated yet**
-- Click refresh button in full screen header (yellow icon)
-- **Verify refresh button icon returns to normal color**
+- Click **Apply button** on date time picker
+- **Verify API call fires immediately**
 - Verify panel data refreshes with 24h data
-- **Verify URL updated NOW**
+- **Verify URL updated**
 - Exit full screen (back to dashboard)
 - Verify Panel A in dashboard picker shows "Last 24h"
-- Verify Panel A refresh button is normal color (not yellow, already applied)
 
 **E2E-040: Full Screen URL Sharing**
 - Open Panel A in full screen with time "Last 7d"
@@ -2445,72 +2509,6 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Print or export to PDF
 - Verify output shows panel times
 
-**E2E-046: Two Paths to Apply Time Change**
-- Load dashboard with Panel A having panel time enabled
-- Panel shows data for "Last 1h"
-- Note current URL (has `panel-time-panelA=1h`)
-- Verify Panel A refresh button is normal color (not yellow)
-
-**Test Path A: Apply Button**
-- Change panel time picker to "Last 7d"
-- **Verify refresh button icon turns YELLOW**
-- **Verify panel data unchanged** (still 1h data)
-- **Verify URL unchanged** (still 1h)
-- Click **Apply** button on date time picker
-- **Verify API call fires** (loading indicator)
-- **Verify refresh button returns to normal color**
-- **Verify URL updated to panel-time-panelA=7d**
-- **Verify panel shows 7d data**
-
-**Test Path B: Yellow Refresh Button**
-- Change panel time picker to "Last 24h"
-- **Verify refresh button icon turns YELLOW**
-- **Verify panel data unchanged** (still 7d data from previous step)
-- **Verify URL unchanged** (still 7d)
-- Click **yellow refresh button**
-- **Verify API call fires** (loading indicator)
-- **Verify refresh button returns to normal color**
-- **Verify URL updated to panel-time-panelA=24h**
-- **Verify panel shows 24h data**
-
-**E2E-047: Yellow Refresh Button Indicator Behavior**
-- Load dashboard with Panel A having panel time enabled
-- Panel shows "Last 1h"
-- Verify Panel A refresh button is normal color (not yellow)
-- **Verify global refresh button remains normal color**
-
-**Change without applying:**
-- Change picker to "Last 7d" but **DO NOT click Apply or refresh**
-- **Verify Panel A refresh button icon turns YELLOW** (warning color)
-- **Verify global refresh button remains normal color** (only panel button changes)
-- Verify other panels' refresh buttons remain normal color
-- **Verify panel data is unchanged** (still showing 1h data)
-- **Verify URL is unchanged** (still shows panel-time-panelA=1h)
-
-**Revert to original value:**
-- Change picker back to "Last 1h" (original value)
-- **Verify refresh button icon returns to normal color** (matches last applied value)
-
-**Change again and reload:**
-- Change picker to "Last 7d" again
-- **Verify refresh button icon turns YELLOW**
-- Reload page (F5)
-- **Verify refresh button is normal color** (reverted to saved URL value)
-- Verify picker shows saved URL value (Last 1h)
-
-**Persist across modals:**
-- Change picker to "Last 7d"
-- **Verify refresh button icon turns YELLOW**
-- Open View Panel modal
-- **Verify modal refresh button icon is YELLOW** (persists in modal)
-- Close modal
-- **Verify dashboard refresh button icon is still YELLOW** (persists)
-
-**Clear yellow by applying:**
-- Click yellow refresh button (or Apply button)
-- **Verify refresh button icon returns to normal color**
-- **Verify URL updated**
-- **Verify panel data refreshed**
 
 ---
 
@@ -2520,15 +2518,13 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 
 **Test Organization:**
 ```
-tests/
-  e2e/
-    panel-time/
-      01-configuration.spec.ts        (E2E-001 to E2E-008)
-      02-view-mode-picker.spec.ts     (E2E-009 to E2E-018)
-      03-url-parameters.spec.ts       (E2E-019 to E2E-028)
-      04-priority-system.spec.ts      (E2E-029 to E2E-035)
-      05-view-fullscreen.spec.ts      (E2E-036 to E2E-040)
-      06-dashboard-operations.spec.ts (E2E-041 to E2E-047)
+tests/ui-testing/playwright-tests/Dashboards/
+  ├── dashboard-panel-time-configuration.spec.js    (E2E-001 to E2E-008)
+  ├── dashboard-panel-time-view-mode.spec.js        (E2E-009 to E2E-018)
+  ├── dashboard-panel-time-url-sync.spec.js         (E2E-019 to E2E-028)
+  ├── dashboard-panel-time-priority.spec.js         (E2E-029 to E2E-035)
+  ├── dashboard-panel-time-fullscreen.spec.js       (E2E-036 to E2E-040)
+  └── dashboard-panel-time-operations.spec.js       (E2E-041 to E2E-045)
 ```
 
 **Test Data Setup:**
@@ -2538,8 +2534,8 @@ tests/
 - Setup test data in backend (if needed)
 
 **Execution Time Estimate:**
-- 47 test cases × ~2 minutes average = ~94 minutes total
-- Parallel execution: ~20-30 minutes (with 3-4 workers)
+- 45 test cases × ~2 minutes average = ~90 minutes total
+- Parallel execution: ~20-25 minutes (with 3-4 workers)
 
 **CI/CD Integration:**
 - Run E2E tests on every PR
@@ -2867,8 +2863,8 @@ if (panel.config.panel_time_range) {
 **Code Changes:**
 - Backend: 1 file (~15 lines)
 - Frontend: 7 files (~690 lines) - **Reuses existing time conversion functions**
-- Tests: 6 E2E test files (47 tests)
-- **Total**: ~705 lines of code + 47 E2E tests
+- Tests: 6 E2E test files (45 tests)
+- **Total**: ~705 lines of code + 45 E2E tests
 
 **Time Estimate:**
 - Development: 11 days
@@ -2882,7 +2878,7 @@ if (panel.config.panel_time_range) {
 - **Category 3**: URL Parameters (10 E2E tests)
 - **Category 4**: Priority System (7 E2E tests)
 - **Category 5**: View Panel & Full Screen (5 E2E tests)
-- **Category 6**: Dashboard Operations (7 E2E tests - includes refresh button & yellow indicator tests)
+- **Category 6**: Dashboard Operations (5 E2E tests)
 - **Unit Tests**: Not needed - reusing existing tested time conversion functions
 
 ### Features Included
@@ -2893,13 +2889,11 @@ if (panel.config.panel_time_range) {
    - Integration with AddPanel date time picker
 
 2. **View Mode**
-   - Panel date time picker widget in panel header
+   - Panel date time picker widget in RenderDashboardCharts area
    - Time picker updates on selection (no auto-refresh)
-   - **Panel refresh button icon turns yellow when time changed but not yet refreshed** (like variables)
-   - **Only individual panel refresh button changes color, not global refresh**
-   - Existing panel refresh button applies the time change and icon returns to normal color
-   - **URL syncs after refresh button is clicked** (not on picker change)
-   - Visual indication of panel time
+   - **Auto-apply disabled:** User must click Apply button to apply changes
+   - **Immediate action on Apply:** API call fires, URL updates, panel refreshes
+   - Visual indication of panel time via picker widget
 
 3. **URL Management**
    - Automatic URL sync for panel times
@@ -2936,20 +2930,54 @@ if (panel.config.panel_time_range) {
 
 ### Quick Reference
 
-**47 E2E Test Cases Breakdown:**
+**45 E2E Test Cases Breakdown:**
 - Basic Configuration: 8 tests
 - View Mode Picker: 10 tests
 - URL Parameters: 10 tests
 - Priority System: 7 tests
 - View Panel & Full Screen: 5 tests
-- Dashboard Operations: 7 tests (includes refresh button & yellow indicator tests)
+- Dashboard Operations: 5 tests
 
 **Estimated E2E Test Execution Time:**
-- Full suite: ~94 minutes sequential
-- Parallel (4 workers): ~20-30 minutes
+- Full suite: ~90 minutes sequential
+- Parallel (4 workers): ~20-25 minutes
 
-**Implementation Team Roles:**
-- Backend Developer: 1 day (schema changes)
-- Frontend Developer: 11 days (UI, logic, integration)
-- QA Engineer: 3 days (E2E test development)
-- Technical Writer: 1 day (documentation)
+**Implementation Status:**
+- ✅ Backend: Complete (schema changes in mod.rs)
+- ✅ Frontend: Complete (all 7 files updated)
+- ✅ Data-test attributes: Added for E2E testing
+- ⏳ E2E Tests: **Pending Implementation** (45 tests to be written)
+
+**Next Steps:**
+1. Implement E2E tests starting with 9 critical path tests
+2. Run tests to validate implementation
+3. Complete remaining 36 E2E tests
+4. Update documentation with any additional findings
+
+---
+
+## Implementation Summary
+
+### ✅ Completed
+- Backend schema with `allow_panel_time`, `panel_time_mode`, `panel_time_range`
+- Configuration UI in ConfigPanel.vue and AddPanel.vue
+- Panel time picker widget in RenderDashboardCharts.vue
+- URL parameter sync for panel times
+- View Panel modal support
+- Full screen mode support
+- Export/import preservation
+- i18n translations (11 languages)
+- Data-test attributes for testing
+
+### ⏳ Pending
+- **E2E Test Implementation** (45 tests)
+  - Priority: Start with 9 "Must-Have" critical path tests
+  - Framework: Playwright (existing in project)
+  - Files: 6 spec files in `tests/ui-testing/playwright-tests/Dashboards/`
+
+### Data-Test Selectors
+- Global picker: `data-test="dashboard-global-date-time-picker"`
+- Panel picker: `data-test="panel-time-picker-{panelId}"`
+- Panel wrapper: `data-test="dashboard-panel-{panelId}-time-picker"`
+- ViewPanel picker: `data-test="dashboard-viewpanel-date-time-picker"`
+- Config toggle: `data-test="dashboard-config-allow-panel-time"`
