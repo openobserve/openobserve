@@ -160,8 +160,8 @@ pub struct PanelFields {
     pub stream_type: StreamType,
     pub x: Vec<AxisItem>,
     pub y: Vec<AxisItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub z: Option<Vec<AxisItem>>,
+    #[serde(default)]
+    pub z: Vec<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakdown: Option<Vec<AxisItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]

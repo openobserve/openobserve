@@ -19,7 +19,7 @@ import { PrebuiltConfig } from './types';
  * Uses HTML email template for rich formatting
  */
 export const emailTemplate = {
-  name: 'system-prebuilt-email',
+  name: 'prebuilt_email',
   body: `<!DOCTYPE html>
 <html>
 <head>
@@ -90,11 +90,12 @@ export const emailTemplate = {
 </body>
 </html>`,
   type: 'email' as const,
+  title: 'OpenObserve Alert Notification',
   isDefault: false
 };
 
 export const emailConfig: PrebuiltConfig = {
-  templateName: 'system-prebuilt-email',
+  templateName: 'prebuilt_email',
   templateBody: emailTemplate.body,
   headers: {
     'Content-Type': 'text/html'
@@ -114,21 +115,22 @@ export const emailConfig: PrebuiltConfig = {
         const invalidEmails = emailList.filter(email => !emailRegex.test(email));
         return invalidEmails.length === 0 || `Invalid email addresses: ${invalidEmails.join(', ')}`;
       }
-    },
-    {
-      key: 'ccRecipients',
-      label: 'CC Recipients (optional)',
-      type: 'email',
-      required: false,
-      hint: 'Comma-separated CC email addresses'
-    },
-    {
-      key: 'subject',
-      label: 'Email Subject (optional)',
-      type: 'text',
-      required: false,
-      hint: 'Custom subject line (defaults to alert name)'
     }
+    // CC and Subject fields removed - not supported by backend Email struct
+    // {
+    //   key: 'ccRecipients',
+    //   label: 'CC Recipients (optional)',
+    //   type: 'email',
+    //   required: false,
+    //   hint: 'Comma-separated CC email addresses'
+    // },
+    // {
+    //   key: 'subject',
+    //   label: 'Email Subject (optional)',
+    //   type: 'text',
+    //   required: false,
+    //   hint: 'Custom subject line (defaults to alert name)'
+    // }
   ]
 };
 

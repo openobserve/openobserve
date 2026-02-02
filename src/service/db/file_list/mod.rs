@@ -30,7 +30,7 @@ use once_cell::sync::Lazy;
 pub mod broadcast;
 pub mod local;
 
-pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
+pub static DEDUPLICATE_FILES: Lazy<RwHashSet<String>> =
     Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));
 
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_static_variables() {
         // Test that static variables are accessible
-        let duplicate_count = DEPULICATE_FILES.len();
+        let duplicate_count = DEDUPLICATE_FILES.len();
         let deleted_count = DELETED_FILES.len();
         let blocked_orgs_count = BLOCKED_ORGS.len();
 
@@ -199,12 +199,12 @@ mod tests {
         let test_file = "duplicate_test.parquet";
 
         // Test insertion
-        DEPULICATE_FILES.insert(test_file.to_string());
-        assert!(DEPULICATE_FILES.contains(test_file));
+        DEDUPLICATE_FILES.insert(test_file.to_string());
+        assert!(DEDUPLICATE_FILES.contains(test_file));
 
         // Test removal
-        DEPULICATE_FILES.remove(test_file);
-        assert!(!DEPULICATE_FILES.contains(test_file));
+        DEDUPLICATE_FILES.remove(test_file);
+        assert!(!DEDUPLICATE_FILES.contains(test_file));
     }
 
     #[test]
@@ -248,9 +248,9 @@ mod tests {
             .map(|i| {
                 let file = format!("{base_file}_{i}.parquet");
                 tokio::spawn(async move {
-                    DEPULICATE_FILES.insert(file.clone());
+                    DEDUPLICATE_FILES.insert(file.clone());
                     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-                    DEPULICATE_FILES.remove(&file);
+                    DEDUPLICATE_FILES.remove(&file);
                 })
             })
             .collect();
@@ -263,7 +263,7 @@ mod tests {
         // Verify all files are removed
         for i in 0..10 {
             let file = format!("{base_file}_{i}.parquet");
-            assert!(!DEPULICATE_FILES.contains(&file));
+            assert!(!DEDUPLICATE_FILES.contains(&file));
         }
     }
 

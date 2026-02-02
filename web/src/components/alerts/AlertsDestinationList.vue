@@ -164,13 +164,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="destination-type-badge-custom"
                   color="grey-6"
                   class="tw:text-xs"
-                  label="Custom"
+                  :label="getCustomDestinationLabel(props.row)"
                 />
                 <q-icon
                   name="settings"
                   size="16px"
                   color="grey-6"
-                  title="Custom destination"
+                  :title="getCustomDestinationLabel(props.row)"
                 />
               </template>
             </div>
@@ -650,6 +650,18 @@ export default defineComponent({
       return typeConfig ? typeConfig.name : prebuiltType;
     };
 
+    // Get display label for custom destination sub-type
+    const getCustomDestinationLabel = (destination: DestinationPayload): string => {
+      if (destination.type === "http") {
+        return t("alert_destinations.customWebhook");
+      } else if (destination.type === "email") {
+        return t("alert_destinations.customEmail");
+      } else if (destination.type === "action") {
+        return t("alert_destinations.customAction");
+      }
+      return t("alert_destinations.custom");
+    };
+
     const visibleRows = computed(() => {
       if (!filterQuery.value) return destinations.value || [];
       return filterData(destinations.value || [], filterQuery.value);
@@ -794,6 +806,7 @@ export default defineComponent({
       confirmBulkDelete,
       selectedDestinations,
       getPrebuiltTypeName,
+      getCustomDestinationLabel,
     };
   },
 });

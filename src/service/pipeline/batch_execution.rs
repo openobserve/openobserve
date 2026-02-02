@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,7 @@ use config::{
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
+    stats::MemorySize,
     utils::{
         flatten,
         json::{self, Value, get_string_value},
@@ -108,6 +109,18 @@ pub enum CompiledFunctionRuntime {
     JS(JSRuntimeConfig, bool),         // (js_config, is_result_array)
 }
 
+impl MemorySize for CompiledFunctionRuntime {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<CompiledFunctionRuntime>()
+            + match self {
+                CompiledFunctionRuntime::VRL(vrl_result_resolver, _) => {
+                    vrl_result_resolver.mem_size()
+                }
+                CompiledFunctionRuntime::JS(js_config, _) => js_config.mem_size(),
+            }
+    }
+}
+
 #[async_trait]
 pub trait PipelineExt: Sync + Send + 'static {
     /// Registers the function of all the FunctionNode of this pipeline once for execution.
@@ -162,11 +175,32 @@ pub struct ExecutablePipeline {
     node_map: HashMap<String, ExecutableNode>,
 }
 
+impl MemorySize for ExecutablePipeline {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ExecutablePipeline>()
+            + self.id.mem_size()
+            + self.name.mem_size()
+            + self.source_node_id.mem_size()
+            + self.sorted_nodes.mem_size()
+            + self.function_map.mem_size()
+            + self.node_map.mem_size()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExecutableNode {
     id: String,
     node_data: NodeData,
     children: Vec<String>,
+}
+
+impl MemorySize for ExecutableNode {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ExecutableNode>()
+            + self.id.mem_size()
+            + self.node_data.mem_size()
+            + self.children.mem_size()
+    }
 }
 
 #[derive(Debug)]

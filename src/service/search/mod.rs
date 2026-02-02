@@ -624,7 +624,7 @@ pub async fn search_partition(
     skip_max_query_range: bool,
     is_http_req: bool,
     enable_align_histogram: bool,
-    use_aggs_cache: bool,
+    use_cache: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -914,12 +914,13 @@ pub async fn search_partition(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {}, base_speed: {}, partition_secs: {}, part_num: {}",
+        "[trace_id {trace_id}] search_partition: \
+        original_size: {}, cpu_cores: {cpu_cores}, base_speed: {}, \
+        partition_secs: {}, part_num: {part_num}, \
+        is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
         resp.original_size,
-        cpu_cores,
         cfg.limit.query_group_base_speed,
         cfg.limit.query_partition_by_secs,
-        part_num
     );
 
     // Calculate step with all constraints
@@ -1041,7 +1042,7 @@ pub async fn search_partition(
             );
 
             // Discover existing cache files for this query
-            let cache_discovery_result = if !use_aggs_cache {
+            let cache_discovery_result = if !use_cache {
                 o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
                     query.start_time,
                     query.end_time,

@@ -481,6 +481,10 @@ export const formatLargeNumber = (number: number) => {
 export const formatSizeFromMB = (sizeInMB: string) => {
   let size = parseFloat(sizeInMB);
 
+  if (isNaN(size)) {
+    return "0 MB";
+  }
+
   const units = ["KB", "MB", "GB", "TB", "PB"];
   let index = 1; // Start from MB
 
