@@ -50,7 +50,7 @@ const isValidServiceNowIncidentUrl = (url: string): boolean => {
  * Creates incidents via ServiceNow Table API
  */
 export const servicenowTemplate = {
-  name: 'system-prebuilt-servicenow',
+  name: 'prebuilt_servicenow',
   body: JSON.stringify({
     "short_description": "OpenObserve Alert: {alert_name}",
     "description": "Alert Details:\n\nStream: {stream_name}\nType: {stream_type}\nCount: {alert_count}\nThreshold: {alert_operator} {alert_threshold}\nTime: {alert_time}\n\nView in OpenObserve: {alert_url}",
@@ -69,7 +69,7 @@ export const servicenowTemplate = {
 };
 
 export const servicenowConfig: PrebuiltConfig = {
-  templateName: 'system-prebuilt-servicenow',
+  templateName: 'prebuilt_servicenow',
   templateBody: servicenowTemplate.body,
   headers: {
     'Content-Type': 'application/json',

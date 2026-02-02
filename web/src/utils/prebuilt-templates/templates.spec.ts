@@ -23,14 +23,14 @@ import { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from '@/uti
 
 describe('Slack template', () => {
   it('has correct structure', () => {
-    expect(slackTemplate.name).toBe('system-prebuilt-slack');
+    expect(slackTemplate.name).toBe('prebuilt_slack');
     expect(slackTemplate.type).toBe('http');
     expect(slackTemplate.isDefault).toBe(false);
     expect(() => JSON.parse(slackTemplate.body)).not.toThrow();
   });
 
   it('config has required properties', () => {
-    expect(slackConfig.templateName).toBe('system-prebuilt-slack');
+    expect(slackConfig.templateName).toBe('prebuilt_slack');
     expect(slackConfig.method).toBe('post');
     expect(typeof slackConfig.urlValidator).toBe('function');
     expect(slackConfig.credentialFields.length).toBeGreaterThan(0);
@@ -50,13 +50,13 @@ describe('Slack template', () => {
 
 describe('Email template', () => {
   it('has correct structure', () => {
-    expect(emailTemplate.name).toBe('system-prebuilt-email');
+    expect(emailTemplate.name).toBe('prebuilt_email');
     expect(emailTemplate.type).toBe('email');
     expect(emailTemplate.isDefault).toBe(false);
   });
 
   it('config has required properties', () => {
-    expect(emailConfig.templateName).toBe('system-prebuilt-email');
+    expect(emailConfig.templateName).toBe('prebuilt_email');
     expect(emailConfig.credentialFields.length).toBeGreaterThan(0);
   });
 
@@ -74,7 +74,7 @@ describe('Email template', () => {
 
 describe('Microsoft Teams template', () => {
   it('has correct structure', () => {
-    expect(msteamsTemplate.name).toBe('system-prebuilt-msteams');
+    expect(msteamsTemplate.name).toBe('prebuilt_msteams');
     expect(msteamsTemplate.type).toBe('http');
     expect(() => JSON.parse(msteamsTemplate.body)).not.toThrow();
   });
@@ -92,7 +92,7 @@ describe('Microsoft Teams template', () => {
 
 describe('PagerDuty template', () => {
   it('has correct structure', () => {
-    expect(pagerdutyTemplate.name).toBe('system-prebuilt-pagerduty');
+    expect(pagerdutyTemplate.name).toBe('prebuilt_pagerduty');
     expect(pagerdutyTemplate.type).toBe('http');
     expect(() => JSON.parse(pagerdutyTemplate.body)).not.toThrow();
   });
@@ -121,7 +121,7 @@ describe('PagerDuty template', () => {
 
 describe('ServiceNow template', () => {
   it('has correct structure', () => {
-    expect(servicenowTemplate.name).toBe('system-prebuilt-servicenow');
+    expect(servicenowTemplate.name).toBe('prebuilt_servicenow');
     expect(servicenowTemplate.type).toBe('http');
     expect(() => JSON.parse(servicenowTemplate.body)).not.toThrow();
   });
@@ -147,7 +147,7 @@ describe('ServiceNow template', () => {
 
 describe('Opsgenie template', () => {
   it('has correct structure', () => {
-    expect(opsgenieTemplate.name).toBe('system-prebuilt-opsgenie');
+    expect(opsgenieTemplate.name).toBe('prebuilt_opsgenie');
     expect(opsgenieTemplate.type).toBe('http');
     expect(() => JSON.parse(opsgenieTemplate.body)).not.toThrow();
   });
@@ -183,7 +183,7 @@ describe('Template consistency', () => {
 
   it('all templates follow naming convention', () => {
     templates.forEach(({ name, config }) => {
-      expect(config.templateName).toBe(`system-prebuilt-${name}`);
+      expect(config.templateName).toBe(`prebuilt_${name}`);
     });
   });
 

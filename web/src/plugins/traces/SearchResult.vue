@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
           "
           @time-range-selected="onMetricsTimeRangeSelected"
+          @filters-updated="onMetricsFiltersUpdated"
         />
       </transition>
 
@@ -147,6 +148,7 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "get:traceDetails",
+    "metrics:filters-updated",
   ],
   methods: {
     closeColumn(col: any) {
@@ -238,6 +240,11 @@ export default defineComponent({
       });
     };
 
+    const onMetricsFiltersUpdated = (filters: string[]) => {
+      // Pass filters up to Index.vue to update Query Editor
+      emit("metrics:filters-updated", filters);
+    };
+
     const getDashboardData = () => {
       metricsDashboardRef?.value?.loadDashboard();
     };
@@ -257,6 +264,7 @@ export default defineComponent({
       getImageURL,
       getRowIndex,
       onMetricsTimeRangeSelected,
+      onMetricsFiltersUpdated,
       getDashboardData,
     };
   },

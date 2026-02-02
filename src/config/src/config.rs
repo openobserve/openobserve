@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 28;
+pub const DB_SCHEMA_VERSION: u64 = 29;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -587,24 +587,6 @@ pub struct Smtp {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Profiling {
-    #[env_config(
-        name = "ZO_PROF_PPROF_ENABLED",
-        default = false,
-        help = "Enable pprof profiling with pprof-rs"
-    )]
-    pub pprof_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PPROF_PROTOBUF_ENABLED",
-        default = false,
-        help = "Enable pprof profiling with pprof-rs encode to protobuf format"
-    )]
-    pub pprof_protobuf_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PPROF_FLAMEGRAPH_PATH",
-        default = "",
-        help = "Path to save flamegraph"
-    )]
-    pub pprof_flamegraph_path: String,
     #[env_config(
         name = "ZO_PROF_PYROSCOPE_ENABLED",
         default = false,
@@ -2554,8 +2536,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.tracing_enabled = false;
     }
 
-    if local_node_role.contains(&cluster::Role::ScriptServer) {
-        // script server does not have external dep, so can ignore their config check
+    if local_node_role.contains(&cluster::Role::ActionServer) {
+        // action server does not have external dep, so can ignore their config check
         return Ok(());
     }
 
@@ -2728,11 +2710,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.mmdb_data_dir.ends_with('/') {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
-    }
-
-    // check for pprof flamegraph
-    if cfg.profiling.pprof_flamegraph_path.is_empty() {
-        cfg.profiling.pprof_flamegraph_path = format!("{}flamegraph.svg", cfg.common.data_dir);
     }
 
     Ok(())

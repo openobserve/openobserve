@@ -20,6 +20,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(
         primary_key,
+        auto_increment = false,
         column_type = "String(StringLen::N(27))",
         unique,
         not_null

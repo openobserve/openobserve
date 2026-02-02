@@ -27,6 +27,7 @@ use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
     MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
+    stats::MemorySize,
     utils::hash::{Sum64, gxhash},
 };
 use once_cell::sync::Lazy;
@@ -818,5 +819,11 @@ impl WriterKey {
             org_id: Arc::from(org_id),
             stream_type: Arc::from(stream_type),
         }
+    }
+}
+
+impl MemorySize for WriterKey {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<WriterKey>() + self.org_id.len() + self.stream_type.len()
     }
 }

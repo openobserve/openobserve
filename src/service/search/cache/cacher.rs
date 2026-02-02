@@ -214,6 +214,8 @@ pub async fn check_cache(
             &cached_responses,
             req.query.start_time,
             req.query.end_time,
+            is_aggregate,
+            is_descending,
             histogram_interval,
         );
         multi_resp.total_cache_duration = cache_duration as usize;
@@ -903,55 +905,51 @@ fn calculate_deltas_multi(
     results: &[CachedQueryResponse],
     start_time: i64,
     end_time: i64,
+    is_aggregate: bool,
+    is_descending: bool,
     histogram_interval: i64,
 ) -> (Vec<QueryDelta>, Option<i64>, i64) {
     let mut deltas = Vec::new();
     let mut cache_duration = 0_i64;
 
-    let mut current_end_time = start_time;
+    let mut current_start_time = end_time;
+    let mut current_end_time = end_time;
 
+    // sort the results by response end time descending
+    let mut results = results.to_vec();
+    results.sort_by(|a, b| b.response_end_time.cmp(&a.response_end_time));
     for meta in results {
         cache_duration += meta.response_end_time - meta.response_start_time;
-        let delta_end_time = if histogram_interval > 0 && !meta.cached_response.hits.is_empty() {
-            // If histogram interval > 0, we need to adjust the end time to the nearest interval
-            let mut end_time = meta.response_start_time;
-            if end_time % histogram_interval != 0 {
-                end_time = end_time - (end_time % histogram_interval);
-                if end_time < start_time {
-                    end_time = start_time;
-                }
-            }
-            end_time
-        } else {
-            // Need to subtract 1 microsecond for the delta end time
-            // since the cache start time will include the records for that start time
-            meta.response_start_time - 1
-        };
-        if meta.response_start_time > current_end_time {
-            // There is a gap (delta) between current coverage and the next meta
-            deltas.push(QueryDelta {
-                delta_start_time: current_end_time,
-                delta_end_time,
-            });
-        }
-        // Update the current end time to the end of the current meta
-        current_end_time = meta.response_end_time;
+        current_start_time = meta.response_start_time;
+        calculate_deltas(
+            &ResultCacheMeta {
+                start_time: meta.response_start_time,
+                end_time: meta.response_end_time,
+                is_aggregate,
+                is_descending,
+            },
+            current_start_time,
+            current_end_time,
+            histogram_interval,
+            &mut deltas,
+        );
+        current_end_time = current_start_time;
     }
 
-    // Check if there is a gap at the end
-    if current_end_time < end_time
-        && results
-            .last()
-            .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
-    {
-        let mut expected_delta_start_time = current_end_time;
-        if expected_delta_start_time > end_time {
-            expected_delta_start_time = current_end_time;
-        }
-        deltas.push(QueryDelta {
-            delta_start_time: expected_delta_start_time,
-            delta_end_time: end_time,
-        });
+    // Check if there is a gap at the start
+    if current_start_time > start_time {
+        calculate_deltas(
+            &ResultCacheMeta {
+                start_time: current_start_time,
+                end_time: current_end_time,
+                is_aggregate,
+                is_descending,
+            },
+            start_time,
+            current_end_time,
+            histogram_interval,
+            &mut deltas,
+        );
     }
 
     deltas.sort(); // Sort the deltas to bring duplicates together
@@ -1038,6 +1036,8 @@ mod tests {
             &[cached_response],
             query_start_time,
             query_end_time,
+            true,
+            false,
             histogram_interval,
         );
         println!("Deltas: {deltas:?}");

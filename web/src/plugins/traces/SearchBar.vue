@@ -38,16 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <q-btn
-                data-test="traces-service-maps-toggle"
-                :class="activeTab === 'service-maps' ? 'selected' : ''"
-                @click="$emit('update:activeTab', 'service-maps')"
+                data-test="traces-service-graph-toggle"
+                :class="activeTab === 'service-graph' ? 'selected' : ''"
+                @click="$emit('update:activeTab', 'service-graph')"
                 no-caps
                 size="sm"
                 icon="hub"
                 class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[2rem]"
               >
                 <q-tooltip>
-                  Service Maps
+                  Service Graph
                 </q-tooltip>
               </q-btn>
             </div>
@@ -93,6 +93,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.resetFilters") }}
             </q-tooltip>
           </q-btn>
+          <!-- Error Only Toggle -->
+          <div
+            class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
+          >
+            <q-toggle
+              data-test="traces-search-bar-error-only-toggle-btn"
+              v-model="searchObj.meta.showErrorOnly"
+              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
+              size="xs"
+              flat
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-xs-dark'
+                  : 'o2-toggle-button-xs-light'
+              "
+              @update:model-value="onErrorOnlyToggle"
+            >
+            </q-toggle>
+            <q-icon name="error" size="1.1rem" class="tw:mx-1 tw:text-red-500" />
+            <q-tooltip>
+              {{ t("traces.showErrorOnly") }}
+            </q-tooltip>
+          </div>
           <syntax-guide
             data-test="logs-search-bar-sql-mode-toggle-btn"
             :sqlmode="searchObj.meta.sqlMode"
@@ -481,6 +504,17 @@ export default defineComponent({
         field.selectedValues = [];
         field.searchKeyword = "";
       });
+
+      // Clear brush selections from metrics dashboard
+      searchObj.meta.metricsRangeFilters.clear();
+
+      // Emit event to notify parent that filters were reset
+      emit("filters-reset");
+    };
+
+    const onErrorOnlyToggle = (value: boolean) => {
+      // Emit event to parent to update filters in Query Editor
+      emit("error-only-toggled", value);
     };
 
     /**
@@ -519,6 +553,7 @@ export default defineComponent({
       updateTimezone,
       dateTimeRef,
       resetFilters,
+      onErrorOnlyToggle,
       updateNewDateTime,
       metricsIcon,
       tracesShareURL,

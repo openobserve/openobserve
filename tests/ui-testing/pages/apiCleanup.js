@@ -1984,7 +1984,13 @@ class APICleanup {
             'auto_',
             'Automation_',
             'sanity',
-            'rbac_'
+            'rbac_',
+            'user_delete_test_',      // RBAC user delete test alerts (orphaned)
+            'user_update_test_',      // RBAC user update test alerts (orphaned)
+            'viewer_delete_test_',    // RBAC viewer delete test alerts (orphaned)
+            'viewer_update_test_',    // RBAC viewer update test alerts (orphaned)
+            'editor_create_test_',    // RBAC editor create test alerts (orphaned)
+            'editor_delete_test_'     // RBAC editor delete test alerts (orphaned)
         ];
 
         try {

@@ -25,7 +25,7 @@ use crate::{
         organization::DEFAULT_ORG,
         user::{UserOrgRole, UserRequest},
     },
-    service::{db, self_reporting, users},
+    service::{alerts, db, self_reporting, users},
 };
 
 #[cfg(feature = "enterprise")]
@@ -333,10 +333,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("system settings cache failed");
 
-    // cache alerts
+    // ensure system templates exist in database BEFORE caching
+    alerts::templates::ensure_system_templates()
+        .await
+        .expect("system templates initialization failed");
+
+    // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
         .await
         .expect("alerts templates cache failed");
+
     db::alerts::destinations::cache()
         .await
         .expect("alerts destinations cache failed");

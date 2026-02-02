@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
-use config::utils::schema_ext::SchemaExt;
+use config::{stats::MemorySize, utils::schema_ext::SchemaExt};
 
 use crate::{
     ReadRecordBatchEntry,
@@ -70,6 +70,7 @@ impl Stream {
 
     pub(crate) async fn persist(
         &self,
+        id: u64,
         idx: usize,
         org_id: &str,
         stream_type: &str,
@@ -79,11 +80,17 @@ impl Stream {
         let mut paths = Vec::new();
         for (_, partition) in self.partitions.iter() {
             let (part_schema_size, partitions) = partition
-                .persist(idx, org_id, stream_type, stream_name)
+                .persist(id, idx, org_id, stream_type, stream_name)
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
         }
         Ok((schema_size, paths))
+    }
+}
+
+impl MemorySize for Stream {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Stream>() + self.partitions.mem_size()
     }
 }
