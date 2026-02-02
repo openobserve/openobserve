@@ -15,7 +15,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-service-graph" style="height: calc(100vh - 202px);">
+  <div class="incident-service-graph" style="height: calc(100vh - 202px); position: relative;">
+    <!-- Info Icon Button -->
+    <q-btn
+      v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
+      round
+      flat
+      icon="info_outline"
+      size="sm"
+      class="info-icon-btn"
+      :class="isDarkMode ? 'tw-text-gray-400 hover:tw-text-gray-200' : 'tw-text-gray-500 hover:tw-text-gray-700'"
+    >
+      <q-tooltip
+        :delay="200"
+        anchor="bottom left"
+        self="top right"
+        :offset="[10, 10]"
+        max-width="300px"
+      >
+        <div style="padding: 8px; font-size: 12px; line-height: 1.6;">
+          <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">Graph Legend</div>
+
+          <div style="margin-bottom: 6px;">
+            <span style="color: #ef4444;">●</span> Red = Root Cause
+          </div>
+          <div style="margin-bottom: 6px;">
+            <span style="color: #f97316;">●</span> Orange = High Frequency
+          </div>
+          <div style="margin-bottom: 6px;">
+            <span style="color: #3b82f6;">●</span> Blue = Normal
+          </div>
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">
+            <span style="color: #a78bfa;">→</span> Purple arrows show temporal flow
+          </div>
+        </div>
+      </q-tooltip>
+    </q-btn>
+
     <!-- Loading State -->
     <div
       v-if="loading"
@@ -156,9 +192,9 @@ export default defineComponent({
           const depth = nodeDepth.get(d.id) || 0;
           return height / 2;
         }).strength((d: any) => {
-          // Much stronger centering for root nodes to overpower collision force
+          // Stronger centering for root nodes
           const depth = nodeDepth.get(d.id) || 0;
-          return depth === 0 ? 3.0 : 0.15; // Very strong centering for root nodes
+          return depth === 0 ? 0.8 : 0.1; // Much stronger centering for root nodes
         }))
         .force('collision', forceCollide()
           .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
@@ -423,6 +459,18 @@ export default defineComponent({
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.2s ease;
+}
+
+.info-icon-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.info-icon-btn:hover {
+  transform: scale(1.1);
 }
 
 /* Light mode */
