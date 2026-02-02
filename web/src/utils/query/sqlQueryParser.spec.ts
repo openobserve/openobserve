@@ -336,5 +336,94 @@ describe("sqlQueryParser", () => {
       expect(result.breakdown.length).toBe(1);
       expect(result.breakdown[0].column).toBe("level");
     });
+
+    it("should use table chart when more than 2 GROUP BY fields (1 x-axis + 2 breakdown)", () => {
+      // Simulates a query with 3 non-aggregation fields that would exceed x-axis + breakdown limit
+      const parsed = {
+        stream: "logs",
+        streamType: "logs",
+        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
+        yFields: [{ column: "amount", alias: "y_axis_1", aggregationFunction: "sum" }],
+        breakdownFields: [
+          { column: "country", alias: "x_axis_2", aggregationFunction: null },
+          { column: "subscription_type", alias: "x_axis_3", aggregationFunction: null },
+        ],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        joins: [],
+        customQuery: false,
+        rawQuery: "SELECT histogram(_timestamp), country, subscription_type, sum(amount) FROM logs GROUP BY x_axis_1, x_axis_2, x_axis_3",
+      };
+
+      const result = parsedQueryToPanelFields(parsed);
+
+      // All GROUP BY fields should be moved to x-axis
+      expect(result.x.length).toBe(3);
+      expect(result.x[0].column).toBe("_timestamp");
+      expect(result.x[1].column).toBe("country");
+      expect(result.x[2].column).toBe("subscription_type");
+
+      // Breakdown should be empty
+      expect(result.breakdown.length).toBe(0);
+
+      // useTableChart flag should be true
+      expect(result.useTableChart).toBe(true);
+    });
+
+    it("should use table chart when more than 2 GROUP BY fields (0 x-axis + 3 breakdown)", () => {
+      // Simulates a query with 3 non-aggregation fields, no histogram
+      const parsed = {
+        stream: "logs",
+        streamType: "logs",
+        xFields: [], // No histogram field
+        yFields: [{ column: "amount", alias: "y_axis_1", aggregationFunction: "sum" }],
+        breakdownFields: [
+          { column: "order_date", alias: "x_axis_1", aggregationFunction: null },
+          { column: "country", alias: "x_axis_2", aggregationFunction: null },
+          { column: "subscription_type", alias: "x_axis_3", aggregationFunction: null },
+        ],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        joins: [],
+        customQuery: false,
+        rawQuery: "SELECT order_date, country, subscription_type, sum(amount) FROM logs GROUP BY x_axis_1, x_axis_2, x_axis_3",
+      };
+
+      const result = parsedQueryToPanelFields(parsed);
+
+      // All breakdown fields should be moved to x-axis
+      expect(result.x.length).toBe(3);
+      expect(result.x[0].column).toBe("order_date");
+      expect(result.x[1].column).toBe("country");
+      expect(result.x[2].column).toBe("subscription_type");
+
+      // Breakdown should be empty
+      expect(result.breakdown.length).toBe(0);
+
+      // useTableChart flag should be true
+      expect(result.useTableChart).toBe(true);
+    });
+
+    it("should not use table chart when exactly 2 GROUP BY fields", () => {
+      // 1 x-axis + 1 breakdown = 2 fields, within limit
+      const parsed = {
+        stream: "logs",
+        streamType: "logs",
+        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
+        yFields: [{ column: "count", alias: "y_axis_1", aggregationFunction: "count" }],
+        breakdownFields: [{ column: "level", alias: "breakdown_1", aggregationFunction: null }],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        joins: [],
+        customQuery: false,
+        rawQuery: "SELECT histogram(_timestamp), level, count(*) FROM logs GROUP BY x_axis_1, breakdown_1",
+      };
+
+      const result = parsedQueryToPanelFields(parsed);
+
+      // Fields should remain as-is
+      expect(result.x.length).toBe(1);
+      expect(result.breakdown.length).toBe(1);
+
+      // useTableChart flag should be false
+      expect(result.useTableChart).toBe(false);
+    });
   });
 });

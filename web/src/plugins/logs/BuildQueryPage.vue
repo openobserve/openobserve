@@ -269,8 +269,11 @@ const initializeFromQuery = async () => {
         }
 
         // Auto-select chart type based on fields:
+        // - If useTableChart flag is set (more than 2 GROUP BY fields) → use "table" chart
         // - If only Y-axis fields (no X-axis, no breakdown) → use "metric" chart
-        if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {
+        if (panelFields.useTableChart) {
+          dashboardPanelData.data.type = "table";
+        } else if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {
           dashboardPanelData.data.type = "metric";
         }
 

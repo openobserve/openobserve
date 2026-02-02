@@ -337,7 +337,7 @@ export async function parseSQL(
 /**
  * Convert parsed query to dashboard panel data format
  * @param parsed The parsed query
- * @returns Panel fields structure with joins
+ * @returns Panel fields structure with joins and recommended chart type
  */
 export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   stream: string;
@@ -347,6 +347,8 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   breakdown: any[];
   filter: any;
   joins: any[];
+  /** True if table chart should be used (e.g., more than 2 GROUP BY fields) */
+  useTableChart: boolean;
 } {
   const mapFieldToPanel = (field: ParsedField, index: number, axis: string) => {
     // Field structure must match dashboard builder format with functionName and args
@@ -374,13 +376,23 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
     return baseField;
   };
 
-  // If no timeseries/histogram field on X-axis but there are breakdown fields,
-  // move the first breakdown field to X-axis
   let xFields = parsed.xFields;
   let breakdownFields = parsed.breakdownFields;
+  let useTableChart = false;
 
-  if (xFields.length === 0 && breakdownFields.length > 0) {
-    // Move first breakdown field to X-axis
+  // Calculate total non-aggregation fields (x-axis + breakdown)
+  // We support single x-axis and single breakdown for most charts
+  // If more than 2 GROUP BY fields, use table chart with all fields on x-axis
+  const totalGroupByFields = xFields.length + breakdownFields.length;
+
+  if (totalGroupByFields > 2) {
+    // Use table chart: move all breakdown fields to x-axis
+    xFields = [...xFields, ...breakdownFields];
+    breakdownFields = [];
+    useTableChart = true;
+  } else if (xFields.length === 0 && breakdownFields.length > 0) {
+    // If no timeseries/histogram field on X-axis but there are breakdown fields,
+    // move the first breakdown field to X-axis
     xFields = [breakdownFields[0]];
     breakdownFields = breakdownFields.slice(1);
   }
@@ -393,6 +405,7 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
     breakdown: breakdownFields.map((f, i) => mapFieldToPanel(f, i, "z")),
     filter: parsed.filters,
     joins: parsed.joins || [],
+    useTableChart,
   };
 }
 
