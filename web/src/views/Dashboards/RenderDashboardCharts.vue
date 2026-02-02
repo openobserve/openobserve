@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
             :panelId="viewPanelId"
-            :selectedDateForViewPanel="selectedDateForViewPanel"
+            :selectedDateForViewPanel="viewPanelSelectedDate"
             :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
             :searchType="searchType"
             @close-panel="() => (showViewPanel = false)"
@@ -1304,6 +1304,24 @@ export default defineComponent({
       return !!panel?.config?.allow_panel_time;
     };
 
+    // Computed property to get the correct time for view panel
+    // Returns panel-specific time if available, otherwise returns global time
+    const viewPanelSelectedDate = computed(() => {
+      if (!viewPanelId.value) {
+        return props.selectedDateForViewPanel;
+      }
+
+      // Check if this panel has a custom time value
+      const panelTimeValue = panelTimeValues.value[viewPanelId.value];
+      if (panelTimeValue) {
+        // Return the panel-specific time
+        return panelTimeValue;
+      }
+
+      // Fall back to global time
+      return props.selectedDateForViewPanel;
+    });
+
     // Initialize panel time values for panels with panel-level time enabled
     const initializePanelTimes = () => {
       panels.value?.forEach((panel: any) => {
@@ -1471,6 +1489,7 @@ export default defineComponent({
       hasPanelTime,
       onPanelTimeApply,
       panelDateTimePickerRefs,
+      viewPanelSelectedDate,
     };
   },
   methods: {
