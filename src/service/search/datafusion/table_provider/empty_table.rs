@@ -81,7 +81,7 @@ impl TableProvider for NewEmptyTable {
         _state: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
-        limit: Option<usize>,
+        _limit: Option<usize>, // limit is not supported for empty table
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
@@ -90,7 +90,7 @@ impl TableProvider for NewEmptyTable {
                 projected_schema,
                 projection,
                 filters,
-                limit,
+                None,
                 self.sorted_by_time,
                 self.schema.clone(),
             )
