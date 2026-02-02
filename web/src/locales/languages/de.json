@@ -2358,7 +2358,8 @@
     "openFields": "Felder öffnen",
     "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
     "fetchingMoreTraces": "Weitere Spuren werden abgerufen...",
-    "showErrorOnly": "Nur Fehler anzeigen"
+    "showErrorOnly": "Nur Fehler anzeigen",
+    "openInTraces": "In Traces öffnen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

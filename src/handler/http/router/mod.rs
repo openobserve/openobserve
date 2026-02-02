@@ -445,6 +445,18 @@ pub fn basic_routes() -> Router {
 
     router = router.nest("/node", node_routes);
 
+    // Debug/profiling routes with auth
+    #[cfg(feature = "profiling")]
+    {
+        let debug_routes = Router::new()
+            .route("/profile/memory", get(profiling::memory_profile))
+            .route("/profile/stats", get(profiling::jemalloc_stats))
+            .route("/profile/cpu", get(profiling::cpu_profile))
+            .layer(middleware::from_fn(auth_middleware));
+
+        router = router.nest("/debug", debug_routes);
+    }
+
     // Swagger UI
     if get_config().common.swagger_enabled {
         router = router.merge(
@@ -765,7 +777,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/re_patterns/bulk", delete(re_pattern::delete_bulk))
 
             // Domain management
-            .route("/{org_id}/domain_management", get(domain_management::get_domain_management_config).post(domain_management::set_domain_management_config))
+            .route("/{org_id}/domain_management", get(domain_management::get_domain_management_config).put(domain_management::set_domain_management_config))
 
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))

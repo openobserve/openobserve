@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="flex">
-      <div class="text-right flex items-center justify-end q-mr-sm">
+      <div class="text-right flex items-center justify-end q-mx-sm">
         <div
           class="flex items-center justify-end"
           data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn
+        v-if="parentMode === 'standalone'"
         class="q-mx-xs view-span-logs-btn tw:border tw:py-[0.3rem]!"
         size="10px"
         icon="search"
@@ -717,9 +718,8 @@ import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
-import { onMounted } from "vue";
+import { onMounted, defineAsyncComponent } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
-import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -756,12 +756,19 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    parentMode: {
+      type: String,
+      default: "standalone",
+    },
   },
   components: {
     LogsHighLighting,
     TelemetryCorrelationDashboard,
     LLMContentRenderer,
     CorrelatedLogsTable,
+    TelemetryCorrelationDashboard: defineAsyncComponent(
+      () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
+    ),
   },
   emits: [
     "close",
@@ -1424,7 +1431,10 @@ export default defineComponent({
         correlationError.value = null;
 
         // If we're already on a correlation tab, reload the data for the new span
-        if (activeTab.value === "correlated-logs" || activeTab.value === "correlated-metrics") {
+        if (
+          activeTab.value === "correlated-logs" ||
+          activeTab.value === "correlated-metrics"
+        ) {
           loadCorrelation();
         }
       },
