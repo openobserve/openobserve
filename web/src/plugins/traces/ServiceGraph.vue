@@ -8,10 +8,10 @@
           <q-select
             v-model="streamFilter"
             :options="
-              availableStreams.length > 0
+              searchObj.data.stream.streamLists && searchObj.data.stream.streamLists.length > 0
                 ? [
                     { label: 'All Streams', value: 'all' },
-                    ...availableStreams.map((s) => ({ label: s, value: s })),
+                    ...searchObj.data.stream.streamLists,
                   ]
                 : [{ label: 'All Streams', value: 'all' }]
             "
@@ -21,14 +21,13 @@
             map-options
             class="tw:w-[180px] tw:flex-shrink-0"
             @update:model-value="onStreamFilterChange"
-            :disable="availableStreams.length === 0"
+            :disable="!searchObj.data.stream.streamLists || searchObj.data.stream.streamLists.length === 0"
           >
             <template #prepend>
               <q-icon name="storage" size="xs" />
             </template>
-            <q-tooltip v-if="availableStreams.length === 0">
-              No streams detected. Ensure service graph metrics include
-              stream_name labels.
+            <q-tooltip v-if="!searchObj.data.stream.streamLists || searchObj.data.stream.streamLists.length === 0">
+              No streams detected. Loading streams from parent...
             </q-tooltip>
           </q-select>
 
@@ -54,12 +53,12 @@
           <date-time
             ref="dateTimeRef"
             auto-apply
-            :default-type="timeRange.type"
+            :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
-              startTime: timeRange.startTime,
-              endTime: timeRange.endTime,
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
             }"
-            :default-relative-time="timeRange.relativeTimePeriod"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="service-graph-date-time-picker"
             class="tw:h-[2rem]"
             @on:date-change="updateTimeRange"
@@ -166,59 +165,7 @@
                       class="text-weight-medium q-mb-sm"
                       style="font-size: 1rem"
                     >
-                      Service graph is disabled
-                    </div>
-                    <div>
-                      Enable the feature by setting environment variable:
-                    </div>
-                    <code
-                      class="q-mt-xs"
-                      style="
-                        background: rgba(var(--q-primary-rgb), 0.1);
-                        padding: 4px 10px;
-                        border-radius: 4px;
-                        font-size: 0.9rem;
-                        color: var(--q-primary);
-                        font-weight: 600;
-                      "
-                      >O2_SERVICE_GRAPH_ENABLED=true</code
-                    >
-                  </div>
-
-                  <div
-                    class="q-pa-md q-mb-md"
-                    style="
-                      background: rgba(var(--q-primary-rgb), 0.05);
-                      border-radius: 6px;
-                    "
-                  >
-                    <div
-                      class="text-weight-medium q-mb-sm"
-                      style="font-size: 1rem"
-                    >
-                      Query time range is too small
-                    </div>
-                    <div>
-                      The daemon queries traces within a time window. If your
-                      traces are older, increase the window:
-                    </div>
-                    <code
-                      class="q-mt-xs"
-                      style="
-                        background: rgba(var(--q-primary-rgb), 0.1);
-                        padding: 4px 10px;
-                        border-radius: 4px;
-                        font-size: 0.9rem;
-                        color: var(--q-primary);
-                        font-weight: 600;
-                      "
-                      >O2_SERVICE_GRAPH_QUERY_TIME_RANGE_MINUTES=120</code
-                    >
-                    <div
-                      class="text-caption q-mt-sm"
-                      style="color: #666; font-size: 0.85rem"
-                    >
-                      (Default: 60 minutes)
+                      Queried time range has no traces, try selecting a longer duration.
                     </div>
                   </div>
 
@@ -233,74 +180,12 @@
                       class="text-weight-medium q-mb-sm"
                       style="font-size: 1rem"
                     >
-                      Only INTERNAL spans detected
-                    </div>
-                    <div>
-                      Your traces have
-                      <code
-                        style="
-                          background: rgba(var(--q-primary-rgb), 0.1);
-                          padding: 3px 7px;
-                          border-radius: 3px;
-                          font-size: 0.9rem;
-                          color: var(--q-primary);
-                          font-weight: 600;
-                        "
-                        >span_kind=1</code
-                      >
-                      (INTERNAL operations within a service).
+                      Maybe your traces have only internal spans (<code>span_kind = 1</code>)?
                     </div>
                     <div class="q-mt-sm">
-                      To create service-to-service edges, send traces with:
+                      Make sure <code>O2_SERVICE_GRAPH_EXCLUDE_INTERNAL_SPANS=true</code>
                     </div>
-                    <ul
-                      class="q-pl-md q-mt-sm q-mb-sm"
-                      style="line-height: 1.6"
-                    >
-                      <li>
-                        <strong>CLIENT spans</strong> (<code
-                          style="
-                            background: rgba(var(--q-primary-rgb), 0.1);
-                            color: var(--q-primary);
-                            font-weight: 600;
-                          "
-                          >span_kind=3</code
-                        >) with
-                        <code
-                          style="
-                            background: rgba(var(--q-primary-rgb), 0.1);
-                            color: var(--q-primary);
-                            font-weight: 600;
-                          "
-                          >peer.service</code
-                        >
-                        attribute, or
-                      </li>
-                      <li>
-                        <strong>SERVER spans</strong> (<code
-                          style="
-                            background: rgba(var(--q-primary-rgb), 0.1);
-                            color: var(--q-primary);
-                            font-weight: 600;
-                          "
-                          >span_kind=2</code
-                        >) receiving requests from other services
-                      </li>
-                    </ul>
-                    <div
-                      class="text-caption q-mt-sm"
-                      style="color: #666; font-size: 0.85rem"
-                    >
-                      Note: INTERNAL spans can be excluded by setting
-                      <code
-                        style="
-                          background: rgba(var(--q-primary-rgb), 0.1);
-                          color: var(--q-primary);
-                          font-weight: 600;
-                        "
-                        >O2_SERVICE_GRAPH_EXCLUDE_INTERNAL_SPANS=true</code
-                      >
-                    </div>
+                    <div>to process internal spans for service edges.</div>
                   </div>
                 </div>
                 <q-btn
@@ -379,6 +264,7 @@ import {
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
 import useStreams from "@/composables/useStreams";
+import useTraces from "@/composables/useTraces";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -390,6 +276,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { getStreams } = useStreams();
+    const { searchObj } = useTraces();
 
     const loading = ref(false);
     const error = ref<string | null>(null);
@@ -416,12 +303,20 @@ export default defineComponent({
     const searchFilter = ref("");
     const connectionTypeFilter = ref("all");
 
-    // Stream filter
-    const storedStreamFilter = localStorage.getItem(
-      "serviceGraph_streamFilter",
-    );
-    const streamFilter = ref(storedStreamFilter || "all");
-    const availableStreams = ref<string[]>([]);
+    // Stream filter - use computed property to read from and write to shared state
+    const streamFilter = computed({
+      get: () => {
+        const selectedValue = searchObj.data.stream.selectedStream?.value;
+        return selectedValue || "all";
+      },
+      set: (value) => {
+        searchObj.data.stream.selectedStream = {
+          label: value === "all" ? "" : value,
+          value: value === "all" ? "" : value,
+        };
+      },
+    });
+    // availableStreams removed - now using searchObj.data.stream.streamLists directly
 
     // Connection type tabs configuration
     const connectionTypeTabs = [
@@ -445,13 +340,8 @@ export default defineComponent({
 
     const stats = ref<any>(null);
 
-    // Time range state - default to last 15 minutes
-    const timeRange = ref({
-      type: "relative",
-      relativeTimePeriod: "15m",
-      startTime: Date.now() * 1000 - 15 * 60 * 1000000, // 15 minutes ago in microseconds
-      endTime: Date.now() * 1000, // Now in microseconds
-    });
+    // Use shared datetime from searchObj instead of local timeRange
+    // searchObj.data.datetime is managed by useTraces composable and shared across tabs
 
     const dateTimeRef = ref<any>(null);
 
@@ -538,27 +428,7 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
-        // If a specific stream is selected but we don't have available streams yet,
-        // first fetch all streams to populate the dropdown
-        if (
-          availableStreams.value.length === 0 &&
-          streamFilter.value !== "all"
-        ) {
-          console.log(
-            "[ServiceGraph] Fetching all streams first to populate dropdown",
-          );
-          const allStreamsResponse =
-            await serviceGraphService.getCurrentTopology(orgId, {
-              startTime: timeRange.value.startTime,
-              endTime: timeRange.value.endTime,
-            });
-          if (
-            allStreamsResponse.data.availableStreams &&
-            allStreamsResponse.data.availableStreams.length > 0
-          ) {
-            availableStreams.value = allStreamsResponse.data.availableStreams;
-          }
-        }
+        // Streams are loaded by parent Index.vue and available in searchObj.data.stream.streamLists
 
         // Stream-only implementation - no store stats needed
         // Use JSON topology endpoint with time range
@@ -567,8 +437,8 @@ export default defineComponent({
             streamFilter.value && streamFilter.value !== "all"
               ? streamFilter.value
               : undefined,
-          startTime: timeRange.value.startTime,
-          endTime: timeRange.value.endTime,
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
         });
 
         // Convert API response to expected format
@@ -767,7 +637,11 @@ export default defineComponent({
     };
 
     const onStreamFilterChange = (stream: string) => {
-      streamFilter.value = stream;
+      // Update shared stream selection
+      searchObj.data.stream.selectedStream = {
+        label: stream === "all" ? "" : stream,
+        value: stream === "all" ? "" : stream,
+      };
       localStorage.setItem("serviceGraph_streamFilter", stream);
 
       // Reload service graph with new stream filter
@@ -845,31 +719,25 @@ export default defineComponent({
     };
 
     const updateTimeRange = (value: any) => {
-      timeRange.value = {
+      // Update shared datetime state
+      searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
         relativeTimePeriod:
-          value.relativeTimePeriod || timeRange.value.relativeTimePeriod,
+          value.relativeTimePeriod || searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
+        queryRangeRestrictionMsg: searchObj.data.datetime?.queryRangeRestrictionMsg || "",
+        queryRangeRestrictionInHour: searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
       };
       // Reload service graph with new time range
       loadServiceGraph();
     };
 
     // Load trace streams using the same method as the Traces search page
-    const loadTraceStreams = async () => {
-      try {
-        const res = await getStreams("traces", false, false);
-        if (res?.list?.length > 0) {
-          availableStreams.value = res.list.map((stream: any) => stream.name);
-        }
-      } catch (e) {
-        console.error("Error loading trace streams:", e);
-      }
-    };
+    // Streams are loaded by parent Index.vue into searchObj.data.stream.streamLists
+    // No need to load them again here
 
-    onMounted(async () => {
-      await loadTraceStreams();
+    onMounted(() => {
       loadServiceGraph();
     });
 
@@ -883,7 +751,6 @@ export default defineComponent({
       lastUpdated,
       searchFilter,
       streamFilter,
-      availableStreams,
       connectionTypeFilter,
       connectionTypeTabs,
       visualizationType,
@@ -892,7 +759,7 @@ export default defineComponent({
       chartData,
       chartKey,
       chartRendererRef,
-      timeRange,
+      searchObj,
       dateTimeRef,
       loadServiceGraph,
       formatNumber,
@@ -934,5 +801,7 @@ code {
   border-radius: 3px;
   font-family: "Courier New", monospace;
   font-size: 0.9em;
+  font-weight: 600;
+  color: #333;
 }
 </style>
