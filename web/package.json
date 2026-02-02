@@ -56,7 +56,7 @@
     "json-2-csv": "^5.5.10",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
-    "lodash-es": "^4.17.22",
+    "lodash-es": "^4.17.23",
     "lucide-vue-next": "^0.562.0",
     "luxon": "^3.7.2",
     "marked": "^17.0.1",
