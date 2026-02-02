@@ -873,6 +873,50 @@ export default defineComponent({
       updateDateTime(selectedDate.value);
     });
 
+    // Watch for panel-level time configuration changes and update URL
+    watch(
+      () => dashboardPanelData.data.config?.panel_time_range,
+      (newPanelTime) => {
+        // Get panel ID (only in edit mode)
+        const panelId = route.query.panelId as string;
+        if (!panelId) {
+          // In create mode, don't update URL with panel time params yet
+          // Panel time will be saved with the panel config
+          return;
+        }
+
+        if (!newPanelTime) {
+          // Panel time removed - clear panel time params from URL
+          const query = { ...route.query };
+          delete query[`panel-time-${panelId}`];
+          delete query[`panel-time-${panelId}-from`];
+          delete query[`panel-time-${panelId}-to`];
+          router.replace({ query });
+          return;
+        }
+
+        // Update URL with panel time parameters
+        const query = { ...route.query };
+
+        if (newPanelTime.type === 'relative' && newPanelTime.relativeTimePeriod) {
+          // Relative time: panel-time-{panelId}={relativeTimePeriod}
+          query[`panel-time-${panelId}`] = newPanelTime.relativeTimePeriod;
+          // Remove absolute time params if they exist
+          delete query[`panel-time-${panelId}-from`];
+          delete query[`panel-time-${panelId}-to`];
+        } else if (newPanelTime.type === 'absolute' && newPanelTime.startTime && newPanelTime.endTime) {
+          // Absolute time: panel-time-{panelId}-from={startTime}&panel-time-{panelId}-to={endTime}
+          query[`panel-time-${panelId}-from`] = newPanelTime.startTime.toString();
+          query[`panel-time-${panelId}-to`] = newPanelTime.endTime.toString();
+          // Remove relative time param if it exists
+          delete query[`panel-time-${panelId}`];
+        }
+
+        router.replace({ query });
+      },
+      { deep: true }
+    );
+
     // resize the chart when config panel is opened and closed
     watch(
       () => dashboardPanelData.layout.isConfigPanelOpen,
@@ -946,35 +990,77 @@ export default defineComponent({
       }
     };
 
+    // Get panel time from URL parameters (same logic as ViewDashboard)
+    const getPanelTimeFromURL = (panelId: string) => {
+      const relativeParam = route.query[`panel-time-${panelId}`];
+      const fromParam = route.query[`panel-time-${panelId}-from`];
+      const toParam = route.query[`panel-time-${panelId}-to`];
+
+      if (relativeParam) {
+        // Relative time from URL
+        const result = getConsumableRelativeTime(relativeParam as string);
+        if (result) {
+          return {
+            start_time: new Date(result.startTime),
+            end_time: new Date(result.endTime),
+          };
+        }
+      }
+
+      if (fromParam && toParam) {
+        // Absolute time from URL
+        return {
+          start_time: new Date(parseInt(fromParam as string)),
+          end_time: new Date(parseInt(toParam as string)),
+        };
+      }
+
+      return null;
+    };
+
     const updateDateTime = (value: object) => {
       if (selectedDate.value && dateTimePickerRef?.value) {
         // CRITICAL FIX (Issue 4): Check if panel has its own time configured
-        // If panel has panel_time_range, use that for rendering instead of global time
-        const panelTimeRange = dashboardPanelData.data.config?.panel_time_range;
-
+        // Priority 1: Check URL params (highest priority)
+        // Priority 2: Use panel's configured time range
+        // Priority 3: Use global time
+        const panelId = route.query.panelId as string;
         let effectiveTime;
 
-        if (panelTimeRange) {
-          // Panel has its own time range configured
-          if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
-            // Convert relative time to absolute time
-            const result = getConsumableRelativeTime(panelTimeRange.relativeTimePeriod);
-            if (result) {
-              effectiveTime = {
-                start_time: new Date(result.startTime),
-                end_time: new Date(result.endTime),
-              };
-            }
-          } else if (panelTimeRange.type === 'absolute') {
-            // Use absolute time directly
-            effectiveTime = {
-              start_time: new Date(panelTimeRange.startTime),
-              end_time: new Date(panelTimeRange.endTime),
-            };
+        // Priority 1: URL params (only in edit mode)
+        if (panelId) {
+          const urlPanelTime = getPanelTimeFromURL(panelId);
+          if (urlPanelTime) {
+            effectiveTime = urlPanelTime;
           }
         }
 
-        // If panel doesn't have its own time or conversion failed, use global time
+        // Priority 2: Panel's configured time range
+        if (!effectiveTime) {
+          const panelTimeRange = dashboardPanelData.data.config?.panel_time_range;
+
+          if (panelTimeRange) {
+            // Panel has its own time range configured
+            if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
+              // Convert relative time to absolute time
+              const result = getConsumableRelativeTime(panelTimeRange.relativeTimePeriod);
+              if (result) {
+                effectiveTime = {
+                  start_time: new Date(result.startTime),
+                  end_time: new Date(result.endTime),
+                };
+              }
+            } else if (panelTimeRange.type === 'absolute') {
+              // Use absolute time directly
+              effectiveTime = {
+                start_time: new Date(panelTimeRange.startTime),
+                end_time: new Date(panelTimeRange.endTime),
+              };
+            }
+          }
+        }
+
+        // Priority 3: If panel doesn't have its own time or conversion failed, use global time
         if (!effectiveTime) {
           const date = dateTimePickerRef.value?.getConsumableDateTime();
           effectiveTime = {
