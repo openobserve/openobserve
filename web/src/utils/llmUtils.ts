@@ -73,7 +73,7 @@ export function isLLMTrace(data: any): boolean {
   // Check legacy fields
   if (hasValue(data.llm_input)) return true;
   if (hasValue(data.llm_output)) return true;
-  if (hasValue(data.llm_usage)) return true;
+  if (hasValue(data.llm_usage) && (hasValue(data.llm_usage['input']) || hasValue(data.llm_usage['output']) || hasValue(data.llm_usage['total']))) return true;
 
   return false;
 }
