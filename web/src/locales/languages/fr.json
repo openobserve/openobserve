@@ -2358,7 +2358,8 @@
     "openFields": "Champs ouverts",
     "timeRangeUpdated": "La plage de temps sélectionnée n'incluait pas cette trace. La plage horaire a été mise à jour pour correspondre à l'horodatage de la trace.",
     "fetchingMoreTraces": "À la recherche de nouvelles traces...",
-    "showErrorOnly": "Afficher uniquement l'erreur"
+    "showErrorOnly": "Afficher uniquement l'erreur",
+    "openInTraces": "Ouvrir dans Traces"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
