@@ -2,7 +2,7 @@
   <a href="https://openobserve.ai"><img src="https://openobserve.ai/img/logo/o2-logo-readme.svg" alt="OpenObserve"></a>
 </p>
 <p align="center">
-    <em>Modern observability platform: 10x easier, 140x lower storage cost, high performance, petabyte scale - Elasticsearch/Splunk/Datadog alternative for logs, metrics, traces, frontend monitoring and more.</em>
+    <em>Open source Datadog alternative for logs, metrics, traces, and frontend monitoring. Modern observability platform: 10x easier, 140x lower storage cost, high performance, petabyte scale.</em>
 </p>
 <p align="center">
 <a href="https://github.com/openobserve/openobserve" target="_blank">
@@ -22,23 +22,25 @@
 </a>
 </p>
 
-OpenObserve (O2 for short) is a cloud-native observability platform built specifically for logs, metrics, traces, analytics, frontend monitoring and more. Start with a single binary that scales to terabytes, or deploy in High Availability mode for petabyte-scale workloads.
+OpenObserve (O2) is a cloud-native observability tool built for logs, metrics, traces, analytics, and Real User Monitoring (RUM). It's designed as a cost-effective alternative to Datadog, Splunk, and Elasticsearch for teams that need full observability without the complexity or cost.
 
 ## Why OpenObserve?
+OpenObserve is a single observability tool for all your monitoring needs. Here's why teams choose OpenObserve:
 
-### 1. Simplicity
-It is straightforward and easy to operate compared to other observability tools that require understanding and tuning numerous settings. Get OpenObserve up and running on a single node in under 2 minutes. No PhD required. 
+| Benefit |  Description |
+| --------| ------------| 
+| 140x Lower Storage Cost | Parquet columnar storage + S3-native architecture dramatically reduces costs vs Elasticsearch | 
+| Single Binary Deployment| Get running in under 2 minutes. No complex cluster setup required |
+| OpenTelemetry Native| Built on OpenTelemetry standard—no vendor lock-in| 
+| Unified Platform| Logs, metrics, traces, RUM, dashboards, alerts in one tool| 
+| High Performance | Better query performance than Elasticsearch on 1/4 the hardware| 
+| SQL + PromQL | Query logs/traces with SQL, metrics with SQL or PromQL—no proprietary query language| 
+| Built in Rust | Memory-safe, high-performance, single binary| 
 
-### 2. Cost Efficiency
-You can reduce your log storage costs by ~140x compared to Elasticsearch. Yes, you read that right - 140x, not a typo. This is achieved through columnar storage format (Parquet), aggressive compression, and S3-native architecture. See the detailed comparison below where we ingested the same amount of data in OpenObserve and Elasticsearch and found OpenObserve storage cost to be ~140x lower. Your CFO will love you.
 
-![OpenObserve Vs Elasticsearch](./screenshots/zo_vs_es.png)
+Cost Comparison: OpenObserve Vs Elasticsearch
+  ![OpenObserve Vs Elasticsearch](./screenshots/zo_vs_es.png)
 
-### 3. Performance
-OpenObserve delivers better performance than Elasticsearch while using 1/4th the hardware resources. Users report faster search performance and significantly faster analytics queries. The columnar storage format (Parquet) with intelligent partitioning and caching reduces the search space by up to 99% for most queries. Built in Rust for memory safety and high performance, OpenObserve handles thousands of concurrent users querying a single cluster simultaneously.
-
-### 4. Single Binary Platform
-Consolidate metrics, logs, and traces on one single, efficient platform. OpenObserve comes with its own UI, eliminating the need for multiple installations. One binary to rule them all.
 
 ## 🎥 Introduction Video
 
@@ -76,26 +78,51 @@ Deploy in High Availability mode with clustering for mission-critical workloads 
 
 [Read enterprise deployment guide →](https://openobserve.ai/docs/ha_deployment/)
 
-## 🌟 Capabilities
-
-- **Logs, Metrics, Traces**: Full support for all three pillars of observability.
-- **OpenTelemetry Support**: Native OTLP ingestion for logs, metrics, and traces.
-- **Real User Monitoring (RUM)**: Performance tracking, error logging, and session replay.
-- **Dashboards, Reports, Alerts**: 19+ built-in chart types plus a custom chart capability that enables creating 200+ chart variations including 3D visualizations. Scheduled reports and flexible alerting.
-- **Pipelines**: Enrich, redact, reduce, or normalize data on ingest. Stream processing for logs-to-metrics and more.
-- **Built-in Web UI**: No separate frontend to install or manage.
-- **SQL and PromQL Support**: Query logs and traces with SQL, metrics with SQL or PromQL.
-- **Single Binary or High Availability Mode**: Start with one binary, scale to full High Availability when you need it.
-- **Flexible Storage**: Local disk, S3, MinIO, GCS, or Azure Blob Storage.
-- **High Availability and Clustering**: Production-grade High Availability deployment.
-- **Dynamic Schema**: No predefined schema required - just start sending data.
-- **Built-in Authentication**: Secure by default.
-- **Simple Upgrades**: No complex migration scripts required.
-- **Multilingual UI**: Available in 11 languages including English, Spanish, German, French, Chinese, and more.
+## Features
 
 For a full list of features, check the [documentation](https://openobserve.ai/docs/#project-status-features-and-roadmap).
 
-## ⚡️ Quick start
+### Logs Management
+OpenObserve provides a centralized log management solution with full-text search, SQL queries, and powerful filtering. Built on Parquet columnar storage for 140x lower storage costs than Elasticsearch.
+Instantly search through all your logs using quick filters and a powerful query builder. Create dashboards from log data and set up alerts. [Read more →](https://openobserve.ai/logs/)
+
+<img width="3024" height="1716" alt="image" src="https://github.com/user-attachments/assets/885bfa0b-3498-4f25-9c8f-f662fb8be812" />
+
+### Distributed Tracing
+Distributed tracing is essential to troubleshoot issues in microservices applications. Powered by OpenTelemetry, tracing in OpenObserve helps you track user requests across services to identify performance bottlenecks.
+See user requests in a detailed breakdown with Flamegraphs and Gantt Charts. Click on any span to see the entire trace and understand where issues occurred. [Read more →](https://openobserve.ai/traces/)
+
+<img width="3022" height="1714" alt="image" src="https://github.com/user-attachments/assets/963b7778-8d6d-4951-a80f-c7ed9786a97c" />
+
+
+### Metrics & Dashboards
+Ingest metrics from your infrastructure or applications and create customized dashboards. 19+ built-in chart types plus custom charts for 200+ visualization variations.
+Query metrics with SQL or PromQL. Add multiple queries and combine them with formulae. [Read more →](https://openobserve.ai/metrics/)
+
+<img width="3024" height="1718" alt="image" src="https://github.com/user-attachments/assets/c150e9bf-147d-4608-a25c-6865c971656e" />
+
+### Frontend Monitoring (RUM)
+Real User Monitoring with performance tracking, error logging, and session replay. Understand exactly what your users experience.
+[Read more →](https://openobserve.ai/frontend-monitoring/)
+
+<img width="3024" height="1714" alt="image" src="https://github.com/user-attachments/assets/70070b7b-091b-4068-9a31-3c7aa2b62984" />
+
+### Alerts
+Get notified when anything unusual happens in your application. Set alerts on any telemetry signal (logs, metrics, traces), create thresholds, and configure notification channels.
+Advanced features like alert history and anomaly detection help you identify issues before they reach your customers. [Read more →](https://openobserve.ai/alerts/)
+<img width="3024" height="1714" alt="image" src="https://github.com/user-attachments/assets/69571d98-ccab-4382-9d1e-ac60f0855e81" />
+
+### Pipelines
+Enrich, redact, reduce, or normalize data on ingest. Stream processing for logs-to-metrics conversion and more. No external tools required.
+[Read more →](https://openobserve.ai/pipelines/)
+
+<img width="3018" height="1714" alt="image" src="https://github.com/user-attachments/assets/6e51b374-cf1c-4e76-b494-fdd933015b78" />
+
+## Getting Started
+
+### OpenObserve Cloud (Fastest Way)
+Get started in minutes without managing infrastructure. Free tier includes up to 200 GB/day ingestion.
+[Get Started Free →](https://cloud.openobserve.ai/)
 
 ### 🐳 Docker:
 ```bash
@@ -113,16 +140,64 @@ For other ways to quickly install OpenObserve or use OpenObserve cloud, check [q
 
 For installing OpenObserve in High Availability mode, check [High Availability deployment documentation](https://openobserve.ai/docs/ha_deployment/).
 
-## 🏆 Production Ready
+## ***Production Ready***
 
-OpenObserve is battle-tested in production environments worldwide (and by "battle-tested", we mean real production traffic, not just our test lab):
+*OpenObserve is battle-tested in production environments worldwide:*
 
-- **Thousands of active deployments** across diverse industries
-- **Largest deployment processes 2 PB/day** of data ingestion
-- **Single binary scales to terabytes** - unique in the observability space, no other single-binary solution achieves this scale
-- **High Availability mode scales to petabytes** - for the most demanding workloads
+* ***Thousands of active deployments** across diverse industries*  
+* ***Largest deployment: 2+ PB/day** ingestion*  
+* ***Single binary scales to terabytes**—unique in the observability space*
 
-[Read customer stories →](https://openobserve.ai/customer-stories/)
+[***Customer Stories →***](https://openobserve.ai/customer-stories/)
+
+## ***Comparisons to Familiar Tools***
+
+### ***OpenObserve vs Datadog***
+
+| *Aspect* | *OpenObserve* | *Datadog* |
+| ----- | ----- | ----- |
+| *Deployment* | *Self-hosted or Cloud* | *SaaS only* |
+| *Pricing model* | *Per-GB (free up to 200GB/day)* | *Per-host \+ per-GB* |
+| *Open source* | *Yes (AGPL-3.0)* | *No* |
+| *OpenTelemetry* | *Native OTLP* | *Supported* |
+| *Query language* | *SQL \+ PromQL* | *Proprietary* |
+| *Vendor lock-in* | *None* | *High* |
+
+*OpenObserve is a **Datadog alternative** that gives you full control over your data and costs.*
+
+### ***OpenObserve vs Elasticsearch***
+
+| *Aspect* | *OpenObserve* | *Elasticsearch* |
+| ----- | ----- | ----- |
+| *Storage cost* | ***140x lower*** | *High (hot/warm/cold tiers)* |
+| *Setup complexity* | *Single binary* | *Complex cluster management* |
+| *Query language* | *SQL* | *Lucene/KQL* |
+| *Hardware requirements* | *1/4 the resources* | *High memory/CPU* |
+
+*OpenObserve achieves 140x lower storage costs through Parquet columnar format and S3-native architecture.*
+
+### ***OpenObserve vs Splunk***
+
+| *Aspect* | *OpenObserve* | *Splunk* |
+| ----- | ----- | ----- |
+| *Licensing* | *Open source* | *Expensive enterprise licensing* |
+| *Deployment* | *Single binary or HA cluster* | *Complex* |
+| *Query language* | *SQL \+ PromQL* | *SPL (proprietary)* |
+| *Cost* | *Predictable, low* | *Unpredictable, high* |
+
+*OpenObserve is an **open-source Splunk alternative** without the licensing complexity.*
+
+### ***OpenObserve vs Grafana/Loki/Prometheus Stack***
+
+| *Aspect* | *OpenObserve* | *Grafana Stack* |
+| ----- | ----- | ----- |
+| *Components* | *Single platform* | *Multiple tools (Grafana \+ Loki \+ Prometheus \+ Tempo)* |
+| *Management* | *One binary* | *Multiple deployments* |
+| *High cardinality* | *Full support* | *Loki struggles with high cardinality* |
+| *Query performance* | *Fast on large volumes* | *Loki slow on large data* |
+
+*OpenObserve consolidates logs, metrics, and traces in one platform instead of stitching together multiple tools.*
+
 
 ## 📷 Screenshots
 
