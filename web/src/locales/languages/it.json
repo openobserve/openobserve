@@ -2356,7 +2356,8 @@
     "openFields": "Campi aperti",
     "timeRangeUpdated": "L'intervallo di tempo selezionato non includeva questa traccia. L'intervallo di tempo è stato aggiornato in modo che corrisponda al timestamp della traccia.",
     "fetchingMoreTraces": "Recuperando altre tracce...",
-    "showErrorOnly": "Mostra solo errori"
+    "showErrorOnly": "Mostra solo errori",
+    "openInTraces": "Apri in Traces"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

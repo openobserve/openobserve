@@ -2358,7 +2358,8 @@
     "openFields": "Campos abertos",
     "timeRangeUpdated": "O intervalo de tempo selecionado não incluiu esse rastreamento. O intervalo de tempo foi atualizado para corresponder ao timestamp do rastreamento.",
     "fetchingMoreTraces": "Buscando mais rastros...",
-    "showErrorOnly": "Mostrar somente erro"
+    "showErrorOnly": "Mostrar somente erro",
+    "openInTraces": "Abrir no Traces"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

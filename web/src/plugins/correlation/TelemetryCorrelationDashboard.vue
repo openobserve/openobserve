@@ -305,21 +305,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Traces Tab Panel -->
         <q-tab-panel name="traces" class="tw:p-0">
           <!-- Refresh Button -->
-          <div
-            v-if="traceCorrelationMode !== null"
-            class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-          >
-            <q-btn
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadCorrelatedTraces"
-              :loading="tracesLoading"
-              size="sm"
-            />
-          </div>
 
           <!-- Loading State -->
           <div
@@ -363,105 +348,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="
               traceCorrelationMode === 'direct' && traceSpanList.length > 0
             "
-            class="tw:h-full"
+            class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
           >
-            <!-- Trace Header -->
-            <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
-            >
-              <div class="tw:flex tw:items-center tw:gap-3">
-                <q-icon name="link" color="positive" size="1.25rem" />
-                <div class="tw:flex tw:flex-col">
-                  <span class="tw:text-sm tw:font-semibold">{{
-                    t("correlation.directTraceMatch")
-                  }}</span>
-                  <a
-                    href="#"
-                    class="tw:text-xs tw:text-blue-500 tw:font-mono tw:underline hover:tw:text-blue-700 tw:cursor-pointer"
-                    @click.prevent="openTraceInNewWindow"
-                    :title="t('correlation.openTraceInNewWindow')"
-                  >
-                    {{ extractedTraceId }}
-                    <q-icon name="open_in_new" size="xs" class="tw:ml-1" />
-                  </a>
-                </div>
-                <q-chip
-                  dense
-                  color="primary"
-                  text-color="white"
-                  class="tw:ml-auto"
-                >
-                  {{ traceSpanList.length }} {{ t("correlation.spans") }}
-                </q-chip>
-              </div>
-            </div>
-
-            <!-- Span Table -->
-            <div
-              class="tw:p-3 tw:overflow-auto"
-              style="max-height: calc(100% - 4rem)"
-            >
-              <q-table
-                :rows="traceSpanList"
-                :columns="spanTableColumns"
-                row-key="span_id"
-                flat
-                dense
-                :rows-per-page-options="[0]"
-                class="trace-span-table"
-              >
-                <template v-slot:body-cell-service_name="props">
-                  <q-td :props="props">
-                    <div class="tw:flex tw:items-center tw:gap-2">
-                      <div
-                        class="tw:w-2 tw:h-2 tw:rounded-full"
-                        :style="{
-                          backgroundColor: getServiceColor(
-                            props.row.service_name,
-                          ),
-                        }"
-                      />
-                      <span class="tw:font-mono tw:text-xs">{{
-                        props.row.service_name
-                      }}</span>
-                    </div>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-operation_name="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      props.row.operation_name
-                    }}</span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-duration="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatDuration(props.row.duration || 0)
-                    }}</span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-span_status="props">
-                  <q-td :props="props">
-                    <q-badge
-                      :color="
-                        props.row.span_status === 'ERROR'
-                          ? 'negative'
-                          : 'positive'
-                      "
-                      :label="props.row.span_status || 'OK'"
-                    />
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-start_time="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatTimestamp(props.row.start_time)
-                    }}</span>
-                  </q-td>
-                </template>
-              </q-table>
-            </div>
+            <TraceDetails
+              mode="embedded"
+              :trace-id-prop="extractedTraceId || ''"
+              :stream-name-prop="
+                traceStreams && traceStreams[0]
+                  ? traceStreams[0].stream_name
+                  : ''
+              "
+              :span-list-prop="traceSpanList"
+              :start-time-prop="computedTraceStartTime"
+              :end-time-prop="computedTraceEndTime"
+              :show-back-button="false"
+              :show-timeline="false"
+              :show-log-stream-selector="false"
+              :show-share-button="false"
+              :show-close-button="false"
+              :show-expand-button="true"
+              :enable-correlation-links="true"
+              :initial-timeline-expanded="false"
+            />
           </div>
 
           <!-- Dimension-based Correlation - Traces List -->
@@ -684,11 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="loading"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-spinner-hourglass
-            color="primary"
-            size="3.75rem"
-            class="tw:mb-4"
-          />
+          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
           <div class="tw:text-base">{{ t("correlation.loading") }}</div>
           <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
             {{ t("correlation.loadingLogs") }}
@@ -827,23 +731,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="activeTab == 'traces'" class="tw:h-full">
-        <!-- Refresh Button -->
-        <div
-          v-if="traceCorrelationMode !== null"
-          class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-        >
-          <q-btn
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadCorrelatedTraces"
-            :loading="tracesLoading"
-            size="sm"
-          />
-        </div>
-
         <!-- Loading State -->
         <div
           v-if="tracesLoading"
@@ -882,105 +769,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             traceCorrelationMode === 'direct' && traceSpanList.length > 0
           "
-          class="tw:h-full"
+          class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
         >
-          <!-- Trace Header -->
-          <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
-          >
-            <div class="tw:flex tw:items-center tw:gap-3">
-              <q-icon name="link" color="positive" size="1.25rem" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-semibold">{{
-                  t("correlation.directTraceMatch")
-                }}</span>
-                <a
-                  href="#"
-                  class="tw:text-xs tw:text-blue-500 tw:font-mono tw:underline hover:tw:text-blue-700 tw:cursor-pointer"
-                  @click.prevent="openTraceInNewWindow"
-                  :title="t('correlation.openTraceInNewWindow')"
-                >
-                  {{ extractedTraceId }}
-                  <q-icon name="open_in_new" size="xs" class="tw:ml-1" />
-                </a>
-              </div>
-              <q-chip
-                dense
-                color="primary"
-                text-color="white"
-                class="tw:ml-auto"
-              >
-                {{ traceSpanList.length }} {{ t("correlation.spans") }}
-              </q-chip>
-            </div>
-          </div>
-
-          <!-- Span Table -->
-          <div
-            class="tw:p-3 tw:overflow-auto"
-            style="max-height: calc(100% - 4rem)"
-          >
-            <q-table
-              :rows="traceSpanList"
-              :columns="spanTableColumns"
-              row-key="span_id"
-              flat
-              dense
-              :rows-per-page-options="[0]"
-              class="trace-span-table"
-            >
-              <template v-slot:body-cell-service_name="props">
-                <q-td :props="props">
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <div
-                      class="tw:w-2 tw:h-2 tw:rounded-full"
-                      :style="{
-                        backgroundColor: getServiceColor(
-                          props.row.service_name,
-                        ),
-                      }"
-                    />
-                    <span class="tw:font-mono tw:text-xs">{{
-                      props.row.service_name
-                    }}</span>
-                  </div>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-operation_name="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    props.row.operation_name
-                  }}</span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-duration="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatDuration(props.row.duration || 0)
-                  }}</span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-span_status="props">
-                <q-td :props="props">
-                  <q-badge
-                    :color="
-                      props.row.span_status === 'ERROR'
-                        ? 'negative'
-                        : 'positive'
-                    "
-                    :label="props.row.span_status || 'OK'"
-                  />
-                </q-td>
-              </template>
-              <template v-slot:body-cell-start_time="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatTimestamp(props.row.start_time)
-                  }}</span>
-                </q-td>
-              </template>
-            </q-table>
-          </div>
+          <TraceDetails
+            mode="embedded"
+            :trace-id-prop="extractedTraceId || ''"
+            :stream-name-prop="
+              traceStreams && traceStreams[0] ? traceStreams[0].stream_name : ''
+            "
+            :span-list-prop="traceSpanList"
+            :start-time-prop="computedTraceStartTime"
+            :end-time-prop="computedTraceEndTime"
+            :show-back-button="false"
+            :show-timeline="false"
+            :show-log-stream-selector="false"
+            :show-share-button="false"
+            :show-close-button="false"
+            :show-expand-button="true"
+            :enable-correlation-links="true"
+            :initial-timeline-expanded="false"
+          />
         </div>
 
         <!-- Dimension-based Correlation - Traces List -->
@@ -1239,6 +1047,7 @@ import searchService from "@/services/search";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1306,7 +1115,9 @@ const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 
 // Panel data caching for hide/unhide optimization
-const panelDataCache = ref<Map<string, { panel: any; timestamp: number }>>(new Map());
+const panelDataCache = ref<Map<string, { panel: any; timestamp: number }>>(
+  new Map(),
+);
 const PANEL_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
 let streamChangeDebounceTimeout: any = null; // Debounce timeout for batching multiple hide/unhide operations
 const STREAM_CHANGE_DEBOUNCE_MS = 300; // 300ms debounce delay
@@ -1319,6 +1130,21 @@ const extractedTraceId = ref<string | null>(null);
 const traceCorrelationMode = ref<"direct" | "dimension-based" | null>(null);
 const traceSpanList = ref<any[]>([]);
 const tracesForDimensions = ref<any[]>([]); // Traces found via dimension-based correlation
+
+// Computed properties for trace time range
+const computedTraceStartTime = computed(() => {
+  if (traceSpanList.value.length === 0) return 0;
+  return Math.min(
+    ...traceSpanList.value.map((s) => Math.floor(s.start_time / 1000)),
+  );
+});
+
+const computedTraceEndTime = computed(() => {
+  if (traceSpanList.value.length === 0) return 0;
+  return Math.max(
+    ...traceSpanList.value.map((s) => Math.ceil(s.end_time / 1000)),
+  );
+});
 
 // Table columns for span list (direct trace correlation)
 const spanTableColumns = [
@@ -1869,7 +1695,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
     addedStreams.forEach((stream) => {
       const cached = panelDataCache.value.get(stream.stream_name);
-      if (cached && (timestamp - cached.timestamp) < PANEL_CACHE_DURATION) {
+      if (cached && timestamp - cached.timestamp < PANEL_CACHE_DURATION) {
         // Use cached panel data (no API call needed)
         cachedPanels.push({ stream, cachedPanel: cached.panel });
       } else {
@@ -1908,8 +1734,8 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
     // Combine cached panels with newly generated ones
     // Deep clone cached panels to avoid modifying the cache
     const allPanelsToAdd = [
-      ...cachedPanels.map(cp => JSON.parse(JSON.stringify(cp.cachedPanel))),
-      ...newPanels
+      ...cachedPanels.map((cp) => JSON.parse(JSON.stringify(cp.cachedPanel))),
+      ...newPanels,
     ];
 
     // Find the maximum Y position from existing panels to place new panels below
@@ -1966,7 +1792,9 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
     // Log cache usage for debugging
     if (cachedPanels.length > 0) {
-      console.log(`[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`);
+      console.log(
+        `[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`,
+      );
     }
   } catch (err: any) {
     console.error(
@@ -2651,15 +2479,22 @@ watch(
 
       // Get current panel stream names
       const currentPanelStreamNames = new Set(
-        currentPanels.map((p: any) => {
-          // Extract stream name from panel id or layout
-          const match = p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
-          return match ? match[1] : null;
-        }).filter(Boolean)
+        currentPanels
+          .map((p: any) => {
+            // Extract stream name from panel id or layout
+            const match =
+              p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+            return match ? match[1] : null;
+          })
+          .filter(Boolean),
       );
 
       // If no dashboard or transitioning from empty, do full reload
-      if (!dashboardData.value || wasEmptyBeforeChange || currentPanels.length === 0) {
+      if (
+        !dashboardData.value ||
+        wasEmptyBeforeChange ||
+        currentPanels.length === 0
+      ) {
         wasEmptyBeforeChange = false;
         if (isOpen.value && currentStreams.length > 0) {
           dashboardData.value = null;
@@ -2670,13 +2505,16 @@ watch(
 
       // Determine which streams need to be added based on current state
       const streamsToAdd = currentStreams.filter(
-        (s) => !currentPanelStreamNames.has(s.stream_name)
+        (s) => !currentPanelStreamNames.has(s.stream_name),
       );
 
       // Determine which panels need to be removed based on current state
-      const currentStreamNames = new Set(currentStreams.map(s => s.stream_name));
+      const currentStreamNames = new Set(
+        currentStreams.map((s) => s.stream_name),
+      );
       const panelsToRemove = currentPanels.filter((p: any) => {
-        const match = p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+        const match =
+          p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
         const streamName = match ? match[1] : null;
         return streamName && !currentStreamNames.has(streamName);
       });
@@ -2684,7 +2522,8 @@ watch(
       // Cache panels before removal
       if (panelsToRemove.length > 0) {
         panelsToRemove.forEach((panel: any) => {
-          const match = panel.id?.match(/^(.+?)_\d+$/) || panel.layout?.i?.match(/^(.+?)_/);
+          const match =
+            panel.id?.match(/^(.+?)_\d+$/) || panel.layout?.i?.match(/^(.+?)_/);
           const streamName = match ? match[1] : null;
           if (streamName) {
             panelDataCache.value.set(streamName, {
@@ -2834,6 +2673,16 @@ watch(
     overflow: auto;
     min-height: 0;
     background: #f5f5f5 !important;
+  }
+}
+
+.telemetry-correlation-traces {
+  :deep(.trace-details-content) {
+    padding: 0 !important;
+  }
+
+  :deep(.trace-combined-header-wrapper) {
+    margin-bottom: 0 !important;
   }
 }
 

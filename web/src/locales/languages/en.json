@@ -2476,6 +2476,7 @@
     "viewLogs": "View Logs",
     "viewRelated": "View Related",
     "backToLogs": "Back to Logs",
+    "openInTraces": "Open in Traces",
     "RedMetrics": "RED Metrics",
     "showErrorOnly": "Show Error Only",
     "loadingStream": "Loading Stream...",
