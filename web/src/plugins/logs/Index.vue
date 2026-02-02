@@ -2153,6 +2153,9 @@ export default defineComponent({
 
         // Trigger PanelEditor's runQuery
         buildQueryPageRef.value?.runQuery(clear_cache);
+
+        // Sync build config to URL parameters
+        updateUrlQueryParams(null, buildQueryPageRef.value?.dashboardPanelData);
       }
     };
 

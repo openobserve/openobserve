@@ -48,6 +48,26 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
+// Mock vue-router
+const mockRouter = {
+  push: vi.fn(),
+  currentRoute: {
+    value: {
+      name: "logs",
+      query: {}, // Empty query - no build_data in URL
+    },
+  },
+};
+
+vi.mock("vue-router", () => ({
+  useRouter: () => mockRouter,
+}));
+
+// Mock logsVisualization
+vi.mock("@/composables/useLogs/logsVisualization", () => ({
+  decodeBuildConfig: vi.fn().mockReturnValue(null),
+}));
+
 // Mock SQL query parser
 vi.mock("@/utils/query/sqlQueryParser", () => ({
   parseSQL: vi.fn().mockResolvedValue({

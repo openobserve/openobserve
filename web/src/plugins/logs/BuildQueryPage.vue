@@ -52,12 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, onMounted, watch, defineAsyncComponent, provide, defineExpose } from "vue";
+import { useRouter } from "vue-router";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import {
   parseSQL,
   shouldUseCustomMode,
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
+import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
 
 // ============================================================================
 // Component Imports
@@ -111,6 +113,7 @@ const emit = defineEmits<{
 // Setup
 // ============================================================================
 
+const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 
@@ -120,6 +123,71 @@ const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields, makeAu
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", "build");
+
+// ============================================================================
+// URL Restore Helper
+// ============================================================================
+
+/**
+ * Restore build configuration from URL if present
+ * @returns true if restored from URL, false otherwise
+ */
+const restoreFromUrl = async (): Promise<boolean> => {
+  const buildData = router.currentRoute.value?.query?.build_data as string | undefined;
+  if (!buildData) {
+    return false;
+  }
+
+  try {
+    const decoded = decodeBuildConfig(buildData);
+    if (!decoded || !decoded.fields) {
+      return false;
+    }
+
+    // Restore chart type and config
+    if (decoded.type) {
+      dashboardPanelData.data.type = decoded.type;
+    }
+    if (decoded.config) {
+      dashboardPanelData.data.config = { ...dashboardPanelData.data.config, ...decoded.config };
+    }
+
+    // Restore fields
+    const fields = decoded.fields;
+    if (fields.stream) {
+      dashboardPanelData.data.queries[0].fields.stream = fields.stream;
+      dashboardPanelData.data.queries[0].fields.stream_type = fields.stream_type || "logs";
+    }
+    if (fields.x) {
+      dashboardPanelData.data.queries[0].fields.x = fields.x;
+    }
+    if (fields.y) {
+      dashboardPanelData.data.queries[0].fields.y = fields.y;
+    }
+    if (fields.breakdown) {
+      dashboardPanelData.data.queries[0].fields.breakdown = fields.breakdown;
+    }
+    if (fields.filter) {
+      dashboardPanelData.data.queries[0].fields.filter = fields.filter;
+    }
+
+    // Restore query mode
+    dashboardPanelData.data.queries[0].customQuery = decoded.customQuery || false;
+    if (decoded.query) {
+      dashboardPanelData.data.queries[0].query = decoded.query;
+    }
+
+    // Load stream fields if we have a stream
+    if (fields.stream) {
+      await updateGroupedFields();
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Failed to restore build config from URL:", error);
+    return false;
+  }
+};
 
 // ============================================================================
 // Initialization
@@ -132,6 +200,14 @@ const initializeFromQuery = async () => {
   // Sync datetime from parent
   if (props.selectedDateTime) {
     dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
+  }
+
+  // First, try to restore from URL (for share links)
+  const restoredFromUrl = await restoreFromUrl();
+  if (restoredFromUrl) {
+    // Successfully restored from URL - run query and return
+    await runQuery();
+    return;
   }
 
   // If no query, use builder mode with selected stream
