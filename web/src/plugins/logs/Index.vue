@@ -1599,6 +1599,11 @@ export default defineComponent({
             searchObj.meta.buildModeQueryEditorDisabled = false;
           }
 
+          // Always enable SQL mode when switching to build tab
+          if (searchObj.meta.logsVisualizeToggle === "build") {
+            searchObj.meta.sqlMode = true;
+          }
+
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
             // Enable quick mode automatically when switching to visualization if:
             // 1. SQL mode is disabled OR

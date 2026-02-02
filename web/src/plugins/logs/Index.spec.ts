@@ -979,6 +979,19 @@ describe("Logs Index", async () => {
         const thirdLevel = wrapper.find('#thirdLevel');
         expect(thirdLevel.exists()).toBe(true);
       });
+
+      it("should enable SQL mode when switching to 'build'", async () => {
+        // Start with SQL mode disabled
+        wrapper.vm.searchObj.meta.sqlMode = false;
+        await flushPromises();
+
+        // Switch to build mode
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+
+        // SQL mode should be automatically enabled
+        expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
+      });
     });
 
     describe("Build page handlers", () => {
