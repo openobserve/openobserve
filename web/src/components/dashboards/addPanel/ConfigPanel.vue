@@ -100,12 +100,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Toggle to enable panel-level time -->
-      <q-checkbox
-        v-model="allowPanelTime"
+      <q-toggle
+      v-model="allowPanelTime"
         :label="t('dashboard.allowPanelTime')"
         data-test="dashboard-config-allow-panel-time"
         @update:model-value="onTogglePanelTime"
-      />
+      class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+      size="lg"
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-lg-dark'
+          : 'o2-toggle-button-lg-light'
+      "
+    />
 
       <!-- Show mode selection when enabled -->
       <div v-if="allowPanelTime" class="q-mt-sm q-ml-lg">
@@ -2628,24 +2635,10 @@ export default defineComponent({
           };
         }
 
-        // Initialize panel time picker value - ONLY include fields relevant to the type
-        const configTime = dashboardPanelData.data.config.panel_time_range;
-        const timeType = configTime.type || 'relative';
-
-        if (timeType === 'relative') {
-          panelTimeValue.value = {
-            type: 'relative',
-            valueType: 'relative',
-            relativeTimePeriod: configTime.relativeTimePeriod,
-          };
-        } else {
-          panelTimeValue.value = {
-            type: 'absolute',
-            valueType: 'absolute',
-            startTime: configTime.startTime,
-            endTime: configTime.endTime,
-          };
-        }
+        // Initialize panel time picker value using helper function
+        panelTimeValue.value = convertPanelTimeRangeToPicker(
+          dashboardPanelData.data.config.panel_time_range
+        );
       } else {
         // GLOBAL MODE: DON'T save panel_time_range
         // Clear panel_time_range when switching to global
@@ -2657,30 +2650,37 @@ export default defineComponent({
     // Panel time picker value
     const panelTimeValue = ref<any>(null);
 
+    // Helper function to convert panel_time_range to picker value format
+    const convertPanelTimeRangeToPicker = (panelTimeRange: any) => {
+      if (!panelTimeRange) return null;
+
+      const timeType = panelTimeRange.type || 'relative';
+
+      if (timeType === 'relative') {
+        return {
+          type: 'relative',
+          valueType: 'relative',
+          relativeTimePeriod: panelTimeRange.relativeTimePeriod,
+        };
+      } else {
+        return {
+          type: 'absolute',
+          valueType: 'absolute',
+          startTime: panelTimeRange.startTime,
+          endTime: panelTimeRange.endTime,
+        };
+      }
+    };
+
     // Initialize panel time picker value if panel already has individual time configured
     if (
       dashboardPanelData.data.config?.allow_panel_time &&
       dashboardPanelData.data.config?.panel_time_mode === 'individual' &&
       dashboardPanelData.data.config?.panel_time_range
     ) {
-      // ONLY include fields relevant to the type
-      const configTime = dashboardPanelData.data.config.panel_time_range;
-      const timeType = configTime.type || 'relative';
-
-      if (timeType === 'relative') {
-        panelTimeValue.value = {
-          type: 'relative',
-          valueType: 'relative',
-          relativeTimePeriod: configTime.relativeTimePeriod,
-        };
-      } else {
-        panelTimeValue.value = {
-          type: 'absolute',
-          valueType: 'absolute',
-          startTime: configTime.startTime,
-          endTime: configTime.endTime,
-        };
-      }
+      panelTimeValue.value = convertPanelTimeRangeToPicker(
+        dashboardPanelData.data.config.panel_time_range
+      );
     }
 
     // Watch for changes to panel time picker and sync to config
