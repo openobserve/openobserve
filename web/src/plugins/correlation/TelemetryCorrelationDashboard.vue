@@ -394,14 +394,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
-                <q-chip
-                  dense
-                  color="primary"
-                  text-color="white"
-                  class="tw:ml-auto"
-                >
-                  {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-                </q-chip>
+                <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
+                  <q-btn
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="open_in_new"
+                    :label="t('correlation.viewInTraces')"
+                    @click="openTracesPage"
+                    data-test="correlation-view-traces-page"
+                    class="tw:text-xs"
+                  >
+                    <q-tooltip>
+                      {{ t("correlation.viewInTracesTooltip") }}
+                    </q-tooltip>
+                  </q-btn>
+                  <q-chip dense color="primary" text-color="white">
+                    {{ tracesForDimensions.length }} {{ t("menu.traces") }}
+                  </q-chip>
+                </div>
               </div>
             </div>
 
@@ -732,14 +744,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <q-chip
-                dense
-                color="primary"
-                text-color="white"
-                class="tw:ml-auto"
-              >
+              <q-chip dense color="primary" text-color="white">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </q-chip>
+              <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
+                <q-btn
+                  flat
+                  dense
+                  no-caps
+                  color="primary"
+                  icon="open_in_new"
+                  :label="t('correlation.viewInTraces')"
+                  @click="openTracesPage"
+                  data-test="correlation-view-traces-page"
+                  class="tw:text-xs"
+                >
+                  <q-tooltip>
+                    {{ t("correlation.viewInTracesTooltip") }}
+                  </q-tooltip>
+                </q-btn>
+              </div>
             </div>
           </div>
 
@@ -2101,6 +2125,32 @@ const openTraceInNewWindow = (trace) => {
       trace_id: trace.trace_id,
       from: trace.trace_start_time - 10000000,
       to: trace.trace_end_time + 10000000,
+      org_identifier: org,
+    },
+  });
+
+  // Open in new window/tab
+  window.open(route.href, "_blank");
+};
+
+/**
+ * Open traces page with filters for all dimension-based correlated traces
+ */
+const openTracesPage = () => {
+  const org = store.state.selectedOrganization.identifier;
+  const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+
+  // Build filter query for service_name
+  const filterQuery = `service_name='${props.serviceName}'`;
+
+  // Build the URL to open traces page with filters
+  const route = router.resolve({
+    name: "traces",
+    query: {
+      stream: traceStream,
+      from: props.timeRange.startTime,
+      to: props.timeRange.endTime,
+      query: b64EncodeUnicode(filterQuery), // Base64 encode the filter query
       org_identifier: org,
     },
   });
