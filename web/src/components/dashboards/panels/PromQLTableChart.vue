@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="$emit('row-click', $event)"
       >
         <!-- Override bottom slot to add legend filter alongside native pagination -->
+        <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
           <div class="row items-center full-width">
             <div class="row items-center q-gutter-xs">
@@ -54,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-select>
             </div>
             <q-space />
+            <!-- Reuse pagination controls structure from TableRenderer -->
             <!-- Records per page dropdown: only when pagination is enabled in config -->
             <div
               v-if="config.show_pagination"
@@ -63,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-select
                 :model-value="scope.pagination.rowsPerPage"
                 @update:model-value="scope.setRowsPerPage"
-                :options="paginationOptions"
+                :options="scope.paginationOptions"
                 :option-label="(opt) => (opt === 0 ? 'All' : opt)"
                 borderless
                 dense
@@ -76,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{
                 config.show_pagination
                   ? scope.pagination.rowsPerPage === 0
-                    ? `1-${filteredTableRows.length} of ${filteredTableRows.length}`
+                    ? `1-${scope.totalRows} of ${scope.totalRows}`
                     : `${(scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1}-${Math.min(
                         scope.pagination.page * scope.pagination.rowsPerPage,
-                        filteredTableRows.length,
-                      )} of ${filteredTableRows.length}`
-                  : `1-${filteredTableRows.length} of ${filteredTableRows.length}`
+                        scope.totalRows,
+                      )} of ${scope.totalRows}`
+                  : `1-${scope.totalRows} of ${scope.totalRows}`
               }}
             </span>
             <!-- Navigation arrows: only when pagination is enabled -->
@@ -240,24 +242,9 @@ export default defineComponent({
       return filtered;
     });
 
-    // Dynamic pagination options
-    const paginationOptions = computed(() => {
-      const defaultOptions = [10, 20, 50, 100, 250, 500, 1000];
-      const configuredRows = Number(props.config?.rows_per_page);
-
-      const options = new Set(defaultOptions);
-      if (configuredRows && configuredRows > 0) {
-        options.add(configuredRows);
-      }
-
-      // Sort numerically
-      const sortedOptions = Array.from(options).sort((a, b) => a - b);
-
-      // Add 'All' option (0) at the end
-      sortedOptions.push(0);
-
-      return sortedOptions;
-    });
+    // Note: paginationOptions is now provided by TableRenderer's slot
+    // and accessible via scope.paginationOptions in the template
+    // This avoids code duplication
 
     const pagination = ref({
       rowsPerPage: 0, // 0 = show all rows (like SQL table)
@@ -300,7 +287,6 @@ export default defineComponent({
       tableRows,
       filteredTableRows,
       pagination,
-      paginationOptions,
       selectedLegend,
       legendOptions,
       showLegendFooter,

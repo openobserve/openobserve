@@ -103,14 +103,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
-      <template v-slot:bottom="scope" v-if="$slots.bottom">
+      <!-- If no custom slot is provided, use default pagination layout -->
+      <template v-slot:bottom="scope">
+        <!-- Custom slot provided by parent (e.g., PromQLTableChart with legend filter) -->
         <slot
+          v-if="$slots.bottom"
           name="bottom"
           v-bind="{
             ...scope,
             setRowsPerPage: (val: number) => (pagination.rowsPerPage = val),
+            paginationOptions,
+            totalRows: (data.rows || []).length,
           }"
         />
+        <!-- Default pagination layout when no custom slot -->
+        <!-- This matches the design in PromQLTableChart for consistency across all pages -->
+        <div v-else class="row items-center full-width">
+          <q-space />
+          <!-- Records per page dropdown: only when pagination is enabled -->
+          <div v-if="showPagination" class="row items-center q-gutter-sm">
+            <span class="text-caption">Records per page:</span>
+            <q-select
+              :model-value="scope.pagination.rowsPerPage"
+              @update:model-value="(val: number) => (pagination.rowsPerPage = val)"
+              :options="paginationOptions"
+              :option-label="(opt) => (opt === 0 ? 'All' : opt)"
+              borderless
+              dense
+              options-dense
+              class="q-table__select"
+            />
+          </div>
+          <!-- Count display -->
+          <span class="text-caption q-pa-sm">
+            {{
+              showPagination
+                ? scope.pagination.rowsPerPage === 0
+                  ? `1-${(data.rows || []).length} of ${(data.rows || []).length}`
+                  : `${(scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1}-${Math.min(
+                      scope.pagination.page * scope.pagination.rowsPerPage,
+                      (data.rows || []).length,
+                    )} of ${(data.rows || []).length}`
+                : `1-${(data.rows || []).length} of ${(data.rows || []).length}`
+            }}
+          </span>
+          <!-- Navigation arrows: only when pagination is enabled -->
+          <template v-if="showPagination">
+            <q-btn
+              v-if="scope.pagesNumber > 1"
+              icon="first_page"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.firstPage"
+            />
+            <q-btn
+              v-if="scope.pagesNumber > 1"
+              icon="chevron_left"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.prevPage"
+            />
+            <q-btn
+              v-if="scope.pagesNumber > 1"
+              icon="chevron_right"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.nextPage"
+            />
+            <q-btn
+              v-if="scope.pagesNumber > 1"
+              icon="last_page"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.lastPage"
+            />
+          </template>
+        </div>
       </template>
     </q-table>
   </div>
