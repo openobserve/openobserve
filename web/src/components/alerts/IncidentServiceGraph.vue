@@ -142,13 +142,24 @@ export default defineComponent({
           .iterations(2)
         )
         .force('x', forceX((d: any) => {
-          // Position nodes left-to-right based on their depth
+          // Position nodes left-to-right based on their depth, starting from extreme left
           const depth = nodeDepth.get(d.id) || 0;
           const maxDepth = Math.max(...Array.from(nodeDepth.values()));
-          const spacing = maxDepth > 0 ? width / (maxDepth + 1) : width / 2;
-          return spacing * (depth + 1);
+          const leftMargin = 80; // Left margin to prevent nodes from touching the edge
+          const rightMargin = 80; // Right margin
+          const availableWidth = width - leftMargin - rightMargin;
+          const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
+          return leftMargin + spacing * depth;
         }).strength(1.5)) // Strong horizontal positioning
-        .force('y', forceY(height / 2).strength(0.1)) // Weak vertical centering
+        .force('y', forceY((d: any) => {
+          // Stronger vertical centering for root nodes (depth 0)
+          const depth = nodeDepth.get(d.id) || 0;
+          return height / 2;
+        }).strength((d: any) => {
+          // Much stronger centering for root nodes to overpower collision force
+          const depth = nodeDepth.get(d.id) || 0;
+          return depth === 0 ? 3.0 : 0.15; // Very strong centering for root nodes
+        }))
         .force('collision', forceCollide()
           .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
           .strength(1.0)
