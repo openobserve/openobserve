@@ -446,13 +446,16 @@ pub fn basic_routes() -> Router {
     router = router.nest("/node", node_routes);
 
     // Debug/profiling routes with auth
-    let debug_routes = Router::new()
-        .route("/profile/memory", get(profiling::memory_profile))
-        .route("/profile/stats", get(profiling::jemalloc_stats))
-        .route("/profile/pprof", get(profiling::memory_pprof))
-        .route("/profile/flamegraph", get(profiling::memory_flamegraph));
+    #[cfg(feature = "profiling")]
+    {
+        let debug_routes = Router::new()
+            .route("/profile/memory", get(profiling::memory_profile))
+            .route("/profile/stats", get(profiling::jemalloc_stats))
+            .route("/profile/cpu", get(profiling::cpu_profile))
+            .layer(middleware::from_fn(auth_middleware));
 
-    router = router.nest("/debug", debug_routes);
+        router = router.nest("/debug", debug_routes);
+    }
 
     // Swagger UI
     if get_config().common.swagger_enabled {

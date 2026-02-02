@@ -17,20 +17,20 @@
 
 use axum::{
     Json,
+    extract::Query,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(feature = "jemalloc")]
-use axum::{body::Body, http::header};
 use config::get_config;
+use pprof::{ProfilerGuard, protos::Message};
+use serde::Deserialize;
 
-/// GET /api/debug/profile/memory
+/// GET /debug/profile/memory
 ///
 /// Generate a memory profile (heap dump) in jeprof format.
 /// The profile can be analyzed with jeprof or converted to flamegraph.
 ///
 /// Returns: Binary profile data
-#[cfg(feature = "jemalloc")]
 pub async fn memory_profile() -> Result<String, String> {
     let prof_ctl = jemalloc_pprof::PROF_CTL
         .as_ref()
@@ -76,110 +76,7 @@ pub async fn memory_profile() -> Result<String, String> {
     Ok(filename)
 }
 
-#[cfg(not(feature = "jemalloc"))]
-pub async fn memory_profile() -> Response {
-    (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json(serde_json::json!({"error": "Memory profiling is not available"})),
-    )
-        .into_response()
-}
-
-/// GET /api/debug/profile/pprof
-///
-/// Get a memory profile in pprof format (protobuf).
-/// Returns the binary pprof data directly in the response.
-///
-/// Returns: Binary pprof data (application/octet-stream)
-#[cfg(feature = "jemalloc")]
-pub async fn memory_pprof() -> Result<impl IntoResponse, (StatusCode, String)> {
-    let prof_ctl = jemalloc_pprof::PROF_CTL.as_ref().ok_or_else(|| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Profiling controller not available".to_string(),
-        )
-    })?;
-
-    let mut prof_ctl = prof_ctl.lock().await;
-
-    if !prof_ctl.activated() {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Jemalloc profiling is not activated".to_string(),
-        ));
-    }
-
-    let pprof_data = prof_ctl.dump_pprof().map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to dump pprof: {e}"),
-        )
-    })?;
-
-    Ok(pprof_data)
-}
-
-#[cfg(not(feature = "jemalloc"))]
-pub async fn memory_pprof() -> Response {
-    (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json(serde_json::json!({"error": "Memory profiling is not available"})),
-    )
-        .into_response()
-}
-
-/// GET /api/debug/profile/flamegraph
-///
-/// Get a memory profile flamegraph in SVG format.
-/// Returns the SVG flamegraph directly in the response.
-///
-/// Returns: SVG image (image/svg+xml)
-#[cfg(feature = "jemalloc")]
-pub async fn memory_flamegraph() -> Result<impl IntoResponse, (StatusCode, String)> {
-    let prof_ctl = jemalloc_pprof::PROF_CTL.as_ref().ok_or_else(|| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Profiling controller not available".to_string(),
-        )
-    })?;
-
-    let mut prof_ctl = prof_ctl.lock().await;
-
-    if !prof_ctl.activated() {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Jemalloc profiling is not activated".to_string(),
-        ));
-    }
-
-    let svg_data = prof_ctl.dump_flamegraph().map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to dump flamegraph: {e}"),
-        )
-    })?;
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, "image/svg+xml")
-        .body(Body::from(svg_data))
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to build response: {e}"),
-            )
-        })
-}
-
-#[cfg(not(feature = "jemalloc"))]
-pub async fn memory_flamegraph() -> Response {
-    (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json(serde_json::json!({"error": "Memory profiling is not available"})),
-    )
-        .into_response()
-}
-
-/// GET /api/debug/profile/stats
+/// GET /debug/profile/stats
 ///
 /// Get current jemalloc memory statistics.
 ///
@@ -187,7 +84,6 @@ pub async fn memory_flamegraph() -> Response {
 /// - allocated: Current allocated memory (bytes)
 /// - resident: Current resident memory (bytes)
 /// - metadata: Metadata overhead (bytes)
-#[cfg(feature = "jemalloc")]
 pub async fn jemalloc_stats() -> Response {
     tikv_jemalloc_ctl::epoch::mib().unwrap().advance().unwrap();
 
@@ -212,11 +108,76 @@ pub async fn jemalloc_stats() -> Response {
     (StatusCode::OK, Json(stats)).into_response()
 }
 
-#[cfg(not(feature = "jemalloc"))]
-pub async fn jemalloc_stats() -> Response {
-    (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json(serde_json::json!({"error": "Jemalloc statistics not available. "})),
-    )
-        .into_response()
+/// Query parameters for CPU profiling
+#[derive(Deserialize)]
+pub struct CpuProfileQuery {
+    /// Duration in seconds to sample the CPU (default: 60)
+    #[serde(default = "default_duration")]
+    pub duration: u64,
+    /// Sampling frequency in Hz (default: 100)
+    #[serde(default = "default_frequency")]
+    pub frequency: i32,
+}
+
+fn default_duration() -> u64 {
+    60
+}
+
+fn default_frequency() -> i32 {
+    100
+}
+
+/// GET /debug/profile/cpu?duration=60&frequency=100
+///
+/// Generate a CPU profile by sampling the program for the specified duration.
+/// The profile is saved in pprof format for analysis with pprof tools.
+///
+/// Query Parameters:
+/// - duration: Sampling duration in seconds (default: 60)
+/// - frequency: Sampling frequency in Hz (default: 100)
+///
+/// Returns: Path to the generated profile file
+pub async fn cpu_profile(Query(params): Query<CpuProfileQuery>) -> Result<String, String> {
+    log::info!(
+        "Starting CPU profiling for {} seconds at {} Hz...",
+        params.duration,
+        params.frequency
+    );
+
+    // Create CPU profiler with the specified sampling frequency
+    let guard = ProfilerGuard::new(params.frequency).map_err(|e| e.to_string())?;
+
+    // Sample for the specified duration
+    tokio::time::sleep(std::time::Duration::from_secs(params.duration)).await;
+
+    // Build the report
+    let report = guard
+        .report()
+        .build()
+        .map_err(|e| format!("Failed to build report: {e}"))?;
+
+    // Use the configured cache directory with a profiling subdirectory
+    let cfg = get_config();
+    let profile_dir = format!("{}/profiling", cfg.common.data_cache_dir);
+
+    // Ensure the profiling directory exists
+    std::fs::create_dir_all(&profile_dir)
+        .map_err(|e| format!("Failed to create profile directory: {e}"))?;
+
+    // Generate filename with timestamp
+    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let filename = format!("{}/cpu_profile_{}.pb", profile_dir, timestamp);
+
+    // Create file and write pprof data
+    let mut file =
+        std::fs::File::create(&filename).map_err(|e| format!("Failed to create file: {e}"))?;
+
+    report
+        .pprof()
+        .map_err(|e| format!("Failed to convert to pprof: {e}"))?
+        .write_to_writer(&mut file)
+        .map_err(|e| format!("Failed to write profile: {e}"))?;
+
+    log::info!("CPU profile dumped to: {}", filename);
+    Ok(filename)
 }

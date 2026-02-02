@@ -22,18 +22,19 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["jemalloc"]
+default = []
 enterprise = []
 vectorscan = []
 cloud = []
 mimalloc = ["dep:mimalloc"]
-jemalloc = [
-    "dep:tikv-jemallocator",
+jemalloc = ["dep:tikv-jemallocator"]
+profiling = [
+    "jemalloc",
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
     "dep:jemalloc_pprof",
+    "dep:pprof",
 ]
-profiling = ["dep:pprof"]
 pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
 
