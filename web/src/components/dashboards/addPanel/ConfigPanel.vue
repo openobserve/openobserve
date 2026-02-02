@@ -1934,6 +1934,11 @@ import { useStore } from "vuex";
 
 import { markRaw, watchEffect, watch } from "vue";
 import {
+  convertPanelTimeRangeToPicker,
+  buildPanelTimeRange,
+  shouldUsePanelTime,
+} from "@/utils/dashboard/panelTimeUtils";
+import {
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
   shouldShowLegendType,
@@ -2651,33 +2656,9 @@ export default defineComponent({
     const panelTimeValue = ref<any>(null);
 
     // Helper function to convert panel_time_range to picker value format
-    const convertPanelTimeRangeToPicker = (panelTimeRange: any) => {
-      if (!panelTimeRange) return null;
-
-      const timeType = panelTimeRange.type || 'relative';
-
-      if (timeType === 'relative') {
-        return {
-          type: 'relative',
-          valueType: 'relative',
-          relativeTimePeriod: panelTimeRange.relativeTimePeriod,
-        };
-      } else {
-        return {
-          type: 'absolute',
-          valueType: 'absolute',
-          startTime: panelTimeRange.startTime,
-          endTime: panelTimeRange.endTime,
-        };
-      }
-    };
 
     // Initialize panel time picker value if panel already has individual time configured
-    if (
-      dashboardPanelData.data.config?.allow_panel_time &&
-      dashboardPanelData.data.config?.panel_time_mode === 'individual' &&
-      dashboardPanelData.data.config?.panel_time_range
-    ) {
+    if (shouldUsePanelTime(dashboardPanelData.data)) {
       panelTimeValue.value = convertPanelTimeRangeToPicker(
         dashboardPanelData.data.config.panel_time_range
       );
@@ -2686,23 +2667,8 @@ export default defineComponent({
     // Watch for changes to panel time picker and sync to config
     watch(panelTimeValue, (newValue) => {
       if (newValue && panelTimeMode.value === 'individual') {
-        // Store panel time range - ONLY save fields relevant to the type
-        const timeType = newValue.valueType || newValue.type;
-
-        if (timeType === 'relative') {
-          // For relative time, ONLY save type and relativeTimePeriod
-          dashboardPanelData.data.config.panel_time_range = {
-            type: 'relative',
-            relativeTimePeriod: newValue.relativeTimePeriod,
-          };
-        } else {
-          // For absolute time, ONLY save type, startTime, and endTime
-          dashboardPanelData.data.config.panel_time_range = {
-            type: 'absolute',
-            startTime: newValue.startTime,
-            endTime: newValue.endTime,
-          };
-        }
+        // Store panel time range using utility function
+        dashboardPanelData.data.config.panel_time_range = buildPanelTimeRange(newValue);
       }
     }, { deep: true });
 
