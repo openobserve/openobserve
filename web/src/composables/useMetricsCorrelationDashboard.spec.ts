@@ -158,6 +158,13 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should use source stream when coming from logs page", () => {
+      const logStreams: StreamInfo[] = [
+        {
+          stream_name: "default",
+          filters: { service_name: "api", env: "prod" },
+        },
+      ];
+
       const config: MetricsCorrelationConfig = {
         serviceName: "api-server",
         matchedDimensions: { service: "api", environment: "prod" },
@@ -176,17 +183,17 @@ describe("useMetricsCorrelationDashboard", () => {
         },
       };
 
-      const dashboard = composable.generateLogsDashboard([], config);
+      const dashboard = composable.generateLogsDashboard(logStreams, config);
 
       expect(dashboard).toBeDefined();
       expect(dashboard!.tabs[0].panels[0].queries[0].fields.stream).toBe("default");
 
-      // Should only use matched dimension values, not all available fields
+      // Should only use matched dimension values from API filters
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       expect(query).toContain('FROM "default"');
       expect(query).toContain("service_name = 'api'");
       expect(query).toContain("env = 'prod'");
-      expect(query).not.toContain("host = 'server01'"); // Not a matched dimension
+      expect(query).not.toContain("host = 'server01'"); // Not in API filters
     });
 
     it("should use correlated log streams from API", () => {
@@ -234,6 +241,18 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should filter out non-string values from filters", () => {
+      const logStreams: StreamInfo[] = [
+        {
+          stream_name: "default",
+          filters: {
+            service_name: "api",
+            port: 8080 as any, // Non-string value
+            enabled: true as any, // Non-string value
+            _timestamp: 123456 as any, // Internal field
+          },
+        },
+      ];
+
       const config: MetricsCorrelationConfig = {
         serviceName: "api-server",
         matchedDimensions: { service: "api" },
@@ -245,15 +264,9 @@ describe("useMetricsCorrelationDashboard", () => {
         },
         sourceStream: "default",
         sourceType: "logs",
-        availableDimensions: {
-          service_name: "api",
-          port: 8080 as any, // Non-string value
-          enabled: true as any, // Non-string value
-          _timestamp: 123456 as any, // Internal field
-        },
       };
 
-      const dashboard = composable.generateLogsDashboard([], config);
+      const dashboard = composable.generateLogsDashboard(logStreams, config);
 
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       // Should only include service_name (string, non-internal) in WHERE clause
