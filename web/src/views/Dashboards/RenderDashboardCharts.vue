@@ -1364,9 +1364,9 @@ export default defineComponent({
 
     // Get panel time from URL params
     const getPanelTimeFromURL = (panelId: string) => {
-      const relativeParam = route.query[`panel-time-${panelId}`];
-      const fromParam = route.query[`panel-time-${panelId}-from`];
-      const toParam = route.query[`panel-time-${panelId}-to`];
+      const relativeParam = route.query[`pt-${panelId}`];
+      const fromParam = route.query[`pt-${panelId}-from`];
+      const toParam = route.query[`pt-${panelId}-to`];
 
       if (relativeParam) {
         return {
@@ -1479,16 +1479,16 @@ export default defineComponent({
       const query = { ...route.query };
 
       // Remove old panel time params
-      delete query[`panel-time-${panelId}`];
-      delete query[`panel-time-${panelId}-from`];
-      delete query[`panel-time-${panelId}-to`];
+      delete query[`pt-${panelId}`];
+      delete query[`pt-${panelId}-from`];
+      delete query[`pt-${panelId}-to`];
 
       // Add new params based on type
       if (timeValue.relativeTimePeriod || timeValue.type === 'relative' || timeValue.valueType === 'relative') {
-        query[`panel-time-${panelId}`] = timeValue.relativeTimePeriod;
+        query[`pt-${panelId}`] = timeValue.relativeTimePeriod;
       } else if (timeValue.type === 'absolute' || timeValue.valueType === 'absolute' || (timeValue.startTime && timeValue.endTime)) {
-        query[`panel-time-${panelId}-from`] = timeValue.startTime.toString();
-        query[`panel-time-${panelId}-to`] = timeValue.endTime.toString();
+        query[`pt-${panelId}-from`] = timeValue.startTime.toString();
+        query[`pt-${panelId}-to`] = timeValue.endTime.toString();
       }
 
       await router.replace({ query });

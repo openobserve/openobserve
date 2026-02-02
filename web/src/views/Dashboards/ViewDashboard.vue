@@ -852,9 +852,9 @@ export default defineComponent({
 
     // Parse panel time from URL parameters
     const getPanelTimeFromURL = (panelId: string) => {
-      const relativeParam = route.query[`panel-time-${panelId}`];
-      const fromParam = route.query[`panel-time-${panelId}-from`];
-      const toParam = route.query[`panel-time-${panelId}-to`];
+      const relativeParam = route.query[`pt-${panelId}`];
+      const fromParam = route.query[`pt-${panelId}-from`];
+      const toParam = route.query[`pt-${panelId}-to`];
 
       if (relativeParam) {
         // Relative time from URL
@@ -925,8 +925,8 @@ export default defineComponent({
 
       // Check if panel has its own time configuration
       const hasPanelTime = targetPanel.config?.panel_time_range ||
-                           route.query[`panel-time-${panelId}`] ||
-                           route.query[`panel-time-${panelId}-from`];
+                           route.query[`pt-${panelId}`] ||
+                           route.query[`pt-${panelId}-from`];
 
       // Update only this panel's time in the object
       if (hasPanelTime) {
@@ -963,8 +963,8 @@ export default defineComponent({
           if (panel.id) {
             // Check if panel has its own time configuration
             const hasPanelTime = panel.config?.panel_time_range ||
-                                 route.query[`panel-time-${panel.id}`] ||
-                                 route.query[`panel-time-${panel.id}-from`];
+                                 route.query[`pt-${panel.id}`] ||
+                                 route.query[`pt-${panel.id}-from`];
 
             if (hasPanelTime) {
               // Panel has its own time → compute and store it
@@ -1222,7 +1222,7 @@ export default defineComponent({
       // When global refresh happens, we need to keep panel-specific time overrides
       const panelTimeParams: Record<string, any> = {};
       Object.keys(route.query).forEach((key) => {
-        if (key.startsWith("panel-time-")) {
+        if (key.startsWith("pt-")) {
           panelTimeParams[key] = route.query[key];
         }
       });
