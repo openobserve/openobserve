@@ -114,7 +114,7 @@ impl From<DashboardError> for Response {
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
         ("x-o2-mcp" = json!({
-            "description": "Create a dashboard with panels on a 192-column grid. Each panel needs layout: {x, y, w, h, i}. x=column position (0-191), y=row position, w=width, h=height, i=panel ID. Rules: (1) panels in same row must have same height, (2) side-by-side widths sum to ~192. Common sizes: full-width w=192, half w=96, third w=64, quarter w=48. Stack rows by adding previous h to y value. IMPORTANT: you MUST set the correct queryType based on the stream type.",
+            "description": "Create a dashboard with visualization panels. LAYOUT: 192-column grid with {x, y, w, h, i} where x=column(0-191), y=row, w=width, h=height, i=panel_id. Common widths: full=192, half=96, third=64. PANEL QUERIES: Each panel query needs 'fields' with x/y/z arrays populated EVEN when customQuery=true. AXIS RULES: x=dimension/time field, y=metric field(s), z=only for heatmaps(color intensity)/stacked-charts(breakdown field)/geo-maps(value). For most charts (line/area/bar/pie), leave z=[]. Use SELECT aliases as column values. Example: 'SELECT histogram(_timestamp) as ts, COUNT(*) as cnt' needs x=[{label:'ts',alias:'ts',column:'ts',aggregationFunction:null}], y=[{label:'cnt',alias:'cnt',column:'cnt',aggregationFunction:null}], z=[].",
             "category": "dashboards"
         }))
     )

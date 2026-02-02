@@ -381,7 +381,7 @@ pub fn proxy_routes(enable_auth: bool) -> Router {
         router = router.layer(middleware::from_fn(proxy_auth_middleware));
     }
 
-    router.layer(cors_layer())
+    router
 }
 
 /// Create basic routes (health, auth, etc.)
@@ -465,7 +465,7 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
-    router.layer(cors_layer())
+    router
 }
 
 /// Create config routes
@@ -476,7 +476,6 @@ pub fn config_routes() -> Router {
         .route("/logout", get(status::logout))
         .route("/runtime", get(status::config_runtime))
         .route("/reload", get(status::config_reload))
-        .layer(cors_layer())
 }
 
 #[cfg(feature = "enterprise")]
@@ -490,7 +489,6 @@ pub fn config_routes() -> Router {
         .route("/dex_login", get(status::dex_login))
         .route("/dex_refresh", get(status::refresh_token_with_dex))
         .route("/token", post(users::service_accounts::exchange_token))
-        .layer(cors_layer())
 }
 
 /// Create main API service routes
@@ -872,24 +870,22 @@ pub fn service_routes() -> Router {
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
         .layer(middleware::from_fn(auth_middleware))
-        .layer(middleware::from_fn(
-            move |mut request: Request, next: Next| {
-                let server = server.clone();
-                async move {
-                    request.headers_mut().insert(
-                        header::HeaderName::from_static("x-api-node"),
-                        header::HeaderValue::from_str(&server)
-                            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-                    );
-                    next.run(request).await
-                }
-            },
-        ))
-        .layer(cors_layer())
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,
         ))
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            let server = server.clone();
+            async move {
+                let mut response = next.run(request).await;
+                response.headers_mut().insert(
+                    header::HeaderName::from_static("x-api-node"),
+                    header::HeaderValue::from_str(&server)
+                        .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+                );
+                response
+            }
+        }))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -925,7 +921,6 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
-        .layer(cors_layer())
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,
