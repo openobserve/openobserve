@@ -78,9 +78,9 @@ fn initialize_usage_queue() -> ReportingQueue {
     // marketplace image must report usage more frequently (30 sec max)
     // enterprise has 10 min max for usage calculations
     #[cfg(feature = "marketplace")]
-    let usage_publish_interval = 30_u64.min(cfg.common.usage_publish_interval);
+    let usage_publish_interval = 30_i64.min(cfg.common.usage_publish_interval);
     #[cfg(all(feature = "enterprise", not(feature = "marketplace")))]
-    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    let usage_publish_interval = (10_i64 * 60).min(cfg.common.usage_publish_interval);
     #[cfg(not(feature = "enterprise"))]
     let usage_publish_interval = cfg.common.usage_publish_interval;
 

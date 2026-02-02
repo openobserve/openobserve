@@ -452,7 +452,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         use infra::cluster::get_cached_nodes;
 
-        use crate::service::self_reporting::{ingest_data_retention_usages, search::get_usage};
+        use crate::service::self_reporting::search::get_usage;
+        #[cfg(feature = "cloud")]
+        use crate::service::self_reporting::ingest_data_retention_usages;
 
         #[cfg(feature = "marketplace")]
         tokio::spawn(async move {
@@ -483,9 +485,26 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 interval.tick().await;
             }
         });
-        o2_enterprise::enterprise::metering::init(get_usage, ingest_data_retention_usages)
-            .await
-            .expect("cloud usage metering job init failed");
+
+        // Marketplace mode: only get_usage_fn is used, lock and data retention are no-ops
+        #[cfg(feature = "marketplace")]
+        o2_enterprise::enterprise::metering::init(
+            || async { Ok(Some(())) }, // lock not used in marketplace init
+            get_usage,
+            |_| async {}, // data retention not used in marketplace
+        )
+        .await
+        .expect("marketplace metering job init failed");
+
+        // Cloud mode: all functions are used
+        #[cfg(all(feature = "cloud", not(feature = "marketplace")))]
+        o2_enterprise::enterprise::metering::init(
+            || async { Ok(Some(())) }, // lock handled separately in cloud mode
+            get_usage,
+            ingest_data_retention_usages,
+        )
+        .await
+        .expect("cloud usage metering job init failed");
 
         // run these cloud jobs only in alert manager
         #[cfg(feature="cloud")]
