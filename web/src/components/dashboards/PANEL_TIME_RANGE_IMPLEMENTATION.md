@@ -352,6 +352,54 @@ function getEffectiveTimeForPanel(panel, dashboard) {
 - Panel refreshes with new time range data
 - Picker closes (standard behavior)
 
+### Variables and Time Range Usage
+
+**IMPORTANT:** Variables should use the appropriate time range based on their scope:
+
+#### Panel-Level Variables
+- **Use panel-level date time** when the panel has individual time configured
+- If panel has `panel_time_range` (individual time mode), panel variables query using that panel's time
+- This ensures panel variables are consistent with the panel's data time range
+
+#### Tab-Level Variables
+- **Use global date time** from `defaultDatetimeDuration`
+- Tab variables apply to all panels in that tab
+- Since panels in a tab can have different times, tab variables use the global time as reference
+
+#### Global Variables
+- **Use global date time** from `defaultDatetimeDuration`
+- Global variables apply to entire dashboard
+- Always use global time for consistency across all panels
+
+**Example Logic:**
+```javascript
+function getTimeRangeForVariable(variable, panel, dashboard) {
+  if (variable.scope === 'panel') {
+    // Panel-level variable: use panel's effective time
+    if (panel.config.panel_time_range && panel.config.panel_time_mode === 'individual') {
+      return panel.config.panel_time_range;  // Panel's individual time
+    }
+  }
+
+  // Tab-level or global variable: always use global time
+  return dashboard.defaultDatetimeDuration;  // Global time
+}
+```
+
+**Behavior Summary:**
+| Variable Scope | Time Range Used | Reason |
+|---------------|----------------|---------|
+| Panel-level | Panel's individual time (if set) | Consistency with panel data |
+| Panel-level | Global time (if panel uses global) | Panel follows global |
+| Tab-level | Global time | Applies to multiple panels |
+| Global | Global time | Applies to entire dashboard |
+
+**Key Benefits:**
+- ✅ **Consistency:** Panel variables match panel data time range
+- ✅ **Clarity:** Global/tab variables always use global time as reference
+- ✅ **Predictable:** Users understand which time range affects their variables
+- ✅ **Flexible:** Panels with individual time have their variables query the same time period
+
 ---
 
 ## Proposed Solution
@@ -2089,7 +2137,9 @@ To enable reliable E2E testing and distinguish between multiple date time picker
 
 Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress, or similar testing frameworks.
 
-**Total E2E Test Cases: 45** (E2E-046 and E2E-047 removed - yellow icon behavior not implemented)
+**Total E2E Test Cases: 47**
+
+**Note:** Original E2E-046 and E2E-047 (yellow icon behavior) were removed and replaced with new tests for variable time range behavior.
 
 #### Category 1: Basic Configuration (8 test cases)
 
@@ -2251,14 +2301,16 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 
 **E2E-018: Panel Time Picker with Variables**
 - Load dashboard with panel having:
-  - Panel-level time enabled
+  - Panel-level time enabled (individual time: "Last 1h")
   - Panel-level variables
-- Both variable selector and time picker visible in panel header
+- Both variable selector and time picker visible in panel area
 - Change variable value
 - Verify panel refreshes with new variable
-- Change panel time
+- **Verify panel variable query uses panel's individual time (Last 1h)**
+- Change panel time to "Last 7d"
 - Verify panel refreshes with new time
-- Both work independently
+- **Verify panel variable query now uses new panel time (Last 7d)**
+- Both work independently but variables use panel's effective time
 
 ---
 
@@ -2464,7 +2516,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 
 ---
 
-#### Category 6: Dashboard Operations (5 test cases)
+#### Category 6: Dashboard Operations & Variables (7 test cases)
 
 **E2E-041: Export Dashboard with Panel Times**
 - Configure multiple panels with different times
@@ -2509,6 +2561,37 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Print or export to PDF
 - Verify output shows panel times
 
+**E2E-046: Panel Variable Uses Panel Time Range**
+- Setup:
+  - Global time: "Last 15m"
+  - Panel A: Individual time "Last 1h" with panel-level variable
+  - Panel B: Uses global time with panel-level variable
+- Change Panel A's panel variable value
+- **Verify Panel A variable query uses "Last 1h"** (panel's individual time)
+- **Verify API request contains panel's time range, not global**
+- Change Panel B's panel variable value
+- **Verify Panel B variable query uses "Last 15m"** (global time, since panel follows global)
+- Change Panel A's time to "Last 7d"
+- Change Panel A's variable again
+- **Verify Panel A variable query now uses "Last 7d"** (new panel time)
+
+**E2E-047: Tab and Global Variables Use Global Time**
+- Setup:
+  - Global time: "Last 15m"
+  - Tab 1: Has tab-level variable
+  - Tab 1 Panel A: Individual time "Last 1h"
+  - Tab 1 Panel B: Individual time "Last 7d"
+  - Dashboard: Has global variable
+- Change tab-level variable value
+- **Verify tab variable query uses "Last 15m"** (global time, not panel times)
+- **Verify tab variable applies to all panels in tab regardless of their individual times**
+- Change global variable value
+- **Verify global variable query uses "Last 15m"** (global time)
+- **Verify global variable applies to all panels in all tabs**
+- Change global time to "Last 1h"
+- Change tab variable again
+- **Verify tab variable query now uses "Last 1h"** (new global time)
+- Both Panel A and Panel B still use their individual times for panel data
 
 ---
 
@@ -2519,22 +2602,23 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 **Test Organization:**
 ```
 tests/ui-testing/playwright-tests/Dashboards/
-  ├── dashboard-panel-time-configuration.spec.js    (E2E-001 to E2E-008)
-  ├── dashboard-panel-time-view-mode.spec.js        (E2E-009 to E2E-018)
-  ├── dashboard-panel-time-url-sync.spec.js         (E2E-019 to E2E-028)
-  ├── dashboard-panel-time-priority.spec.js         (E2E-029 to E2E-035)
-  ├── dashboard-panel-time-fullscreen.spec.js       (E2E-036 to E2E-040)
-  └── dashboard-panel-time-operations.spec.js       (E2E-041 to E2E-045)
+  ├── dashboard-panel-time-configuration.spec.js    (E2E-001 to E2E-008)  [8 tests]
+  ├── dashboard-panel-time-view-mode.spec.js        (E2E-009 to E2E-018)  [10 tests]
+  ├── dashboard-panel-time-url-sync.spec.js         (E2E-019 to E2E-028)  [10 tests]
+  ├── dashboard-panel-time-priority.spec.js         (E2E-029 to E2E-035)  [7 tests]
+  ├── dashboard-panel-time-fullscreen.spec.js       (E2E-036 to E2E-040)  [5 tests]
+  └── dashboard-panel-time-operations.spec.js       (E2E-041 to E2E-047)  [7 tests]
 ```
 
 **Test Data Setup:**
 - Create test dashboard with 10+ panels
 - Configure various panel time settings
+- Configure panel-level, tab-level, and global variables
 - Prepare test URLs with parameters
 - Setup test data in backend (if needed)
 
 **Execution Time Estimate:**
-- 45 test cases × ~2 minutes average = ~90 minutes total
+- 47 test cases × ~2 minutes average = ~94 minutes total
 - Parallel execution: ~20-25 minutes (with 3-4 workers)
 
 **CI/CD Integration:**
@@ -2863,14 +2947,16 @@ if (panel.config.panel_time_range) {
 **Code Changes:**
 - Backend: 1 file (~15 lines)
 - Frontend: 7 files (~690 lines) - **Reuses existing time conversion functions**
-- Tests: 6 E2E test files (45 tests)
-- **Total**: ~705 lines of code + 45 E2E tests
+- Variable Logic: Update to support panel/tab/global time range usage
+- Tests: 6 E2E test files (47 tests)
+- **Total**: ~705 lines of code + 47 E2E tests
 
 **Time Estimate:**
-- Development: 11 days
-- E2E Testing: 3 days
-- Documentation: 1 day
-- **Total**: 14 days (2 weeks + 4 days)
+- Development: 11 days (completed)
+- Variable Time Logic: 1 day (pending)
+- E2E Testing: 3 days (pending)
+- Documentation: 1 day (completed)
+- **Total**: 16 days
 
 **Test Coverage:**
 - **Category 1**: Configuration (8 E2E tests)
@@ -2878,7 +2964,7 @@ if (panel.config.panel_time_range) {
 - **Category 3**: URL Parameters (10 E2E tests)
 - **Category 4**: Priority System (7 E2E tests)
 - **Category 5**: View Panel & Full Screen (5 E2E tests)
-- **Category 6**: Dashboard Operations (5 E2E tests)
+- **Category 6**: Dashboard Operations & Variables (7 E2E tests)
 - **Unit Tests**: Not needed - reusing existing tested time conversion functions
 
 ### Features Included
@@ -2921,38 +3007,46 @@ if (panel.config.panel_time_range) {
    - Print mode shows panel times
    - Refresh respects panel times
 
+8. **Variables and Time Range**
+   - Panel-level variables use panel's individual time (if configured)
+   - Tab-level variables always use global time
+   - Global variables always use global time
+   - Ensures consistency between variable queries and panel data
+
 ---
 
-**Document Version:** 4.0 (Complete with E2E Tests & View/Fullscreen)
-**Last Updated:** 2026-01-30
-**Status:** ✅ Ready for Implementation
+**Document Version:** 3.1 (Updated - Reflects Actual Implementation + Variable Time Range)
+**Last Updated:** 2026-02-02
+**Status:** Implementation Complete - E2E Tests Pending
 **Location:** `d:\openobserve\web\src\components\dashboards\PANEL_TIME_RANGE_IMPLEMENTATION.md`
 
 ### Quick Reference
 
-**45 E2E Test Cases Breakdown:**
+**47 E2E Test Cases Breakdown:**
 - Basic Configuration: 8 tests
 - View Mode Picker: 10 tests
 - URL Parameters: 10 tests
 - Priority System: 7 tests
 - View Panel & Full Screen: 5 tests
-- Dashboard Operations: 5 tests
+- Dashboard Operations & Variables: 7 tests
 
 **Estimated E2E Test Execution Time:**
-- Full suite: ~90 minutes sequential
+- Full suite: ~94 minutes sequential
 - Parallel (4 workers): ~20-25 minutes
 
 **Implementation Status:**
 - ✅ Backend: Complete (schema changes in mod.rs)
 - ✅ Frontend: Complete (all 7 files updated)
 - ✅ Data-test attributes: Added for E2E testing
-- ⏳ E2E Tests: **Pending Implementation** (45 tests to be written)
+- ✅ Variables time range logic: Documented and ready for implementation
+- ⏳ E2E Tests: **Pending Implementation** (47 tests to be written)
 
 **Next Steps:**
-1. Implement E2E tests starting with 9 critical path tests
-2. Run tests to validate implementation
-3. Complete remaining 36 E2E tests
-4. Update documentation with any additional findings
+1. Implement variable time range logic (panel variables use panel time, tab/global use global time)
+2. Implement E2E tests starting with 9 critical path tests
+3. Run tests to validate implementation
+4. Complete remaining 38 E2E tests (including 2 new variable tests)
+5. Update documentation with any additional findings
 
 ---
 
@@ -2969,9 +3063,16 @@ if (panel.config.panel_time_range) {
 - i18n translations (11 languages)
 - Data-test attributes for testing
 
+### 🔄 In Progress
+- **Variables Time Range Logic**
+  - Panel-level variables should use panel's individual time
+  - Tab-level and global variables should use global time
+  - Implementation: Update variable query logic to check panel time
+
 ### ⏳ Pending
-- **E2E Test Implementation** (45 tests)
+- **E2E Test Implementation** (47 tests)
   - Priority: Start with 9 "Must-Have" critical path tests
+  - New: E2E-046 and E2E-047 test variable time range behavior
   - Framework: Playwright (existing in project)
   - Files: 6 spec files in `tests/ui-testing/playwright-tests/Dashboards/`
 
