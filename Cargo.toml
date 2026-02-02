@@ -28,7 +28,13 @@ vectorscan = []
 cloud = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
-profiling = ["dep:pprof"]
+profiling = [
+    "jemalloc",
+    "dep:tikv-jemalloc-ctl",
+    "dep:tikv-jemalloc-sys",
+    "dep:jemalloc_pprof",
+    "dep:pprof",
+]
 pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
 
@@ -147,7 +153,27 @@ strum.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 time.workspace = true
-tikv-jemallocator = { version = "0.6", optional = true }
+tikv-jemallocator = { version = "0.6", optional = true, features = [
+    "profiling",
+    "stats",
+    "unprefixed_malloc_on_supported_platforms",
+] }
+tikv-jemalloc-ctl = { version = "0.6", optional = true, features = [
+    "use_std",
+    "stats",
+    "profiling",
+] }
+tikv-jemalloc-sys = { version = "0.6", optional = true, features = [
+    "profiling",
+] }
+jemalloc_pprof = { version = "0.8", optional = true, features = [
+    "symbolize",
+    "flamegraph",
+] }
+pprof = { version = "0.14", optional = true, features = [
+    "flamegraph",
+    "protobuf-codec",
+] }
 tokio.workspace = true
 console-subscriber = { version = "0.4", optional = true }
 tonic.workspace = true
@@ -179,10 +205,6 @@ tantivy-fst.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
 tokio-util = "0.7.13"
-pprof = { version = "0.15.0", features = [
-    "flamegraph",
-    "prost-codec",
-], optional = true }
 tokio-stream.workspace = true
 mime = "0.3.17"
 pin-project-lite.workspace = true
@@ -283,9 +305,9 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "52.0.0"
-datafusion-proto = "52.0.0"
-datafusion-functions-aggregate-common = "52.0.0"
+datafusion = "52"
+datafusion-proto = "52"
+datafusion-functions-aggregate-common = "52"
 datafusion-functions-json = "0.52.0"
 expect-test = "1.4"
 arrow = { version = "57.1.0", features = ["ipc_compression", "prettyprint"] }

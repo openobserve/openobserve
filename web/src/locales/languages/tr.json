@@ -2358,7 +2358,8 @@
     "openFields": "Açık Alanlar",
     "timeRangeUpdated": "Seçilen zaman aralığı bu izi içermiyordu. Zaman aralığı, izlemenin zaman damgasıyla eşleşecek şekilde güncellendi.",
     "fetchingMoreTraces": "Daha fazla iz getiriyor...",
-    "showErrorOnly": "Yalnızca Hatayı Göster"
+    "showErrorOnly": "Yalnızca Hatayı Göster",
+    "openInTraces": "Traces'te aç"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

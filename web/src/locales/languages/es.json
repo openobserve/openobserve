@@ -2356,7 +2356,8 @@
     "openFields": "Campos abiertos",
     "timeRangeUpdated": "El intervalo de tiempo seleccionado no incluía este seguimiento. El intervalo de tiempo se actualizó para que coincida con la marca de tiempo del rastreo.",
     "fetchingMoreTraces": "Buscando más rastros...",
-    "showErrorOnly": "Mostrar solo error"
+    "showErrorOnly": "Mostrar solo error",
+    "openInTraces": "Abrir en Traces"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",

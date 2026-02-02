@@ -2358,7 +2358,8 @@
     "openFields": "오픈 필드",
     "timeRangeUpdated": "선택한 시간 범위에는 이 추적이 포함되지 않았습니다.트레이스의 타임스탬프와 일치하도록 시간 범위가 업데이트되었습니다.",
     "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중...",
-    "showErrorOnly": "오류만 보기"
+    "showErrorOnly": "오류만 보기",
+    "openInTraces": "오픈 인 트레이스"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
