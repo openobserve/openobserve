@@ -30,15 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Deploy all AWS services in one click. This CloudFormation stack sets up comprehensive monitoring across your entire AWS infrastructure.
             </p>
 
-            <q-banner v-if="comingSoonNotice" class="tw:mb-4 notice-banner" rounded dense>
-              <template v-slot:avatar>
-                <q-icon name="info" color="info" size="sm" />
-              </template>
-              <span class="tw:text-xs">
-                Currently includes CloudTrail, WAF, and ALB. Additional services will be added soon.
-              </span>
-            </q-banner>
-
             <div class="tw:flex tw:gap-2 tw:mt-4">
               <q-btn
                 color="primary"
@@ -68,25 +59,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator />
           <q-card-section class="tw:pt-4">
             <div class="tw:text-sm details-section">
-              <h6 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title">What You'll Get</h6>
+              <h6 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title">
+                Included AWS Services ({{ includedServices.length }})
+              </h6>
 
               <div class="tw:mb-4">
-                <div class="tw:space-y-1">
-                  <div class="tw:flex tw:items-start tw:gap-2">
-                    <q-icon name="dashboard" size="xs" class="tw:mt-0.5" />
-                    <span class="tw:text-sm benefit-text">Pre-built dashboards for all services</span>
-                  </div>
-                  <div class="tw:flex tw:items-start tw:gap-2">
-                    <q-icon name="security" size="xs" class="tw:mt-0.5" />
-                    <span class="tw:text-sm benefit-text">Security monitoring (CloudTrail, WAF)</span>
-                  </div>
-                  <div class="tw:flex tw:items-start tw:gap-2">
-                    <q-icon name="speed" size="xs" class="tw:mt-0.5" />
-                    <span class="tw:text-sm benefit-text">Performance insights (ALB, CloudWatch)</span>
-                  </div>
-                  <div class="tw:flex tw:items-start tw:gap-2">
-                    <q-icon name="network_check" size="xs" class="tw:mt-0.5" />
-                    <span class="tw:text-sm benefit-text">Network analysis (VPC Flow Logs)</span>
+                <div class="row q-col-gutter-sm">
+                  <div
+                    v-for="service in includedServices"
+                    :key="service.name"
+                    class="col-12 col-sm-6"
+                  >
+                    <div class="service-item tw:p-2 tw:rounded tw:border">
+                      <div class="tw:flex tw:items-start tw:gap-2">
+                        <q-icon
+                          :name="getCategoryIcon(service.category)"
+                          size="sm"
+                          class="tw:mt-0.5"
+                          color="primary"
+                        />
+                        <div class="tw:flex-1">
+                          <div class="tw:font-medium tw:text-sm service-name">
+                            {{ service.name }}
+                          </div>
+                          <div class="tw:text-xs tw:mt-0.5 service-description">
+                            {{ service.description }}
+                          </div>
+                          <div class="tw:text-xs tw:mt-1 service-category">
+                            {{ formatCategory(service.category) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -129,11 +133,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import { generateCloudFormationURL } from "@/utils/awsIntegrations";
+import { generateCloudFormationURL, awsIntegrations } from "@/utils/awsIntegrations";
 import segment from "@/services/segment_analytics";
 
 export default defineComponent({
@@ -142,7 +146,6 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const showDetails = ref(false);
-    const comingSoonNotice = ref(true);
 
     // Get endpoint information during setup
     let endpoint: any = null;
@@ -153,20 +156,35 @@ export default defineComponent({
       console.error("Error getting endpoint during setup:", e);
     }
 
-    const includedServices = [
-      { name: "CloudTrail", category: "Security" },
-      { name: "WAF", category: "Security" },
-      { name: "Application Load Balancer", category: "Networking" },
-      { name: "VPC Flow Logs", category: "Networking" },
-      { name: "CloudWatch Logs", category: "Logs" },
-      { name: "CloudWatch Metrics", category: "Metrics" },
-      { name: "Lambda", category: "Compute" },
-      { name: "API Gateway", category: "API" },
-      { name: "RDS", category: "Database" },
-      { name: "DynamoDB", category: "Database" },
-      { name: "S3 Access Logs", category: "Storage" },
-      { name: "CloudFront", category: "CDN" },
-    ];
+    // Get all services with CloudFormation templates
+    const includedServices = computed(() => {
+      return awsIntegrations
+        .filter(integration =>
+          integration.cloudFormationTemplate ||
+          (integration.cloudFormationTemplates && integration.cloudFormationTemplates.length > 0)
+        )
+        .map(integration => ({
+          name: integration.displayName,
+          description: integration.description,
+          category: integration.category,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    const getCategoryIcon = (category: string) => {
+      const iconMap: Record<string, string> = {
+        'logs': 'description',
+        'metrics': 'speed',
+        'security': 'security',
+        'networking': 'network_check',
+        'other': 'settings',
+      };
+      return iconMap[category] || 'cloud';
+    };
+
+    const formatCategory = (category: string) => {
+      return category.charAt(0).toUpperCase() + category.slice(1);
+    };
 
     const handleDeployStack = () => {
       try {
@@ -232,7 +250,7 @@ export default defineComponent({
         // Track analytics
         segment.track("AWS Complete Integration Started", {
           integration_type: "complete",
-          services_count: includedServices.length,
+          services_count: includedServices.value.length,
         });
 
         q.notify({
@@ -252,9 +270,10 @@ export default defineComponent({
 
     return {
       showDetails,
-      comingSoonNotice,
       includedServices,
       handleDeployStack,
+      getCategoryIcon,
+      formatCategory,
     };
   },
 });
@@ -267,20 +286,41 @@ export default defineComponent({
     margin: 0 auto;
   }
 
+  .service-item {
+    transition: all 0.2s ease;
+  }
+
   .body--light & {
     .title {
       color: #1a1a1a;
     }
 
     .description,
-    .service-name,
     .benefit-text,
     .detail-value {
       color: #666;
     }
 
+    .service-name {
+      color: #1a1a1a;
+    }
+
+    .service-description {
+      color: #666;
+    }
+
     .service-category {
       color: #999;
+      font-weight: 500;
+    }
+
+    .service-item {
+      border: 1px solid #e0e0e0;
+      background-color: #fafafa;
+
+      &:hover {
+        background-color: #f5f5f5;
+      }
     }
 
     .section-header,
@@ -300,14 +340,31 @@ export default defineComponent({
     }
 
     .description,
-    .service-name,
     .benefit-text,
     .detail-value {
       color: #b0b0b0;
     }
 
+    .service-name {
+      color: #e0e0e0;
+    }
+
+    .service-description {
+      color: #b0b0b0;
+    }
+
     .service-category {
       color: #808080;
+      font-weight: 500;
+    }
+
+    .service-item {
+      border: 1px solid #404040;
+      background-color: rgba(255, 255, 255, 0.05);
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+      }
     }
 
     .section-header,

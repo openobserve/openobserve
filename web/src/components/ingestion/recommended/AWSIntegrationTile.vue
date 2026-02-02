@@ -25,6 +25,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
         </div>
+        <q-btn
+          v-if="integration.documentationUrl"
+          flat
+          dense
+          round
+          size="sm"
+          icon="description"
+          color="primary"
+          @click="handleDocumentation()"
+          class="docs-btn"
+          :data-test="`aws-${integration.id}-docs-btn`"
+        >
+          <q-tooltip>View Documentation</q-tooltip>
+        </q-btn>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
         {{ integration.description }}
@@ -42,28 +56,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex-1"
         :data-test="`aws-${integration.id}-add-source-btn`"
       />
-      <!-- Documentation Button -->
+      <!-- Documentation Button (only shown if no CloudFormation) -->
       <q-btn
-        v-if="integration.documentationUrl"
-        :color="hasCloudFormation ? 'grey-7' : 'primary'"
-        :outline="hasCloudFormation"
-        :unelevated="!hasCloudFormation"
-        icon="description"
-        label="Docs"
+        v-else-if="integration.documentationUrl"
+        color="primary"
+        label="Documentation"
         @click="handleDocumentation()"
+        unelevated
         class="tw:flex-1"
         :data-test="`aws-${integration.id}-documentation-btn`"
       />
-      <!-- Dashboard Button -->
+      <!-- Add Dashboard Button -->
       <q-btn
         outline
         color="primary"
-        icon="dashboard"
-        label="Dashboard"
-        @click="handleDashboard"
-        :disable="!integration.hasDashboard"
+        label="Add Dashboard"
+        @click="handleAddDashboard"
+        :disable="!integration.hasDashboard || !integration.dashboardGithubUrl"
         class="tw:flex-1"
-        :data-test="`aws-${integration.id}-dashboard-btn`"
+        :data-test="`aws-${integration.id}-add-dashboard-btn`"
       />
     </q-card-actions>
 
@@ -163,6 +174,7 @@ import type { AWSIntegration, CloudFormationTemplate, ComponentOption } from "@/
 import { generateCloudFormationURL, generateDashboardURL } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
+import dashboardsService from "@/services/dashboards";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 
@@ -338,38 +350,196 @@ export default defineComponent({
       }
     };
 
-    const handleDashboard = () => {
-      if (!props.integration.hasDashboard) {
+    const ensureIntegrationsFolderExists = async (orgId: string) => {
+      try {
+        // Get all folders
+        const foldersResponse = await dashboardsService.list_Folders(orgId);
+        const folders = foldersResponse.data?.list || [];
+
+        // Check if "AWS" folder exists
+        let awsFolder = folders.find((f: any) => f.name === 'AWS');
+
+        if (!awsFolder) {
+          // Create "AWS" folder
+          const createResponse = await dashboardsService.new_Folder(orgId, {
+            name: 'AWS',
+            description: 'AWS service dashboards',
+          });
+          awsFolder = createResponse.data;
+        }
+
+        return awsFolder.folderId;
+      } catch (error) {
+        console.error("Error ensuring folders exist:", error);
+        throw error;
+      }
+    };
+
+    const importDashboard = async (dashboardJson: any, folderId: string, orgId: string, existingDashboardId?: string) => {
+      // If replacing existing dashboard, delete it first
+      if (existingDashboardId) {
+        try {
+          console.log('Attempting to delete dashboard:', {
+            orgId,
+            dashboardId: existingDashboardId,
+            folderId
+          });
+          const deleteResponse = await dashboardsService.delete(orgId, existingDashboardId, folderId);
+          console.log('Delete response:', deleteResponse);
+          // Wait a moment to ensure deletion completes
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (deleteError) {
+          console.error("Error deleting existing dashboard:", deleteError);
+          throw new Error(`Failed to delete existing dashboard: ${deleteError instanceof Error ? deleteError.message : 'Unknown error'}`);
+        }
+      }
+
+      // Import dashboard
+      console.log('Creating dashboard:', { orgId, folderId, title: dashboardJson.title });
+      await dashboardsService.create(orgId, dashboardJson, folderId);
+    };
+
+    const handleAddDashboard = async () => {
+      if (!props.integration.hasDashboard || !props.integration.dashboardGithubUrl) {
         return;
       }
 
       try {
-        const organizationId = store.state.selectedOrganization.identifier;
+        const orgId = store.state.selectedOrganization.identifier;
 
-        // Get the base URL from current location
-        const baseURL = `${window.location.protocol}//${window.location.host}`;
+        // Step 1: Ensure folders exist
+        const folderId = await ensureIntegrationsFolderExists(orgId);
 
-        // Generate dashboard URL
-        const dashboardURL = generateDashboardURL(
-          props.integration,
-          organizationId,
-          baseURL
+        // Step 2: Download dashboard JSON to get the actual title
+        const response = await fetch(props.integration.dashboardGithubUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
+        }
+        const dashboardJson = await response.json();
+        const dashboardTitle = dashboardJson.title || props.integration.displayName;
+
+        // Step 3: Check if dashboard already exists by listing all dashboards in the folder
+        const dashboardsResponse = await dashboardsService.list(
+          0,
+          1000,
+          'name',
+          false,
+          '',
+          orgId,
+          folderId,
+          ''
         );
 
+        const existingDashboard = dashboardsResponse.data?.dashboards?.find(
+          (d: any) => d.title === dashboardTitle
+        );
+
+        // Get dashboard ID - could be dashboardId, dashboard_id, or id
+        const existingDashboardId = existingDashboard?.dashboardId || existingDashboard?.dashboard_id || existingDashboard?.id;
+
+        console.log('Dashboard check:', {
+          dashboardTitle,
+          allDashboards: dashboardsResponse.data?.dashboards,
+          existingDashboard,
+          existingDashboardId
+        });
+
+        if (existingDashboard) {
+          // Ask user if they want to replace the existing dashboard
+          q.dialog({
+            title: 'Dashboard Already Exists',
+            message: `A dashboard for ${props.integration.displayName} already exists. Do you wish to replace it?`,
+            cancel: {
+              label: 'Cancel',
+              flat: true,
+              color: 'primary'
+            },
+            ok: {
+              label: 'Replace',
+              flat: true,
+              color: 'negative'
+            },
+            persistent: true
+          }).onOk(async () => {
+            // User chose to replace
+            const loadingNotif = q.notify({
+              type: 'ongoing',
+              message: 'Replacing dashboard...',
+              timeout: 0,
+              spinner: true,
+            });
+
+            try {
+              await importDashboard(dashboardJson, folderId, orgId, existingDashboardId);
+
+              loadingNotif();
+              q.notify({
+                type: 'positive',
+                message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
+                timeout: 5000,
+                actions: [
+                  {
+                    label: 'View Dashboard',
+                    color: 'white',
+                    handler: () => router.push(`/dashboards?org_identifier=${orgId}`)
+                  }
+                ]
+              });
+
+              // Track analytics
+              segment.track("AWS Dashboard Replaced", {
+                service: props.integration.name,
+                integration_id: props.integration.id,
+              });
+            } catch (error) {
+              loadingNotif();
+              console.error("Error replacing dashboard:", error);
+              q.notify({
+                type: 'negative',
+                message: `Failed to replace dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timeout: 5000,
+              });
+            }
+          });
+          return;
+        }
+
+        // No existing dashboard, proceed with import
+        const loadingNotif = q.notify({
+          type: 'ongoing',
+          message: 'Importing dashboard...',
+          timeout: 0,
+          spinner: true,
+        });
+
+        await importDashboard(dashboardJson, folderId, orgId);
+
+        loadingNotif();
+        q.notify({
+          type: 'positive',
+          message: `Dashboard for ${props.integration.displayName} imported successfully!`,
+          timeout: 5000,
+          actions: [
+            {
+              label: 'View Dashboard',
+              color: 'white',
+              handler: () => router.push(`/dashboards?org_identifier=${orgId}`)
+            }
+          ]
+        });
+
         // Track analytics
-        segment.track("AWS Dashboard Opened", {
+        segment.track("AWS Dashboard Imported", {
           service: props.integration.name,
           integration_id: props.integration.id,
         });
 
-        // Navigate to dashboard
-        router.push(`/dashboards?org_identifier=${organizationId}`);
       } catch (error) {
-        console.error("Error navigating to dashboard:", error);
+        console.error("Error importing dashboard:", error);
         q.notify({
-          type: "negative",
-          message: "Error opening dashboard. Please try again.",
-          timeout: 3000,
+          type: 'negative',
+          message: `Failed to import dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timeout: 5000,
         });
       }
     };
@@ -392,7 +562,7 @@ export default defineComponent({
 
     return {
       handleAddSource,
-      handleDashboard,
+      handleAddDashboard,
       handleDocumentation,
       handleTemplateSelection,
       handleComponentSelection,
@@ -466,7 +636,7 @@ export default defineComponent({
     margin-top: auto;
   }
 
-  .info-btn {
+  .docs-btn {
     opacity: 0.7;
     transition: opacity 0.2s ease;
 
