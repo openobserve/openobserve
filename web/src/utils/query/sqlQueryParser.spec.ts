@@ -279,5 +279,62 @@ describe("sqlQueryParser", () => {
       expect(result.y).toEqual([]);
       expect(result.breakdown).toEqual([]);
     });
+
+    it("should move first breakdown field to x-axis when x-axis is empty", () => {
+      // Simulates: SELECT count(_timestamp) as "y_axis_1", k8s_namespace_name as "x_axis_1" FROM "default"
+      // where k8s_namespace_name is classified as breakdown (no aggregation function)
+      const parsed = {
+        stream: "default",
+        streamType: "logs",
+        xFields: [], // No histogram/timeseries field
+        yFields: [{ column: "_timestamp", alias: "y_axis_1", aggregationFunction: "count" }],
+        breakdownFields: [
+          { column: "k8s_namespace_name", alias: "x_axis_1", aggregationFunction: null },
+          { column: "k8s_pod_name", alias: "x_axis_2", aggregationFunction: null },
+        ],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        customQuery: false,
+        rawQuery: 'SELECT count(_timestamp) as "y_axis_1", k8s_namespace_name as "x_axis_1", k8s_pod_name as "x_axis_2" FROM "default"',
+      };
+
+      const result = parsedQueryToPanelFields(parsed);
+
+      // First breakdown field should be moved to x-axis
+      expect(result.x.length).toBe(1);
+      expect(result.x[0].column).toBe("k8s_namespace_name");
+      expect(result.x[0].alias).toBe("x_axis_1");
+
+      // Y-axis should remain unchanged
+      expect(result.y.length).toBe(1);
+      expect(result.y[0].column).toBe("_timestamp");
+
+      // Remaining breakdown fields should stay in breakdown
+      expect(result.breakdown.length).toBe(1);
+      expect(result.breakdown[0].column).toBe("k8s_pod_name");
+    });
+
+    it("should not move breakdown to x-axis when x-axis already has fields", () => {
+      const parsed = {
+        stream: "logs",
+        streamType: "logs",
+        xFields: [{ column: "_timestamp", alias: "time", aggregationFunction: "histogram" }],
+        yFields: [{ column: "count", alias: "count", aggregationFunction: "count" }],
+        breakdownFields: [{ column: "level", alias: "level", aggregationFunction: null }],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        customQuery: false,
+        rawQuery: "SELECT histogram(_timestamp), COUNT(*) FROM logs GROUP BY level",
+      };
+
+      const result = parsedQueryToPanelFields(parsed);
+
+      // X-axis should keep the histogram field
+      expect(result.x.length).toBe(1);
+      expect(result.x[0].column).toBe("_timestamp");
+      expect(result.x[0].functionName).toBe("histogram");
+
+      // Breakdown should remain unchanged
+      expect(result.breakdown.length).toBe(1);
+      expect(result.breakdown[0].column).toBe("level");
+    });
   });
 });

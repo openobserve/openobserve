@@ -352,12 +352,23 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
     return baseField;
   };
 
+  // If no timeseries/histogram field on X-axis but there are breakdown fields,
+  // move the first breakdown field to X-axis
+  let xFields = parsed.xFields;
+  let breakdownFields = parsed.breakdownFields;
+
+  if (xFields.length === 0 && breakdownFields.length > 0) {
+    // Move first breakdown field to X-axis
+    xFields = [breakdownFields[0]];
+    breakdownFields = breakdownFields.slice(1);
+  }
+
   return {
     stream: parsed.stream,
     stream_type: parsed.streamType,
-    x: parsed.xFields.map((f, i) => mapFieldToPanel(f, i, "x")),
+    x: xFields.map((f, i) => mapFieldToPanel(f, i, "x")),
     y: parsed.yFields.map((f, i) => mapFieldToPanel(f, i, "y")),
-    breakdown: parsed.breakdownFields.map((f, i) => mapFieldToPanel(f, i, "z")),
+    breakdown: breakdownFields.map((f, i) => mapFieldToPanel(f, i, "z")),
     filter: parsed.filters,
   };
 }

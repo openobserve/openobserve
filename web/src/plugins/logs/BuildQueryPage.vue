@@ -187,6 +187,12 @@ const initializeFromQuery = async () => {
         dashboardPanelData.data.queries[0].fields.filter = panelFields.filter;
         dashboardPanelData.data.queries[0].customQuery = false;
 
+        // Auto-select chart type based on fields:
+        // - If only Y-axis fields (no X-axis, no breakdown) → use "metric" chart
+        if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {
+          dashboardPanelData.data.type = "metric";
+        }
+
         // Load stream fields after setting the stream from parsed query
         if (streamName) {
           await updateGroupedFields();

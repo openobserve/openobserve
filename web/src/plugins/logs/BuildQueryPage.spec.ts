@@ -555,6 +555,43 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.data.type).toBe("table");
       expect(mockDashboardPanelData.data.config.table_dynamic_columns).toBe(true);
     });
+
+    it("should auto-select metric chart type when only Y-axis fields are present", async () => {
+      const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } = await import("@/utils/query/sqlQueryParser");
+
+      // Mock parseSQL to return a valid parsed result
+      (parseSQL as any).mockResolvedValueOnce({
+        stream: "test_stream",
+        streamType: "logs",
+        xFields: [],
+        yFields: [{ column: "_timestamp", alias: "y_axis_1", aggregationFunction: "count" }],
+        breakdownFields: [],
+        filters: { filterType: "group", logicalOperator: "AND", conditions: [] },
+        customQuery: false,
+        rawQuery: 'SELECT count(_timestamp) as "y_axis_1" FROM "test_stream"',
+      });
+
+      // Mock parsedQueryToPanelFields to return only Y-axis field (no X, no breakdown)
+      (parsedQueryToPanelFields as any).mockReturnValueOnce({
+        stream: "test_stream",
+        stream_type: "logs",
+        x: [], // No X-axis fields
+        y: [{ column: "_timestamp", alias: "y_axis_1", functionName: "count" }], // Has Y-axis field
+        breakdown: [], // No breakdown fields
+        filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      });
+
+      (shouldUseCustomMode as any).mockReturnValueOnce(false);
+
+      wrapper = createWrapper({
+        searchQuery: 'SELECT count(_timestamp) as "y_axis_1" FROM "test_stream"',
+        selectedStream: "test_stream",
+      });
+      await flushPromises();
+
+      // Should auto-select "metric" chart type for Y-axis only queries
+      expect(mockDashboardPanelData.data.type).toBe("metric");
+    });
   });
 
   describe("Run Query", () => {
