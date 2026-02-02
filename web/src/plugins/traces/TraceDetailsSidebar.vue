@@ -763,7 +763,6 @@ export default defineComponent({
   },
   components: {
     LogsHighLighting,
-    TelemetryCorrelationDashboard,
     LLMContentRenderer,
     CorrelatedLogsTable,
     TelemetryCorrelationDashboard: defineAsyncComponent(
