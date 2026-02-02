@@ -1488,7 +1488,8 @@
     "custom": "Op maat",
     "sqlBuilder": "SQL Builder",
     "generatedSql": "Gegenereerde SQL",
-    "enterCustomSql": "Voer uw aangepaste SQL-query in..."
+    "enterCustomSql": "Voer uw aangepaste SQL-query in...",
+    "customSql": "SQL op maat"
   },
   "home": {
     "streams": "Streams",

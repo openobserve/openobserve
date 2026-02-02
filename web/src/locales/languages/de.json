@@ -1488,7 +1488,8 @@
     "custom": "Benutzerdefiniert",
     "sqlBuilder": "SQL-Generator",
     "generatedSql": "Generiertes SQL",
-    "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein..."
+    "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
+    "customSql": "Benutzerdefiniertes SQL"
   },
   "home": {
     "streams": "Streams",

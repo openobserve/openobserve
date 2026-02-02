@@ -1488,7 +1488,8 @@
     "custom": "Personnalisé",
     "sqlBuilder": "Générateur SQL",
     "generatedSql": "SQL généré",
-    "enterCustomSql": "Entrez votre requête SQL personnalisée..."
+    "enterCustomSql": "Entrez votre requête SQL personnalisée...",
+    "customSql": "SQL personnalisé"
   },
   "home": {
     "streams": "Ruisseaux",

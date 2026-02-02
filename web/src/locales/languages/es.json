@@ -1488,7 +1488,8 @@
     "custom": "Personalizado",
     "sqlBuilder": "Constructor SQL",
     "generatedSql": "SQL generado",
-    "enterCustomSql": "Introduzca su consulta SQL personalizada..."
+    "enterCustomSql": "Introduzca su consulta SQL personalizada...",
+    "customSql": "SQL personalizado"
   },
   "home": {
     "streams": "Transmisiones",

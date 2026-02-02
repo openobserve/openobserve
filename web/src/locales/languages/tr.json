@@ -1488,7 +1488,8 @@
     "custom": "Özel",
     "sqlBuilder": "SQL Oluşturucu",
     "generatedSql": "Oluşturulan SQL",
-    "enterCustomSql": "Özel SQL sorgunuzu girin..."
+    "enterCustomSql": "Özel SQL sorgunuzu girin...",
+    "customSql": "Özel SQL"
   },
   "home": {
     "streams": "Akışlar",

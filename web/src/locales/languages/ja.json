@@ -1505,7 +1505,8 @@
     "custom": "カスタム",
     "sqlBuilder": "SQL ビルダー",
     "generatedSql": "生成された SQL",
-    "enterCustomSql": "カスタム SQL クエリを入力してください..."
+    "enterCustomSql": "カスタム SQL クエリを入力してください...",
+    "customSql": "カスタム SQL"
   },
   "home": {
     "streams": "ストリーム",

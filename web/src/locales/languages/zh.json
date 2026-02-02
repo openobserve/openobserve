@@ -1488,7 +1488,8 @@
     "custom": "自定义",
     "sqlBuilder": "SQL 生成器",
     "generatedSql": "生成的 SQL",
-    "enterCustomSql": "输入您的自定义 SQL 查询..."
+    "enterCustomSql": "输入您的自定义 SQL 查询...",
+    "customSql": "自定义 SQL"
   },
   "home": {
     "streams": "数据流",
