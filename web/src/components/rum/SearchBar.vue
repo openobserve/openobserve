@@ -56,7 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-pa-none search-button bg-secondary"
             @click="searchData"
             :disable="
-              searchObj.loading || searchObj.data.streamResults.list.length == 0
+              searchObj.loading ||
+              searchObj.data.streamResults?.list?.length == 0
             "
             >{{ t("search.runQuery") }}</q-btn
           >
@@ -87,10 +88,10 @@ import {
   ref,
   watch,
   onBeforeMount,
+  defineAsyncComponent,
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
@@ -116,32 +117,17 @@ export default defineComponent({
       type: Object,
       default: () => {},
     },
-    sqlMode: {
-      type: Boolean,
-      default: false,
-    },
-    disabled: {
-      type: Boolean,
-      default: false,
-    },
-    showQuery: {
-      type: Boolean,
-      default: true,
-    },
   },
   methods: {
     searchData() {
       if (this.searchObj?.loading == false) {
-        // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }
     },
   },
   setup(props, { emit }) {
-    const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const btnRefreshInterval = ref(null);
 
     const { searchObj } = useTraces();
     const queryEditorRef = ref(null);
@@ -155,12 +141,6 @@ export default defineComponent({
       getSuggestions,
       updateFieldKeywords,
     } = useSqlSuggestions();
-
-    const refreshTimeChange = (item) => {
-      searchObj.meta.refreshInterval = item.value;
-      searchObj.meta.refreshIntervalLabel = item.label;
-      btnRefreshInterval.value = false;
-    };
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -254,8 +234,6 @@ export default defineComponent({
           button: "Date Change",
           tab: value.tab,
           value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
           stream_name: searchObj.data.stream.selectedStream.value,
           page: "Search Logs",
         });
@@ -265,7 +243,6 @@ export default defineComponent({
     };
 
     const updateQuery = () => {
-      // alert(searchObj.data.query);
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(searchObj.data.query);
     };
@@ -308,12 +285,8 @@ export default defineComponent({
 
     return {
       t,
-      router,
       searchObj,
       queryEditorRef,
-      btnRefreshInterval,
-      refreshTimes: searchObj.config.refreshTimes,
-      refreshTimeChange,
       updateQueryValue,
       updateDateTime,
       updateQuery,
@@ -368,22 +341,22 @@ export default defineComponent({
   padding-bottom: 1px;
 
   .q-toggle__inner {
-    font-size: 30px;
+    font-size: 1.875rem;
   }
 
   .q-toggle__label {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
 
   .casesensitive-btn {
-    padding: 8px;
-    margin-left: -6px;
+    padding: 0.5rem;
+    margin-left: -0.375rem;
     background-color: #d5d5d5;
-    border-radius: 0px 3px 3px 0px;
+    border-radius: 0 0.1875rem 0.1875rem 0;
   }
   .search-field .q-field {
     &__control {
-      border-radius: 3px 0px 0px 3px !important;
+      border-radius: 0.1875rem 0 0 0.1875rem !important;
     }
     &__native {
       font-weight: 600;
@@ -391,9 +364,9 @@ export default defineComponent({
   }
   .search-time {
     // width: 120px;
-    margin-right: 10px;
+    margin-right: 0.625rem;
     .q-btn-group {
-      border-radius: 3px;
+      border-radius: 0.1875rem;
 
       .q-btn {
         min-height: auto;
@@ -401,22 +374,22 @@ export default defineComponent({
     }
   }
   .search-dropdown {
-    padding: 0px;
+    padding: 0;
     .block {
       color: $dark-page;
       font-weight: 600;
-      font-size: 12px;
+      font-size: 0.75rem;
     }
     .q-btn-dropdown__arrow-container {
       color: $light-text2;
     }
   }
   .refresh-rate-dropdown-container {
-    width: 220px;
+    width: 13.75rem;
     * .q-btn {
-      font-size: 12px !important;
-      padding-left: 8px;
-      padding-right: 8px;
+      font-size: 0.75rem !important;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
     }
   }
 
@@ -440,7 +413,7 @@ export default defineComponent({
     .listWrapper {
       box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
       transition: height 0.25s ease;
-      height: calc(100vh - 146px);
+      height: calc(100vh - 9.125rem);
       background-color: white;
       position: absolute;
       top: 2.75rem;
@@ -453,39 +426,39 @@ export default defineComponent({
 
       &,
       .q-list {
-        border-radius: 3px;
+        border-radius: 0.1875rem;
       }
     }
   }
   .fields_autocomplete {
-    max-height: 250px;
+    max-height: 15.625rem;
   }
   .monaco-editor {
     width: 100% !important;
-    height: 70px !important;
+    height: 4.375rem !important;
   }
 
   .search-button {
-    width: 96px;
-    line-height: 29px;
+    width: 6rem;
+    line-height: 1.8125rem;
     font-weight: bold;
     text-transform: initial;
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: white;
 
     .q-btn__content {
       background: $secondary;
-      border-radius: 3px 3px 3px 3px;
+      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
       .q-icon {
-        font-size: 15px;
+        font-size: 0.9375rem;
         color: #ffffff;
       }
     }
   }
 
   .download-logs-btn {
-    height: 30px;
+    height: 1.875rem;
   }
 }
 </style>

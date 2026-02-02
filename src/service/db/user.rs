@@ -139,10 +139,11 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
         organizations: orgs
             .into_iter()
             .map(|org| UserOrg {
-                role: org.role,
                 name: org.org_id,
+                org_name: org.org_name,
                 token: org.token,
                 rum_token: org.rum_token,
+                role: org.role,
             })
             .collect(),
         password_ext: user.password_ext,
@@ -214,7 +215,11 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     org_users::remove_by_user(&name).await?;
     match users::remove(&name).await {
         Ok(_) => {
-            let _ = delete_from_db_coordinator(&key, false, true, None).await;
+            delete_from_db_coordinator(&key, false, true, None)
+                .await
+                .inspect_err(|e| {
+                    log::error!("error sending delete user to nats {name} : {e}");
+                })?;
             #[cfg(feature = "enterprise")]
             super_cluster::delete_user_from_super_cluster(&name).await?;
             Ok(())
@@ -230,6 +235,11 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
 pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, anyhow::Error> {
     let user_id = user_id.to_lowercase();
     org_invites::list_by_invitee(&user_id).await
+}
+
+#[cfg(feature = "cloud")]
+pub async fn delete_invites_for_user(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
+    org_invites::delete_invites_for_user(org_id, user_email).await
 }
 
 pub async fn list_users(
@@ -346,10 +356,11 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
                 organizations: orgs
                     .into_iter()
                     .map(|org| UserOrg {
-                        role: org.role,
                         name: org.org_id,
+                        org_name: org.org_name,
                         token: org.token,
                         rum_token: org.rum_token,
+                        role: org.role,
                     })
                     .collect(),
                 password_ext: user.password_ext,
@@ -450,6 +461,7 @@ mod tests {
             organizations: vec![UserOrg {
                 role: UserRole::Admin,
                 name: org_id.clone(),
+                org_name: org_id.clone(),
                 token: "Abcd".to_string(),
                 rum_token: Some("rumAbcd".to_string()),
             }],

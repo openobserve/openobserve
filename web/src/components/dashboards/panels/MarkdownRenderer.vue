@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       :class="[
-        'tw-prose tw-prose-sm tw-max-w-none',
-        store.state?.theme === 'dark' && 'tw-prose-invert',
+        'tw:prose tw:prose-sm tw:max-w-none',
+        store.state?.theme === 'dark' && 'tw:prose-invert',
       ]"
       v-html="DOMPurify.sanitize(marked(processedContent))"
       data-test="markdown-renderer"
@@ -48,12 +48,24 @@ export default defineComponent({
       type: Object,
       default: () => ({}),
     },
+    tabId: {
+      type: String,
+      default: undefined,
+    },
+    panelId: {
+      type: String,
+      default: undefined,
+    },
   },
   setup(props): any {
     const store = useStore();
 
     const processedContent = computed(() => {
-      return processVariableContent(props.markdownContent, props.variablesData);
+      const context = {
+        tabId: props.tabId,
+        panelId: props.panelId,
+      };
+      return processVariableContent(props.markdownContent, props.variablesData, context);
     });
 
     return {

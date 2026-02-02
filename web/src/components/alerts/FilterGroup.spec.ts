@@ -36,14 +36,16 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
   const defaultProps = {
     group: {
       groupId: 'test-group-1',
-      label: 'and',
-      items: [
+      filterType: 'group',
+      logicalOperator: 'AND',
+      conditions: [
         {
           id: 'item-1',
+          filterType: 'condition',
           column: 'field1',
           operator: '=',
           value: 'test',
-          ignore_case: true,
+          logicalOperator: 'AND',
         }
       ],
     },
@@ -100,8 +102,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         ...defaultProps,
         group: {
           groupId: 'empty-group',
-          label: 'or',
-          items: [],
+          filterType: 'group',
+          logicalOperator: 'OR',
+          conditions: [],
         }
       };
 
@@ -118,7 +121,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.items).toHaveLength(0);
+      expect(wrapper.vm.groups.conditions).toHaveLength(0);
     });
   });
 
@@ -248,16 +251,16 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addCondition('test-group');
 
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength + 1);
-      
-      const newCondition = wrapper.vm.groups.items[wrapper.vm.groups.items.length - 1];
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 1);
+
+      const newCondition = wrapper.vm.groups.conditions[wrapper.vm.groups.conditions.length - 1];
       expect(newCondition.column).toBe('');
       expect(newCondition.operator).toBe('=');
       expect(newCondition.value).toBe('');
-      expect(newCondition.ignore_case).toBe(true);
+      expect(newCondition.ignore_case).toBeUndefined(); // No longer added to conditions
       expect(newCondition.id).toBe('mock-uuid-123');
     });
 
@@ -295,11 +298,11 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addCondition('test-group');
       wrapper.vm.addCondition('test-group');
 
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength + 2);
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 2);
     });
   });
 
@@ -318,22 +321,25 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addGroup('test-group');
 
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength + 1);
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 1);
       
-      const newGroup = wrapper.vm.groups.items[wrapper.vm.groups.items.length - 1];
+      const newGroup = wrapper.vm.groups.conditions[wrapper.vm.groups.conditions.length - 1];
       expect(newGroup.groupId).toBe('mock-uuid-123');
-      expect(newGroup.label).toBe('or');
-      expect(newGroup.items).toHaveLength(1);
-      
+      expect(newGroup.filterType).toBe('group');
+      expect(newGroup.logicalOperator).toBe('OR');
+      expect(newGroup.conditions).toHaveLength(1);
+
       // Check the default condition in the new group
-      const defaultCondition = newGroup.items[0];
+      const defaultCondition = newGroup.conditions[0];
+      expect(defaultCondition.filterType).toBe('condition');
       expect(defaultCondition.column).toBe('');
       expect(defaultCondition.operator).toBe('=');
       expect(defaultCondition.value).toBe('');
-      expect(defaultCondition.ignore_case).toBe(true);
+      expect(defaultCondition.logicalOperator).toBe('OR');
+      expect(defaultCondition.ignore_case).toBeUndefined(); // No longer added to conditions
     });
 
     it('should emit add-group event', () => {
@@ -371,19 +377,19 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       wrapper.vm.addGroup('test-group');
-      const newGroup = wrapper.vm.groups.items[wrapper.vm.groups.items.length - 1];
-      
+      const newGroup = wrapper.vm.groups.conditions[wrapper.vm.groups.conditions.length - 1];
+
       expect(wrapper.vm.isGroup(newGroup)).toBe(true);
-      expect(newGroup.items[0].id).toBe('mock-uuid-123');
+      expect(newGroup.conditions[0].id).toBe('mock-uuid-123');
     });
   });
 
   describe('toggleLabel Function', () => {
-    it('should toggle from and to or', () => {
+    it('should toggle from AND to OR', () => {
       const wrapper = mount(FilterGroup, {
         props: {
           ...defaultProps,
-          group: { ...defaultProps.group, label: 'and' }
+          group: { ...defaultProps.group, logicalOperator: 'AND' }
         },
         global: {
           plugins: [Quasar, mockI18n],
@@ -396,16 +402,16 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.label).toBe('and');
+      expect(wrapper.vm.groups.logicalOperator).toBe('AND');
       wrapper.vm.toggleLabel();
-      expect(wrapper.vm.groups.label).toBe('or');
+      expect(wrapper.vm.groups.logicalOperator).toBe('OR');
     });
 
-    it('should toggle from or to and', () => {
+    it('should toggle from OR to AND', () => {
       const wrapper = mount(FilterGroup, {
         props: {
           ...defaultProps,
-          group: { ...defaultProps.group, label: 'or' }
+          group: { ...defaultProps.group, logicalOperator: 'OR' }
         },
         global: {
           plugins: [Quasar, mockI18n],
@@ -418,9 +424,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.label).toBe('or');
+      expect(wrapper.vm.groups.logicalOperator).toBe('OR');
       wrapper.vm.toggleLabel();
-      expect(wrapper.vm.groups.label).toBe('and');
+      expect(wrapper.vm.groups.logicalOperator).toBe('AND');
     });
 
     it('should emit add-group event when toggling', () => {
@@ -463,7 +469,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', wrapper.vm.groups]);
     });
 
-    it('should update label ref when toggling', () => {
+    it('should update logicalOperator ref when toggling', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
@@ -477,9 +483,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const originalLabel = wrapper.vm.groups.label;
+      const originalOperator = wrapper.vm.groups.logicalOperator;
       wrapper.vm.toggleLabel();
-      expect(wrapper.vm.groups.label).not.toBe(originalLabel);
+      expect(wrapper.vm.groups.logicalOperator).not.toBe(originalOperator);
     });
   });
 
@@ -488,12 +494,18 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const multiItemProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
             { id: 'item-2', column: 'field2', operator: '=', value: 'test2' },
-          ]
+          ],
+
         }
       };
 
@@ -510,22 +522,28 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.items).toHaveLength(2);
+      expect(wrapper.vm.groups.conditions).toHaveLength(2);
       wrapper.vm.removeCondition('item-1');
-      expect(wrapper.vm.groups.items).toHaveLength(1);
-      expect(wrapper.vm.groups.items[0].id).toBe('item-2');
+      expect(wrapper.vm.groups.conditions).toHaveLength(1);
+      expect(wrapper.vm.groups.conditions[0].id).toBe('item-2');
     });
 
     it('should emit add-group when removing non-last condition', () => {
       const multiItemProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
             { id: 'item-2', column: 'field2', operator: '=', value: 'test2' },
-          ]
+          ],
+
         }
       };
 
@@ -551,11 +569,17 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const singleItemProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'only-item', column: 'field1', operator: '=', value: 'test' }
-          ]
+          ],
+
         }
       };
 
@@ -592,10 +616,10 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.removeCondition('non-existent-id');
       
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength);
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength);
     });
   });
 
@@ -1156,12 +1180,10 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const addGroupButtons = wrapper.findAll('[data-test="alert-conditions-add-condition-btn"]');
-      const addGroupBtn = addGroupButtons[1]; // Second button is add group
-      
-      if (addGroupBtn) {
-        expect(addGroupBtn.attributes('disabled')).toBeDefined();
-      }
+      const addGroupBtn = wrapper.find('[data-test="alert-conditions-add-condition-group-btn"]');
+
+      expect(addGroupBtn.exists()).toBe(true);
+      expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
     it('should handle tab change for toggle label', async () => {
@@ -1187,112 +1209,35 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
     });
   });
 
-  describe('Theme-based Styling', () => {
-    it('should apply dark theme classes', () => {
-      const darkStore = createStore({
-        state: {
-          theme: 'dark',
-          isAiChatEnabled: false,
-        },
-      });
+
+  describe('Confirmation Dialog for Condition Deletion', () => {
+    it('should show confirmation dialog when removing last condition with sub-groups', async () => {
+      const propsWithSubGroup = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [
+                { id: 'nested-condition', column: 'field2', operator: '=', value: 'test2' }
+              ],
+
+        }
+          ]
+        }
+      };
 
       const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: darkStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.find('.dark-mode').exists()).toBe(true);
-      expect(wrapper.find('.dark-mode-group-tabs').exists()).toBe(true);
-      expect(wrapper.find('.dark-mode-group').exists()).toBe(true);
-    });
-
-    it('should apply light theme classes', () => {
-      const lightStore = createStore({
-        state: {
-          theme: 'light',
-          isAiChatEnabled: false,
-        },
-      });
-
-      const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: lightStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.find('.light-mode').exists()).toBe(true);
-      expect(wrapper.find('.light-mode-group-tabs').exists()).toBe(true);
-      expect(wrapper.find('.light-mode-group').exists()).toBe(true);
-    });
-
-    it('should apply AI chat enabled classes', () => {
-      const aiStore = createStore({
-        state: {
-          theme: 'light',
-          isAiChatEnabled: true,
-        },
-      });
-
-      const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: aiStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      const mainContainer = wrapper.find('.tw-px-2');
-      expect(mainContainer.classes()).toContain('tw-w-full');
-    });
-
-    it('should apply different depth-based margins for AI chat enabled', () => {
-      const aiStore = createStore({
-        state: {
-          theme: 'light',
-          isAiChatEnabled: true,
-        },
-      });
-
-      const wrapper = mount(FilterGroup, {
-        props: { ...defaultProps, depth: 2 },
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: aiStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      const mainContainer = wrapper.find('.tw-px-2');
-      expect(mainContainer.classes()).toContain('tw-ml-[20px]'); // depth * 10
-    });
-
-    it('should apply different depth-based margins for AI chat disabled', () => {
-      const wrapper = mount(FilterGroup, {
-        props: { ...defaultProps, depth: 2 },
+        props: propsWithSubGroup,
         global: {
           plugins: [Quasar, mockI18n],
           provide: {
@@ -1304,8 +1249,593 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const mainContainer = wrapper.find('.tw-px-2');
-      expect(mainContainer.classes()).toContain('tw-ml-[40px]'); // depth * 20
+      // Remove the only condition
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      // Should show confirmation dialog
+      expect(wrapper.vm.confirmDialog.show).toBe(true);
+      expect(wrapper.vm.confirmDialog.title).toBe('Delete Condition');
+      expect(wrapper.vm.confirmDialog.warningMessage).toContain('1 sub-group');
+    });
+
+    it('should show correct warning for multiple sub-groups', async () => {
+      const propsWithMultipleSubGroups = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }],
+
+        },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field3', operator: '=', value: 'test3' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithMultipleSubGroups,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      expect(wrapper.vm.confirmDialog.show).toBe(true);
+      expect(wrapper.vm.confirmDialog.warningMessage).toContain('2 sub-groups');
+    });
+
+    it('should not show dialog when removing condition without sub-groups', () => {
+      const propsWithoutSubGroups = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '=', value: 'test2' }
+          ],
+
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithoutSubGroups,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('condition-1');
+
+      // Should not show dialog
+      expect(wrapper.vm.confirmDialog.show).toBe(false);
+    });
+
+    it('should call performRemoveCondition when user confirms', async () => {
+      const propsWithSubGroup = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }],
+
+        }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithSubGroup,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      // Confirm deletion
+      wrapper.vm.confirmDialog.okCallback();
+      await nextTick();
+
+      // Should emit remove-group
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+      expect(wrapper.vm.confirmDialog.show).toBe(false);
+    });
+  });
+
+  describe('performRemoveCondition Function', () => {
+    it('should remove condition and emit remove-group when no conditions left', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+
+            groupId: 'test-group',
+
+            filterType: 'group',
+
+            logicalOperator: 'AND',
+
+            conditions: [
+              { id: 'only-item', column: 'field1', operator: '=', value: 'test' }
+            ],
+
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('only-item');
+
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+      expect(wrapper.emitted('remove-group')?.[0][0]).toBe('test-group');
+    });
+
+    it('should remove condition but keep group when conditions remain', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+
+            groupId: 'test-group',
+
+            filterType: 'group',
+
+            logicalOperator: 'AND',
+
+            conditions: [
+              { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
+              { id: 'item-2', column: 'field2', operator: '=', value: 'test2' }
+            ],
+
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('item-1');
+
+      expect(wrapper.emitted('add-group')).toBeTruthy();
+      expect(wrapper.emitted('remove-group')).toBeFalsy();
+      expect(wrapper.vm.groups.conditions).toHaveLength(1);
+    });
+
+    it('should emit remove-group when only sub-groups remain after removing condition', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+
+            groupId: 'test-group',
+
+            filterType: 'group',
+
+            logicalOperator: 'AND',
+
+            conditions: [
+              { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+              {
+                groupId: 'sub-group',
+                label: 'or',
+                items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }],
+
+          }
+            ]
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('only-condition');
+
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+    });
+  });
+
+  describe('Props Watch Functionality', () => {
+    it('should update groups when prop changes', async () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      const newGroup = {
+        groupId: 'new-group',
+        filterType: 'group',
+        logicalOperator: 'OR',
+        conditions: [
+          {
+            id: 'new-item',
+            filterType: 'condition',
+            column: 'newfield',
+            operator: '!=',
+            value: 'newtest',
+            logicalOperator: 'OR',
+          }
+        ]
+      };
+
+      await wrapper.setProps({ group: newGroup });
+      await nextTick();
+
+      expect(wrapper.vm.groups.groupId).toBe('new-group');
+      expect(wrapper.vm.label).toBe('or');
+    });
+
+    it('should update label when prop group logicalOperator changes', async () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: { ...defaultProps.group, logicalOperator: 'AND' }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Wait for initial mount to settle
+      await nextTick();
+      expect(wrapper.vm.label).toBe('and');
+
+      // Now change the logicalOperator
+      await wrapper.setProps({
+        group: { ...defaultProps.group, logicalOperator: 'OR' }
+      });
+      await nextTick();
+
+      expect(wrapper.vm.label).toBe('or');
+    });
+  });
+
+  describe('Reorder Items Functionality', () => {
+    it('should reorder items with conditions first and groups last', () => {
+      const mixedOrderProps = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }],
+
+        },
+            { id: 'condition-2', column: 'field3', operator: '!=', value: 'test3' },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field4', operator: '>', value: 'test4' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: mixedOrderProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Before reorder: condition, group, condition, group
+      expect(wrapper.vm.groups.conditions[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.conditions[1].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.conditions[2].id).toBe('condition-2');
+      expect(wrapper.vm.groups.conditions[3].groupId).toBe('sub-group-2');
+
+      // Call reorder
+      wrapper.vm.reorderItems();
+
+      // After reorder: condition, condition, group, group
+      expect(wrapper.vm.groups.conditions[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.conditions[1].id).toBe('condition-2');
+      expect(wrapper.vm.groups.conditions[2].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.conditions[3].groupId).toBe('sub-group-2');
+    });
+
+    it('should emit events when reordering', () => {
+      const mixedOrderProps = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            {
+              groupId: 'sub-group',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field1', operator: '=', value: 'test1' }],
+
+        },
+            { id: 'condition-1', column: 'field2', operator: '=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: mixedOrderProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      expect(wrapper.emitted('add-group')).toBeTruthy();
+      expect(wrapper.emitted('input:update')).toBeTruthy();
+      expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', wrapper.vm.groups]);
+    });
+
+    it('should handle group with only conditions (no reordering needed)', () => {
+      const onlyConditionsProps = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '!=', value: 'test2' }
+          ],
+
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlyConditionsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      // Order should remain the same
+      expect(wrapper.vm.groups.conditions[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.conditions[1].id).toBe('condition-2');
+    });
+
+    it('should handle group with only sub-groups (no reordering needed)', () => {
+      const onlyGroupsProps = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }],
+
+        },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlyGroupsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      // Order should remain the same
+      expect(wrapper.vm.groups.conditions[0].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.conditions[1].groupId).toBe('sub-group-2');
+    });
+
+    it('should handle empty items array', () => {
+      const emptyItemsProps = {
+        ...defaultProps,
+        group: {
+
+          groupId: 'test-group',
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [],
+
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: emptyItemsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should not throw error
+      expect(() => wrapper.vm.reorderItems()).not.toThrow();
+      expect(wrapper.vm.groups.conditions).toHaveLength(0);
+    });
+  });
+
+
+  describe('conditionInputWidth Prop', () => {
+    it('should accept conditionInputWidth prop', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          conditionInputWidth: 'tw:w-[100px]'
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('conditionInputWidth')).toBe('tw:w-[100px]');
+    });
+
+    it('should have empty string as default for conditionInputWidth', () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('conditionInputWidth')).toBe('');
     });
   });
 
@@ -1361,9 +1891,14 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const complexGroupProps = {
         ...defaultProps,
         group: {
+
           groupId: 'root',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             {
               groupId: 'nested-1',
               label: 'or',
@@ -1374,8 +1909,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
                   label: 'and',
                   items: [
                     { id: 'condition-2', column: 'field2', operator: '!=', value: 'test2' }
-                  ]
-                }
+                  ],
+
+        }
               ]
             },
             { id: 'condition-3', column: 'field3', operator: '>', value: 'test3' }
@@ -1397,9 +1933,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.groups.items).toHaveLength(2);
-      expect(wrapper.vm.isGroup(wrapper.vm.groups.items[0])).toBe(true);
-      expect(wrapper.vm.isGroup(wrapper.vm.groups.items[1])).toBeFalsy();
+      expect(wrapper.vm.groups.conditions).toHaveLength(2);
+      expect(wrapper.vm.isGroup(wrapper.vm.groups.conditions[0])).toBe(true);
+      expect(wrapper.vm.isGroup(wrapper.vm.groups.conditions[1])).toBeFalsy();
     });
   });
 });

@@ -54,12 +54,36 @@ const regexPatterns = {
       `/api/${org_identifier}/re_patterns/${id}`
     );
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/re_patterns/bulk`, { data });
+  },
   test: (
     org_identifier: string,
     pattern: string,
     test_records: Array<string>,
+    policy?: string,
   ) => {
-    return http().post(`/api/${org_identifier}/re_patterns/test`, { pattern, test_records });
+    const payload: any = { pattern, test_records };
+    if (policy) {
+      payload.policy = policy;
+    }
+    return http().post(`/api/${org_identifier}/re_patterns/test`, payload);
+  },
+  getBuiltInPatterns: (
+    org_identifier: string,
+    params?: {
+      search?: string;
+      tags?: string[];
+    }
+  ) => {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.tags) params.tags.forEach(tag => queryParams.append('tags', tag));
+
+    const queryString = queryParams.toString();
+    const url = `/api/${org_identifier}/re_patterns/built-in${queryString ? '?' + queryString : ''}`;
+
+    return http().get(url);
   }
 };
 

@@ -1,14 +1,14 @@
 <template>
   <div data-test="add-stream-fields-section">
     <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
-      Fields
+      {{ t('logStream.fields') }}
     </div>
     <template v-if="!fields.length">
       <q-btn
         data-test="add-stream-add-field-btn"
         color="primary"
         class="q-mt-sm text-bold add-field"
-        label="Add Field"
+        :label="t('logStream.addField')"
         size="sm"
         icon="add"
         style="
@@ -30,15 +30,12 @@
         <div data-test="add-stream-field-name-input" class="q-ml-none o2-input flex items-center ">
           <q-input
             v-model="field.name"
-            :placeholder="'Field Name' + ' *'"
-            color="input-border"
-            bg-color="input-bg"
+            :placeholder="t('logStream.fieldName') + ' *'"
             class="q-py-sm"
             stack-label
-            outlined
-            filled
+            borderless
             dense
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            :rules="[(val: any) => !!val.trim() || t('logStream.fieldRequired')]"
             tabindex="0"
             :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
@@ -73,24 +70,20 @@
             v-model="field.index_type"
             :options="streamIndexType"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm stream-schema-index-select"
+            class="q-py-sm"
             multiple
             :max-values="2"
             map-options
             :option-disable="(_option: any) => disableOptions(field, _option)"
             emit-value
             clearable
-            outlined
             stack-label
             borderless
-            filled
             dense
             use-input
             fill-input
             style="width: 250px"
-            :placeholder="!isFocused && (!field.index_type || field.index_type.length === 0) ? 'Index Type' : ''"
+            :placeholder="!isFocused && (!field.index_type || field.index_type.length === 0) ? t('logStream.indexType') : ''"
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleFocus"
             @blur="handleBlur"
@@ -105,23 +98,19 @@
             v-model="field.type"
             :options="dataTypes"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm stream-schema-index-select"
+            class="q-py-sm"
             option-label="label"
             option-value="value"
             clearable
-            outlined
             borderless
-            filled
             dense
             use-input
             fill-input
             hide-selected
             emit-value
             style="width: 250px"
-            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? 'Data Type *' : ''"
-            :rules="[(val: any) => !!val || 'Data Type is required!']"
+            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? t('logStream.dataType') + ' *' : ''"
+            :rules="[(val: any) => !!val || t('logStream.dataTypeRequired')]"
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleDataTypeFocus"
             @blur="handleDataTypeBlur"

@@ -1,11 +1,12 @@
 <template>
-  <div class="q-px-md q-pt-md q-pb-md">
-    <div class="text-body1 text-bold">
-      {{ t("settings.logDetails") }}
+  <div>
+    <div class="q-px-md q-pt-md q-pb-md">
+      <div class="text-body1 text-bold">
+        {{ t("settings.logDetails") }}
+      </div>
     </div>
-  </div>
 
-  <div class="q-mx-md q-mb-md">
+    <div class="q-mx-md q-mb-md">
     <div
       data-test="add-role-rolename-input-btn"
       class="trace-id-field-name o2-input q-mb-sm"
@@ -16,9 +17,8 @@
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
-        outlined
         stack-label
-        filled
+        borderless
         dense
         :rules="[
           (val: string) =>
@@ -45,8 +45,7 @@
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
         dense
         :rules="[
           (val: string) =>
@@ -68,43 +67,39 @@
         data-test="add-toggle-ingestion-btn"
         v-model="toggleIngestionLogs"
         :label="t('settings.toggleIngestionLogsLabel')"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
-        dense
+        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
+        size="lg"
       >
       </q-toggle>
     </div>
 
-    <div class="flex justify-start q-mt-lg">
+    <div class="flex justify-start q-mt-md">
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
-        class="q-mb-md text-bold"
+        class="q-mr-md o2-secondary-button tw:h-[36px]"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
+        flat
         @click="$emit('cancel:hideform')"
       />
       <q-btn
         data-test="add-alert-submit-btn"
         :label="t('alerts.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
+        class="o2-primary-button no-border tw:h-[36px]"
+        type="submit"
         no-caps
+        flat
         @click="saveOrgSettings"
       />
+    </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
@@ -153,21 +148,25 @@ const updateFieldName = (fieldName: string) => {
 
 const saveOrgSettings = async () => {
   try {
+    const payload: any = {
+      trace_id_field_name: traceIdFieldName.value,
+      span_id_field_name: spanIdFieldName.value,
+      toggle_ingestion_logs: toggleIngestionLogs.value,
+    };
+
     await organizations.post_organization_settings(
       store.state.selectedOrganization.identifier,
-      {
-        trace_id_field_name: traceIdFieldName.value,
-        span_id_field_name: spanIdFieldName.value,
-        toggle_ingestion_logs: toggleIngestionLogs.value,
-      },
+      payload,
     );
 
-    store.dispatch("setOrganizationSettings", {
+    const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
-    });
+    };
+
+    store.dispatch("setOrganizationSettings", updatedSettings);
 
     q.notify({
       message: "Organization settings updated successfully",

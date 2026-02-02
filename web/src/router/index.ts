@@ -58,6 +58,13 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
+    // Set page title with OpenObserve prefix
+    if (to.meta && to.meta.title) {
+      document.title = `OpenObserve - ${to.meta.title}`;
+    } else {
+      document.title = 'OpenObserve';
+    }
+
     const isAuthenticated = store.state.loggedIn;
 
     if (!isAuthenticated && (to.path == "/cb" || to.path == "/web/cb")) {

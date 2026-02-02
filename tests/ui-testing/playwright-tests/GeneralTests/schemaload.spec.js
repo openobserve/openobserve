@@ -4,6 +4,10 @@ const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: 'parallel' });
 
+// Generate a unique run ID at the start of test execution (shared across all workers)
+// This ensures stream names are unique across test runs, not just within a run
+const testRunId = Date.now().toString(36).slice(-4);
+
 test.describe("Schema Load testcases", () => {
     let pm;
 
@@ -84,10 +88,13 @@ test.describe("Schema Load testcases", () => {
     }
 
     test('should send a large log payload to the API and verify success', async ({ page }, testInfo) => {
-        const streamName = 'stress_test1';
-        
+        // Generate unique stream name using testRunId and worker index to avoid conflicts
+        // in parallel execution and across test runs
+        const streamName = `stress_test_${testRunId}_w${testInfo.parallelIndex}`;
+
         // Initialize test setup
         testLogger.testStart(testInfo.title, testInfo.file);
+        testLogger.info('Using unique stream name for this test run', { streamName, testRunId, workerIndex: testInfo.parallelIndex });
         
         // Navigate to base URL with authentication
         await navigateToBase(page);

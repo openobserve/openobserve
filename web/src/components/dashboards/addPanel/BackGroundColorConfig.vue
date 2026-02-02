@@ -1,12 +1,12 @@
 <template>
   <div style="display: flex; align-items: center; width: 100%">
     <q-select
-      outlined
+    borderless hide-bottom-space
       v-model="backgroundType"
       :options="colorModeOptions"
       dense
       :label="t('dashboard.colorMode')"
-      class="showLabelOnTop selectedLabel tw-w-full"
+      class="showLabelOnTop selectedLabel tw:w-full"
       stack-label
       emit-value
       :display-value="

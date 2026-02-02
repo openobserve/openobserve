@@ -19,10 +19,11 @@ use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
     ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
-    RwHashMap, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, get_config,
+    RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
+    get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
-    utils::{json, schema_ext::SchemaExt},
+    utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use once_cell::sync::Lazy;
@@ -45,11 +46,15 @@ pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new
 /// SnowflakeIdGenerator::generate() requires a &mut
 pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerator>> =
     Lazy::new(Default::default);
+/// Cache if the stream stats exist, used for calculating stats
+pub static STREAM_STATS_EXISTS: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 
 // atomic version of cache
 type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
 static STREAM_SETTINGS_ATOMIC: Lazy<ArcSwap<StreamSettingsCache>> =
     Lazy::new(|| ArcSwap::from(Arc::new(hashbrown::HashMap::new())));
+
+pub const SCHEMA_KEY: &str = "/schema/";
 
 pub async fn init() -> Result<()> {
     history::init().await?;
@@ -70,7 +75,7 @@ pub async fn get_stream_schema_from_cache(
     stream_type: StreamType,
 ) -> Option<Schema> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
     STREAM_SCHEMAS_LATEST
         .read()
         .await
@@ -79,7 +84,7 @@ pub async fn get_stream_schema_from_cache(
 }
 
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
-    format!("/schema/{org_id}/{stream_type}/{stream_name}")
+    format!("{SCHEMA_KEY}{org_id}/{stream_type}/{stream_name}")
 }
 
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
@@ -93,7 +98,7 @@ pub async fn get_cache(
     stream_type: StreamType,
 ) -> Result<SchemaCache> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
     if let Some(schema) = STREAM_SCHEMAS_LATEST.read().await.get(cache_key).cloned() {
         return Ok(schema);
     }
@@ -155,9 +160,9 @@ pub async fn get_versions(
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<Schema>> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
 
-    let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
+    let (min_ts, max_ts) = time_range.unwrap_or_default();
     let mut last_schema_index = None;
     let r = STREAM_SCHEMAS.read().await;
     if let Some(versions) = r.get(cache_key) {
@@ -188,8 +193,10 @@ pub async fn get_versions(
     }
     drop(r);
 
+    log::warn!("get_versions: cache missing and get from db for key: {cache_key}");
+
     let db = infra_db::get_db().await;
-    Ok(match db.get(&key).await {
+    let ret = match db.get(&key).await {
         Err(e) => {
             if let Error::DbError(DbError::KeyNotExists(_)) = e {
                 vec![]
@@ -207,7 +214,27 @@ pub async fn get_versions(
                 vec![json::from_slice(&v)?]
             }
         }
-    })
+    };
+    if ret.is_empty() {
+        return Ok(vec![]);
+    }
+
+    log::warn!("get_versions: got from db and cache for key: {cache_key}");
+
+    // cache the latest versions
+    let latest_schema = ret.last().cloned().unwrap();
+    let start_dt = unwrap_stream_start_dt(&latest_schema).unwrap_or(now_micros());
+    let schema_versions = vec![(start_dt, latest_schema)];
+    let mut w = STREAM_SCHEMAS.write().await;
+    w.entry(cache_key.to_string())
+        .and_modify(|existing_vec| {
+            existing_vec.retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
+            existing_vec.extend(schema_versions.clone())
+        })
+        .or_insert(schema_versions);
+    drop(w);
+
+    Ok(ret)
 }
 
 pub async fn get_settings(
@@ -243,6 +270,16 @@ pub async fn get_settings(
     settings
 }
 
+pub async fn get_flatten_level(org_id: &str, stream_name: &str, stream_type: StreamType) -> u32 {
+    if let Some(settings) = get_settings(org_id, stream_name, stream_type).await
+        && let Some(level) = settings.flatten_level
+        && level > 0
+    {
+        return level as u32;
+    }
+    get_config().limit.ingest_flatten_level
+}
+
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;
@@ -257,6 +294,13 @@ pub fn unwrap_stream_created_at(schema: &Schema) -> Option<i64> {
     schema
         .metadata()
         .get("created_at")
+        .and_then(|v| v.parse().ok())
+}
+
+pub fn unwrap_stream_start_dt(schema: &Schema) -> Option<i64> {
+    schema
+        .metadata()
+        .get("start_dt")
         .and_then(|v| v.parse().ok())
 }
 
@@ -284,6 +328,8 @@ pub fn unwrap_partition_time_level(
             StreamType::Traces => {
                 PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str())
             }
+            // for file list dump streams, we want to compact by day
+            StreamType::Filelist => PartitionTimeLevel::Daily,
             _ => PartitionTimeLevel::default(),
         }
     }
@@ -342,6 +388,13 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
         }
         None => default_fields,
     }
+}
+
+pub fn get_stream_setting_log_patterns_enabled(settings: &Option<StreamSettings>) -> bool {
+    settings
+        .as_ref()
+        .map(|s| s.enable_log_patterns_extraction)
+        .unwrap_or(false)
 }
 
 pub fn get_stream_setting_index_updated_at(
@@ -624,7 +677,7 @@ pub async fn delete(
     stream_name: &str,
     start_dt: Option<i64>,
 ) -> Result<()> {
-    let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
+    let key = format!("{SCHEMA_KEY}{org_id}/{stream_type}/{stream_name}");
     let db = infra_db::get_db().await;
     match db.delete(&key, false, infra_db::NEED_WATCH, start_dt).await {
         Ok(_) => {}
@@ -833,5 +886,429 @@ mod tests {
         let settings = unwrap_stream_settings(&schema);
         let res = get_stream_setting_fts_fields(&settings);
         assert!(!res.is_empty());
+    }
+
+    #[test]
+    fn test_mk_key() {
+        let key = mk_key("test_org", StreamType::Logs, "test_stream");
+        assert_eq!(key, "/schema/test_org/logs/test_stream");
+
+        let key = mk_key("org123", StreamType::Metrics, "metrics_stream");
+        assert_eq!(key, "/schema/org123/metrics/metrics_stream");
+
+        let key = mk_key("org_id", StreamType::Traces, "trace_data");
+        assert_eq!(key, "/schema/org_id/traces/trace_data");
+    }
+
+    #[test]
+    fn test_unwrap_stream_settings() {
+        // Test with empty metadata
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let settings = unwrap_stream_settings(&schema);
+        assert!(settings.is_none());
+
+        // Test with settings in metadata
+        let mut metadata = HashMap::new();
+        let stream_settings = StreamSettings::default();
+        metadata.insert(
+            "settings".to_string(),
+            json::to_string(&stream_settings).unwrap(),
+        );
+        let schema =
+            Schema::new(vec![Field::new("field1", DataType::Int32, false)]).with_metadata(metadata);
+        let settings = unwrap_stream_settings(&schema);
+        assert!(settings.is_some());
+    }
+
+    #[test]
+    fn test_unwrap_stream_created_at() {
+        // Test with created_at in metadata
+        let mut metadata = HashMap::new();
+        metadata.insert("created_at".to_string(), "1234567890".to_string());
+        let schema =
+            Schema::new(vec![Field::new("field1", DataType::Int32, false)]).with_metadata(metadata);
+        let created_at = unwrap_stream_created_at(&schema);
+        assert_eq!(created_at, Some(1234567890));
+
+        // Test without created_at
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let created_at = unwrap_stream_created_at(&schema);
+        assert!(created_at.is_none());
+
+        // Test with invalid created_at
+        let mut metadata = HashMap::new();
+        metadata.insert("created_at".to_string(), "invalid".to_string());
+        let schema =
+            Schema::new(vec![Field::new("field1", DataType::Int32, false)]).with_metadata(metadata);
+        let created_at = unwrap_stream_created_at(&schema);
+        assert!(created_at.is_none());
+    }
+
+    #[test]
+    fn test_unwrap_stream_start_dt() {
+        // Test with start_dt in metadata
+        let mut metadata = HashMap::new();
+        metadata.insert("start_dt".to_string(), "9876543210".to_string());
+        let schema =
+            Schema::new(vec![Field::new("field1", DataType::Int32, false)]).with_metadata(metadata);
+        let start_dt = unwrap_stream_start_dt(&schema);
+        assert_eq!(start_dt, Some(9876543210));
+
+        // Test without start_dt
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let start_dt = unwrap_stream_start_dt(&schema);
+        assert!(start_dt.is_none());
+    }
+
+    #[test]
+    fn test_unwrap_stream_is_derived() {
+        // Test with is_derived = true
+        let mut metadata = HashMap::new();
+        metadata.insert("is_derived".to_string(), "true".to_string());
+        let schema =
+            Schema::new(vec![Field::new("field1", DataType::Int32, false)]).with_metadata(metadata);
+        let is_derived = unwrap_stream_is_derived(&schema);
+        assert_eq!(is_derived, Some(true));
+
+        // Test with is_derived = false
+        let mut metadata = HashMap::new();
+        metadata.insert("is_derived".to_string(), "false".to_string());
+        let schema =
+            Schema::new(vec![Field::new("field1", DataType::Int32, false)]).with_metadata(metadata);
+        let is_derived = unwrap_stream_is_derived(&schema);
+        assert_eq!(is_derived, Some(false));
+
+        // Test without is_derived
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let is_derived = unwrap_stream_is_derived(&schema);
+        assert!(is_derived.is_none());
+    }
+
+    #[test]
+    fn test_unwrap_partition_time_level() {
+        // Test with specific level
+        let level = unwrap_partition_time_level(Some(PartitionTimeLevel::Hourly), StreamType::Logs);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
+
+        // Test with Unset - should use stream type default
+        let level = unwrap_partition_time_level(Some(PartitionTimeLevel::Unset), StreamType::Logs);
+        assert_ne!(level, PartitionTimeLevel::Unset);
+
+        // Test with None - should use stream type default
+        let level = unwrap_partition_time_level(None, StreamType::Metrics);
+        assert_ne!(level, PartitionTimeLevel::Unset);
+
+        // Test Filelist stream type
+        let level = unwrap_partition_time_level(None, StreamType::Filelist);
+        assert_eq!(level, PartitionTimeLevel::Daily);
+    }
+
+    #[test]
+    fn test_get_stream_setting_defined_schema_fields() {
+        // Test with None
+        let fields = get_stream_setting_defined_schema_fields(&None);
+        assert!(fields.is_empty());
+
+        // Test with Some settings
+        let mut settings = StreamSettings::default();
+        settings.defined_schema_fields = vec!["field1".to_string(), "field2".to_string()];
+        let fields = get_stream_setting_defined_schema_fields(&Some(settings));
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains(&"field1".to_string()));
+        assert!(fields.contains(&"field2".to_string()));
+    }
+
+    #[test]
+    fn test_get_stream_setting_fts_fields_with_settings() {
+        // Test with custom FTS fields
+        let mut settings = StreamSettings::default();
+        settings.full_text_search_keys = vec!["custom_field".to_string()];
+        settings.index_original_data = true;
+        settings.index_all_values = true;
+
+        let fields = get_stream_setting_fts_fields(&Some(settings));
+        assert!(fields.contains(&"custom_field".to_string()));
+        assert!(fields.contains(&ORIGINAL_DATA_COL_NAME.to_string()));
+        assert!(fields.contains(&ALL_VALUES_COL_NAME.to_string()));
+
+        // Verify no duplicates
+        let unique_count = fields.iter().collect::<hashbrown::HashSet<_>>().len();
+        assert_eq!(unique_count, fields.len());
+    }
+
+    #[test]
+    fn test_get_stream_setting_index_fields() {
+        // Test with None
+        let fields = get_stream_setting_index_fields(&None);
+        assert!(!fields.is_empty()); // Should have default fields
+
+        // Test with custom index fields
+        let mut settings = StreamSettings::default();
+        settings.index_fields = vec!["index_field1".to_string(), "index_field2".to_string()];
+        let fields = get_stream_setting_index_fields(&Some(settings));
+        assert!(fields.contains(&"index_field1".to_string()));
+        assert!(fields.contains(&"index_field2".to_string()));
+
+        // Verify no duplicates
+        let unique_count = fields.iter().collect::<hashbrown::HashSet<_>>().len();
+        assert_eq!(unique_count, fields.len());
+    }
+
+    #[test]
+    fn test_get_stream_setting_bloom_filter_fields() {
+        // Test with None
+        let fields = get_stream_setting_bloom_filter_fields(&None);
+        assert!(!fields.is_empty()); // Should have default fields
+
+        // Test with custom bloom filter fields
+        let mut settings = StreamSettings::default();
+        settings.bloom_filter_fields = vec!["bloom_field".to_string()];
+        let fields = get_stream_setting_bloom_filter_fields(&Some(settings));
+        assert!(fields.contains(&"bloom_field".to_string()));
+
+        // Verify no duplicates
+        let unique_count = fields.iter().collect::<hashbrown::HashSet<_>>().len();
+        assert_eq!(unique_count, fields.len());
+    }
+
+    #[test]
+    fn test_get_stream_setting_log_patterns_enabled() {
+        // Test with None
+        assert!(!get_stream_setting_log_patterns_enabled(&None));
+
+        // Test with disabled
+        let mut settings = StreamSettings::default();
+        settings.enable_log_patterns_extraction = false;
+        assert!(!get_stream_setting_log_patterns_enabled(&Some(settings)));
+
+        // Test with enabled
+        let mut settings = StreamSettings::default();
+        settings.enable_log_patterns_extraction = true;
+        assert!(get_stream_setting_log_patterns_enabled(&Some(settings)));
+    }
+
+    #[test]
+    fn test_get_stream_setting_index_updated_at() {
+        // Test with None settings and created_at
+        let created_at = 1234567890;
+        let result = get_stream_setting_index_updated_at(&None, Some(created_at));
+        assert_eq!(result, created_at);
+
+        // Test with None settings and None created_at
+        let result = get_stream_setting_index_updated_at(&None, None);
+        assert!(result > 0); // Should return current time
+
+        // Test with settings that have index_updated_at
+        let mut settings = StreamSettings::default();
+        settings.index_updated_at = 9999999999;
+        let result = get_stream_setting_index_updated_at(&Some(settings), Some(created_at));
+        assert_eq!(result, 9999999999);
+
+        // Test with settings that have index_updated_at = 0
+        let mut settings = StreamSettings::default();
+        settings.index_updated_at = 0;
+        let result = get_stream_setting_index_updated_at(&Some(settings), Some(created_at));
+        assert_eq!(result, created_at);
+    }
+
+    #[test]
+    fn test_get_merge_schema_changes_no_changes() {
+        // Test when schemas are identical
+        let schema = Schema::new(vec![
+            Field::new("field1", DataType::Int32, false),
+            Field::new("field2", DataType::Utf8, false),
+        ]);
+        let inferred_schema = schema.clone();
+
+        let (is_changed, delta, merged) = get_merge_schema_changes(&schema, &inferred_schema);
+        assert!(!is_changed);
+        assert!(delta.is_empty());
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn test_get_merge_schema_changes_new_field() {
+        // Test when new field is added
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let inferred_schema = Schema::new(vec![
+            Field::new("field1", DataType::Int32, false),
+            Field::new("field2", DataType::Utf8, false),
+        ]);
+
+        let (is_changed, delta, merged) = get_merge_schema_changes(&schema, &inferred_schema);
+        assert!(is_changed);
+        assert!(delta.is_empty()); // No type changes, just new field
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn test_get_merge_schema_changes_widening_conversion() {
+        // Test widening conversion (Int32 -> Int64)
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let inferred_schema = Schema::new(vec![Field::new("field1", DataType::Int64, false)]);
+
+        let (is_changed, delta, merged) = get_merge_schema_changes(&schema, &inferred_schema);
+        assert!(is_changed);
+        assert_eq!(delta.len(), 1);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].data_type(), &DataType::Int64);
+    }
+
+    #[test]
+    fn test_get_merge_schema_changes_narrowing_conversion() {
+        // Test narrowing conversion (Int64 -> Int32) - should add zo_cast
+        let schema = Schema::new(vec![Field::new("field1", DataType::Int64, false)]);
+        let inferred_schema = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+
+        let (is_changed, delta, merged) = get_merge_schema_changes(&schema, &inferred_schema);
+        assert!(!is_changed); // No actual schema change
+        assert_eq!(delta.len(), 1);
+        assert!(delta[0].metadata().contains_key("zo_cast"));
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn test_is_widening_conversion_comprehensive() {
+        // Test Boolean conversions
+        assert!(is_widening_conversion(&DataType::Boolean, &DataType::Utf8));
+        assert!(is_widening_conversion(
+            &DataType::Boolean,
+            &DataType::LargeUtf8
+        ));
+
+        // Test Int8 conversions
+        assert!(is_widening_conversion(&DataType::Int8, &DataType::Int16));
+        assert!(is_widening_conversion(&DataType::Int8, &DataType::Int32));
+        assert!(is_widening_conversion(&DataType::Int8, &DataType::Int64));
+        assert!(is_widening_conversion(&DataType::Int8, &DataType::Float32));
+        assert!(is_widening_conversion(&DataType::Int8, &DataType::Float64));
+        assert!(is_widening_conversion(&DataType::Int8, &DataType::Utf8));
+
+        // Test Int32 conversions
+        assert!(is_widening_conversion(&DataType::Int32, &DataType::Int64));
+        assert!(is_widening_conversion(&DataType::Int32, &DataType::UInt32));
+        assert!(is_widening_conversion(&DataType::Int32, &DataType::UInt64));
+        assert!(is_widening_conversion(&DataType::Int32, &DataType::Float64));
+        assert!(!is_widening_conversion(&DataType::Int32, &DataType::Int16));
+
+        // Test Float conversions
+        assert!(is_widening_conversion(
+            &DataType::Float32,
+            &DataType::Float64
+        ));
+        assert!(!is_widening_conversion(
+            &DataType::Float64,
+            &DataType::Float32
+        ));
+
+        // Test UInt conversions
+        assert!(is_widening_conversion(&DataType::UInt8, &DataType::UInt16));
+        assert!(is_widening_conversion(&DataType::UInt16, &DataType::UInt32));
+        assert!(is_widening_conversion(&DataType::UInt32, &DataType::UInt64));
+        assert!(!is_widening_conversion(
+            &DataType::UInt64,
+            &DataType::UInt32
+        ));
+
+        // Test Utf8 conversions
+        assert!(is_widening_conversion(
+            &DataType::Utf8,
+            &DataType::LargeUtf8
+        ));
+        assert!(!is_widening_conversion(
+            &DataType::LargeUtf8,
+            &DataType::Utf8
+        ));
+    }
+
+    #[test]
+    fn test_schema_cache_new() {
+        let schema = Schema::new(vec![
+            Field::new("field1", DataType::Int32, false),
+            Field::new("field2", DataType::Utf8, false),
+        ]);
+
+        let cache = SchemaCache::new(schema.clone());
+        assert_eq!(cache.schema().fields().len(), 2);
+        assert_eq!(cache.fields_map().len(), 2);
+        assert!(!cache.hash_key().is_empty());
+    }
+
+    #[test]
+    fn test_schema_cache_contains_field() {
+        let schema = Schema::new(vec![
+            Field::new("field1", DataType::Int32, false),
+            Field::new("field2", DataType::Utf8, false),
+        ]);
+
+        let cache = SchemaCache::new(schema);
+        assert!(cache.contains_field("field1"));
+        assert!(cache.contains_field("field2"));
+        assert!(!cache.contains_field("field3"));
+    }
+
+    #[test]
+    fn test_schema_cache_field_with_name() {
+        let schema = Schema::new(vec![
+            Field::new("field1", DataType::Int32, false),
+            Field::new("field2", DataType::Utf8, false),
+        ]);
+
+        let cache = SchemaCache::new(schema);
+        let field = cache.field_with_name("field1");
+        assert!(field.is_some());
+        assert_eq!(field.unwrap().name(), "field1");
+
+        let field = cache.field_with_name("nonexistent");
+        assert!(field.is_none());
+    }
+
+    #[test]
+    fn test_schema_cache_size() {
+        let schema = Schema::new(vec![
+            Field::new("field1", DataType::Int32, false),
+            Field::new("field2", DataType::Utf8, false),
+        ]);
+
+        let cache = SchemaCache::new(schema);
+        let size = cache.size();
+        assert!(size > 0);
+    }
+
+    #[test]
+    fn test_schema_cache_hash_key() {
+        let schema1 = Schema::new(vec![Field::new("field1", DataType::Int32, false)]);
+        let schema2 = Schema::new(vec![Field::new("field2", DataType::Utf8, false)]);
+
+        let cache1 = SchemaCache::new(schema1.clone());
+        let cache2 = SchemaCache::new(schema2);
+        let cache3 = SchemaCache::new(schema1.clone());
+
+        // Different schemas should have different hash keys
+        assert_ne!(cache1.hash_key(), cache2.hash_key());
+        // Same schema should have same hash key
+        assert_eq!(cache1.hash_key(), cache3.hash_key());
+    }
+
+    #[test]
+    fn test_get_merge_schema_changes_multiple_fields() {
+        // Test with multiple fields and mixed changes
+        let schema = Schema::new(vec![
+            Field::new("field1", DataType::Int32, false),
+            Field::new("field2", DataType::Utf8, false),
+            Field::new("field3", DataType::Float32, false),
+        ]);
+
+        let inferred_schema = Schema::new(vec![
+            Field::new("field1", DataType::Int64, false), // Widening
+            Field::new("field2", DataType::Utf8, false),  // No change
+            Field::new("field3", DataType::Float64, false), // Widening
+            Field::new("field4", DataType::Boolean, false), // New field
+        ]);
+
+        let (is_changed, delta, merged) = get_merge_schema_changes(&schema, &inferred_schema);
+        assert!(is_changed);
+        assert_eq!(delta.len(), 2); // Two widening conversions
+        assert_eq!(merged.len(), 4); // All four fields
     }
 }

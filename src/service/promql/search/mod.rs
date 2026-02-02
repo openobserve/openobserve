@@ -22,32 +22,35 @@ use config::{
     get_config,
     meta::{
         cluster::RoleGroup,
+        promql::value::*,
         search::ScanStats,
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
     utils::{
-        rand::generate_random_string,
         time::{now_micros, second_micros},
+        took_watcher::TookWatcher,
     },
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes, Result};
+use infra::{
+    client::grpc::make_grpc_metrics_client,
+    cluster::get_cached_online_querier_nodes,
+    errors::{Error, ErrorCodes, Result},
+};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::WorkGroup;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 
-use crate::{
-    common::infra::cluster,
-    service::{
-        grpc::make_grpc_metrics_client,
-        promql::{
-            DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
-            micros, value::*,
-        },
-        search::server_internal_error,
-        self_reporting::report_request_usage_stats,
+use crate::service::{
+    promql::{
+        DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
+        micros,
     },
+    search::server_internal_error,
+    self_reporting::report_request_usage_stats,
 };
 
 mod cache;
@@ -70,10 +73,12 @@ pub async fn search(
     req: &MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
+    is_super_cluster: bool,
 ) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.timeout = timeout;
+    req.is_super_cluster = is_super_cluster;
     search_in_cluster(trace_id, req, user_email).await
 }
 
@@ -83,9 +88,14 @@ async fn search_in_cluster(
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
 ) -> Result<Value> {
-    let op_start = std::time::Instant::now();
+    let mut stop_watch = TookWatcher::new();
     let started_at = now_micros();
     let cfg = get_config();
+    let timeout = if req.timeout > 0 {
+        req.timeout as u64
+    } else {
+        cfg.limit.query_timeout
+    };
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -93,26 +103,53 @@ async fn search_in_cluster(
         end,
         step,
         query_exemplars,
+        query_data: _,
+        label_selector: _,
     } = req.query.as_ref().unwrap();
 
-    // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
-    let cache_disabled =
-        !cfg.common.metrics_cache_enabled || req.no_cache || start == end || step == 0;
+    // cache enabled if result cache is enabled and use_cache is true and start != end
+    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end;
     // adjust start and end time
-    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
+    let (start, end) = adjust_start_end(start, end, step);
 
     log::info!(
-        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
-        cache_disabled,
+        use_cache,
         start,
         end,
         step,
         query,
     );
 
+    // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
+    #[cfg(not(feature = "enterprise"))]
+    let _lock = crate::service::search::work_group::check_work_group(
+        trace_id,
+        &req.org_id,
+        timeout,
+        &mut stop_watch,
+        "metrics",
+    )
+    .await
+    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+    // Enterprise: Always use Short workgroup for metrics queries
+    #[cfg(feature = "enterprise")]
+    let _lock = crate::service::search::work_group::check_work_group(
+        trace_id,
+        &req.org_id,
+        Some(user_email),
+        timeout,
+        WorkGroup::Short,
+        &mut stop_watch,
+        "metrics",
+    )
+    .await
+    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
     // get querier nodes from cluster
-    let mut nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let mut nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio
@@ -129,26 +166,25 @@ async fn search_in_cluster(
 
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
-    let partition_step = max(micros(DEFAULT_LOOKBACK), step);
-    let nr_steps = match (end - start) / partition_step {
-        0 => 1,
-        n => n,
-    };
+    let partition_step = max(micros(DEFAULT_LOOKBACK) * 2, step);
+    let nr_steps = (end - start + partition_step - 1) / partition_step;
 
     // get cache data
     let original_start = start;
-    let (start, cached_values) = if cache_disabled {
+    let (start, cached_values) = if !use_cache {
         (start, vec![])
     } else {
         let start_time = std::time::Instant::now();
         match cache::get(query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
+                let cache_ratio = (new_start - start) as f64 / (end - start) as f64;
                 config::metrics::QUERY_METRICS_CACHE_RATIO
                     .with_label_values(&[&req.org_id])
-                    .observe((new_start - start) as f64 / (end - start) as f64);
+                    .observe(cache_ratio);
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->cache: hit cache, took: {took} ms"
+                    "[trace_id {trace_id}] promql->search->cache: hit cache, cache ratio: {:.2}%, took: {took} ms",
+                    cache_ratio * 100.0,
                 );
                 (new_start, values)
             }
@@ -164,10 +200,11 @@ async fn search_in_cluster(
     if start > end && !cached_values.is_empty() {
         log::info!("[trace_id {trace_id}] promql->search->cache: hit full cache");
         let values = if query_exemplars {
-            merge_exemplars_query(&cached_values)
+            merge_exemplars_query(&cached_values, &req.org_id).await?
         } else {
-            merge_matrix_query(&cached_values)
+            merge_matrix_query(&cached_values, &req.org_id).await?
         };
+
         return Ok(values);
     }
 
@@ -191,13 +228,13 @@ async fn search_in_cluster(
 
     let job = cluster_rpc::Job {
         trace_id: trace_id.to_string(),
-        job: generate_random_string(7),
+        job: trace_id[..7].to_string(),
         stage: 0,
         partition: 0,
     };
 
     // make cluster request
-    let mut tasks = Vec::new();
+    let mut tasks = Vec::with_capacity(nodes.len());
     let mut worker_start = start;
     for node in nodes.iter() {
         let node = node.clone();
@@ -243,9 +280,8 @@ async fn search_in_cluster(
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {:?}",
+                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {err:?}",
                             &node.get_grpc_addr(),
-                            err
                         );
                         let err = ErrorCodes::from_json(err.message())
                             .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
@@ -255,9 +291,8 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {} bytes, took: {} ms",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {req_need_wal}, files: {}, scan_size: {} mb, took: {} ms",
                     &node.get_grpc_addr(),
-                    req_need_wal,
                     scan_stats.files,
                     scan_stats.original_size,
                     response.took,
@@ -269,7 +304,7 @@ async fn search_in_cluster(
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     let task_results = match try_join_all(tasks).await {
         Ok(res) => res,
         Err(err) => {
@@ -279,7 +314,12 @@ async fn search_in_cluster(
         }
     };
     for res in task_results {
-        results.push(res?);
+        match res {
+            Ok(response) => results.push(response),
+            Err(err) => {
+                return Err(err);
+            }
+        }
     }
 
     // merge multiple instances data
@@ -309,27 +349,30 @@ async fn search_in_cluster(
 
     // merge result
     let values = if result_type == "matrix" {
-        merge_matrix_query(&series_data)
+        merge_matrix_query(&series_data, &req.org_id).await?
     } else if result_type == "vector" {
-        merge_vector_query(&series_data)
+        merge_vector_query(&series_data, &req.org_id).await?
     } else if result_type == "scalar" {
         merge_scalar_query(&series_data)
     } else if result_type == "exemplars" {
-        merge_exemplars_query(&series_data)
+        merge_exemplars_query(&series_data, &req.org_id).await?
     } else {
-        return Err(server_internal_error("invalid result type"));
+        return Err(server_internal_error(format!(
+            "invalid result type: {result_type}"
+        )));
     };
+    let result_time = stop_watch.record_split("result").as_secs_f64();
     log::info!(
-        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} bytes, took: {} ms",
+        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} mb, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
-        op_start.elapsed().as_millis(),
+        (result_time * 1000.0) as u64,
     );
 
     let req_stats = RequestStats {
         records: scan_stats.records,
         size: scan_stats.original_size as f64,
-        response_time: op_start.elapsed().as_secs_f64(),
+        response_time: result_time,
         request_body: Some(query.to_string()),
         user_email: Some(user_email.to_string()),
         min_ts: Some(start),
@@ -350,7 +393,7 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if !cache_disabled
+    if cfg.common.result_cache_enabled
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -360,16 +403,22 @@ async fn search_in_cluster(
             end,
             step,
             matrix.to_vec(),
+            !use_cache, // if the query with use_cache=false, we should update the exist cache
         )
         .await
     {
         log::error!("[trace_id {trace_id}] promql->search->cache: set cache err: {err:?}");
     }
 
+    log::info!(
+        "[trace_id {trace_id}] promql->search search finished {}",
+        stop_watch.get_summary()
+    );
+
     Ok(values)
 }
 
-fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -397,22 +446,22 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 })
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            (
-                sig,
-                RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples),
-            )
+            RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
         .collect::<Vec<_>>();
-    // sort by signature
-    merged_data.sort_by(|a, b| a.0.cmp(&b.0));
-    let merged_data = merged_data.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
+
+    // Check series limit and truncate if necessary
+    let max_limit = get_max_series_limit(org_id).await;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
-    value
+    Ok(value)
 }
 
-fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
@@ -427,7 +476,7 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
             merged_metrics.insert(signature(&labels), labels);
         }
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, sample)| InstantValue {
             labels: merged_metrics.get(&sig).unwrap().to_owned(),
@@ -435,9 +484,15 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
         })
         .collect::<Vec<_>>();
 
+    // Check series limit and truncate if necessary
+    let max_limit = get_max_series_limit(org_id).await;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
+
     let mut value = Value::Vector(merged_data);
     value.sort();
-    value
+    Ok(value)
 }
 
 fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
@@ -452,7 +507,7 @@ fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
     Value::Sample(sample)
 }
 
-fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -474,7 +529,7 @@ fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
             });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, exemplars)| {
             let mut exemplars: Vec<Arc<Exemplar>> = exemplars
@@ -484,9 +539,118 @@ fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
             exemplars.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             RangeValue::new_with_exemplars(merged_metrics.get(&sig).unwrap().to_owned(), exemplars)
         })
-        .collect();
+        .collect::<Vec<_>>();
+
+    // Check series limit and truncate if necessary
+    let max_limit = get_max_series_limit(org_id).await;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
-    value
+    Ok(value)
+}
+
+/// Get the maximum series limit for the organization.
+///
+/// Fetches the org-specific setting if available, otherwise falls back
+/// to the system-wide ENV configuration default (ZO_METRICS_MAX_SERIES_RESPONSE).
+///
+/// # Arguments
+/// * `org_id` - The organization identifier
+///
+/// # Returns
+/// Maximum number of series allowed per PromQL query
+///
+/// # Note
+/// This function is called for every PromQL query. Consider caching org settings
+/// with a TTL to reduce database load in high-throughput scenarios.
+async fn get_max_series_limit(org_id: &str) -> usize {
+    match crate::service::db::organization::get_org_setting(org_id).await {
+        Ok(settings) => settings.max_series_per_query.unwrap_or_else(|| {
+            let cfg = get_config();
+            cfg.limit.metrics_max_series_response
+        }),
+        Err(err) => {
+            log::warn!(
+                "Failed to fetch org settings for {}, using default limit: {:?}",
+                org_id,
+                err
+            );
+            let cfg = get_config();
+            cfg.limit.metrics_max_series_response
+        }
+    }
+}
+
+/// Check if series count exceeds the limit and log a warning if truncation is needed.
+///
+/// This function does not return an error. Instead, it logs a warning when the series
+/// count exceeds the limit, allowing the caller to truncate the results.
+///
+/// # Arguments
+/// * `series_count` - The actual number of series in the result
+/// * `max_limit` - The maximum allowed series limit
+///
+/// # Returns
+/// `true` if series count exceeds limit (truncation needed), `false` otherwise
+fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
+    if series_count > max_limit {
+        log::warn!(
+            "Query result exceeds maximum allowed series limit. Returning first {} series out of {}. \
+             You can increase this limit via organization settings or ZO_METRICS_MAX_SERIES_RESPONSE environment variable.",
+            max_limit,
+            series_count
+        );
+        true
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_truncate_series_within_limit() {
+        // Test series count within limit - should not truncate
+        assert!(!should_truncate_series(1000, 10000));
+
+        // Test series count exactly at limit - should not truncate
+        assert!(!should_truncate_series(10000, 10000));
+    }
+
+    #[test]
+    fn test_should_truncate_series_exceeds_limit() {
+        // Test series count exceeds limit - should truncate
+        assert!(should_truncate_series(10001, 10000));
+        assert!(should_truncate_series(50000, 10000));
+    }
+
+    #[test]
+    fn test_should_truncate_series_edge_cases() {
+        // Test zero series - should not truncate
+        assert!(!should_truncate_series(0, 1000));
+
+        // Test with limit of 1
+        assert!(!should_truncate_series(0, 1));
+        assert!(!should_truncate_series(1, 1));
+        assert!(should_truncate_series(2, 1));
+    }
+
+    #[tokio::test]
+    async fn test_get_max_series_limit_fallback_to_env_default() {
+        // Test that get_max_series_limit falls back to ENV default
+        // when org settings cannot be fetched (e.g., org doesn't exist)
+        let limit = get_max_series_limit("nonexistent_test_org_123456").await;
+
+        // Should return the default from config
+        let expected_default = get_config().limit.metrics_max_series_response;
+        assert_eq!(limit, expected_default);
+
+        // Verify the default is the expected value (40,000)
+        assert_eq!(expected_default, 40_000);
+    }
 }

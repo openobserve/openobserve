@@ -31,7 +31,7 @@ use config::{
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
         size::bytes_to_human_readable,
-        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
+        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
     },
 };
@@ -50,13 +50,12 @@ use tokio_stream::StreamExt as _;
 use tracing::Instrument;
 
 use crate::service::{
-    db, file_list,
+    file_list,
     search::{
         datafusion::exec::TableBuilder,
-        generate_search_schema_diff,
         grpc::{
+            tantivy_result::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
-            utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
         },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -77,75 +76,34 @@ pub async fn search(
     file_list: &[FileKey],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
-    index_condition: Option<IndexCondition>,
+    mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
+    let trace_id = &query.trace_id;
     let enter_span = tracing::span::Span::current();
-    log::info!("[trace_id {}] search->storage: enter", query.trace_id);
-    // fetch all schema versions, group files by version
-    let schema_versions = match infra::schema::get_versions(
-        &query.org_id,
-        &query.stream_name,
-        query.stream_type,
-        query.time_range,
-    )
-    .instrument(enter_span.clone())
-    .await
-    {
-        Ok(versions) => versions,
-        Err(err) => {
-            log::error!("[trace_id {}] get schema error: {}", query.trace_id, err);
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                query.stream_name.clone(),
-            )));
-        }
-    };
-    log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, get schema versions num {}",
-        query.trace_id,
-        query.org_id,
-        query.stream_type,
-        query.stream_name,
-        schema_versions.len()
-    );
-    if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new()));
-    }
-    let latest_schema_id = schema_versions.len() - 1;
-
+    log::info!("[trace_id {trace_id}] search->storage: enter");
     // get file list
     let mut files = file_list.to_vec();
     if files.is_empty() {
-        return Ok((vec![], ScanStats::default()));
+        return Ok((vec![], ScanStats::default(), HashSet::new()));
     }
     let original_files_len = files.len();
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load file_list num {}",
-        query.trace_id,
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
         query.org_id,
         query.stream_type,
         query.stream_name,
         files.len(),
     );
 
-    let (use_inverted_index, tantivy_condition, datafusion_condition) =
-        check_inverted_index(query.clone(), index_condition);
-    log::info!(
-        "[trace_id {}] flight->search: use_inverted_index {}, tantivy_condition {:?}, datafusion_condition {:?}",
-        query.trace_id,
-        use_inverted_index,
-        tantivy_condition,
-        datafusion_condition
-    );
-
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
-    if use_inverted_index {
+    if query.use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
-            tantivy_condition.clone(),
+            index_condition.clone(),
             idx_optimize_rule,
         )
         .await?;
@@ -154,13 +112,11 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {}] search->storage: stream {}/{}/{}, inverted index reduced file_list num to {} in {} ms",
-                    query.trace_id,
+                    "[trace_id {trace_id}] search->storage: stream {}/{}/{}, inverted index reduced file_list num to {} in {idx_took} ms",
                     query.org_id,
                     query.stream_type,
                     query.stream_name,
                     files.len(),
-                    idx_took
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
@@ -168,21 +124,13 @@ pub async fn search(
                     .search_role("follower".to_string())
                     .duration(idx_took)
                     .desc(format!(
-                        "inverted index reduced file_list from {} to {} in {} ms",
-                        original_files_len,
+                        "inverted index reduced file_list from {original_files_len} to {} in {idx_took} ms",
                         files.len(),
-                        idx_took
                     ))
                     .build()
             )
         );
     }
-
-    let mut index_condition = generate_add_filter_back_condition(
-        tantivy_condition,
-        datafusion_condition,
-        &mut is_add_filter_back, // pass by reference to modify the value
-    );
 
     // set index_condition to None, means we do not need to add filter back
     if !is_add_filter_back {
@@ -190,67 +138,19 @@ pub async fn search(
         fst_fields = vec![];
     }
 
-    log::info!(
-        "[trace_id {}] search->storage: add filter back index_condition {:?}, is_add_filter_back {}",
-        query.trace_id,
-        index_condition,
-        is_add_filter_back
-    );
-
     let cfg = get_config();
-    let mut files_group: HashMap<usize, Vec<FileKey>> =
-        HashMap::with_capacity(schema_versions.len());
-    let mut scan_stats = ScanStats::new();
-    if schema_versions.len() == 1 {
-        let files = files.to_vec();
-        scan_stats = match file_list::calculate_files_size(&files).await {
-            Ok(size) => size,
-            Err(err) => {
-                log::error!(
-                    "[trace_id {}] calculate files size error: {err}",
-                    query.trace_id
-                );
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    "calculate files size error".to_string(),
-                )));
-            }
-        };
-        files_group.insert(latest_schema_id, files);
-    } else {
-        scan_stats.files = files.len() as i64;
-        for file in files.iter() {
-            // calculate scan size
-            scan_stats.records += file.meta.records;
-            scan_stats.original_size += file.meta.original_size;
-            scan_stats.compressed_size += file.meta.compressed_size;
-            scan_stats.idx_scan_size += file.meta.index_size;
-            // check schema version
-            let schema_ver_id = match db::schema::filter_schema_version_id(
-                &schema_versions,
-                file.meta.min_ts,
-                file.meta.max_ts,
-            ) {
-                Some(id) => id,
-                None => {
-                    log::error!(
-                        "[trace_id {}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
-                        query.trace_id,
-                        &file.key,
-                        file.meta.min_ts,
-                        file.meta.max_ts
-                    );
-                    // HACK: use the latest version if not found in schema versions
-                    latest_schema_id
-                }
-            };
-            let group = files_group.entry(schema_ver_id).or_default();
-            group.push(file.clone());
+    let mut scan_stats = match file_list::calculate_files_size(&files).await {
+        Ok(size) => size,
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] calculate files size error: {err}",);
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                "calculate files size error".to_string(),
+            )));
         }
-    }
+    };
 
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
-        query.trace_id,
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
         query.org_id,
         query.stream_type,
         query.stream_name,
@@ -282,14 +182,14 @@ pub async fn search(
         "parquet",
     )
     .instrument(enter_span.clone())
-    .await?;
+    .await;
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
         .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
         .inc_by(cache_misses);
 
     scan_stats.idx_took = idx_took as i64;
@@ -307,8 +207,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.org_id,
                 query.stream_type,
                 query.stream_name,
@@ -348,52 +247,34 @@ pub async fn search(
         cfg.limit.cpu_num
     };
 
-    // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
-    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
-    for field in latest_schema.fields() {
-        latest_schema_map.insert(field.name(), field);
-    }
-
-    let mut tables = Vec::new();
     let start = std::time::Instant::now();
-    for (ver, files) in files_group {
-        if files.is_empty() {
-            continue;
-        }
-        let schema = schema_versions[ver]
-            .clone()
-            .with_metadata(Default::default());
-        let schema = utils::change_schema_to_utf8_view(schema);
 
-        let session = config::meta::search::Session {
-            id: format!("{}-storage-{ver}", query.trace_id),
-            storage_type: StorageType::Memory,
-            work_group: query.work_group.clone(),
-            target_partitions,
-        };
+    let session = config::meta::search::Session {
+        id: format!("{trace_id}-storage"),
+        storage_type: StorageType::Memory,
+        work_group: query.work_group.clone(),
+        target_partitions,
+    };
 
-        log::debug!("search->storage: session target_partitions: {target_partitions}");
+    log::debug!("search->storage: session target_partitions: {target_partitions}");
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        let table = TableBuilder::new()
-            .rules(diff_fields)
-            .sorted_by_time(sorted_by_time)
-            .file_stat_cache(file_stat_cache.clone())
-            .index_condition(index_condition.clone())
-            .fst_fields(fst_fields.clone())
-            .need_optimize_partition(true)
-            .build(session, &files, latest_schema.clone())
-            .await?;
-        tables.push(table);
-    }
+    let table = TableBuilder::new()
+        .sorted_by_time(sorted_by_time)
+        .file_stat_cache(file_stat_cache.clone())
+        .index_condition(index_condition.clone())
+        .fst_fields(fst_fields.clone())
+        .build(
+            session,
+            files,
+            Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
+        )
+        .await?;
 
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->storage: create tables took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->storage: create tables took: {} ms",
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
@@ -404,88 +285,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((tables, scan_stats))
-}
-
-// if Condition::All() -> disable inverted index
-// if negated condition
-//    1. split the negated condition into two parts (negative_conditions, positive_conditions)
-//    2. if negative_conditions is empty or enable not filter env, use inverted index
-//    3. if negative_conditions is not empty and positive_conditions is empty, do not use inverted
-//       index
-//    4. if negative_conditions is not empty and positive_conditions is not empty, use
-//       positive_conditions search tantivy, and if search error add filter back, always add
-//       negative_conditions to filter back
-// return
-//     1. use_inverted_index,
-//     2. index_condition(positive conditions used for tantivy search, if search tantivy error, also
-//        need add filter back)
-//     3. index_condition(negative conditions used for add filter back),
-fn check_inverted_index(
-    query: Arc<super::QueryParams>,
-    index_condition: Option<IndexCondition>,
-) -> (bool, Option<IndexCondition>, Option<IndexCondition>) {
-    if !query.use_inverted_index || index_condition.is_none() {
-        return (false, None, None);
-    }
-
-    // Condition:All() means search tantivy without filter,
-    // so we should not use inverted index in datafusion search
-    // Condition:All() is used for TantivyOptimizeExec
-    let index_condition = index_condition.unwrap();
-    if index_condition.is_condition_all() {
-        return (false, None, None);
-    }
-
-    // negative conditions with TantivyOptimizeExec is fast,
-    // but for row_ids it only fast when row_ids is small
-    // only positive conditions or enable not filter env, use inverted index
-    if get_config().common.feature_query_not_filter_with_index
-        || !index_condition.is_negated_condition()
-    {
-        return (true, Some(index_condition), None);
-    }
-
-    // only negative conditions, do not use inverted index
-    let (positive_conditions, negative_conditions) = index_condition.split_condition_by_negated();
-    if positive_conditions.is_empty() {
-        return (false, None, Some(negative_conditions));
-    }
-
-    // positive and negative conditions, use inverted index
-    (true, Some(positive_conditions), Some(negative_conditions))
-}
-
-fn generate_add_filter_back_condition(
-    tantivy_condition: Option<IndexCondition>,
-    datafusion_condition: Option<IndexCondition>,
-    is_add_filter_back: &mut bool,
-) -> Option<IndexCondition> {
-    // early return if tantivy_condition or datafusion_condition is None
-    if tantivy_condition.is_none() && datafusion_condition.is_none() {
-        return None;
-    }
-
-    // if have datafusion_condition, always add filter back
-    if datafusion_condition.is_some() {
-        let mut index_condition = datafusion_condition.clone();
-        if let Some(tantivy_cond) = tantivy_condition.as_ref()
-            && *is_add_filter_back
-        {
-            index_condition
-                .as_mut()
-                .unwrap()
-                .add_index_condition(tantivy_cond.clone());
-        }
-        *is_add_filter_back = true;
-        return index_condition;
-    }
-
-    if *is_add_filter_back {
-        return tantivy_condition;
-    }
-
-    None
+    Ok((vec![table], scan_stats, HashSet::new()))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
@@ -494,7 +294,7 @@ pub async fn cache_files(
     files: &[(i64, &String, &String, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
-) -> Result<(file_data::CacheType, u64, u64), Error> {
+) -> (file_data::CacheType, u64, u64) {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
@@ -550,7 +350,7 @@ pub async fn cache_files(
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
-        return Ok((file_data::CacheType::Disk, cache_hits, cache_misses));
+        return (file_data::CacheType::Disk, cache_hits, cache_misses);
     }
 
     // check cache size
@@ -568,7 +368,7 @@ pub async fn cache_files(
         file_data::CacheType::Disk
     } else {
         // no cache, the files are too big than cache size
-        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
+        return (file_data::CacheType::None, cache_hits, cache_misses);
     };
 
     let trace_id = trace_id.to_string();
@@ -610,9 +410,9 @@ pub async fn cache_files(
     // if cached file less than 50% of the total files, return None
     if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
     {
-        Ok((file_data::CacheType::None, cache_hits, cache_misses))
+        (file_data::CacheType::None, cache_hits, cache_misses)
     } else {
-        Ok((cache_type, cache_hits, cache_misses))
+        (cache_type, cache_hits, cache_misses)
     }
 }
 
@@ -660,14 +460,14 @@ pub async fn tantivy_search(
         &mut scan_stats,
         "index",
     )
-    .await?;
+    .await;
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
         .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
         .inc_by(cache_misses);
 
     let cached_ratio = (scan_stats.querier_memory_cached_files
@@ -725,7 +525,7 @@ pub async fn tantivy_search(
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
-    let time_range = query.time_range.unwrap_or((0, 0));
+    let time_range = query.time_range.unwrap_or_default();
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (index_parquet_files, query_limit) =
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);
@@ -875,7 +675,7 @@ pub async fn tantivy_search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}, is_add_filter_back: {}, file_num: {}, took: {} ms",
                 query.trace_id,
                 index_condition,
                 tantivy_result,
@@ -889,7 +689,7 @@ pub async fn tantivy_search(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {} , is_add_filter_back: {}, file_num: {}",
+                    "found {}, is_add_filter_back: {}, file_num: {}",
                     tantivy_result,
                     is_add_filter_back,
                     file_list_map.len(),
@@ -942,12 +742,12 @@ async fn search_tantivy_index(
     let mut cache_key = String::new();
     if cfg.common.inverted_index_result_cache_enabled {
         metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .inc();
         cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
         if let Some(result) = tantivy_result_cache::GLOBAL_CACHE.get(&cache_key) {
             metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
-                .with_label_values(&[])
+                .with_label_values::<&str>(&[])
                 .inc();
             return Ok((parquet_file.key.to_string(), result));
         }
@@ -972,7 +772,7 @@ async fn search_tantivy_index(
     let index = tantivy::Index::open(reader_directory)?;
     index
         .tokenizers()
-        .register(O2_TOKENIZER, o2_tokenizer_build());
+        .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Search));
     let reader = index
         .reader_builder()
         .reload_policy(tantivy::ReloadPolicy::Manual)
@@ -1083,6 +883,10 @@ async fn search_tantivy_index(
             let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
             if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
                 // return empty file name means we need to add filter back and skip tantivy search
+                log::info!(
+                    "search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
+                    parquet_file.key
+                );
                 return Ok((
                     "".to_string(),
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
@@ -1309,7 +1113,10 @@ mod tests {
     use config::meta::stream::FileMeta;
 
     use super::*;
-    use crate::service::search::grpc::QueryParams;
+    use crate::service::search::{
+        grpc::tantivy_result::TantivyResult,
+        index::{Condition, IndexCondition},
+    };
 
     fn create_file_key(min_ts: i64, max_ts: i64) -> FileKey {
         FileKey {
@@ -1516,172 +1323,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_inverted_index_disabled_by_config() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: false,
-        });
-        let index_condition = Some(crate::service::search::index::IndexCondition::default());
-
-        let result = check_inverted_index(query, index_condition);
-        assert!(!result.0);
-        assert!(result.1.is_none());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_check_inverted_index_no_condition() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: true,
-        });
-
-        let result = check_inverted_index(query, None);
-        assert!(!result.0);
-        assert!(result.1.is_none());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_check_inverted_index_condition_all() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: true,
-        });
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::All());
-
-        let result = check_inverted_index(query, Some(index_condition));
-        assert!(!result.0);
-        assert!(result.1.is_none());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_check_inverted_index_positive_condition() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: true,
-        });
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        let result = check_inverted_index(query, Some(index_condition));
-        assert!(result.0);
-        assert!(result.1.is_some());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_both_none() {
-        let mut is_add_filter_back = false;
-        let result = generate_add_filter_back_condition(None, None, &mut is_add_filter_back);
-        assert!(result.is_none());
-        assert!(!is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_only_datafusion() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut datafusion_condition = IndexCondition::new();
-        datafusion_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        let mut is_add_filter_back = false;
-
-        let result = generate_add_filter_back_condition(
-            None,
-            Some(datafusion_condition),
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_some());
-        assert!(is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_with_both() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut tantivy_condition = IndexCondition::new();
-        tantivy_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        let mut datafusion_condition = IndexCondition::new();
-        datafusion_condition
-            .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
-
-        let mut is_add_filter_back = true;
-
-        let result = generate_add_filter_back_condition(
-            Some(tantivy_condition),
-            Some(datafusion_condition),
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_some());
-        assert!(is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_only_tantivy_no_filter_back() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut tantivy_condition = IndexCondition::new();
-        tantivy_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        let mut is_add_filter_back = false;
-
-        let result = generate_add_filter_back_condition(
-            Some(tantivy_condition),
-            None,
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_none());
-        assert!(!is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_only_tantivy_with_filter_back() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut tantivy_condition = IndexCondition::new();
-        tantivy_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        let mut is_add_filter_back = true;
-
-        let result = generate_add_filter_back_condition(
-            Some(tantivy_condition),
-            None,
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_some());
-        assert!(is_add_filter_back);
-    }
-
-    #[test]
     fn test_get_simple_distinct_field_none() {
         let idx_optimize_rule = None;
         let result = get_simple_distinct_field(&idx_optimize_rule);
@@ -1781,8 +1422,6 @@ mod tests {
 
     #[test]
     fn test_generate_cache_key_valid() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
         let mut index_condition = IndexCondition::new();
         index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
         let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
@@ -1791,5 +1430,189 @@ mod tests {
         let result = generate_cache_key(&Some(index_condition), &idx_optimize_rule, parquet_file);
         assert!(!result.is_empty());
         assert!(result.contains("file_1_10"));
+    }
+
+    #[test]
+    fn test_get_cache_entry_row_ids_bitvec_small_percent() {
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(2, true);
+        let result = TantivyResult::RowIdsBitVec(2, bitvec);
+        let percent = 0.5; // Less than 1.0, should use roaring bitmap
+        let parquet_rows = 4;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::RowIdsRoaring(num_rows, roaring, rows) => {
+                assert_eq!(num_rows, 2);
+                assert_eq!(rows, 4);
+                assert_eq!(roaring.len(), 2); // Should contain positions 0 and 2
+                assert!(roaring.contains(0));
+                assert!(roaring.contains(2));
+            }
+            _ => panic!("Expected RowIdsRoaring cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_row_ids_bitvec_large_percent() {
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(1, true);
+        bitvec.set(3, true);
+        let result = TantivyResult::RowIdsBitVec(3, bitvec);
+        let percent = 2.0; // Greater than 1.0, should use bitvec
+        let parquet_rows = 4;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::RowIdsBitVec(num_rows, returned_bitvec) => {
+                assert_eq!(num_rows, 3);
+                assert_eq!(returned_bitvec.len(), 4);
+                assert_eq!(returned_bitvec.get(0).unwrap(), true);
+                assert_eq!(returned_bitvec.get(1).unwrap(), true);
+                assert_eq!(returned_bitvec.get(2).unwrap(), false);
+                assert_eq!(returned_bitvec.get(3).unwrap(), true);
+            }
+            _ => panic!("Expected RowIdsBitVec cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_count() {
+        let result = TantivyResult::Count(42);
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Count(count) => {
+                assert_eq!(count, 42);
+            }
+            _ => panic!("Expected Count cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_histogram() {
+        let histogram_data = vec![1, 2, 3, 4];
+        let result = TantivyResult::Histogram(histogram_data.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Histogram(histogram) => {
+                assert_eq!(histogram, histogram_data);
+            }
+            _ => panic!("Expected Histogram cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_distinct() {
+        let mut distinct_values = HashSet::new();
+        distinct_values.insert("value1".to_string());
+        distinct_values.insert("value2".to_string());
+        let result = TantivyResult::Distinct(distinct_values.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Distinct(distinct) => {
+                assert_eq!(distinct, distinct_values);
+            }
+            _ => panic!("Expected Distinct cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_into_chunks_exact_divisible() {
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let chunks = into_chunks(v, 2);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], vec![1, 2]);
+        assert_eq!(chunks[1], vec![3, 4]);
+        assert_eq!(chunks[2], vec![5, 6]);
+    }
+
+    #[test]
+    fn test_into_chunks_empty_vector() {
+        let v: Vec<i32> = vec![];
+        let chunks = into_chunks(v, 3);
+
+        assert_eq!(chunks.len(), 0);
+    }
+
+    #[test]
+    fn test_into_chunks_chunk_size_larger_than_vector() {
+        let v = vec![1, 2];
+        let chunks = into_chunks(v, 5);
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], vec![1, 2]);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups_empty() {
+        let groups: Vec<Vec<FileKey>> = vec![];
+        let result = repartition_sorted_groups(groups, 2);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups_no_split_needed() {
+        let groups = vec![vec![create_file_key(1, 10)], vec![create_file_key(11, 20)]];
+        let expect_group_elements = 2;
+        let result = repartition_sorted_groups(groups.clone(), expect_group_elements);
+
+        // Should remain unchanged since groups are already small enough
+        assert_eq!(result, groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_single_file() {
+        let files = vec![create_file_key(1, 10)];
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].len(), 1);
+        assert_eq!(groups[0][0].key, "file_1_10");
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_no_overlap_many_partitions() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+        ];
+        let partition_num = 10; // More partitions than files
+        let groups = group_files_by_time_range(files, partition_num);
+
+        // Should create separate groups for non-overlapping files
+        assert_eq!(groups.len(), 3);
+        for group in &groups {
+            assert_eq!(group.len(), 1); // Each file should be in its own group
+        }
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_many_single_element_groups() {
+        let file_groups = vec![
+            vec![create_file_key(1, 10)],
+            vec![create_file_key(11, 20)],
+            vec![create_file_key(21, 30)],
+        ];
+        let result = regroup_tantivy_files(file_groups);
+
+        assert_eq!(result.len(), 1); // Max group length is 1
+        assert_eq!(result[0].len(), 3); // Should contain all files
+        assert_eq!(result[0][0].key, "file_1_10");
+        assert_eq!(result[0][1].key, "file_11_20");
+        assert_eq!(result[0][2].key, "file_21_30");
     }
 }

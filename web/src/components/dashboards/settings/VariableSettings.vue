@@ -31,24 +31,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- show variables dependencies if variables exist -->
             <q-btn
               v-if="dashboardVariablesList.length > 0"
-              class="text-bold no-border q-ml-md"
+              class="text-bold no-border q-ml-md o2-secondary-button tw:h-[36px]"
               no-caps
               no-outline
-              rounded
-              color="primary"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              flat
               label="Show Dependencies"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
             />
             <q-btn
-              class="text-bold no-border q-ml-md"
-              no-caps
-              no-outline
-              rounded
-              color="secondary"
+              class="text-bold no-border q-ml-md o2-primary-button tw:h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
+              flat
               :label="t(`dashboard.newVariable`)"
               @click="addVariables"
-              data-test="dashboard-variable-add-btn"
+              data-test="dashboard-add-variable-btn"
             />
           </div>
         </template>
@@ -60,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="header-item">{{ t("dashboard.name") }}</div>
           <div class="header-item">{{ t("dashboard.type") }}</div>
           <div class="header-item">{{ t("dashboard.selectType") }}</div>
+          <div class="header-item">Scope</div>
           <div class="header-item q-ml-lg q-pl-lg">
             {{ t("dashboard.actions") }}
           </div>
@@ -90,7 +97,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 {{ index < 9 ? `0${index + 1}` : index + 1 }}
               </div>
-              <div class="item-name">{{ variable.name }}</div>
+              <div class="item-name">
+                <span class="item-name-text">
+                  {{ variable.name }}
+                </span>
+                <q-tooltip
+                  v-if="variable.name.length > 30"
+                  style="word-wrap: break-word; white-space: normal;"
+                  class="variable-name-tooltip"
+                >
+                  {{ variable.name }}
+                </q-tooltip>
+              </div>
               <div>
                 {{ getVariableTypeLabel(variable.type) }}
               </div>
@@ -100,6 +118,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t("dashboard.isMultiSelect")
                     : t("dashboard.isSingleSelect")
                 }}
+              </div>
+              <div class="item-scope">
+                <div class="scope-info">
+                  <q-badge
+                    color="primary"
+                    v-if="getScopeType(variable) === 'global'"
+                  >
+                    Global
+                  </q-badge>
+                  <q-badge
+                    color="secondary"
+                    v-else-if="getScopeType(variable) === 'tabs'"
+                  >
+                    {{ variable.tabs?.length || 0 }} Tabs
+                  </q-badge>
+                  <q-badge
+                    color="teal"
+                    v-else-if="getScopeType(variable) === 'panels'"
+                  >
+                    {{ variable.panels?.length || 0 }} Panels
+                  </q-badge>
+
+                  <q-tooltip
+                    v-if="
+                      getScopeType(variable) === 'tabs' && variable.tabs?.length
+                    "
+                  >
+                    <div>Applied to tabs:</div>
+                    <div v-for="tabId in variable.tabs" :key="tabId">
+                      {{ getTabName(tabId) }}
+                    </div>
+                  </q-tooltip>
+
+                  <q-tooltip
+                    v-if="
+                      getScopeType(variable) === 'panels' &&
+                      variable.panels?.length
+                    "
+                  >
+                    <div>Applied to panels:</div>
+                    <div v-for="panelId in variable.panels" :key="panelId">
+                      {{ getPanelName(panelId) }}
+                    </div>
+                  </q-tooltip>
+                </div>
               </div>
               <div class="item-actions">
                 <q-btn
@@ -111,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   :title="t('dashboard.edit')"
                   @click="editVariableFn(variable.name)"
-                  data-test="dashboard-edit-variable"
+                  :data-test="`dashboard-edit-variable-${variable.name}`"
                 />
                 <q-btn
                   :icon="outlinedDelete"
@@ -163,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onActivated, reactive } from "vue";
+import { defineComponent, ref, onMounted, onActivated, reactive, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
@@ -241,6 +304,37 @@ export default defineComponent({
 
     const getVariableTypeLabel = (type: string) => {
       return variableTypes.find((vType) => vType.value === type)?.label || type;
+    };
+
+    // Function to determine the scope type of a variable
+    const getScopeType = (variable: any) => {
+      if (variable.panels && variable.panels.length > 0) {
+        return "panels";
+      } else if (variable.tabs && variable.tabs.length > 0) {
+        return "tabs";
+      } else {
+        return "global";
+      }
+    };
+
+    // Function to get tab name by ID
+    const getTabName = (tabId: string) => {
+      const tab = dashboardVariableData.data.tabs?.find(
+        (t: any) => t.tabId === tabId,
+      );
+      return tab ? tab.name : "Deleted Tab";
+    };
+
+    // Function to get panel name by ID
+    const getPanelName = (panelId: string) => {
+      // Look through all tabs to find the panel
+      for (const tab of dashboardVariableData.data.tabs || []) {
+        const panel = tab.panels?.find((p: any) => p.id === panelId);
+        if (panel) {
+          return `${tab.name} > ${panel.title || panel.id}`;
+        }
+      }
+      return "Deleted Panel";
     };
 
     const handleDragEnd = async () => {
@@ -339,9 +433,17 @@ export default defineComponent({
       }
     };
     const handleSaveVariable = async () => {
-      isAddVariable.value = false;
-      await getDashboardData();
-      emit("save");
+      try {
+        await getDashboardData();
+        emit("save");
+      } finally {
+        // Wait for next tick before switching views to ensure data is updated
+        await nextTick();
+        // Always go back to listing page after save, regardless of success or failure
+        isAddVariable.value = false;
+        // Wait for the listing view to render
+        await nextTick();
+      }
     };
     const goBackToDashboardList = () => {
       isAddVariable.value = false;
@@ -371,6 +473,9 @@ export default defineComponent({
       dragOptions,
       handleDragEnd,
       getVariableTypeLabel,
+      getScopeType,
+      getTabName,
+      getPanelName,
     };
   },
 });
@@ -385,10 +490,11 @@ export default defineComponent({
 
 .variables-list-header {
   display: grid;
-  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 120px;
+  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 100px 120px;
   padding: 8px 0;
   font-weight: 900;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
+  background-color: var(--o2-table-header-bg);
 
   .header-item {
     &:first-child {
@@ -402,9 +508,9 @@ export default defineComponent({
   grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
   border-radius: 4px;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
   &:hover {
-    background-color: #cccccc10;
+    background-color: var(--o2-hover-accent);
   }
 }
 
@@ -419,18 +525,50 @@ export default defineComponent({
 
 .draggable-content {
   display: grid;
-  grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 120px;
+  grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 100px 120px;
   align-items: center;
 
   // .item-name {
   //   padding-right: 16px;
   // }
 
+  .item-name-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .item-scope {
+    .scope-info {
+      display: flex;
+      align-items: center;
+
+      .q-badge {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+      }
+    }
+  }
+
   .item-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+
+    .q-btn {
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: var(--o2-hover-accent) !important;
+      }
+    }
   }
+}
+
+:deep(.variable-name-tooltip) {
+  max-width: 500px !important;
+  word-break: break-all;
 }
 
 :deep(.dark-mode) {

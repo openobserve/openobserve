@@ -14,13 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div data-test="add-role-section">
-        <div class="flex justify-between items-center q-px-md q-py-sm">
+  <q-card class="o2-side-dialog column full-height">
+    <q-card-section class="q-py-md tw:w-full">
+      <div class="row items-center no-wrap q-py-sm">
+        <div class="col">
           <div data-test="add-role-section-title" style="font-size: 18px">
             {{ t("iam.addRole") }}
           </div>
+        </div>
+        <div class="col-auto">
           <q-icon
             data-test="add-role-close-dialog-btn"
             name="cancel"
@@ -29,57 +31,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="emits('cancel:hideform')"
           />
         </div>
+      </div>
 
-        <div class="full-width bg-grey-4" style="height: 1px" />
+      <q-separator />
+      <div data-test="add-role-section">
+        <q-input
+          v-model.trim="name"
+          :label="t('common.name') + ' *'"
+          class="showLabelOnTop tw:mt-2"
+          stack-label
+          borderless
+          dense
+          :rules="[
+            (val: any, rules: any) =>
+              !!val
+                ? isValidRoleName ||
+                  `Use alphanumeric and '_' characters only, without spaces.`
+                : t('common.nameRequired'),
+          ]"
+          maxlength="100"
+          data-test="add-role-rolename-input-btn"
+          hide-bottom-space
+        >
+          <template v-slot:hint>
+            Use alphanumeric and '_' characters only, without spaces.
+          </template>
+        </q-input>
 
-        <div class="q-px-md q-mt-md o2-input">
-          <div data-test="add-role-rolename-input-btn">
-            <q-input
-              v-model.trim="name"
-              :label="t('common.name') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[
-                (val: any, rules: any) =>
-                  !!val
-                    ? isValidRoleName ||
-                      `Use alphanumeric and '_' characters only, without spaces.`
-                    : t('common.nameRequired'),
-              ]"
-              maxlength="100"
-            >
-              <template v-slot:hint>
-                Use alphanumeric and '_' characters only, without spaces.
-              </template>
-            </q-input>
-          </div>
-
-          <div class="flex justify-center q-mt-lg">
-            <q-btn
-              data-test="add-alert-cancel-btn"
-              v-close-popup="true"
-              class="q-mb-md text-bold"
-              :label="t('alerts.cancel')"
-              text-color="light-text"
-              padding="sm md"
-              no-caps
-              @click="$emit('cancel:hideform')"
-            />
-            <q-btn
-              data-test="add-alert-submit-btn"
-              :label="t('alerts.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
-              no-caps
-              @click="saveRole"
-            />
-          </div>
+        <div class="flex justify-start tw:mt-6">
+          <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw:h-[36px]"
+            :label="t('alerts.cancel')"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            @click="emits('cancel:hideform')"
+            data-test="add-alert-cancel-btn"
+          />
+          <q-btn
+            :disable="!name || !isValidRoleName"
+            class="o2-primary-button no-border tw:h-[36px]"
+            :label="t('alerts.save')"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            @click="saveRole"
+            data-test="add-alert-submit-btn"
+          />
         </div>
       </div>
     </q-card-section>
@@ -92,13 +91,10 @@ import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 const props = defineProps({
-  width: {
-    type: String,
-    default: "30vw",
-  },
   role: {
     type: Object,
     default: () => null,
@@ -110,6 +106,8 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["cancel:hideform", "added:role"]);
+
+const { track } = useReo();
 
 const name = ref(props.role?.name || "");
 
@@ -147,7 +145,10 @@ const saveRole = () => {
       }
       console.log(err);
     });
+    track("Button Click", {
+      button: "Save Role",
+      page: "Add Role"
+    });
 };
 </script>
 
-<style scoped></style>

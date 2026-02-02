@@ -32,8 +32,8 @@ const mockStore = createStore({
 
 const mockSpan = {
   _timestamp: 1752490492843047,
-  startTimeMs: 1752490492843,
-  endTimeMs: 1752490493164,
+  startTimeUs: 1752490492843000,
+  endTimeUs: 1752490493164000,
   durationMs: 321.372,
   durationUs: 321372,
   idleMs: 321.33,
@@ -64,6 +64,8 @@ const mockSpan = {
 const mockBaseTracePosition = {
   durationMs: 350.372,
   startTimeMs: 1752490492843,
+  startTimeUs: 1752490492843000,
+  durationUs: 350372,
   tics: [
     {
       value: 0,

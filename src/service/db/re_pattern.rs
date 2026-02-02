@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use config::meta::stream::{PatternAssociation, StreamType, UpdateSettingsWrapper};
 use infra::{
-    cluster_coordinator::get_coordinator,
+    coordinator::get_coordinator,
     db::Event,
-    errors::{self, DbError},
+    errors,
     table::{
         re_pattern::PatternEntry,
         re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
@@ -35,7 +35,7 @@ pub const RE_PATTERN_ASSOCIATIONS_PREFIX: &str = "/re_pattern_associations/";
 pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     match infra::table::re_pattern::add(entry.clone()).await {
         Ok(_) => {}
-        Err(errors::Error::DbError(DbError::UniqueViolation)) => {
+        Err(errors::Error::DbError(errors::DbError::UniqueViolation)) => {
             return Err(anyhow::anyhow!(
                 "Pattern with given id/name already exists in the org"
             ));
@@ -366,7 +366,7 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                     Some(v) => v,
                     None => {
                         log::error!(
-                            "expected value with pattern association message, found none, event : {ev:?}",
+                            "expected value with pattern association message, found none, event : {ev:?}"
                         );
                         continue;
                     }
@@ -377,7 +377,7 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                         Ok(v) => v,
                         Err(e) => {
                             log::error!(
-                                "error deserializing pattern association message : error: {e} event: {ev:?}",
+                                "error deserializing pattern association message : error: {e} event: {ev:?}"
                             );
                             continue;
                         }

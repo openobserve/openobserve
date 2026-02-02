@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="markdown-editor"
-    style="width: 100%; height: 100%; overflow: auto"
+    class="markdown-editor card-container"
+    style="width: 100%; height: 100%; overflow: hidden; display: flex; flex-direction: column;"
   >
-    <div style="width: 100%; height: calc(100% - 1px)">
-          <div class="col" style="height: 100%">
+    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
             <QueryEditor
               v-model:query="javascriptCodeContent"
               :debounceTime="500"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-markdown-editor-query-editor"
               language="javascript"
               class="javascript-query-editor "
-              style="padding-left: 20px; height: 100% !important;"
+              style="padding-left: 20px; height: 100%; flex: 1;"
               :style="{
                 backgroundColor:
                   store.state.theme == 'dark'
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
+  watch,
 } from "vue";
 import QueryEditor from "@/components/CodeQueryEditor.vue";
 import { useStore } from "vuex";
@@ -69,6 +70,13 @@ export default defineComponent({
     const dataToBeRendered = ref({});
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData("dashboard");
+
+    // Watch for prop changes and update the editor content
+    watch(() => props.modelValue, (newValue) => {
+      if (newValue !== javascriptCodeContent.value) {
+        javascriptCodeContent.value = newValue;
+      }
+    });
 
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));

@@ -24,7 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
+          <q-btn v-close-popup="true"
+round flat
+icon="cancel" />
         </div>
       </div>
     </q-card-section>
@@ -37,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       indicator-color="primary"
       align="justify"
       narrow-indicator
+      no-caps
     >
       <q-tab name="table" :label="t('common.table')" />
       <q-tab name="json" :label="t('common.json')" />

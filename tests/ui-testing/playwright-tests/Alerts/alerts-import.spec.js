@@ -1,233 +1,213 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
+
+// Test timeout constants (in milliseconds)
+const FIVE_MINUTES_MS = 300000;
+const ALERT_REGISTRATION_WAIT_MS = 30000; // Wait for alert to fully register and become active
+const UI_STABILIZATION_WAIT_MS = 2000;
+const ALERT_TRIGGER_TIMEOUT_MS = 90000; // Real-time alerts need time to process and fire
 
 test.describe("Alerts Import/Export", () => {
-  // Shared test variables
   let pm;
   let sharedRandomValue;
+  let validationInfra;
+  let testStreamName; // Unique stream with custom columns for this test run
 
-  /**
-   * Setup for each test
-   * - Logs in
-   * - Initializes page objects
-   * - Generates shared random value
-   * - Ingests test data
-   * - Navigates to alerts page
-   */
   test.beforeEach(async ({ page }, testInfo) => {
     pm = new PageManager(page);
 
-    // Generate shared random value if not already generated
     if (!sharedRandomValue) {
-      sharedRandomValue = pm.alertsPage.generateRandomString();
-      console.log('Generated shared random value for this run:', sharedRandomValue);
+      // Lowercase to match API behavior (stream names are lowercased)
+      sharedRandomValue = pm.alertsPage.generateRandomString().toLowerCase();
+      testLogger.info('Generated shared random value for this run', { sharedRandomValue });
     }
 
-    // Ingest test data using common actions
-    const streamName = 'auto_playwright_stream';
-    await pm.commonActions.ingestTestData(streamName);
-    
-    // Navigate to alerts page
+    // Create unique test stream name for this test run (lowercase to match API behavior)
+    testStreamName = `alert_import_${sharedRandomValue}`.toLowerCase();
+
+    // Initialize the test stream with custom columns (city, country, status, age, etc.)
+    // This ensures we have predictable columns for alert condition testing
+    await pm.commonActions.initializeAlertTestStream(testStreamName);
+    testLogger.info('Initialized test stream with custom columns', {
+      testStreamName,
+      columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
+    });
+
+    // Navigate to alerts page - stream will be available after page load
     await page.goto(
-      `${process.env["ZO_BASE_URL"]}${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
+
+    // Refresh page to ensure newly created stream appears in dropdowns
+    await page.reload();
+    await page.waitForLoadState('networkidle');
   });
 
-  /**
-   * Test: Import/Export Alert Functionality
-   * Tests importing and exporting alerts
-   */
   test('Import/Export Alert Functionality', {
-    tag: ['@all', '@alerts', '@alertsImportExport']
+    tag: ['@all', '@alerts', '@alertsImportExport'],
+    timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
-    // Create template
+    // This test covers import/export and includes trigger validation
+    test.slow();
+
+    validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, sharedRandomValue);
+    testLogger.info('Validation infrastructure ready', validationInfra);
+
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.createTemplate(templateName);
-    console.log('Created template:', templateName);
+    testLogger.info('Created template', { templateName });
 
-    // Create destination
-    const destinationName = 'auto_playwright_destination_' + sharedRandomValue;
-    const slackUrl = "DEMO";
-    await pm.alertDestinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
-    console.log('Created destination:', destinationName);
-
-    // Navigate to alerts page
     await pm.commonActions.navigateToAlerts();
 
-    // Create folder
     const folderName = 'auto_' + sharedRandomValue;
     await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
-    console.log('Created folder:', folderName);
+    testLogger.info('Created folder', { folderName });
 
-    // Create alert
-    const streamName = 'auto_playwright_stream';
-    const column = 'job';
-    const value = 'test';
+    // Use the dedicated test stream initialized in beforeEach with custom columns
+    // This provides predictable columns (city, country, status, age) for alert conditions
+    const triggerStreamName = testStreamName;
+    const column = 'city';        // Custom column from our test stream
+    const value = 'bangalore';    // Value that triggers the alert condition
+
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(2000);
-    const alertName = await pm.alertsPage.createAlert(streamName, column, value, destinationName, sharedRandomValue);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    const alertName = await pm.alertsPage.createAlert(triggerStreamName, column, value, validationInfra.destinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
-    console.log('Successfully created alert:', alertName);
-    await page.waitForTimeout(2000);
+    testLogger.info('Successfully created alert', { alertName });
 
-    // Export alerts
+    // Wait for alert to register in the system before triggering
+    await page.waitForTimeout(ALERT_REGISTRATION_WAIT_MS);
+
+    // Trigger and validate alert fires (self-referential destination approach)
+    const triggerResult = await pm.alertsPage.verifyAlertTrigger(
+      pm,
+      alertName,
+      triggerStreamName,
+      column,
+      value,
+      ALERT_TRIGGER_TIMEOUT_MS,
+      validationInfra.streamName
+    );
+    expect(triggerResult.found, `Alert ${alertName} should fire and appear in validation stream`).toBe(true);
+    testLogger.info('Alert trigger validation PASSED', { alertName, triggerResult });
+
+    await pm.commonActions.navigateToAlerts();
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
     const download = await pm.alertsPage.exportAlerts();
-    const downloadPath = `./alerts-${new Date().toISOString().split('T')[0]}-${streamName}.json`;
+    const downloadPath = `./alerts-${new Date().toISOString().split('T')[0]}-${triggerStreamName}.json`;
     await download.saveAs(downloadPath);
 
-    // Test invalid import
-    await pm.alertsPage.importInvalidFile('utils/td150.json');
-
-    // Import valid file
+    await pm.alertsPage.importInvalidFile('../test-data/invalid-alert.json');
     await pm.alertsPage.importValidFile(downloadPath);
-
-    // Clean up imported alert
     await pm.alertsPage.deleteImportedAlert(alertName);
 
     await pm.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
     await pm.alertsPage.cleanupDownloadedFile(downloadPath);
   });
 
   /**
-   * Test: Template Import from URL and Direct Creation
    * Tests importing templates from URL and creating templates directly from files
+   * Covers: webhook/email templates from URL and FILE
    */
   test('Template Import from URL and Direct Template Creation', {
     tag: ['@templateImport', '@all', '@alerts']
   }, async ({ page }) => {
-    // Test URLs
     const webhookTemplateUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Webhook_Template_Import.json';
     const emailTemplateUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Email_Template_Import.json';
 
-    // Test 1: Valid template import from URL (Webhook template)
+    // Test 1: Webhook template from URL
     const urlWebhookTemplateName = 'auto_url_webhook_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.importTemplateFromUrl(webhookTemplateUrl, urlWebhookTemplateName, 'valid');
-    console.log('WEBHOOK URL template IMPORTED:', urlWebhookTemplateName);
-    
-    // Verify imported webhook template exists
     await pm.alertTemplatesPage.verifyImportedTemplateExists(urlWebhookTemplateName);
-    console.log('Successfully verified imported webhook template exists:', urlWebhookTemplateName);
-    
-    // Delete URL imported webhook template
     await pm.alertTemplatesPage.deleteTemplateAndVerify(urlWebhookTemplateName);
-    console.log('WEBHOOK URL template DELETED:', urlWebhookTemplateName);
+    testLogger.info('Webhook URL template cycle complete', { templateName: urlWebhookTemplateName });
 
-    // Test 2: Valid template import from URL (Email template)
+    // Test 2: Email template from URL
     const urlEmailTemplateName = 'auto_url_email_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.importTemplateFromUrl(emailTemplateUrl, urlEmailTemplateName, 'valid');
-    console.log('EMAIL URL template IMPORTED:', urlEmailTemplateName);
-    
-    // Verify imported email template exists
     await pm.alertTemplatesPage.verifyImportedTemplateExists(urlEmailTemplateName);
-    console.log('Successfully verified imported email template exists:', urlEmailTemplateName);
-    
-    // Delete URL imported email template
     await pm.alertTemplatesPage.deleteTemplateAndVerify(urlEmailTemplateName);
-    console.log('EMAIL URL template DELETED:', urlEmailTemplateName);
+    testLogger.info('Email URL template cycle complete', { templateName: urlEmailTemplateName });
 
-    // Test 3: Valid direct webhook template creation
+    // Test 3: Webhook template from FILE
     const directWebhookTemplateName = 'auto_direct_webhook_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.createTemplateFromFile('utils/webhookTemplateImport.json', directWebhookTemplateName, 'valid');
-    console.log('WEBHOOK Direct template IMPORTED:', directWebhookTemplateName);
-    
-    // Verify direct webhook template exists
     await pm.alertTemplatesPage.verifyImportedTemplateExists(directWebhookTemplateName);
-    console.log('Successfully verified direct webhook template exists:', directWebhookTemplateName);
-    
-    // Delete direct webhook template
     await pm.alertTemplatesPage.deleteTemplateAndVerify(directWebhookTemplateName);
-    console.log('WEBHOOK Direct template DELETED:', directWebhookTemplateName);
+    testLogger.info('Webhook FILE template cycle complete', { templateName: directWebhookTemplateName });
 
-    // Test 4: Valid direct email template creation
+    // Test 4: Email template from FILE
     const directEmailTemplateName = 'auto_direct_email_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.createTemplateFromFile('utils/emailTemplateImport.json', directEmailTemplateName, 'valid');
-    console.log('EMAIL Direct template IMPORTED:', directEmailTemplateName);
-    
-    // Verify direct email template exists
     await pm.alertTemplatesPage.verifyImportedTemplateExists(directEmailTemplateName);
-    console.log('Successfully verified direct email template exists:', directEmailTemplateName);
-    
-    // Delete direct email template
     await pm.alertTemplatesPage.deleteTemplateAndVerify(directEmailTemplateName);
-    console.log('EMAIL Direct template DELETED:', directEmailTemplateName);
-    
-    console.log('All template import tests completed successfully with cleanup');
+    testLogger.info('Email FILE template cycle complete', { templateName: directEmailTemplateName });
+
+    testLogger.info('All template import tests completed successfully');
   });
 
   /**
-   * Test: Destination Import from URL and File
    * Tests importing destinations from both URL and local files
+   * Covers: webhook/email destinations from URL and FILE
    */
   test('Destination Import from URL and File', {
     tag: ['@destinationImport', '@all', '@alerts']
   }, async ({ page }) => {
-    // Create webhook template for webhook destination
+    // Create templates needed for destinations
     const webhookTemplateName = 'auto_webhook_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.createTemplate(webhookTemplateName);
-    console.log('Created webhook template:', webhookTemplateName);
+    testLogger.info('Created webhook template', { templateName: webhookTemplateName });
 
-    // Import email template for email destination
     const emailTemplateUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Email_Template_Import.json';
     const emailTemplateName = 'auto_email_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.importTemplateFromUrl(emailTemplateUrl, emailTemplateName, 'valid');
-    console.log('Imported email template:', emailTemplateName);
     await pm.alertTemplatesPage.verifyImportedTemplateExists(emailTemplateName);
-    console.log('Successfully verified imported email template exists:', emailTemplateName);
+    testLogger.info('Imported email template', { templateName: emailTemplateName });
 
-    // Navigate to destinations page
     await pm.alertDestinationsPage.navigateToDestinations();
-    console.log('Navigated to destinations page');
 
-    // Test 1: Import webhook destination from URL
+    // Test 1: Webhook destination from URL
     const webhookDestinationUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Webhook_Destination_Import.json';
     const webhookDestinationName = 'auto_dest_name_' + sharedRandomValue;
     await pm.alertDestinationsPage.importDestinationFromUrl(webhookDestinationUrl, webhookTemplateName, webhookDestinationName);
-    await expect(page.getByText('Successfully imported')).toBeVisible();
-    console.log('Imported webhook destination from URL:', webhookDestinationName);
     await pm.alertDestinationsPage.verifyDestinationExists(webhookDestinationName);
-    console.log('Successfully verified webhook destination exists');
     await pm.alertDestinationsPage.deleteDestinationWithSearch(webhookDestinationName);
-    console.log('Successfully deleted webhook destination');
+    testLogger.info('Webhook URL destination cycle complete');
 
-    // Test 2: Import webhook destination from file
+    // Test 2: Webhook destination from file
     await pm.alertDestinationsPage.importDestinationFromFile('utils/webhookDestinationImport.json', webhookTemplateName, webhookDestinationName);
-    console.log('Imported webhook destination from file:', webhookDestinationName);
-    await expect(page.getByText('Successfully imported')).toBeVisible();
+    await pm.alertDestinationsPage.verifySuccessfulImportMessage();
     await pm.alertDestinationsPage.verifyDestinationExists(webhookDestinationName);
-    console.log('Successfully verified webhook destination exists');
     await pm.alertDestinationsPage.deleteDestinationWithSearch(webhookDestinationName);
-    console.log('Successfully deleted webhook destination');
+    testLogger.info('Webhook FILE destination cycle complete');
 
-    // Test 3: Import email destination from URL
+    // Test 3: Email destination from URL (cancel after verifying count message)
     const emailDestinationUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Email_Destination_Import.json';
     const emailDestinationName = 'auto_email_dest_' + sharedRandomValue;
     await pm.alertDestinationsPage.importDestinationFromUrl(emailDestinationUrl, emailTemplateName, emailDestinationName);
-    console.log('Imported email destination from URL:', emailDestinationName);
-    await expect(page.getByText('Destination - 1: "')).toBeVisible();
+    await pm.alertDestinationsPage.verifyDestinationCountMessage();
     await pm.alertDestinationsPage.cancelDestinationImport();
-    console.log('Successfully cancelled email destination import');
+    testLogger.info('Email URL destination import cancelled');
 
-    // Test 4: Import email destination from file
+    // Test 4: Email destination from file (cancel after verifying count message)
     await pm.alertDestinationsPage.importDestinationFromFile('utils/emailDestinationImport.json', emailTemplateName, emailDestinationName);
-    console.log('Imported email destination from file:', emailDestinationName);
-    await expect(page.getByText('Destination - 1: "')).toBeVisible();
+    await pm.alertDestinationsPage.verifyDestinationCountMessage();
     await pm.alertDestinationsPage.cancelDestinationImport();
-    console.log('Successfully cancelled email destination import');
+    testLogger.info('Email FILE destination import cancelled');
 
-    // Navigate to templates page for cleanup
+    // Cleanup templates
     await pm.alertTemplatesPage.navigateToTemplates();
-    console.log('Navigated to templates page for cleanup');
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Clean up templates
     await pm.alertTemplatesPage.deleteTemplateAndVerify(webhookTemplateName);
-    console.log('Webhook template deleted:', webhookTemplateName);
     await pm.alertTemplatesPage.deleteTemplateAndVerify(emailTemplateName);
-    console.log('Email template deleted:', emailTemplateName);
-
-    console.log('All destination import tests completed successfully with cleanup');
+    testLogger.info('All destination import tests completed successfully');
   });
-}); 
+});

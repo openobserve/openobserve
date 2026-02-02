@@ -16,11 +16,11 @@
 /// Duration in seconds to sleep when a job is paused
 pub const PAUSE_SLEEP_DURATION: u64 = 60;
 
-/// Macro for spawning pausable jobs with flexible configuration
+/// Macro for spawning pausable jobs with flexible configuration.
 /// Prefer using this macro for jobs that need to execute at some interval as its
-/// reactive to the changes in the configuration
+/// reactive to the changes in the configuration.
 ///
-/// This macro standardizes the pattern used across multiple jobs where:
+/// Note:
 /// 1. A job gets an interval from config and checks if it should be paused
 /// 2. If paused (interval <= 0 by default), it sleeps for 60 seconds and checks again
 /// 3. If not paused, it sleeps for the interval and executes the job logic

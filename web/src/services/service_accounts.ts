@@ -42,9 +42,12 @@ const service_accounts = {
   delete: (org_identifier: string, user_email: string) => {
     return http().delete(`/api/${org_identifier}/service_accounts/${user_email}`);
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/service_accounts/bulk`, { data });
+  },
   refresh_token : (org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`,{});
   }
-  
+
 };
 export default service_accounts;

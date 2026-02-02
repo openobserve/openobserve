@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="relative-position">
     <div
-      class="q-mx-sm performance-dashboard"
-      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+      class="performance-dashboard"
+      :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <div
-        class="text-bold q-ml-sm q-px-sm rounded q-mt-md q-py-xs learn-web-vitals-link flex items-center"
+        class="text-bold q-ml-md q-px-sm rounded q-mt-sm q-py-xs learn-web-vitals-link flex items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >
         <q-icon
           name="info"
-          size="16px"
+          size="1rem"
           class="material-symbols-outlined q-mr-xs"
         />
         {{ t("rum.learnWebVitalsLabel") }}
@@ -48,18 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
         searchType="RUM"
+        @variablesManagerReady="onVariablesManagerReady"
+        @updated:data-zoom="onDataZoom"
       />
     </div>
     <div
       v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
-      style="height: calc(100vh - 250px); top: 0"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
         <q-spinner-hourglass
           color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
+          size="2.5rem"
+          class="tw:mx-auto tw:block"
         />
         <div class="text-center full-width">Loading Dashboard</div>
       </div>
@@ -76,6 +77,7 @@ import {
   onActivated,
   nextTick,
   onMounted,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -104,7 +106,8 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  setup() {
+  emits: ["variablesManagerReady", "update:dateTime"],
+  setup(props, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -123,10 +126,15 @@ export default defineComponent({
     const webVitalsChartsRef = ref(null);
     const isLoading: Ref<boolean[]> = ref([]);
 
-    // variables data
-    const variablesData = reactive({});
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
+    // Variables manager event handler - pass through to parent
+    const onVariablesManagerReady = (manager: any) => {
+      emit("variablesManagerReady", manager);
+    };
+
+    // Handle data zoom from chart interactions
+    const onDataZoom = (event: any) => {
+      // Update the dateTime prop to trigger parent to update time range
+      emit("update:dateTime", event);
     };
 
     onMounted(async () => {
@@ -144,13 +152,15 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      webVitalsChartsRef.value.layoutUpdate();
+      if (webVitalsChartsRef.value) {
+        webVitalsChartsRef.value.layoutUpdate();
 
-      // Dashboards gets overlapped as we have used keep alive
-      // Its an internal bug of vue-grid-layout
-      // So adding settimeout of 1 sec to fix the issue
+        // Dashboards gets overlapped as we have used keep alive
+        // Its an internal bug of vue-grid-layout
+        // So adding settimeout of 1 sec to fix the issue
 
-      webVitalsChartsRef.value.layoutUpdate();
+        webVitalsChartsRef.value.layoutUpdate();
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -251,13 +261,15 @@ export default defineComponent({
       selectedDate,
       viewOnly,
       eventLog,
-      variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
+      onDataZoom,
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
       webVitalsChartsRef,
       isLoading,
+      updateLayout,
+      router,
     };
   },
 });

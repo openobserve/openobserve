@@ -44,8 +44,8 @@ vi.mock("@/services/organizations", () => ({
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    isCloud: 'false',
-    isEnterprise: 'false',
+    isCloud: "false",
+    isEnterprise: "false",
   },
 }));
 
@@ -55,6 +55,7 @@ vi.mock("@/utils/zincutils", () => ({
   checkCallBackValues: vi.fn(),
   useLocalCurrentUser: vi.fn(),
   useLocalOrganization: vi.fn(() => ({ value: null })),
+  getImageURL: vi.fn(),
 }));
 
 vi.mock("@/components/login/Login.vue", () => ({
@@ -89,18 +90,18 @@ const mockLocalStorage = {
   removeItem: vi.fn(),
 };
 
-Object.defineProperty(window, 'sessionStorage', {
+Object.defineProperty(window, "sessionStorage", {
   value: mockSessionStorage,
 });
 
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   value: mockLocalStorage,
 });
 
 // Mock location
-Object.defineProperty(window, 'location', {
+Object.defineProperty(window, "location", {
   value: {
-    href: '',
+    href: "",
   },
   writable: true,
 });
@@ -138,7 +139,7 @@ describe("Login.vue", () => {
         setOrganizations: mockDispatch,
       },
     });
-    
+
     // Override dispatch and commit with spies
     store.dispatch = mockDispatch;
     store.commit = mockCommit;
@@ -210,10 +211,12 @@ describe("Login.vue", () => {
       family_name: "User",
     });
 
-    (zincutils.getDecodedUserInfo as any).mockReturnValue(JSON.stringify({
-      email: "test@example.com",
-      pgdata: true,
-    }));
+    (zincutils.getDecodedUserInfo as any).mockReturnValue(
+      JSON.stringify({
+        email: "test@example.com",
+        pgdata: true,
+      }),
+    );
 
     // Mock route with empty hash initially
     router.currentRoute = {
@@ -316,12 +319,12 @@ describe("Login.vue", () => {
 
     it("should return redirectUser function from setup", () => {
       expect(wrapper.vm.redirectUser).toBeDefined();
-      expect(typeof wrapper.vm.redirectUser).toBe('function');
+      expect(typeof wrapper.vm.redirectUser).toBe("function");
     });
 
     it("should return getDefaultOrganization function from setup", () => {
       expect(wrapper.vm.getDefaultOrganization).toBeDefined();
-      expect(typeof wrapper.vm.getDefaultOrganization).toBe('function');
+      expect(typeof wrapper.vm.getDefaultOrganization).toBe("function");
     });
 
     it("should return q (quasar) from setup", () => {
@@ -332,7 +335,7 @@ describe("Login.vue", () => {
   describe("onBeforeMount Hook", () => {
     it("should fetch config when no route hash", async () => {
       router.currentRoute.value.hash = "";
-      
+
       wrapper = mount(LoginPage, {
         global: {
           plugins: [store, router, i18n, Quasar],
@@ -344,12 +347,15 @@ describe("Login.vue", () => {
 
       await nextTick();
       expect(configService.get_config).toHaveBeenCalled();
-      expect(store.commit).toHaveBeenCalledWith("setConfig", expect.any(Object));
+      expect(store.commit).toHaveBeenCalledWith(
+        "setConfig",
+        expect.any(Object),
+      );
     });
 
     it("should not fetch config when route hash exists", async () => {
       router.currentRoute.value.hash = "#access_token=test";
-      
+
       wrapper = mount(LoginPage, {
         global: {
           plugins: [store, router, i18n, Quasar],
@@ -365,7 +371,9 @@ describe("Login.vue", () => {
     });
 
     it("should handle config service error", async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       configService.get_config.mockRejectedValueOnce(new Error("Config error"));
       router.currentRoute.value.hash = "";
 
@@ -379,7 +387,10 @@ describe("Login.vue", () => {
       });
 
       await nextTick();
-      expect(consoleSpy).toHaveBeenCalledWith("Error while fetching config:", expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error while fetching config:",
+        expect.any(Error),
+      );
       consoleSpy.mockRestore();
     });
   });
@@ -403,6 +414,7 @@ describe("Login.vue", () => {
         cognito_sub: "",
         first_name: "",
         last_name: "",
+        sub_key: "",
       });
     });
 
@@ -444,7 +456,7 @@ describe("Login.vue", () => {
 
     it("should redirect to sessionStorage URI when available", async () => {
       mockSessionStorage.getItem.mockReturnValue("/dashboard");
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.redirectUser();
 
@@ -455,7 +467,7 @@ describe("Login.vue", () => {
 
     it("should redirect to external URL when redirectURI contains http", async () => {
       mockSessionStorage.getItem.mockReturnValue("https://external.com");
-      
+
       wrapper.vm.redirectUser();
 
       expect(mockSessionStorage.getItem).toHaveBeenCalledWith("redirectURI");
@@ -465,7 +477,7 @@ describe("Login.vue", () => {
 
     it("should redirect to home when no redirectURI", async () => {
       mockSessionStorage.getItem.mockReturnValue(null);
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.redirectUser();
 
@@ -474,7 +486,7 @@ describe("Login.vue", () => {
 
     it("should redirect to home when redirectURI is empty string", async () => {
       mockSessionStorage.getItem.mockReturnValue("");
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.redirectUser();
 
@@ -506,13 +518,22 @@ describe("Login.vue", () => {
     it("should fetch organizations list", async () => {
       await wrapper.vm.getDefaultOrganization();
 
-      expect(organizationsService.list).toHaveBeenCalledWith(0, 100000, "id", false, "");
+      expect(organizationsService.list).toHaveBeenCalledWith(
+        0,
+        100000,
+        "id",
+        false,
+        "",
+      );
     });
 
     it("should set organizations in store", async () => {
       await wrapper.vm.getDefaultOrganization();
 
-      expect(store.dispatch).toHaveBeenCalledWith("setOrganizations", expect.any(Array));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "setOrganizations",
+        expect.any(Array),
+      );
     });
 
     it("should select default organization when type is default", async () => {
@@ -532,11 +553,14 @@ describe("Login.vue", () => {
 
       await wrapper.vm.getDefaultOrganization();
 
-      expect(store.dispatch).toHaveBeenCalledWith("setSelectedOrganization", expect.objectContaining({
-        label: "Default Org",
-        id: "1",
-        identifier: "default",
-      }));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.objectContaining({
+          label: "Default Org",
+          id: "1",
+          identifier: "default",
+        }),
+      );
     });
 
     it("should select organization when only one exists", async () => {
@@ -556,10 +580,13 @@ describe("Login.vue", () => {
 
       await wrapper.vm.getDefaultOrganization();
 
-      expect(store.dispatch).toHaveBeenCalledWith("setSelectedOrganization", expect.objectContaining({
-        label: "Single Org",
-        id: "2",
-      }));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.objectContaining({
+          label: "Single Org",
+          id: "2",
+        }),
+      );
     });
 
     it("should use local organization when user email matches", async () => {
@@ -588,7 +615,10 @@ describe("Login.vue", () => {
 
       await wrapper.vm.getDefaultOrganization();
 
-      expect(store.dispatch).toHaveBeenCalledWith("setSelectedOrganization", mockLocalOrg.value);
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        mockLocalOrg.value,
+      );
     });
 
     it("should reset local organization when user email doesn't match", async () => {
@@ -606,21 +636,30 @@ describe("Login.vue", () => {
     });
 
     it("should set first time login flag when cloud and new_user_login", async () => {
-      config.isCloud = 'true';
+      config.isCloud = "true";
       zincutils.checkCallBackValues.mockReturnValue("true");
 
       await wrapper.vm.getDefaultOrganization();
 
-      expect(zincutils.checkCallBackValues).toHaveBeenCalledWith("", "new_user_login");
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith("isFirstTimeLogin", "true");
+      expect(zincutils.checkCallBackValues).toHaveBeenCalledWith(
+        "",
+        "new_user_login",
+      );
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        "isFirstTimeLogin",
+        "true",
+      );
     });
 
     it("should not set first time login flag when not cloud", async () => {
-      config.isCloud = 'false';
+      config.isCloud = "false";
 
       await wrapper.vm.getDefaultOrganization();
 
-      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith("isFirstTimeLogin", "true");
+      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith(
+        "isFirstTimeLogin",
+        "true",
+      );
     });
 
     it("should call redirectUser after processing organizations", async () => {
@@ -654,17 +693,20 @@ describe("Login.vue", () => {
       await wrapper.vm.getDefaultOrganization();
 
       // The component selects default org when it finds one with type="default"
-      expect(store.dispatch).toHaveBeenCalledWith("setSelectedOrganization", expect.objectContaining({
-        label: "Regular Org", // First org gets selected because conditions are met first
-        id: "1",
-      }));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.objectContaining({
+          label: "Regular Org", // First org gets selected because conditions are met first
+          id: "1",
+        }),
+      );
     });
   });
 
   describe("Created Lifecycle Hook", () => {
     it("should process route hash and extract user info", async () => {
       router.currentRoute.value.hash = "#access_token=test&id_token=test";
-      
+
       wrapper = mount(LoginPage, {
         global: {
           plugins: [store, router, i18n, Quasar],
@@ -678,7 +720,7 @@ describe("Login.vue", () => {
       });
 
       await nextTick();
-      
+
       expect(configService.get_config).toHaveBeenCalled();
       expect(zincutils.getUserInfo).toHaveBeenCalled();
     });
@@ -739,13 +781,15 @@ describe("Login.vue", () => {
 
     it("should login and get default organization when user has pgdata", async () => {
       router.currentRoute.value.hash = "#access_token=test";
-      zincutils.getDecodedUserInfo.mockReturnValue(JSON.stringify({
-        email: "test@example.com",
-        pgdata: true,
-      }));
-      
+      zincutils.getDecodedUserInfo.mockReturnValue(
+        JSON.stringify({
+          email: "test@example.com",
+          pgdata: true,
+        }),
+      );
+
       const getDefaultOrgSpy = vi.fn();
-      
+
       wrapper = mount(LoginPage, {
         global: {
           plugins: [store, router, i18n, Quasar],
@@ -763,18 +807,23 @@ describe("Login.vue", () => {
 
       await nextTick();
 
-      expect(store.dispatch).toHaveBeenCalledWith("login", expect.objectContaining({
-        loginState: true,
-      }));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "login",
+        expect.objectContaining({
+          loginState: true,
+        }),
+      );
       expect(getDefaultOrgSpy).toHaveBeenCalled();
     });
 
     it("should login when isEnterprise is true", async () => {
-      config.isEnterprise = 'true';
+      config.isEnterprise = "true";
       router.currentRoute.value.hash = "#access_token=test";
-      zincutils.getDecodedUserInfo.mockReturnValue(JSON.stringify({
-        email: "test@example.com",
-      }));
+      zincutils.getDecodedUserInfo.mockReturnValue(
+        JSON.stringify({
+          email: "test@example.com",
+        }),
+      );
 
       wrapper = mount(LoginPage, {
         global: {
@@ -795,10 +844,12 @@ describe("Login.vue", () => {
 
     it("should handle user without pgdata correctly", async () => {
       router.currentRoute.value.hash = "#access_token=test";
-      (zincutils.getDecodedUserInfo as any).mockReturnValue(JSON.stringify({
-        email: "test@example.com",
-      }));
-      
+      (zincutils.getDecodedUserInfo as any).mockReturnValue(
+        JSON.stringify({
+          email: "test@example.com",
+        }),
+      );
+
       const verifySpy = vi.fn();
 
       wrapper = mount(LoginPage, {
@@ -820,7 +871,9 @@ describe("Login.vue", () => {
     });
 
     it("should handle config service error in created hook", async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       configService.get_config.mockRejectedValueOnce(new Error("Config error"));
       router.currentRoute.value.hash = "#access_token=test";
 
@@ -838,7 +891,10 @@ describe("Login.vue", () => {
 
       await nextTick();
 
-      expect(consoleSpy).toHaveBeenCalledWith("Error while fetching config:", expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error while fetching config:",
+        expect.any(Error),
+      );
       consoleSpy.mockRestore();
     });
 
@@ -883,7 +939,10 @@ describe("Login.vue", () => {
 
       expect(usersService.verifyUser).toHaveBeenCalledWith("test@example.com");
       expect(zincutils.useLocalCurrentUser).toHaveBeenCalled();
-      expect(store.dispatch).toHaveBeenCalledWith("setCurrentUser", expect.any(Object));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "setCurrentUser",
+        expect.any(Object),
+      );
     });
 
     it("should create new user when id is 0", async () => {
@@ -892,7 +951,7 @@ describe("Login.vue", () => {
           data: { id: 0, email: "test@example.com" },
         },
       });
-      
+
       wrapper.vm.getDefaultOrganization = vi.fn();
       wrapper.vm.q.notify = vi.fn().mockReturnValue(vi.fn());
 
@@ -903,10 +962,13 @@ describe("Login.vue", () => {
         message: "Please wait while creating new user...",
       });
       expect(usersService.addNewUser).toHaveBeenCalledWith(wrapper.vm.user);
-      expect(store.dispatch).toHaveBeenCalledWith("setCurrentUser", expect.objectContaining({
-        email: "test@example.com",
-        id: 0,
-      }));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "setCurrentUser",
+        expect.objectContaining({
+          email: "test@example.com",
+          id: 0,
+        }),
+      );
     });
 
     it("should login existing user when id is not 0", async () => {
@@ -922,9 +984,12 @@ describe("Login.vue", () => {
       await wrapper.vm.VerifyAndCreateUser();
 
       expect(usersService.addNewUser).not.toHaveBeenCalled();
-      expect(store.dispatch).toHaveBeenCalledWith("login", expect.objectContaining({
-        loginState: true,
-      }));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "login",
+        expect.objectContaining({
+          loginState: true,
+        }),
+      );
       expect(getDefaultOrgSpy).toHaveBeenCalled();
     });
 
@@ -936,7 +1001,7 @@ describe("Login.vue", () => {
           data: { id: 0, email: "test@example.com" },
         },
       });
-      
+
       wrapper.vm.getDefaultOrganization = vi.fn();
 
       await wrapper.vm.VerifyAndCreateUser();
@@ -983,8 +1048,10 @@ describe("Login.vue", () => {
 
       // When user has email, check if login component logic changes
       // (Actual template behavior might differ from expected due to reactivity)
-      const hasLoginComponent = wrapper.findComponent({ name: "Login" }).exists();
-      expect(typeof hasLoginComponent).toBe('boolean');
+      const hasLoginComponent = wrapper
+        .findComponent({ name: "Login" })
+        .exists();
+      expect(typeof hasLoginComponent).toBe("boolean");
     });
   });
 
@@ -1018,7 +1085,7 @@ describe("Login.vue", () => {
       });
 
       await nextTick();
-      
+
       expect(createdWrapper.vm.user.email).toBe("");
     });
 
@@ -1039,7 +1106,7 @@ describe("Login.vue", () => {
       });
 
       await nextTick();
-      
+
       expect(createdWrapper.vm.user.email).toBe("");
     });
 
@@ -1054,7 +1121,9 @@ describe("Login.vue", () => {
     });
 
     it("should handle organizations service error", async () => {
-      (organizationsService.list as any).mockRejectedValue(new Error("Orgs error"));
+      (organizationsService.list as any).mockRejectedValue(
+        new Error("Orgs error"),
+      );
 
       // Test should complete without crashing even when service errors occur
       try {
@@ -1067,7 +1136,9 @@ describe("Login.vue", () => {
 
     it("should handle user service errors", async () => {
       wrapper.vm.userInfo = { email: "test@example.com" };
-      (usersService.verifyUser as any).mockRejectedValue(new Error("User error"));
+      (usersService.verifyUser as any).mockRejectedValue(
+        new Error("User error"),
+      );
 
       // Test should complete without crashing even when service errors occur
       try {
@@ -1083,7 +1154,9 @@ describe("Login.vue", () => {
       (usersService.verifyUser as any).mockResolvedValue({
         data: { data: { id: 0 } },
       });
-      (usersService.addNewUser as any).mockRejectedValue(new Error("Add user error"));
+      (usersService.addNewUser as any).mockRejectedValue(
+        new Error("Add user error"),
+      );
 
       // Test should complete without crashing even when service errors occur
       try {
@@ -1111,7 +1184,7 @@ describe("Login.vue", () => {
       });
 
       await nextTick();
-      
+
       expect(createdWrapper.vm.userInfo).toBeNull();
     });
   });
@@ -1126,9 +1199,11 @@ describe("Login.vue", () => {
         given_name: "New",
         family_name: "User",
       });
-      zincutils.getDecodedUserInfo.mockReturnValue(JSON.stringify({
-        email: "newuser@example.com",
-      }));
+      zincutils.getDecodedUserInfo.mockReturnValue(
+        JSON.stringify({
+          email: "newuser@example.com",
+        }),
+      );
       usersService.verifyUser.mockResolvedValue({
         data: { data: { id: 0, email: "newuser@example.com" } },
       });
@@ -1155,10 +1230,12 @@ describe("Login.vue", () => {
 
     it("should handle complete existing user flow", async () => {
       router.currentRoute.value.hash = "#access_token=test";
-      zincutils.getDecodedUserInfo.mockReturnValue(JSON.stringify({
-        email: "existing@example.com",
-        pgdata: true,
-      }));
+      zincutils.getDecodedUserInfo.mockReturnValue(
+        JSON.stringify({
+          email: "existing@example.com",
+          pgdata: true,
+        }),
+      );
 
       wrapper = mount(LoginPage, {
         global: {
@@ -1174,9 +1251,12 @@ describe("Login.vue", () => {
 
       await nextTick();
 
-      expect(store.dispatch).toHaveBeenCalledWith("login", expect.objectContaining({
-        loginState: true,
-      }));
+      expect(store.dispatch).toHaveBeenCalledWith(
+        "login",
+        expect.objectContaining({
+          loginState: true,
+        }),
+      );
       expect(organizationsService.list).toHaveBeenCalled();
     });
   });

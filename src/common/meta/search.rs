@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use config::meta::{search::Response, sql::OrderBy};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+pub const CAPPED_RESULTS_MSG: &str = "Warn: results are capped to meet default limit";
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct CachedQueryResponse {
@@ -37,7 +37,6 @@ pub struct CachedQueryResponse {
 pub struct QueryDelta {
     pub delta_start_time: i64,
     pub delta_end_time: i64,
-    pub delta_removed_hits: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
@@ -46,8 +45,13 @@ pub struct CacheQueryRequest {
     pub q_end_time: i64,
     pub is_aggregate: bool,
     pub ts_column: String,
-    pub discard_interval: i64,
+    pub histogram_interval: i64,
     pub is_descending: bool,
+    /// Flag indicating this is a histogram query with non-timestamp column ORDER BY.
+    /// When true, cache file timestamps must be calculated by scanning all hits,
+    /// not just first/last, since results may not be time-ordered.
+    /// Example: SELECT histogram(_timestamp), count(*) ... ORDER BY count DESC
+    pub is_histogram_non_ts_order: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
@@ -80,15 +84,13 @@ pub enum ResultCacheSelectionStrategy {
 }
 
 // Implementing FromStr for ResultCacheSelectionStrategy
-impl FromStr for ResultCacheSelectionStrategy {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<ResultCacheSelectionStrategy, Self::Err> {
+impl From<&str> for ResultCacheSelectionStrategy {
+    fn from(input: &str) -> Self {
         match input {
-            "overlap" => Ok(ResultCacheSelectionStrategy::Overlap),
-            "duration" => Ok(ResultCacheSelectionStrategy::Duration),
-            "both" => Ok(ResultCacheSelectionStrategy::Both),
-            _ => Ok(ResultCacheSelectionStrategy::Both),
+            "overlap" => ResultCacheSelectionStrategy::Overlap,
+            "duration" => ResultCacheSelectionStrategy::Duration,
+            "both" => ResultCacheSelectionStrategy::Both,
+            _ => ResultCacheSelectionStrategy::Both,
         }
     }
 }
@@ -132,7 +134,6 @@ mod tests {
             deltas: vec![QueryDelta {
                 delta_start_time: 1000,
                 delta_end_time: 2000,
-                delta_removed_hits: false,
             }],
             has_cached_data: true,
             cache_query_response: true,
@@ -158,12 +159,10 @@ mod tests {
         let delta = QueryDelta {
             delta_start_time: 1000,
             delta_end_time: 2000,
-            delta_removed_hits: true,
         };
 
         assert_eq!(delta.delta_start_time, 1000);
         assert_eq!(delta.delta_end_time, 2000);
-        assert!(delta.delta_removed_hits);
     }
 
     #[test]
@@ -171,13 +170,11 @@ mod tests {
         let delta1 = QueryDelta {
             delta_start_time: 1000,
             delta_end_time: 2000,
-            delta_removed_hits: false,
         };
 
         let delta2 = QueryDelta {
             delta_start_time: 2000,
             delta_end_time: 3000,
-            delta_removed_hits: false,
         };
 
         assert!(delta1 < delta2);
@@ -191,15 +188,16 @@ mod tests {
             q_end_time: 2000,
             is_aggregate: true,
             ts_column: "timestamp".to_string(),
-            discard_interval: 100,
+            histogram_interval: 100,
             is_descending: false,
+            is_histogram_non_ts_order: false,
         };
 
         assert_eq!(request.q_start_time, 1000);
         assert_eq!(request.q_end_time, 2000);
         assert!(request.is_aggregate);
         assert_eq!(request.ts_column, "timestamp");
-        assert_eq!(request.discard_interval, 100);
+        assert_eq!(request.histogram_interval, 100);
         assert!(!request.is_descending);
     }
 
@@ -240,19 +238,19 @@ mod tests {
     #[test]
     fn test_result_cache_selection_strategy_from_str() {
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("overlap").unwrap(),
+            ResultCacheSelectionStrategy::from("overlap"),
             ResultCacheSelectionStrategy::Overlap
         );
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("duration").unwrap(),
+            ResultCacheSelectionStrategy::from("duration"),
             ResultCacheSelectionStrategy::Duration
         );
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("both").unwrap(),
+            ResultCacheSelectionStrategy::from("both"),
             ResultCacheSelectionStrategy::Both
         );
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("invalid").unwrap(),
+            ResultCacheSelectionStrategy::from("invalid"),
             ResultCacheSelectionStrategy::Both
         );
     }
@@ -341,7 +339,7 @@ mod enterprise_tests {
     }
 
     #[test]
-    fn test_calculate_record_batches_deltas_no_cache() {
+    fn test_calculate_record_batches_deltas_without_cache() {
         // Test case: No cache, entire query range should be a delta
         let cache_result = vec![];
         let query_start_time = 10_000_000;

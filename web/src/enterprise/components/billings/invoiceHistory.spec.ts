@@ -63,16 +63,16 @@ describe("InvoiceHistory", () => {
     it("should render the main container with proper class", () => {
       const pageContainer = wrapper.find(".q-page");
       expect(pageContainer.exists()).toBe(true);
-      expect(pageContainer.classes()).toContain("q-pa-md");
+      expect(pageContainer.classes()).toContain("q-py-md");
     });
 
     it("should render the title row with correct classes", () => {
-      const titleRow = wrapper.find(".row.text-body1.text-weight-medium");
+      const titleRow = wrapper.find(".row.q-px-sm.q-table__title");
       expect(titleRow.exists()).toBe(true);
     });
 
     it("should display the correct title text", () => {
-      const titleElement = wrapper.find(".row.text-body1.text-weight-medium");
+      const titleElement = wrapper.find(".row.q-px-sm.q-table__title");
       expect(titleElement.exists()).toBe(true);
       // The text should be the translated text
       expect(titleElement.text()).toContain("Invoice History");
@@ -149,10 +149,10 @@ describe("InvoiceHistory", () => {
     it("should have the correct template structure", () => {
       const qPage = wrapper.find(".q-page");
       expect(qPage.exists()).toBe(true);
-      
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
+
+      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
       expect(titleDiv.exists()).toBe(true);
-      
+
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
       expect(invoiceTable.exists()).toBe(true);
     });
@@ -163,7 +163,7 @@ describe("InvoiceHistory", () => {
     });
 
     it("should contain exactly one title div", () => {
-      const titleDivs = wrapper.findAll(".row.text-body1.text-weight-medium");
+      const titleDivs = wrapper.findAll(".row.q-px-sm.q-table__title");
       expect(titleDivs).toHaveLength(1);
     });
 
@@ -174,46 +174,19 @@ describe("InvoiceHistory", () => {
 
     it("should have proper nesting structure", () => {
       const qPage = wrapper.find(".q-page");
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
+      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
-      
+
       expect(qPage.exists()).toBe(true);
       expect(titleDiv.exists()).toBe(true);
       expect(invoiceTable.exists()).toBe(true);
     });
   });
 
-  describe("Styling and CSS Classes", () => {
-    it("should apply q-pa-md class to q-page", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.classes()).toContain("q-pa-md");
-    });
-
-    it("should apply text styling classes to title", () => {
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
-      expect(titleDiv.classes()).toContain("row");
-      expect(titleDiv.classes()).toContain("text-body1");
-      expect(titleDiv.classes()).toContain("text-weight-medium");
-    });
-
-    it("should have proper CSS class combinations", () => {
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
-      const classes = titleDiv.classes();
-      expect(classes).toEqual(
-        expect.arrayContaining(["row", "text-body1", "text-weight-medium"])
-      );
-    });
-
-    it("should not have any scoped styles affecting layout", () => {
-      // Since there are no scoped styles, the component should render cleanly
-      // QPage might have some default styles, so we'll just check it renders
-      expect(wrapper.element).toBeDefined();
-    });
-  });
 
   describe("Internationalization (i18n)", () => {
     it("should use i18n for title text", () => {
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
+      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
       expect(titleDiv.text()).toBe("Invoice History");
     });
 
@@ -366,7 +339,7 @@ describe("InvoiceHistory", () => {
     });
 
     it("should not have accessibility violations in basic structure", () => {
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
+      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
       expect(titleDiv.exists()).toBe(true);
       expect(titleDiv.element.tagName).toBe("DIV");
     });

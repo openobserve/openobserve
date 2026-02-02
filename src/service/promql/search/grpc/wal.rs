@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use arrow::record_batch::RecordBatch;
 use config::{
@@ -30,25 +27,27 @@ use datafusion::{
     physical_plan::visit_execution_plan,
     prelude::{SessionContext, col, lit},
 };
+use hashbrown::HashSet;
+use infra::cluster::get_cached_online_ingester_nodes;
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::cluster::get_cached_online_ingester_nodes,
-    service::{
-        promql::utils::{apply_label_selector, apply_matchers},
-        search::{
-            datafusion::{
-                distributed_plan::{
-                    node::{RemoteScanNode, SearchInfos},
-                    remote_scan::RemoteScanExec,
-                },
-                exec::DataFusionContextBuilder,
-                table_provider::empty_table::NewEmptyTable,
+use crate::service::{
+    promql::{
+        search::grpc::Context,
+        utils::{apply_label_selector, apply_matchers},
+    },
+    search::{
+        datafusion::{
+            distributed_plan::{
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan_exec::RemoteScanExec,
             },
-            utils::ScanStatsVisitor,
+            exec::DataFusionContextBuilder,
+            table_provider::empty_table::NewEmptyTable,
         },
+        utils::ScanStatsVisitor,
     },
 };
 
@@ -59,8 +58,8 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     matchers: Matchers,
-    label_selector: Option<HashSet<String>>,
-) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
+    label_selector: HashSet<String>,
+) -> Result<Vec<Context>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
     let schema = Arc::new(
@@ -93,6 +92,7 @@ pub(crate) async fn create_context(
             SessionContext::new(),
             Arc::new(Schema::empty()),
             ScanStats::default(),
+            true,
         )]);
     }
 
@@ -109,7 +109,7 @@ pub(crate) async fn create_context(
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push((ctx, schema, stats));
+    resp.push((ctx, schema, stats, true));
 
     Ok(resp)
 }
@@ -125,7 +125,7 @@ async fn get_wal_batches(
     schema: Arc<Schema>,
     time_range: (i64, i64),
     matchers: Matchers,
-    label_selector: Option<HashSet<String>>,
+    label_selector: HashSet<String>,
 ) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
     let cfg = get_config();
     let nodes = get_cached_online_ingester_nodes().await;
@@ -149,7 +149,7 @@ async fn get_wal_batches(
     let mut df = match ctx.table(stream_name).await {
         Ok(df) => df.filter(
             col(TIMESTAMP_COL_NAME)
-                .gt(lit(start))
+                .gt_eq(lit(start))
                 .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
@@ -187,6 +187,8 @@ async fn get_wal_batches(
             use_cache: false,
             histogram_interval: 0, // not needed for wal
             is_analyze: false,     // not needed for wal
+            sampling_config: None, // not needed for wal
+            clear_cache: false,    // not needed for wal
         },
         index_info: IndexInfo::default(), // not needed for wal
         super_cluster_info: cluster_rpc::SuperClusterInfo::default(), // current not needed for wal
@@ -216,7 +218,7 @@ async fn get_wal_batches(
             .schema()
             .as_ref()
             .clone()
-            .with_metadata(HashMap::new()),
+            .with_metadata(std::collections::HashMap::new()),
     );
     let mut new_batches = Vec::with_capacity(batches.len());
     for batch in batches {

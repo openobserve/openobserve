@@ -20,6 +20,8 @@ import {
   getContrastColor,
   applySeriesColorMappings,
   getUnitValue,
+  calculateDynamicNameGap,
+  calculateRotatedLabelBottomSpace,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -29,6 +31,11 @@ import {
   getSeriesColor,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import {
+  calculateBottomLegendHeight,
+  calculateRightLegendWidth,
+} from "./legendConfiguration";
+import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 
 let moment: any;
 let momentInitialized = false;
@@ -75,8 +82,13 @@ export const convertPromQLData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   annotations: any,
+  metadata: any = null,
 ) => {
-  // console.time("convertPromQLData");
+  // Set gridlines visibility based on config.show_gridlines (default: true)
+  const showGridlines =
+    panelSchema?.config?.show_gridlines !== undefined
+      ? panelSchema.config.show_gridlines
+      : true;
 
   await importMoment();
 
@@ -91,22 +103,80 @@ export const convertPromQLData = async (
     return { options: null };
   }
 
+  // ========== NEW MODULAR CHART SYSTEM ==========
+  // Delegate to new modular converter for newly supported chart types
+  const NEW_CHART_TYPES = [
+    "pie",
+    "donut",
+    "table",
+    "heatmap",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "geomap",
+    "maps",
+  ];
+
+  if (NEW_CHART_TYPES.includes(panelSchema.type)) {
+    try {
+      const result = await convertPromQLChartData(searchQueryData, {
+        panelSchema,
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        annotations,
+        metadata,
+      });
+
+      // Apply annotations if present (only for ECharts-based charts)
+      if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
+        const annotationResults = await getAnnotationsData(
+          annotations,
+          store,
+          panelSchema,
+        );
+        if (annotationResults && result.options) {
+          result.options.annotations = annotationResults;
+        }
+      }
+      return result;
+    } catch (error) {
+      console.error(`Error converting ${panelSchema.type} chart:`, error);
+      console.error("Error stack:", error);
+      // Fall back to legacy system if new system fails
+      console.warn(`Falling back to legacy converter for ${panelSchema.type}`);
+    }
+  }
+  // ========== END NEW MODULAR CHART SYSTEM ==========
+
   // Initialize extras object
   let extras: any = {};
 
   // get the limit series from the config
-  let limitSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+  const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
 
   // get the total series
   let totalSeries = 0;
   searchQueryData.forEach((queryData: any) => {
-    totalSeries += queryData.result?.length || 0;
+    if (queryData && queryData.result) {
+      totalSeries += queryData.result.length || 0;
+    }
   });
 
-  // Limit number of series to limitSeries
+  // For multiple queries (multi y-axis equivalent), divide the limit equally
+  const numberOfQueries = searchQueryData.filter(
+    (q: any) => q.result?.length > 0,
+  ).length;
+  const limitPerQuery =
+    numberOfQueries > 1 ? Math.floor(maxSeries / numberOfQueries) : maxSeries;
+
+  // Limit number of series to limitPerQuery per query
   const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
-    const remainingSeries = queryData.result?.slice(0, limitSeries);
-    limitSeries = limitSeries - remainingSeries.length;
+    if (!queryData || !queryData.result) {
+      return queryData;
+    }
+    const originalCount = queryData.result.length;
+    const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
       result: remainingSeries,
@@ -114,7 +184,17 @@ export const convertPromQLData = async (
   });
 
   // Add warning if total number of series exceeds limit
-  if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+  // Check if series limiting info is available from data loader (PromQL streaming)
+  if (metadata?.seriesLimiting) {
+    const { totalMetricsReceived, metricsStored } = metadata.seriesLimiting;
+    // Only show warning if we actually hit the limit (metricsStored >= maxSeries)
+    // AND we had to drop some metrics (totalMetricsReceived > metricsStored)
+    if (totalMetricsReceived > metricsStored && metricsStored >= maxSeries) {
+      extras.limitNumberOfSeriesWarningMessage =
+        "Limiting the displayed series to ensure optimal performance";
+    }
+  } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+    // Fallback: Series limiting happens here (for non-streaming queries)
     extras.limitNumberOfSeriesWarningMessage =
       "Limiting the displayed series to ensure optimal performance";
   }
@@ -130,14 +210,29 @@ export const convertPromQLData = async (
   let xAxisData: any = new Set();
 
   // add all series timestamp
-  limitedSearchQueryData.forEach((queryData: any) =>
-    queryData.result.forEach((result: any) =>
-      result.values.forEach((value: any) => xAxisData.add(value[0])),
-    ),
-  );
+  limitedSearchQueryData.forEach((queryData: any) => {
+    if (queryData && queryData.result) {
+      queryData.result.forEach((result: any) => {
+        if (result.values) {
+          result.values.forEach((value: any) => xAxisData.add(value[0]));
+        } else if (result.value) {
+          xAxisData.add(result.value[0]);
+        }
+      });
+    }
+  });
 
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
+
+  // Add end time from metadata to reserve full time range and prevent chart shifting during chunked data loading
+  if (metadata?.queries?.[0]?.endTime) {
+    const endTimeInSeconds = Math.floor(metadata.queries[0].endTime / 1000000); // Convert from microseconds to seconds
+    // Only add if end time is not already in the data
+    if (!xAxisData.includes(endTimeInSeconds)) {
+      xAxisData.push(endTimeInSeconds);
+    }
+  }
 
   // convert timestamp to specified timezone time
   xAxisData.forEach((value: number, index: number) => {
@@ -152,7 +247,7 @@ export const convertPromQLData = async (
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
-    type: "scroll",
+    type: panelSchema.config?.legends_type === "plain" ? "plain" : "scroll",
     orient: legendPosition,
     padding: [10, 20, 10, 10],
     tooltip: {
@@ -224,6 +319,12 @@ export const convertPromQLData = async (
       : Math.max(configValue, dataValue);
   };
 
+  // For PromQL, xAxis type is always "time" (time-series data)
+  // Skip rotation and truncation for time-based x-axis
+  // PromQL always uses time-series data, so no rotation/truncation calculations needed
+  const additionalBottomSpace = 0;
+  const dynamicXAxisNameGap = 25;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -233,14 +334,17 @@ export const convertPromQLData = async (
       left: panelSchema.config?.axis_width ?? 5,
       right: 20,
       top: "15",
-      bottom:
-        legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-          ? panelSchema.config?.axis_width == null
-            ? 30
-            : 50
-          : panelSchema.config?.axis_width == null
-            ? 5
-            : 25,
+      bottom: (() => {
+        const baseBottom =
+          legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+            ? panelSchema.config?.axis_width == null
+              ? 30
+              : 50
+            : panelSchema.config?.axis_width == null
+              ? 5
+              : 25;
+        return baseBottom + additionalBottomSpace;
+      })(),
     },
     tooltip: {
       show: true,
@@ -253,7 +357,7 @@ export const convertPromQLData = async (
       backgroundColor:
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText:
-        "max-height: 200px; overflow: auto; max-width: 500px; user-select: text;",
+        "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
       formatter: function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
@@ -332,6 +436,7 @@ export const convertPromQLData = async (
           fontSize: 12,
           precision: panelSchema.config?.decimals,
           show: true,
+          backgroundColor: store.state.theme === "dark" ? "#333" : "",
           formatter: function (name: any) {
             if (name.axisDimension == "y")
               return formatUnitValue(
@@ -350,13 +455,20 @@ export const convertPromQLData = async (
     },
     xAxis: {
       type: "time",
+      name: panelSchema.queries[0]?.fields?.x?.[0]?.label || "",
+      nameLocation: "middle",
+      nameGap: dynamicXAxisNameGap,
+      nameTextStyle: {
+        fontWeight: "bold",
+        fontSize: 14,
+      },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it.result.length == 0)
+        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
         lineStyle: {
           opacity: 0.5,
         },
@@ -364,6 +476,11 @@ export const convertPromQLData = async (
       axisLabel: {
         // hide axis label if overlaps
         hideOverlap: true,
+        // For time-based x-axis (type: "time"), rotation and truncation are not applicable
+        rotate: 0,
+        overflow: "none",
+        width: undefined,
+        margin: 10,
       },
     },
     yAxis: {
@@ -383,12 +500,12 @@ export const convertPromQLData = async (
         },
       },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it.result.length == 0)
+        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
         lineStyle: {
           opacity: 0.5,
         },
@@ -421,6 +538,24 @@ export const convertPromQLData = async (
   let totalLength = 0;
   // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
   let gridDataForGauge: any = {};
+
+  // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
+  if (options.xAxis) {
+    (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
+  if (options.yAxis) {
+    (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
 
   if (panelSchema.type === "gauge") {
     // calculate total length of all metrics
@@ -542,17 +677,66 @@ export const convertPromQLData = async (
             return seriesObj;
           }
           case "vector": {
-            const traces = it?.result?.map((metric: any) => {
+            const seriesObj = it?.result?.map((metric: any) => {
               const values = [metric.value];
+
+              const seriesName = getPromqlLegendName(
+                metric.metric,
+                panelSchema.queries[index].config.promql_legend,
+              );
+
               return {
-                name: JSON.stringify(metric.metric),
-                x: values.map((value: any) =>
-                  moment(value[0] * 1000).toISOString(true),
-                ),
-                y: values.map((value: any) => value[1]),
+                name: seriesName,
+                label: {
+                  show: panelSchema.config?.label_option?.position != null,
+                  position:
+                    panelSchema.config?.label_option?.position || "None",
+                  rotate: panelSchema.config?.label_option?.rotate || 0,
+                },
+                smooth:
+                  panelSchema.config?.line_interpolation === "smooth" ||
+                  panelSchema.config?.line_interpolation == null,
+                step: ["step-start", "step-end", "step-middle"].includes(
+                  panelSchema.config?.line_interpolation,
+                )
+                  ? panelSchema.config.line_interpolation.replace("step-", "")
+                  : false,
+                showSymbol: panelSchema.config?.show_symbol ?? false,
+                zlevel: 2,
+                itemStyle: {
+                  color: (() => {
+                    try {
+                      return getSeriesColor(
+                        panelSchema?.config?.color,
+                        seriesName,
+                        values.map((value: any) => value[1]),
+                        chartMin,
+                        chartMax,
+                        store.state.theme,
+                        panelSchema?.config?.color?.colorBySeries,
+                      );
+                    } catch (error) {
+                      console.warn("Failed to get series color:", error);
+                      return undefined;
+                    }
+                  })(),
+                },
+                data: values.map((value: any) => [
+                  store.state.timezone != "UTC"
+                    ? toZonedTime(value[0] * 1000, store.state.timezone)
+                    : new Date(value[0] * 1000).toISOString().slice(0, -1),
+                  value[1],
+                ]),
+                ...seriesPropsBasedOnChartType,
+                markLine: {
+                  silent: true,
+                  animation: false,
+                  data: getMarkLineData(panelSchema),
+                },
+                connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
-            return traces;
+            return seriesObj;
           }
         }
       }
@@ -662,7 +846,7 @@ export const convertPromQLData = async (
               ? "rgba(0,0,0,1)"
               : "rgba(255,255,255,1)",
           extraCssText:
-            "max-height: 200px; overflow: auto; max-width: 500px; user-select: text;",
+            "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
         };
 
         // Set coordinate system options
@@ -799,6 +983,12 @@ export const convertPromQLData = async (
   }
 
   options.series = options.series.flat();
+
+  // For metric chart type, only show one metric value (from last query with data)
+  if (panelSchema.type === "metric" && options.series.length > 1) {
+    options.series = options.series.slice(-1);
+  }
+
   // Apply series color mappings via reusable helper
   applySeriesColorMappings(
     options.series,
@@ -812,7 +1002,11 @@ export const convertPromQLData = async (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
     panelSchema.type != "gauge" &&
-    panelSchema.type != "metric"
+    panelSchema.type != "metric" &&
+    panelSchema?.config?.legends_position == "right" &&
+    (panelSchema?.config?.legends_type == null ||
+      panelSchema?.config?.legends_type === "plain" ||
+      panelSchema?.config?.legends_type === "scroll")
   ) {
     let legendWidth;
 
@@ -821,29 +1015,32 @@ export const convertPromQLData = async (
       !isNaN(parseFloat(panelSchema.config.legend_width.value))
       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
-      if (panelSchema.config.legend_width.unit === "%") {
-        // If in percentage, calculate percentage of the chartPanelRef width
-        const percentage = panelSchema.config.legend_width.value / 100;
-        legendWidth = chartPanelRef.value?.offsetWidth * percentage;
-      } else {
-        // If in pixels, use the provided value
-        legendWidth = panelSchema.config.legend_width.value;
-      }
-    } else {
-      const maxValue = options.series.reduce((max: any, it: any) => {
-        return max.length < it?.name?.length ? it?.name : max;
-      }, "");
-
-      // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
-        Math.min(
-          chartPanelRef.value?.offsetWidth / 3,
-          calculateWidthText(maxValue) + 60,
-        ) ?? 20;
+        panelSchema.config.legend_width.unit === "%"
+          ? (chartPanelRef.value?.offsetWidth || 0) *
+            (panelSchema.config.legend_width.value / 100)
+          : panelSchema.config.legend_width.value;
+    } else {
+      // Dynamically compute width to ensure legends do not overlap the chart
+      legendWidth = calculateRightLegendWidth(
+        options.series?.length || 0,
+        chartPanelRef.value?.offsetWidth || 800,
+        chartPanelRef.value?.offsetHeight || 400,
+        options.series || [],
+        panelSchema?.config?.legends_type === "scroll" ||
+          panelSchema?.config?.legends_type == null,
+      );
     }
 
+    // Reserve space on the right so that the plot shrinks horizontally
     options.grid.right = legendWidth;
-    options.legend.textStyle.width = legendWidth - 55;
+    // Constrain legend text to the reserved space to avoid overflow
+    options.legend.textStyle.width = Math.max(legendWidth - 55, 60);
+    // Explicitly bound the legend area to the reserved right-side width
+    const containerWidth = chartPanelRef.value?.offsetWidth || 0;
+    const legendLeftPx = Math.max(containerWidth - legendWidth, 0);
+    options.legend.left = legendLeftPx;
+    options.legend.right = 0;
   }
 
   //check if is there any data else filter out axis or series data
@@ -861,6 +1058,90 @@ export const convertPromQLData = async (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+  // Apply dynamic legend height for bottom legends if conditions are met
+  if (
+    panelSchema?.config?.show_legends &&
+    (panelSchema?.config?.legends_type === "plain" ||
+      (panelSchema.config.legend_height &&
+        !isNaN(parseFloat(panelSchema.config.legend_height.value)))) &&
+    (panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null) // Handle null/undefined as auto
+  ) {
+    // Get chart dimensions from chartPanelRef
+    const chartWidth = chartPanelRef.value?.offsetWidth || 800;
+    const chartHeight = chartPanelRef.value?.offsetHeight || 400;
+    // Count legend items from series data
+    const legendCount = options.series?.length || 0;
+
+    // Apply 80% height constraint for plain legends with bottom or auto position
+    const maxHeight =
+      panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null
+        ? chartHeight
+        : undefined;
+
+    // Calculate and configure bottom legend positioning to prevent overflow to top
+    // Prefer explicit legend height if provided in config
+    if (
+      panelSchema.config.legend_height &&
+      !isNaN(parseFloat(panelSchema.config.legend_height.value))
+    ) {
+      const legendHeight =
+        panelSchema.config.legend_height.unit === "%"
+          ? chartHeight * (panelSchema.config.legend_height.value / 100)
+          : panelSchema.config.legend_height.value;
+      
+      // Apply the configured height using the same approach as calculateBottomLegendHeight
+      if (options.grid) {
+        options.grid.bottom = legendHeight;
+      }
+      
+      const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+      options.legend.top = legendTopPosition;
+      options.legend.height = legendHeight - 20; // Constrain height within allocated space
+    } else {
+      // Dynamically compute height to ensure legends do not overlap the chart
+      calculateBottomLegendHeight(
+        legendCount,
+        chartWidth,
+        options.series || [],
+        maxHeight,
+        options.legend,
+        options.grid,
+        chartHeight,
+      );
+    }
+  }
+
+  // Apply legend height for scroll/auto legends at bottom position
+  if (
+    panelSchema?.config?.show_legends &&
+    (panelSchema?.config?.legends_type === "scroll" ||
+      panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
+    (panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null) &&
+    panelSchema.config.legend_height &&
+    !isNaN(parseFloat(panelSchema.config.legend_height.value))
+  ) {
+    // Get chart dimensions from chartPanelRef
+    const chartHeight = chartPanelRef.value?.offsetHeight || 400;
+
+    // Apply explicit legend height for scroll/auto legends
+    const legendHeight =
+      panelSchema.config.legend_height.unit === "%"
+        ? chartHeight * (panelSchema.config.legend_height.value / 100)
+        : panelSchema.config.legend_height.value;
+    
+    // Apply the configured height using the same approach as calculateBottomLegendHeight
+    if (options.grid) {
+      options.grid.bottom = legendHeight;
+    }
+    
+    const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+    options.legend.top = legendTopPosition;
+    options.legend.height = legendHeight - 20; // Constrain height within allocated space
+  }
+
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
   return {
@@ -892,6 +1173,8 @@ const calculateWidthText = (text: string): number => {
   span.remove();
   return width;
 };
+
+
 
 /**
  * Retrieves the legend name for a given metric and label.
@@ -947,7 +1230,7 @@ const getLegendPosition = (legendPosition: string) => {
  * @param {string} type - The chart type.
  * @return {object} The props object for the given chart type.
  */
-const getPropsByChartTypeForSeries = (type: string) => {
+export const getPropsByChartTypeForSeries = (type: string) => {
   switch (type) {
     case "bar":
       return {

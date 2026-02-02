@@ -36,11 +36,12 @@ use crate::{
     common::{
         meta,
         utils::{
+            auth::UserEmail,
             http::{get_or_create_trace_id, get_use_cache_from_request},
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::error_utils,
+    handler::http::{extractors::Headers, request::search::error_utils},
     service::{
         search::inspector::{SearchInspectorFields, extract_search_inspector_fields},
         self_reporting::http_report_metrics,
@@ -48,12 +49,16 @@ use crate::{
 };
 
 /// GetSearchProfile
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "GetSearchProfile",
+    summary = "Get search performance profile",
+    description = "Retrieves detailed performance profiling information for search queries executed within a specified time \
+                   range. This includes execution timing, node information, component performance metrics, and resource \
+                   usage statistics. Use this to analyze and optimize search performance, troubleshoot slow queries, and \
+                   understand query execution patterns across your cluster.",
     security(
         ("Authorization"= [])
     ),
@@ -64,7 +69,7 @@ use crate::{
         ("end_time" = i64, Query, description = "end time"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
           "sql": "SELECT count(*) FROM \"default\" WHERE match_all('m')",
           "start_time": "1744168877746000",
           "end_time": "1744773677746000",
@@ -83,13 +88,17 @@ use crate::{
               "component": "wal:memtable load",
               "desc": "wal mem search load groups 1, files 6, scan_size 16.01 MB, compressed_size 16.85 MB"
             }]})),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/search/profile")]
 pub async fn get_search_profile(
     path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -107,12 +116,7 @@ pub async fn get_search_profile(
     };
 
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = user_email.user_id;
 
     let query =
         match web::Query::<hashbrown::HashMap<String, String>>::from_query(in_req.query_string()) {

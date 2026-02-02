@@ -15,15 +15,23 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+#[cfg(not(feature = "enterprise"))]
+use actix_web::HttpRequest;
+use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use {
     crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
+    crate::common::utils::auth::check_permissions,
     crate::common::{
         meta::authz::Authz,
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{UserEmail, remove_ownership, set_ownership},
+    },
+    crate::handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     actix_web::http,
+    actix_web::web::Json,
     config::utils::time::now_micros,
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
@@ -31,12 +39,18 @@ use {
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
+#[cfg(feature = "enterprise")]
 /// Store a key credential in db
 #[utoipa::path(
     post,
     context_path = "/api",
+    operation_id = "CreateCipherKey",
+    summary = "Create encryption key",
+    description = "Creates a new encryption key for data encryption and decryption operations. The key is securely stored \
+                   and validated before being made available for use. Key names cannot contain ':' characters. Only \
+                   available in enterprise deployments for enhanced data security and compliance requirements.",
     request_body(
-        content = KeyAddRequest,
+        content = inline(KeyAddRequest),
         description = "Key data to add",
         content_type = "application/json",
     ),
@@ -49,84 +63,99 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
     org_id: web::Path<String>,
-    body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    body: web::Json<KeyAddRequest>,
 ) -> Result<HttpResponse, Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        let req: KeyAddRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
+    let req = body.into_inner();
 
-        let user_id = match in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-        {
-            Some(id) => id,
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-        };
+    let user_id = user_email.user_id;
 
-        if req.name.contains(":") {
-            return Ok(MetaHttpResponse::bad_request(
-                "Key name cannot have ':' in it",
-            ));
-        }
-
-        let cd: CipherData = match req.key.try_into() {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-
-        match cd.get_key().await {
-            // here we are just checking that the key can encrypt a string, i.e.
-            // it is set up correctly. We don't care what the actual entrypted string is.
-            Ok(mut k) => match k.encrypt("hello world") {
-                Ok(_) => {}
-                Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-            },
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        }
-
-        match crate::service::db::keys::add(CipherEntry {
-            org: org_id.to_string(),
-            created_at: now_micros(),
-            created_by: user_id.to_string(),
-            name: req.name.clone(),
-            data: serde_json::to_string(&cd).unwrap(),
-            kind: infra::table::cipher::EntryKind::CipherKey,
-        })
-        .await
-        {
-            Ok(_) => {
-                set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK,
-                    "Key created successfully",
-                )))
-            }
-            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-        }
+    if req.name.contains(":") {
+        return Ok(MetaHttpResponse::bad_request(
+            "Key name cannot have ':' in it",
+        ));
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        drop(org_id);
-        drop(in_req);
-        drop(body);
-        Ok(MetaHttpResponse::forbidden("not supported"))
+
+    let cd: CipherData = match req.key.try_into() {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    match cd.get_key().await {
+        // here we are just checking that the key can encrypt a string, i.e.
+        // it is set up correctly. We don't care what the actual entrypted string is.
+        Ok(mut k) => match k.encrypt("hello world") {
+            Ok(_) => {}
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        },
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     }
+
+    match crate::service::db::keys::add(CipherEntry {
+        org: org_id.to_string(),
+        created_at: now_micros(),
+        created_by: user_id.to_string(),
+        name: req.name.clone(),
+        data: serde_json::to_string(&cd).unwrap(),
+        kind: infra::table::cipher::EntryKind::CipherKey,
+    })
+    .await
+    {
+        Ok(_) => {
+            set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK,
+                "Key created successfully",
+            )))
+        }
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+/// Store a key credential in db
+#[utoipa::path(
+    post,
+    context_path = "/api",
+    operation_id = "CreateCipherKey",
+    summary = "Create encryption key",
+    description = "Creates a new encryption key for data encryption and decryption operations. This feature is only \
+                   available in enterprise deployments.",
+    responses(
+        (status = 403, description = "Feature not supported", content_type = "application/json")
+    ),
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[post("/{org_id}/cipher_keys")]
+pub async fn save(
+    _org_id: web::Path<String>,
+    _body: web::Payload,
+    _in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("not supported"))
 }
 
 /// get key with given name if present
 #[utoipa::path(
     get,
     context_path = "/api",
+    operation_id = "GetCipherKey",
+    summary = "Get encryption key details",
+    description = "Retrieves the configuration and metadata for a specific encryption key by name. Returns key \
+                   information without exposing sensitive key material. Used for managing and auditing encryption \
+                   keys within the organization. Only available in enterprise deployments for enhanced security \
+                   management.",
     params(
         ("key_name" = String, Path, description = "Name of the key to retrieve", example = "test_key")
     ),
@@ -134,12 +163,15 @@ pub async fn save(
         (
             status = 200,
             description = "Key info",
-            body = KeyGetResponse,
+            body = Object,
             content_type = "application/json",
         ),
         (status = 404, description = "Key not found", content_type = "text/plain")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[get("/{org_id}/cipher_keys/{key_name}")]
 pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -183,15 +215,24 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
 #[utoipa::path(
     get,
     context_path = "/api",
+    operation_id = "ListCipherKeys",
+    summary = "List encryption keys",
+    description = "Retrieves a list of all encryption keys available within the organization. Returns key names and \
+                   metadata without exposing sensitive key material. Helps administrators manage encryption keys, \
+                   audit key usage, and ensure proper key lifecycle management. Only available in enterprise \
+                   deployments for enhanced security and compliance.",
     responses(
         (
             status = 200,
             description = "list all keys in the org",
-            body = KeyListResponse,
+            body = Object,
             content_type = "application/json",
         ),
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[get("/{org_id}/cipher_keys")]
 pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
@@ -234,6 +275,12 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
 #[utoipa::path(
     delete,
     context_path = "/api",
+    operation_id = "DeleteCipherKey",
+    summary = "Delete encryption key",
+    description = "Permanently removes an encryption key from the organization. This action cannot be undone and will \
+                   prevent any future data decryption operations that depend on this key. Ensure all data encrypted \
+                   with this key is either migrated or no longer needed before deletion. Only available in enterprise \
+                   deployments for enhanced security management.",
     params(
         ("key_name" = String, Path, description = "name of the key to delete", example = "test_key")
     ),
@@ -245,7 +292,10 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
             content_type = "application/json",
         ),
     ),
-    tag = "Keys"
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[delete("/{org_id}/cipher_keys/{key_name}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -276,15 +326,94 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     }
 }
 
+/// delete multiple key credentials
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    context_path = "/api",
+    operation_id = "DeleteCipherKeysBulk",
+    summary = "Delete multiple encryption key",
+    description = "Permanently removes multiple encryption key from the organization. This action cannot be undone and will \
+                   prevent any future data decryption operations that depend on this key. Ensure all data encrypted \
+                   with this key is either migrated or no longer needed before deletion. Only available in enterprise \
+                   deployments for enhanced security management.",
+    params(
+        ("org_id" = String, Path, description = "name of the organization from which delete", example = "default")
+    ),
+    request_body(content = BulkDeleteRequest, description = "Key name list", content_type = "application/json"),
+    responses(
+        (
+            status = 200,
+            description = "Empty response",
+            body = (),
+            content_type = "application/json",
+        ),
+    ),
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/cipher_keys/bulk")]
+pub async fn delete_bulk(
+    path: web::Path<String>,
+    body: web::Json<BulkDeleteRequest>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let body = body.into_inner();
+    let user_id = &user_email.user_id;
+    for key in &body.ids {
+        if !check_permissions(key, &org_id, user_id, "cipher_keys", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+    let mut successful = Vec::with_capacity(body.ids.len());
+    let mut unsuccessful = Vec::with_capacity(body.ids.len());
+    let mut err = None;
+    for key_name in body.ids {
+        match crate::service::db::keys::remove(
+            &org_id,
+            infra::table::cipher::EntryKind::CipherKey,
+            &key_name,
+        )
+        .await
+        {
+            Ok(_) => {
+                remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
+                successful.push(key_name);
+            }
+            Err(e) => {
+                log::error!("error in deleting key {key_name} : {e}");
+                unsuccessful.push(key_name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
+#[cfg(feature = "enterprise")]
 /// update the credentials for given key
 #[utoipa::path(
     post,
     context_path = "/api",
+    operation_id = "UpdateCipherKey",
+    summary = "Update encryption key",
+    description = "Updates the configuration and parameters of an existing encryption key. The key is validated after \
+                   updates to ensure it remains functional for encryption and decryption operations. Changes are \
+                   applied atomically to maintain data security and consistency. Only available in enterprise \
+                   deployments for enhanced security management.",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
     ),
     request_body(
-        content = KeyAddRequest,
+        content = inline(KeyAddRequest),
         description = "updated key data",
         content_type = "application/json",
     ),
@@ -297,100 +426,112 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
-#[put("/{org_id}/cipher_keys/{name}")]
+#[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<KeyAddRequest>,
 ) -> Result<HttpResponse, Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        let (org_id, key_name) = path.into_inner();
-        let req: KeyAddRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-        if key_name != req.name {
-            return Ok(MetaHttpResponse::bad_request(
-                "Key name from request does not match path",
-            ));
-        }
+    let (org_id, key_name) = path.into_inner();
 
-        let user_id = match in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-        {
-            Some(id) => id,
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-        };
-
-        if req.name.contains(":") {
-            return Ok(MetaHttpResponse::bad_request(
-                "Key name cannot have ':' in it",
-            ));
-        }
-
-        let incoming: CipherData = match req.key.try_into() {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-
-        let kdata = match infra::table::cipher::get_data(
-            &org_id,
-            infra::table::cipher::EntryKind::CipherKey,
-            &key_name,
-        )
-        .await
-        {
-            Ok(Some(k)) => k,
-            Ok(None) => {
-                return Ok(MetaHttpResponse::not_found(format!(
-                    "Key {key_name} not found"
-                )));
-            }
-            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
-        };
-
-        // we can be fairly certain that in db we have proper json
-        let existing: CipherData = serde_json::from_str(&kdata).unwrap();
-
-        let cd = merge_updates(existing, incoming);
-
-        match cd.get_key().await {
-            // here we are just checking that the key can encrypt a string, i.e.
-            // it is set up correctly. We don't care what the actual entrypted string is.
-            Ok(mut k) => match k.encrypt("hello world") {
-                Ok(_) => {}
-                Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-            },
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        }
-
-        match crate::service::db::keys::update(CipherEntry {
-            org: org_id.to_string(),
-            created_at: now_micros(),
-            created_by: user_id.to_string(),
-            name: req.name,
-            data: serde_json::to_string(&cd).unwrap(),
-            kind: infra::table::cipher::EntryKind::CipherKey,
-        })
-        .await
-        {
-            Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK,
-                "key updated successfully",
-            ))),
-            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-        }
+    if key_name != req.name {
+        return Ok(MetaHttpResponse::bad_request(
+            "Key name from request does not match path",
+        ));
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        drop(in_req);
-        drop(path);
-        drop(body);
-        Ok(MetaHttpResponse::forbidden("not supported"))
+
+    let user_id = user_email.user_id;
+
+    if req.name.contains(":") {
+        return Ok(MetaHttpResponse::bad_request(
+            "Key name cannot have ':' in it",
+        ));
     }
+
+    let incoming: CipherData = match req.key.try_into() {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    let kdata = match infra::table::cipher::get_data(
+        &org_id,
+        infra::table::cipher::EntryKind::CipherKey,
+        &key_name,
+    )
+    .await
+    {
+        Ok(Some(k)) => k,
+        Ok(None) => {
+            return Ok(MetaHttpResponse::not_found(format!(
+                "Key {key_name} not found"
+            )));
+        }
+        Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
+    };
+
+    // we can be fairly certain that in db we have proper json
+    let existing: CipherData = serde_json::from_str(&kdata).unwrap();
+
+    let cd = merge_updates(existing, incoming);
+
+    match cd.get_key().await {
+        // here we are just checking that the key can encrypt a string, i.e.
+        // it is set up correctly. We don't care what the actual entrypted string is.
+        Ok(mut k) => match k.encrypt("hello world") {
+            Ok(_) => {}
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        },
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    }
+
+    match crate::service::db::keys::update(CipherEntry {
+        org: org_id.to_string(),
+        created_at: now_micros(),
+        created_by: user_id.to_string(),
+        name: req.name,
+        data: serde_json::to_string(&cd).unwrap(),
+        kind: infra::table::cipher::EntryKind::CipherKey,
+    })
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK,
+            "key updated successfully",
+        ))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+/// update the credentials for given key
+#[utoipa::path(
+    put,
+    context_path = "/api",
+    operation_id = "UpdateCipherKey",
+    summary = "Update encryption key",
+    description = "Updates the configuration and parameters of an existing encryption key. This feature is only \
+                   available in enterprise deployments.",
+    params(
+        ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
+    ),
+    responses(
+        (status = 403, description = "Feature not supported", content_type = "application/json")
+    ),
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[put("/{org_id}/cipher_keys/{key_name}")]
+pub async fn update(
+    _path: web::Path<(String, String)>,
+    _body: web::Payload,
+    _in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("not supported"))
 }

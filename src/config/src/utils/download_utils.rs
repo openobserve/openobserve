@@ -63,3 +63,66 @@ pub async fn is_digest_different(
     let local_file_sha = try_digest(Path::new(local_file_path)).unwrap_or_default();
     Ok(remote_file_sha.trim() != local_file_sha.trim())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_is_digest_different_with_direct_hash() {
+        // Test with a direct hash string (not HTTP URL)
+        let test_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+        // Test with a non-existent file (should return empty digest and thus be different)
+        let result = is_digest_different("/nonexistent/file.txt", test_hash).await;
+        assert!(result.is_ok());
+        // Since local file doesn't exist, digest will be empty, so it should be different
+        assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_is_digest_different_same_empty_hashes() {
+        // Both empty should be considered the same
+        let result = is_digest_different("/nonexistent/file.txt", "").await;
+        assert!(result.is_ok());
+        assert!(!result.unwrap()); // Empty == Empty
+    }
+
+    #[tokio::test]
+    async fn test_is_digest_different_with_whitespace() {
+        // Test that trimming works correctly
+        let hash_with_space = " e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ";
+        let result = is_digest_different("/nonexistent/file.txt", hash_with_space).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_is_digest_different_url_detection() {
+        // Test that HTTP URL is detected
+        let http_url = "https://openobserve.ai/img/logo/logo_horizontal.svg";
+        let result = is_digest_different("/nonexistent/file.txt", http_url).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_url_detection_logic() {
+        // Test the URL detection logic directly
+        let test_cases = vec![
+            ("http://example.com", true),
+            ("https://example.com", true),
+            ("HTTP://example.com", true),
+            ("HTTPS://example.com", true),
+            ("ftp://example.com", false),
+            ("/path/to/file", false),
+            (
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                false,
+            ),
+        ];
+
+        for (input, expected_is_url) in test_cases {
+            let is_url = input.to_lowercase().starts_with("http");
+            assert_eq!(is_url, expected_is_url, "Failed for input: {}", input);
+        }
+    }
+}

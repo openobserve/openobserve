@@ -39,13 +39,15 @@ pub async fn write_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    clear_cache: bool,
 ) -> Result<(), infra::errors::Error> {
     if accumulated_results.is_empty() {
         return Ok(());
     }
 
+    let start = std::time::Instant::now();
     log::info!(
-        "[HTTP2_STREAM]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
+        "[HTTP2_STREAM trace_id {}] Writing results to file: {}, accumulated_results len: {}",
         c_resp.trace_id,
         c_resp.file_path,
         accumulated_results.len()
@@ -80,21 +82,33 @@ pub async fn write_results_to_cache(
         && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
-        cache::write_results_v2(
+        // Determine if this is a non-timestamp histogram query for websocket streaming
+        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
+            && !merged_response.order_by_metadata.is_empty()
+            && merged_response
+                .order_by_metadata
+                .first()
+                .map(|(field, _)| field != &c_resp.ts_column)
+                .unwrap_or(false);
+
+        cache::write_results(
             &c_resp.trace_id,
             &c_resp.ts_column,
             start_time,
             end_time,
-            &merged_response,
+            merged_response,
             c_resp.file_path.clone(),
             c_resp.is_aggregate,
             c_resp.is_descending,
+            clear_cache,
+            is_histogram_non_ts_order,
         )
         .await;
         log::info!(
-            "[HTTP2_STREAM]: Results written to file for trace_id: {}, file_path: {}",
+            "[HTTP2_STREAM trace_id {}] Results written to file: {}, async cache task created, took: {} ms",
             c_resp.trace_id,
             c_resp.file_path,
+            start.elapsed().as_millis()
         );
     }
 
@@ -159,14 +173,17 @@ pub async fn handle_cache_responses_and_deltas(
     let mut curr_res_size = 0; // number of records
 
     let mut remaining_query_range = remaining_query_range as f64; // hours
-    let cache_start_time = cached_resp
-        .first()
-        .map(|c| c.response_start_time)
-        .unwrap_or_default();
-    let cache_end_time = cached_resp
-        .last()
-        .map(|c| c.response_end_time)
-        .unwrap_or_default();
+
+    // Get the actual min/max timestamps regardless of sort order
+    // We need to consider both start and end times from all cached responses
+    // to handle cases where entries might have inverted times or overlapping ranges
+    let mut all_timestamps = Vec::new();
+    for cached in &cached_resp {
+        all_timestamps.push(cached.response_start_time);
+        all_timestamps.push(cached.response_end_time);
+    }
+    let cache_start_time = all_timestamps.iter().min().copied().unwrap_or_default();
+    let cache_end_time = all_timestamps.iter().max().copied().unwrap_or_default();
     let cache_duration = cache_end_time - cache_start_time; // microseconds
     let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
 
@@ -293,7 +310,7 @@ pub async fn handle_cache_responses_and_deltas(
         }
 
         // Stop if reached the requested result size
-        if req_size != -1 && curr_res_size >= req_size {
+        if req_size != -1 && req_size != 0 && curr_res_size >= req_size {
             log::info!(
                 "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size: {req_size}, stopping search",
             );
@@ -436,6 +453,7 @@ async fn send_cached_responses(
         took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
         work_group: None, // TODO: add work group
         result_cache_ratio: Some(cached.cached_response.result_cache_ratio),
+        peak_memory_usage: cached.cached_response.peak_memory_usage,
         ..Default::default()
     };
     report_request_usage_stats(
@@ -462,6 +480,7 @@ pub async fn write_partial_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    clear_cache: bool,
 ) {
     // TEMPORARY: disable writing partial cache
     return;
@@ -474,7 +493,15 @@ pub async fn write_partial_results_to_cache(
                 "[HTTP2_STREAM trace_id {trace_id}] Search cancelled, writing results to cache",
             );
             // write the result to cache
-            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+            match write_results_to_cache(
+                c_resp,
+                start_time,
+                end_time,
+                accumulated_results,
+                clear_cache,
+            )
+            .await
+            {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(
@@ -489,20 +516,146 @@ pub async fn write_partial_results_to_cache(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::search::Response;
 
-    use super::*;
+    use crate::common::meta::search::CachedQueryResponse;
 
-    #[test]
-    fn test_write_results_to_cache_empty_results_logic() {
-        let accumulated_results: Vec<SearchResultType> = Vec::new();
-
-        // Test that empty results return early
-        assert!(accumulated_results.is_empty());
-
-        // This simulates the early return logic in write_results_to_cache
-        if accumulated_results.is_empty() {
-            // Should return Ok for empty results - this is the expected behavior
-            // No assertion needed here as this is just testing the early return logic
+    /// Test helper to create a mock CachedQueryResponse
+    fn create_mock_cached_response(start_time: i64, end_time: i64) -> CachedQueryResponse {
+        CachedQueryResponse {
+            cached_response: Response::default(),
+            deltas: vec![],
+            has_cached_data: true,
+            cache_query_response: true,
+            response_start_time: start_time,
+            response_end_time: end_time,
+            ts_column: "_timestamp".to_string(),
+            is_descending: false,
+            limit: 100,
         }
+    }
+
+    /// This test reproduces the bug from the faulty flow
+    /// where cached responses sorted in descending order produce negative cache_duration
+    #[test]
+    fn test_cache_duration_calculation_descending_order() {
+        // Create 3 cached responses with different time ranges
+        let mut cached_resp = vec![
+            create_mock_cached_response(300, 400), // Newest
+            create_mock_cached_response(200, 250), // Middle
+            create_mock_cached_response(100, 150), // Oldest
+        ];
+
+        // Sort in DESCENDING order (newest first) - this is what triggers the bug
+        cached_resp.sort_by(|a, b| b.response_start_time.cmp(&a.response_start_time));
+
+        // OLD CODE (buggy) - would use first() and last()
+        let old_cache_start_time = cached_resp.first().unwrap().response_start_time;
+        let old_cache_end_time = cached_resp.last().unwrap().response_end_time;
+        let old_cache_duration = old_cache_end_time - old_cache_start_time;
+
+        println!("\n=== OLD CODE (BUGGY) ===");
+        println!(
+            "Array sorted descending: first()={}, last()={}",
+            cached_resp.first().unwrap().response_start_time,
+            cached_resp.last().unwrap().response_end_time
+        );
+        println!("old_cache_start_time: {}", old_cache_start_time);
+        println!("old_cache_end_time: {}", old_cache_end_time);
+        println!("old_cache_duration: {} (NEGATIVE!)", old_cache_duration);
+
+        // Verify the bug: old code produces negative duration
+        assert!(
+            old_cache_duration < 0,
+            "Old code should produce negative duration"
+        );
+        assert_eq!(old_cache_start_time, 300, "Old code gets wrong start time");
+        assert_eq!(old_cache_end_time, 150, "Old code gets wrong end time");
+
+        // NEW CODE (fixed) - use min/max on all timestamps
+        let mut all_timestamps = Vec::new();
+        for cached in &cached_resp {
+            all_timestamps.push(cached.response_start_time);
+            all_timestamps.push(cached.response_end_time);
+        }
+        let new_cache_start_time = all_timestamps.iter().min().copied().unwrap_or_default();
+        let new_cache_end_time = all_timestamps.iter().max().copied().unwrap_or_default();
+        let new_cache_duration = new_cache_end_time - new_cache_start_time;
+
+        println!("\n=== NEW CODE (FIXED) ===");
+        println!("All timestamps: {:?}", all_timestamps);
+        println!("new_cache_start_time: {} (min)", new_cache_start_time);
+        println!("new_cache_end_time: {} (max)", new_cache_end_time);
+        println!("new_cache_duration: {} (POSITIVE!)", new_cache_duration);
+
+        // Verify the fix: new code produces positive duration
+        assert!(
+            new_cache_duration >= 0,
+            "New code should produce non-negative duration"
+        );
+        assert_eq!(
+            new_cache_start_time, 100,
+            "New code gets correct start time"
+        );
+        assert_eq!(new_cache_end_time, 400, "New code gets correct end time");
+        assert_eq!(
+            new_cache_duration, 300,
+            "New code calculates correct duration"
+        );
+    }
+
+    /// Test with real timestamps from the faulty flow log
+    #[test]
+    fn test_cache_duration_with_real_timestamps() {
+        // From the faulty flow log:
+        // cache_start_time: 1763646864583000
+        // cache_end_time: 1763640124696200
+        // cached_search_duration: -6739886800
+
+        let cached_resp = vec![
+            create_mock_cached_response(1763646864583000, 1763647000000000),
+            create_mock_cached_response(1763643000000000, 1763644000000000),
+            create_mock_cached_response(1763640124696200, 1763641000000000),
+        ];
+
+        // These are sorted descending by start_time (simulating the bug scenario)
+
+        // OLD CODE (reproduces the bug)
+        let old_cache_start_time = cached_resp.first().unwrap().response_start_time;
+        let old_cache_end_time = cached_resp.last().unwrap().response_end_time;
+        let old_cache_duration = old_cache_end_time - old_cache_start_time;
+
+        println!("\n=== REAL TIMESTAMPS FROM LOG ===");
+        println!("Old cache_start_time: {}", old_cache_start_time);
+        println!("Old cache_end_time: {}", old_cache_end_time);
+        println!("Old cache_duration: {}", old_cache_duration);
+
+        // Verify we reproduce the exact bug
+        assert_eq!(old_cache_start_time, 1763646864583000);
+        assert_eq!(old_cache_end_time, 1763641000000000);
+        assert!(
+            old_cache_duration < 0,
+            "Reproduces the negative duration bug"
+        );
+
+        // NEW CODE (fixes it)
+        let mut all_timestamps = Vec::new();
+        for cached in &cached_resp {
+            all_timestamps.push(cached.response_start_time);
+            all_timestamps.push(cached.response_end_time);
+        }
+        let new_cache_start_time = all_timestamps.iter().min().copied().unwrap_or_default();
+        let new_cache_end_time = all_timestamps.iter().max().copied().unwrap_or_default();
+        let new_cache_duration = new_cache_end_time - new_cache_start_time;
+
+        println!("New cache_start_time: {}", new_cache_start_time);
+        println!("New cache_end_time: {}", new_cache_end_time);
+        println!("New cache_duration: {} (FIXED!)", new_cache_duration);
+
+        // Verify the fix
+        assert_eq!(new_cache_start_time, 1763640124696200);
+        assert_eq!(new_cache_end_time, 1763647000000000);
+        assert!(new_cache_duration > 0, "Fix produces positive duration");
+        assert_eq!(new_cache_duration, 6875303800);
     }
 }

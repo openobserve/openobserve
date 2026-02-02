@@ -1,0 +1,329 @@
+import { test, expect } from "../baseFixtures.js";
+import PageManager from '../../pages/page-manager.js';
+import { waitUtils } from '../utils/wait-helpers.js';
+
+test.use({
+  contextOptions: {
+    slowMo: 1000
+  }
+});
+
+function reportName() {
+    const characters = 'abcdefghijklmnopqrstuvwxyz';
+    let TEST_REPORT_NAME = '';
+    for (let i = 0; i < 10; i++) {
+        const randomIndex = Math.floor(Math.random() * characters.length);
+        TEST_REPORT_NAME += characters[randomIndex];
+    }
+    return TEST_REPORT_NAME;
+}
+
+
+
+test.describe("Report test cases Updated", () => {
+    let pageManager;
+
+    test.beforeEach(async ({ page }) => {
+        pageManager = new PageManager(page);
+        await pageManager.loginPage.gotoLoginPage();
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.ingestionPage.ingestion();
+    });
+    
+    test("Create, use, and delete dashboard and custom Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.reportsPage.createReportAddReportButton();
+        await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await pageManager.reportsPage.createReportFolderInput();
+        await pageManager.reportsPage.createReportDashboardInput(pageManager.dashboardPage.dashboardName);
+        await pageManager.reportsPage.createReportDashboardTabInput();
+        await pageManager.reportsPage.createReportContinueButtonStep1();
+        await pageManager.reportsPage.createReportCustom();
+        await pageManager.reportsPage.createReportScheduleLater();
+        await pageManager.reportsPage.createReportDateTime();
+        await pageManager.reportsPage.createReportZone();
+        await pageManager.reportsPage.createReportContinueButtonStep2();
+        await pageManager.reportsPage.createReportFillDetail();
+        await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
+        await pageManager.reportsPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPageSC();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUserSC();
+        await pageManager.loginPage.loginSC();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
+        await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await expect(page).toHaveURL(/.*\/reports/);
+        await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.deleteDashboard();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.dashboardPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPage();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.notAvailableDashboard();
+
+    });
+
+    test("Create, use, and delete dashboard and months Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.reportsPage.createReportAddReportButton();
+        await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await pageManager.reportsPage.createReportFolderInput();
+        await pageManager.reportsPage.createReportDashboardInput(pageManager.dashboardPage.dashboardName);
+        await pageManager.reportsPage.createReportDashboardTabInput();
+        await pageManager.reportsPage.createReportContinueButtonStep1();
+        await pageManager.reportsPage.createReportMonths();
+        await pageManager.reportsPage.createReportScheduleLater();
+        await pageManager.reportsPage.createReportDateTime();
+        await pageManager.reportsPage.createReportZone();
+        await pageManager.reportsPage.createReportContinueButtonStep2();
+        await pageManager.reportsPage.createReportFillDetail();
+        await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
+        await pageManager.reportsPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPageSC();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUserSC();
+        await pageManager.loginPage.loginSC();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
+        await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await expect(page).toHaveURL(/.*\/reports/);
+        await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.deleteDashboard();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.dashboardPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPage();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.notAvailableDashboard();
+
+    });
+
+    test("Create, use, and delete dashboard and weeks Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.reportsPage.createReportAddReportButton();
+        await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await pageManager.reportsPage.createReportFolderInput();
+        await pageManager.reportsPage.createReportDashboardInput(pageManager.dashboardPage.dashboardName);
+        await pageManager.reportsPage.createReportDashboardTabInput();
+        await pageManager.reportsPage.createReportContinueButtonStep1();
+        await pageManager.reportsPage.createReportWeeks();
+        await pageManager.reportsPage.createReportScheduleLater();
+        await pageManager.reportsPage.createReportDateTime();
+        await pageManager.reportsPage.createReportZone();
+        await pageManager.reportsPage.createReportContinueButtonStep2();
+        await pageManager.reportsPage.createReportFillDetail();
+        await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
+        await pageManager.reportsPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPageSC();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUserSC();
+        await pageManager.loginPage.loginSC();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
+        await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await expect(page).toHaveURL(/.*\/reports/);
+        await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.deleteDashboard();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.dashboardPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPage();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.notAvailableDashboard();
+
+    });
+
+    test("Create, use, and delete dashboard and days Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.reportsPage.createReportAddReportButton();
+        await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await pageManager.reportsPage.createReportFolderInput();
+        await pageManager.reportsPage.createReportDashboardInput(pageManager.dashboardPage.dashboardName);
+        await pageManager.reportsPage.createReportDashboardTabInput();
+        await pageManager.reportsPage.createReportContinueButtonStep1();
+        await pageManager.reportsPage.createReportDays();
+        await pageManager.reportsPage.createReportScheduleLater();
+        await pageManager.reportsPage.createReportDateTime();
+        await pageManager.reportsPage.createReportZone();
+        await pageManager.reportsPage.createReportContinueButtonStep2();
+        await pageManager.reportsPage.createReportFillDetail();
+        await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
+        await pageManager.reportsPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPageSC();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUserSC();
+        await pageManager.loginPage.loginSC();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
+        await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await expect(page).toHaveURL(/.*\/reports/);
+        await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.deleteDashboard();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.dashboardPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPage();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.notAvailableDashboard();
+
+    });
+
+    test("Create, use, and delete dashboard and hours Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.reportsPage.createReportAddReportButton();
+        await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await pageManager.reportsPage.createReportFolderInput();
+        await pageManager.reportsPage.createReportDashboardInput(pageManager.dashboardPage.dashboardName);
+        await pageManager.reportsPage.createReportDashboardTabInput();
+        await pageManager.reportsPage.createReportContinueButtonStep1();
+        await pageManager.reportsPage.createReportHours();
+        await pageManager.reportsPage.createReportScheduleLater();
+        await pageManager.reportsPage.createReportDateTime();
+        await pageManager.reportsPage.createReportZone();
+        await pageManager.reportsPage.createReportContinueButtonStep2();
+        await pageManager.reportsPage.createReportFillDetail();
+        await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
+        await pageManager.reportsPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPageSC();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUserSC();
+        await pageManager.loginPage.loginSC();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
+        await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await expect(page).toHaveURL(/.*\/reports/);
+        await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.deleteDashboard();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.dashboardPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPage();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.notAvailableDashboard();
+
+    });
+
+    test("Create, use, and delete dashboard and once Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.reportsPage.createReportAddReportButton();
+        await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await pageManager.reportsPage.createReportFolderInput();
+        await pageManager.reportsPage.createReportDashboardInput(pageManager.dashboardPage.dashboardName);
+        await pageManager.reportsPage.createReportDashboardTabInput();
+        await pageManager.reportsPage.createReportContinueButtonStep1();
+        await pageManager.reportsPage.createReportOnce();
+        await pageManager.reportsPage.createReportScheduleLater();
+        await pageManager.reportsPage.createReportDateTime();
+        await pageManager.reportsPage.createReportZone();
+        await pageManager.reportsPage.createReportContinueButtonStep2();
+        await pageManager.reportsPage.createReportFillDetail();
+        await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
+        await pageManager.reportsPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPageSC();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUserSC();
+        await pageManager.loginPage.loginSC();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
+        await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+        await expect(page).toHaveURL(/.*\/reports/);
+        await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.deleteDashboard();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.dashboardPage.signOut();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.gotoLoginPage();
+        await waitUtils.smartWait(page, 4000, 'login sequence wait');
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.reportsPage.navigateToReports();
+        await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.dashboardPage.notAvailableDashboard();
+
+    });
+
+
+});

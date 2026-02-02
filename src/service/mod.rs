@@ -24,11 +24,11 @@ pub mod dashboards;
 pub mod db;
 pub mod enrichment;
 pub mod enrichment_table;
-pub mod exporter;
 pub mod file_list;
 pub mod file_list_dump;
 pub mod folders;
 pub mod functions;
+pub mod github;
 pub mod grpc;
 pub mod ingestion;
 pub mod kv;
@@ -43,6 +43,7 @@ pub mod pipeline;
 pub mod promql;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
+pub mod runtime_metrics;
 pub mod schema;
 pub mod search;
 pub mod tantivy;
@@ -53,8 +54,6 @@ pub mod self_reporting;
 pub mod session;
 pub mod short_url;
 pub mod stream;
-#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
-pub mod syslogs_route;
 pub mod tls;
 pub mod traces;
 pub mod users;
@@ -64,7 +63,7 @@ pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
     let stream_name = params.stream_name.to_string();
     let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type).await?;
     Ok(if schema.fields_map().is_empty() {
-        format_stream_name(&stream_name)
+        format_stream_name(stream_name)
     } else {
         stream_name
     })
@@ -81,6 +80,6 @@ pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) ->
     );
     headers.insert("traceparent".to_string(), traceparent);
     let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-    span.set_parent(parent_ctx);
+    let _ = span.set_parent(parent_ctx);
     span
 }

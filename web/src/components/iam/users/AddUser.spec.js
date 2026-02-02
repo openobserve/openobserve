@@ -220,50 +220,7 @@ describe("AddUser Component", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("displays add user title when not updating", () => {
-    expect(wrapper.find('.text-h6').exists()).toBe(true);
-    expect(wrapper.vm.beingUpdated).toBe(false);
-  });
 
-  it("displays edit user title when updating", async () => {
-    // Create a new wrapper with isUpdated true
-    const editWrapper = mount(AddUser, {
-      props: {
-        ...defaultProps,
-        isUpdated: true,
-        modelValue: {
-          ...defaultProps.modelValue,
-          email: "test@example.com"
-        }
-      },
-      global: {
-        plugins: [
-          i18n, 
-          router,
-          [Quasar, { platform }]
-        ],
-        provide: { 
-          store,
-          platform
-        },
-        mocks: {
-          $q: {
-            platform,
-            notify: vi.fn()
-          }
-        }
-      }
-    });
-
-    await nextTick();
-    await flushPromises();
-    
-    const title = editWrapper.find('.text-h6');
-    expect(title.exists()).toBe(true);
-    expect(editWrapper.vm.beingUpdated).toBe(true);
-
-    editWrapper.unmount();
-  });
 
   it("validates email format", async () => {
     // Set existingUser to true to show email input

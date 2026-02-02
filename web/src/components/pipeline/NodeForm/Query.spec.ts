@@ -542,22 +542,23 @@ describe("Query Component", () => {
     it("should not save when SQL validation fails", async () => {
       // Clear mocks to ensure clean state
       vi.clearAllMocks();
-      
-      // Based on the actual implementation, the validateSqlQuery resolves even on error
-      // and sets isValidSqlQuery to false. We need to mock it to reject to prevent save.
-      vi.mocked(searchService.search).mockImplementationOnce(() => 
-        Promise.reject() // Reject with no error to trigger the reject branch
+
+      // Mock search to reject with an error to trigger validation failure
+      vi.mocked(searchService.search).mockImplementationOnce(() =>
+        Promise.reject({
+          response: { data: { message: "Invalid SQL syntax" } }
+        })
       );
-      
+
       wrapper.vm.scheduledPipelineRef = {
         validateInputs: vi.fn().mockReturnValue(true)
       };
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.streamRoute.query_condition.sql = "INVALID SQL";
-      
+
       // This should now properly prevent the save
       const result = await wrapper.vm.saveQueryData();
-      
+
       expect(result).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
@@ -908,10 +909,10 @@ describe("Query Component", () => {
     it("should complete full workflow: create, validate, and save", async () => {
       // Clear all previous mocks first
       vi.clearAllMocks();
-      
+
       // Setup successful search mock
       vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
-      
+
       // Setup the component state
       wrapper.vm.streamRoute.name = "integration-test";
       wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs WHERE level = 'ERROR'";
@@ -919,10 +920,10 @@ describe("Query Component", () => {
       wrapper.vm.scheduledPipelineRef = {
         validateInputs: vi.fn().mockReturnValue(true),
       };
-      
+
       // Execute the save operation (which includes validation)
       await wrapper.vm.saveQueryData();
-      
+
       // Verify that the workflow completed successfully
       expect(mockAddNode).toHaveBeenCalled();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
@@ -931,7 +932,7 @@ describe("Query Component", () => {
     it("should handle complete deletion workflow", () => {
       wrapper.vm.openDeleteDialog();
       wrapper.vm.dialog.okCallback();
-      
+
       expect(mockDeletePipelineNode).toHaveBeenCalled();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
@@ -939,12 +940,78 @@ describe("Query Component", () => {
     it("should handle complete cancellation workflow with changes", () => {
       wrapper.vm.streamRoute.name = "changed";
       wrapper.vm.openCancelDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
-      
+
       wrapper.vm.dialog.okCallback();
-      
+
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
+  });
+
+  describe("Bug Fix: Stream Type Validation (Issue #1)", () => {
+    it("should use correct stream type for logs validation", async () => {
+      vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
+
+      wrapper.vm.streamRoute.stream_type = "logs";
+      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs";
+
+      await wrapper.vm.validateSqlQuery();
+
+      expect(searchService.search).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page_type: "logs",
+        })
+      );
+    });
+
+    it("should use correct stream type for metrics validation", async () => {
+      vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
+
+      wrapper.vm.streamRoute.stream_type = "metrics";
+      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM metrics";
+
+      await wrapper.vm.validateSqlQuery();
+
+      expect(searchService.search).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page_type: "metrics",
+        })
+      );
+    });
+
+    it("should use correct stream type for traces validation", async () => {
+      vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
+
+      wrapper.vm.streamRoute.stream_type = "traces";
+      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM traces";
+
+      await wrapper.vm.validateSqlQuery();
+
+      expect(searchService.search).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page_type: "traces",
+        })
+      );
+    });
+
+    it("should not hardcode logs stream type for validation", async () => {
+      vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
+
+      wrapper.vm.streamRoute.stream_type = "metrics";
+      wrapper.vm.streamRoute.query_condition.type = "sql";
+
+      await wrapper.vm.validateSqlQuery();
+
+      // Ensure it's NOT using hardcoded "logs"
+      expect(searchService.search).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          page_type: "logs",
+        })
+      );
     });
   });
 });

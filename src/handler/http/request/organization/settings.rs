@@ -35,22 +35,29 @@ use crate::{
 };
 
 /// Organization specific settings
-///
-/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingCreate",
+    summary = "Update organization settings",
+    description = "Creates or updates organization-specific settings such as scrape interval, trace field names, ingestion \
+                   toggles, and streaming configurations. Allows administrators to customize organizational behavior and \
+                   operational parameters to match specific requirements and use cases.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = OrganizationSettingPayload, description = "Organization settings", content_type = "application/json"),
+    request_body(content = inline(OrganizationSettingPayload), description = "Organization settings", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create/update org settings"}))
     )
 )]
 #[post("/{org_id}/settings")]
@@ -107,9 +114,31 @@ async fn create(
         data.enable_streaming_search = enable_streaming_search;
     }
 
-    if let Some(enable_streaming_search) = settings.enable_streaming_search {
+    if let Some(light_mode_theme_color) = settings.light_mode_theme_color {
         field_found = true;
-        data.enable_streaming_search = enable_streaming_search;
+        data.light_mode_theme_color = Some(light_mode_theme_color);
+    }
+
+    if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
+        field_found = true;
+        data.dark_mode_theme_color = Some(dark_mode_theme_color);
+    }
+
+    if let Some(max_series_per_query) = settings.max_series_per_query {
+        // Validate max_series_per_query is within acceptable range
+        if !(1_000..=1_000_000).contains(&max_series_per_query) {
+            return Ok(MetaHttpResponse::bad_request(
+                "max_series_per_query must be between 1,000 and 1,000,000",
+            ));
+        }
+        field_found = true;
+        data.max_series_per_query = Some(max_series_per_query);
+    }
+
+    #[cfg(feature = "enterprise")]
+    if let Some(claim_parser_function) = settings.claim_parser_function {
+        field_found = true;
+        data.claim_parser_function = claim_parser_function;
     }
 
     if !field_found {
@@ -125,12 +154,15 @@ async fn create(
 }
 
 /// Retrieve organization specific settings
-///
-/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingGet",
+    summary = "Get organization settings",
+    description = "Retrieves the current configuration settings for an organization, including scrape intervals, field \
+                   mappings, ingestion preferences, and streaming options. Returns default settings if none have been \
+                   configured previously for the organization.",
     security(
         ("Authorization"= [])
     ),
@@ -138,8 +170,12 @@ async fn create(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get organization settings"}))
     )
 )]
 #[get("/{org_id}/settings")]
@@ -163,7 +199,12 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/settings/logo")]
-async fn upload_logo(mut payload: Multipart) -> Result<HttpResponse, StdErr> {
+async fn upload_logo(
+    mut payload: Multipart,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, StdErr> {
+    let theme = query.get("theme").map(|s| s.to_string());
+
     match payload.try_next().await {
         Ok(field) => {
             let mut data: Vec<u8> = Vec::<u8>::new();
@@ -176,7 +217,7 @@ async fn upload_logo(mut payload: Multipart) -> Result<HttpResponse, StdErr> {
                     return Ok(MetaHttpResponse::bad_request("Image data not present"));
                 }
 
-                match settings::upload_logo(data).await {
+                match settings::upload_logo(data, theme).await {
                     Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
                     Err(e) => Ok(MetaHttpResponse::bad_request(e)),
                 }
@@ -196,8 +237,12 @@ async fn upload_logo() -> Result<HttpResponse, StdErr> {
 
 #[cfg(feature = "enterprise")]
 #[delete("/{org_id}/settings/logo")]
-async fn delete_logo() -> Result<HttpResponse, StdErr> {
-    match settings::delete_logo().await {
+async fn delete_logo(
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, StdErr> {
+    let theme = query.get("theme").map(|s| s.to_string());
+
+    match settings::delete_logo(theme).await {
         Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
@@ -237,4 +282,49 @@ async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
 #[delete("/{org_id}/settings/logo/text")]
 async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_max_series_per_query_validation_valid_values() {
+        // Test minimum valid value
+        let value = 1_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test maximum valid value
+        let value = 1_000_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test mid-range value (default)
+        let value = 40_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test another mid-range value
+        let value = 500_000;
+        assert!((1_000..=1_000_000).contains(&value));
+    }
+
+    #[test]
+    fn test_max_series_per_query_validation_invalid_values() {
+        // Test below minimum
+        let value = 999;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test above maximum
+        let value = 1_000_001;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test zero
+        let value = 0;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test very large value
+        let value = 10_000_000;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test value just below minimum
+        let value = 500;
+        assert!(!(1_000..=1_000_000).contains(&value));
+    }
 }

@@ -1,0 +1,23 @@
+.monaco-editor {
+  --vscode-focusBorder: #515151 !important;
+}
+.log_json_content {
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 12px;
+}
+.monaco-editor {
+  width: calc(100% - 16px) !important;
+  height: calc(100vh - 250px) !important;
+
+  &.expanded {
+    height: 300px !important;
+    max-width: 1024px !important;
+  }
+}
+
+.log-preview-btn {
+  margin-bottom: 0.375rem;
+  border: 1px solid var(--o2-border-color);
+  font-weight: normal;
+}

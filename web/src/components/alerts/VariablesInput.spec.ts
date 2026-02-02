@@ -82,14 +82,6 @@ describe("VariablesInput.vue", () => {
       expect(addBtn.text()).toContain("Add Variable");
     });
 
-    it("should apply correct CSS classes when variables array is empty", () => {
-      wrapper = createWrapper({ variables: [] });
-      const container = wrapper.find(".variables-input");
-      expect(container.classes()).toContain("flex");
-      expect(container.classes()).toContain("tw-gap-2");
-      expect(container.classes()).toContain("items-center");
-      expect(container.classes()).toContain("tw-w-full");
-    });
 
     it("should emit add:variable event when add button is clicked in empty state", async () => {
       wrapper = createWrapper({ variables: [] });
@@ -212,33 +204,6 @@ describe("VariablesInput.vue", () => {
     });
   });
 
-  describe("Theme Support", () => {
-    it("should apply dark theme classes when theme is dark", () => {
-      mockStore.state.theme = "dark";
-      wrapper = createWrapper({ variables: [{ uuid: "1", key: "var1", value: "value1" }] });
-      expect(wrapper.html()).toContain('input-bg-dark');
-    });
-
-    it("should apply light theme classes when theme is light", () => {
-      mockStore.state.theme = "light";
-      wrapper = createWrapper({ variables: [{ uuid: "1", key: "var1", value: "value1" }] });
-      expect(wrapper.html()).toContain('input-bg-light');
-    });
-
-    it("should apply dark icon theme for delete button when theme is dark", () => {
-      mockStore.state.theme = "dark";
-      wrapper = createWrapper({ variables: [{ uuid: "1", key: "var1", value: "value1" }] });
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      expect(deleteButton.classes()).toContain("icon-dark");
-    });
-
-    it("should apply dark icon theme for add button when theme is dark", () => {
-      mockStore.state.theme = "dark";
-      wrapper = createWrapper({ variables: [{ uuid: "1", key: "var1", value: "value1" }] });
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      expect(addButton.classes()).toContain("icon-dark");
-    });
-  });
 
   describe("Props Validation", () => {
     it("should accept variables prop as required array", () => {

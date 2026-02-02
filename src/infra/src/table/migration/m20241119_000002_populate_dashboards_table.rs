@@ -17,6 +17,7 @@
 //! records from the meta table.
 
 use chrono::{DateTime, FixedOffset};
+use config::utils::json;
 use sea_orm::{
     ActiveValue::NotSet, EntityTrait, FromQueryResult, Paginator, PaginatorTrait, SelectModel, Set,
     Statement, TransactionTrait,
@@ -167,11 +168,11 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
         let role = obj
             .remove("role")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .and_then(|s| if s.is_empty() { None } else { Some(s) });
+            .filter(|s| !s.is_empty());
         let description = obj
             .remove("description")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .and_then(|s| if s.is_empty() { None } else { Some(s) });
+            .filter(|s| !s.is_empty());
 
         // Since the created field includes a timezone that cannot be
         // represented in all databases and since the UI expects to receieve a
@@ -179,9 +180,11 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
         // JSON while also migrating its value into the created_at Unix timestamp column.
         let created_at_tz: DateTime<FixedOffset> = obj
             .get("created")
-            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .and_then(json::Value::as_str)
             .ok_or("Dashboard JSON does not have string \"created\" field".to_string())
-            .and_then(|s| DateTime::parse_from_rfc3339(&s).map_err(|e| e.to_string()))?;
+            .map(DateTime::parse_from_rfc3339)?
+            .map_err(|e| e.to_string())?;
+
         let created_at_unix = created_at_tz.timestamp();
 
         Ok(dashboards::ActiveModel {

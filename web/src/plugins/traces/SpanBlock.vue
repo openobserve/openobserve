@@ -171,15 +171,15 @@ export default defineComponent({
 
     const getLeftPosition = () => {
       const left =
-        props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
+        props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
 
-      return (left / props.baseTracePosition?.durationMs) * 100;
+      return (left / props.baseTracePosition?.durationUs) * 100;
     };
 
     const getSpanWidth = () => {
       return Number(
         (
-          (props.span?.durationMs / props.baseTracePosition?.durationMs) *
+          (props.span?.durationUs / props.baseTracePosition?.durationUs) *
           100
         ).toFixed(2),
       );
@@ -205,7 +205,7 @@ export default defineComponent({
     });
 
     watch(
-      () => props.span.startTimeMs,
+      () => props.span.startTimeUs,
       () => {
         leftPosition.value = getLeftPosition();
       },
@@ -226,7 +226,7 @@ export default defineComponent({
     );
 
     watch(
-      () => props.span?.durationMs + props.baseTracePosition?.durationMs,
+      () => props.span?.durationUs + props.baseTracePosition?.durationUs,
       () => {
         spanWidth.value = getSpanWidth();
       },
@@ -254,7 +254,7 @@ export default defineComponent({
         spanBlockWidth.value
       ) {
         style.right = 0;
-        style.top = "-5px";
+        style.top = "-0.3125rem";
       } else if (leftPosition.value > 50) {
         style.left = leftPosition.value * onePercent - labelWidth + "px";
       } else {

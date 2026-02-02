@@ -32,12 +32,13 @@ use crate::{
 };
 
 /// GetSavedView - Retrieve a single saved view associated with this org.
-///
-/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "GetSavedView",
+    summary = "Get saved view",
+    description = "Retrieves a specific saved search view by its ID. Saved views allow users to store and reuse complex search queries, filters, and visualization settings. The view contains all the necessary information to recreate the exact search state, including query parameters, time ranges, and display configurations.",
     security(
         ("Authorization"= [])
     ),
@@ -46,14 +47,18 @@ use crate::{
         ("view_id" = String, Path, description = "The view_id which was stored"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = View, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = inline(View), example = json!({
             "org_id": "some-org-id",
             "view_id": "some-uuid-v4",
             "view_name": "view-name",
             "payload": "base64-encoded-object-as-sent-by-frontend"
         })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get saved view details"}))
     )
 )]
 #[get("/{org_id}/savedviews/{view_id}")]
@@ -70,12 +75,13 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
 }
 
 /// ListSavedViews - Retrieve the list of saved views.
-///
-/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "ListSavedViews",
+    summary = "List saved views",
+    description = "Retrieves a list of all saved search views for the organization. This provides an overview of all stored queries and visualizations that users have created and saved for reuse. Each view includes basic metadata such as name and ID, allowing users to identify and select the views they want to load.",
     security(
         ("Authorization"= [])
     ),
@@ -83,14 +89,18 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ViewsWithoutData, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!([{
                 "org_id": "some-org-id",
                 "view_name": "view-name",
                 "view_id": "view-id",
                 "payload": "base-64-encoded-versioned-payload"
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all saved views"}))
     )
 )]
 #[get("/{org_id}/savedviews")]
@@ -103,12 +113,13 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
 }
 
 /// DeleteSavedViews - Delete a view associated with this given org.
-///
-/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "DeleteSavedViews",
+    summary = "Delete saved view",
+    description = "Permanently removes a saved search view from the organization. This action deletes the stored query configuration, visualization settings, and all associated metadata. Once deleted, the view cannot be recovered, so use this operation carefully when cleaning up unused or outdated saved views.",
     security(
         ("Authorization"= [])
     ),
@@ -117,12 +128,16 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
         ("view_id" = String, Path, description = "The view_id to delete"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = DeleteViewResponse, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = inline(DeleteViewResponse), example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a saved view"}))
     )
 )]
 #[delete("/{org_id}/savedviews/{view_id}")]
@@ -141,26 +156,31 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// CreateSavedViews - Create a view for later retrieval associated with the given search.
-///
-/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "CreateSavedViews",
+    summary = "Create a new saved view",
+    description = "Creates a saved search view with specified query parameters and filters",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = CreateViewRequest, description = "Create view data", content_type = "application/json"),
+    request_body(content = inline(CreateViewRequest), description = "Create view data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = CreateViewResponse, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = inline(CreateViewResponse), example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a saved view"}))
     )
 )]
 #[post("/{org_id}/savedviews")]
@@ -184,12 +204,13 @@ pub async fn create_view(
 }
 
 /// UpdateSavedViews - Update a saved view
-///
-/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "UpdateSavedViews",
+    summary = "Update an existing saved view",
+    description = "Updates the configuration and parameters of an existing saved search view",
     security(
         ("Authorization"= [])
     ),
@@ -197,16 +218,20 @@ pub async fn create_view(
         ("org_id" = String, Path, description = "Organization name"),
         ("view_id" = String, Path, description = "View id to be updated"),
     ),
-    request_body(content = UpdateViewRequest, description = "Update view data", content_type = "application/json"),
+    request_body(content = inline(UpdateViewRequest), description = "Update view data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = View, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = inline(View), example = json!([{
             "org_id": "some-org-id",
             "view_name": "view-name",
             "view_id": "view-id",
             "payload": "base-64-encoded-versioned-payload"
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a saved view"}))
     )
 )]
 #[put("/{org_id}/savedviews/{view_id}")]

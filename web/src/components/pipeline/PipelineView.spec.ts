@@ -511,7 +511,7 @@ describe("PipelineView", () => {
   // Image URL Tests
   describe("Image URLs", () => {
     it("should have streamImage available", () => {
-      expect(wrapper.vm.streamImage).toBe("mock-images/pipeline/stream.svg");
+      expect(wrapper.vm.streamImage).toBe("mock-images/pipeline/input_stream.png");
     });
 
     it("should initialize image constants", async () => {
@@ -524,7 +524,7 @@ describe("PipelineView", () => {
         }
       }
       // If nodeTypes is empty, just check that streamImage exists
-      expect(wrapper.vm.streamImage).toBe("mock-images/pipeline/stream.svg");
+      expect(wrapper.vm.streamImage).toBe("mock-images/pipeline/input_stream.png");
     });
   });
 

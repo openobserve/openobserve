@@ -23,23 +23,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
       {{ t("pipeline.streamTitle") }}
+      <div>
+          <q-btn v-close-popup="true" round flat icon="cancel" >
+          </q-btn>
+        </div>
     </div>
+    
     <q-separator />
 
-    <div   class="stream-routing-container full-width q-pa-md">
+    <div   class="stream-routing-container full-width q-py-md">
       <q-toggle
-      v-if="selectedNodeType == 'input'"
+        v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
-        class="q-mb-sm"
+        class="q-mb-sm tw:mr-3 tw:h-[36px] o2-toggle-button-lg q-ml-md"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
       />
 
       <q-form   @submit="saveStream">
 
-      <div v-if="!createNewStream">
+      <div v-if="!createNewStream" class="q-px-md">
         <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
             data-test="input-node-stream-type-select"
@@ -108,45 +115,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
           <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
-            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
-            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
+            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
+            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
 
-          <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+          <span class="tw:flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
 
             </div>
         </div>
 
         <div
-          class="flex justify-start full-width"
+          class="flex justify-start full-width q-mt-sm"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+        <q-btn
+            v-if="pipelineObj.isEditNode"
+            data-test="input-node-stream-delete-btn"
+            class="o2-secondary-button tw:h-[36px] q-mr-md"
+            color="negative"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            @click="openDeleteDialog"
+            >
+            <q-icon name="delete" class="q-mr-xs" />
+            {{ t('pipeline.deleteNode') }}
+          </q-btn>
           <q-btn
             data-test="input-node-stream-cancel-btn"
-            class="text-bold"
+            class="o2-secondary-button tw:h-[36px]"
             :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="openCancelDialog"
           />
           <q-btn
             data-test="input-node-stream-save-btn"
             :label="t('alerts.save')"
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             no-caps
             type="submit"
-          />
-          <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="input-node-stream-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
           />
         </div>
       </div>
@@ -166,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="dialog.show"
     :title="dialog.title"
     :message="dialog.message"
+    :warning-message="dialog.warningMessage"
     @update:ok="dialog.okCallback"
     @update:cancel="dialog.show = false"
   />
@@ -184,6 +195,7 @@ import AddStream from "@/components/logstream/AddStream.vue";
 import { useQuasar } from "quasar";
 
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
 const emit = defineEmits(["cancel:hideform"]);
 
@@ -194,7 +206,7 @@ const { t } = useI18n();
 
 const store = useStore();
 
-const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, checkIfDefaultDestinationNode} = useDragAndDrop();
 const { getUsedStreamsList } = usePipelines();
 
 const { getStreams } = useStreams();
@@ -373,6 +385,7 @@ const dialog = ref({
   show: false,
   title: "",
   message: "",
+  warningMessage:"",
   okCallback: () => {},
 });
 
@@ -380,6 +393,7 @@ const openCancelDialog = () => {
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel changes?";
+  dialog.value.warningMessage = "";
   dialog.value.okCallback = () => emit("cancel:hideform");
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
@@ -390,6 +404,13 @@ const openDeleteDialog = () => {
   dialog.value.title = "Delete Node";
   dialog.value.message =
     "Are you sure you want to delete stream association?";
+  //here we will check if the destination node is added by default if yes then we will show a warning message to the user
+  if(pipelineObj.currentSelectedNodeData?.data.hasOwnProperty('node_type') && pipelineObj.currentSelectedNodeData?.data.node_type === 'stream' && checkIfDefaultDestinationNode(pipelineObj.currentSelectedNodeID)){
+      dialog.value.warningMessage = defaultDestinationNodeWarningMessage
+  }
+  else{
+    dialog.value.warningMessage = "";
+  }
   dialog.value.okCallback = deleteNode;
 };
 
@@ -509,7 +530,7 @@ defineExpose({
 
 <style >
 .stream-routing-title {
-  font-size: 20px;
+  font-size: 18px;
   padding-top: 16px;
 }
 .pipeline-add-stream {

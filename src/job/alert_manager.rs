@@ -15,7 +15,12 @@
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use {
+    config::meta::alerts::incidents::IncidentTopology,
+    o2_enterprise::enterprise::{
+        alerts::rca_agent::RcaAgentClient, common::config::get_config as get_o2_config,
+    },
+};
 
 use crate::service;
 
@@ -59,7 +64,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await?;
     }
 
-    tokio::task::spawn(async move { run_schedule_jobs().await });
+    tokio::task::spawn(run_schedule_jobs());
     spawn_pausable_job!(
         "alert_manager_watch_timeout",
         get_config().limit.scheduler_watch_interval,
@@ -96,6 +101,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
     );
+
+    // Alert deduplication state cleanup job
+    spawn_pausable_job!(
+        "alert_dedup_cleanup",
+        3600, // Run every hour
+        {
+            if let Err(e) = cleanup_alert_dedup_state().await {
+                log::error!("[ALERT DEDUP CLEANUP] Error cleaning up deduplication state: {e}");
+            }
+        }
+    );
+
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "search_job_delete_by_retention",
@@ -122,10 +139,197 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     );
 
+    // Incident RCA job
+    #[cfg(feature = "enterprise")]
+    {
+        let o2_config = get_o2_config();
+        if o2_config.incidents.enabled && o2_config.incidents.rca_enabled {
+            if o2_config.incidents.rca_agent_url.is_empty() {
+                log::warn!("[INCIDENTS::RCA] RCA enabled but O2_AGENT_URL is not set");
+            } else {
+                log::info!(
+                    "[INCIDENTS::RCA] RCA job enabled (interval: {}s, agent: {})",
+                    o2_config.incidents.rca_interval_secs,
+                    o2_config.incidents.rca_agent_url
+                );
+
+                spawn_pausable_job!(
+                    "incidents_rca",
+                    o2_config.incidents.rca_interval_secs,
+                    {
+                        log::debug!("[INCIDENTS::RCA] Running RCA job");
+                        if let Err(e) = run_rca_job().await {
+                            log::error!("[INCIDENTS::RCA] RCA job failed: {e}");
+                        }
+                    },
+                    sleep_after
+                );
+            }
+        }
+    }
+
     Ok(())
 }
 
 /// Runs the schedule jobs
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     service::alerts::scheduler::run().await
+}
+
+/// Cleanup old alert deduplication state records (enterprise-only feature)
+#[cfg(feature = "enterprise")]
+async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
+    log::debug!("[ALERT DEDUP CLEANUP] Starting cleanup of old deduplication state");
+
+    // Get database connection
+    let db = match infra::db::ORM_CLIENT.get() {
+        Some(db) => db,
+        None => {
+            log::warn!("[ALERT DEDUP CLEANUP] ORM client not available, skipping cleanup");
+            return Ok(());
+        }
+    };
+
+    // Default cleanup: Remove records older than 24 hours
+    // This is conservative - most alerts have shorter time windows
+    let older_than_minutes = 24 * 60; // 24 hours
+
+    match service::alerts::deduplication::cleanup_expired_state(db, older_than_minutes).await {
+        Ok(deleted_count) => {
+            if deleted_count > 0 {
+                log::info!(
+                    "[ALERT DEDUP CLEANUP] Cleaned up {} expired deduplication state records",
+                    deleted_count
+                );
+            }
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("[ALERT DEDUP CLEANUP] Error during cleanup: {}", e);
+            Err(anyhow::anyhow!("Cleanup failed: {}", e))
+        }
+    }
+}
+
+/// OSS version: no-op cleanup since deduplication is enterprise-only
+#[cfg(not(feature = "enterprise"))]
+async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
+    // Deduplication is enterprise-only, nothing to clean up
+    Ok(())
+}
+
+/// Run RCA (Root Cause Analysis) for open incidents
+#[cfg(feature = "enterprise")]
+async fn run_rca_job() -> Result<(), anyhow::Error> {
+    let config = get_o2_config();
+
+    // Get admin credentials for basic auth
+    let zo_config = get_config();
+    let username = &zo_config.auth.root_user_email;
+    let password = &zo_config.auth.root_user_password;
+
+    // Create RCA agent client
+    let client = RcaAgentClient::new(&config.incidents.rca_agent_url, username, password)?;
+
+    // Check agent health first
+    if let Err(e) = client.health().await {
+        log::warn!("[INCIDENTS::RCA] Agent health check failed: {e}");
+        return Err(anyhow::anyhow!("RCA agent not available: {}", e));
+    }
+
+    // Get open incidents (ordered by newest first)
+    let incidents = infra::table::alert_incidents::get_open_incidents_for_rca().await?;
+
+    if incidents.is_empty() {
+        log::debug!("[INCIDENTS::RCA] No open incidents");
+        return Ok(());
+    }
+
+    // Filter to only incidents that need RCA (no suggested_root_cause yet)
+    let mut incidents_needing_rca = Vec::new();
+    for incident in incidents {
+        // Use centralized topology getter
+        match infra::table::alert_incidents::get_topology(&incident.org_id, &incident.id).await {
+            Ok(Some(topology)) if topology.suggested_root_cause.is_none() => {
+                incidents_needing_rca.push(incident);
+            }
+            Ok(Some(_)) => {
+                // Already has RCA - skip
+            }
+            Ok(None) => {
+                // No topology - skip (enrichment will add it first)
+            }
+            Err(e) => {
+                log::error!(
+                    "[INCIDENTS::RCA] Failed to get topology for incident {}: {}",
+                    incident.id,
+                    e
+                );
+            }
+        }
+    }
+
+    if incidents_needing_rca.is_empty() {
+        log::debug!("[INCIDENTS::RCA] No incidents need RCA");
+        return Ok(());
+    }
+
+    log::info!(
+        "[INCIDENTS::RCA] Processing {} incidents for RCA",
+        incidents_needing_rca.len()
+    );
+
+    // Process incidents sequentially (newest first)
+    for incident in incidents_needing_rca {
+        let incident_id = &incident.id;
+        let org_id = &incident.org_id;
+
+        log::info!("[INCIDENTS::RCA] Analyzing incident {incident_id}");
+
+        // Call RCA agent (agent only needs incident.id and incident.org_id from the model)
+        match client.analyze_incident(&incident).await {
+            Ok(rca_result) => {
+                log::info!(
+                    "[INCIDENTS::RCA] RCA completed for {}: {} chars",
+                    incident_id,
+                    rca_result.len()
+                );
+
+                // Get current topology and add RCA result
+                let mut topology =
+                    match infra::table::alert_incidents::get_topology(org_id, incident_id).await {
+                        Ok(Some(t)) => t,
+                        Ok(None) => {
+                            log::warn!(
+                                "[INCIDENTS::RCA] No topology for {incident_id}, using default"
+                            );
+                            IncidentTopology::default()
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[INCIDENTS::RCA] Failed to get topology for {incident_id}: {e}"
+                            );
+                            continue;
+                        }
+                    };
+
+                topology.suggested_root_cause = Some(rca_result);
+
+                if let Err(e) =
+                    infra::table::alert_incidents::update_topology(org_id, incident_id, &topology)
+                        .await
+                {
+                    log::error!(
+                        "[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}"
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
+                // Continue to next incident on failure
+            }
+        }
+    }
+
+    Ok(())
 }

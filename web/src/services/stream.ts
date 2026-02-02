@@ -104,6 +104,7 @@ const stream = {
     clusters,
     no_count,
     action_id,
+    traceparent,
   }: any) => {
     const fieldsString = fields.join(",");
     let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}`;
@@ -114,7 +115,14 @@ const stream = {
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;
     if (clusters) url += "&clusters=" + clusters;
-    return http().get(url);
+
+    let headers = {};
+    if (traceparent) {
+      headers = { traceparent };
+    }
+    return http({
+      headers,
+    }).get(url);
   },
 
   // Thia API is just used for service_name and operation_name fields
@@ -160,9 +168,9 @@ const stream = {
     );
   },
 
-  deleteFields: (org_identifier: string, stream_name: string, fields: []) => {
+  deleteFields: (org_identifier: string, stream_name: string, stream_type: string, fields: []) => {
     return http().put(
-      `/api/${org_identifier}/streams/${stream_name}/delete_fields`,
+      `/api/${org_identifier}/streams/${stream_name}/delete_fields?type=${stream_type}`,
       {
         fields,
       },

@@ -15,13 +15,22 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
+use actix_web::{
+    HttpResponse, delete, get, http, post, put,
+    web::{self, Json, Query},
+};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::pipelines::PipelineList,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::{
+        extractors::Headers,
+        models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
     service::{db::pipeline::PipelineError, pipeline},
 };
 
@@ -37,39 +46,43 @@ impl From<PipelineError> for HttpResponse {
 }
 
 /// CreatePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
-    tag = "Pipeline",
+    tag = "Pipelines",
     operation_id = "createPipeline",
+    summary = "Create new pipeline",
+    description = "Creates a new data processing pipeline with specified transformations and routing rules. Pipelines define how incoming data is processed before storage",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = inline(Pipeline), description = "Pipeline data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a data pipeline"}))
     )
 )]
 #[post("/{org_id}/pipelines")]
 pub async fn save_pipeline(
     path: web::Path<String>,
-    pipeline: web::Json<Pipeline>,
-    req: HttpRequest,
+    Query(query): Query<HashMap<String, String>>,
+    Json(mut pipeline): Json<Pipeline>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let mut pipeline = pipeline.into_inner();
     pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let overwrite = match query.get("overwrite") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
+
+    let overwrite = query
+        .get("overwrite")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
     if !overwrite {
         pipeline.id = ider::generate();
     }
@@ -83,12 +96,13 @@ pub async fn save_pipeline(
 }
 
 /// ListPipelines
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "listPipelines",
+    summary = "List organization pipelines",
+    description = "Retrieves all data processing pipelines configured for the organization, including their status and associated triggers",
     security(
         ("Authorization"= [])
     ),
@@ -96,13 +110,17 @@ pub async fn save_pipeline(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines")]
 async fn list_pipelines(
     org_id: web::Path<String>,
-    _req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let mut _permitted = None;
@@ -111,10 +129,9 @@ async fn list_pipelines(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            &user_email.user_id,
             "GET",
             OFGA_MODELS
                 .get("pipelines")
@@ -144,16 +161,42 @@ async fn list_pipelines(
         Err(e) => return Ok(e.into()),
     };
 
-    Ok(HttpResponse::Ok().json(PipelineList::from(pipelines, pipeline_triggers)))
+    // Fetch pipeline errors from DB
+    let pipeline_errors = match crate::service::db::pipeline_errors::list_by_org(&org_id).await {
+        Ok(errors) => errors
+            .into_iter()
+            .map(|error| {
+                (
+                    error.pipeline_id.clone(),
+                    crate::handler::http::models::pipelines::PipelineErrorInfo {
+                        last_error_timestamp: error.last_error_timestamp,
+                        error_summary: error.error_summary,
+                        node_errors: error.node_errors,
+                    },
+                )
+            })
+            .collect::<std::collections::HashMap<_, _>>(),
+        Err(e) => {
+            log::error!("[Pipeline] Failed to fetch pipeline errors: {}", e);
+            std::collections::HashMap::default() // Continue without errors if DB fetch fails
+        }
+    };
+
+    Ok(HttpResponse::Ok().json(PipelineList::from(
+        pipelines,
+        pipeline_triggers,
+        pipeline_errors,
+    )))
 }
 
 /// GetStreamsWithPipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "getStreamsWithPipeline",
+    summary = "Get streams with pipelines",
+    description = "Retrieves a list of streams that have associated data processing pipelines, showing the relationship between streams and their transformation rules",
     security(
         ("Authorization"= [])
     ),
@@ -161,7 +204,11 @@ async fn list_pipelines(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List streams using pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
@@ -174,12 +221,13 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
 }
 
 /// DeletePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "deletePipeline",
+    summary = "Delete pipeline",
+    description = "Permanently deletes a data processing pipeline. This will stop any ongoing data transformations using this pipeline",
     security(
         ("Authorization"= [])
     ),
@@ -188,8 +236,12 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
         ("pipeline_id" = String, Path, description = "Pipeline ID"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline"}))
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
@@ -204,28 +256,96 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
     }
 }
 
-/// UpdatePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
+/// DeletePipelineBulk
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
-    operation_id = "updatePipeline",
+    operation_id = "deletePipelineBulk",
+    summary = "Delete multiple pipelines",
+    description = "Permanently deletes multiple data processing pipelines. This will stop any ongoing data transformations using these pipelines",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "Pipeline data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/pipelines/bulk")]
+async fn delete_pipeline_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(id, &org_id, &_user_id, "pipelines", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in req.ids {
+        match pipeline::delete_pipeline(&id).await {
+            Ok(()) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error deleting pipeline {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
+/// UpdatePipeline
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "updatePipeline",
+    summary = "Update pipeline",
+    description = "Updates an existing data processing pipeline with new transformation rules, routing configurations, or other settings",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(Pipeline), description = "Pipeline data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a pipeline"}))
     )
 )]
 #[put("/{org_id}/pipelines")]
-pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpResponse, Error> {
-    let pipeline = pipeline.into_inner();
+pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpResponse, Error> {
     match pipeline::update_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK,
@@ -236,12 +356,13 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
 }
 
 /// EnablePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "enablePipeline",
+    summary = "Enable or disable pipeline",
+    description = "Enables or disables a data processing pipeline. Disabled pipelines will not process incoming data until re-enabled",
     security(
         ("Authorization"= [])
     ),
@@ -251,32 +372,116 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
         ("value" = bool, Query, description = "Enable or disable pipeline"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline"}))
     )
 )]
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]
 pub async fn enable_pipeline(
     path: web::Path<(String, String)>,
-    req: HttpRequest,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, pipeline_id) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let enable = match query.get("value") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
-    let starts_from_now = match query.get("from_now") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
-    let resp_msg =
-        "Pipeline successfully ".to_string() + if enable { "enabled" } else { "disabled" };
+
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
+    let starts_from_now = query
+        .get("from_now")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
     match pipeline::enable_pipeline(&org_id, &pipeline_id, enable, starts_from_now).await {
         Ok(()) => {
+            let resp_msg = format!(
+                "Pipeline successfully {}",
+                if enable { "enabled" } else { "disabled" }
+            );
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
         }
         Err(e) => Ok(e.into()),
     }
+}
+
+/// EnablePipelineBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "enablePipelineBulk",
+    summary = "Enable or disable pipeline in bulk",
+    description = "Enables or disables data processing pipelines in bulk. Disabled pipelines will not process incoming data until re-enabled",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("value" = bool, Query, description = "Enable or disable pipeline"),
+    ),
+    request_body(content = inline(PipelineBulkEnableRequest), description = "Pipeline id list", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[post("/{org_id}/pipelines/bulk/enable")]
+pub async fn enable_pipeline_bulk(
+    path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<PipelineBulkEnableRequest>,
+    Headers(_user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+    let starts_from_now = query
+        .get("from_now")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = _user_email.user_id;
+
+        for id in &req.ids {
+            if !check_permissions(id, &org_id, &user_id, "pipelines", "PUT", None).await {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in req.ids {
+        match pipeline::enable_pipeline(&org_id, &id, enable, starts_from_now).await {
+            Ok(()) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error in enabling pipeline {id} : {e}");
+                err = Some(e.to_string());
+                unsuccessful.push(id);
+            }
+        }
+    }
+    Ok(MetaHttpResponse::json(PipelineBulkEnableResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }

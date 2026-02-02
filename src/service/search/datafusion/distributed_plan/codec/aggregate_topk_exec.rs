@@ -22,7 +22,7 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::aggregate_topk_exec::AggregateTopkExec;
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::agg_topk_exec::AggregateTopkExec;
 use prost::Message;
 use proto::cluster_rpc;
 
@@ -117,7 +117,8 @@ mod tests {
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<AggregateTopkExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<AggregateTopkExec>().unwrap();
 

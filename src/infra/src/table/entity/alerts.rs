@@ -16,6 +16,7 @@ pub struct Model {
     pub destinations: Json,
     pub context_attributes: Option<Json>,
     pub row_template: Option<String>,
+    pub row_template_type: i16,
     pub description: Option<String>,
     pub enabled: bool,
     pub tz_offset: i32,
@@ -43,6 +44,9 @@ pub struct Model {
     pub last_edited_by: Option<String>,
     pub updated_at: Option<i64>,
     pub align_time: bool,
+    pub dedup_enabled: bool,
+    pub dedup_time_window_minutes: Option<i32>,
+    pub dedup_config: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

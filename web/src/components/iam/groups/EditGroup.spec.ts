@@ -140,10 +140,11 @@ describe("EditGroup Component", () => {
     it("displays group name in title", async () => {
       wrapper.vm.groupDetails.group_name = "test-group";
       await wrapper.vm.$nextTick();
-      
+
       const titleElement = wrapper.find('[data-test="edit-group-section-title"]');
       expect(titleElement.exists()).toBe(true);
-      expect(titleElement.text()).toBe("test-group");
+      // The title div contains both the group name and tabs, so we check if it includes the group name
+      expect(titleElement.text()).toContain("test-group");
     });
 
     it("renders tabs component", () => {
@@ -430,10 +431,15 @@ describe("EditGroup Component", () => {
   describe("Navigation", () => {
     it("navigates back to groups page when cancel is clicked", async () => {
       const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
-      
+
       await wrapper.vm.cancelEditGroup();
-      
-      expect(routerPushSpy).toHaveBeenCalledWith({ name: "groups" });
+
+      expect(routerPushSpy).toHaveBeenCalledWith({
+        name: "groups",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier
+        }
+      });
     });
 
     it("triggers navigation when cancel button is clicked", async () => {
@@ -452,7 +458,8 @@ describe("EditGroup Component", () => {
 
   describe("Theme Support", () => {
     it("applies correct theme classes to sticky footer", () => {
-      const footer = wrapper.find('.flex.justify-end.q-px-md.q-py-sm.full-width');
+      // Footer classes have been updated to use Tailwind CSS
+      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
       expect(footer.exists()).toBe(true);
       // Test that theme classes are applied correctly
     });
@@ -473,8 +480,9 @@ describe("EditGroup Component", () => {
         },
       });
 
-      const footer = wrapper.find('.flex.justify-end.q-px-md.q-py-sm.full-width');
-      expect(footer.classes()).toContain('bg-dark');
+      // Footer classes have been updated, theme classes are no longer applied to footer
+      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
+      expect(footer.exists()).toBe(true);
     });
   });
 

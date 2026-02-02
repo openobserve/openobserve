@@ -156,7 +156,7 @@ impl ObjectStore for Remote {
                 .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc_by(time);
         }
-        log::debug!("[STORAGE] get remote file: {}", file);
+        log::debug!("[STORAGE] get remote file: {file}");
 
         Ok(result)
     }
@@ -326,6 +326,9 @@ fn init_azure_config(
     }
     if !config.secret_key.is_empty() {
         builder = builder.with_access_key(&config.secret_key);
+    }
+    if !config.server_url.is_empty() {
+        builder = builder.with_endpoint(config.server_url.clone());
     }
     builder.build()
 }

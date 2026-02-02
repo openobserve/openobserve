@@ -87,7 +87,7 @@ fn splite_function_args(args: &FunctionArguments) -> (FunctionArg, Vec<FunctionA
             (first.clone(), others.to_vec())
         }
         _ => {
-            log::error!("Unsupported function arguments: {:?}", args);
+            log::error!("Unsupported function arguments: {args:?}");
             (FunctionArg::Unnamed(FunctionArgExpr::Wildcard), vec![])
         }
     }
@@ -120,7 +120,7 @@ fn convert_function_args_to_expr(args: FunctionArg) -> Expr {
         FunctionArg::Unnamed(FunctionArgExpr::Expr(arg)) => arg,
         FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => Expr::Wildcard(AttachedToken::empty()),
         _ => {
-            log::error!("Unsupported function argument: {:?}", args);
+            log::error!("Unsupported function argument: {args:?}");
             Expr::Wildcard(AttachedToken::empty())
         }
     }

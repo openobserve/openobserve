@@ -16,13 +16,12 @@
 use std::sync::Arc;
 
 use config::meta::cluster::{Node as ConfigNode, NodeInfo, NodeStatus, Role, RoleGroup};
+use infra::cluster::get_cached_nodes;
 use proto::cluster_rpc::{
     EmptyRequest, GetNodesResponse, NodeDetails, NodeMetrics as ProtoNodeMetrics,
     NodeStatus as ProtoNodeStatus, Role as ProtoRole, RoleGroup as ProtoRoleGroup,
 };
 use tonic::{Request, Response, Status};
-
-use crate::common::infra::cluster;
 
 pub struct NodeService;
 
@@ -158,9 +157,7 @@ impl proto::cluster_rpc::node_service_server::NodeService for NodeService {
         _request: Request<EmptyRequest>,
     ) -> Result<Response<GetNodesResponse>, Status> {
         // Get all nodes from cache
-        let nodes = cluster::get_cached_nodes(|_| true)
-            .await
-            .unwrap_or_default();
+        let nodes = get_cached_nodes(|_| true).await.unwrap_or_default();
 
         // Convert config nodes to proto nodes
         let proto_nodes = nodes.into_iter().map(config_node_to_proto).collect();
@@ -183,9 +180,9 @@ pub async fn get_node_list(
     let task: tokio::task::JoinHandle<Result<Vec<NodeDetails>, infra::errors::Error>> =
         tokio::task::spawn(async move {
             let empty_request = EmptyRequest {};
-            let mut request = Request::new(empty_request.clone());
+            let mut request = Request::new(empty_request);
             let mut client =
-                super::grpc::make_grpc_node_client(&trace_id, &mut request, &node).await?;
+                infra::client::grpc::make_grpc_node_client(&trace_id, &mut request, &node).await?;
             let nodes = match client.get_nodes(Request::new(empty_request)).await {
                 Ok(remote_nodes) => remote_nodes.into_inner().nodes,
                 Err(err) => {

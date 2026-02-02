@@ -23,7 +23,7 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use roaring::RoaringBitmap;
 
-use crate::service::search::grpc::utils::TantivyResult;
+use crate::service::search::grpc::tantivy_result::TantivyResult;
 
 pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
     Lazy::new(|| Arc::new(TantivyResultCache::default()));
@@ -116,7 +116,7 @@ impl TantivyResultCache {
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
             metrics::TANTIVY_RESULT_CACHE_GC_TOTAL
-                .with_label_values(&[])
+                .with_label_values::<&str>(&[])
                 .inc();
             let mut memory_usage = 0;
             // release 10% of the cache
@@ -130,7 +130,7 @@ impl TantivyResultCache {
                 }
             }
             metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
-                .with_label_values(&[])
+                .with_label_values::<&str>(&[])
                 .sub(memory_usage as i64);
         }
         w.push_back(key.clone());
@@ -138,7 +138,7 @@ impl TantivyResultCache {
         // update metrics
         let memory_usage = value.get_memory_size() + 2 * key.capacity();
         metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .add(memory_usage as i64);
         self.readers.insert(key, value)
     }

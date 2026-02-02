@@ -19,10 +19,11 @@ use config::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
         pipeline::components::PipelineSource,
+        self_reporting::usage,
         stream::StreamType,
         user::{UserOrg, UserRole},
     },
-    utils::rand::generate_random_string,
+    utils::{json, rand::generate_random_string, time},
 };
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -35,30 +36,79 @@ use {
     chrono::{Duration, Utc},
     config::{SMTP_CLIENT, get_config},
     lettre::{AsyncTransport, Message, message::SinglePart},
-    o2_enterprise::enterprise::cloud::{OrgInviteStatus, org_invites},
+    o2_enterprise::enterprise::cloud::{
+        InvitationRecord, OrgInviteStatus, billings::get_billing_by_org_id, org_invites,
+    },
 };
 
 #[cfg(feature = "cloud")]
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
+        infra::config::ORG_USERS,
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
             OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
+            TriggerStatus, TriggerStatusSearchResult,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
     service::{
         db::{self, org_users},
+        self_reporting,
         stream::get_streams,
         users::add_admin_to_org,
     },
 };
 
+const MASKED_TOKEN: &str = "NOT_AVAILABLE";
+
+/// Checks if a service account token should be masked
+/// Returns true if:
+/// - The service account has allow_static_token set to false
+/// - This prevents exposure of tokens that should only be used via assume_service_account API
+fn should_mask_token(org_id: Option<&str>, user_email: &str) -> bool {
+    // Check if this user has allow_static_token flag set to false in the requesting org
+    if let Some(org) = org_id {
+        let key = format!("{}/{}", org, user_email);
+        if let Some(user_record) = ORG_USERS.get(&key) {
+            return !user_record.allow_static_token;
+        }
+    }
+
+    false
+}
+
+/// Masks a token if necessary based on org context
+fn mask_token_if_needed(token: String, org_id: Option<&str>, user_email: &str) -> String {
+    if should_mask_token(org_id, user_email) {
+        MASKED_TOKEN.to_string()
+    } else {
+        token
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// Wrapper function to call o2-enterprise's tenant admin role creation logic
+async fn create_and_assign_tenant_admin_role(
+    org_id: &str,
+    service_account_email: &str,
+) -> Result<(), anyhow::Error> {
+    o2_openfga::authorizer::roles::create_and_assign_tenant_admin_role(
+        org_id,
+        service_account_email,
+    )
+    .await
+}
+
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
     let mut stream_summary = StreamSummary::default();
+    let mut has_trigger_stream = false;
     for stream in streams.iter() {
+        if stream.name == usage::TRIGGERS_STREAM {
+            has_trigger_stream = true;
+        }
         if !stream.stream_type.eq(&StreamType::Index)
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
@@ -70,6 +120,24 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         }
     }
 
+    let trigger_status_results = if !has_trigger_stream {
+        vec![]
+    } else {
+        let sql = format!(
+            "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
+            usage::TRIGGERS_STREAM,
+            org_id
+        );
+        let end_time = time::now_micros();
+        let start_time = end_time - time::second_micros(900); // 15 mins
+        self_reporting::search::get_usage(sql, start_time, end_time)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|v| json::from_value::<TriggerStatusSearchResult>(v).ok())
+            .collect::<Vec<_>>()
+    };
+
     let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
     let pipeline_summary = PipelineSummary {
         num_realtime: pipelines
@@ -80,6 +148,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .iter()
             .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
             .count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::DerivedStream,
+        ),
     };
 
     let alerts = super::alerts::alert::list_with_folders_db(ListAlertsParams::new(org_id))
@@ -88,6 +160,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let alert_summary = AlertSummary {
         num_realtime: alerts.iter().filter(|(_, a)| a.is_real_time).count() as i64,
         num_scheduled: alerts.iter().filter(|(_, a)| !a.is_real_time).count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::Alert,
+        ),
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
@@ -116,9 +192,10 @@ pub async fn get_passcode(
             "Not allowed for external service accounts",
         ));
     }
+    let passcode = mask_token_if_needed(user.token, org_id, &user.email);
     Ok(IngestionPasscode {
         user: user.email,
-        passcode: user.token,
+        passcode,
     })
 }
 
@@ -203,13 +280,14 @@ async fn update_passcode_inner(
     // TODO : Fix for root users
     let ret = if is_rum_update {
         IngestionTokensContainer::RumToken(RumIngestionToken {
-            user: db_user.email,
+            user: db_user.email.clone(),
             rum_token: Some(rum_token),
         })
     } else {
+        let passcode = mask_token_if_needed(token, org_id, &db_user.email);
         IngestionTokensContainer::Passcode(IngestionPasscode {
             user: db_user.email,
-            passcode: token,
+            passcode,
         })
     };
     Ok(ret)
@@ -227,6 +305,7 @@ pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, an
             identifier: record.org_id.clone(),
             name: record.org_name.clone(),
             org_type: record.org_type.to_string(),
+            service_account: None,
         })
         .collect())
 }
@@ -241,7 +320,13 @@ pub async fn list_org_users_by_user(
 pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
-) -> Result<Organization, anyhow::Error> {
+) -> Result<
+    (
+        Organization,
+        Option<crate::common::meta::organization::ServiceAccountTokenInfo>,
+    ),
+    anyhow::Error,
+> {
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
@@ -255,7 +340,31 @@ pub async fn create_org(
     if !is_allowed && !is_root_user(user_email) {
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
+
+    #[cfg(feature = "cloud")]
+    {
+        let orgs = list_orgs_by_user(user_email).await?;
+        for org in orgs {
+            let billing = get_billing_by_org_id(&org.identifier).await?;
+            if billing.is_none() {
+                return Err(anyhow::anyhow!(
+                    "A user cannot be part of multiple free accounts"
+                ));
+            }
+        }
+    }
+
     org.name = org.name.trim().to_owned();
+
+    let has_valid_chars = org
+        .name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
+    }
 
     org.identifier = ider::uuid();
     #[cfg(not(feature = "cloud"))]
@@ -266,7 +375,100 @@ pub async fn create_org(
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
-            add_admin_to_org(&org.identifier, user_email).await?;
+
+            // Determine which user to add to the org
+            // If service_account is specified, add it instead of the caller
+            if let Some(ref service_account_email) = org.service_account {
+                // Validate email format
+                if !service_account_email.contains('@') {
+                    return Err(anyhow::anyhow!("Invalid service account email format"));
+                }
+
+                log::info!(
+                    "Creating/adding service account '{}' to organization '{}' (caller: '{}')",
+                    service_account_email,
+                    org.identifier,
+                    user_email
+                );
+
+                // Create user record if it doesn't exist as ServiceAccount
+                use crate::service::users::create_service_account_if_not_exists;
+                create_service_account_if_not_exists(service_account_email).await?;
+
+                // Add service account to the org with ServiceAccount role
+                // Set allow_static_token = false to force use of assume_service_account API
+                use config::{meta::user::UserRole, utils::rand::generate_random_string};
+                let token = generate_random_string(32); // Generate random token (won't be exposed)
+                let rum_token = format!("rum{}", generate_random_string(16));
+
+                db::org_users::add_with_flags(
+                    &org.identifier,
+                    service_account_email,
+                    UserRole::ServiceAccount,
+                    &token,
+                    Some(rum_token),
+                    false,
+                )
+                .await?;
+
+                // Update OpenFGA and create tenant admin role
+                #[cfg(feature = "enterprise")]
+                {
+                    use o2_openfga::authorizer::authz::{
+                        get_add_user_to_org_tuples, update_tuples,
+                    };
+                    if get_openfga_config().enabled {
+                        let mut tuples = vec![];
+                        get_add_user_to_org_tuples(
+                            &org.identifier,
+                            service_account_email,
+                            &UserRole::ServiceAccount.to_string(),
+                            &mut tuples,
+                        );
+                        match update_tuples(tuples, vec![]).await {
+                            Ok(_) => {
+                                log::info!("Service account added to org successfully in openfga");
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Error adding service account to the org in openfga: {e}"
+                                );
+                            }
+                        }
+
+                        // Create tenant admin role and assign service account to it
+                        if let Err(e) = create_and_assign_tenant_admin_role(
+                            &org.identifier,
+                            service_account_email,
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "Failed to create/assign tenant admin role for '{}' in org '{}': {}",
+                                service_account_email,
+                                org.identifier,
+                                e
+                            );
+                            // Don't fail org creation if role assignment fails
+                            // The org and service account are already created
+                        } else {
+                            log::info!(
+                                "Created and assigned tenant admin role to '{}' in org '{}'",
+                                service_account_email,
+                                org.identifier
+                            );
+                        }
+                    }
+                }
+            } else {
+                // No service_account provided: add caller as admin to new org
+                log::info!(
+                    "No service_account provided, adding caller '{}' as admin for organization '{}'",
+                    user_email,
+                    org.identifier
+                );
+                add_admin_to_org(&org.identifier, user_email).await?;
+            }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
@@ -278,7 +480,38 @@ pub async fn create_org(
                 stream_name: None,
             })
             .await;
-            Ok(org.clone())
+
+            // if service account provided, and that SA is also SA in _meta,
+            // send the info in response, else ignore
+            let service_account_info = if let Some(sa) = org.service_account.as_ref() {
+                // Check if they're a service account in _meta org
+                if let Some(meta_user) =
+                    crate::service::users::get_user(Some(config::META_ORG_ID), sa).await
+                {
+                    if meta_user.role == UserRole::ServiceAccount {
+                        // Return service account info with instructions to use
+                        // assume_service_account API Tokens are no longer
+                        // returned directly for security reasons
+                        Some(crate::common::meta::organization::ServiceAccountTokenInfo {
+                            email: sa.clone(),
+                            token: String::new(), // Not returned for security
+                            role: UserRole::ServiceAccount.to_string(),
+                            message: format!(
+                                "Use POST /api/_meta/assume_service_account with org_id='{}' and service_account='{}' to obtain a temporary session token",
+                                org.identifier, sa
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            Ok((org.clone(), service_account_info))
         }
         Err(e) => {
             log::error!("Error creating org: {e}");
@@ -303,6 +536,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
         } else {
             CUSTOM.to_owned()
         },
+        service_account: None,
     };
     match db::organization::save_org(org).await {
         Ok(_) => {
@@ -343,6 +577,7 @@ pub async fn check_and_create_org_without_ofga(
         } else {
             CUSTOM.to_owned()
         },
+        service_account: None,
     };
     match db::organization::save_org(org).await {
         Ok(_) => Ok(org.clone()),
@@ -370,6 +605,15 @@ pub async fn rename_org(
     };
     if !is_allowed && !is_root_user(user_email) {
         return Err(anyhow::anyhow!("Not allowed to rename org"));
+    }
+
+    let has_valid_chars = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
     }
 
     if get_org(org_id).await.is_none() {
@@ -435,8 +679,15 @@ pub async fn get_invitations_for_org(
             expires_at: invite.expires_at,
             is_external: true,
             role: invite.role,
+            token: invite.token,
         })
         .collect())
+}
+
+#[cfg(feature = "cloud")]
+pub async fn delete_invite_by_token(org_id: &str, token: &str) -> Result<(), anyhow::Error> {
+    org_invites::delete_invite_by_token(org_id, token).await?;
+    Ok(())
 }
 
 #[cfg(feature = "cloud")]
@@ -462,8 +713,39 @@ pub async fn generate_invitation(
             None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
     }
+    for invitee in &invites.invites {
+        match get_user(Some(org_id), invitee).await {
+            None => {}
+            Some(_) => {
+                return Err(anyhow::anyhow!(
+                    "user with email {invitee} already part of the organization"
+                ));
+            }
+        }
+
+        if o2_enterprise::enterprise::cloud::email::check_email(invitee)
+            .await
+            .is_err()
+        {
+            return Err(anyhow::anyhow!("Email Domain not allowed for {invitee}"));
+        }
+
+        if get_billing_by_org_id(org_id).await?.is_none() {
+            // If the org we are inviting to is paid, its fine to send invitations
+            // irrespective of what other orgs invitees are part of.
+            // if it is a free org, we must check that the orgs invitee is already part
+            // of are all paid, as one user cannot be part of more than one free org.
+            let invitee_orgs = list_orgs_by_user(invitee).await?;
+            for org in invitee_orgs {
+                if get_billing_by_org_id(&org.identifier).await?.is_none() {
+                    return Err(anyhow::anyhow!(
+                        "Invitee {invitee} is already part of another free org, cannot be invited in this org"
+                    ));
+                }
+            }
+        }
+    }
     if let Some(org) = get_org(org_id).await {
-        let invite_token = config::ider::generate();
         let expires_at = Utc::now().timestamp_micros()
             + Duration::days(cfg.common.org_invite_expiry as i64)
                 .num_microseconds()
@@ -473,7 +755,6 @@ pub async fn generate_invitation(
             &invites.role.to_string(),
             user_email,
             org_id,
-            &invite_token,
             expires_at,
             invites.invites.clone(),
         )
@@ -490,7 +771,8 @@ pub async fn generate_invitation(
             if !cfg.smtp.smtp_reply_to.is_empty() {
                 email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
             }
-            let msg = get_invite_email_body(org_id, &org.name, &inviter_name, &invite_token);
+            let msg =
+                get_invite_email_body(org_id, &org.name, &inviter_name, invites.role, expires_at);
             let email = email.singlepart(SinglePart::html(msg)).unwrap();
 
             // Send the email
@@ -537,6 +819,20 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         None => return Err(anyhow::anyhow!("Organization doesn't exist")),
     };
 
+    if get_billing_by_org_id(&org_id).await?.is_none() {
+        // if the org user is joining is paid, no issues, we can just let them join
+        // if it is a free org, we must check that the orgs the joining user is already part
+        // of are all paid, as one user cannot be part of more than one free org.
+        let user_orgs = list_orgs_by_user(user_email).await?;
+        for org in user_orgs {
+            if get_billing_by_org_id(&org.identifier).await?.is_none() {
+                return Err(anyhow::anyhow!(
+                    "User is already a part of a free organization. A user cannot join multiple free orgs."
+                ));
+            }
+        }
+    }
+
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
         return Ok(()); // User is already part of the org
@@ -573,6 +869,46 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     })
     .await;
     Ok(())
+}
+
+#[cfg(feature = "cloud")]
+pub async fn decline_invitation(
+    user_email: &str,
+    token: &str,
+) -> Result<Vec<InvitationRecord>, anyhow::Error> {
+    let invite = org_invites::get_by_token_user(token, user_email)
+        .await
+        .map_err(|e| {
+            log::info!("error getting token {token} for email {user_email} : {e}");
+            anyhow::anyhow!("Provided Token is not valid for this email id")
+        })?;
+
+    let now = chrono::Utc::now().timestamp_micros();
+
+    if invite.expires_at < now {
+        return Err(anyhow::anyhow!("Invalid token"));
+    }
+
+    if let Err(e) =
+        org_invites::update_invite_status(token, user_email, OrgInviteStatus::Rejected).await
+    {
+        log::error!("Error updating the invite status in the db: {e}");
+        return Err(anyhow::anyhow!("Error updating status"));
+    }
+
+    let invites = match db::user::list_user_invites(user_email).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in listing invites for {user_email} : {e}");
+            vec![]
+        }
+    };
+    let pending = invites
+        .into_iter()
+        .filter(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now)
+        .collect();
+
+    Ok(pending)
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {

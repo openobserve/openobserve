@@ -23,12 +23,12 @@ use config::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt, util::DISTINCT_STREAM_PREFIX},
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
     catalog::TableProvider,
-    common::Column,
+    config::Dialect,
     datasource::{
         file_format::parquet::ParquetFormat,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
@@ -46,10 +46,9 @@ use datafusion::{
     optimizer::{AnalyzerRule, OptimizerRule},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::execute_stream,
-    prelude::{Expr, SessionContext},
+    prelude::{SessionContext, col},
 };
 use futures::TryStreamExt;
-use hashbrown::HashMap;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 #[cfg(feature = "enterprise")]
 use {
@@ -62,14 +61,12 @@ use {
 };
 
 use super::{
-    file_type::{FileType, GetExt},
-    planner::extension_planner::OpenobserveQueryPlanner,
-    storage::file_list,
-    table_provider::{NewListingTable, uniontable::NewUnionTable},
+    peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
+    storage::file_list, table_provider::uniontable::NewUnionTable,
     udf::transform_udf::get_all_transform,
 };
-use crate::service::{
-    metadata::distinct_values::DISTINCT_STREAM_PREFIX, search::index::IndexCondition,
+use crate::service::search::{
+    datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
 };
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
@@ -402,7 +399,7 @@ pub fn create_session_config(
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
-    config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
+    config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
     // based on data distributing, it only works for the data on a few records
     // config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
@@ -418,6 +415,9 @@ pub fn create_session_config(
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     }
 
+    // due to: https://github.com/apache/datafusion/issues/19219
+    config = config.set_bool("datafusion.optimizer.enable_topk_aggregation", false);
+
     // When set to true, skips verifying that the schema produced by planning the input of
     // `LogicalPlan::Aggregate` exactly matches the schema of the input plan.
     config = config.set_bool(
@@ -428,7 +428,7 @@ pub fn create_session_config(
     Ok(config)
 }
 
-pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
+pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
     let memory = super::storage::memory::FS::new();
@@ -455,23 +455,25 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         .map_err(|e| {
             DataFusionError::Execution(format!("Invalid datafusion memory pool type: {e}"))
         })?;
-    match mem_pool {
+    let memory_pool = match mem_pool {
         super::MemoryPoolType::Greedy => {
             let pool = GreedyMemoryPool::new(memory_size);
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
         super::MemoryPoolType::Fair => {
             let pool = FairSpillPool::new(memory_size);
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
         super::MemoryPoolType::None => {
             let pool = UnboundedMemoryPool::default();
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
     };
+
+    builder = builder.with_memory_pool(Arc::new(memory_pool));
     builder.build()
 }
 
@@ -549,7 +551,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         .await?;
 
         let session_config = create_session_config(self.sorted_by_time, target_partitions)?;
-        let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
+        let runtime_env = Arc::new(create_runtime_env(self.trace_id, memory_size).await?);
         let mut builder = SessionStateBuilder::new()
             .with_config(session_config)
             .with_runtime_env(runtime_env)
@@ -591,6 +593,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
+    ctx.register_udf(super::udf::match_all_hash_udf::MATCH_ALL_HASH_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
@@ -626,10 +629,8 @@ pub async fn register_table(
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
-    files: &[FileKey],
-    rules: HashMap<String, DataType>,
+    files: Vec<FileKey>,
     sort_key: &[(String, bool)],
-    need_optimize_partition: bool,
 ) -> Result<SessionContext> {
     // only sort by timestamp desc
     let sorted_by_time =
@@ -643,10 +644,8 @@ pub async fn register_table(
         .await?;
 
     let table = TableBuilder::new()
-        .rules(rules)
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
-        .need_optimize_partition(need_optimize_partition)
         .build(session.clone(), files, schema)
         .await?;
     ctx.register_table(table_name, table)?;
@@ -656,29 +655,20 @@ pub async fn register_table(
 
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
-    rules: HashMap<String, DataType>,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
-    need_optimize_partition: bool,
 }
 
 impl TableBuilder {
     pub fn new() -> Self {
         Self {
-            rules: HashMap::new(),
             sorted_by_time: false,
             file_stat_cache: None,
             index_condition: None,
             fst_fields: vec![],
-            need_optimize_partition: false,
         }
-    }
-
-    pub fn rules(mut self, rules: HashMap<String, DataType>) -> Self {
-        self.rules = rules;
-        self
     }
 
     pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
@@ -701,15 +691,10 @@ impl TableBuilder {
         self
     }
 
-    pub fn need_optimize_partition(mut self, need_optimize_partition: bool) -> Self {
-        self.need_optimize_partition = need_optimize_partition;
-        self
-    }
-
     pub async fn build(
         self,
         session: SearchSession,
-        files: &[FileKey],
+        files: Vec<FileKey>,
         schema: Arc<Schema>,
     ) -> Result<Arc<dyn TableProvider>> {
         let cfg = get_config();
@@ -735,19 +720,13 @@ impl TableBuilder {
         // Configure listing options
         let file_format = ParquetFormat::default();
         let mut listing_options = ListingOptions::new(Arc::new(file_format))
-            .with_file_extension(FileType::PARQUET.get_ext())
             .with_target_partitions(target_partitions)
             .with_collect_stat(true); // current is default to true
 
         if self.sorted_by_time {
             // specify sort columns for parquet file
-            listing_options = listing_options.with_file_sort_order(vec![vec![
-                datafusion::logical_expr::SortExpr {
-                    expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
-                    asc: false,
-                    nulls_first: false,
-                },
-            ]]);
+            listing_options = listing_options
+                .with_file_sort_order(vec![vec![col(TIMESTAMP_COL_NAME).sort(false, false)]]);
         }
 
         let schema_key = schema.hash_key();
@@ -795,12 +774,11 @@ impl TableBuilder {
             schema
         };
         config = config.with_schema(schema);
-        let mut table = NewListingTable::try_new(
+        let mut table = ListingTableAdapter::try_new(
             config,
-            self.rules,
+            session.id.clone(),
             self.index_condition,
             self.fst_fields,
-            self.need_optimize_partition,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache);
@@ -1022,7 +1000,7 @@ mod tests {
                 .max(get_config().limit.datafusion_min_partition_num)
         );
         assert_eq!(config.options().execution.batch_size, PARQUET_BATCH_SIZE);
-        assert_eq!(config.options().sql_parser.dialect, "PostgreSQL");
+        assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
 
@@ -1061,7 +1039,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_runtime_env() -> Result<()> {
         let memory_limit = 1024 * 1024 * 512; // 512MB
-        let runtime_env = create_runtime_env(memory_limit).await?;
+        let runtime_env = create_runtime_env("test", memory_limit).await?;
 
         // Check that object stores are registered
         let memory_url = url::Url::parse("memory:///").unwrap();
@@ -1086,7 +1064,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_runtime_env_min_memory() -> Result<()> {
         let small_memory = 1024; // Very small memory
-        let runtime_env = create_runtime_env(small_memory).await?;
+        let runtime_env = create_runtime_env("test", small_memory).await?;
 
         // Should handle small memory gracefully
         // Memory pool behavior may vary by implementation
@@ -1150,28 +1128,19 @@ mod tests {
     #[test]
     fn test_table_builder_new() {
         let builder = TableBuilder::new();
-        assert!(builder.rules.is_empty());
         assert!(!builder.sorted_by_time);
         assert!(builder.file_stat_cache.is_none());
         assert!(builder.index_condition.is_none());
         assert!(builder.fst_fields.is_empty());
-        assert!(!builder.need_optimize_partition);
     }
 
     #[test]
     fn test_table_builder_with_options() {
-        let mut rules = HashMap::new();
-        rules.insert("field1".to_string(), DataType::Utf8);
-
         let builder = TableBuilder::new()
-            .rules(rules.clone())
             .sorted_by_time(true)
-            .need_optimize_partition(true)
             .fst_fields(vec!["field1".to_string()]);
 
-        assert_eq!(builder.rules, rules);
         assert!(builder.sorted_by_time);
-        assert!(builder.need_optimize_partition);
         assert_eq!(builder.fst_fields, vec!["field1".to_string()]);
     }
 
@@ -1210,7 +1179,7 @@ mod tests {
         let memory_limit = 1024 * 1024 * 256; // 256MB
 
         // Test that runtime env creation works (which tests different pool types)
-        let runtime_env = create_runtime_env(memory_limit).await?;
+        let runtime_env = create_runtime_env("test", memory_limit).await?;
         // Memory pool exists and was created successfully
         // Memory pool exists and was created successfully
         let _ = runtime_env.memory_pool.reserved();
@@ -1293,19 +1262,9 @@ mod tests {
                 id: 1,
                 segment_ids: None,
             }];
-            let rules = HashMap::new();
             let sort_key = vec![(TIMESTAMP_COL_NAME.to_string(), true)];
 
-            let result = register_table(
-                &session,
-                schema,
-                "test_table",
-                &files,
-                rules,
-                &sort_key,
-                false,
-            )
-            .await;
+            let result = register_table(&session, schema, "test_table", files, &sort_key).await;
 
             // Should create context successfully
             assert!(result.is_ok());
@@ -1344,11 +1303,9 @@ mod tests {
                 segment_ids: None,
             }];
 
-            let builder = TableBuilder::new()
-                .sorted_by_time(true)
-                .need_optimize_partition(false);
+            let builder = TableBuilder::new().sorted_by_time(true);
 
-            let result = builder.build(session, &files, schema).await;
+            let result = builder.build(session, files, schema).await;
             assert!(result.is_ok());
 
             Ok(())
@@ -1363,7 +1320,7 @@ mod tests {
             // This test verifies error handling in memory pool creation
             // The actual error handling is in the FromStr implementation
             let memory_limit = 1024 * 1024 * 256;
-            let result = create_runtime_env(memory_limit).await;
+            let result = create_runtime_env("test", memory_limit).await;
             assert!(result.is_ok()); // Should handle gracefully
         }
 

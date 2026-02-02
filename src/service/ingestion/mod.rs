@@ -15,6 +15,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    io::Write,
     sync::{Arc, atomic::Ordering},
 };
 
@@ -53,7 +54,12 @@ use crate::{
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
-        utils::functions::get_vrl_compiler_config,
+        utils::{
+            functions::get_vrl_compiler_config,
+            js::{
+                JSRuntimeConfig, apply_js_fn as apply_js, compile_js_function as compile_js_func,
+            },
+        },
     },
     service::{
         alerts::alert::AlertExt,
@@ -93,6 +99,23 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
             vrl::diagnostic::Formatter::new(func, e).to_string(),
         )),
     }
+}
+
+/// Compile a JS function and return configuration
+/// This wraps the common::utils::js::compile_js_function
+pub fn compile_js_function(func: &str, org_id: &str) -> Result<JSRuntimeConfig, std::io::Error> {
+    compile_js_func(func, org_id)
+}
+
+/// Apply a JS function to transform data
+/// This wraps the common::utils::js::apply_js_fn
+pub fn apply_js_fn(
+    js_config: &JSRuntimeConfig,
+    row: Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (Value, Option<String>) {
+    apply_js(js_config, row, org_id, stream_name)
 }
 
 pub fn apply_vrl_fn(
@@ -136,11 +159,13 @@ pub fn apply_vrl_fn(
                         TRANSFORM_FAILED,
                     ])
                     .inc();
-                let err_msg = format!(
-                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row.",
+                // Log full error with record for debugging
+                log::warn!(
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
                 );
-                log::warn!("{err_msg}");
-                (row, Some(err_msg))
+                // Return only error message without sensitive record data
+                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                (row, Some(clean_err))
             }
         },
         Err(err) => {
@@ -152,11 +177,13 @@ pub fn apply_vrl_fn(
                     TRANSFORM_FAILED,
                 ])
                 .inc();
-            let err_msg = format!(
-                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row.",
+            // Log full error with record for debugging
+            log::warn!(
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
             );
-            log::warn!("{err_msg}");
-            (row, Some(err_msg))
+            // Return only error message without sensitive record data
+            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            (row, Some(clean_err))
         }
     }
 }
@@ -175,13 +202,9 @@ pub async fn get_stream_partition_keys(
     }
 }
 
-pub async fn get_stream_executable_pipeline(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: &StreamType,
-) -> Option<ExecutablePipeline> {
-    let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
-    pipeline::get_executable_pipeline(&stream_params).await
+#[inline(always)]
+pub async fn get_stream_executable_pipeline(stream: &StreamParams) -> Option<ExecutablePipeline> {
+    pipeline::get_executable_pipeline(stream).await
 }
 
 pub async fn get_stream_alerts(
@@ -229,7 +252,6 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     if triggers.is_empty() {
         return;
     }
-    log::debug!("Evaluating triggers: {triggers:?}");
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
@@ -255,8 +277,13 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            skipped_alerts_count: None,
+            ..Default::default()
         };
+        log::info!(
+            "Evaluating trigger for alert: {}/{}",
+            alert.org_id,
+            alert.name
+        );
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
@@ -289,15 +316,19 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                             .unwrap();
                     // After the notification is sent successfully, we need to update
                     // the silence period of the trigger
-                    if let Err(e) = db::scheduler::update_trigger(db::scheduler::Trigger {
-                        org: alert.org_id.to_string(),
-                        module: db::scheduler::TriggerModule::Alert,
-                        module_key,
-                        is_silenced: true,
-                        is_realtime: true,
-                        next_run_at,
-                        ..Default::default()
-                    })
+                    if let Err(e) = db::scheduler::update_trigger(
+                        db::scheduler::Trigger {
+                            org: alert.org_id.to_string(),
+                            module: db::scheduler::TriggerModule::Alert,
+                            module_key,
+                            is_silenced: true,
+                            is_realtime: true,
+                            next_run_at,
+                            ..Default::default()
+                        },
+                        false,
+                        "",
+                    )
                     .await
                     {
                         log::error!("Failed to update trigger: {e}");
@@ -312,7 +343,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 
     for trigger_data_stream in trigger_usage_reports {
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
     }
 }
 
@@ -359,6 +390,7 @@ pub fn init_functions_runtime() -> Runtime {
 
 pub async fn write_file(
     writer: &Arc<ingester::Writer>,
+    org_id: &str,
     stream_name: &str,
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
@@ -371,6 +403,7 @@ pub async fn write_file(
                 None
             } else {
                 Some(ingester::Entry {
+                    org_id: Arc::from(org_id),
                     stream: Arc::from(stream_name),
                     schema: Some(entry.schema),
                     schema_key: Arc::from(entry.schema_key.as_str()),
@@ -432,14 +465,15 @@ pub async fn check_ingestion_allowed(
     #[cfg(feature = "cloud")]
     {
         if !super::organization::is_org_in_free_trial_period(org_id).await? {
-            return Err(Error::IngestionError(format!(
-                "org {org_id} has expired its trial period"
-            )));
+            return Err(Error::TrialPeriodExpired);
         }
     }
 
     // check memory circuit breaker
     ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
+
+    // check disk circuit breaker
+    ingester::check_disk_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // check memtable
     ingester::check_memtable_size().map_err(|e| Error::ResourceError(e.to_string()))?;
@@ -574,7 +608,7 @@ pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamT
 
 pub fn create_log_ingestion_req(
     ingestion_type: i32,
-    data: &bytes::Bytes,
+    data: bytes::Bytes,
 ) -> Result<IngestionRequest> {
     match IngestionType::try_from(ingestion_type) {
         Ok(IngestionType::Json) => Ok(IngestionRequest::JSON(data)),
@@ -585,6 +619,45 @@ pub fn create_log_ingestion_req(
             "Ingestion type not yet supported".to_string(),
         )),
     }
+}
+
+pub fn refactor_map(
+    original_map: Map<String, Value>,
+    defined_schema_keys: &HashSet<String>,
+) -> Map<String, Value> {
+    let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
+    let mut non_schema_map = Vec::with_capacity(1024); // 1KB
+
+    let mut has_elements = false;
+    non_schema_map.write_all(b"{").unwrap();
+    for (key, value) in original_map {
+        if defined_schema_keys.contains(&key) {
+            new_map.insert(key, value);
+        } else {
+            if has_elements {
+                non_schema_map.write_all(b",").unwrap();
+            } else {
+                has_elements = true;
+            }
+            non_schema_map.write_all(b"\"").unwrap();
+            non_schema_map.write_all(key.as_bytes()).unwrap();
+            non_schema_map.write_all(b"\":\"").unwrap();
+            non_schema_map
+                .write_all(pickup_string_value(value).as_bytes())
+                .unwrap();
+            non_schema_map.write_all(b"\"").unwrap();
+        }
+    }
+    non_schema_map.write_all(b"}").unwrap();
+
+    if has_elements {
+        new_map.insert(
+            config::get_config().common.column_all.to_string(),
+            Value::String(String::from_utf8(non_schema_map).unwrap()),
+        );
+    }
+
+    new_map
 }
 
 #[cfg(test)]

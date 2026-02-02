@@ -38,6 +38,7 @@ const config = {
   ddAPPID: import.meta.env.VITE_DD_APP_ID,
   ddClientToken: import.meta.env.VITE_DD_CLIENT_TOKEN,
   ddSite: import.meta.env.VITE_DD_SITE,
+  REO_CLIENT_KEY: import.meta.env.VITE_REODOTDEV_CLIENT_KEY || "",
 };
 
 export default config;

@@ -22,18 +22,18 @@ use arrow_flight::{
     utils::flight_data_to_arrow_batch,
 };
 use arrow_schema::{Schema, SchemaRef};
-use datafusion::{parquet::data_type::AsBytes, physical_plan::metrics::BaselineMetrics};
+use datafusion::parquet::data_type::AsBytes;
 use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
-use crate::common::{CustomMessage, FlightMessage};
+use crate::common::{CustomMessage, FlightMessage, RemoteScanMetrics};
 
 pub struct FlightDataDecoder {
     response: Streaming<FlightData>,
     schema: Option<SchemaRef>,
     dictionaries_by_field: HashMap<i64, ArrayRef>,
     done: bool,
-    metrics: BaselineMetrics,
+    metrics: RemoteScanMetrics,
 }
 
 impl Debug for FlightDataDecoder {
@@ -52,7 +52,7 @@ impl FlightDataDecoder {
     pub fn new(
         response: Streaming<FlightData>,
         schema: Option<SchemaRef>,
-        metrics: BaselineMetrics,
+        metrics: RemoteScanMetrics,
     ) -> Self {
         Self {
             response,
@@ -70,7 +70,7 @@ impl FlightDataDecoder {
 
     /// Extracts flight data from the next message
     fn extract_message(&mut self, data: FlightData) -> Result<Option<FlightMessage>> {
-        let timer = self.metrics.elapsed_compute().timer();
+        let timer = self.metrics.decode_time.timer();
         let message = arrow::ipc::root_as_message(&data.data_header[..])
             .map_err(|e| FlightError::DecodeError(format!("Error decoding header: {e}")))?;
 
@@ -189,7 +189,7 @@ mod tests {
         array::{ArrayRef, Int32Array, RecordBatch, StringArray},
         ipc::{
             MessageHeader,
-            writer::{DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
+            writer::{CompressionContext, DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
         },
     };
     use arrow_flight::{FlightData, SchemaAsIpc};
@@ -229,6 +229,7 @@ mod tests {
             idx_took: 50,
             file_list_took: 25,
             aggs_cache_ratio: 90,
+            peak_memory_usage: 1024000,
         };
         let custom_message = CustomMessage::ScanStats(scan_stats);
         let metadata = serde_json::to_string(&custom_message).unwrap();
@@ -262,6 +263,7 @@ mod tests {
             idx_took: 50,
             file_list_took: 25,
             aggs_cache_ratio: 90,
+            peak_memory_usage: 1024000,
         };
         let custom_message = CustomMessage::ScanStats(scan_stats);
 
@@ -304,10 +306,11 @@ mod tests {
         let batch = create_test_record_batch();
         let options = IpcWriteOptions::default();
         let data_gen = IpcDataGenerator::default();
+        let mut compress = CompressionContext::default();
         let mut dictionary_tracker = DictionaryTracker::new(false);
 
         let (_, encoded_batch) = data_gen
-            .encoded_batch(&batch, &mut dictionary_tracker, &options)
+            .encode(&batch, &mut dictionary_tracker, &options, &mut compress)
             .unwrap();
 
         let flight_data: FlightData = encoded_batch.into();

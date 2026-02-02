@@ -32,6 +32,7 @@ use crate::{common::meta, handler::http::request};
         request::organization::org::organizations,
         request::organization::org::create_org,
         request::organization::org::rename_org,
+        request::organization::assume_service_account::assume_service_account,
         request::organization::org::org_summary,
         request::organization::org::get_user_passcode,
         request::organization::org::update_user_passcode,
@@ -40,6 +41,12 @@ use crate::{common::meta, handler::http::request};
         request::organization::org::create_user_rumtoken,
         request::organization::settings::get,
         request::organization::settings::create,
+        request::organization::system_settings::get_setting,
+        request::organization::system_settings::list_settings,
+        request::organization::system_settings::set_org_setting,
+        request::organization::system_settings::set_user_setting,
+        request::organization::system_settings::delete_org_setting,
+        request::organization::system_settings::delete_user_setting,
         request::stream::list,
         request::stream::schema,
         request::stream::create,
@@ -62,6 +69,7 @@ use crate::{common::meta, handler::http::request};
         request::promql::label_values,
         request::promql::format_query_get,
         request::enrichment_table::save_enrichment_table,
+        request::enrichment_table::save_enrichment_table_from_url,
         request::rum::ingest::log,
         request::rum::ingest::data,
         request::rum::ingest::sessionreplay,
@@ -122,8 +130,19 @@ use crate::{common::meta, handler::http::request};
         request::alerts::delete_alert,
         request::alerts::list_alerts,
         request::alerts::enable_alert,
+        request::alerts::enable_alert_bulk,
         request::alerts::trigger_alert,
+        request::alerts::generate_sql,
         request::alerts::move_alerts,
+        request::alerts::history::get_alert_history,
+        request::alerts::incidents::list_incidents,
+        request::alerts::incidents::get_incident,
+        request::alerts::incidents::update_incident_status,
+        request::alerts::incidents::get_incident_stats,
+        request::alerts::incidents::trigger_incident_rca,
+        request::alerts::incidents::get_incident_service_graph,
+        request::agent::chat::agent_chat,
+        request::agent::chat::agent_chat_stream,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
         request::alerts::templates::save_template,
@@ -138,10 +157,6 @@ use crate::{common::meta, handler::http::request};
         request::kv::set,
         request::kv::delete,
         request::kv::list,
-        request::syslog::create_route,
-        request::syslog::update_route,
-        request::syslog::list_routes,
-        request::syslog::delete_route,
         request::clusters::list_clusters,
         request::short_url::shorten,
         request::short_url::retrieve,
@@ -153,12 +168,23 @@ use crate::{common::meta, handler::http::request};
         request::service_accounts::update,
         request::service_accounts::delete,
         request::service_accounts::get_api_token,
+        request::mcp::handle_mcp_post,
+        request::mcp::handle_mcp_get,
+        request::mcp::oauth_authorization_server_metadata,
         request::pipeline::save_pipeline,
         request::pipeline::list_pipelines,
         request::pipeline::list_streams_with_pipeline,
         request::pipeline::delete_pipeline,
         request::pipeline::update_pipeline,
         request::pipeline::enable_pipeline,
+        request::pipeline::enable_pipeline_bulk,
+        request::pipelines::history::get_pipeline_history,
+        request::pipelines::backfill::create_backfill,
+        request::pipelines::backfill::list_backfills,
+        request::pipelines::backfill::get_backfill,
+        request::pipelines::backfill::enable_backfill,
+        request::pipelines::backfill::update_backfill,
+        request::pipelines::backfill::delete_backfill,
         request::dashboards::reports::create_report,
         request::dashboards::reports::update_report,
         request::dashboards::reports::list_reports,
@@ -197,6 +223,21 @@ use crate::{common::meta, handler::http::request};
         request::search::search_job::retry_job,
         request::search::search_stream::search_http2_stream,
         request::search::search_stream::values_http2_stream,
+        // Patterns (enterprise)
+        request::patterns::extract_patterns,
+        // Service Graph (enterprise)
+        crate::service::traces::service_graph::api::get_current_topology,
+        // Service Streams (enterprise)
+        request::service_streams::get_dimension_analytics,
+        request::service_streams::correlate_streams,
+        // Alert Deduplication (enterprise)
+        request::alerts::deduplication::get_config,
+        request::alerts::deduplication::set_config,
+        request::alerts::deduplication::delete_config,
+        request::alerts::deduplication::get_semantic_groups,
+        request::alerts::deduplication::preview_semantic_groups_diff,
+        request::alerts::deduplication::save_semantic_groups,
+        request::alerts::dedup_stats::get_dedup_summary,
     ),
     components(
         schemas(
@@ -241,12 +282,13 @@ use crate::{common::meta, handler::http::request};
             config::meta::timed_annotations::TimedAnnotationReq,
             config::meta::timed_annotations::TimedAnnotationDelete,
             config::meta::timed_annotations::TimedAnnotationUpdate,
+            // Enrichment Tables
+            config::meta::enrichment_table::EnrichmentTableStatus,
+            config::meta::enrichment_table::EnrichmentTableUrlJob,
+            crate::handler::http::request::enrichment_table::EnrichmentTableUrlRequest,
             // Dashboards
-            crate::handler::http::models::dashboards::CreateDashboardRequestBody,
-            crate::handler::http::models::dashboards::CreateDashboardResponseBody,
-            crate::handler::http::models::dashboards::GetDashboardResponseBody,
-            crate::handler::http::models::dashboards::UpdateDashboardRequestBody,
-            crate::handler::http::models::dashboards::UpdateDashboardResponseBody,
+            crate::handler::http::models::dashboards::DashboardRequestBody,
+            crate::handler::http::models::dashboards::DashboardResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBodyItem,
             crate::handler::http::models::dashboards::MoveDashboardRequestBody,
@@ -273,6 +315,22 @@ use crate::{common::meta, handler::http::request};
             crate::handler::http::models::alerts::QueryType,
             crate::handler::http::models::alerts::Condition,
             crate::handler::http::models::alerts::Operator,
+            // Incidents
+            request::alerts::incidents::ListIncidentsQuery,
+            request::alerts::incidents::ListIncidentsResponse,
+            request::alerts::incidents::UpdateIncidentStatusRequest,
+            config::meta::alerts::incidents::Incident,
+            config::meta::alerts::incidents::IncidentWithAlerts,
+            config::meta::alerts::incidents::IncidentAlert,
+            config::meta::alerts::incidents::IncidentStats,
+            config::meta::alerts::incidents::IncidentStatus,
+            config::meta::alerts::incidents::IncidentSeverity,
+            config::meta::alerts::incidents::CorrelationReason,
+            config::meta::alerts::incidents::IncidentServiceGraph,
+            config::meta::alerts::incidents::AlertNode,
+            config::meta::alerts::incidents::AlertEdge,
+            config::meta::alerts::incidents::EdgeType,
+            config::meta::alerts::incidents::IncidentGraphStats,
             // Folders
             crate::handler::http::models::folders::CreateFolderRequestBody,
             crate::handler::http::models::folders::CreateFolderResponseBody,
@@ -339,6 +397,8 @@ use crate::{common::meta, handler::http::request};
             meta::organization::OrganizationSettingResponse,
             meta::organization::RumIngestionResponse,
             meta::organization::RumIngestionToken,
+            request::organization::assume_service_account::AssumeServiceAccountRequest,
+            request::organization::assume_service_account::AssumeServiceAccountResponse,
             request::status::HealthzResponse,
             meta::ingestion::BulkResponse,
             meta::ingestion::BulkResponseItem,
@@ -346,7 +406,27 @@ use crate::{common::meta, handler::http::request};
             meta::ingestion::BulkResponseError,
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
-            // Functions
+            // Service Streams (enterprise)
+            request::service_streams::CorrelationRequest,
+            config::meta::service_streams::CorrelationResponse,
+            config::meta::service_streams::DimensionAnalytics,
+            config::meta::service_streams::DimensionAnalyticsSummary,
+            config::meta::service_streams::CardinalityClass,
+            config::meta::service_streams::RelatedStreams,
+            config::meta::service_streams::StreamInfo,
+            // Alert Deduplication (enterprise)
+            config::meta::alerts::deduplication::GlobalDeduplicationConfig,
+            config::meta::correlation::SemanticFieldGroup,
+            config::meta::alerts::deduplication::DeduplicationConfig,
+            config::meta::alerts::deduplication::GroupingConfig,
+            config::meta::alerts::deduplication::SendStrategy,
+            request::alerts::dedup_stats::DedupSummaryResponse,
+            request::agent::chat::AgentChatRequest,
+            request::agent::chat::ChatMessage,
+            // Backfill
+            request::pipelines::backfill::BackfillRequest,
+            request::pipelines::backfill::BackfillResponse,
+            crate::service::alerts::backfill::BackfillJobStatus,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -358,6 +438,8 @@ use crate::{common::meta, handler::http::request};
         (name = "Search", description = "Search/Query operations"),
         (name = "Saved Views", description = "Collection of saved search views for easy retrieval"),
         (name = "Alerts", description = "Alerts retrieval & management operations"),
+        (name = "Incidents", description = "Alert incident correlation & management operations"),
+        (name = "Agents", description = "AI agent chat and analysis operations (enterprise)"),
         (name = "Functions", description = "Functions retrieval & management operations"),
         (name = "Organizations", description = "Organizations retrieval & management operations"),
         (name = "Streams", description = "Stream retrieval & management operations"),
@@ -365,10 +447,11 @@ use crate::{common::meta, handler::http::request};
         (name = "KV", description = "Key Value retrieval & management operations"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
-        (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
         (name = "Ratelimit", description = "Ratelimit operations"),
+        (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
+        (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -403,29 +486,53 @@ pub async fn openapi_info() -> OpenapiInfo {
     let mut tag_operations: OpenapiInfo = std::collections::HashMap::new();
 
     for (path, path_item) in &api.paths.paths {
-        for (method, operation) in path_item.operations.clone() {
+        for (method, operation) in [
+            (utoipa::openapi::HttpMethod::Get, path_item.get.as_ref()),
+            (utoipa::openapi::HttpMethod::Post, path_item.post.as_ref()),
+            (utoipa::openapi::HttpMethod::Put, path_item.put.as_ref()),
+            (
+                utoipa::openapi::HttpMethod::Delete,
+                path_item.delete.as_ref(),
+            ),
+            (utoipa::openapi::HttpMethod::Patch, path_item.patch.as_ref()),
+            (utoipa::openapi::HttpMethod::Head, path_item.head.as_ref()),
+            (
+                utoipa::openapi::HttpMethod::Options,
+                path_item.options.as_ref(),
+            ),
+            (utoipa::openapi::HttpMethod::Trace, path_item.trace.as_ref()),
+        ]
+        .into_iter()
+        .filter_map(|(method, op)| op.map(|operation| (method, operation)))
+        {
             let tags = operation
                 .tags
                 .clone()
                 .unwrap_or_else(|| vec!["untagged".to_string()]);
 
             let method = match method {
-                utoipa::openapi::PathItemType::Get => "GET",
-                utoipa::openapi::PathItemType::Post => "POST",
-                utoipa::openapi::PathItemType::Put => "PUT",
-                utoipa::openapi::PathItemType::Delete => "DELETE",
-                utoipa::openapi::PathItemType::Patch => "PATCH",
-                utoipa::openapi::PathItemType::Head => "HEAD",
-                utoipa::openapi::PathItemType::Options => "OPTIONS",
-                utoipa::openapi::PathItemType::Trace => "TRACE",
-                utoipa::openapi::PathItemType::Connect => "CONNECT",
+                utoipa::openapi::HttpMethod::Get => "GET",
+                utoipa::openapi::HttpMethod::Post => "POST",
+                utoipa::openapi::HttpMethod::Put => "PUT",
+                utoipa::openapi::HttpMethod::Delete => "DELETE",
+                utoipa::openapi::HttpMethod::Patch => "PATCH",
+                utoipa::openapi::HttpMethod::Head => "HEAD",
+                utoipa::openapi::HttpMethod::Options => "OPTIONS",
+                utoipa::openapi::HttpMethod::Trace => "TRACE",
             };
+
+            let extensions: std::collections::HashMap<String, serde_json::Value> = operation
+                .extensions
+                .as_ref()
+                .map(|ext| ext.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .unwrap_or_default();
 
             let operation_info = (
                 method.to_string(),
                 path.clone(),
                 operation.clone().description,
                 tags.clone(),
+                extensions,
             );
 
             for tag in tags {

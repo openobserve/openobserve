@@ -26,7 +26,7 @@ use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
-        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
+        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
 };
 use futures::TryStreamExt;
@@ -121,17 +121,18 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
                 .is_some()
         })
-        .map(|f| f.to_string())
+        .map(String::from)
         .collect::<HashSet<_>>();
     let index_fields = index_fields
         .iter()
-        .map(|f| f.to_string())
+        .filter(|f| schema_fields.contains_key(f))
+        .map(String::from)
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields
         .union(&index_fields)
         .cloned()
         .collect::<HashSet<_>>();
-    // no fields need to create index, return
+
     if tantivy_fields.is_empty() {
         return Ok(None);
     }
@@ -146,19 +147,20 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
     }
+
+    let index_opts = tantivy::schema::TextOptions::default()
+        .set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_tokenizer("raw")
+                .set_fieldnorms(false),
+        )
+        .set_fast(None);
     for field in index_fields.iter() {
         if field == TIMESTAMP_COL_NAME {
             continue;
         }
-        let index_opts = tantivy::schema::TextOptions::default()
-            .set_indexing_options(
-                tantivy::schema::TextFieldIndexing::default()
-                    .set_index_option(tantivy::schema::IndexRecordOption::Basic)
-                    .set_tokenizer("raw")
-                    .set_fieldnorms(false),
-            )
-            .set_fast(None);
-        tantivy_schema_builder.add_text_field(field, index_opts);
+        tantivy_schema_builder.add_text_field(field, index_opts.clone());
     }
     // add _timestamp field to tantivy schema
     tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
@@ -166,7 +168,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
-    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build());
+    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema.clone())
         .tokenizers(tokenizer_manager)
@@ -298,11 +300,13 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         }
     }
     let total_num_rows = task.await??;
-    // no docs need to create index, return
-    if total_num_rows == 0 {
-        return Ok(None);
-    }
-    log::debug!("write documents to tantivy index success");
+    // Create index even with 0 rows since we have valid configured fields in stream schema
+    // (empty index acts as a marker to prevent expensive DataFusion scans)
+    log::debug!(
+        "write documents to tantivy index success (rows: {}, empty_index: {})",
+        total_num_rows,
+        total_num_rows == 0
+    );
 
     let index = tokio::task::spawn_blocking(move || {
         index_writer.finalize().map_err(|e| {
@@ -362,7 +366,7 @@ mod tests {
             fields.push(Field::new("status", DataType::Utf8, false));
             let status: Vec<String> = (0..num_rows)
                 .map(|i| {
-                    if i % 2 == 0 {
+                    if i.is_multiple_of(2) {
                         "success".to_string()
                     } else {
                         "error".to_string()
@@ -434,7 +438,8 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
-        assert!(result.unwrap().is_none()); // Should return None for empty data
+        // Should create empty index when fields are configured (even with 0 rows)
+        assert!(result.unwrap().is_some());
     }
 
     #[tokio::test]
@@ -530,7 +535,7 @@ mod tests {
         let batch = create_test_batch(10, true, true, true);
         let stream = create_test_stream(vec![batch.clone()]).await;
 
-        // Request fields that don't exist in the schema
+        // Request fields that don't exist in the schema at all
         let result = generate_tantivy_index(
             dir,
             stream,
@@ -542,16 +547,9 @@ mod tests {
 
         assert!(result.is_ok());
         let index = result.unwrap();
-        assert!(index.is_some()); // Returns Some because index fields are not filtered by existence
-
-        // Verify the index has the timestamp field and requested fields (even if they don't exist
-        // in data)
-        let index = index.unwrap();
-        let schema = index.schema();
-        assert!(schema.get_field("another_nonexistent_field").is_ok());
-        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
-        // FTS field WILL be present because full_text_search_fields is not empty
-        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        // Should NOT create index when configured fields don't exist in stream schema
+        // (this indicates a configuration error, not just missing data)
+        assert!(index.is_none());
     }
 
     #[tokio::test]
@@ -778,6 +776,95 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0); // Should return 0 when filename conversion fails
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_stream_schema_vs_parquet_schema() {
+        // This test validates the critical fix where we pass stream schema (with all
+        // configured fields) instead of parquet schema (only fields in actual data).
+        //
+        // Scenario: Stream settings configure `continent`, `name`, `flag_url` as secondary
+        // index fields, but the parquet data only contains `name` and `flag_url`.
+        // The missing field `continent` should still be included in the .ttv schema.
+
+        let dir = RamDirectory::create();
+
+        // Create parquet data with only `name` and `flag_url` (no `continent`)
+        let parquet_fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("flag_url", DataType::Utf8, false),
+        ];
+        let parquet_schema = Arc::new(Schema::new(parquet_fields));
+
+        let timestamps: Vec<i64> = (0..10).map(|i| 1000 + i as i64).collect();
+        let names: Vec<String> = (0..10).map(|i| format!("Name {i}")).collect();
+        let flag_urls: Vec<String> = (0..10)
+            .map(|i| format!("https://example.com/{i}"))
+            .collect();
+
+        let parquet_batch = RecordBatch::try_new(
+            parquet_schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(timestamps)),
+                Arc::new(StringArray::from(names)),
+                Arc::new(StringArray::from(flag_urls)),
+            ],
+        )
+        .unwrap();
+
+        // Create stream schema with all configured fields including `continent`
+        let stream_fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("continent", DataType::Utf8, false), // Configured but not in data
+            Field::new("name", DataType::Utf8, false),
+            Field::new("flag_url", DataType::Utf8, false),
+        ];
+        let stream_schema = Arc::new(Schema::new(stream_fields));
+
+        let stream = create_test_stream(vec![parquet_batch]).await;
+
+        // Generate index with stream schema (all configured fields)
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &[], // No FTS fields
+            &[
+                "continent".to_string(),
+                "name".to_string(),
+                "flag_url".to_string(),
+            ],
+            stream_schema.clone(), // Pass stream schema, not parquet schema
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let tantivy_schema = index.schema();
+
+        // Verify that ALL configured fields are in the tantivy schema,
+        // including `continent` which is missing from the parquet data
+        assert!(
+            tantivy_schema.get_field("continent").is_ok(),
+            "continent field should be in tantivy schema even though it's not in parquet data"
+        );
+        assert!(
+            tantivy_schema.get_field("name").is_ok(),
+            "name field should be in tantivy schema"
+        );
+        assert!(
+            tantivy_schema.get_field("flag_url").is_ok(),
+            "flag_url field should be in tantivy schema"
+        );
+        assert!(tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+
+        // Verify we have 10 documents
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        assert_eq!(searcher.num_docs(), 10);
     }
 
     // Note: Full testing of create_tantivy_index with storage operations would require

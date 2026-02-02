@@ -24,7 +24,6 @@ use config::{
     utils::time::now_micros,
 };
 use infra::{
-    cluster_coordinator::alerts as cluster,
     db::{ORM_CLIENT, connect_to_orm},
     table::alerts as table,
 };
@@ -70,7 +69,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
-            cluster::emit_put_event(org_id, &alert, None).await?;
+            infra::coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
             #[cfg(feature = "enterprise")]
             if create {
                 super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
@@ -104,7 +103,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Ok(job) => {
                         trigger.data = job.data;
                         trigger.start_time = job.start_time;
-                        match db::scheduler::update_trigger(trigger).await {
+                        match db::scheduler::update_trigger(trigger, false, "").await {
                             Ok(_) => Ok(alert),
                             Err(e) => {
                                 log::error!(
@@ -135,7 +134,7 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     };
     let (_f, _) = get_folder_alert_by_id_db(org_id, alert_id).await?;
     let alert = table::update(client, org_id, None, alert).await?;
-    cluster::emit_put_event(org_id, &alert, None).await?;
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
@@ -155,7 +154,7 @@ pub async fn create<C: TransactionTrait>(
     let alert = table::create(conn, org_id, folder_id, alert, overwrite).await?;
     let schedule_key = scheduler_key(alert.id);
 
-    cluster::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(org_id, folder_id, alert.clone()).await?;
 
@@ -185,7 +184,8 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let alert = table::update(conn, org_id, folder_id, alert).await?;
     let schedule_key = scheduler_key(alert.id);
 
-    cluster::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string())).await?;
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string()))
+        .await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
@@ -203,9 +203,11 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     {
         trigger.data = job.data;
         trigger.start_time = job.start_time;
-        let _ = db::scheduler::update_trigger(trigger).await.map_err(|e| {
-            log::error!("Failed to update trigger for alert {schedule_key}: {e}");
-        });
+        let _ = db::scheduler::update_trigger(trigger, false, "")
+            .await
+            .map_err(|e| {
+                log::error!("Failed to update trigger for alert {schedule_key}: {e}");
+            });
     } else {
         let _ = db::scheduler::push(trigger).await.map_err(|e| {
             log::error!("Failed to save trigger for alert {schedule_key}: {e}");
@@ -227,7 +229,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     let alert_id_str = alert_id.to_string();
 
     table::delete_by_id(conn, org_id, alert_id).await?;
-    cluster::emit_delete_event(org_id, &alert_id_str).await?;
+    infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(
         org_id,
@@ -264,7 +266,7 @@ pub async fn delete_by_name(
     let alert_id_str = alert_id.to_string();
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    cluster::emit_delete_event(org_id, &alert_id_str).await?;
+    infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, stream_type, stream_name, name, alert_id).await?;
@@ -306,7 +308,7 @@ pub async fn list_with_folders<C: ConnectionTrait>(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    cluster::watch_events(put_into_cache, delete_from_cache).await
+    infra::coordinator::alerts::watch_events(put_into_cache, delete_from_cache).await
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
@@ -444,7 +446,10 @@ pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::meta::{alerts::alert::Alert, stream::StreamType};
+    use config::{
+        get_config,
+        meta::{alerts::alert::Alert, stream::StreamType},
+    };
     use infra::errors::Error;
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     use svix_ksuid::Ksuid;
@@ -456,7 +461,9 @@ mod super_cluster {
         folder_id: &str,
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
             log::debug!("Sending super cluster alert creation event: {alert:?}");
@@ -477,7 +484,9 @@ mod super_cluster {
         folder_id: Option<&str>,
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
             log::debug!("Sending super cluster alert update event: {alert:?}");
@@ -500,7 +509,9 @@ mod super_cluster {
         alert_name: &str,
         alert_id: Ksuid,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             let key = alert_key(org, stream_type, stream_name, alert_name);
             log::debug!("Sending super cluster alert delete event: {key:?}");
             // o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
@@ -516,7 +527,9 @@ mod super_cluster {
     /// Sends event to the super cluster queue indicating that all alert have
     /// been deleted from the database.
     pub async fn _emit_delete_all_event() -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             o2_enterprise::enterprise::super_cluster::queue::delete("/alerts/", true, false, None)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;

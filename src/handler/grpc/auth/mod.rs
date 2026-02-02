@@ -85,6 +85,9 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         };
 
         if user.token.eq(&credentials.password) {
+            let mut req = req;
+            let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
+            req.metadata_mut().append("user_id", user_id_metadata);
             return Ok(req);
         }
         let in_pass = get_hash(&credentials.password, &user.salt);
@@ -175,6 +178,7 @@ mod tests {
                 org_id: "default".to_string(),
                 email: "root@example.com".to_string(),
                 created_at: 0,
+                allow_static_token: true,
             },
         );
 

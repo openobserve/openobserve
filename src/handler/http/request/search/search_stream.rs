@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, post, web};
+use actix_web::{
+    HttpRequest, HttpResponse, post,
+    web::{self, Query},
+};
 use config::{
     get_config,
     meta::{
@@ -35,33 +38,47 @@ use tokio::sync::mpsc;
 use tracing::Span;
 
 #[cfg(feature = "enterprise")]
+use crate::common::utils::http::get_extract_patterns_from_request;
+#[cfg(feature = "enterprise")]
 use crate::{
-    common::meta::search::AuditContext,
+    common::meta::search::AuditContext, common::utils::auth::check_permissions,
     handler::http::request::search::utils::check_stream_permissions,
     service::self_reporting::audit,
 };
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::http::{
-            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
-            get_is_ui_histogram_from_request, get_or_create_trace_id,
-            get_search_event_context_from_request, get_search_type_from_request,
-            get_stream_type_from_request, get_use_cache_from_request,
+        utils::{
+            auth::UserEmail,
+            http::{
+                get_clear_cache_from_request, get_fallback_order_by_col_from_request,
+                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request,
+            },
         },
     },
-    handler::http::request::search::{
-        build_search_request_per_field, error_utils::map_error_to_http_response,
+    handler::http::{
+        extractors::Headers,
+        request::search::{
+            build_search_request_per_field, error_utils::map_error_to_http_response,
+        },
     },
-    service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
+    service::{
+        search::{streaming::process_search_stream_request, utils::is_permissable_function_error},
+        setup_tracing_with_trace_id,
+    },
 };
+
 /// Search HTTP2 streaming endpoint
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamHttp2",
+    summary = "Stream search results",
+    description = "Executes a search query and streams the results back in real-time using HTTP/2 server-sent events. This is ideal for large result sets or long-running queries where you want to receive data as it becomes available rather than waiting for the complete response. Results are streamed as JSON objects separated by newlines.",
     security(
         ("Authorization"= [])
     ),
@@ -77,12 +94,17 @@ use crate::{
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_search_stream")]
 pub async fn search_http2_stream(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> HttpResponse {
@@ -97,12 +119,7 @@ pub async fn search_http2_stream(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = user_email.user_id;
 
     // Log the request
     log::debug!(
@@ -132,6 +149,10 @@ pub async fn search_http2_stream(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    #[cfg(feature = "enterprise")]
+    let extract_patterns = get_extract_patterns_from_request(&query);
+    #[cfg(not(feature = "enterprise"))]
+    let extract_patterns = false;
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -183,6 +204,16 @@ pub async fn search_http2_stream(
         return http_response;
     }
 
+    // Sampling is not available for /_search_stream endpoint
+    if req.query.sampling_config.is_some() || req.query.sampling_ratio.is_some() {
+        log::warn!(
+            "[trace_id {}] Sampling is not available for /_search_stream endpoint. Ignoring sampling parameters.",
+            trace_id
+        );
+        req.query.sampling_config = None;
+        req.query.sampling_ratio = None;
+    }
+
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
@@ -209,15 +240,20 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            ));
+        }
+    }
 
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(sql) => sql,
         Err(e) => {
-            log::error!(
-                "[trace_id: {}] Error getting histogram interval: {:?}",
-                trace_id,
-                e
-            );
+            log::error!("[trace_id: {trace_id}] Error getting histogram interval: {e:?}");
 
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
@@ -271,7 +307,7 @@ pub async fn search_http2_stream(
                 sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+                        log::error!("[trace_id: {trace_id}] Error parsing sql: {e:?}");
 
                         #[cfg(feature = "enterprise")]
                         let error_message = e.to_string();
@@ -306,8 +342,41 @@ pub async fn search_http2_stream(
         }
     }
 
+    // Check if user has edit permissions when clear_cache is requested
+    #[cfg(feature = "enterprise")]
+    if get_clear_cache_from_request(&query) {
+        for stream_name in stream_names.iter() {
+            if !check_permissions(
+                stream_name,
+                &org_id,
+                &user_id,
+                stream_type.as_str(),
+                "PUT",
+                None,
+            )
+            .await
+            {
+                // Add audit before closing
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    403,
+                    Some(
+                        "Unauthorized to clear cache - requires stream edit permission".to_string(),
+                    ),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+        }
+    }
+
     // Set use_cache from query params
-    req.use_cache = get_use_cache_from_request(&query);
+    req.clear_cache = get_clear_cache_from_request(&query);
+    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
     // Set search type if not set
     if req.search_type.is_none() {
@@ -401,6 +470,7 @@ pub async fn search_http2_stream(
     });
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
+    let search_type = req.search_type;
 
     // Spawn the search task in a separate task
     actix_web::rt::spawn(process_search_stream_request(
@@ -417,12 +487,24 @@ pub async fn search_http2_stream(
         fallback_order_by_col,
         audit_ctx,
         is_multi_stream_search,
+        extract_patterns,
     ));
 
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
+                // Check if function error is only - query limit default error and only `ui`
+                if let StreamResponses::SearchResponse {
+                    ref mut results, ..
+                } = v
+                    && search_type == Some(SearchEventType::UI)
+                    && is_permissable_function_error(&results.function_error)
+                {
+                    results.function_error.clear();
+                    results.is_partial = false;
+                }
+
                 if is_ui_histogram
                     && let StreamResponses::SearchResponse {
                         ref mut results, ..
@@ -506,12 +588,13 @@ pub async fn report_to_audit(
 }
 
 /// Values  HTTP2 streaming endpoint
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "ValuesStreamHttp2",
+    summary = "Get field values with HTTP/2 streaming",
+    description = "Retrieves field values from logs using HTTP/2 streaming for real-time results",
     security(
         ("Authorization"= [])
     ),
@@ -525,12 +608,18 @@ pub async fn report_to_audit(
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_values_stream")]
 pub async fn values_http2_stream(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> HttpResponse {
@@ -545,20 +634,13 @@ pub async fn values_http2_stream(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = user_email.user_id;
 
     // Log the request
     log::debug!(
         "[HTTP2_STREAM trace_id {trace_id}] Received values HTTP/2 stream request for org_id: {org_id}"
     );
 
-    // Get query params
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let mut stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
@@ -590,12 +672,28 @@ pub async fn values_http2_stream(
             return http_response;
         }
     };
+    // check default values limit
+    if values_req.size.is_none() {
+        values_req.size = Some(config::get_config().limit.query_values_default_num);
+    }
     let no_count = values_req.no_count;
     let top_k = values_req.size;
 
     // check stream type from request
     if values_req.stream_type != stream_type {
         stream_type = values_req.stream_type;
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) =
+            crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
+        {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            ));
+        }
     }
 
     // Get use_cache from query params
@@ -714,6 +812,9 @@ pub async fn values_http2_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
+    // Pattern extraction is not supported for values endpoint
+    let extract_patterns = false;
+
     // Spawn the search task to process the request
     actix_web::rt::spawn(process_search_stream_request(
         org_id.clone(),
@@ -729,6 +830,7 @@ pub async fn values_http2_stream(
         None,
         audit_ctx,
         false,
+        extract_patterns,
     ));
 
     // Return streaming response

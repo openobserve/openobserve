@@ -1,5 +1,6 @@
 import pytest
 import json
+import time
 from datetime import datetime, timezone, timedelta
 
 # Load queries from the queries.json file
@@ -43,6 +44,9 @@ def test_e2e_join_queries(create_session, base_url, test_name, sql_query):
         f"{url}api/{org_id}/{stream_name_orders}/_json", json=orders_payload
     )
     assert resp_create_orders_logstream.status_code == 200, f"Failed to ingest orders data: {resp_create_orders_logstream.content}"
+
+    # Wait for data to be indexed
+    time.sleep(3)
 
     # Define time range for the query
     now = datetime.now(timezone.utc)

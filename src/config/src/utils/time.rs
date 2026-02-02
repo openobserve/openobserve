@@ -24,6 +24,7 @@ pub static BASE_TIME: Lazy<DateTime<Utc>> =
     Lazy::new(|| Utc.with_ymd_and_hms(1971, 1, 1, 0, 0, 0).unwrap());
 
 pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
+pub static HOUR_MICRO_SECS: i64 = 3600 * 1_000_000;
 
 // check format: 1s, 1m, 1h, 1d, 1w, 1y, 1h10m30s
 static TIME_UNITS: [(char, u64); 7] = [
@@ -149,24 +150,27 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
     Ok(ret)
 }
 
+// return timestamp and is_valid micros value
 #[inline(always)]
-pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<i64, anyhow::Error> {
-    let n = match v {
-        json::Value::String(s) => parse_str_to_timestamp_micros(s)?,
+pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), anyhow::Error> {
+    let (ts, is_i64) = match v {
+        json::Value::String(s) => (parse_str_to_timestamp_micros(s)?, false),
         json::Value::Number(n) => {
             if n.is_i64() {
-                n.as_i64().unwrap()
+                (n.as_i64().unwrap(), true)
             } else if n.is_u64() {
-                n.as_u64().unwrap() as i64
+                (n.as_u64().unwrap() as i64, true)
             } else if n.is_f64() {
-                n.as_f64().unwrap() as i64
+                (n.as_f64().unwrap() as i64, false)
             } else {
                 return Err(anyhow::anyhow!("Invalid time format [timestamp]"));
             }
         }
         _ => return Err(anyhow::anyhow!("Invalid time format [type]")),
     };
-    Ok(parse_i64_to_timestamp_micros(n))
+    let new_ts = parse_i64_to_timestamp_micros(ts);
+    let is_valid = is_i64 && new_ts == ts;
+    Ok((new_ts, is_valid))
 }
 
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
@@ -361,10 +365,23 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp_micro_from_value() {
-        let test_fn = parse_timestamp_micro_from_value;
         let v_exp_arr = [
             (1609459200000000, json::json!(1609459200000000i64)),
             (1609459200000000, json::json!("2021-01-01T00:00:00")),
+            (1609459200000000, json::json!("2021-01-01T00:00:00Z")),
+            (1609430400000000, json::json!("2021-01-01T00:00:00+08:00")),
+            (1609488000000000, json::json!("2021-01-01T00:00:00-08:00")),
+            (1609459200000000, json::json!("2021-01-01 00:00:00")),
+            (1609459200000000, json::json!("2021-01-01T00:00:00.000000Z")),
+            (
+                1609430400000000,
+                json::json!("2021-01-01T00:00:00.000000+08:00"),
+            ),
+            (
+                1678315611000000,
+                json::json!("Wed, 8 Mar 2023 16:46:51 CST"),
+            ),
+            (1609459200123000, json::json!("2021-01-01T00:00:00.123")),
             (1609459200000000, json::json!("2021-01-01T00:00:00Z")),
             (1609430400000000, json::json!("2021-01-01T00:00:00+08:00")),
             (1609488000000000, json::json!("2021-01-01T00:00:00-08:00")),
@@ -383,7 +400,7 @@ mod tests {
         ];
 
         for (v_exp, input) in v_exp_arr {
-            assert!(test_fn(&input).is_ok_and(|v| v == v_exp));
+            assert!(parse_timestamp_micro_from_value(&input).is_ok_and(|v| v.0 == v_exp));
         }
     }
 
@@ -464,5 +481,86 @@ mod tests {
         for (v_exp, input) in v_exp_arr {
             assert_eq!(format_duration(input), v_exp);
         }
+    }
+
+    #[test]
+    fn test_day_micros() {
+        assert_eq!(day_micros(1), 86400000000);
+        assert_eq!(day_micros(2), 172800000000);
+        assert_eq!(day_micros(0), 0);
+    }
+
+    #[test]
+    fn test_hour_micros() {
+        assert_eq!(hour_micros(1), 3600000000);
+        assert_eq!(hour_micros(2), 7200000000);
+        assert_eq!(hour_micros(0), 0);
+    }
+
+    #[test]
+    fn test_second_micros() {
+        assert_eq!(second_micros(1), 1000000);
+        assert_eq!(second_micros(60), 60000000);
+        assert_eq!(second_micros(0), 0);
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_as_option_valid() {
+        let result = parse_str_to_timestamp_micros_as_option("1609459200000000");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 1609459200000000);
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_as_option_invalid() {
+        let result = parse_str_to_timestamp_micros_as_option("invalid");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_as_option_date_string() {
+        let result = parse_str_to_timestamp_micros_as_option("2021-01-01T00:00:00Z");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 1609459200000000);
+    }
+
+    #[test]
+    fn test_parse_i64_to_timestamp_micros_zero() {
+        let now = now_micros();
+        let result = parse_i64_to_timestamp_micros(0);
+        // Result should be close to now (within a few seconds)
+        assert!(result > 0);
+        assert!((result - now).abs() < 5000000); // Within 5 seconds
+    }
+
+    #[test]
+    fn test_parse_i64_to_timestamp_micros_negative() {
+        // Negative timestamps should be treated as seconds
+        let result = parse_i64_to_timestamp_micros(-1);
+        assert_eq!(result, -1_000_000);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_edge_cases() {
+        assert_eq!(parse_milliseconds("1ms").unwrap(), 1);
+        assert_eq!(parse_milliseconds("100ms").unwrap(), 100);
+        assert_eq!(parse_milliseconds("1s1ms").unwrap(), 1001);
+        assert_eq!(parse_milliseconds("1m1s1ms").unwrap(), 61001);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_complex() {
+        assert_eq!(parse_milliseconds("2d3h4m5s").unwrap(), 183845000);
+        assert_eq!(parse_milliseconds("1w1d").unwrap(), 691200000);
+        assert_eq!(parse_milliseconds("1y1w1d").unwrap(), 32227200000);
+    }
+
+    #[test]
+    fn test_now_micros() {
+        let t1 = now_micros();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let t2 = now_micros();
+        assert!(t2 > t1);
+        assert!(t2 - t1 >= 10000); // At least 10ms difference
     }
 }

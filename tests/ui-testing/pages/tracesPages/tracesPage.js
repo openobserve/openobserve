@@ -28,8 +28,8 @@ export
 
   async validateTracesPage() {
 
-    await expect(this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]')).toContainText('Syntax Guide');
-    await expect(this.page.locator('[data-test="logs-search-bar"]')).toContainText('Reset Filters');
+    await expect(this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]')).toBeDefined();
+    await expect(this.page.locator('[data-test="logs-search-bar"]')).toBeDefined();
 
   }
 

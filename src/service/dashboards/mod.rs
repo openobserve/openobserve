@@ -24,9 +24,12 @@ use config::{
 };
 use futures::future::join_all;
 use hashbrown::HashMap;
-use infra::table::{
-    self,
-    distinct_values::{DistinctFieldRecord, OriginType},
+use infra::{
+    schema::get_stream_setting_fts_fields,
+    table::{
+        self,
+        distinct_values::{DistinctFieldRecord, OriginType},
+    },
 };
 
 use super::{db::distinct_values, folders, stream::save_stream_settings};
@@ -192,9 +195,10 @@ async fn update_distinct_variables(
                 .unwrap_or_default();
             let mut _new_added = false;
 
+            let _fts = get_stream_setting_fts_fields(&Some(stream_settings.clone()));
             for f in fields.iter() {
                 // we ignore full text search no matter what
-                if stream_settings.full_text_search_keys.contains(f) {
+                if _fts.contains(f) {
                     continue;
                 }
 
@@ -288,8 +292,20 @@ pub fn get_query_variables(
             let dash = dashboard.v5.as_ref().unwrap();
             _get_variables!(map, dash);
         }
+        6 => {
+            let dash = dashboard.v6.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
+        7 => {
+            let dash = dashboard.v7.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
+        8 => {
+            let dash = dashboard.v8.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
         _ => {
-            unreachable!("we only have 5 dashboard versions")
+            unreachable!("we only have 8 dashboard versions")
         }
     }
     map
@@ -365,6 +381,15 @@ pub async fn update_dashboard(
     dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
+    // Check if dashboard exists and belongs to the specified folder.
+    // Note: We don't need to explicitly check if the folder exists because
+    // the folder-dashboard relationship is enforced by a foreign key constraint.
+    // If the dashboard exists in the folder, the folder must exist.
+    let existing = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?;
+    if existing.is_none() {
+        return Err(DashboardError::DashboardNotFound);
+    }
+
     let dashboard = put(org_id, dashboard_id, folder_id, None, dashboard, hash).await?;
 
     #[cfg(feature = "enterprise")]
@@ -452,12 +477,12 @@ pub async fn move_dashboard(
     if _check_openfga && get_openfga_config().enabled {
         // TODO: Try to make a single call for all alerts
         if !check_permissions(
-            Some(dashboard_id.to_owned()),
+            dashboard_id,
             org_id,
             _user_id,
             "dashboards",
             "PUT",
-            &curr_folder.folder_id,
+            Some(&curr_folder.folder_id),
         )
         .await
         {

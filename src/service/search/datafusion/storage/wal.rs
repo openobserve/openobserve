@@ -65,7 +65,6 @@ impl ObjectStore for FS {
         storage::wal::head(&location).await
     }
 
-    #[tracing::instrument(name = "datafusion::storage::local_wal::list", skip_all)]
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.unwrap().to_string();
         let objects = match super::file_list::get(&key) {
@@ -83,7 +82,7 @@ impl ObjectStore for FS {
     }
 
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
-        log::error!("NotImplemented list_with_delimiter: {:?}", prefix);
+        log::error!("NotImplemented list_with_delimiter: {prefix:?}");
         Err(object_store::Error::NotImplemented {})
     }
 
@@ -93,12 +92,12 @@ impl ObjectStore for FS {
         _payload: PutPayload,
         _opts: PutOptions,
     ) -> Result<PutResult> {
-        log::error!("NotImplemented put_opts: {}", location);
+        log::error!("NotImplemented put_opts: {location}");
         Err(object_store::Error::NotImplemented {})
     }
 
     async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        log::error!("NotImplemented put_multipart: {}", location);
+        log::error!("NotImplemented put_multipart: {location}");
         Err(object_store::Error::NotImplemented)
     }
 
@@ -107,22 +106,22 @@ impl ObjectStore for FS {
         location: &Path,
         _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
-        log::error!("NotImplemented put_multipart_opts: {}", location);
+        log::error!("NotImplemented put_multipart_opts: {location}");
         Err(object_store::Error::NotImplemented)
     }
 
     async fn delete(&self, location: &Path) -> Result<()> {
-        log::error!("NotImplemented delete: {}", location);
+        log::error!("NotImplemented delete: {location}");
         Err(object_store::Error::NotImplemented {})
     }
 
     async fn copy(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy: from {} to {}", from, to);
+        log::error!("NotImplemented copy: from {from} to {to}");
         Err(object_store::Error::NotImplemented {})
     }
 
     async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy_if_not_exists: from {} to {}", from, to);
+        log::error!("NotImplemented copy_if_not_exists: from {from} to {to}");
         Err(object_store::Error::NotImplemented {})
     }
 }

@@ -22,7 +22,7 @@
     <div
       v-for="(overrideConfig, index) in overrideConfigs"
       :key="index"
-      class="q-mb-md flex items-start tw-w-full tw-flex"
+      class="q-mb-md flex items-start tw:w-full tw:flex"
       style="gap: 15px"
     >
       <q-select
@@ -33,14 +33,13 @@
         style="width: 40%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         input-debounce="0"
-        filled
         emit-value
         map-options
         borderless
         dense
-        class="tw-flex-1"
-      />
-      <div class="tw-flex items-center" style="width: 60%; gap: 10px">
+        class="tw:flex-1 o2-custom-select-dashboard"
+       hide-bottom-space/>
+      <div class="tw:flex items-center" style="width: 60%; gap: 10px">
         <q-select
           v-model="overrideConfig.config[0].type"
           :label="'Type'"
@@ -49,17 +48,17 @@
           style="width: 40%"
           :data-test="`dashboard-addpanel-config-type-select-${index}`"
           input-debounce="0"
-          filled
           emit-value
           map-options
           borderless
           dense
+          class="o2-custom-select-dashboard"
           @update:model-value="onConfigTypeChange(index)"
-        />
+         hide-bottom-space/>
 
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
-          class="tw-flex items-center"
+          class="tw:flex items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <q-select
@@ -70,13 +69,12 @@
             style="flex-grow: 1; width: 50%"
             :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
             input-debounce="0"
-            filled
             emit-value
             map-options
             borderless
             dense
-            class="tw-flex-1"
-          />
+            class="tw:flex-1 o2-custom-select-dashboard"
+           hide-bottom-space/>
           <q-input
             v-if="overrideConfig.config[0].value.unit === 'custom'"
             v-model="overrideConfig.config[0].value.customUnit"
@@ -84,17 +82,16 @@
             color="input-border"
             bg-color="input-bg"
             stack-label
-            filled
             dense
             label-slot
             data-test="dashboard-config-unit"
             style="width: 50%"
-          />
+           borderless hide-bottom-space/>
         </div>
 
         <div
           v-else-if="overrideConfig.config[0].type === 'unique_value_color'"
-          class="tw-flex items-center"
+          class="tw:flex items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <q-checkbox
@@ -120,7 +117,7 @@
       @click="addOverrideConfig"
       label="+ Add field override"
       no-caps
-      class="q-mt-md"
+      class="q-mt-md el-border"
     />
 
     <q-card-actions align="right">

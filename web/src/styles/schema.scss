@@ -1,0 +1,298 @@
+
+
+
+.add-fields-card {
+  width: 100vw;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.indexDetailsContainer {
+  .q-table__control {
+    width: 100%;
+  }
+
+  .q-table {
+    td:nth-child(2) {
+      min-width: 15rem;
+      width: 15rem;
+      max-width: 15rem;
+      overflow: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #999 #f0f0f0;
+    }
+    td:nth-child(3) {
+      padding: 4px 8px !important;
+    }
+  }
+
+  th:first-child,
+  td:first-child {
+    padding-left: 8px !important;
+  }
+
+  th:nth-child(5),
+  td:nth-child(5){
+    min-width: 15rem;
+    width: 15rem;
+    max-width: 15rem;
+  }
+}
+.dark-theme-table tr:hover td:nth-child(2) {
+  background-color: #272a2b !important;
+}
+.light-theme-table tr:hover td:nth-child(2) {
+  background-color: #f7f7f7 !important;
+}
+
+.schema-fields-tabs {
+  height: fit-content;
+  .rum-tab {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
+}
+.main-fields-tabs {
+  height: fit-content;
+  color: var(--q-light);
+  .rum-tab {
+    padding: 4px 12px !important;
+
+    &.active {
+      color: white !important;
+      border-bottom: 5px solid var(--q-primary) !important;
+      background-color: rgba(88, 96, 178, 0.6);
+    }
+  }
+}
+.floating-buttons {
+  position: sticky;
+  bottom: 0;
+  z-index: 1; /* Ensure it stays on top of table content */
+  width: 100%;
+  margin-top: auto; /* Push to bottom when there's less content */
+}
+.dark-theme-floating-buttons {
+  background-color: #181a1b;
+}
+.light-theme-floating-buttons {
+  background-color: #ffffff
+}
+
+.warning-text {
+  color: #f5a623;
+  border: 1px solid #f5a623;
+  border-radius: 10px;
+  padding: 6px 3px;
+}
+.mini-select .q-field__control {
+  min-height: 24px !important;
+  padding: 0px 4px !important;
+}
+
+.mini-select .q-field__control-container {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  min-height: 20px !important;
+}
+
+.mini-select .q-field__control-container span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  font-size: 11px !important;
+  line-height: 12px !important;
+}
+
+.mini-select .q-field__marginal {
+  height: 20px !important;
+}
+
+.mini-select.q-field--auto-height.q-field--dense .q-field__control,
+.mini-select.q-field--auto-height.q-field--dense .q-field__native {
+  min-height: 24px !important;
+  height: 24px !important;
+}
+
+.mini-select.q-field--dense .q-field__control,
+.mini-select.q-field--dense .q-field__marginal {
+  min-height: 12px !important;
+  height: 12px !important;
+}
+
+.mini-select .q-field--dense .q-field__control,
+.mini-select .q-field--dense .q-field__marginal {
+  min-height: 12px !important;
+  height: 12px !important;
+}
+
+/* Custom clear icon styling */
+.mini-select .q-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  opacity: 0.7;
+  font-weight: 900 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  margin-top: 16px !important;
+}
+
+.mini-select .q-icon:hover {
+  opacity: 1;
+}
+
+/* Move dropdown arrow down and add rotation animation */
+.mini-select .q-field__append .q-icon {
+  margin-top: 14px;
+  transition: transform 0.2s ease;
+}
+
+/* Rotate arrow when dropdown is open */
+.mini-select.q-field--focused .q-field__append .q-icon {
+  transform: rotate(180deg);
+}
+.schema-index-select-dropdown-light{
+  background-color: white !important;
+  border-radius: 4px !important;
+  border: 1px solid #C9CCD6 !important;
+}
+
+.schema-index-select-dropdown-light.q-field--focused .q-field__control {
+  outline: 2px solid #575FC5 !important;
+  box-shadow: none !important;
+  background-color: #FFFFFF !important;
+  border-radius: 4px !important;
+}
+
+.schema-index-select-dropdown-dark{
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+  border: 1px solid #4E5157 !important;
+}
+
+.schema-index-select-dropdown-dark.q-field--focused .q-field__control {
+  outline: 2px solid #575FC5 !important;
+  box-shadow: none !important;
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+}
+
+/* Field name ellipsis styling */
+.field-name-ellipsis {
+  max-width: 200px;
+}
+
+.field-name-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  
+}
+
+.o2-schema-table{
+  th,td {
+    height: 14px !important;
+    min-height: 14px !important;
+    padding: 2px 3px !important;
+  }
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+}
+
+.o2-schema-table-header-sticky-dark{
+  thead {
+    background-color: #181A1B;
+  }
+}
+
+.o2-schema-table-header-sticky-light{
+  thead {
+    background-color: #ffffff;
+  }
+}
+
+
+/* Field type badge styling */
+.field-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-int64 {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badge-float64 {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-utf8 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-bool {
+  background: #fce7f3;
+  color: #9f1239;
+}
+
+.schema-input-box{
+  background-color: white !important;
+  border-radius: 4px !important;
+  padding: 0px 8px !important;
+  border: 1px solid #C9CCD6 !important;
+  .q-field__control{
+    color: transparent !important;
+
+  }
+}
+
+.schema-input-box-light{
+  .q-field__control{
+    background-color: #ffffff !important;
+    outline: 0px 1px 0px 1px solid #C9CCD6 !important;
+    padding: 0px 6px !important;
+    }
+}
+
+.schema-input-box-dark{
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+  border: 1px solid #4E5157 !important;
+}
+.bottom-btn {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tile-content-dark{
+  background-color: #181a1b;
+}
+
+.tile-content-light{
+  background-color: #ffffff;
+}

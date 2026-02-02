@@ -17,9 +17,10 @@ use std::sync::Arc;
 
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use arrow::array::RecordBatch;
-use arrow_schema::{DataType, Field};
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+#[cfg(feature = "enterprise")]
+use config::utils::parquet::read_recordbatch_from_bytes;
 use config::{
     FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -41,7 +42,9 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
+    cluster::get_node_by_uuid,
     dist_lock, file_list as infra_file_list,
+    runtime::DATAFUSION_RUNTIME,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_created_at,
@@ -57,17 +60,11 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{
-        db, file_list,
-        schema::generate_schema_for_defined_schema_fields,
-        search::{
-            DATAFUSION_RUNTIME,
-            datafusion::exec::{self, MergeParquetResult, TableBuilder},
-        },
-        tantivy::create_tantivy_index,
-    },
+use crate::service::{
+    db, file_list,
+    schema::generate_schema_for_defined_schema_fields,
+    search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
+    tantivy::create_tantivy_index,
 };
 
 /// Generate merging job by stream
@@ -246,7 +243,7 @@ pub async fn generate_old_data_job_by_stream(
         org_id,
         stream_type,
         stream_name,
-        Some((start_time, end_time - 1)),
+        (start_time, end_time - 1),
     )
     .await?;
 
@@ -444,7 +441,7 @@ pub async fn merge_by_stream(
         )
     };
     let files =
-        file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
+        file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
             .await
             .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
@@ -629,7 +626,7 @@ pub async fn merge_by_stream(
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
-                if let Err(e) = write_file_list(&org_id, &events).await {
+                if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
                     log::error!("[COMPACTOR] write file list failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
@@ -786,6 +783,7 @@ pub async fn merge_files(
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema);
         let latest_schema = generate_schema_for_defined_schema_fields(
+            stream_type,
             &latest_schema,
             &defined_schema_fields,
             need_original,
@@ -799,7 +797,7 @@ pub async fn merge_files(
 
     // read schema from parquet file and group files by schema
     let mut schemas = HashMap::new();
-    let mut file_groups = HashMap::new();
+    let files = new_file_list.clone();
     let mut fi = 0;
     for file in new_file_list.iter() {
         fi += 1;
@@ -813,10 +811,7 @@ pub async fn merge_files(
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {
             schemas.insert(schema_key.clone(), schema);
-            file_groups.insert(schema_key.clone(), vec![]);
         }
-        let entry = file_groups.get_mut(&schema_key).unwrap();
-        entry.push(file.clone());
     }
 
     // generate the final schema
@@ -824,6 +819,9 @@ pub async fn merge_files(
         .values()
         .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
         .collect::<HashSet<_>>();
+    // Keep original schema for index generation (has all stream fields)
+    let stream_schema_for_index = Arc::new(latest_schema.clone());
+    // Create filtered schema for parquet merging (only fields in parquet files)
     let latest_schema = Arc::new(latest_schema.retain(all_fields));
     let mut latest_schema_fields = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
@@ -831,35 +829,27 @@ pub async fn merge_files(
     }
 
     // generate datafusion tables
-    let mut tables = Vec::new();
     let trace_id = ider::generate();
-    for (schema_key, files) in file_groups {
-        if files.is_empty() {
-            continue;
-        }
-        let schema = schemas.get(&schema_key).unwrap().clone();
-        let session = config::meta::search::Session {
-            id: format!("{trace_id}-{schema_key}"),
-            storage_type: StorageType::Memory,
-            work_group: None,
-            target_partitions: 2,
-        };
+    let session = config::meta::search::Session {
+        id: trace_id.to_string(),
+        storage_type: StorageType::Memory,
+        work_group: None,
+        target_partitions: 2,
+    };
 
-        let diff_fields = generate_schema_diff(&schema, &latest_schema_fields)?;
-        match TableBuilder::new()
-            .rules(diff_fields)
-            .sorted_by_time(true)
-            .need_optimize_partition(is_match_downsampling_rule)
-            .build(session, &files, latest_schema.clone())
-            .await
-        {
-            Ok(table) => tables.push(table),
-            Err(e) => {
-                log::error!("create_parquet_table err: {e}, files: {files:?}, schema: {schema:?}");
-                return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
-            }
-        };
-    }
+    let table = match TableBuilder::new()
+        .sorted_by_time(true)
+        .build(session, files.clone(), latest_schema.clone())
+        .await
+    {
+        Ok(table) => table,
+        Err(e) => {
+            log::error!(
+                "create_parquet_table err: {e}, files: {files:?}, schema: {latest_schema:?}"
+            );
+            return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
+        }
+    };
 
     let merge_result = {
         let stream_name = stream_name.to_string();
@@ -871,7 +861,7 @@ pub async fn merge_files(
                     stream_type,
                     &stream_name,
                     latest_schema,
-                    tables,
+                    vec![table],
                     &bloom_filter_fields,
                     &new_file_meta,
                     false,
@@ -894,6 +884,45 @@ pub async fn merge_files(
             return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
         }
     };
+
+    // Process service streams if in compactor mode
+    #[cfg(feature = "enterprise")]
+    {
+        let o2_config = o2_enterprise::enterprise::common::config::get_config();
+        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
+        if o2_config.service_streams.enabled
+            && o2_config.service_streams.is_compactor_mode()
+            && org_id != config::META_ORG_ID
+            && (stream_type == StreamType::Logs
+                || stream_type == StreamType::Metrics
+                || stream_type == StreamType::Traces)
+        {
+            // Apply two-tier sampling to ensure fair processing across all streams
+            // Use the first file key as identifier for this merge operation
+            let file_identifier = files.first().map(|f| f.as_str()).unwrap_or("unknown");
+            let should_process =
+                o2_enterprise::enterprise::service_streams::sampler::should_process_file(
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    file_identifier,
+                );
+
+            if should_process {
+                // Process the merged data for service discovery
+                // Works with all stream types (same as ingester mode)
+                if let Err(e) =
+                    process_service_streams_from_parquet(org_id, stream_name, stream_type, &buf)
+                        .await
+                {
+                    log::warn!(
+                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {}",
+                        e
+                    );
+                }
+            }
+        }
+    }
 
     let latest_schema_fields = latest_schema
         .fields()
@@ -918,7 +947,7 @@ pub async fn merge_files(
                 ));
             }
 
-            let id = ider::generate();
+            let id = ider::generate_file_name();
             let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
@@ -942,7 +971,7 @@ pub async fn merge_files(
             let account = storage::get_account(&new_file_key).unwrap_or_default();
             storage::put(&account, &new_file_key, buf.clone()).await?;
 
-            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
+            if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                 // generate inverted index
                 generate_inverted_index(
                     &new_file_key,
@@ -950,6 +979,7 @@ pub async fn merge_files(
                     &index_fields,
                     &retain_file_list,
                     &mut new_file_meta,
+                    stream_schema_for_index.clone(),
                     &buf,
                 )
                 .await?;
@@ -966,7 +996,7 @@ pub async fn merge_files(
                     ));
                 }
 
-                let id = ider::generate();
+                let id = ider::generate_file_name();
                 let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
 
                 // upload file to storage
@@ -982,7 +1012,7 @@ pub async fn merge_files(
                 let account = storage::get_account(&new_file_key).unwrap_or_default();
                 storage::put(&account, &new_file_key, buf.clone()).await?;
 
-                if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
+                if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                     // generate inverted index
                     generate_inverted_index(
                         &new_file_key,
@@ -990,6 +1020,7 @@ pub async fn merge_files(
                         &index_fields,
                         &retain_file_list,
                         &mut new_file_meta,
+                        stream_schema_for_index.clone(),
                         &buf,
                     )
                     .await?;
@@ -1020,15 +1051,16 @@ async fn generate_inverted_index(
     index_fields: &[String],
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
+    latest_schema: Arc<Schema>,
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
-    let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
+    let (_parquet_schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
         new_file_key,
         full_text_search_fields,
         index_fields,
-        schema,
+        latest_schema, // Use stream schema to include all configured fields
         reader,
     )
     .await
@@ -1045,7 +1077,11 @@ async fn generate_inverted_index(
     Ok(())
 }
 
-async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(
+    org_id: &str,
+    stream_type: StreamType,
+    events: &[FileKey],
+) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
     }
@@ -1064,14 +1100,17 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
 
     // set to db
     // retry 5 times
+    let cfg = get_config();
     let mut success = false;
+    let mut mark_deleted_done = false;
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_process(events).await {
+        if !mark_deleted_done && let Err(e) = infra::file_list::batch_process(events).await {
             log::error!("[COMPACTOR] batch_process to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
+        mark_deleted_done = true;
         if !del_items.is_empty()
             && let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
         {
@@ -1083,9 +1122,15 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         break;
     }
 
+    // handle dump_stats for file_list type streams
+    if success && stream_type == StreamType::Filelist && cfg.compact.file_list_dump_enabled {
+        let (deleted_files, new_files): (Vec<_>, Vec<_>) = events.iter().partition(|e| e.deleted);
+        super::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
+    }
+
     if success {
         // send broadcast to other nodes
-        if get_config().cache_latest_files.enabled {
+        if cfg.cache_latest_files.enabled {
             // get id for all the new files
             let file_ids = infra_file_list::query_ids_by_files(events).await?;
             let mut events = events.to_vec();
@@ -1113,7 +1158,7 @@ pub fn generate_inverted_idx_recordbatch(
     index_fields: &[String],
 ) -> Result<Option<RecordBatch>, anyhow::Error> {
     let cfg = get_config();
-    if !cfg.common.inverted_index_enabled || batches.is_empty() || !stream_type.is_basic_type() {
+    if !cfg.common.inverted_index_enabled || batches.is_empty() || !stream_type.support_index() {
         return Ok(None);
     }
 
@@ -1195,7 +1240,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
         return Ok(Vec::new());
     };
 
-    let mut tasks = Vec::new();
+    let mut tasks = Vec::with_capacity(files.len());
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_account = file.account.to_string();
@@ -1276,37 +1321,17 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     Ok(delete_files)
 }
 
-// generate parquet file compact schema
-fn generate_schema_diff(
-    schema: &Schema,
-    latest_schema_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<HashMap<String, DataType>, anyhow::Error> {
-    // calculate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-
-    for field in schema.fields().iter() {
-        if let Some(latest_field) = latest_schema_map.get(field.name())
-            && field.data_type() != latest_field.data_type()
-        {
-            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-        }
-    }
-
-    Ok(diff_fields)
-}
-
 /// sort by time range without overlapping
 fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
     let files_num = file_list.len();
     file_list.sort_by_key(|f| f.meta.min_ts);
-    let mut groups: Vec<Vec<FileKey>> = Vec::new();
+    let mut groups: Vec<Vec<FileKey>> = Vec::with_capacity(files_num);
     for file in file_list {
         let mut inserted = None;
         for (i, group) in groups.iter().enumerate() {
             if group
                 .last()
-                .map(|f| file.meta.min_ts >= f.meta.max_ts)
-                .unwrap_or(false)
+                .is_some_and(|f| file.meta.min_ts >= f.meta.max_ts)
             {
                 inserted = Some(i);
                 break;
@@ -1325,13 +1350,155 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
     files
 }
 
+/// Process service streams from merged parquet data (compactor mode)
+#[cfg(feature = "enterprise")]
+async fn process_service_streams_from_parquet(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    parquet_result: &exec::MergeParquetResult,
+) -> Result<(), anyhow::Error> {
+    let parquet_bytes = match parquet_result {
+        exec::MergeParquetResult::Single(buf) => buf,
+        exec::MergeParquetResult::Multiple { bufs, .. } => {
+            // For multiple files, process each one
+            for buf in bufs {
+                process_single_parquet_buffer(org_id, stream_name, stream_type, buf).await?;
+            }
+            return Ok(());
+        }
+    };
+
+    process_single_parquet_buffer(org_id, stream_name, stream_type, parquet_bytes).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn process_single_parquet_buffer(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    parquet_bytes: &[u8],
+) -> Result<(), anyhow::Error> {
+    // Read record batches from parquet bytes
+    let bytes = Bytes::from(parquet_bytes.to_vec());
+    let (_schema, batches) = read_recordbatch_from_bytes(&bytes).await?;
+
+    if batches.is_empty() {
+        return Ok(());
+    }
+
+    // Get semantic field groups from system_settings (user-customizable via UI, with caching)
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+
+    // Get FQN priority from DB/cache (org-level setting or system default)
+    let fqn_priority =
+        crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
+
+    let processor = std::sync::Arc::new(
+        o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
+            org_id.to_string(),
+            semantic_groups,
+            fqn_priority,
+        ),
+    );
+
+    // Get config values for channel capacity
+    let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
+    let channel_capacity = ss_config.channel_capacity;
+
+    // Use bounded channel with backpressure for memory control
+    // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
+    let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(channel_capacity);
+
+    let org_id_owned = org_id.to_string();
+    let stream_name_owned = stream_name.to_string();
+
+    // Spawn producer task to send Arrow batches directly through channel
+    // ARROW-NATIVE: No HashMap conversion! Sends RecordBatch directly.
+    let producer_handle = tokio::spawn(async move {
+        let mut records_sent: u64 = 0;
+        let mut records_dropped: u64 = 0;
+
+        for batch in batches {
+            let num_rows = batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // Send Arrow batch directly (no conversion!)
+            match tx.try_send(batch) {
+                Ok(()) => {
+                    records_sent += num_rows as u64;
+                }
+                Err(mpsc::error::TrySendError::Full(dropped_batch)) => {
+                    let dropped = dropped_batch.num_rows() as u64;
+                    records_dropped += dropped;
+                    if records_dropped.is_multiple_of(1000) {
+                        log::warn!(
+                            "[COMPACTOR] Service streams channel full, dropped {} records so far",
+                            records_dropped
+                        );
+                    }
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    return (records_sent, records_dropped);
+                }
+            }
+        }
+
+        (records_sent, records_dropped)
+    });
+
+    // Consumer: process Arrow batches as they arrive
+    // ARROW-NATIVE: Process RecordBatch directly (no HashMap conversion!)
+    let mut total_services = 0u64;
+    while let Some(batch) = rx.recv().await {
+        if batch.num_rows() == 0 {
+            continue;
+        }
+
+        let services = processor
+            .process_arrow_batch(&batch, stream_type, &stream_name_owned)
+            .await;
+
+        if !services.is_empty() {
+            let service_count = services.len() as u64;
+            total_services += service_count;
+
+            // Queue services for batched processing
+            o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
+                org_id_owned.clone(),
+                services,
+            )
+            .await;
+        }
+    }
+
+    // Wait for producer to finish and get stats
+    let (records_sent, records_dropped) = producer_handle.await.unwrap_or((0, 0));
+
+    if total_services > 0 || records_dropped > 0 {
+        log::info!(
+            "[COMPACTOR] Service streams for {}/{}/{}: {} services discovered, {} records processed, {} records dropped",
+            org_id_owned,
+            stream_type,
+            stream_name_owned,
+            total_services,
+            records_sent,
+            records_dropped
+        );
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::{FileKey, FileMeta};
-    use hashbrown::HashMap;
 
     use super::*;
 
@@ -1586,250 +1753,355 @@ mod tests {
         assert!(keys.contains(&&"file3.parquet".to_string()));
     }
 
-    // Test cases for generate_schema_diff function
+    // Test cases for generate_inverted_idx_recordbatch function
     #[test]
-    fn test_generate_schema_diff_no_differences() {
-        // Create a schema with fields
-        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
-        let field2 = Arc::new(Field::new("field2", DataType::Int64, false));
-        let schema = Schema::new(vec![field1.clone(), field2.clone()]);
+    fn test_generate_inverted_idx_recordbatch_empty_batches() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field1", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
 
-        // Create latest schema map with same types
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(field1.name(), &field1);
-        latest_schema_map.insert(field2.name(), &field2);
+        let batches: Vec<RecordBatch> = vec![];
+        let full_text_search_fields = vec!["field1".to_string()];
+        let index_fields = vec![];
 
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-        assert!(diff.is_empty());
-    }
-
-    #[test]
-    fn test_generate_schema_diff_with_type_differences() {
-        // Create original schema
-        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
-        let field2 = Arc::new(Field::new("field2", DataType::Int32, false));
-        let schema = Schema::new(vec![field1.clone(), field2.clone()]);
-
-        // Create latest schema with different types
-        let latest_field1 = Arc::new(Field::new("field1", DataType::Utf8, true)); // Same type
-        let latest_field2 = Arc::new(Field::new("field2", DataType::Int64, false)); // Different type
-
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(latest_field1.name(), &latest_field1);
-        latest_schema_map.insert(latest_field2.name(), &latest_field2);
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-
-        assert_eq!(diff.len(), 1);
-        assert!(diff.contains_key("field2"));
-        assert_eq!(diff.get("field2").unwrap(), &DataType::Int64);
-    }
-
-    #[test]
-    fn test_generate_schema_diff_multiple_type_differences() {
-        // Create original schema
-        let field1 = Arc::new(Field::new("field1", DataType::Int32, true));
-        let field2 = Arc::new(Field::new("field2", DataType::Float32, false));
-        let field3 = Arc::new(Field::new("field3", DataType::Boolean, true));
-        let schema = Schema::new(vec![field1.clone(), field2.clone(), field3.clone()]);
-
-        // Create latest schema with different types
-        let latest_field1 = Arc::new(Field::new("field1", DataType::Int64, true)); // Different
-        let latest_field2 = Arc::new(Field::new("field2", DataType::Float64, false)); // Different
-        let latest_field3 = Arc::new(Field::new("field3", DataType::Boolean, true)); // Same
-
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(latest_field1.name(), &latest_field1);
-        latest_schema_map.insert(latest_field2.name(), &latest_field2);
-        latest_schema_map.insert(latest_field3.name(), &latest_field3);
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-
-        assert_eq!(diff.len(), 2);
-        assert!(diff.contains_key("field1"));
-        assert!(diff.contains_key("field2"));
-        assert!(!diff.contains_key("field3")); // Same type, should not be in diff
-        assert_eq!(diff.get("field1").unwrap(), &DataType::Int64);
-        assert_eq!(diff.get("field2").unwrap(), &DataType::Float64);
-    }
-
-    #[test]
-    fn test_generate_schema_diff_field_missing_in_latest() {
-        // Create original schema
-        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
-        let field2 = Arc::new(Field::new("field2", DataType::Int64, false));
-        let schema = Schema::new(vec![field1.clone(), field2.clone()]);
-
-        // Create latest schema map missing field2
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(field1.name(), &field1);
-        // field2 is missing from latest_schema_map
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-
-        // Should be empty since field2 is not found in latest_schema_map
-        assert!(diff.is_empty());
-    }
-
-    #[test]
-    fn test_generate_schema_diff_empty_schema() {
-        let schema = Schema::empty();
-        let latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-        assert!(diff.is_empty());
-    }
-
-    #[test]
-    fn test_generate_schema_diff_empty_latest_schema_map() {
-        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
-        let schema = Schema::new(vec![field1]);
-        let latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-        assert!(diff.is_empty()); // No fields in latest_schema_map to compare against
-    }
-
-    #[test]
-    fn test_generate_schema_diff_complex_data_types() {
-        // Test with complex data types like List, Struct, etc.
-        let list_field = Arc::new(Field::new(
-            "list_field",
-            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
-            true,
-        ));
-        let timestamp_field = Arc::new(Field::new(
-            "timestamp_field",
-            DataType::Timestamp(arrow_schema::TimeUnit::Microsecond, None),
-            false,
-        ));
-        let schema = Schema::new(vec![list_field.clone(), timestamp_field.clone()]);
-
-        // Create latest schema with different complex types
-        let latest_list_field = Arc::new(Field::new(
-            "list_field",
-            DataType::List(Arc::new(Field::new("item", DataType::Int64, true))), /* Different inner type */
-            true,
-        ));
-        let latest_timestamp_field = Arc::new(Field::new(
-            "timestamp_field",
-            DataType::Timestamp(arrow_schema::TimeUnit::Nanosecond, None), // Different time unit
-            false,
-        ));
-
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(latest_list_field.name(), &latest_list_field);
-        latest_schema_map.insert(latest_timestamp_field.name(), &latest_timestamp_field);
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-
-        assert_eq!(diff.len(), 2);
-        assert!(diff.contains_key("list_field"));
-        assert!(diff.contains_key("timestamp_field"));
-    }
-
-    #[test]
-    fn test_generate_schema_diff_nullable_differences() {
-        // Test that nullable differences are detected when data types are same
-        let field1 = Arc::new(Field::new("field1", DataType::Utf8, false)); // Not nullable
-        let schema = Schema::new(vec![field1.clone()]);
-
-        let latest_field1 = Arc::new(Field::new("field1", DataType::Utf8, true)); // Nullable
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(latest_field1.name(), &latest_field1);
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-
-        // Note: This test verifies current behavior - the function only compares data_type(),
-        // not the nullable property. If nullable differences should be detected,
-        // the function would need to be modified.
-        assert!(diff.is_empty()); // Current implementation doesn't detect nullable differences
-    }
-
-    #[test]
-    fn test_generate_schema_diff_mixed_scenario() {
-        // Create a realistic mixed scenario
-        let original_fields = vec![
-            Arc::new(Field::new("id", DataType::Int32, false)),
-            Arc::new(Field::new("name", DataType::Utf8, true)),
-            Arc::new(Field::new("score", DataType::Float32, true)),
-            Arc::new(Field::new("active", DataType::Boolean, false)),
-            Arc::new(Field::new("metadata", DataType::Utf8, true)),
-        ];
-        let schema = Schema::new(original_fields);
-
-        // Latest schema with some changes
-        let latest_id = Arc::new(Field::new("id", DataType::Int64, false)); // Changed type
-        let latest_name = Arc::new(Field::new("name", DataType::Utf8, true)); // Same
-        let latest_score = Arc::new(Field::new("score", DataType::Float64, true)); // Changed type
-        let latest_active = Arc::new(Field::new("active", DataType::Boolean, false)); // Same
-        // metadata field missing from latest schema
-
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(latest_id.name(), &latest_id);
-        latest_schema_map.insert(latest_name.name(), &latest_name);
-        latest_schema_map.insert(latest_score.name(), &latest_score);
-        latest_schema_map.insert(latest_active.name(), &latest_active);
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-
-        assert_eq!(diff.len(), 2);
-        assert!(diff.contains_key("id"));
-        assert!(diff.contains_key("score"));
-        assert!(!diff.contains_key("name")); // Same type
-        assert!(!diff.contains_key("active")); // Same type
-        assert!(!diff.contains_key("metadata")); // Missing from latest
-
-        assert_eq!(diff.get("id").unwrap(), &DataType::Int64);
-        assert_eq!(diff.get("score").unwrap(), &DataType::Float64);
-    }
-
-    #[test]
-    fn test_generate_schema_diff_decimal_types() {
-        // Test with decimal types that have precision and scale
-        let decimal_field = Arc::new(Field::new(
-            "decimal_field",
-            DataType::Decimal128(10, 2), // precision=10, scale=2
-            true,
-        ));
-        let schema = Schema::new(vec![decimal_field.clone()]);
-
-        let latest_decimal_field = Arc::new(Field::new(
-            "decimal_field",
-            DataType::Decimal128(12, 4), // Different precision and scale
-            true,
-        ));
-
-        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        latest_schema_map.insert(latest_decimal_field.name(), &latest_decimal_field);
-
-        let result = generate_schema_diff(&schema, &latest_schema_map);
-        assert!(result.is_ok());
-        let diff = result.unwrap();
-
-        assert_eq!(diff.len(), 1);
-        assert!(diff.contains_key("decimal_field"));
-        assert_eq!(
-            diff.get("decimal_field").unwrap(),
-            &DataType::Decimal128(12, 4)
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
         );
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_with_fts_fields() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new("level", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let message_array = StringArray::from(vec!["log message 1", "log message 2"]);
+        let level_array = StringArray::from(vec!["info", "error"]);
+        let timestamp_array = Int64Array::from(vec![1000, 2000]);
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(message_array),
+                Arc::new(level_array),
+                Arc::new(timestamp_array),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        let full_text_search_fields = vec!["message".to_string()];
+        let index_fields = vec![];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        let batch_result = result.unwrap();
+        assert!(batch_result.is_some());
+
+        let inverted_batch = batch_result.unwrap();
+        assert_eq!(inverted_batch.num_rows(), 2);
+        assert_eq!(inverted_batch.num_columns(), 2); // message + _timestamp
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_with_index_fields() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("user_id", DataType::Utf8, true),
+            Field::new("session_id", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let user_id_array = StringArray::from(vec!["user1", "user2"]);
+        let session_id_array = StringArray::from(vec!["session1", "session2"]);
+        let timestamp_array = Int64Array::from(vec![1000, 2000]);
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(user_id_array),
+                Arc::new(session_id_array),
+                Arc::new(timestamp_array),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        let full_text_search_fields = vec![];
+        let index_fields = vec!["user_id".to_string(), "session_id".to_string()];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        let batch_result = result.unwrap();
+        assert!(batch_result.is_some());
+
+        let inverted_batch = batch_result.unwrap();
+        assert_eq!(inverted_batch.num_rows(), 2);
+        assert_eq!(inverted_batch.num_columns(), 3); // user_id + session_id + _timestamp
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_with_multiple_batches() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch1 = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["message 1", "message 2"])),
+                Arc::new(Int64Array::from(vec![1000, 2000])),
+            ],
+        )
+        .unwrap();
+
+        let batch2 = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["message 3", "message 4"])),
+                Arc::new(Int64Array::from(vec![3000, 4000])),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch1, batch2];
+        let full_text_search_fields = vec!["message".to_string()];
+        let index_fields = vec![];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        let batch_result = result.unwrap();
+        assert!(batch_result.is_some());
+
+        let inverted_batch = batch_result.unwrap();
+        assert_eq!(inverted_batch.num_rows(), 4); // Combined rows from both batches
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_no_matching_fields() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field1", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["value1", "value2"])),
+                Arc::new(Int64Array::from(vec![1000, 2000])),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        // Specify fields that don't exist in schema
+        let full_text_search_fields = vec!["nonexistent_field".to_string()];
+        let index_fields = vec!["another_nonexistent".to_string()];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        let batch_result = result.unwrap();
+        // Should return None because only _timestamp would be present
+        assert!(batch_result.is_none());
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_only_timestamp() {
+        use arrow::array::Int64Array;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int64Array::from(vec![1000, 2000]))],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        let full_text_search_fields = vec![];
+        let index_fields = vec![];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        let batch_result = result.unwrap();
+        // Should return None because only timestamp field exists
+        assert!(batch_result.is_none());
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_with_combined_fts_and_index() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new("user_id", DataType::Utf8, true),
+            Field::new("level", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["log1", "log2"])),
+                Arc::new(StringArray::from(vec!["user1", "user2"])),
+                Arc::new(StringArray::from(vec!["info", "error"])),
+                Arc::new(Int64Array::from(vec![1000, 2000])),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        let full_text_search_fields = vec!["message".to_string()];
+        let index_fields = vec!["user_id".to_string(), "level".to_string()];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        let batch_result = result.unwrap();
+        assert!(batch_result.is_some());
+
+        let inverted_batch = batch_result.unwrap();
+        assert_eq!(inverted_batch.num_rows(), 2);
+        // Should have: level, message, user_id (sorted), + _timestamp = 4 columns
+        assert_eq!(inverted_batch.num_columns(), 4);
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_duplicate_fields() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field1", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["value1", "value2"])),
+                Arc::new(Int64Array::from(vec![1000, 2000])),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        // Same field in both FTS and index fields (should be deduped)
+        let full_text_search_fields = vec!["field1".to_string()];
+        let index_fields = vec!["field1".to_string()];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        let batch_result = result.unwrap();
+        assert!(batch_result.is_some());
+
+        let inverted_batch = batch_result.unwrap();
+        assert_eq!(inverted_batch.num_rows(), 2);
+        assert_eq!(inverted_batch.num_columns(), 2); // field1 + _timestamp (deduplicated)
+    }
+
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_unsupported_stream_type() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["msg1", "msg2"])),
+                Arc::new(Int64Array::from(vec![1000, 2000])),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        let full_text_search_fields = vec!["message".to_string()];
+        let index_fields = vec![];
+
+        // Test with a stream type that might not support indexing
+        // Note: This depends on the support_index() implementation
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Metrics, // Metrics may not support indexing
+            &full_text_search_fields,
+            &index_fields,
+        );
+
+        assert!(result.is_ok());
+        // Result depends on whether Metrics support_index() returns true
     }
 }

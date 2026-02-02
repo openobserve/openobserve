@@ -66,19 +66,13 @@ describe("AddGroup Component", () => {
     it("displays the correct title", () => {
       const titleElement = wrapper.find('[data-test="add-group-section-title"]');
       expect(titleElement.exists()).toBe(true);
-      expect(titleElement.text()).toContain("Add User Group");
-    });
-
-    it("renders the close button", () => {
-      const closeButton = wrapper.find('[data-test="add-group-close-dialog-btn"]');
-      expect(closeButton.exists()).toBe(true);
-      expect(closeButton.classes()).toContain("q-btn");
+      expect(titleElement.text()).toContain("New user group");
     });
   });
 
   describe("Form Input", () => {
     it("renders the group name input field", () => {
-      const nameInput = wrapper.find('[data-test="add-group-groupname-input-btn"] .q-input');
+      const nameInput = wrapper.find('[data-test="add-group-groupname-input-btn"]');
       expect(nameInput.exists()).toBe(true);
     });
 
@@ -264,7 +258,9 @@ describe("AddGroup Component", () => {
     });
 
     it("uses default width when not provided", () => {
-      expect(wrapper.props("width")).toBe("30vw");
+      // The width prop has been removed from the component
+      // Verify the component mounts successfully without the width prop
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("uses provided org_identifier", () => {

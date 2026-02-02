@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    net::IpAddr,
-    sync::atomic::{AtomicI32, Ordering},
-};
+use std::sync::atomic::{AtomicI32, Ordering};
 
 use once_cell::sync::Lazy;
 
@@ -30,7 +27,7 @@ pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 pub static LOCAL_NODE_STATUS: AtomicI32 = AtomicI32::new(NodeStatus::Prepare as _);
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
 
-pub fn load_local_node() -> Node {
+fn load_local_node() -> Node {
     let cfg = get_config();
     Node {
         id: 1,
@@ -38,18 +35,8 @@ pub fn load_local_node() -> Node {
         role: load_local_node_role(),
         role_group: load_role_group(),
         name: cfg.common.instance_name.clone(),
-        http_addr: format!(
-            "{}://{}:{}",
-            get_http_schema(),
-            get_local_http_ip(),
-            cfg.http.port
-        ),
-        grpc_addr: format!(
-            "{}://{}:{}",
-            get_grpc_schema(),
-            get_local_grpc_ip(),
-            cfg.grpc.port
-        ),
+        http_addr: get_local_http_addr(),
+        grpc_addr: get_local_grpc_addr(),
         cpu_num: cfg.limit.cpu_num as u64,
         scheduled: false,
         broadcasted: false,
@@ -77,6 +64,24 @@ pub fn load_role_group() -> RoleGroup {
     RoleGroup::from(get_config().common.node_role_group.as_str())
 }
 
+pub fn get_local_http_addr() -> String {
+    format!(
+        "{}://{}:{}",
+        get_http_schema(),
+        get_local_http_ip(),
+        get_config().http.port
+    )
+}
+
+pub fn get_local_grpc_addr() -> String {
+    format!(
+        "{}://{}:{}",
+        get_grpc_schema(),
+        get_local_grpc_ip(),
+        get_config().grpc.port
+    )
+}
+
 pub fn get_local_http_ip() -> String {
     let cfg = get_config();
     if !cfg.http.addr.is_empty() {
@@ -96,12 +101,16 @@ pub fn get_local_grpc_ip() -> String {
 }
 
 pub fn get_local_node_ip() -> String {
-    for adapter in get_if_addrs::get_if_addrs().unwrap() {
-        if !adapter.is_loopback() && matches!(adapter.ip(), IpAddr::V4(_)) {
-            return adapter.ip().to_string();
-        }
-    }
-    String::new()
+    // returns ipv4
+    local_ip_address::local_ip()
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Failed to get local IP address: {}, falling back to 127.0.0.1",
+                e
+            );
+            "127.0.0.1".to_string()
+        })
 }
 
 pub fn get_grpc_schema() -> String {

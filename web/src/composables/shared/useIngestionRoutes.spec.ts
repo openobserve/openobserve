@@ -26,7 +26,6 @@ vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((to, from, next) => next())
 }));
 
-vi.mock("@/components/ingestion/logs/SysLog.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/SyslogNg.vue", () => ({ default: {} }));
 vi.mock("@/views/Ingestion.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/FluentBit.vue", () => ({ default: {} }));

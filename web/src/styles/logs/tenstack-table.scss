@@ -1,0 +1,104 @@
+.resizer {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 5px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.resizer.ltr {
+  right: 0;
+}
+
+.resizer.rtl {
+  left: 0;
+}
+
+.resizer.isResizing {
+  background: $primary;
+  opacity: 1;
+}
+
+.container {
+  height: calc(100vh - 294px);
+  overflow: auto;
+  border-radius: 0.5rem;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.select-none {
+  user-select: none;
+}
+
+.text-left {
+  text-align: left;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 12px !important;
+}
+
+thead {
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px !important;
+}
+
+.table-row {
+  border-bottom: 1px solid gray;
+}
+
+th {
+  text-align: left;
+
+  &:hover {
+    .column-actions {
+      visibility: visible !important;
+    }
+  }
+}
+
+td {
+  font-family: monospace;
+  // content-visibility: auto;
+}
+
+.thead-sticky tr > *,
+.tfoot-sticky tr > * {
+  position: sticky;
+  opacity: 1;
+  z-index: 1;
+  background: #E0E0E0;
+}
+
+.q-table--dark .thead-sticky tr > *,
+.q-table--dark .tfoot-sticky tr > * {
+  background: #565656;
+}
+
+.table-cell {
+  &:hover {
+    .table-cell-actions {
+      display: block !important;
+    }
+  }
+}
+
+.table-row-hover {
+  // Modern CSS optimization for off-screen content
+  // content-visibility: auto;
+  // contain-intrinsic-size: auto 24px; // Match row height
+
+  &:hover {
+    .ai-btn {
+      visibility: visible !important;
+      z-index: 2;
+    }
+  }
+}

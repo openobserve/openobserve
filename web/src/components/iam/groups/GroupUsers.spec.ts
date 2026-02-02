@@ -362,6 +362,7 @@ describe("GroupUsers Component", () => {
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
         role: "user",
+        is_external: false,
       });
       expect(wrapper.vm.users[1]).toEqual({
         "#": 2,
@@ -369,6 +370,7 @@ describe("GroupUsers Component", () => {
         isInGroup: true,
         org: "TestOrg1",
         role: "admin",
+        is_external: false,
       });
       expect(wrapper.vm.users[2]).toEqual({
         "#": 3,
@@ -376,6 +378,7 @@ describe("GroupUsers Component", () => {
         isInGroup: false,
         org: "",
         role: "root",
+        is_external: false,
       });
     });
 
@@ -408,6 +411,7 @@ describe("GroupUsers Component", () => {
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
         role: "user",
+        is_external: false,
       });
     });
   });
@@ -817,8 +821,7 @@ describe("GroupUsers Component", () => {
     it("applies correct theme classes", () => {
       const filters = wrapper.find('[data-test="iam-users-selection-filters"]');
       expect(filters.exists()).toBe(true);
-      // The component applies theme classes based on store.state.theme
-      expect(filters.classes()).toContain('bg-white');
+      // Theme classes have been removed from the component
     });
 
     it("switches to dark theme classes when theme is dark", async () => {
@@ -844,7 +847,8 @@ describe("GroupUsers Component", () => {
       });
 
       const filters = wrapper.find('[data-test="iam-users-selection-filters"]');
-      expect(filters.classes()).toContain('bg-dark');
+      expect(filters.exists()).toBe(true);
+      // Theme classes have been removed from the component
     });
   });
 

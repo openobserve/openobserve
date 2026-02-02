@@ -22,7 +22,7 @@ export class LogsQueryPage {
   async typeQuery(query) {
     const queryEditor = this.page.locator(this.queryEditor);
     await expect(queryEditor).toBeVisible();
-    await queryEditor.locator(".cm-content").fill(query);
+    await queryEditor.locator(".inputarea").fill(query);
   }
 
   async clickRefresh() {
@@ -30,7 +30,8 @@ export class LogsQueryPage {
   }
 
   async clickErrorMessage() {
-    await expect(this.page.locator(this.errorMessage).getByText('No events found')).toBeVisible();
+    // Wait longer for error message to appear in deployed environments
+    await expect(this.page.locator(this.errorMessage).getByText('No events found')).toBeVisible({ timeout: 30000 });
     await this.page.locator(this.errorMessage).click();
   }
 

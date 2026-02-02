@@ -9,7 +9,7 @@
         <div class="row items-center no-wrap">
           <div class="col">
             <div class="text-body1 text-bold" data-test="queryList-title-text">
-              {{ t("queries.queryList") }}
+              {{ t("queries.queryList") }}123
             </div>
           </div>
           <div class="col-auto">
@@ -124,6 +124,8 @@ export default defineComponent({
         ["User ID", query?.user_id],
         ["Org ID", query?.org_id],
         ["Stream Type", query?.stream_type],
+        ["Search Type", query?.search_type],
+        ["Query Source", query?.query_source],
         ["SQL", query?.sql],
         ["Start Time", startTimeEntry],
         ["End Time", endTimeEntry],

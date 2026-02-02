@@ -17,7 +17,7 @@ use core::clone::Clone;
 use std::net::IpAddr;
 
 use actix_web::{
-    Error,
+    Error, HttpResponse,
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorNotFound, ErrorUnauthorized},
     http::{Method, header},
@@ -25,7 +25,7 @@ use actix_web::{
 };
 use config::{
     get_config,
-    meta::user::{DBUser, UserRole},
+    meta::user::{DBUser, User, UserRole, UserType},
     utils::base64,
 };
 #[cfg(feature = "enterprise")]
@@ -36,7 +36,6 @@ use url::Url;
 
 use crate::{
     common::{
-        infra::cluster,
         meta::{
             ingestion::INGESTION_EP,
             organization::DEFAULT_ORG,
@@ -77,9 +76,9 @@ pub async fn validator(
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
-        validate_credentials_ext(user_id, password, path, auth_token).await
+        validate_credentials_ext(user_id, password, path, auth_token, &auth_info.method).await
     } else {
-        validate_credentials(user_id, password.trim(), path).await
+        validate_credentials(user_id, password.trim(), path, auth_info.bypass_check).await
     } {
         Ok(res) => {
             if res.is_valid {
@@ -143,7 +142,6 @@ pub async fn validator(
 ///
 /// ### Args:
 /// - token: The token to validate
-///  
 pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     match users::get_user_by_token(org_id, token).await {
         Some(_user) => Ok(()),
@@ -155,6 +153,7 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
+    from_session: bool,
 ) -> Result<TokenValidationResponse, Error> {
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
@@ -163,7 +162,7 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
-    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -171,7 +170,13 @@ pub async fn validate_credentials(
                 if all_users.is_empty() {
                     None
                 } else {
-                    all_users.first().cloned()
+                    // For organizations endpoint, specifically look for user in _meta org
+                    // since permission check at line 966 expects the user to be in _meta
+                    all_users
+                        .iter()
+                        .find(|u| u.org == config::META_ORG_ID)
+                        .cloned()
+                        .or_else(|| all_users.first().cloned())
                 }
             }
             Err(e) => {
@@ -199,15 +204,42 @@ pub async fn validate_credentials(
     };
 
     if user.is_none() {
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            user_name: "".to_string(),
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
+        // for license, we do not provide org in path, but
+        // want to be able to access it in all orgs, as long as user has
+        // logged in. So here we check if the user id is part of atleast one
+        // org, and if so, allow the call. If the user is not part of the current org
+        // rest of api calls will get blocked anyways, but without this,
+        // native users get stuck in logout loop if they go to any page calling license
+        // api call
+        if path == "license"
+            && let Ok(v) = db::user::get_user_record(user_id).await
+        {
+            // we set the record manually with minimal permission,
+            // so the password check later can be done correctly
+            user = Some(User {
+                email: v.email,
+                first_name: v.first_name,
+                last_name: v.last_name,
+                password: v.password,
+                salt: v.salt,
+                token: "".into(),
+                rum_token: None,
+                role: UserRole::User,
+                org: "".into(),
+                is_external: v.user_type == UserType::External,
+                password_ext: v.password_ext,
+            });
+        } else {
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
     }
     let user = user.unwrap();
 
@@ -239,6 +271,32 @@ pub async fn validate_credentials(
     }
 
     if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
+        // Check if static token usage is allowed for this service account
+        // allow_static_token=false means the token cannot be used directly,
+        // user must use assume_service_account API to get a temporary session
+        // However, tokens from assume_service_account sessions (from_session=true) bypass this
+        // check
+        if !from_session
+            && let Ok(org_user) = db::org_users::get(&user.org, &user.email).await
+            && !org_user.allow_static_token
+        {
+            log::warn!(
+                "Service account '{}' in org '{}' attempted direct token auth but allow_static_token=false. Use assume_service_account API instead.",
+                user.email,
+                user.org
+            );
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
+
+        // Service account authentication succeeded
         return Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
@@ -307,9 +365,10 @@ pub async fn validate_credentials_ext(
     in_password: &str,
     path: &str,
     auth_token: AuthTokensExt,
+    method: &str,
 ) -> Result<TokenValidationResponse, Error> {
-    let config = get_config();
-    let password_ext_salt = config.auth.ext_auth_salt.as_str();
+    let cfg = get_config();
+    let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
         && v.is_empty()
@@ -325,7 +384,13 @@ pub async fn validate_credentials_ext(
                 if all_users.is_empty() {
                     None
                 } else {
-                    all_users.first().cloned()
+                    // For organizations endpoint, specifically look for user in _meta org
+                    // since permission check at line 966 expects the user to be in _meta
+                    all_users
+                        .iter()
+                        .find(|u| u.org == config::META_ORG_ID)
+                        .cloned()
+                        .or_else(|| all_users.first().cloned())
                 }
             }
             Err(_) => None,
@@ -344,7 +409,35 @@ pub async fn validate_credentials_ext(
                     users::get_user(Some(org_id), user_id).await
                 }
             }
-            None => users::get_user(None, user_id).await,
+            None => {
+                if path_columns.len() == 1 && path_columns[0] == "license" {
+                    // for license requests, we only need to check if part of o2
+                    // rest rbac is done in the handlers themselves
+                    if method == "GET" {
+                        if let Ok(v) = db::user::get_user_record(user_id).await {
+                            Some(config::meta::user::User {
+                                email: v.email,
+                                first_name: v.first_name,
+                                last_name: v.last_name,
+                                password: v.password,
+                                salt: v.salt,
+                                token: "".into(),
+                                rum_token: None,
+                                role: config::meta::user::UserRole::User,
+                                org: "".into(),
+                                is_external: v.user_type == config::meta::user::UserType::External,
+                                password_ext: v.password_ext,
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        users::get_user(Some("_meta"), user_id).await
+                    }
+                } else {
+                    users::get_user(None, user_id).await
+                }
+            }
         }
     };
 
@@ -392,7 +485,7 @@ pub async fn validate_credentials_ext(
 /// - The user is a root user
 /// - This is a ingestion POST endpoint
 async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Result<(), Error> {
-    let config = get_config();
+    let cfg = get_config();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.first()
         && v.is_empty()
@@ -421,7 +514,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         .await
         .is_none()
     {
-        if !config.common.create_org_through_ingestion {
+        if !cfg.common.create_org_through_ingestion {
             Err(ErrorNotFound("Organization not found"))
         } else if is_root_user(user_id)
             && method.eq(&Method::POST)
@@ -445,6 +538,7 @@ pub async fn validate_credentials_ext(
     _in_password: &str,
     _path: &str,
     _auth_token: AuthTokensExt,
+    _method: &str,
 ) -> Result<TokenValidationResponse, Error> {
     Err(ErrorForbidden("Not allowed"))
 }
@@ -494,7 +588,7 @@ async fn validate_user_from_db(
                 );
                 if hashed_pass.eq(&user_password) {
                     let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
-                    return Ok(resp);
+                    Ok(resp)
                 } else {
                     Err(ErrorForbidden("Not allowed"))
                 }
@@ -513,8 +607,8 @@ pub async fn validate_user(
     let db_user = db::user::get_user_record(user_id)
         .await
         .map(|user| DBUser::from(&user));
-    let config = get_config();
-    validate_user_from_db(db_user, user_password, None, 0, &config.auth.ext_auth_salt).await
+    let cfg = get_config();
+    validate_user_from_db(db_user, user_password, None, 0, &cfg.auth.ext_auth_salt).await
 }
 
 pub async fn validate_user_for_query_params(
@@ -524,13 +618,13 @@ pub async fn validate_user_for_query_params(
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    let config = get_config();
+    let cfg = get_config();
     validate_user_from_db(
         db_user,
         user_password,
         req_time,
         exp_in,
-        &config.auth.ext_auth_salt,
+        &cfg.auth.ext_auth_salt,
     )
     .await
 }
@@ -558,7 +652,7 @@ pub async fn validator_aws(
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>();
 
-                match validate_credentials(&creds[0], &creds[1], path).await {
+                match validate_credentials(&creds[0], &creds[1], path, false).await {
                     Ok(res) => {
                         if res.is_valid {
                             let mut req = req;
@@ -602,7 +696,7 @@ pub async fn validator_gcp(
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>();
 
-            match validate_credentials(&creds[0], &creds[1], path).await {
+            match validate_credentials(&creds[0], &creds[1], path, false).await {
                 Ok(res) => {
                     if res.is_valid {
                         let mut req = req;
@@ -648,7 +742,19 @@ pub async fn validator_rum(
     let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
     match token {
         Some(token) => match validate_token(token, org_id_end_point[0]).await {
-            Ok(_res) => Ok(req),
+            Ok(_res) => {
+                // Get user from token to set user_id header
+                if let Some(user) = users::get_user_by_token(org_id_end_point[0], token).await {
+                    let mut req = req;
+                    req.headers_mut().insert(
+                        header::HeaderName::from_static("user_id"),
+                        header::HeaderValue::from_str(&user.email).unwrap(),
+                    );
+                    Ok(req)
+                } else {
+                    Ok(req)
+                }
+            }
             Err(err) => {
                 log::error!(
                     "validate_token: Token not found for org_id: {}",
@@ -672,25 +778,39 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if auth_info.auth.starts_with("Basic") {
-        let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
+    // Check if this is a session-based auth (marked with Session:: prefix)
+    let (is_from_session, auth_str) = if let Some(rest) = auth_info.auth.strip_prefix("Session::") {
+        // Format: "Session::<session_id>::<actual_token>"
+        if let Some((_session_id, token)) = rest.split_once("::") {
+            (true, token.to_string())
+        } else {
+            (false, auth_info.auth.clone())
+        }
+    } else {
+        (false, auth_info.auth.clone())
+    };
+
+    if let Some(info) = auth_str.strip_prefix("Basic ").map(str::trim) {
+        let decoded = match base64::decode(info) {
             Ok(val) => val,
             Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
 
-        let (username, password) = match get_user_details(decoded) {
+        let (username, password) = match get_user_details(&decoded) {
             Some(value) => value,
             None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
-        validator(req, &username, &password, auth_info, path_prefix).await
-    } else if auth_info.auth.starts_with("Bearer") {
+        // Pass is_from_session flag through a modified auth_info
+        let mut modified_auth_info = auth_info.clone();
+        modified_auth_info.bypass_check = is_from_session || auth_info.bypass_check;
+        validator(req, &username, &password, modified_auth_info, path_prefix).await
+    } else if auth_str.starts_with("Bearer") {
         log::debug!("Bearer token found");
         super::token::token_validator(req, auth_info).await
-    } else if auth_info.auth.starts_with("{\"auth_ext\":") {
+    } else if let Ok(auth_tokens) = config::utils::json::from_str::<AuthTokensExt>(&auth_info.auth)
+    {
         log::debug!("Auth ext token found");
-        let auth_tokens: AuthTokensExt =
-            config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
-        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
+        if auth_tokens.has_expired() {
             Err((ErrorUnauthorized("Unauthorized Access"), req))
         } else {
             log::debug!("Auth ext token found: decoding");
@@ -704,7 +824,7 @@ async fn oo_validator_internal(
                 Ok(val) => val,
                 Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
             };
-            let (username, password) = match get_user_details(decoded) {
+            let (username, password) = match get_user_details(&decoded) {
                 Some(value) => value,
                 None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
             };
@@ -712,7 +832,8 @@ async fn oo_validator_internal(
             validator(req, &username, &password, auth_info, path_prefix).await
         }
     } else {
-        Err((ErrorUnauthorized("Unauthorized Access"), req))
+        // Missing or unrecognized auth - return WWW-Authenticate header
+        Err((create_unauthorized_response("Unauthorized Access"), req))
     }
 }
 
@@ -756,19 +877,40 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
     }
 }
 
-fn get_user_details(decoded: String) -> Option<(String, String)> {
-    let credentials = match String::from_utf8(decoded.into()).map_err(|_| ()) {
-        Ok(val) => val,
-        Err(_) => return None,
+fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
+    let credentials = str::from_utf8(decoded.as_ref()).ok()?;
+    credentials
+        .split_once(':')
+        .map(|(u, p)| (u.to_string(), p.to_string()))
+}
+
+/// Creates an Unauthorized error response with WWW-Authenticate header
+fn create_unauthorized_response(message: &str) -> Error {
+    #[cfg(feature = "enterprise")]
+    let auth_server_uri = {
+        let dex_config = get_dex_config();
+        if dex_config.dex_enabled {
+            dex_config.dex_url.clone()
+        } else {
+            String::new()
+        }
     };
-    let parts: Vec<&str> = credentials.splitn(2, ':').collect();
-    if parts.len() != 2 {
-        return None;
-    }
-    let (username, password) = (parts[0], parts[1]);
-    let username = username.to_owned();
-    let password = password.to_owned();
-    Some((username, password))
+    #[cfg(not(feature = "enterprise"))]
+    let auth_server_uri = String::new();
+
+    let www_authenticate = if !auth_server_uri.is_empty() {
+        format!(r#"Bearer as_uri="{auth_server_uri}""#)
+    } else {
+        r#"Bearer realm="openobserve""#.to_string()
+    };
+
+    actix_web::error::InternalError::from_response(
+        message.to_string(),
+        HttpResponse::Unauthorized()
+            .insert_header(("WWW-Authenticate", www_authenticate))
+            .finish(),
+    )
+    .into()
 }
 
 /// Validates the authentication information in the incoming request and returns the request if
@@ -790,29 +932,16 @@ pub async fn oo_validator(
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path_prefix = "/api/";
     let path = extract_relative_path(req.request().path(), path_prefix);
-    let path_columns = path.split('/').collect::<Vec<&str>>();
-    let is_short_url = is_short_url_path(&path_columns);
+    let _path_columns = path.split('/').collect::<Vec<&str>>();
 
     let auth_info = match auth_result {
         Ok(info) => info,
-        Err(e) => {
-            return if is_short_url {
-                Err(handle_auth_failure_for_redirect(req, &e))
-            } else {
-                Err((e, req))
-            };
-        }
+        Err(e) => return Err((e, req)),
     };
 
     match oo_validator_internal(req, auth_info, path_prefix).await {
         Ok(service_req) => Ok(service_req),
-        Err((err, err_req)) => {
-            if is_short_url {
-                Err(handle_auth_failure_for_redirect(err_req, &err))
-            } else {
-                Err((err, err_req))
-            }
-        }
+        Err((err, err_req)) => Err((err, err_req)),
     }
 }
 
@@ -840,7 +969,7 @@ pub async fn validator_proxy_url(
 pub async fn validate_http_internal(
     req: ServiceRequest,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let router_nodes = cluster::get_cached_online_router_nodes()
+    let router_nodes = infra::cluster::get_cached_online_router_nodes()
         .await
         .unwrap_or_default();
 
@@ -1007,7 +1136,7 @@ fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
 }
 
 /// Helper function to check if the path corresponds to a short URL
-fn is_short_url_path(path_columns: &[&str]) -> bool {
+fn _is_short_url_path(path_columns: &[&str]) -> bool {
     path_columns
         .get(1)
         .is_some_and(|&segment| segment.to_lowercase() == "short")
@@ -1018,8 +1147,11 @@ fn is_short_url_path(path_columns: &[&str]) -> bool {
 /// This function is responsible for logging the authentication failure and returning a redirect
 /// response. It takes in the request and the error message, and returns a tuple containing the
 /// redirect response and the service request.
-fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
-    let full_url = extract_full_url(&req);
+fn _handle_auth_failure_for_redirect(
+    req: ServiceRequest,
+    error: &Error,
+) -> (Error, ServiceRequest) {
+    let full_url = _extract_full_url(&req);
     let redirect_http = RedirectResponseBuilder::default()
         .with_query_param("short_url", &full_url)
         .build();
@@ -1033,7 +1165,7 @@ fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Erro
 }
 
 /// Extracts the full URL from the request.
-fn extract_full_url(req: &ServiceRequest) -> String {
+fn _extract_full_url(req: &ServiceRequest) -> String {
     let connection_info = req.connection_info();
     let scheme = connection_info.scheme();
     let host = connection_info.host();
@@ -1172,20 +1304,25 @@ mod tests {
         .await;
 
         assert!(
-            validate_credentials(init_user, pwd, "default/_bulk")
+            validate_credentials(init_user, pwd, "default/_bulk", false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "default/_bulk")
+            !validate_credentials("", pwd, "default/_bulk", false)
                 .await
                 .unwrap()
                 .is_valid
         );
-        assert!(!validate_credentials("", pwd, "/").await.unwrap().is_valid);
         assert!(
-            !validate_credentials(user_id, pwd, "/")
+            !validate_credentials("", pwd, "/", false)
+                .await
+                .unwrap()
+                .is_valid
+        );
+        assert!(
+            !validate_credentials(user_id, pwd, "/", false)
                 .await
                 .unwrap()
                 .is_valid
@@ -1199,7 +1336,7 @@ mod tests {
         //         .is_valid
         // );
         assert!(
-            !validate_credentials(user_id, "x", "default/user")
+            !validate_credentials(user_id, "x", "default/user", false)
                 .await
                 .unwrap()
                 .is_valid
@@ -1261,19 +1398,19 @@ mod tests {
     async fn test_is_short_url_path() {
         // Test short URL path
         let short_url_path = ["api", "short", "abc123"];
-        assert!(is_short_url_path(&short_url_path));
+        assert!(_is_short_url_path(&short_url_path));
 
         // Test non-short URL path
         let normal_path = ["api", "v1", "logs"];
-        assert!(!is_short_url_path(&normal_path));
+        assert!(!_is_short_url_path(&normal_path));
 
         // Test path with insufficient segments
         let short_path = ["api"];
-        assert!(!is_short_url_path(&short_path));
+        assert!(!_is_short_url_path(&short_path));
 
         // Test case insensitive
         let mixed_case_path = ["api", "SHORT", "abc123"];
-        assert!(is_short_url_path(&mixed_case_path));
+        assert!(_is_short_url_path(&mixed_case_path));
     }
 
     #[test]
@@ -1328,7 +1465,7 @@ mod tests {
 
         // This test would need more setup to work properly
         // For now, just test that the function exists and compiles
-        let _ = extract_full_url(&service_req);
+        let _ = _extract_full_url(&service_req);
     }
 
     #[test]
@@ -1339,7 +1476,7 @@ mod tests {
         let error = ErrorUnauthorized("Test error");
 
         // Test that the function handles errors properly
-        let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
+        let (redirect_error, _) = _handle_auth_failure_for_redirect(req, &error);
         // The error should be a redirect response, not necessarily contain "redirect" in the string
         assert!(!redirect_error.to_string().is_empty());
     }

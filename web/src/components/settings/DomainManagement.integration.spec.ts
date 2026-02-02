@@ -46,9 +46,37 @@ vi.mock("@/services/domainManagement", () => ({
   },
 }));
 
+// Mock jstransform service
+vi.mock("@/services/jstransform", () => ({
+  default: {
+    list: vi.fn(),
+  },
+}));
+
+// Mock organizations service
+vi.mock("@/services/organizations", () => ({
+  default: {
+    post_organization_settings: vi.fn(),
+  },
+}));
+
+// Mock search service
+vi.mock("@/services/search", () => ({
+  default: {
+    search: vi.fn(),
+  },
+}));
+
 // Import after mocking
 import domainManagement from "@/services/domainManagement";
+import jstransform from "@/services/jstransform";
+import organizations from "@/services/organizations";
+import searchService from "@/services/search";
+
 const mockDomainManagement = domainManagement as any;
+const mockJstransform = jstransform as any;
+const mockOrganizations = organizations as any;
+const mockSearchService = searchService as any;
 
 // Mock Vuex store with isolated scope
 const createIsolatedMockStore = () => ({
@@ -59,7 +87,13 @@ const createIsolatedMockStore = () => ({
     selectedOrganization: {
       identifier: "test-meta-org",
     },
+    organizationData: {
+      organizationSettings: {
+        claim_parser_function: "",
+      },
+    },
   },
+  dispatch: vi.fn(),
 });
 
 const mockStore = createIsolatedMockStore();
@@ -86,13 +120,32 @@ describe("DomainManagement Integration Tests", () => {
     // Clear all mocks and reset state
     vi.clearAllMocks();
     vi.resetAllMocks();
-    
+
     // Reset mock implementations
     mockDomainManagement.getDomainRestrictions.mockResolvedValue({
       data: mockDomainData.complex,
     });
     mockDomainManagement.updateDomainRestrictions.mockResolvedValue({
       success: true,
+    });
+
+    // Mock jstransform service
+    mockJstransform.list.mockResolvedValue({
+      data: {
+        list: [],
+      },
+    });
+
+    // Mock organizations service
+    mockOrganizations.post_organization_settings.mockResolvedValue({
+      success: true,
+    });
+
+    // Mock search service
+    mockSearchService.search.mockResolvedValue({
+      data: {
+        hits: [],
+      },
     });
   });
 
@@ -130,6 +183,12 @@ describe("DomainManagement Integration Tests", () => {
       props,
       global: {
         plugins: [i18n],
+        stubs: {
+          QDrawer: {
+            template: '<div class="q-drawer-stub"><slot /></div>',
+            props: ['modelValue', 'side', 'bordered', 'width', 'overlay', 'elevated'],
+          },
+        },
       },
     });
   };

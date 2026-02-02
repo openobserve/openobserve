@@ -25,3 +25,8 @@ pub fn generate_plan_string(trace_id: &str, plan: &dyn ExecutionPlan) -> String 
     }
     plan
 }
+
+pub fn print_plan(plan: &dyn ExecutionPlan) {
+    let plan = displayable(plan).indent(false).to_string();
+    println!("\n{plan}\n");
+}

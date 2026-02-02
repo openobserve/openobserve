@@ -17,17 +17,14 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
-    TextEncoder,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
+    Registry, TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
-pub const SPAN_METRICS_BUCKET: [f64; 15] = [
-    0.1, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
-    60000.0,
-];
+
 // http latency
 pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -250,6 +247,94 @@ pub static INGEST_WAL_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
             ])
             .const_labels(create_const_labels()),
         &["organization"],
+    )
+    .expect("Metric created")
+});
+
+// pattern extraction timing metrics (enterprise feature)
+pub static PATTERN_EXTRACTION_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "pattern_extraction_time_seconds",
+            "Pattern extraction time in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "phase"], // phase: read_parquet, extraction, ingestion, total
+    )
+    .expect("Metric created")
+});
+
+// service discovery metrics (enterprise feature)
+pub static SERVICE_STREAMS_SERVICES_DISCOVERED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_services_discovered_total",
+            "Total number of services discovered",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PROCESSING_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "service_streams_processing_time_seconds",
+            "Service discovery processing time in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_high_cardinality_blocked_total",
+            "Total number of high-cardinality dimensions blocked",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "dimension"],
+    )
+    .expect("Metric created")
+});
+
+// NOTE: SERVICE_STREAMS_DIMENSION_CARDINALITY was removed because using dimension_name
+// as a label creates unbounded metric cardinality (500+ dimensions × 1000 orgs = OOM).
+// Use SERVICE_STREAMS_CACHE_ENTRIES with cache_type="dimensions" for aggregate stats.
+
+pub static SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_high_cardinality_total",
+            "Count of high cardinality dimension detections (aggregate per org)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"], // No dimension label - would cause unbounded cardinality
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_records_dropped",
+            "Count of records dropped due to backpressure in service streams processing",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -480,6 +565,75 @@ pub static COMPACT_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+
+// stream stats aggregation metrics
+pub static STREAM_STATS_SCAN_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "stream_stats_scan_duration_seconds",
+            "Stream stats aggregation task duration in seconds.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]),
+        &["organization", "stream_type", "scan_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static STREAM_STATS_SCAN_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "stream_stats_scan_total",
+            "Total number of stream stats aggregation tasks executed.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "scan_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static STREAM_STATS_SCAN_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "stream_stats_scan_errors_total",
+            "Total number of stream stats aggregation task failures.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "scan_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static STREAM_STATS_STREAMS_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "stream_stats_streams_total",
+            "Total number of streams being tracked.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static STREAM_STATS_LAST_SCAN_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "stream_stats_last_scan_timestamp",
+            "Unix timestamp in microseconds of the last completed aggregation scan.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 // TODO deletion / archiving stats
 
 // storage stats
@@ -677,6 +831,114 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+
+// Alert deduplication metrics
+pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_suppressed_total",
+            "Total number of alerts suppressed by deduplication",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "alert_name", "dedup_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_DEDUP_PASSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_passed_total",
+            "Total number of alerts that passed deduplication",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "alert_name"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_errors_total",
+            "Total deduplication processing errors",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "error_type"],
+    )
+    .expect("Metric created")
+});
+
+// Alert grouping/batching metrics
+pub static ALERT_GROUPING_BATCHES_PENDING: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "alert_grouping_batches_pending",
+            "Current number of pending alert batches",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_grouping_notifications_sent_total",
+            "Total number of grouped notifications sent",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "send_strategy", "reason"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "alert_grouping_batch_size",
+            "Number of alerts per grouped notification",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 10.0, 25.0, 50.0, 100.0]),
+        &["organization", "send_strategy"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_WAIT_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "alert_grouping_wait_time_seconds",
+            "Time batches waited before sending (seconds)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0, 120.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_SEND_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_grouping_send_errors_total",
+            "Total grouped notification send failures",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "error_type"],
+    )
+    .expect("Metric created")
+});
 pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("meta_num_dashboards", "Metadata dashboard nums")
@@ -812,6 +1074,24 @@ pub static NODE_MEMORY_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_memory_usage", "Memory usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_DISK_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_disk_total", "Total disk space")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_DISK_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_disk_usage", "Disk usage")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &[],
@@ -1050,6 +1330,269 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Tokio runtime metrics - consolidated into fewer metrics with different labels
+pub static TOKIO_RUNTIME_TASKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("tokio_runtime_tasks", "Tokio runtime task statistics")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["runtime", "metric_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_TASKS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tokio_runtime_tasks_total",
+            "Total tokio runtime task counters",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["runtime", "metric_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_WORKER_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tokio_runtime_worker_metrics_total",
+            "Tokio runtime worker metrics",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["runtime", "worker", "metric_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_WORKER_DURATION_SECONDS: Lazy<CounterVec> = Lazy::new(|| {
+    CounterVec::new(
+        Opts::new(
+            "tokio_runtime_worker_duration_seconds_total",
+            "Tokio runtime worker duration metrics in seconds",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["runtime", "worker"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "tokio_runtime_worker_poll_time_seconds",
+            "Tokio runtime worker poll time distribution in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1,
+            0.5, 1.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["runtime", "worker"],
+    )
+    .expect("Metric created")
+});
+
+// self-reporting metrics
+pub static SELF_REPORTING_DROPPED_TRIGGERS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "self_reporting_dropped_triggers_total",
+            "Total number of trigger usage events dropped due to full queue",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static SELF_REPORTING_TIMEOUT_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "self_reporting_timeout_errors_total",
+            "Total number of error data publish timeouts",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static SELF_REPORTING_QUEUE_DEPTH: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "self_reporting_queue_depth",
+            "Current depth of self-reporting queues (pending items waiting to be processed)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["queue_type"], // "usage" or "error"
+    )
+    .expect("Metric created")
+});
+
+// service streams cache stats
+pub static SERVICE_STREAMS_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_cache_bytes",
+            "Service streams cache memory usage in bytes by organization",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "cache_type"], // cache_type: "services" or "dimensions"
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_CACHE_ENTRIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_cache_entries",
+            "Number of entries in service streams cache by organization",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "cache_type"], // cache_type: "services" or "dimensions"
+    )
+    .expect("Metric created")
+});
+
+// Pattern learner metrics (for OOM debugging)
+pub static SERVICE_STREAMS_PATTERN_LEARNER_ORGS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_pattern_learner_orgs",
+            "Number of organizations with active pattern learners",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PATTERN_LEARNER_FIELDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_pattern_learner_fields",
+            "Number of fields tracked by pattern learner",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PATTERN_LEARNER_VALUES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_pattern_learner_values",
+            "Total unique values tracked by pattern learner",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PATTERN_LEARNER_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_pattern_learner_bytes",
+            "Estimated memory usage of pattern learner in bytes",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+// Service queue metrics
+pub static SERVICE_STREAMS_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_queue_size",
+            "Number of services queued for batch processing",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_QUEUE_ORGS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_queue_orgs",
+            "Number of organizations with queued services",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_QUEUE_TOTAL: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_queue_total",
+            "Total number of services queued across all organizations",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_QUEUE_DROPPED: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_queue_dropped",
+            "Total services dropped due to queue limits",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+// Cleanup metrics
+pub static SERVICE_STREAMS_CLEANUP_RUNS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_cleanup_runs_total",
+            "Number of cleanup runs by type",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["cleanup_type"], // "cache", "pattern_learner", "dimension_tracker"
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_CLEANUP_REMOVED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_cleanup_removed_total",
+            "Number of items removed during cleanup",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["cleanup_type"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1103,6 +1646,25 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_LOCK_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PATTERN_EXTRACTION_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_SERVICES_DISCOVERED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PROCESSING_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED.clone()))
+        .expect("Metric registered");
+    // SERVICE_STREAMS_DIMENSION_CARDINALITY removed - unbounded labels cause OOM
+    registry
+        .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_RECORDS_DROPPED.clone()))
         .expect("Metric registered");
 
     // querier stats
@@ -1174,6 +1736,23 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(COMPACT_PENDING_JOBS.clone()))
         .expect("Metric registered");
 
+    // stream stats aggregation metrics
+    registry
+        .register(Box::new(STREAM_STATS_SCAN_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_SCAN_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_SCAN_ERRORS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_STREAMS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_LAST_SCAN_TIMESTAMP.clone()))
+        .expect("Metric registered");
+
     // storage stats
     registry
         .register(Box::new(STORAGE_ORIGINAL_BYTES.clone()))
@@ -1234,6 +1813,34 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
         .expect("Metric registered");
 
+    // alert deduplication metrics
+    registry
+        .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_DEDUP_PASSED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
+        .expect("Metric registered");
+
+    // alert grouping metrics
+    registry
+        .register(Box::new(ALERT_GROUPING_BATCHES_PENDING.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_BATCH_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_WAIT_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_SEND_ERRORS_TOTAL.clone()))
+        .expect("Metric registered");
+
     // db stats
     registry
         .register(Box::new(DB_QUERY_NUMS.clone()))
@@ -1265,6 +1872,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_DISK_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_DISK_USAGE.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
@@ -1324,6 +1937,78 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+
+    // tokio runtime metrics
+    registry
+        .register(Box::new(TOKIO_RUNTIME_TASKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_TASKS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_WORKER_METRICS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_WORKER_DURATION_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS.clone()))
+        .expect("Metric registered");
+
+    // self-reporting metrics
+    registry
+        .register(Box::new(SELF_REPORTING_DROPPED_TRIGGERS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SELF_REPORTING_TIMEOUT_ERRORS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SELF_REPORTING_QUEUE_DEPTH.clone()))
+        .expect("Metric registered");
+
+    // service streams cache
+    registry
+        .register(Box::new(SERVICE_STREAMS_CACHE_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CACHE_ENTRIES.clone()))
+        .expect("Metric registered");
+
+    // service streams pattern learner (OOM debugging)
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_ORGS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_FIELDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_VALUES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_BYTES.clone()))
+        .expect("Metric registered");
+
+    // service streams queue
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_ORGS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_DROPPED.clone()))
+        .expect("Metric registered");
+
+    // service streams cleanup
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_RUNS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_REMOVED.clone()))
         .expect("Metric registered");
 }
 

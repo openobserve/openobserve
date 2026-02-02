@@ -60,7 +60,7 @@ fn create_templates_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Templates::Name).string_len(256).not_null())
         .col(ColumnDef::new(Templates::IsDefault).boolean().not_null())
         .col(ColumnDef::new(Templates::Type).string_len(10).not_null())
-        .col(ColumnDef::new(Templates::Body).custom(Alias::new(&text_type)).not_null())
+        .col(ColumnDef::new(Templates::Body).custom(Alias::new(text_type)).not_null())
         .col(ColumnDef::new(Templates::Title).text().null())
         .to_owned()
 }

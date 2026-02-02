@@ -23,7 +23,7 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::auth::UserEmail,
     },
-    handler::http::models::billings::NewUserAttribution,
+    handler::http::{extractors::Headers, models::billings::NewUserAttribution},
 };
 
 /// HandleUserAttributionEvent
@@ -31,6 +31,8 @@ use crate::{
     context_path = "/api",
     tag = "Marketing",
     operation_id = "HandleUserAttributionEvent",
+    summary = "Handle user attribution event for marketing",
+    description = "Processes user attribution data for marketing analytics and campaign tracking",
     security(
         ("Authorization" = [])
     ),
@@ -38,7 +40,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = NewUserAttribution,
+        content = inline(NewUserAttribution),
         description = "New user attribution info",
         example = json!({
             "from": "Over the web",
@@ -46,13 +48,16 @@ use crate::{
         }),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[post("/{org_id}/billings/new_user_attribution")]
 pub async fn handle_new_attribution_event(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req_body: web::Json<NewUserAttribution>,
 ) -> impl Responder {
     let email = user_email.user_id.as_str();
@@ -75,8 +80,18 @@ pub async fn handle_new_attribution_event(
             json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
         ),
     ]);
-    telemetry::Telemetry::new()
+    let mut telemetry_instance = telemetry::Telemetry::new();
+    telemetry_instance
         .send_track_event(
+            "OpenObserve - New user attribution",
+            Some(segment_event_data.clone()),
+            false,
+            false,
+        )
+        .await;
+
+    telemetry_instance
+        .send_keyevent_track_event(
             "OpenObserve - New user attribution",
             Some(segment_event_data),
             false,

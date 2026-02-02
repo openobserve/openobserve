@@ -408,7 +408,7 @@ describe("MemberInvitation Component", () => {
     it("converts emails to lowercase", async () => {
       const emailInput = wrapper.find('.q-input input');
       await emailInput.setValue("TEST@EXAMPLE.COM, Test@Example.com");
-      
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { data: {}, message: "Success" }
       });
@@ -418,7 +418,7 @@ describe("MemberInvitation Component", () => {
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
         {
-          invites: ["test@example.com", "test@example.com"],
+          invites: ["test@example.com"],
           role: "admin"
         },
         "test-org"

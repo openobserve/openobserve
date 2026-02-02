@@ -70,7 +70,7 @@ impl TreeNodeRewriter for TantivyOptimizeRewriter {
         if node.name() == "AggregateExec" {
             let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
             if *aggregate.mode() == AggregateMode::Partial {
-                let new_node = Arc::new(UnionExec::new(vec![node, self.tantivy_exec.clone() as _]));
+                let new_node = UnionExec::try_new(vec![node, self.tantivy_exec.clone() as _])?;
                 Ok(Transformed::new(new_node, true, TreeNodeRecursion::Stop))
             } else {
                 unreachable!("AggregateExec should be partial mode");

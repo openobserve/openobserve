@@ -17,52 +17,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
-    <div class="flex justify-between items-center q-py-sm q-px-md">
-      <div class="performance_title">
-        {{ t("rum.performanceSummaryLabel") }}
-      </div>
-      <div class="flex items-center">
-        <DateTimePickerDashboard
-          class="q-ml-sm rum-date-time-picker"
-          ref="dateTimePicker"
-          v-model="selectedDate"
+  <div :key="store.state.selectedOrganization.identifier">
+    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+      <div class="card-container">
+        <div class="flex justify-between items-center q-py-sm q-px-md">
+          <div class="performance_title">
+            {{ t("rum.performanceSummaryLabel") }}
+          </div>
+          <div class="flex items-center">
+            <DateTimePickerDashboard
+              class="q-ml-sm rum-date-time-picker"
+              ref="dateTimePicker"
+              v-model="selectedDate"
+            />
+            <AutoRefreshInterval
+              v-model="refreshInterval"
+              :min-refresh-interval="
+                store.state?.zoConfig?.min_auto_refresh_interval || 5
+              "
+              trigger
+              class="app-performance-auto-refresh-interval tw:ml-[0.5rem]! tw:pl-0! tw:overflow-hidden!"
+              @trigger="refreshData"
+            />
+            <q-btn
+              :outline="isVariablesChanged ? false : true"
+              class="q-ml-sm tw:border! tw:border-solid! tw:h-[2rem] tw:px-[0.325rem]!"
+              :class="
+                !isVariablesChanged
+                  ? 'hover:tw:bg-[var(--o2-hover-accent)]!'
+                  : ''
+              "
+              data-test="rum-performance-refresh"
+              padding="xs"
+              no-caps
+              icon="refresh"
+              @click="refreshData"
+              :color="isVariablesChanged ? 'warning' : ''"
+              :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
+            >
+              <q-tooltip>
+                {{
+                  isVariablesChanged
+                    ? t("dashboard.refreshToApplyVariableChanges")
+                    : t("dashboard.refresh")
+                }}
+              </q-tooltip>
+            </q-btn>
+          </div>
+        </div>
+        <AppTabs
+          class="q-px-md"
+          :tabs="tabs"
+          v-model:active-tab="activePerformanceTab"
         />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          :min-refresh-interval="
-            store.state?.zoConfig?.min_auto_refresh_interval || 5
-          "
-          trigger
-          @trigger="refreshData"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="refresh"
-          @click="refreshData"
-        >
-        </q-btn>
       </div>
     </div>
-    <AppTabs
-      class="q-px-md"
-      :tabs="tabs"
-      v-model:active-tab="activePerformanceTab"
-    />
-    <q-separator></q-separator>
+
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <component
-          :is="Component"
-          :date-time="currentTimeObj"
-          :selected-date="selectedDate"
-        />
+        <div class="tw:pb-[0.375rem] tw:px-[0.625rem] tw:h-[calc(100%-101px)]!">
+          <div
+            class="card-container tw:py-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <component
+              :is="Component"
+              :date-time="currentTimeObj"
+              :selected-date="selectedDate"
+              ref="activePerformanceComponent"
+              @variablesManagerReady="onVariablesManagerReady"
+              @update:dateTime="onDataZoom"
+            />
+          </div>
+        </div>
       </keep-alive>
     </router-view>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -101,8 +130,37 @@ export default defineComponent({
     const { t } = useI18n();
 
     const activePerformanceTab = ref("overview");
+    const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
     const { rumState } = useRum();
+
+    // Variables manager will be initialized by RenderDashboardCharts in child components
+    const variablesManager = ref(null);
+
+    // Track if there are uncommitted variable changes
+    const isVariablesChanged = computed(() => {
+      // If using variables manager, access hasUncommittedChanges directly from the manager
+      // Explicitly dereference to ensure Vue tracks the dependency
+      const manager = variablesManager.value;
+
+      if (manager && "hasUncommittedChanges" in manager) {
+        // Access the value (Vue auto-unwraps computed refs in composable returns)
+        const hasChanges = manager.hasUncommittedChanges;
+        return hasChanges;
+      }
+
+      return false;
+    });
+
+    // Computed ref to access RenderDashboardCharts from the active child component
+    const performanceChartsRef = computed(() => {
+      return (
+        activePerformanceComponent.value?.performanceChartsRef ||
+        activePerformanceComponent.value?.webVitalsChartsRef ||
+        activePerformanceComponent.value?.errorRenderDashboardChartsRef ||
+        activePerformanceComponent.value?.apiDashboardChartsRef
+      );
+    });
 
     const tabs = [
       {
@@ -110,8 +168,8 @@ export default defineComponent({
         value: "overview",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -119,8 +177,8 @@ export default defineComponent({
         value: "web_vitals",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -128,8 +186,8 @@ export default defineComponent({
         value: "errors",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -137,8 +195,8 @@ export default defineComponent({
         value: "api",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
     ];
@@ -244,36 +302,10 @@ export default defineComponent({
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
-    // variables data
-    const variablesData = reactive({});
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-      const variableObj = {};
-      data.values.forEach((v) => {
-        variableObj[`var-${v.name}`] = v.value;
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-        },
-      });
+    // Handler for when variables manager is ready from child component
+    const onVariablesManagerReady = (manager: any) => {
+      variablesManager.value = manager;
     };
-
-    // ======= [START] default variable values
-
-    const initialVariableValues = {};
-    Object.keys(route.query).forEach((key) => {
-      if (key.startsWith("var-")) {
-        const newKey = key.slice(4);
-        initialVariableValues[newKey] = route.query[key];
-      }
-    });
-    // ======= [END] default variable values
 
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
@@ -331,6 +363,35 @@ export default defineComponent({
     };
 
     const refreshData = () => {
+      // CRITICAL: Commit all live variable changes to committed state
+      // This is the key mechanism that prevents premature API calls
+      // Call commitAllVariables via the RenderDashboardCharts ref
+      if (performanceChartsRef.value?.commitAllVariables) {
+        performanceChartsRef.value.commitAllVariables();
+      }
+
+      // Refresh the dashboard
+      dateTimePicker.value.refresh();
+    };
+
+    const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setMilliseconds(0);
+      selectedDateObj.end.setMilliseconds(0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
+      // Update the selected date to trigger time range change
+      dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
+
       dateTimePicker.value.refresh();
     };
 
@@ -389,16 +450,17 @@ export default defineComponent({
       refreshInterval,
       // ----------------
       refreshData,
+      onDataZoom,
       onDeletePanel,
-      variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,
-      initialVariableValues,
       getQueryParamsForDuration,
       tabs,
       activePerformanceTab,
+      activePerformanceComponent,
+      isVariablesChanged,
     };
   },
 });
@@ -406,7 +468,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .performance_title {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 .q-table {
   &__top {
@@ -415,15 +477,40 @@ export default defineComponent({
   }
 }
 
-.rum-date-time-picker {
-  height: 30px;
+.performance-dashboard {
+  :deep(.card-container) {
+    box-shadow: none !important;
+    &:first-child {
+      padding: 0 !important;
+    }
+  }
+}
+
+:deep(.app-performance-auto-refresh-interval) {
+  .q-btn {
+    height: 1.9rem !important;
+    min-height: 1.9rem !important;
+    border-radius: 0.375rem !important;
+    padding: 0.125rem 0.25rem !important;
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+  }
 }
 </style>
 
 <style lang="scss">
 .performance-dashboard {
   min-height: auto !important;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 12.5rem);
   overflow-y: auto;
+
+  .card-container {
+    box-shadow: none !important;
+    &:only-child {
+      padding: 0 !important;
+    }
+  }
 }
 </style>

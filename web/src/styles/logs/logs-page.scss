@@ -1,0 +1,1416 @@
+/**
+ * Logs Page Styles
+ * Phase 2: CSS Architecture - Extract Inline Styles Only
+ * NO SIZE CHANGES - Keep all original measurements
+ * Using rem units (1rem = 16px)
+ */
+
+/* ============================================================================
+   LAYOUT HELPERS
+   ============================================================================ */
+
+.logPage_bkcss {
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.full-height {
+  height: 100% !important;
+  max-height: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* ============================================================================
+   VISUALIZE CONTAINER
+   ============================================================================ */
+
+.visualize-container {
+  // Dynamic height - will use CSS variable
+  height: calc(100vh - var(--splitter-height, 10vh) - 2.5rem); // 40px
+  border-radius: 0.5rem;
+}
+
+/* ============================================================================
+   SEARCH HISTORY EMPTY STATE
+   ============================================================================ */
+
+.search-history-empty {
+  height: 12.5rem; // 200px
+  border-radius: 0.5rem;
+
+  &__content {
+    height: 80vh;
+    border-radius: 0.5rem;
+  }
+
+  &__icon {
+    font-size: 6.25rem; // 100px
+    opacity: 0.1;
+  }
+
+  &__title {
+    opacity: 0.8;
+  }
+
+  &__info {
+    opacity: 0.8;
+
+    .q-icon {
+      font-size: 1.25rem; // 20px
+      opacity: 0.5;
+    }
+  }
+}
+
+/* ============================================================================
+   ERROR MESSAGE STYLING
+   ============================================================================ */
+
+.error-display {
+  border-radius: 0.5rem;
+
+  &__message {
+    font-size: 0.875rem; // 14px
+    margin: 0;
+  }
+}
+
+
+/************************* SearchBar.vue *************************/
+.logs-saved-view-icon:hover {
+  color: var(--o2-text-primary) !important;
+  background-color: var(--o2-hover-accent) !important;
+}
+.logs-search-bar-component {
+  padding-bottom: 0.0625rem; // 1px
+  height: 100%;
+  overflow: visible;
+
+  // Align all top bar elements vertically
+  > .row:first-child {
+    align-items: center;
+    padding: 0.25rem 0;
+
+    > .col {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+
+    // Normalize all button heights
+    .q-btn {
+      height: 2rem !important; // 32px
+      min-height: 2rem !important;
+      border-radius: 0.375rem; // 6px - modern rounded borders
+    }
+
+    // Normalize select heights
+    .q-select {
+      .q-field__control {
+        height: 2rem !important; // 32px
+        min-height: 2rem !important;
+        border-radius: 0.375rem; // 6px
+      }
+    }
+  }
+
+  .q-splitter {
+    .q-splitter__before,
+    .q-splitter__after {
+      transition: none !important;
+      padding-right: 0 !important;
+    }
+  }
+
+  .reset-filters {
+    width: 2rem; // 32px
+    height: 2rem; // 32px
+    border-radius: 0.375rem; // 6px
+    border: 0.11rem solid var(--o2-border) !important; // 1px - override Quasar default
+
+    .q-icon {
+      margin-right: 0;
+    }
+  }
+
+  // Toggle containers with borders
+  .toggle-container {
+    border: 0.0625rem solid var(--o2-border); // 1px
+    border-radius: 0.375rem; // 6px
+  }
+
+  // Icon sizing
+  .icon-sm {
+    width: 1.25rem; // 20px
+    height: 1.25rem; // 20px
+  }
+
+  // Button heights for consistency
+  .btn-height-32 {
+    height: 2rem; // 32px
+    min-height: 2rem;
+  }
+
+  #logsQueryEditor,
+  #fnEditor {
+    height: 100% !important;
+  }
+  #fnEditor {
+    width: 100%;
+    border-radius: 0.375rem; // 6px
+    border: 0 solid var(--o2-border);
+    overflow: hidden;
+  }
+
+  .q-field--standard .q-field__control:before,
+  .q-field--standard .q-field__control:focus:before,
+  .q-field--standard .q-field__control:hover:before {
+    border: 0 !important;
+    border-color: none;
+    transition: none;
+  }
+
+  .row:nth-child(2) {
+    height: 100%; /* or any other height you want to set */
+  }
+  
+  .function-dropdown {
+    width: 12.8125rem; // 205px
+    padding-bottom: 0;
+    border: 0.0625rem solid var(--o2-border); // 1px
+    border-radius: 0.375rem; // 6px
+    cursor: pointer;
+
+    .q-field__input {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem; // 12px
+    }
+    .q-field__native,
+    .q-field__control {
+      min-height: 1.8125rem; // 29px
+      height: 1.8125rem; // 29px
+      padding: 0 0 0 0.25rem; // 4px
+    }
+
+    .q-field__marginal {
+      height: 1.875rem; // 30px
+    }
+  }
+
+  .q-toggle__inner {
+    font-size: 1.875rem; // 30px
+  }
+
+  .q-toggle__label {
+    font-size: 0.75rem; // 12px
+  }
+
+  .casesensitive-btn {
+    padding: 0.5rem; // 8px
+    margin-left: -0.375rem; // -6px
+    background-color: var(--o2-muted-background);
+    border-radius: 0 0.25rem 0.25rem 0; // 0 4px 4px 0
+  }
+
+  .search-field .q-field {
+    &__control {
+      border-radius: 0.25rem 0 0 0.25rem !important; // 4px 0 0 4px
+    }
+
+    &__native {
+      font-weight: 600;
+    }
+  }
+
+  .search-time {
+    .q-btn-group {
+      border-radius: 0.375rem; // 6px
+
+      .q-btn {
+        min-height: auto;
+      }
+    }
+  }
+
+  .search-dropdown {
+    padding: 0;
+
+    .block {
+      color: var(--o2-text-primary);
+      font-weight: 600;
+      font-size: 0.75rem; // 12px
+    }
+
+    .q-btn-dropdown__arrow-container {
+      color: var(--o2-text-secondary);
+    }
+  }
+
+  .refresh-rate-dropdown-container {
+    width: 13.75rem; // 220px
+
+    * .q-btn {
+      font-size: 0.75rem !important; // 12px
+      padding-left: 0.5rem; // 8px
+      padding-right: 0.5rem; // 8px
+    }
+  }
+
+  .flex-start {
+    justify-content: flex-start;
+    align-items: flex-start;
+    display: flex;
+  }
+
+  .resultsOverChart {
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem; // 14px
+    color: var(--o2-text-primary);
+    font-weight: 700;
+  }
+
+  .ddlWrapper {
+    position: relative;
+    z-index: 10;
+
+    .listWrapper {
+      box-shadow: 0 0.1875rem 0.9375rem rgba(0, 0, 0, 0.1); // 0 3px 15px
+      transition: height 0.25s ease;
+      height: calc(100vh - 9.125rem); // 146px
+      background-color: var(--o2-card-background);
+      position: absolute;
+      top: 2.75rem;
+      width: 100%;
+      left: 0;
+      border-radius: 0.375rem; // 6px
+
+      &:empty {
+        height: 0;
+      }
+
+      &,
+      .q-list {
+        border-radius: 0.375rem; // 6px
+      }
+    }
+  }
+
+  .fields_autocomplete {
+    max-height: 15.625rem; // 250px
+  }
+
+  .search-button {
+    min-width: 4.8125rem; // 77px
+    line-height: 1.8125rem; // 29px
+    font-weight: bold;
+    text-transform: initial;
+    font-size: 0.6875rem; // 11px
+    color: var(--o2-primary-foreground);
+    border-radius: 0.375rem; // 6px
+
+    .q-btn__content {
+      background: $secondary;
+      border-radius: 0.375rem; // 6px
+      padding: 0 0.3125rem; // 5px
+
+      .q-icon {
+        font-size: 0.9375rem; // 15px
+        color: var(--o2-primary-foreground);
+      }
+    }
+  }
+
+  .cancel-search-button {
+    .q-btn__content {
+      background: $negative !important;
+    }
+  }
+
+  .download-logs-btn {
+    height: 1rem; // 30px
+    border-radius: 0.375rem; // 6px
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+
+    .q-icon {
+      font-size: 1rem; // 18px
+    }
+  }
+
+  .save-transform-btn {
+    height: 1rem; // 31px
+    border-radius: 0.375rem; // 6px
+  }
+
+  .query-editor-container {
+    height: calc(100% - 3.31rem) !important; // 35px
+  }
+
+  .logs-auto-refresh-interval {
+    .q-btn {
+      min-height: 1.875rem; // 30px
+      max-height: 1.875rem; // 30px
+      padding: 0 0.25rem; // 4px
+      border-radius: 0.375rem; // 6px
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: var(--o2-hover-accent);
+      }
+
+      .q-icon {
+        font-size: 1.125rem; // 18px
+      }
+    }
+  }
+
+  .saved-views-dropdown {
+    border-radius: 0.375rem; // 6px
+    button {
+      padding: 0.25rem 0.3125rem; // 4px 5px
+      border-radius: 0.375rem; // 6px
+    }
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+    .q-btn-dropdown__arrow-container{
+      border-left: 1px solid var(--o2-border);
+    }
+  }
+
+  .savedview-dropdown {
+    width: 13.4375rem; // 215px
+    display: inline-block;
+    border: 0.0625rem solid var(--o2-border); // 1px
+    border-radius: 0.375rem; // 6px
+
+    .q-field__input {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem; // 12px
+    }
+    .q-field__native,
+    .q-field__control {
+      min-height: 1.8125rem !important; // 29px
+      height: 1.8125rem; // 29px
+      padding: 0 0 0 0.25rem; // 4px
+    }
+
+    .q-field__marginal {
+      height: 1.875rem; // 30px
+    }
+  }
+
+  .saved-view-item {
+    padding: 0.125rem 0.25rem !important; // 2px 4px
+  }
+
+  .download-menu-parent {
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      right: -10px;
+      top: 0;
+      width: 10px;
+      height: 100%;
+      pointer-events: auto;
+    }
+  }
+
+  .body--dark {
+    .btn-function {
+      filter: brightness(100);
+    }
+  }
+
+  .btn-function {
+    .q-icon {
+      &.on-left {
+        margin-right: 6px !important;
+        font-size: 16px;
+      }
+    }
+  }
+
+  .q-pagination__middle > .q-btn {
+    min-width: 1.875rem !important; // 30px
+    max-width: 1.875rem !important; // 30px
+    border-radius: 0.375rem; // 6px
+  }
+
+  .q-item {
+    padding: 0 !important;
+
+    &:hover {
+      background-color: var(--o2-hover-accent) !important;
+    }
+  }
+
+  .q-focus-helper:hover {
+    background: transparent !important;
+  }
+
+  .favorite-label {
+    line-height: 1.5rem !important; // 24px
+    font-weight: bold !important;
+  }
+
+  .region-dropdown-btn {
+    text-transform: capitalize;
+    font-weight: 600;
+    font-size: 0.75rem; // 12px
+    padding-left: 0.5rem; // 8px
+    height: 1.875rem; // 30px
+    padding-top: 0.1875rem; // 3px
+    border-radius: 0.375rem; // 6px
+
+    .q-btn-dropdown__arrow {
+      margin-left: 0 !important;
+    }
+  }
+
+  .download-logs-btn {
+    .q-btn-dropdown__arrow {
+      margin-left: 0 !important;
+    }
+  }
+
+  .region-dropdown-list {
+    min-width: 9.375rem; // 150px
+    border-radius: 0.375rem; // 6px
+
+    .q-item__section {
+      display: inline-block;
+    }
+
+    .q-item__label {
+      margin-left: 1.25rem; // 20px
+      text-transform: capitalize;
+      margin-top: 0.125rem; // 2px
+    }
+  }
+}
+.saved-view-table {
+  td {
+    padding: 0;
+    height: 1.5625rem !important; // 25px
+    min-height: 1.5625rem !important; // 25px
+  }
+
+  .q-table__control {
+    margin: 0 !important;
+    width: 100% !important;
+    text-align: right;
+  }
+
+  .q-table__bottom {
+    padding: 0 !important;
+    min-height: 2.1875rem; // 35px
+
+    .q-table__control {
+      padding: 0 0.625rem !important; // 10px
+    }
+  }
+
+  .q-table__top {
+    padding: 0 !important;
+    margin: 0 !important;
+    left: 0;
+    width: 100%;
+
+    .q-table__separator {
+      display: none;
+    }
+
+    .q-table__control {
+      padding: 0 !important;
+    }
+  }
+
+  .q-field--filled .q-field__control {
+    padding: 0 0.3125rem !important; // 5px
+  }
+
+  .saved-view-item {
+    padding: 0.25rem 0.3125rem 0.25rem 0.625rem !important; // 4px 5px 4px 10px
+  }
+
+  .q-item__section--main ~ .q-item__section--side {
+    padding-left: 0.3125rem !important; // 5px
+  }
+}
+
+.file-type-button-group {
+  .q-btn {
+    border: 0.0625rem solid var(--o2-border); // 1px
+    background-color: var(--o2-card-background);
+    color: var(--o2-text-primary);
+    border-radius: 0.375rem; // 6px
+    transition: all 0.2s ease;
+
+    &.selected {
+      background-color: var(--q-primary) !important;
+      color: var(--o2-primary-foreground) !important;
+      border-color: var(--q-primary) !important;
+    }
+
+    &:first-child {
+      border-top-left-radius: 0.375rem; // 6px
+      border-bottom-left-radius: 0.375rem; // 6px
+    }
+
+    &:last-child {
+      border-top-right-radius: 0.375rem; // 6px
+      border-bottom-right-radius: 0.375rem; // 6px
+    }
+
+    &:not(:last-child) {
+      border-right: none;
+    }
+
+    &:hover:not(.selected) {
+      background-color: var(--o2-hover-accent);
+    }
+  }
+}
+/************************* SearchBar.vue *************************/
+
+
+/************************* IndexList.vue *************************/
+.logs-index-menu {
+  width: 100%;
+
+  .q-menu {
+    // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(0.5rem);
+    border-radius: 0px;
+
+    .q-virtual-scroll__content {
+      padding: 0.5rem;
+    }
+  }
+
+  .q-field {
+    &__control {
+      height: 35px;
+      padding: 0px 5px;
+      min-height: auto !important;
+
+      &-container {
+        padding-top: 0px !important;
+      }
+    }
+  }
+
+  .index-table {
+    width: 100%;
+    height: calc(100% - 40px);
+    // border: 1px solid rgba(0, 0, 0, 0.02);
+
+    .q-table {
+      display: table;
+      table-layout: fixed !important;
+    }
+
+    tr {
+      margin-bottom: 1px;
+    }
+
+    tbody,
+    tr,
+    td {
+      width: 100%;
+      display: block;
+      height: fit-content;
+      overflow: hidden;
+    }
+
+    .q-table__control,
+    label.q-field {
+      width: 100%;
+    }
+
+    .q-table thead tr,
+    .q-table tbody td {
+      height: auto;
+    }
+
+    .q-table__top {
+      padding: 0 !important;
+      border-bottom: unset;
+    }
+  }
+
+  .field-table {
+    width: 100%;
+
+    > .q-table__bottom {
+      padding: 0.5rem 0 0.5rem 0.5rem !important; // 8px top, bottom, left padding for button groups
+      min-height: auto !important;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    // Field list pagination styling - right-aligned, consistent with SearchResult
+    .field-list-pagination {
+      display: flex;
+      align-items: center;
+      gap: 0.125rem; // 4px - better spacing
+
+      .pagination-nav-btn {
+        padding: 0 !important;
+        margin: 0 !important;
+        min-width: auto !important;
+        min-height: auto !important;
+        width: auto !important;
+        height: auto !important;
+        border-radius: 0 !important;
+
+        .q-btn__content {
+          font-size: 0.75rem !important; // 12px - even smaller icon
+          padding: 0 !important; // 0px - no padding
+        }
+
+        &.disabled {
+          opacity: 0.4;
+        }
+
+        // Remove hover effects
+        &:hover,
+        &:focus {
+          background-color: transparent !important;
+        }
+
+        .q-focus-helper {
+          display: none !important;
+        }
+      }
+
+      .pagination-page-btn {
+        padding: 0.375rem 0.25rem !important;
+        margin: 0 !important;
+        min-width: 1.5rem !important;
+        width: 1.5rem !important;
+        min-height: 1.375rem !important;
+        height: 1.375rem !important;
+        font-size: 0.75rem !important; // 13px - slightly larger
+        font-weight: 500;
+        line-height: 1;
+        color: var(--o2-text-primary) !important;
+        border-radius: 0.25rem !important; // 4px - rounded border
+        overflow: visible !important;
+
+        .q-btn__content {
+          min-height: auto !important;
+          line-height: 1;
+        }
+      }
+
+      .pagination-page-active {
+        background-color: var(--q-primary) !important;
+        color: var(--o2-primary-foreground) !important;
+        font-weight: 600;
+      }
+    }
+
+    .field-list-reset {
+      display: flex;
+      align-items: center;
+
+      .reset-icon {
+        font-size: 1.25rem !important; // 20px
+        color: var(--o2-text-primary);
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: var(--q-primary);
+        }
+      }
+    }
+  }
+
+  .field_list {
+    padding: 0px;
+    margin-bottom: 0.125rem;
+    position: relative;
+    overflow: visible;
+    cursor: default;
+
+    .field_label {
+      pointer-events: none;
+      font-size: 0.825rem;
+      position: relative;
+      display: inline;
+      z-index: 2;
+      left: 0;
+      height: 20px;
+      color: var(--o2-text-primary);
+      // text-transform: capitalize;
+    }
+
+    .field-container {
+      height: 25px;
+    }
+
+    .field_overlay {
+      position: absolute;
+      height: 100%;
+      right: 0;
+      top: 0;
+      z-index: 5;
+      padding: 0 6px;
+      visibility: hidden;
+      display: flex;
+      align-items: center;
+
+      .q-icon {
+        cursor: pointer;
+        opacity: 0;
+        margin: 0 1px;
+      }
+    }
+
+    &.selected {
+      .field_overlay {
+        background-color: var(--o2-hover-accent);
+
+        .field_icons {
+          opacity: 0;
+        }
+      }
+    }
+
+    &:hover {
+      .field-container {
+        // background-color: #ffffff;
+      }
+    }
+  }
+
+  &.theme-dark {
+    .field_list {
+      &:hover {
+        .field_overlay {
+          background-color: var(--o2-hover-accent);
+        }
+
+        .q-focus-helper{
+          opacity: 1;
+          background: none !important;
+
+          &:before{
+            opacity: 1 !important;
+            background: none !important;
+          }
+
+          &:after{
+            opacity: 1 !important;
+            background: none !important;
+          }
+        }
+      }
+    }
+
+    .field-list-pagination {
+      .q-btn {
+        color: var(--o2-text-primary) !important;
+        border-radius: 0.25rem !important;
+      }
+    }
+
+    .field-list-reset {
+      .reset-icon {
+        color: var(--o2-text-primary);
+        border: 1px solid rgba(196, 196, 196);
+        border-radius: 0.375rem !important;
+        padding: 0.125rem;
+
+
+        &:hover {
+          color: white;
+        }
+      }
+    }
+  }
+
+  &.theme-light {
+    .field_list {
+      &:hover {
+        // box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+
+        .field_overlay {
+          background-color: var(--o2-hover-accent);
+          opacity: 1;
+        }
+      }
+    }
+  }
+
+  .q-item {
+    min-height: 1.3rem;
+    padding: 5px 10px;
+
+    &__label {
+      font-size: 0.75rem;
+    }
+
+    &.q-manual-focusable--focused > .q-focus-helper {
+      background: currentColor !important;
+      opacity: 0.3 !important;
+    }
+  }
+
+  .q-field--dense .q-field__before,
+  .q-field--dense .q-field__prepend {
+    padding: 0px 0px 0px 0px;
+    height: auto;
+    line-height: auto;
+  }
+
+  .q-field__native,
+  .q-field__input {
+    padding: 0px 0px 0px 0px;
+  }
+
+  .q-field--dense .q-field__label {
+    top: 5px;
+  }
+
+  .q-field--dense .q-field__control,
+  .q-field--dense .q-field__marginal {
+    height: 34px;
+  }
+}
+
+.logs-index-menu {
+  .index-table {
+    .q-table {
+      width: 100%;
+      table-layout: fixed;
+
+      .q-expansion-item {
+        .q-item {
+          display: flex;
+          align-items: center;
+          padding: 0;
+          height: 25px !important;
+          min-height: 25px !important;
+        }
+
+        .q-item__section--avatar {
+          min-width: 12px;
+          max-width: 12px;
+          margin-right: 8px;
+        }
+
+        .filter-values-container {
+          .q-item {
+            padding-left: 4px;
+
+            .q-focus-helper {
+              background: none !important;
+            }
+          }
+        }
+
+        .q-item-type {
+          &:hover {
+            .field_overlay {
+              visibility: visible;
+
+              .q-icon {
+                opacity: 1;
+              }
+            }
+          }
+        }
+
+        .field-expansion-icon {
+          img {
+            width: 12px;
+            height: 12px;
+          }
+
+          .q-icon {
+            font-size: 18px;
+            color: #808080;
+          }
+        }
+      }
+
+      .field-container {
+        &:hover {
+          .field_overlay {
+            visibility: visible;
+
+            .q-icon {
+              opacity: 1;
+            }
+          }
+        }
+      }
+
+      .field_list {
+        &.selected {
+          background-color: var(--o2-hover-accent);
+        }
+      }
+    }
+
+    .schema-field-toggle {
+      border: 1px solid var(--o2-border-color);
+      border-radius: 0.325rem;
+      background-color: transparent;
+      line-height: 10px;
+    }
+
+    .q-table__bottom {
+      padding: 0 !important;
+      min-height: 2.43rem !important; // 31.2px
+      max-height: 2.43rem !important;
+    }
+
+    .pagination-field-count {
+      line-height: 1.95rem; // 31.2px
+      font-weight: 700;
+      font-size: 0.8125rem; // 13px
+    }
+  }
+
+  .field-table {
+    .q-table__bottom {
+      // padding: 0.3125rem !important; // 5px
+    }
+
+    .schema-field-toggle .q-btn {
+      padding: 0.3125rem !important; // 5px
+    }
+  }
+}
+
+/************************* IndexList.vue *************************/
+
+/************************* SearchResult.vue *************************/
+/**
+ * Search Result Styles
+ * Phase 2: CSS Architecture - Extract Inline Styles Only
+ * NO SIZE CHANGES - Keep all original measurements
+ * Using rem units (1rem = 16px)
+ */
+
+/* ============================================================================
+   LAYOUT HELPERS
+   ============================================================================ */
+
+.full-width {
+  width: 100%;
+}
+
+/* ============================================================================
+   PAGINATION BLOCK
+   ============================================================================ */
+
+.paginator-section {
+  line-height: 1.5rem; // 24px - more compact
+  max-height: 1.5rem; // 24px
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem; // Compact padding
+  background: rgba(255, 255, 255, 0.1); // Glassmorphic
+  backdrop-filter: blur(10px);
+  margin-top: 0.4rem;
+
+  .q-btn {
+    padding: 0.125rem 0.25rem;
+    min-height: 1.5rem;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
+    line-height: 1rem;
+  }
+}
+
+.select-pagination {
+  line-height: 1.75rem !important; // 28px - slightly taller to prevent clipping
+  border-radius: 0.25rem !important;
+  padding: 0.125rem 0.5rem !important; // Add vertical padding
+  background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
+  backdrop-filter: blur(10px) !important;
+  min-height: 1.45rem !important;
+  height: 1.45rem !important;
+  border: 0.0626rem solid var(--o2-border-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+  margin-top: 0.4rem;
+
+  .q-field__control-container {
+    padding-top: 0 !important;
+  }
+
+  .q-field__control {
+    height: 1.4rem !important;
+    min-height: 1.4rem !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: visible !important;
+    top: -3px;
+    border: none !important;
+
+    &:before,
+    &:after {
+      border: none !important;
+    }
+  }
+
+  .q-field__native {
+    padding: 0 0.25rem !important;
+    min-height: 100% !important;
+    line-height: 100% !important;
+    font-size: 0.75rem !important;
+    overflow: visible !important;
+    height: 100% !important;
+    display: flex;
+    align-items: center;
+
+    span {
+      padding: 0 !important;
+      height: auto;
+    }
+
+    input {
+      display: none;
+    }
+  }
+
+  .q-field__input {
+    padding: 0 !important;
+    line-height: 100% !important;
+  }
+
+  .q-field__append {
+    padding: 0 !important;
+    padding-left: 0.25rem !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .q-icon {
+    font-size: 1rem !important;
+    transform: none !important;
+  }
+
+  // Selected value display
+  input[readonly] {
+    line-height: 1.75rem !important;
+    padding: 0 !important;
+  }
+}
+
+/* ============================================================================
+   HISTOGRAM CONTAINER
+   ============================================================================ */
+
+.histogram-container {
+  border-radius: 0.5rem;
+
+  // Dynamic height controlled by CSS classes
+  &--visible {
+    height: 6.25rem; // 100px
+    opacity: 1;
+    transition: all 0.3s ease-in-out;
+  }
+
+  &--hidden {
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.3s ease-in-out;
+  }
+}
+
+.histogram-chart {
+  max-height: 6.25rem; // 100px
+  border-radius: 0.5rem;
+}
+
+.histogram-empty {
+  height: 6.25rem; // 100px
+  border-radius: 0.5rem;
+
+  &__message {
+    min-height: 2rem; // 32px (reduced from 50px)
+  }
+}
+
+.histogram-loader {
+  top: 3.125rem; // 50px
+  position: absolute;
+  left: 50%;
+}
+
+.histogram-error {
+  margin: 0.5rem 0; // 8px (reduced from 30px)
+  border-radius: 0.5rem;
+
+  &__message {
+    min-height: 2rem; // 32px (reduced from 50px)
+  }
+}
+
+/* ============================================================================
+   TABLE HEIGHT CALCULATIONS
+   ============================================================================ */
+
+.table-container {
+  border-radius: 0.5rem;
+  overflow: auto !important;
+
+  &--with-histogram {
+    height: calc(100% - 8.7rem) !important; // 128px
+    max-height: calc(100% - 8.7rem) !important;
+  }
+
+  &--without-histogram {
+    height: calc(100% - 2.5rem) !important; // 40px (32px pagination header + 8px spacing)
+    max-height: calc(100% - 2.5rem) !important;
+  }
+
+  // Ensure consistent scrollbar styling
+  .q-table__middle,
+  .q-virtual-scroll__content {
+    overflow-y: auto !important;
+  }
+}
+
+/* ============================================================================
+   LOADING & SPINNER STYLES
+   ============================================================================ */
+
+.search-spinner {
+  margin: 0 auto;
+  display: block;
+}
+
+.search-loading-text {
+  font-size: 0.875rem; // 14px
+}
+
+/* ============================================================================
+   DETAIL TABLE DIALOG
+   ============================================================================ */
+
+.detail-table-dialog {
+  margin-bottom: 0.5rem; // 8px (reduced from 15px)
+  border-radius: 0.5rem;
+}
+
+.search-list {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100%;
+  overflow: hidden !important;
+
+  .copy-log-btn {
+    .q-icon {
+      font-size: 12px !important;
+    }
+  }
+
+  .view-trace-btn {
+    .q-icon {
+      font-size: 13px !important;
+    }
+  }
+
+  .q-pagination__content input {
+    border: 1px solid lightgrey;
+    top: 7px;
+    position: relative;
+    height: 30px;
+  }
+}
+
+// Pagination dark mode styles
+.dark-theme {
+  .q-pagination__content {
+    input {
+      border: 1px solid rgba(255, 255, 255, 0.28) !important;
+      color: var(--o2-text-primary);
+      background-color: transparent;
+    }
+
+    .q-btn {
+      color: var(--o2-text-primary) !important;
+    }
+  }
+}
+
+.histogram-unavailable-text {
+  color: #f5a623;
+}
+.histogram-unavailable-text-light {
+  color: #ff8800;
+}
+
+/************************* SearchResult.vue *************************/
+
+/************************* DetailTable.vue *************************/
+.searchdetaildialog {
+  .copy-log-btn {
+    .q-btn .q-icon {
+      font-size: 12px !important;
+    }
+  }
+
+  .select-noof-records {
+    padding-left: 0.56rem;
+    border-radius: 0.375rem;
+    height: 2.55rem;
+
+  }
+}
+
+/************************* DetailTable.vue *************************/
+
+
+/************************* JSONPreview.vue *************************/
+
+.logs-trace-selector {
+  .q-select {
+    .q-field__control {
+      min-height: 30px !important;
+      height: 30px !important;
+      padding: 0px 8px !important;
+      width: 220px !important;
+
+      .q-field,
+      .q-field__native {
+        span {
+          display: inline-block;
+          width: 180px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          text-align: left;
+          font-weight: 400;
+        }
+      }
+
+      .q-field__append {
+        height: 27px !important;
+      }
+    }
+  }
+
+  .q-btn {
+    height: 30px !important;
+    padding: 2px 8px !important;
+    margin-left: -1px;
+
+    .q-btn__content {
+      span {
+        font-size: 11px;
+        font-weight: 400;
+      }
+    }
+  }
+}
+
+.logs-json-preview-tabs {
+  height: fit-content;
+  overflow: hidden;
+  border: none;
+  border-top: 1px solid var(--o2-border-color);
+  border-left: 1px solid var(--o2-border-color);
+  border-right: 1px solid var(--o2-border-color);
+  
+  .o2-tab {
+    width: fit-content !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 12px !important;
+    border-bottom: 3px solid var(--o2-border-color) !important;
+  }
+
+  .active {
+    border-bottom: 3px solid var(--o2-primary-btn-bg) !important;
+  }
+}
+
+.context-menu {
+  min-width: 200px;
+  padding: 4px 0;
+  font-size: 13px;
+
+  .context-menu-item {
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+}
+
+.context-menu-dark {
+  background-color: #1a1a1a;
+  border: 1px solid #4a5568;
+  .context-menu-item {
+    color: #e2e8f0;
+    &:hover {
+      background-color: #4a5568;
+    }
+  }
+}
+.context-menu-light {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  .context-menu-item {
+    &:hover {
+      background-color: #f3f4f6;
+    }
+  }
+}
+
+
+/* ============================================================================
+   SPLITTER ICON COLLAPSE/EXPAND BUTTONS
+   Specific styles for collapse/expand icons in splitter separators
+   ============================================================================ */
+
+.logs-splitter-icon-collapse {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 15px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
+.logs-splitter-icon-expand {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 4px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
+
+/************************* JSONPreview.vue *************************/

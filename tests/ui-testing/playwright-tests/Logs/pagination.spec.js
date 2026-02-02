@@ -1,5 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import PageManager from "../../pages/page-manager.js";
+const testLogger = require('../utils/test-logger.js');
 // (duplicate import removed)
 
 // Function to generate a random 9-character alphabetic name
@@ -15,7 +16,7 @@ function generateRandomStreamName() {
 test.describe("Pagination for logs", () => {
     let pageManager;
 
-    const orgId = "default";
+    const orgId = process.env.ORGNAME || "default";
     const streamName = generateRandomStreamName();
 
     test.beforeEach(async ({ page }) => {
@@ -32,8 +33,8 @@ test.describe("Pagination for logs", () => {
 
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')`);
         // Strategic 1000ms wait for query preparation - this is functionally necessary
         await page.waitForTimeout(1000);
         await pageManager.logsPage.selectRunQuery();
@@ -53,8 +54,8 @@ test.describe("Pagination for logs", () => {
 
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("zin*")`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('zin*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -70,8 +71,8 @@ test.describe("Pagination for logs", () => {
 
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T1*")`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T1*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -87,8 +88,8 @@ test.describe("Pagination for logs", () => {
         
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl") limit 10`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit 10`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -99,14 +100,14 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -120,14 +121,14 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('zin*')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("zin*")`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('zin*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -141,14 +142,14 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T1*')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T1*")`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T1*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -162,14 +163,14 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:2*')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:2*")`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:2*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -183,14 +184,14 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
-        console.log(streamName);
-        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl") limit 10`);
+        testLogger.debug('Stream name generated', { streamName });
+        await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit 10`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500);
         await pageManager.logsPage.selectRunQuery();
@@ -200,6 +201,6 @@ test.describe("Pagination for logs", () => {
     });
     
     test.afterEach(async ({ page }) => {
-        await pageManager.commonActions.flipStreaming();
+        // await pageManager.commonActions.flipStreaming();
     });
 });

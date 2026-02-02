@@ -1,6 +1,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const matchAllLogsData = require("../../../test-data/match_all.json");
 
@@ -31,7 +31,7 @@ async function ingestion(page) {
     streamName: streamName,
     logsdata: matchAllLogsData
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 test.describe("Match All Logs Queries testcases", () => {
@@ -210,7 +210,7 @@ test.describe("Match All Logs Queries testcases", () => {
 
   test.afterEach(async ({ page }) => {
     try {
-      await pageManager.commonActions.flipStreaming();
+      // await pageManager.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
     } catch (error) {
       testLogger.warn('Streaming flip failed', { error: error.message });

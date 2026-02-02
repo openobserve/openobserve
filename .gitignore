@@ -10,6 +10,8 @@ flamegraph.html
 /examples/
 /target/
 /bin/
+/docs/
+/.claude/*
 
 # data
 /tmp/
@@ -27,9 +29,26 @@ flamegraph.html
 /web/.env
 
 CLAUDE.md
-tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/test-logs
-/test-logs
-/test-results
-tests/ui-testing/playwright-tests/utils/README.md
 /tests/ui-testing/test-archives
+/test-logs
+tests/ui-testing/playwright-tests/utils/auth/user.json
+/tests/ui-testing/utils/test-mapping/archived-utils
+/tests/ui-testing/playwright-results
+/tests/ui-testing/testDinoPOC/MD Files
+/tests/ui-testing/playwright-tests/envRunsMDFiles
+/tests/ui-testing/testDinoPOC
+/tests/ui-testing/MD_Files
+*.bak
+/tests/ui-testing/MD_Files
+.github/workflows/bug-automation-helper.yml
+/tests/bug-automation
+tests/playwright_mcp/
+/tests/ui-testing/metrics-ingestion
+
+# CI-copied Claude configs (runtime only, not committed)
+CLAUDE.md
+.claude/commands/
+.claude/agents/
+.claude/skills/
+.claude/settings.json

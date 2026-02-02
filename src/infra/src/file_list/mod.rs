@@ -17,6 +17,7 @@ use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
 use config::{
+    get_config,
     meta::{
         meta_store::MetaStore,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
@@ -35,9 +36,8 @@ static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
 pub fn connect_default() -> Box<dyn FileList> {
-    match config::get_config().common.meta_store.as_str().into() {
+    match get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
-        MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
@@ -78,7 +78,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream_name: &str,
         time_level: PartitionTimeLevel,
-        time_range: Option<(i64, i64)>,
+        time_range: (i64, i64),
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>>;
     async fn query_for_merge(
@@ -86,15 +86,24 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        date_range: Option<(String, String)>,
+        date_range: (String, String),
     ) -> Result<Vec<FileKey>>;
+    async fn query_for_dump(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<FileRecord>>;
+    async fn query_for_dump_by_updated_at(&self, time_range: (i64, i64))
+    -> Result<Vec<FileRecord>>;
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        time_range: Option<(i64, i64)>,
+        time_range: (i64, i64),
     ) -> Result<Vec<FileId>>;
     async fn query_ids_by_files(&self, files: &[FileKey]) -> Result<stdHashMap<String, i64>>;
     async fn query_old_data_hours(
@@ -102,7 +111,7 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        time_range: Option<(i64, i64)>,
+        time_range: (i64, i64),
     ) -> Result<Vec<String>>;
     async fn query_deleted(
         &self,
@@ -118,24 +127,19 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: Option<(String, String)>,
     ) -> Result<String>;
-    // stream stats
-    async fn get_min_ts(
+    async fn get_min_update_at(&self) -> Result<i64>;
+    async fn get_max_update_at(&self) -> Result<i64>;
+    async fn clean_by_min_update_at(&self, val: i64) -> Result<()>;
+
+    // stream stats table
+    async fn get_updated_streams(&self, time_range: (i64, i64)) -> Result<Vec<String>>;
+    async fn stats_by_date_range(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-    ) -> Result<i64>;
-    async fn get_max_pk_value(&self) -> Result<i64>;
-    async fn get_min_pk_value(&self) -> Result<i64>;
-    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()>;
-    async fn stats(
-        &self,
-        org_id: &str,
-        stream_type: Option<StreamType>,
-        stream_name: Option<&str>,
-        pk_value: Option<(i64, i64)>,
-        deleted: bool,
-    ) -> Result<Vec<(String, StreamStats)>>;
+        date_range: (String, String),
+    ) -> Result<StreamStats>;
     async fn get_stream_stats(
         &self,
         org_id: &str,
@@ -151,8 +155,10 @@ pub trait FileList: Sync + Send + 'static {
     async fn set_stream_stats(
         &self,
         org_id: &str,
-        streams: &[(String, StreamStats)],
-        pk_value: Option<(i64, i64)>,
+        stream_type: StreamType,
+        stream_name: &str,
+        stats: &StreamStats,
+        is_recent: bool,
     ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
@@ -179,16 +185,23 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
-    async fn get_entries_in_range(
+    async fn get_pending_dump_jobs(
         &self,
-        org: &str,
-        stream: Option<&str>,
-        start_time: i64,
-        end_time: i64,
-        min_id: Option<i64>,
-    ) -> Result<Vec<FileRecord>>;
-    async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>>;
-    async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()>;
+        node: &str,
+        limit: i64,
+    ) -> Result<Vec<(i64, String, i64)>>;
+    async fn set_job_dumped_status(&self, ids: &[i64], dumped: bool) -> Result<()>;
+
+    // file_list_dump_stats table methods
+    async fn insert_dump_stats(&self, file: &str, stats: &StreamStats) -> Result<()>;
+    async fn delete_dump_stats(&self, file: &str) -> Result<()>;
+    async fn query_dump_stats_by_date_range(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: (String, String),
+    ) -> Result<StreamStats>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -280,7 +293,7 @@ pub async fn query(
     stream_type: StreamType,
     stream_name: &str,
     time_level: PartitionTimeLevel,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
     flattened: Option<bool>,
 ) -> Result<Vec<FileKey>> {
     validate_time_range(time_range)?;
@@ -302,7 +315,7 @@ pub async fn query_for_merge(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    date_range: Option<(String, String)>,
+    date_range: (String, String),
 ) -> Result<Vec<FileKey>> {
     CLIENT
         .query_for_merge(org_id, stream_type, stream_name, date_range)
@@ -310,8 +323,31 @@ pub async fn query_for_merge(
 }
 
 #[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_for_dump")]
+pub async fn query_for_dump(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Result<Vec<FileRecord>> {
+    validate_time_range(time_range)?;
+    CLIENT
+        .query_for_dump(org_id, stream_type, stream_name, time_range)
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_for_dump_by_updated_at")]
+pub async fn query_for_dump_by_updated_at(time_range: (i64, i64)) -> Result<Vec<FileRecord>> {
+    CLIENT.query_for_dump_by_updated_at(time_range).await
+}
+
+#[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
 pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
+    if ids.is_empty() {
+        return Ok(Vec::default());
+    }
     CLIENT.query_by_ids(ids).await
 }
 
@@ -321,7 +357,7 @@ pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> Result<Vec<FileId>> {
     validate_time_range(time_range)?;
     CLIENT
@@ -341,7 +377,7 @@ pub async fn query_old_data_hours(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> Result<Vec<String>> {
     validate_time_range(time_range)?;
     CLIENT
@@ -376,30 +412,29 @@ pub async fn get_min_date(
 }
 
 #[inline]
-pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str) -> Result<i64> {
-    CLIENT.get_min_ts(org_id, stream_type, stream_name).await
+pub async fn get_min_update_at() -> Result<i64> {
+    CLIENT.get_min_update_at().await
 }
 
 #[inline]
-pub async fn get_max_pk_value() -> Result<i64> {
-    CLIENT.get_max_pk_value().await
+pub async fn get_max_update_at() -> Result<i64> {
+    CLIENT.get_max_update_at().await
 }
 
 #[inline]
-pub async fn get_min_pk_value() -> Result<i64> {
-    CLIENT.get_min_pk_value().await
+pub async fn get_updated_streams(time_range: (i64, i64)) -> Result<Vec<String>> {
+    CLIENT.get_updated_streams(time_range).await
 }
 
 #[inline]
-pub async fn stats(
+pub async fn stats_by_date_range(
     org_id: &str,
-    stream_type: Option<StreamType>,
-    stream_name: Option<&str>,
-    pk_value: Option<(i64, i64)>,
-    deleted: bool,
-) -> Result<Vec<(String, StreamStats)>> {
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (String, String),
+) -> Result<StreamStats> {
     CLIENT
-        .stats(org_id, stream_type, stream_name, pk_value, deleted)
+        .stats_by_date_range(org_id, stream_type, stream_name, date_range)
         .await
 }
 
@@ -428,10 +463,14 @@ pub async fn del_stream_stats(
 #[inline]
 pub async fn set_stream_stats(
     org_id: &str,
-    streams: &[(String, StreamStats)],
-    pk_value: Option<(i64, i64)>,
+    stream_type: StreamType,
+    stream_name: &str,
+    stats: &StreamStats,
+    is_recent: bool,
 ) -> Result<()> {
-    CLIENT.set_stream_stats(org_id, streams, pk_value).await
+    CLIENT
+        .set_stream_stats(org_id, stream_type, stream_name, stats, is_recent)
+        .await
 }
 
 #[inline]
@@ -507,70 +546,95 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 }
 
 #[inline]
-pub async fn get_entries_in_range(
-    org: &str,
-    stream: Option<&str>,
-    start_time: i64,
-    end_time: i64,
-    min_id: Option<i64>,
-) -> Result<Vec<FileRecord>> {
+pub async fn get_pending_dump_jobs(node: &str, limit: i64) -> Result<Vec<(i64, String, i64)>> {
+    CLIENT.get_pending_dump_jobs(node, limit).await
+}
+
+#[inline]
+pub async fn set_job_dumped_status(ids: &[i64], dumped: bool) -> Result<()> {
+    CLIENT.set_job_dumped_status(ids, dumped).await
+}
+
+#[inline]
+pub async fn insert_dump_stats(file: &str, stats: &StreamStats) -> Result<()> {
+    CLIENT.insert_dump_stats(file, stats).await
+}
+
+#[inline]
+pub async fn delete_dump_stats(file: &str) -> Result<()> {
+    CLIENT.delete_dump_stats(file).await
+}
+
+#[inline]
+pub async fn query_dump_stats_by_date_range(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (String, String),
+) -> Result<StreamStats> {
     CLIENT
-        .get_entries_in_range(org, stream, start_time, end_time, min_id)
+        .query_dump_stats_by_date_range(org_id, stream_type, stream_name, date_range)
         .await
-}
-
-#[inline]
-pub async fn get_pending_dump_jobs() -> Result<Vec<(i64, String, String, i64)>> {
-    CLIENT.get_pending_dump_jobs().await
-}
-
-#[inline]
-pub async fn set_job_dumped_status(id: i64, dumped: bool) -> Result<()> {
-    CLIENT.set_job_dumped_status(id, dumped).await
 }
 
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
-        let cfg = config::get_config();
+        let cfg = get_config();
         if cfg.common.local_mode {
             return;
         }
 
         // gc every hour
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
-        interval.tick().await; // the first tick is immediate
         loop {
-            if let Ok(min_id) = get_min_pk_value().await
-                && min_id > 0
+            if let Ok(min_update_at) = get_min_update_at().await
+                && min_update_at > 0
             {
-                match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                match LOCAL_CACHE.clean_by_min_update_at(min_update_at).await {
                     Ok(_) => log::info!("[file_list] local cache gc done"),
                     Err(e) => log::error!("[file_list] local cache gc failed: {e}"),
                 }
             }
-            interval.tick().await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
         }
     });
 
     Ok(())
 }
 
-fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
-    if let Some((start, end)) = time_range
-        && (start > end || start == 0 || end == 0)
-    {
+#[inline]
+fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
+    let (start, end) = time_range;
+    if start > end || start == 0 || end == 0 {
         return Err(Error::Message("[file_list] invalid time range".to_string()));
     }
     Ok(())
 }
 
 pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
-    let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
+    let mut level = super::schema::unwrap_partition_time_level(None, stream_type);
+    if stream_type == StreamType::Metrics
+        && PartitionTimeLevel::from(get_config().limit.metrics_query_retention.as_str())
+            == PartitionTimeLevel::Daily
+    {
+        level = PartitionTimeLevel::Daily;
+    }
+    let ts = level.duration();
     if ts > 0 {
         time_end + second_micros(ts)
     } else {
         time_end + second_micros(PartitionTimeLevel::Hourly.duration())
     }
+}
+
+pub fn parse_stream_key(key: &str) -> Option<(String, StreamType, String)> {
+    let parts = key.split('/').collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return None;
+    }
+    let org_id = parts[0].to_string();
+    let stream_type = parts[1].into();
+    let stream_name = parts[2].to_string();
+    Some((org_id, stream_type, stream_name))
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -596,6 +660,10 @@ pub struct FileRecord {
     pub index_size: i64,
     #[sqlx(default)]
     pub flattened: bool,
+    #[sqlx(default)]
+    pub created_at: i64,
+    #[sqlx(default)]
+    pub updated_at: i64,
 }
 
 impl From<&FileRecord> for FileKey {
@@ -627,9 +695,10 @@ impl From<&FileRecord> for FileMeta {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct StatsRecord {
+    #[sqlx(default)]
     pub stream: String,
     pub file_num: i64,
-    pub min_ts: i64,
+    pub min_ts: Option<i64>,
     pub max_ts: i64,
     pub records: i64,
     pub original_size: i64,
@@ -641,7 +710,7 @@ impl From<&StatsRecord> for StreamStats {
     fn from(record: &StatsRecord) -> Self {
         Self {
             created_at: 0,
-            doc_time_min: record.min_ts,
+            doc_time_min: record.min_ts.unwrap_or_default(),
             doc_time_max: record.max_ts,
             doc_num: record.records,
             file_num: record.file_num,
@@ -649,6 +718,12 @@ impl From<&StatsRecord> for StreamStats {
             compressed_size: record.compressed_size as f64,
             index_size: record.index_size as f64,
         }
+    }
+}
+
+impl From<StatsRecord> for StreamStats {
+    fn from(record: StatsRecord) -> Self {
+        (&record).into()
     }
 }
 

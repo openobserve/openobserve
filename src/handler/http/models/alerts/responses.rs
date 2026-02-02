@@ -30,9 +30,10 @@ pub struct ListAlertsResponseBody {
     pub list: Vec<ListAlertsResponseBodyItem>,
 }
 
-/// An item in the list returned by the `ListDashboards` endpoint.
+/// An item in the list returned by the `ListAlerts` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
+    #[schema(value_type = String)]
     pub alert_id: Ksuid,
     pub folder_id: String,
     pub folder_name: String,
@@ -105,4 +106,37 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             is_real_time: alert.is_real_time,
         })
     }
+}
+#[derive(Default, Serialize, ToSchema)]
+pub struct AlertBulkEnableResponse {
+    #[schema(value_type = Vec<String>)]
+    pub successful: Vec<Ksuid>,
+    #[schema(value_type = Vec<String>)]
+    pub unsuccessful: Vec<Ksuid>,
+    pub err: Option<String>,
+}
+
+/// HTTP response body for `GenerateSql` endpoint.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct GenerateSqlResponseBody {
+    /// The generated SQL query string
+    #[schema(example = "SELECT * FROM \"my_stream\" WHERE field > 100")]
+    pub sql: String,
+
+    /// Optional metadata about the generated query
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<GenerateSqlMetadata>,
+}
+
+/// Metadata about the generated SQL query.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct GenerateSqlMetadata {
+    /// Whether aggregation is present
+    pub has_aggregation: bool,
+
+    /// Whether WHERE clause is present
+    pub has_conditions: bool,
+
+    /// Whether GROUP BY is present
+    pub has_group_by: bool,
 }

@@ -54,17 +54,6 @@ describe('NoData.vue', () => {
       expect(wrapper.text()).toContain('ticket.noDataErrorMsg');
     });
 
-    it('renders the clipboard icon image', () => {
-      wrapper = createWrapper();
-      const image = wrapper.find('.q-img-stub');
-      expect(image.exists()).toBe(true);
-    });
-
-    it('uses correct image URL from getImageURL utility', () => {
-      wrapper = createWrapper();
-      const image = wrapper.find('.q-img-stub');
-      expect(image.attributes('data-src')).toBe('mocked-url-for-images/common/clipboard_icon.svg');
-    });
   });
 
   describe('Component Structure', () => {
@@ -85,34 +74,8 @@ describe('NoData.vue', () => {
       expect(container.attributes('style')).toContain('font-size: 1.5rem');
     });
 
-    it('has proper layout structure with image and text', () => {
-      wrapper = createWrapper();
-      
-      const image = wrapper.find('.q-img-stub');
-      const textDiv = wrapper.find('.q-ma-none');
-      
-      expect(image.exists()).toBe(true);
-      expect(textDiv.exists()).toBe(true);
-    });
   });
 
-  describe('Image Configuration', () => {
-    it('passes correct style to q-img component', () => {
-      wrapper = createWrapper();
-      const image = wrapper.find('.q-img-stub');
-      
-      expect(image.exists()).toBe(true);
-      expect(image.attributes('data-src')).toBeTruthy();
-    });
-
-    it('calls getImageURL with correct path', () => {
-      wrapper = createWrapper();
-      
-      const image = wrapper.find('.q-img-stub');
-      expect(image.exists()).toBe(true);
-      expect(image.attributes('data-src')).toContain('clipboard_icon.svg');
-    });
-  });
 
   describe('Internationalization', () => {
     it('uses i18n for the no data message', () => {
@@ -197,16 +160,6 @@ describe('NoData.vue', () => {
       // Component should have readable text content
       expect(wrapper.text().trim()).toBeTruthy();
     });
-
-    it('uses semantic structure with image and text', () => {
-      wrapper = createWrapper();
-      
-      const image = wrapper.find('.q-img-stub');
-      const text = wrapper.find('.q-ma-none');
-      
-      expect(image.exists()).toBe(true);
-      expect(text.exists()).toBe(true);
-    });
   });
 
   describe('Vue 3 Composition API Integration', () => {
@@ -250,13 +203,6 @@ describe('NoData.vue', () => {
       expect(wrapper.text()).toContain('ticket.noDataErrorMsg');
     });
 
-    it('maintains component integrity with different viewport sizes', () => {
-      wrapper = createWrapper();
-      
-      const image = wrapper.find('.q-img-stub');
-      expect(image.exists()).toBe(true);
-      expect(image.attributes('data-src')).toBeTruthy();
-    });
   });
 
   describe('Component Performance', () => {
@@ -281,14 +227,6 @@ describe('NoData.vue', () => {
       
       // Component should be suitable for table no-data scenarios
       expect(wrapper.classes()).toContain('full-width');
-    });
-
-    it('provides appropriate visual feedback', () => {
-      wrapper = createWrapper();
-      
-      // Should have both image and text for clear communication
-      expect(wrapper.find('.q-img-stub').exists()).toBe(true);
-      expect(wrapper.text()).toBeTruthy();
     });
 
     it('maintains consistent styling across different contexts', () => {

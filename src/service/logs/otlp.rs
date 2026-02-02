@@ -31,7 +31,7 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
-use infra::errors::Result;
+use infra::{errors::Result, schema::get_flatten_level};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -66,7 +66,9 @@ pub async fn handle_request(
     let started_at = Utc::now().timestamp_micros();
 
     // check stream
-    let stream_name = in_stream_name.map_or_else(|| "default".to_owned(), format_stream_name);
+    let stream_name = in_stream_name
+        .map(|name| format_stream_name(name.to_string()))
+        .unwrap_or("default".to_string());
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let cfg = get_config();
@@ -76,14 +78,13 @@ pub async fn handle_request(
     let max_ts =
         (Utc::now() + Duration::hours(cfg.limit.ingest_allowed_in_future)).timestamp_micros();
 
-    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+    let index_all_max_value_length = cfg.limit.index_all_max_value_length;
+
+    let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Logs);
     // Start retrieve associated pipeline and construct pipeline components
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &stream_name,
-        &StreamType::Logs,
-    )
-    .await;
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
+    let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
     let mut timestamps = Vec::new();
@@ -246,10 +247,12 @@ pub async fn handle_request(
                     original_options.push(original_data);
                     timestamps.push(timestamp);
                 } else {
-                    let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *_size += estimate_json_bytes(&rec);
-                    // JSON Flattening
-                    rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
+                    let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                    *size += estimate_json_bytes(&rec);
+                    // JSON Flattening - use per-stream flatten level
+                    let flatten_level =
+                        get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                    rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
                     let mut local_val = match rec.take() {
@@ -258,7 +261,7 @@ pub async fn handle_request(
                     };
 
                     if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                        local_val = crate::service::logs::refactor_map(local_val, fields);
+                        local_val = crate::service::ingestion::refactor_map(local_val, fields);
                     }
 
                     // add `_original` and '_record_id` if required by StreamSettings
@@ -285,7 +288,7 @@ pub async fn handle_request(
                     {
                         let values = local_val
                             .iter()
-                            .filter(|(k, _)| {
+                            .filter(|(k, v)| {
                                 ![
                                     TIMESTAMP_COL_NAME,
                                     ID_COL_NAME,
@@ -293,6 +296,9 @@ pub async fn handle_request(
                                     ALL_VALUES_COL_NAME,
                                 ]
                                 .contains(&k.as_str())
+                                    && (index_all_max_value_length == 0
+                                        || v.as_str()
+                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
                             })
                             .map(|(_, v)| v)
                             .join(" ");
@@ -343,6 +349,7 @@ pub async fn handle_request(
                     if !derived_streams.contains(&destination_stream) {
                         derived_streams.insert(destination_stream.clone());
                     }
+
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(
@@ -364,7 +371,7 @@ pub async fn handle_request(
 
                         if let Some(Some(fields)) = user_defined_schema_map.get(&destination_stream)
                         {
-                            local_val = crate::service::logs::refactor_map(local_val, fields);
+                            local_val = crate::service::ingestion::refactor_map(local_val, fields);
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
@@ -395,7 +402,7 @@ pub async fn handle_request(
                         {
                             let values = local_val
                                 .iter()
-                                .filter(|(k, _)| {
+                                .filter(|(k, v)| {
                                     ![
                                         TIMESTAMP_COL_NAME,
                                         ID_COL_NAME,
@@ -403,6 +410,10 @@ pub async fn handle_request(
                                         ALL_VALUES_COL_NAME,
                                     ]
                                     .contains(&k.as_str())
+                                        && (index_all_max_value_length == 0
+                                            || v.as_str().is_none_or(|s| {
+                                                s.len() <= index_all_max_value_length
+                                            }))
                                 })
                                 .map(|(_, v)| v)
                                 .join(" ");
@@ -410,10 +421,10 @@ pub async fn handle_request(
                             local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
                         }
 
-                        let _size = size_by_stream
+                        let size: &mut usize = size_by_stream
                             .entry(destination_stream.clone())
                             .or_insert(0);
-                        *_size += original_size;
+                        *size += original_size;
 
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
@@ -522,7 +533,7 @@ mod tests {
         collector::logs::v1::ExportLogsServiceRequest,
         common::v1::{
             AnyValue, InstrumentationScope, KeyValue,
-            any_value::Value::{IntValue, StringValue},
+            any_value::Value::{BoolValue, DoubleValue, IntValue, StringValue},
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };
@@ -587,6 +598,648 @@ mod tests {
             request,
             Some("test_stream"),
             "a@a.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_resource_attributes() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 9,
+            severity_text: "Info".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("Test log with resource".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            trace_id: vec![],
+            span_id: vec![],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            resource: Some(opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: vec![
+                    KeyValue {
+                        key: "service.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("test-service".to_string())),
+                        }),
+                    },
+                    KeyValue {
+                        key: "service.version".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("1.0.0".to_string())),
+                        }),
+                    },
+                ],
+                dropped_attributes_count: 0,
+                entity_refs: vec![],
+            }),
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_trace_and_span_ids() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 13,
+            severity_text: "Error".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("Error log with trace context".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            trace_id: vec![
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+                0x0e, 0x0f,
+            ],
+            span_id: vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_observed_time() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 0, // No time_unix_nano set
+            observed_time_unix_nano: 1581452773000000789,
+            severity_number: 5,
+            severity_text: "Warning".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("Log with observed time".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            trace_id: vec![],
+            span_id: vec![],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_multiple_records() {
+        let org_id = "test_org_id";
+
+        let log_recs = vec![
+            LogRecord {
+                time_unix_nano: 1581452773000000789,
+                severity_number: 9,
+                severity_text: "Info".to_string(),
+                body: Some(AnyValue {
+                    value: Some(StringValue("First log".to_string())),
+                }),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+                trace_id: vec![],
+                span_id: vec![],
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: 1581452774000000789,
+                severity_number: 5,
+                severity_text: "Warning".to_string(),
+                body: Some(AnyValue {
+                    value: Some(StringValue("Second log".to_string())),
+                }),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+                trace_id: vec![],
+                span_id: vec![],
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: 1581452775000000789,
+                severity_number: 13,
+                severity_text: "Error".to_string(),
+                body: Some(AnyValue {
+                    value: Some(StringValue("Third log".to_string())),
+                }),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+                trace_id: vec![],
+                span_id: vec![],
+                ..Default::default()
+            },
+        ];
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: log_recs,
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_various_attribute_types() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 9,
+            severity_text: "Info".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("Log with mixed attribute types".to_string())),
+            }),
+            attributes: vec![
+                KeyValue {
+                    key: "string_field".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(StringValue("test_value".to_string())),
+                    }),
+                },
+                KeyValue {
+                    key: "int_field".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(IntValue(42)),
+                    }),
+                },
+                KeyValue {
+                    key: "bool_field".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(BoolValue(true)),
+                    }),
+                },
+                KeyValue {
+                    key: "double_field".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(DoubleValue(1.23)),
+                    }),
+                },
+            ],
+            dropped_attributes_count: 0,
+            trace_id: vec![],
+            span_id: vec![],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_empty_request() {
+        let org_id = "test_org_id";
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_empty_scope_logs() {
+        let org_id = "test_org_id";
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_default_stream_name() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 9,
+            severity_text: "Info".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("Log for default stream".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            trace_id: vec![],
+            span_id: vec![],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            None, // Should default to "default"
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_severity_number_only() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 13,           // ERROR level
+            severity_text: "".to_string(), // Empty severity text
+            body: Some(AnyValue {
+                value: Some(StringValue("Log with severity number only".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            trace_id: vec![],
+            span_id: vec![],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_all_request_types() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 9,
+            severity_text: "Info".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("Test log".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            trace_id: vec![],
+            span_id: vec![],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: None,
+            log_records: vec![log_rec.clone()],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        // Test HttpJson
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs.clone()],
+        };
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+        assert!(result.is_ok());
+
+        // Test HttpProtobuf
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs.clone()],
+        };
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await;
+        assert!(result.is_ok());
+
+        // Test Grpc
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_multiple_scope_logs() {
+        let org_id = "test_org_id";
+
+        let scope_logs1 = ScopeLogs {
+            scope: Some(InstrumentationScope {
+                name: "scope1".to_string(),
+                version: "1.0.0".to_string(),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            log_records: vec![LogRecord {
+                time_unix_nano: 1581452773000000789,
+                severity_number: 9,
+                severity_text: "Info".to_string(),
+                body: Some(AnyValue {
+                    value: Some(StringValue("Log from scope1".to_string())),
+                }),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+                trace_id: vec![],
+                span_id: vec![],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        let scope_logs2 = ScopeLogs {
+            scope: Some(InstrumentationScope {
+                name: "scope2".to_string(),
+                version: "2.0.0".to_string(),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            log_records: vec![LogRecord {
+                time_unix_nano: 1581452774000000789,
+                severity_number: 5,
+                severity_text: "Warning".to_string(),
+                body: Some(AnyValue {
+                    value: Some(StringValue("Log from scope2".to_string())),
+                }),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+                trace_id: vec![],
+                span_id: vec![],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![scope_logs1, scope_logs2],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_with_instrumentation_library() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 9,
+            severity_text: "Info".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("Log with instrumentation library".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            trace_id: vec![],
+            span_id: vec![],
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: Some(InstrumentationScope {
+                name: "my-library".to_string(),
+                version: "1.2.3".to_string(),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "test@test.com",
             OtlpRequestType::Grpc,
         )
         .await;

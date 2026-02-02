@@ -676,7 +676,7 @@ describe('FolderList.vue', () => {
     it('should render new folder button', () => {
       const newFolderBtn = wrapper.find('[data-test="dashboard-new-folder-btn"]')
       expect(newFolderBtn.exists()).toBe(true)
-      expect(newFolderBtn.text()).toBe('New Folder')
+      expect(newFolderBtn.text()).toBe('add')
     })
 
     it('should render folder dialog', () => {

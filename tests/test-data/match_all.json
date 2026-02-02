@@ -30,5 +30,41 @@
     "level": "info",
     "msg": "stopping collector runner...",
     "log": "level=info msg=\"stopping collector runner...\""
+  },
+  {
+    "error": "DbException",
+    "class": "UserAccountService",
+    "message": "Database connection failed",
+    "log": "error=DbException class=UserAccountService message=\"Database connection failed\""
+  },
+  {
+    "exception": "NullPointerException",
+    "component": "XMLHttpRequest",
+    "method": "validateUserInput",
+    "log": "exception=NullPointerException component=XMLHttpRequest method=validateUserInput"
+  },
+  {
+    "error": "SQLException",
+    "handler": "OAuth2TokenHandler", 
+    "status": "InvalidFormatException",
+    "log": "error=SQLException handler=OAuth2TokenHandler status=InvalidFormatException"
+  },
+  {
+    "service": "UserManagementService",
+    "operation": "createNewAccount",
+    "result": "AccountCreationSuccessful",
+    "log": "service=UserManagementService operation=createNewAccount result=AccountCreationSuccessful"
+  },
+  {
+    "token": "U8iI34Vi",
+    "identifier": "A1B2C3D4",
+    "code": "Http404Error",
+    "log": "token=U8iI34Vi identifier=A1B2C3D4 code=Http404Error"
+  },
+  {
+    "api": "RESTApiController",
+    "parser": "JSON2XMLConverter",
+    "version": "ApiVersion2_3",
+    "log": "api=RESTApiController parser=JSON2XMLConverter version=ApiVersion2_3"
   }
 ] 

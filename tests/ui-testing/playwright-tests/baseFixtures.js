@@ -2,12 +2,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { test as baseTest } from '@playwright/test';
+const testLogger = require('./utils/test-logger.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
 
 export function generateUUID() {
   return crypto.randomBytes(16).toString('hex');
 }
+
 
 export const test = baseTest.extend({
   context: async ({ context }, use) => {
@@ -16,7 +18,7 @@ export const test = baseTest.extend({
         try {
           (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
         } catch (error) {
-          console.error('Failed to collect coverage on page unload:', error);
+          testLogger.error('Failed to collect coverage on page unload', { error });
         }
       }),
     );
@@ -27,7 +29,7 @@ export const test = baseTest.extend({
       try {
         await fs.promises.writeFile(filename, coverageJSON);
       } catch (error) {
-        console.error('Failed to write coverage data:', error);
+        testLogger.error('Failed to write coverage data', { error });
       }
     });
     await use(context);
@@ -35,9 +37,13 @@ export const test = baseTest.extend({
       try {
         await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
       } catch (error) {
-        console.error('Failed to collect final coverage for page:', error);
+        testLogger.error('Failed to collect final coverage for page', { error });
       }
     }));
+  },
+
+  page: async ({ page }, use) => {
+    await use(page);
   }
 });
 

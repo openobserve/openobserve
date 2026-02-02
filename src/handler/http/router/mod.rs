@@ -46,7 +46,9 @@ use {
 use super::request::*;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-    handler::http::request::search::search_inspector,
+    handler::http::{
+        request::search::search_inspector, router::middlewares::blocked_orgs_middleware,
+    },
 };
 
 pub mod middlewares;
@@ -245,6 +247,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     #[cfg(feature = "cloud")]
     svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
 
+    // OAuth 2.0 Authorization Server Metadata endpoint (RFC 8414)
+    // Must be publicly accessible (no auth) at root per MCP spec
+    svc.service(mcp::oauth_authorization_server_metadata);
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -253,19 +259,31 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(users::get_auth),
     );
 
-    svc.service(
-        web::scope("/node")
+    {
+        let mut node_scope = web::scope("/node")
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node)
+            .service(status::flush_node);
+
+        #[cfg(feature = "enterprise")]
+        {
+            node_scope = node_scope.service(status::drain_status);
+        }
+
+        node_scope = node_scope
             .service(status::list_node)
             .service(status::node_metrics)
-            .service(status::consistent_hash),
-    );
+            .service(status::consistent_hash)
+            .service(status::refresh_nodes_list)
+            .service(status::refresh_user_sessions)
+            .service(status::cache_reload);
+
+        svc.service(node_scope);
+    }
 
     if get_config().common.swagger_enabled {
         svc.service(
@@ -329,6 +347,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::zo_config)
             .service(status::logout)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -345,6 +364,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .service(status::refresh_token_with_dex)
             .service(status::logout)
             .service(users::service_accounts::exchange_token)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -364,6 +384,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
 
     #[allow(deprecated)]
     let service = web::scope("/api")
+        .wrap(middleware::from_fn(blocked_orgs_middleware))
         .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
             super::auth::validator::oo_validator,
@@ -372,18 +393,28 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)
         .service(users::save)
+        .service(users::delete_bulk)
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
         .service(users::list_invitations)
+        .service(users::decline_invitation)
         .service(users::list_roles)
         .service(organization::org::organizations)
+        .service(organization::assume_service_account::assume_service_account)
         .service(organization::settings::get)
         .service(organization::settings::create)
         .service(organization::settings::upload_logo)
         .service(organization::settings::delete_logo)
         .service(organization::settings::set_logo_text)
         .service(organization::settings::delete_logo_text)
+        // System settings v2 (multi-level)
+        .service(organization::system_settings::get_setting)
+        .service(organization::system_settings::list_settings)
+        .service(organization::system_settings::set_org_setting)
+        .service(organization::system_settings::set_user_setting)
+        .service(organization::system_settings::delete_org_setting)
+        .service(organization::system_settings::delete_user_setting)
         .service(organization::org::org_summary)
         .service(organization::org::get_user_passcode)
         .service(organization::org::update_user_passcode)
@@ -405,6 +436,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::schema)
         .service(stream::create)
         .service(stream::update_settings)
+        .service(stream::update_fields)
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
@@ -454,6 +486,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(functions::save_function)
         .service(functions::list_functions)
         .service(functions::test_function)
+        .service(functions::delete_function_bulk)
         .service(functions::delete_function)
         .service(functions::update_function)
         .service(functions::list_pipeline_dependencies)
@@ -462,6 +495,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::list_dashboards)
         .service(dashboards::get_dashboard)
         .service(dashboards::export_dashboard)
+        .service(dashboards::delete_dashboard_bulk)
         .service(dashboards::delete_dashboard)
         .service(dashboards::move_dashboard)
         .service(dashboards::move_dashboards)
@@ -469,6 +503,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::reports::update_report)
         .service(dashboards::reports::get_report)
         .service(dashboards::reports::list_reports)
+        .service(dashboards::reports::delete_report_bulk)
         .service(dashboards::reports::delete_report)
         .service(dashboards::reports::enable_report)
         .service(dashboards::reports::trigger_report)
@@ -489,15 +524,29 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(folders::deprecated::get_folder)
         .service(folders::deprecated::get_folder_by_name)
         .service(folders::deprecated::delete_folder)
+        // Incidents routes must be registered before alerts::get_alert
+        // to avoid /incidents being matched as {alert_id}
+        .service(alerts::incidents::list_incidents)
+        .service(alerts::incidents::get_incident_stats)
+        .service(alerts::incidents::trigger_incident_rca)
+        .service(alerts::incidents::get_incident_service_graph)
+        .service(alerts::incidents::get_incident)
+        .service(alerts::incidents::update_incident_status)
+        // Agent chat routes (enterprise only, but always exposed in API)
         .service(alerts::create_alert)
         .service(alerts::get_alert)
         .service(alerts::export_alert)
         .service(alerts::update_alert)
+        .service(alerts::delete_alert_bulk)
         .service(alerts::delete_alert)
         .service(alerts::list_alerts)
         .service(alerts::enable_alert)
+        .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
+        .service(alerts::generate_sql)
         .service(alerts::move_alerts)
+        .service(alerts::history::get_alert_history)
+        .service(alerts::dedup_stats::get_dedup_summary)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -509,23 +558,22 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::templates::save_template)
         .service(alerts::templates::update_template)
         .service(alerts::templates::get_template)
+        .service(alerts::templates::delete_template_bulk)
         .service(alerts::templates::delete_template)
         .service(alerts::templates::list_templates)
         .service(alerts::destinations::save_destination)
         .service(alerts::destinations::update_destination)
         .service(alerts::destinations::get_destination)
         .service(alerts::destinations::list_destinations)
+        .service(alerts::destinations::delete_destination_bulk)
         .service(alerts::destinations::delete_destination)
         .service(kv::get)
         .service(kv::set)
         .service(kv::delete)
         .service(kv::list)
-        .service(syslog::list_routes)
-        .service(syslog::create_route)
-        .service(syslog::delete_route)
-        .service(syslog::update_route)
-        .service(syslog::toggle_state)
         .service(enrichment_table::save_enrichment_table)
+        .service(enrichment_table::save_enrichment_table_from_url)
+        .service(enrichment_table::get_all_enrichment_table_statuses)
         .service(logs::ingest::handle_kinesis_request)
         .service(logs::ingest::handle_gcp_request)
         .service(organization::org::create_org)
@@ -542,16 +590,28 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(authz::fga::get_users_with_role)
         .service(authz::fga::get_roles_for_user)
         .service(authz::fga::get_groups_for_user)
+        .service(authz::fga::delete_role_bulk)
         .service(authz::fga::delete_role)
+        .service(authz::fga::delete_group_bulk)
         .service(authz::fga::delete_group)
         .service(clusters::list_clusters)
         .service(pipeline::save_pipeline)
         .service(pipeline::update_pipeline)
         .service(pipeline::list_pipelines)
         .service(pipeline::list_streams_with_pipeline)
+        .service(pipeline::delete_pipeline_bulk)
         .service(pipeline::delete_pipeline)
         .service(pipeline::enable_pipeline)
+        .service(pipeline::enable_pipeline_bulk)
+        .service(pipelines::history::get_pipeline_history)
+        .service(pipelines::backfill::create_backfill)
+        .service(pipelines::backfill::list_backfills)
+        .service(pipelines::backfill::get_backfill)
+        .service(pipelines::backfill::enable_backfill)
+        .service(pipelines::backfill::update_backfill)
+        .service(pipelines::backfill::delete_backfill)
         .service(search::multi_streams::search_multi)
+        .service(search::multi_streams::search_multi_stream)
         .service(search::multi_streams::_search_partition_multi)
         .service(search::multi_streams::around_multi)
         .service(stream::delete_stream_cache)
@@ -559,9 +619,18 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(short_url::retrieve)
         .service(service_accounts::list)
         .service(service_accounts::save)
+        .service(service_accounts::delete_bulk)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(mcp::handle_mcp_post)
+        .service(mcp::handle_mcp_get)
+        .service(alerts::deduplication::get_config)
+        .service(alerts::deduplication::set_config)
+        .service(alerts::deduplication::delete_config)
+        .service(alerts::deduplication::get_semantic_groups)
+        .service(alerts::deduplication::preview_semantic_groups_diff)
+        .service(alerts::deduplication::save_semantic_groups);
 
     #[cfg(feature = "enterprise")]
     let service = service
@@ -576,6 +645,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(search::query_manager::cancel_multiple_query)
         .service(search::query_manager::cancel_query)
         .service(keys::get)
+        .service(keys::delete_bulk)
         .service(keys::delete)
         .service(keys::save)
         .service(keys::list)
@@ -585,6 +655,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(actions::action::upload_zipped_action)
         .service(actions::action::update_action_details)
         .service(actions::action::serve_action_zip)
+        .service(actions::action::delete_action_bulk)
         .service(actions::action::delete_action)
         .service(ratelimit::list_module_ratelimit)
         .service(ratelimit::list_role_ratelimit)
@@ -597,19 +668,34 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ai::prompt::get_prompt)
         .service(ai::prompt::update_prompt)
         .service(ai::prompt::rollback_prompt)
-        .service(re_pattern::get)
+        .service(re_pattern::get_built_in_patterns)
+        .service(re_pattern::test)
         .service(re_pattern::list)
         .service(re_pattern::save)
+        .service(re_pattern::get)
         .service(re_pattern::update)
+        .service(re_pattern::delete_bulk)
         .service(re_pattern::delete)
-        .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config);
+        .service(domain_management::set_domain_management_config)
+        .service(license::get_license_info)
+        .service(license::store_license)
+        .service(traces::get_current_topology)
+        .service(patterns::extract_patterns)
+        .service(agent::chat::agent_chat)
+        .service(agent::chat::agent_chat_stream);
+
+    #[cfg(feature = "enterprise")]
+    let service = service
+        .service(service_streams::get_dimension_analytics)
+        .service(service_streams::correlate_streams)
+        .service(service_streams::get_services_grouped);
 
     #[cfg(feature = "cloud")]
     let service = service
         .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
+        .service(organization::org::delete_org_invite)
         .service(organization::org::accept_org_invite)
         .service(cloud::billings::create_checkout_session)
         .service(cloud::billings::process_session_detail)

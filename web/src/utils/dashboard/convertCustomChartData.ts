@@ -322,13 +322,4 @@ const validateUserCode = (code: string): string | null => {
   } catch (error) {
     return "Invalid JavaScript syntax.";
   }
-};
-
-
-
-
-
-
-
-
-
+};

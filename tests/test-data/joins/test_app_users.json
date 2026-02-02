@@ -1,0 +1,7 @@
+[
+  {"user_id": "U001", "name": "Alice Johnson", "email": "alice@example.com", "plan": "premium", "country": "USA", "created_at": "2024-01-15"},
+  {"user_id": "U002", "name": "Bob Smith", "email": "bob@example.com", "plan": "free", "country": "UK", "created_at": "2024-02-20"},
+  {"user_id": "U003", "name": "Charlie Brown", "email": "charlie@example.com", "plan": "premium", "country": "Canada", "created_at": "2024-03-10"},
+  {"user_id": "U004", "name": "Diana Prince", "email": "diana@example.com", "plan": "enterprise", "country": "USA", "created_at": "2024-04-05"},
+  {"user_id": "U005", "name": "Eve Wilson", "email": "eve@example.com", "plan": "free", "country": "Australia", "created_at": "2024-05-12"}
+]

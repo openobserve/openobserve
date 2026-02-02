@@ -19,7 +19,7 @@ const store = createStore({
   state: {
     API_ENDPOINT: "http://localhost:5080",
     isAiChatEnabled: false,
-    
+
     theme: "dark",
     timezone: "UTC",
     selectedOrganization: {
@@ -46,7 +46,7 @@ const store = createStore({
       iat: 1678689753,
       family_name: "example",
       email: "example@gmail.com",
-    },  
+    },
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
@@ -62,6 +62,7 @@ const store = createStore({
       user_defined_schemas_enabled: true,
       super_cluster_enabled: false,
       query_on_stream_selection: false,
+      query_values_default_num: 10,
       meta_org: "default",
       default_functions: [
         {
@@ -87,7 +88,8 @@ const store = createStore({
       ],
       timestamp_column: "_timestamp",
       all_fields_name: "_all",
-      default_secondary_index_fields: ["level"]
+      default_secondary_index_fields: ["level"],
+      service_graph_enabled: true,
     },
     organizationData: {
       organizationPasscode: "",
@@ -106,14 +108,8 @@ const store = createStore({
       },
       isDataIngested: false,
       allDashboardData: {},
-      foldersByType:[],
-    },
-    streams:{
-      logs:{
-        
-      }
+      foldersByType: [],
     }
-
   },
   mutations: {
     login(state, payload) {
@@ -260,6 +256,28 @@ const store = createStore({
     },
     setChatUpdated(state, payload) {
       state.chatUpdated = payload;
+    },
+    clearPendingShortURL(state) {
+      // Mock mutation for tests - clears pending short URL state
+    },
+  },
+  modules: {
+    streams: {
+      namespaced: true,
+      state: {
+        streamMapping: {},
+      },
+      mutations: {
+        updateStreamIndexMapping(state: any, payload: any) {
+          // Mock mutation for updating stream index mapping
+          state.streamMapping = { ...state.streamMapping, ...payload };
+        },
+      },
+      actions: {
+        setStreams(context: any, payload: any) {
+          // Mock action for setting streams
+        },
+      },
     },
   },
   actions: {

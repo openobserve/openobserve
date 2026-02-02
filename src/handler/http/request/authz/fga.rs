@@ -14,33 +14,46 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use o2_dex::meta::auth::RoleRequest;
+use {crate::common::utils::auth::check_permissions, o2_dex::meta::auth::RoleRequest};
 
-use crate::common::meta::{
-    http::HttpResponse as MetaHttpResponse,
-    user::{UserGroup, UserGroupRequest, UserRoleRequest},
+use crate::{
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            user::{UserGroup, UserGroupRequest, UserRoleRequest},
+        },
+        utils::auth::UserEmail,
+    },
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
 };
 
 #[cfg(feature = "enterprise")]
 /// CreateRoles
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "CreateRoles",
+    summary = "Create custom role",
+    description = "Creates a new custom role with specified permissions and capabilities. Custom roles allow fine-grained access control beyond the standard predefined roles. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserRoleRequest, description = "UserRoleRequest", content_type = "application/json"),
+    request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a role"}))
     )
 )]
 #[post("/{org_id}/roles")]
@@ -80,16 +93,21 @@ pub async fn create_role(
     context_path = "/api",
     tag = "Roles",
     operation_id = "CreateRoles",
+    summary = "Create custom role",
+    description = "Creates a new custom role with specified permissions and capabilities. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserRoleRequest, description = "UserRoleRequest", content_type = "application/json"),
+    request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/roles")]
@@ -102,12 +120,12 @@ pub async fn create_role(
 
 #[cfg(feature = "enterprise")]
 /// DeleteRole
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRole",
+    summary = "Delete custom role",
+    description = "Permanently removes a custom role from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -116,8 +134,12 @@ pub async fn create_role(
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a role"}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
@@ -132,11 +154,116 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
     }
 }
 
+/// DeleteRoleBulk
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/roles/bulk")]
+pub async fn delete_role_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.ids {
+        if !check_permissions(
+            &format!("{org_id}/{name}"),
+            &org_id,
+            &user_id,
+            "roles",
+            "DELETE",
+            None,
+        )
+        .await
+        {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match o2_openfga::authorizer::roles::delete_role(&org_id, &name).await {
+            Ok(_) => {
+                successful.push(name);
+            }
+            Err(e) => {
+                log::error!("error in deleting role {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/roles/bulk")]
+pub async fn delete_role_bulk(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
+}
+
+#[cfg(not(feature = "enterprise"))]
+/// DeleteRole
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Roles",
     operation_id = "DeleteRole",
+    summary = "Delete custom role",
+    description = "Permanently removes a custom role from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -145,8 +272,11 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
@@ -156,12 +286,12 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
 
 #[cfg(feature = "enterprise")]
 /// ListRoles
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "ListRoles",
+    summary = "List organization roles",
+    description = "Retrieves a list of all roles available in the organization, including both standard predefined roles and custom roles. Users will only see roles they have permissions to view when role-based access control is active. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -169,20 +299,26 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all roles"}))
     )
 )]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_roles(
+    org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let mut permitted;
     // Get List of allowed objects
 
-    let user_id = req.headers().get("user_id").unwrap();
     match crate::handler::http::auth::validator::list_objects_for_user(
         &org_id,
-        user_id.to_str().unwrap(),
+        &user_email.user_id,
         "GET",
         "role",
     )
@@ -197,18 +333,18 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
     }
     // Get List of allowed objects ends
 
-    if let Some(mut local_permitted) = permitted {
+    if let Some(local_permitted) = permitted.as_mut() {
         let prefix = "role:";
         for value in local_permitted.iter_mut() {
-            if value.starts_with(prefix) {
-                *value = value.strip_prefix(prefix).unwrap().to_string();
+            if let Some(remaining) = value.strip_prefix(prefix) {
+                *value = remaining.to_string();
             }
+
             let role_prefix = format!("{org_id}/");
-            if value.starts_with(&role_prefix) {
-                *value = value.strip_prefix(&role_prefix).unwrap().to_string()
+            if let Some(remaining) = value.strip_prefix(&role_prefix) {
+                *value = remaining.to_string()
             }
         }
-        permitted = Some(local_permitted);
     }
 
     match o2_openfga::authorizer::roles::get_all_roles(&org_id, permitted).await {
@@ -222,6 +358,8 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
     context_path = "/api",
     tag = "Roles",
     operation_id = "ListRoles",
+    summary = "List organization roles",
+    description = "Retrieves a list of all roles available in the organization. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -229,26 +367,26 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(
-    _org_id: web::Path<String>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
 /// UpdateRoles
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "UpdateRoles",
+    summary = "Update role permissions",
+    description = "Updates an existing role by adding or removing permissions and users. Allows modification of role capabilities and user assignments to maintain proper access control. Standard roles cannot be modified. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -256,10 +394,14 @@ pub async fn get_roles(
         ("org_id" = String, Path, description = "Organization name"),
         ("role_id" = String, Path, description = "Role Id"),
     ),
-    request_body(content = RoleRequest, description = "RoleRequest", content_type = "application/json"),
+    request_body(content = inline(RoleRequest), description = "RoleRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a role"}))
     )
 )]
 #[put("/{org_id}/roles/{role_id}")]
@@ -290,6 +432,8 @@ pub async fn update_role(
     context_path = "/api",
     tag = "Roles",
     operation_id = "UpdateRoles",
+    summary = "Update role permissions",
+    description = "Updates an existing role by adding or removing permissions and users. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -297,10 +441,9 @@ pub async fn update_role(
         ("org_id" = String, Path, description = "Organization name"),
         ("role_id" = String, Path, description = "Role Id"),
     ),
-    request_body(content = RoleRequest, description = "RoleRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/roles/{role_id}")]
@@ -313,12 +456,12 @@ pub async fn update_role(
 
 #[cfg(feature = "enterprise")]
 /// GetResourcePermission
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetResourcePermission",
+    summary = "Get role permissions for resource",
+    description = "Retrieves detailed permissions that a specific role has on a particular resource type. Useful for understanding access control capabilities and auditing role assignments. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -328,8 +471,8 @@ pub async fn update_role(
         ("resource" = String, Path, description = "resource"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<O2EntityAuthorization>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/roles/{role_id}/permissions/{resource}")]
@@ -348,6 +491,8 @@ pub async fn get_role_permissions(
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetResourcePermission",
+    summary = "Get role permissions for resource",
+    description = "Retrieves detailed permissions that a specific role has on a particular resource type. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -357,8 +502,8 @@ pub async fn get_role_permissions(
         ("resource" = String, Path, description = "resource"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<O2EntityAuthorization>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/roles/{role_id}/permissions/{resource}")]
@@ -370,12 +515,12 @@ pub async fn get_role_permissions(
 
 #[cfg(feature = "enterprise")]
 /// GetRoleUsers
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetRoleUsers",
+    summary = "Get users assigned to role",
+    description = "Retrieves a list of all users who are currently assigned to a specific role. Useful for role management, auditing user permissions, and understanding access control assignments. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -384,8 +529,8 @@ pub async fn get_role_permissions(
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/roles/{role_id}/users")]
@@ -402,6 +547,8 @@ pub async fn get_users_with_role(path: web::Path<(String, String)>) -> Result<Ht
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetRoLesUsers",
+    summary = "Get users assigned to role",
+    description = "Retrieves a list of all users who are currently assigned to a specific role. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -410,8 +557,8 @@ pub async fn get_users_with_role(path: web::Path<(String, String)>) -> Result<Ht
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/roles/{role_id}/users")]
@@ -422,6 +569,25 @@ pub async fn get_users_with_role(
 }
 
 #[cfg(feature = "enterprise")]
+/// GetUserRoles
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "GetUserRoles",
+    summary = "Get roles for user",
+    description = "Retrieves all roles assigned to a specific user in the organization. Shows both directly assigned roles and roles inherited through group membership. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "User email address"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
 #[get("/{org_id}/users/{user_email}/roles")]
 pub async fn get_roles_for_user(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, user_email) = path.into_inner();
@@ -431,12 +597,49 @@ pub async fn get_roles_for_user(path: web::Path<(String, String)>) -> Result<Htt
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "GetUserRoles",
+    summary = "Get roles for user",
+    description = "Retrieves all roles assigned to a specific user in the organization. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "User email address"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
 #[get("/{org_id}/users/{user_email}/roles")]
 pub async fn get_roles_for_user(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
+/// GetUserGroups
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "GetUserGroups",
+    summary = "Get groups for user",
+    description = "Retrieves all groups that a specific user belongs to in the organization. Shows group memberships which determine inherited roles and permissions. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "User email address"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
 #[get("/{org_id}/users/{user_email}/groups")]
 pub async fn get_groups_for_user(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, user_email) = path.into_inner();
@@ -447,6 +650,24 @@ pub async fn get_groups_for_user(path: web::Path<(String, String)>) -> Result<Ht
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "GetUserGroups",
+    summary = "Get groups for user",
+    description = "Retrieves all groups that a specific user belongs to in the organization. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "User email address"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
 #[get("/{org_id}/users/{user_email}/groups")]
 pub async fn get_groups_for_user(
     _path: web::Path<(String, String)>,
@@ -456,22 +677,22 @@ pub async fn get_groups_for_user(
 
 #[cfg(feature = "enterprise")]
 /// CreateGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
     operation_id = "CreateGroup",
+    summary = "Create user group",
+    description = "Creates a new user group with specified users and roles. Groups allow efficient management of permissions by assigning roles to groups instead of individual users. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserGroup, description = "UserGroup", content_type = "application/json"),
+    request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/groups")]
@@ -502,16 +723,18 @@ pub async fn create_group(
     context_path = "/api",
     tag = "Groups",
     operation_id = "CreateGroup",
+    summary = "Create user group",
+    description = "Creates a new user group with specified users and roles. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserGroup, description = "UserGroup", content_type = "application/json"),
+    request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/groups")]
@@ -524,12 +747,12 @@ pub async fn create_group(
 
 #[cfg(feature = "enterprise")]
 /// UpdateGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
     operation_id = "UpdateGroup",
+    summary = "Update user group",
+    description = "Updates an existing user group by adding or removing users and roles. Allows dynamic management of group membership and permissions to maintain proper access control. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -537,10 +760,10 @@ pub async fn create_group(
         ("org_id" = String, Path, description = "Organization name"),
         ("group_name" = String, Path, description = "Group name"),
     ),
-    request_body(content = UserGroupRequest, description = "UserGroupRequest", content_type = "application/json"),
+    request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/groups/{group_name}")]
@@ -571,6 +794,8 @@ pub async fn update_group(
     context_path = "/api",
     tag = "Groups",
     operation_id = "UpdateGroup",
+    summary = "Update user group",
+    description = "Updates an existing user group by adding or removing users and roles. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -578,10 +803,10 @@ pub async fn update_group(
         ("org_id" = String, Path, description = "Organization name"),
         ("group_name" = String, Path, description = "Group name"),
     ),
-    request_body(content = UserGroupRequest, description = "UserGroupRequest", content_type = "application/json"),
+    request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/groups/{group_name}")]
@@ -594,12 +819,12 @@ pub async fn update_group(
 
 #[cfg(feature = "enterprise")]
 /// ListGroups
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
     operation_id = "ListGroups",
+    summary = "List organization groups",
+    description = "Retrieves a list of all user groups in the organization. Users will only see groups they have permissions to view when role-based access control is active. Useful for managing group-based permissions and understanding organizational structure. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -607,21 +832,23 @@ pub async fn update_group(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/groups")]
-pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_groups(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
     let mut permitted;
     // Get List of allowed objects
 
-    let user_id = req.headers().get("user_id").unwrap();
     match crate::handler::http::auth::validator::list_objects_for_user(
         &org_id,
-        user_id.to_str().unwrap(),
+        &user_email.user_id,
         "GET",
         "group",
     )
@@ -663,6 +890,8 @@ pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<Htt
     context_path = "/api",
     tag = "Groups",
     operation_id = "ListGroups",
+    summary = "List organization groups",
+    description = "Retrieves a list of all user groups in the organization. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -670,8 +899,8 @@ pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<Htt
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/groups")]
@@ -681,12 +910,12 @@ pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error>
 
 #[cfg(feature = "enterprise")]
 /// GetGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
     operation_id = "GetGroup",
+    summary = "Get group details",
+    description = "Retrieves detailed information about a specific user group including its members, assigned roles, and configuration. Useful for understanding group composition and permissions. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -694,8 +923,8 @@ pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error>
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserGroup),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/groups/{group_name}")]
@@ -713,6 +942,8 @@ pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<Http
     context_path = "/api",
     tag = "Groups",
     operation_id = "GetGroup",
+    summary = "Get group details",
+    description = "Retrieves detailed information about a specific user group including its members, assigned roles, and configuration. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -720,8 +951,8 @@ pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<Http
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserGroup),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/groups/{group_name}")]
@@ -730,6 +961,24 @@ pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<Htt
 }
 
 #[cfg(feature = "enterprise")]
+/// GetResources
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Resources",
+    operation_id = "GetResources",
+    summary = "Get available resources",
+    description = "Retrieves a list of all available resource types that can be used in role and permission assignments. Shows the resource hierarchy and available permission levels for fine-grained access control. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
 #[get("/{org_id}/resources")]
 pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "cloud")]
@@ -747,6 +996,23 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Resources",
+    operation_id = "GetResources",
+    summary = "Get available resources",
+    description = "Retrieves a list of all available resource types that can be used in role and permission assignments. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
 #[get("/{org_id}/resources")]
 pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
@@ -754,12 +1020,12 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
 
 #[cfg(feature = "enterprise")]
 /// DeleteGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
     operation_id = "DeleteGroup",
+    summary = "Delete user group",
+    description = "Permanently removes a user group from the organization. Users in the group will lose group-based permissions but retain any directly assigned roles. This action cannot be undone. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -768,8 +1034,8 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
         ("group_name" = String, Path, description = "Group name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/groups/{group_name}")]
@@ -784,11 +1050,116 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
     }
 }
 
+/// DeleteGroupBulk
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Groups",
+    operation_id = "DeleteGroupBulk",
+    summary = "Delete multiple user group",
+    description = "Permanently removes multiple user groups from the organization. Users in those groups will lose group-based permissions but retain any directly assigned roles. This action cannot be undone. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/groups/bulk")]
+pub async fn delete_group_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.ids {
+        if !check_permissions(
+            &format!("{org_id}/{name}"),
+            &org_id,
+            &user_id,
+            "groups",
+            "DELETE",
+            None,
+        )
+        .await
+        {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match o2_openfga::authorizer::groups::delete_group(&org_id, &name).await {
+            Ok(_) => {
+                successful.push(name);
+            }
+            Err(e) => {
+                log::error!("error in deleting group {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Groups",
+    operation_id = "DeleteGroupBulk",
+    summary = "Delete multiple user group",
+    description = "Permanently removes multiple user groups from the organization. Users in those groups will lose group-based permissions but retain any directly assigned roles. This action cannot be undone. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/groups/bulk")]
+pub async fn delete_group_bulk(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
     operation_id = "DeleteGroup",
+    summary = "Delete user group",
+    description = "Permanently removes a user group from the organization. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
     security(
         ("Authorization"= [])
     ),
@@ -797,8 +1168,8 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
         ("group_name" = String, Path, description = "Group name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/groups/{group_name}")]
@@ -914,7 +1285,6 @@ mod tests {
             let req = test::TestRequest::delete()
                 .uri("/test_org/roles/test_role")
                 .to_request();
-
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 403); // Forbidden in non-enterprise
         }
@@ -983,7 +1353,7 @@ mod tests {
             let app = test::init_service(App::new().service(update_role)).await;
             let req = test::TestRequest::post()
                 .uri("/test_org/roles/test_role")
-                .set_json(&"test")
+                .set_json("test")
                 .to_request();
 
             let resp = test::call_service(&app, req).await;

@@ -23,7 +23,7 @@ pub mod json;
 pub mod otlp;
 pub mod prom;
 
-const EXCLUDE_LABELS: [&str; 7] = [
+const EXCLUDE_LABELS: [&str; 8] = [
     VALUE_LABEL,
     HASH_LABEL,
     EXEMPLARS_LABEL,
@@ -31,6 +31,7 @@ const EXCLUDE_LABELS: [&str; 7] = [
     "trace_id",
     "span_id",
     "_timestamp",
+    "_all",
 ];
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {

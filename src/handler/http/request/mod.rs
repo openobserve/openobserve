@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
 pub mod actions;
+// #[cfg(feature = "enterprise")]
+pub mod agent;
 #[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;
@@ -30,10 +35,15 @@ pub mod folders;
 pub mod functions;
 pub mod keys;
 pub mod kv;
+#[cfg(feature = "enterprise")]
+pub mod license;
 pub mod logs;
+pub mod mcp;
 pub mod metrics;
 pub mod organization;
+pub mod patterns;
 pub mod pipeline;
+pub mod pipelines;
 pub mod promql;
 pub mod ratelimit;
 #[cfg(feature = "enterprise")]
@@ -43,13 +53,26 @@ pub mod rum;
 pub mod script_server;
 pub mod search;
 pub mod service_accounts;
+pub mod service_streams;
 pub mod short_url;
 pub mod status;
 pub mod stream;
-#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
-pub mod syslog;
 pub mod traces;
 pub mod users;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+
+// these are the common bulk delete req/res structs
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct BulkDeleteRequest {
+    pub ids: Vec<String>,
+}
+
+#[derive(Default, Serialize, ToSchema)]
+pub struct BulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}

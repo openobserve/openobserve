@@ -26,10 +26,10 @@ const docURL = serverDocURLs[name];
 </script>
 
 <template>
-  <div class="q-ma-md">
-    <div class="tw-text-[16px]">
-      <CopyContent class="q-mt-sm" :content="content" />
-      <div class="tw-font-bold tw-pt-6 tw-pb-2">
+  <div class="q-pa-sm">
+    <div class="tw:text-[16px]">
+      <CopyContent :content="content" />
+      <div class="tw:font-bold tw:pt-6 tw:pb-2">
         Click <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
       </div>
     </div>

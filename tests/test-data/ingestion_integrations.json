@@ -1,0 +1,302 @@
+[
+  {
+    "path": "/ingestion/custom/logs/curl",
+    "label": "Curl",
+    "category": "logs"
+  },
+  {
+    "path": "/ingestion/custom/logs/fluentbit",
+    "label": "FluentBit",
+    "category": "logs"
+  },
+  {
+    "path": "/ingestion/custom/logs/fluentd",
+    "label": "Fluentd",
+    "category": "logs"
+  },
+  {
+    "path": "/ingestion/custom/logs/filebeat",
+    "label": "FileBeat",
+    "category": "logs"
+  },
+  {
+    "path": "/ingestion/custom/logs/vector",
+    "label": "Vector",
+    "category": "logs"
+  },
+  {
+    "path": "/ingestion/custom/logs/syslogng",
+    "label": "Syslog-ng",
+    "category": "logs"
+  },
+  {
+    "path": "/ingestion/custom/logs/logstash",
+    "label": "Logstash",
+    "category": "logs"
+  },
+  {
+    "path": "/ingestion/custom/metrics/prometheus",
+    "label": "Prometheus",
+    "category": "metrics"
+  },
+  {
+    "path": "/ingestion/custom/metrics/otelCollector",
+    "label": "OTEL Collector",
+    "category": "metrics"
+  },
+  {
+    "path": "/ingestion/custom/metrics/cloudwatch",
+    "label": "CloudWatch Metrics",
+    "category": "metrics"
+  },
+  {
+    "path": "/ingestion/custom/traces/opentelemetry",
+    "label": "OpenTelemetry",
+    "category": "traces"
+  },
+  {
+    "path": "/ingestion/databases/postgres",
+    "label": "PostgreSQL",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/mysql",
+    "label": "MySQL",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/mongodb",
+    "label": "MongoDB",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/redis",
+    "label": "Redis",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/cassandra",
+    "label": "Cassandra",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/elasticsearch",
+    "label": "Elasticsearch",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/couchdb",
+    "label": "CouchDB",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/dynamodb",
+    "label": "DynamoDB",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/oracle",
+    "label": "Oracle",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/sqlserver",
+    "label": "SQL Server",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/snowflake",
+    "label": "Snowflake",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/databricks",
+    "label": "Databricks",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/saphana",
+    "label": "SAP HANA",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/aerospike",
+    "label": "Aerospike",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/databases/zookeeper",
+    "label": "Zookeeper",
+    "category": "databases"
+  },
+  {
+    "path": "/ingestion/servers/nginx",
+    "label": "Nginx",
+    "category": "servers"
+  },
+  {
+    "path": "/ingestion/servers/apache",
+    "label": "Apache",
+    "category": "servers"
+  },
+  {
+    "path": "/ingestion/servers/iis",
+    "label": "IIS",
+    "category": "servers"
+  },
+  {
+    "path": "/ingestion/security/okta",
+    "label": "Okta",
+    "category": "security"
+  },
+  {
+    "path": "/ingestion/security/office365",
+    "label": "Office 365",
+    "category": "security"
+  },
+  {
+    "path": "/ingestion/security/googleworkspace",
+    "label": "Google Workspace",
+    "category": "security"
+  },
+  {
+    "path": "/ingestion/security/jumpcloud",
+    "label": "JumpCloud",
+    "category": "security"
+  },
+  {
+    "path": "/ingestion/security/openvpn",
+    "label": "OpenVPN",
+    "category": "security"
+  },
+  {
+    "path": "/ingestion/security/osquery",
+    "label": "OSQuery",
+    "category": "security"
+  },
+  {
+    "path": "/ingestion/security/falco",
+    "label": "Falco",
+    "category": "security"
+  },
+  {
+    "path": "/ingestion/devops/jenkins",
+    "label": "Jenkins",
+    "category": "devops"
+  },
+  {
+    "path": "/ingestion/devops/terraform",
+    "label": "Terraform",
+    "category": "devops"
+  },
+  {
+    "path": "/ingestion/devops/ansible",
+    "label": "Ansible",
+    "category": "devops"
+  },
+  {
+    "path": "/ingestion/devops/githubactions",
+    "label": "GitHub Actions",
+    "category": "devops"
+  },
+  {
+    "path": "/ingestion/networking/netflow",
+    "label": "Netflow",
+    "category": "networking"
+  },
+  {
+    "path": "/ingestion/messagequeues/kafka",
+    "label": "Kafka",
+    "category": "messagequeues"
+  },
+  {
+    "path": "/ingestion/messagequeues/rabbitmq",
+    "label": "RabbitMQ",
+    "category": "messagequeues"
+  },
+  {
+    "path": "/ingestion/messagequeues/nats",
+    "label": "NATS",
+    "category": "messagequeues"
+  },
+  {
+    "path": "/ingestion/languages/python",
+    "label": "Python",
+    "category": "languages"
+  },
+  {
+    "path": "/ingestion/languages/nodejs",
+    "label": "Node.js",
+    "category": "languages"
+  },
+  {
+    "path": "/ingestion/languages/java",
+    "label": "Java",
+    "category": "languages"
+  },
+  {
+    "path": "/ingestion/languages/go",
+    "label": "Go",
+    "category": "languages"
+  },
+  {
+    "path": "/ingestion/languages/dotnetlogs",
+    "label": ".NET Logs",
+    "category": "languages"
+  },
+  {
+    "path": "/ingestion/languages/dotnettracing",
+    "label": ".NET Tracing",
+    "category": "languages"
+  },
+  {
+    "path": "/ingestion/languages/fastapi",
+    "label": "FastAPI",
+    "category": "languages"
+  },
+  {
+    "path": "/ingestion/others/airbyte",
+    "label": "Airbyte",
+    "category": "others"
+  },
+  {
+    "path": "/ingestion/others/airflow",
+    "label": "Airflow",
+    "category": "others"
+  },
+  {
+    "path": "/ingestion/others/cribl",
+    "label": "Cribl",
+    "category": "others"
+  },
+  {
+    "path": "/ingestion/others/heroku",
+    "label": "Heroku",
+    "category": "others"
+  },
+  {
+    "path": "/ingestion/others/vercel",
+    "label": "Vercel",
+    "category": "others"
+  },
+  {
+    "path": "/ingestion/recommended/kubernetes",
+    "label": "Kubernetes",
+    "category": "recommended"
+  },
+  {
+    "path": "/ingestion/recommended/gcp",
+    "label": "GCP",
+    "category": "recommended"
+  },
+  {
+    "path": "/ingestion/recommended/azure",
+    "label": "Azure",
+    "category": "recommended"
+  },
+  {
+    "path": "/ingestion/recommended/aws",
+    "label": "AWS",
+    "category": "recommended"
+  }
+]

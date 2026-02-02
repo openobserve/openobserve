@@ -18,12 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="col">
       <div
         data-test="iam-service-accounts-selection-filters"
-        class="flex justify-start bordered q-px-md q-py-sm"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+       class="flex justify-start q-px-md q-py-sm card-container"
         style="position: sticky; top: 0px; z-index: 2"
       >
         <div data-test="iam-service-accounts-selection-show-toggle" class="q-mr-md">
-          <div class="flex items-center q-pt-xs">
+          <div class="flex items-center">
             <span
               data-test="iam-service-accounts-selection-show-text"
               style="font-size: 14px"
@@ -33,10 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="q-ml-xs"
               style="
-                border: 1px solid #d7d7d7;
-                width: fit-content;
-                border-radius: 2px;
-              "
+              border: 1px solid #d7d7d7;
+              width: fit-content;
+              border-radius: 0.3rem;
+              padding: 2px;
+            "
             >
               <template v-for="visual in usersDisplayOptions" :key="visual.value">
                 <q-btn
@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="11px"
                   class="q-px-md visual-selection-btn"
                   @click="updateUserTable(visual.value)"
+                  style="height: 30px;"
                 >
                   {{ visual.label }}</q-btn
                 >
@@ -57,33 +58,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="iam-service-accounts-selection-search-input"
-          class="o2-input q-mr-md"
-          style="width: 400px"
+          class="q-mr-md"
         >
           <q-input
             data-test="service-accounts-list-search-input"
             v-model="userSearchKey"
             borderless
-            filled
             dense
-            class="q-ml-auto q-mb-xs no-border"
+            class=" no-border o2-search-input tw:h-[36px] tw:w-[200px]"
             placeholder="Search Service Accounts"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+              <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
             </template>
           </q-input>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table">
+      <div data-test="iam-service-accounts-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
         <template v-if="rows.length">
           <app-table
-            :rows="rows"
+            :rows="visibleRows"
             :columns="columns"
             :dense="true"
             :virtual-scroll="false"
             style="height: fit-content"
-            class="o2-quasar-table"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+            :hideTopPagination="true"
+            :showBottomPaginationWithTitle="true"
             :filter="{
               value: userSearchKey,
               method: filterUsers,
@@ -104,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           data-test="iam-service-accounts-selection-table-no-users-text"
           v-if="!rows.length"
-          class="q-mt-md text-bold q-pl-md"
+          class="text-bold q-pl-md q-py-md"
         >
           No Service Accounts added
         </div>
@@ -116,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import AppTable from "@/components/AppTable.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";
-  import { watch } from "vue";
+  import { computed, watch } from "vue";
   import type { Ref } from "vue";
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
@@ -284,6 +286,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }
     return filtered;
   };
+
+  const visibleRows = computed(() => {
+    if (!userSearchKey.value) return rows.value || [];
+    return filterUsers(rows.value || [], userSearchKey.value);
+  });
+
+  const hasVisibleRows = computed(() => visibleRows.value.length > 0);
   </script>
   
   <style scoped></style>

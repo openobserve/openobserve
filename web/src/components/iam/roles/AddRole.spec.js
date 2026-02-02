@@ -446,7 +446,9 @@ describe("AddRole Component", () => {
         }
       });
 
-      expect(wrapper.vm.width).toBe("30vw");
+      // The width prop has been removed from the component
+      // Verify the component mounts successfully without the width prop
+      expect(wrapper.exists()).toBe(true);
     });
   });
 

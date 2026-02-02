@@ -1,0 +1,348 @@
+{
+  "regexPatterns": [
+    {
+      "name": "email_format",
+      "description": "Email address validation pattern",
+      "pattern": "^[\\w\\.-]+@[\\w\\.-]+\\.\\w{2,}$",
+      "testField": "user_email",
+      "validData": "john.doe@example.com",
+      "invalidData": "notanemail"
+    },
+    {
+      "name": "email_format_redact",
+      "description": "Email address validation pattern (for redaction tests)",
+      "pattern": "^[\\w\\.-]+@[\\w\\.-]+\\.\\w{2,}$",
+      "testField": "user_email",
+      "validData": "john.doe@example.com",
+      "invalidData": "notanemail"
+    },
+    {
+      "name": "us_phone",
+      "description": "US phone number (10 digits)",
+      "pattern": "^\\d{10}$",
+      "testField": "phone",
+      "validData": "5551234567",
+      "invalidData": "123"
+    },
+    {
+      "name": "us_phone_redact",
+      "description": "US phone number (10 digits) (for redaction tests)",
+      "pattern": "^\\d{10}$",
+      "testField": "phone",
+      "validData": "5551234567",
+      "invalidData": "123"
+    },
+    {
+      "name": "url_format",
+      "description": "URL validation pattern",
+      "pattern": "^https?://[\\w.-]+\\.[\\w.-]+.*$",
+      "testField": "website_url",
+      "validData": "https://openobserve.ai/docs",
+      "invalidData": "not-a-url"
+    },
+    {
+      "name": "url_format_drop",
+      "description": "URL validation pattern (for drop tests)",
+      "pattern": "^https?://[\\w.-]+\\.[\\w.-]+.*$",
+      "testField": "website_url",
+      "validData": "https://openobserve.ai/docs",
+      "invalidData": "not-a-url"
+    },
+    {
+      "name": "strong_password",
+      "description": "Strong password pattern (8+ chars with mixed case, digit, special char)",
+      "pattern": "^[A-Za-z0-9@$!%*?&]{8,}$",
+      "testField": "user_password",
+      "validData": "Xyz@1234",
+      "invalidData": "weak"
+    },
+    {
+      "name": "strong_password_drop",
+      "description": "Strong password pattern (for drop tests)",
+      "pattern": "^[A-Za-z0-9@$!%*?&]{8,}$",
+      "testField": "user_password",
+      "validData": "Xyz@1234",
+      "invalidData": "weak"
+    },
+    {
+      "name": "hex_color",
+      "description": "Hexadecimal color code",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "testField": "theme_color",
+      "validData": "#1A2b3C",
+      "invalidData": "#GGGGGG"
+    },
+    {
+      "name": "hex_color_drop",
+      "description": "Hexadecimal color code (for drop tests)",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "testField": "theme_color",
+      "validData": "#1A2b3C",
+      "invalidData": "#GGGGGG"
+    },
+    {
+      "name": "ipv4_address",
+      "description": "IPv4 address format",
+      "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$",
+      "testField": "server_ip",
+      "validData": "192.168.1.100",
+      "invalidData": "999.999.999.999"
+    },
+    {
+      "name": "ipv4_address_drop",
+      "description": "IPv4 address format (for drop tests)",
+      "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$",
+      "testField": "server_ip",
+      "validData": "192.168.1.100",
+      "invalidData": "999.999.999.999"
+    },
+    {
+      "name": "date_yyyy_mm_dd",
+      "description": "Date in YYYY-MM-DD format",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+      "testField": "event_date",
+      "validData": "2025-07-08",
+      "invalidData": "2025-13-45"
+    },
+    {
+      "name": "credit_card",
+      "description": "Credit card number format",
+      "pattern": "^\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}$",
+      "testField": "cc_number",
+      "validData": "1234 5678 9012 3456",
+      "invalidData": "123"
+    },
+    {
+      "name": "credit_card_redact",
+      "description": "Credit card number format (for redaction tests)",
+      "pattern": "^\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}$",
+      "testField": "cc_number",
+      "validData": "1234 5678 9012 3456",
+      "invalidData": "123"
+    },
+    {
+      "name": "ssn",
+      "description": "US Social Security Number",
+      "pattern": "^\\d{3}-\\d{2}-\\d{4}$",
+      "testField": "ssn",
+      "validData": "123-45-6789",
+      "invalidData": "123"
+    },
+    {
+      "name": "ssn_redact",
+      "description": "US Social Security Number (for redaction tests)",
+      "pattern": "^\\d{3}-\\d{2}-\\d{4}$",
+      "testField": "ssn",
+      "validData": "123-45-6789",
+      "invalidData": "123"
+    },
+    {
+      "name": "pin_code",
+      "description": "Indian PIN code (6 digits)",
+      "pattern": "^\\d{6}$",
+      "testField": "postal_code",
+      "validData": "560001",
+      "invalidData": "12345"
+    },
+    {
+      "name": "phone_country_code",
+      "description": "Phone with country code +91",
+      "pattern": "^\\+91[-\\s]?[6-9]\\d{9}$",
+      "testField": "mobile_with_code",
+      "validData": "+91-9876543210",
+      "invalidData": "+91-1234567890"
+    },
+    {
+      "name": "percentage_format",
+      "description": "Percentage value",
+      "pattern": "\\b\\d{1,3}%\\b",
+      "testField": "cpu_usage",
+      "validData": "87%",
+      "invalidData": "1000%"
+    },
+    {
+      "name": "url_format_query_drop",
+      "description": "URL validation pattern (for query time drop tests)",
+      "pattern": "^https?://[\\w.-]+\\.[\\w.-]+.*$",
+      "testField": "website_url",
+      "validData": "https://openobserve.ai/docs",
+      "invalidData": "not-a-url"
+    },
+    {
+      "name": "strong_password_query_drop",
+      "description": "Strong password pattern (for query time drop tests)",
+      "pattern": "^[A-Za-z0-9@$!%*?&]{8,}$",
+      "testField": "user_password",
+      "validData": "Xyz@1234",
+      "invalidData": "weak"
+    },
+    {
+      "name": "ipv4_address_query_drop",
+      "description": "IPv4 address format (for query time drop tests)",
+      "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$",
+      "testField": "server_ip",
+      "validData": "192.168.1.100",
+      "invalidData": "999.999.999.999"
+    },
+    {
+      "name": "hex_color_query_drop",
+      "description": "Hexadecimal color code (for query time drop tests)",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "testField": "theme_color",
+      "validData": "#1A2b3C",
+      "invalidData": "#GGGGGG"
+    },
+    {
+      "name": "email_format_query_redact",
+      "description": "Email address validation pattern (for query time redaction tests)",
+      "pattern": "^[\\w\\.-]+@[\\w\\.-]+\\.\\w{2,}$",
+      "testField": "user_email",
+      "validData": "john.doe@example.com",
+      "invalidData": "notanemail"
+    },
+    {
+      "name": "us_phone_query_redact",
+      "description": "US phone number (10 digits) (for query time redaction tests)",
+      "pattern": "^\\d{10}$",
+      "testField": "phone",
+      "validData": "5551234567",
+      "invalidData": "123"
+    },
+    {
+      "name": "credit_card_query_redact",
+      "description": "Credit card number format (for query time redaction tests)",
+      "pattern": "^\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}$",
+      "testField": "cc_number",
+      "validData": "1234 5678 9012 3456",
+      "invalidData": "123"
+    },
+    {
+      "name": "ssn_query_redact",
+      "description": "US Social Security Number (for query time redaction tests)",
+      "pattern": "^\\d{3}-\\d{2}-\\d{4}$",
+      "testField": "ssn",
+      "validData": "123-45-6789",
+      "invalidData": "123"
+    },
+    {
+      "name": "url_format_hash",
+      "description": "URL validation pattern (for hash tests)",
+      "pattern": "^https?://[\\w.-]+\\.[\\w.-]+.*$",
+      "testField": "website_url",
+      "validData": "https://openobserve.ai/docs",
+      "invalidData": "not-a-url"
+    },
+    {
+      "name": "strong_password_hash",
+      "description": "Strong password pattern (for hash tests)",
+      "pattern": "^[A-Za-z0-9@$!%*?&]{8,}$",
+      "testField": "user_password",
+      "validData": "Xyz@1234",
+      "invalidData": "weak"
+    },
+    {
+      "name": "ipv4_address_hash",
+      "description": "IPv4 address format (for hash tests)",
+      "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$",
+      "testField": "server_ip",
+      "validData": "192.168.1.100",
+      "invalidData": "999.999.999.999"
+    },
+    {
+      "name": "hex_color_hash",
+      "description": "Hexadecimal color code (for hash tests)",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "testField": "theme_color",
+      "validData": "#1A2b3C",
+      "invalidData": "#GGGGGG"
+    },
+    {
+      "name": "email_format_query_hash",
+      "description": "Email address validation pattern (for query time hash tests)",
+      "pattern": "^[\\w\\.-]+@[\\w\\.-]+\\.\\w{2,}$",
+      "testField": "user_email",
+      "validData": "john.doe@example.com",
+      "invalidData": "notanemail"
+    },
+    {
+      "name": "us_phone_query_hash",
+      "description": "US phone number (10 digits) (for query time hash tests)",
+      "pattern": "^\\d{10}$",
+      "testField": "phone",
+      "validData": "5551234567",
+      "invalidData": "123"
+    },
+    {
+      "name": "credit_card_query_hash",
+      "description": "Credit card number format (for query time hash tests)",
+      "pattern": "^\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}$",
+      "testField": "cc_number",
+      "validData": "1234 5678 9012 3456",
+      "invalidData": "123"
+    },
+    {
+      "name": "ssn_query_hash",
+      "description": "US Social Security Number (for query time hash tests)",
+      "pattern": "^\\d{3}-\\d{2}-\\d{4}$",
+      "testField": "ssn",
+      "validData": "123-45-6789",
+      "invalidData": "123"
+    }
+  ],
+  "ingestionData": {
+    "withSensitiveFields": [
+      {
+        "level": "info",
+        "user_email": "john.doe@example.com",
+        "phone": "9876543210",
+        "log": "User login successful"
+      },
+      {
+        "level": "info",
+        "website_url": "https://openobserve.ai/docs",
+        "user_password": "Xyz@1234",
+        "log": "Password reset initiated"
+      },
+      {
+        "level": "info",
+        "theme_color": "#1A2b3C",
+        "server_ip": "192.168.1.100",
+        "log": "Theme preferences updated"
+      },
+      {
+        "level": "info",
+        "event_date": "2025-07-08",
+        "cc_number": "1234 5678 9012 3456",
+        "log": "Payment processed"
+      },
+      {
+        "level": "info",
+        "pan": "ABCDE1234F",
+        "postal_code": "560001",
+        "log": "KYC verification completed"
+      },
+      {
+        "level": "info",
+        "mobile_with_code": "+91-9876543210",
+        "cpu_usage": "87%",
+        "log": "System metrics report"
+      }
+    ],
+    "withoutSensitiveFields": [
+      {
+        "level": "info",
+        "username": "testuser",
+        "action": "login",
+        "log": "Regular log entry without sensitive data"
+      }
+    ]
+  },
+  "queryTestData": {
+    "searchQueries": [
+      "user_email: *",
+      "phone: *",
+      "cc_number: *",
+      "pan: *"
+    ]
+  }
+}

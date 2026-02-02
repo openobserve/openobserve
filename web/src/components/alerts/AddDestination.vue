@@ -15,18 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="o2-input">
-      <div class="row items-center no-wrap q-mx-md q-my-sm">
-        <div class="flex items-center">
+ <q-page class="q-pa-none o2-custom-bg" style="height: calc(100vh - 48px); min-height: inherit" >
+      <div class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]">
+        <div class="flex items-center tw:h-[60px]">
           <div
-            class="flex justify-center items-center q-mr-md cursor-pointer"
-            style="
-              border: 1.5px solid;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-            "
+            no-caps
+            padding="xs"
+            outline
+            icon="arrow_back_ios_new"
+            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
             title="Go Back"
             @click="$emit('cancel:hideform')"
           >
@@ -42,19 +39,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <q-separator />
-      <div class="row q-col-gutter-sm q-px-lg q-my-md">
+      <div class="card-container tw:h-full tw:py-2">
+        <div>
+       <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
         <div v-if="isAlerts" class="col-12 q-pb-md">
+         <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
           <app-tabs
-            style="
-              border: 1px solid #8a8a8a;
-              border-radius: 4px;
-              overflow: hidden;
-              width: fit-content;
-            "
+            data-test="add-destination-tabs"
             :tabs="tabs"
+            class="tabs-selection-container"
             v-model:active-tab="formData.type"
           />
+          </div>
         </div>
         <div
           v-if="formData.type === 'email' && !getFormattedTemplates.length"
@@ -67,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Create Email Template"
             size="sm"
             no-caps
-            color="secondary"
+            class="o2-secondary-button"
             style="border-radius: 4px; font-size: 12px"
             @click="createEmailTemplate"
           />
@@ -80,12 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-destination-name-input"
             v-model="formData.name"
             :label="t('alerts.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             v-bind:readonly="isUpdatingDestination"
             v-bind:disable="isUpdatingDestination"
@@ -97,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('common.nameRequired'),
             ]"
             tabindex="0"
+            hide-bottom-space
           />
         </div>
         <div v-if="isAlerts" class="col-6 row q-py-xs">
@@ -106,12 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.template"
               :label="t('alert_destinations.template') + ' *'"
               :options="getFormattedTemplates"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop no-case"
               stack-label
-              outlined
-              filled
+              borderless
+              hide-bottom-space
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
@@ -127,12 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-destination-url-input"
               v-model="formData.url"
               :label="t('alert_destinations.url') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
+              hide-bottom-space
               dense
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
@@ -146,14 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.method"
               :label="t('alert_destinations.method') + ' *'"
               :options="apiMethods"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
+                            dense
+
+              borderless
+              hide-bottom-space
               :popup-content-style="{ textTransform: 'uppercase' }"
-              filled
-              dense
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
             />
@@ -165,13 +154,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.output_format"
               :label="t('alert_destinations.output_format') + ' *'"
               :options="outputFormats"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
+              borderless
+              hide-bottom-space
               :popup-content-style="{ textTransform: 'uppercase' }"
-              filled
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
@@ -179,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
           </div>
           <div class="col-12 q-py-sm">
-            <div class="text-bold q-py-xs" style="paddingleft: 10px">
+            <div class="text-bold q-py-xs">
               Headers
             </div>
             <div
@@ -191,11 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-input
                   :data-test="`add-destination-header-${header['key']}-key-input`"
                   v-model="header.key"
-                  color="input-border"
-                  bg-color="input-bg"
                   stack-label
-                  outlined
-                  filled
+                  borderless
+                  hide-bottom-space
                   :placeholder="t('alert_destinations.api_header')"
                   dense
                   tabindex="0"
@@ -206,11 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`add-destination-header-${header['key']}-value-input`"
                   v-model="header.value"
                   :placeholder="t('alert_destinations.api_header_value')"
-                  color="input-border"
-                  bg-color="input-bg"
                   stack-label
-                  outlined
-                  filled
+                  borderless
+                  hide-bottom-space
                   dense
                   isUpdatingDestination
                   tabindex="0"
@@ -246,26 +229,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="col-12 q-py-sm">
-            <div class="q-py-sm">
               <q-toggle
                 data-test="add-destination-skip-tls-verify-toggle"
-                class="q-mt-sm"
+                class="o2-toggle-button-lg tw:mr-3 -tw:ml-4"
+                size="lg"
                 v-model="formData.skip_tls_verify"
                 :label="t('alert_destinations.skip_tls_verify')"
               />
-            </div>
           </div>
         </template>
         <template v-if="formData.type === 'email'">
           <q-input
             v-model="formData.emails"
             :label="t('reports.recipients') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             :rules="[
               (val: any) =>
@@ -275,7 +254,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
             tabindex="0"
             style="width: 100%"
-            borderless
             :placeholder="t('user.inviteByEmail')"
           />
         </template>
@@ -287,14 +265,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.action_id"
               :label="t('alert_destinations.action') + ' *'"
               :options="filteredActions"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop no-case"
               map-options
               emit-value
               stack-label
-              outlined
-              filled
+              borderless
               dense
               use-input
               :loading="isLoadingActions"
@@ -306,26 +281,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <div class="flex justify-center q-mt-lg">
+    <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
       <q-btn
         data-test="add-destination-cancel-btn"
         v-close-popup="true"
-        class="q-mb-md text-bold"
+        class="q-mr-md o2-secondary-button tw:h-[36px]"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
+        flat
         @click="$emit('cancel:hideform')"
       />
       <q-btn
         data-test="add-destination-submit-btn"
+        class="o2-primary-button no-border tw:h-[36px]"
         :label="t('alerts.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        @click="saveDestination"
+        type="submit"
         no-caps
+        flat
+        @click="saveDestination"
       />
+    </div>
     </div>
   </q-page>
 </template>
@@ -352,6 +327,7 @@ import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps({
   templates: {
@@ -373,6 +349,7 @@ const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const store = useStore();
 const { t } = useI18n();
+const { track } = useReo();
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
@@ -615,6 +592,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Update Destination",
+      page: "Add Destination"
+    });
   } else {
     destinationService
       .create({
@@ -641,6 +622,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Create Destination",
+      page: "Add Destination"
+    });
   }
 };
 const addApiHeader = (key: string = "", value: string = "") => {

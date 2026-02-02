@@ -36,23 +36,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     hide-no-data
   >
     <template v-slot:body-cell="props">
-      <q-td :props="props" :style="getStyle(props)">
-        {{ props.value == 'undefined' || props.value === null ? '' : props.value }}
+      <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
+        <!-- Copy button on left for numeric/right-aligned columns -->
+        <q-btn
+          v-if="props.col.align === 'right' && shouldShowCopyButton(props.value)"
+          :icon="
+            isCellCopied(props.rowIndex, props.col.name)
+              ? 'check'
+              : 'content_copy'
+          "
+          dense
+          size="xs"
+          no-caps
+          flat
+          class="copy-btn q-mr-xs"
+          @click.stop="
+            copyCellContent(props.value, props.rowIndex, props.col.name)
+          "
+        >
+        </q-btn>
+          <!-- Use JsonFieldRenderer if column is marked as JSON -->
+          <JsonFieldRenderer
+            v-if="props.col.showFieldAsJson"
+            :value="props.value"
+          />
+          <!-- Otherwise show normal value -->
+          <template v-else>
+              {{
+                props.value === "undefined" || props.value === null
+                  ? ""
+                  : props.col.format
+                    ? props.col.format(props.value, props.row)
+                    : props.value
+              }}
+          </template>
+        <!-- Copy button on right for non-numeric columns -->
+          <q-btn
+            v-if="props.col.align !== 'right' && shouldShowCopyButton(props.value)"
+            :icon="
+              isCellCopied(props.rowIndex, props.col.name)
+                ? 'check'
+                : 'content_copy'
+            "
+            dense
+            size="xs"
+            no-caps
+            flat
+            class="copy-btn q-ml-xs"
+            @click.stop="
+              copyCellContent(props.value, props.rowIndex, props.col.name)
+            "
+          >
+          </q-btn>
       </q-td>
+    </template>
+
+    <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
+    <template v-slot:bottom="scope" v-if="$slots.bottom">
+      <slot name="bottom" v-bind="scope" />
     </template>
   </q-table>
 </template>
 
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
-import { exportFile } from "quasar";
+import { exportFile, copyToClipboard, useQuasar } from "quasar";
 import { defineComponent, ref } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
+import JsonFieldRenderer from "./JsonFieldRenderer.vue";
 
 export default defineComponent({
   name: "TableRenderer",
+  components: {
+    JsonFieldRenderer,
+  },
   props: {
     data: {
       required: true,
@@ -74,6 +133,8 @@ export default defineComponent({
   setup(props: any) {
     const tableRef: any = ref(null);
     const store = useStore();
+    const $q = useQuasar();
+    const copiedCells = ref(new Map<string, boolean>());
 
     const { showErrorNotification, showPositiveNotification } =
       useNotifications();
@@ -218,6 +279,36 @@ export default defineComponent({
       return luminance < 0.5;
     };
 
+    const isCellCopied = (rowIndex: number, colName: string) => {
+      return copiedCells.value.has(`${rowIndex}_${colName}`);
+    };
+
+    const shouldShowCopyButton = (value: any) => {
+      if (value === null || value === undefined) return false;
+      if (value === "undefined") return false;
+      const stringValue = String(value).trim();
+      return stringValue !== "";
+    };
+
+    const copyCellContent = (value: any, rowIndex: number, colName: string) => {
+      if (value === null || value === undefined) return;
+
+      const textToCopy = String(value);
+      copyToClipboard(textToCopy)
+        .then(() => {
+          // Set copied state
+          const key = `${rowIndex}_${colName}`;
+          copiedCells.value.set(key, true);
+
+          // Reset after 3 seconds
+          setTimeout(() => {
+            copiedCells.value.delete(key);
+          }, 3000);
+        })
+        .catch(() => {
+        });
+    };
+
     return {
       pagination: ref({
         rowsPerPage: 0,
@@ -227,6 +318,9 @@ export default defineComponent({
       tableRef,
       getStyle,
       store,
+      copyCellContent,
+      isCellCopied,
+      shouldShowCopyButton,
     };
   },
 });
@@ -290,6 +384,18 @@ export default defineComponent({
     word-break: break-word;
     overflow-wrap: break-word;
     white-space: normal !important;
+  }
+
+}
+
+.copy-cell-td {
+  .copy-btn {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  &:hover .copy-btn {
+    opacity: 1;
   }
 }
 </style>

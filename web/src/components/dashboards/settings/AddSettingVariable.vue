@@ -22,14 +22,165 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="scrollable-content">
         <q-form greedy ref="addVariableForm" @submit="onSubmit">
+          <div class="q-mt-md">
+            <div class="q-mb-md">
+              <q-select
+                hint="Variables will be applied to all tabs and panels if global is selected."
+                v-model="variableData.scope"
+                :options="scopeOptions"
+                label="Select variable scope"
+                outlined
+                dense
+                emit-value
+                map-options
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                data-test="dashboard-variable-scope-select"
+              />
+            </div>
+
+            <!-- Tab selection section - shown only when scope is tabs or panels -->
+            <div
+              v-if="
+                variableData.scope === 'tabs' || variableData.scope === 'panels'
+              "
+              class="q-mt-md q-mb-md"
+            >
+              <q-select
+                hint="Variables will be available only in the selected tabs."
+                v-model="selectedTabs"
+                :options="tabsOptions"
+                label="Select tabs"
+                multiple
+                stack-label
+                outlined
+                dense
+                emit-value
+                map-options
+                @update:model-value="updatePanels"
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                data-test="dashboard-variable-tabs-select"
+                :rules="[
+                  (val: any) =>
+                    (variableData.scope !== 'tabs' &&
+                      variableData.scope !== 'panels') ||
+                    (val && val.length > 0) ||
+                    'At least one tab is required',
+                ]"
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
+                  >
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                        :data-test="`dashboard-variable-assign-tabs-${opt.value}`"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+
+            <!-- Panel selection section - shown only when scope is panels -->
+            <div
+              v-if="
+                variableData.scope === 'panels' &&
+                (selectedTabs.length > 0 || isFromAddPanel)
+              "
+              class="q-mt-md"
+            >
+              <q-select
+                hint="Variables will be available only in the selected panels."
+                v-model="selectedPanels"
+                :options="groupedPanelsOptions"
+                label="Select panels"
+                stack-label
+                multiple
+                filled
+                outlined
+                dense
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop q-mb-md"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                emit-value
+                map-options
+                data-test="dashboard-variable-panels-select"
+                :rules="[
+                  (val: any) =>
+                    variableData.scope !== 'panels' ||
+                    (val && val.length > 0) ||
+                    'At least one panel is required',
+                ]"
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <!-- Tab separator -->
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
+                  >
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <!-- Panel options (including Current Panel) -->
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                        :data-test="`dashboard-variable-assign-panels-${opt.value}`"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label
+                        :class="
+                          opt.isCurrentPanel
+                            ? 'text-primary text-weight-bold'
+                            : ''
+                        "
+                      >
+                        {{ opt.label }}
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+          </div>
           <div class="col">
             <div>
               <q-select
                 class="showLabelOnTop"
-                filled
                 stack-label
                 input-debounce="0"
-                outlined
                 dense
                 v-model="variableData.type"
                 :options="variableTypes"
@@ -38,6 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 map-options
                 emit-value
                 data-test="dashboard-variable-type-select"
+                borderless
+                hide-bottom-space
               ></q-select>
             </div>
             <div class="text-body1 text-bold q-mt-sm">
@@ -50,8 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop q-mr-sm"
                   :label="t('dashboard.nameOfVariable') + ' *'"
                   dense
-                  filled
-                  outlined
+                  borderless
+                  hide-bottom-space
                   stack-label
                   :rules="[
                     (val: any) => !!val.trim() || 'Field is required!',
@@ -68,15 +221,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop"
                   :label="t('dashboard.labelOfVariable')"
                   dense
-                  filled
-                  outlined
                   stack-label
                   data-test="dashboard-variable-label"
+                  borderless
+                  hide-bottom-space
                 ></q-input>
               </div>
             </div>
             <div
-              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-sm"
+              class="tw:flex tw:justify-between tw:w-full text-body1 text-bold q-mt-sm"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -92,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="data.streamType"
                   input-debounce="0"
                   behavior="menu"
-                  filled
+                  hide-bottom-space
                   borderless
                   dense
                   stack-label
@@ -108,8 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   input-debounce="0"
                   behavior="menu"
                   use-input
-                  filled
                   borderless
+                  hide-bottom-space
                   dense
                   stack-label
                   @filter="streamsFilterFn"
@@ -126,7 +279,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-select
                 v-model="variableData.query_data.field"
                 :label="t('dashboard.selectField') + ' *'"
-                filled
                 stack-label
                 use-input
                 borderless
@@ -152,10 +304,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model.number="variableData.query_data.max_record_size"
                   :label="t('dashboard.DefaultSize')"
                   dense
-                  filled
-                  outlined
                   stack-label
                   data-test="dashboard-variable-max-record-size"
+                  borderless
+                  hide-bottom-space
                 >
                   <q-btn
                     padding="xs"
@@ -195,14 +347,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="row items-center" style="width: 100%">
                   <div
-                    class="row no-wrap items-center q-mb-xs"
+                    class="row no-wrap items-start q-mb-xs"
                     style="width: 100%"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
                     <q-select
-                      filled
-                      outlined
                       emit-value
                       dense
                       hide-selected
@@ -223,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[
                         (val: any) => !!val.trim() || 'Field is required!',
                       ]"
-                      style="max-width: 41%; width: 41%"
+                      style="max-width: 41%; width: 41%; flex-shrink: 0"
                       ><q-tooltip v-if="filter.name">
                         {{ filter.name }}
                       </q-tooltip>
@@ -237,10 +387,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-select>
                     <q-select
                       dense
-                      filled
                       v-model="filter.operator"
                       :display-value="filter.operator ? filter.operator : ''"
-                      style="width: 18%"
+                      style="width: 18%; flex-shrink: 0"
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :rules="[
@@ -281,13 +430,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         margin-top: none !important;
                         width: 41% !important;
                         padding-bottom: 0px !important;
+                        flex-shrink: 0;
                       "
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
                     <q-btn
                       size="sm"
                       padding="12px 5px"
-                      style="margin-bottom: 20px"
+                      style="margin-bottom: 20px; flex-shrink: 0"
                       flat
                       dense
                       @click="removeFilter(index)"
@@ -301,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     icon="add"
                     no-outline
-                    class="q-mt-sm"
+                    class="q-mt-sm el-border"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
                   >
@@ -323,8 +473,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.ValueOfVariable') + ' *'"
               data-test="dashboard-variable-constant-value"
               dense
-              filled
-              outlined
               stack-label
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             ></q-input>
@@ -336,21 +484,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.DefaultValue')"
               data-test="dashboard-variable-textbox-default-value"
               dense
-              filled
-              outlined
               stack-label
+              borderless
+              hide-bottom-space
             ></q-input>
           </div>
           <div v-if="variableData.type == 'custom'">
-            <div class="tw-flex">
-              <div class="tw-w-6"></div>
-              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+            <div class="tw:flex">
+              <div class="tw:w-6"></div>
+              <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
                 Label
               </div>
-              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+              <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
                 Value
               </div>
-              <div class="tw-w-12 tw-flex tw-flex-col tw-items-center">
+              <div class="tw:w-12 tw:flex tw:flex-col tw:items-center">
                 <span v-if="!variableData.multiSelect"> Default </span>
                 <q-checkbox
                   v-if="variableData.multiSelect"
@@ -358,21 +506,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="customSelectAllModel"
                   data-test="dashboard-custom-variable-select-all-checkbox"
                   @click="onCustomSelectAllClick"
-                  class="tw-ml-[0.4rem]"
+                  class="tw:ml-[0.4rem]"
                 >
                   <q-tooltip anchor="top middle" self="bottom middle">
                     Default - Select All
                   </q-tooltip>
                 </q-checkbox>
               </div>
-              <div class="tw-w-[2.62rem]"></div>
+              <div class="tw:w-[2.62rem]"></div>
             </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
               class="row"
             >
-              <span class="tw-pt-3.5 tw-w-6">{{ index + 1 }}</span>
+              <span class="tw:pt-3.5 tw:w-6">{{ index + 1 }}</span>
               <q-input
                 dense
                 filled
@@ -386,8 +534,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-input
                 dense
-                filled
-                outlined
+                borderless
+                hide-bottom-space
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 class="col textbox q-mr-sm"
                 v-model="variableData.options[index].value"
@@ -395,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="'Value ' + (index + 1)"
                 name="value"
               />
-              <div class="tw-flex tw-w-12 tw-item-center tw-justify-center">
+              <div class="tw:flex tw:w-12 tw:item-center tw:justify-center">
                 <q-checkbox
                   dense
                   v-model="variableData.options[index].selected"
@@ -420,7 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 icon="add"
                 no-outline
-                class="q-mt-md"
+                class="q-mt-md el-border"
                 @click="addField()"
                 >Add Option</q-btn
               >
@@ -435,6 +583,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="variableData.multiSelect"
               :label="t('dashboard.multiSelect')"
               data-test="dashboard-query_values-show_multiple_values"
+              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+              size="lg"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-lg-dark'
+                  : 'o2-toggle-button-lg-light'
+              "
             />
           </div>
           <!-- default value for multi select variables -->
@@ -512,14 +667,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex q-mr-sm" style="width: 50%">
                   <q-input
                     dense
-                    filled
-                    outlined
                     stack-label
                     class="col textbox showLabelOnTop"
                     v-model="variableData.customMultiSelectValue[index]"
                     name="value"
                     placeholder="Enter value"
                     :data-test="`dashboard-variable-custom-value-${index}`"
+                    borderless
+                    hide-bottom-space
                   />
                   <q-btn
                     v-if="variableData.multiSelect"
@@ -543,7 +698,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   no-caps
                   icon="add"
                   no-outline
-                  class="q-mt-md"
+                  class="q-mt-md el-border"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
                 >
@@ -551,13 +706,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-
           <!-- hide on dashboard toggle -->
-          <div>
+          <div class="q-mt-md">
             <q-toggle
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
+              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+              size="lg"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-lg-dark'
+                  : 'o2-toggle-button-lg-light'
+              "
             />
           </div>
 
@@ -567,6 +728,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-toggle
                 v-model="variableData.escapeSingleQuotes"
                 :label="t('dashboard.escapeSingleQuotes')"
+                class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+                size="lg"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-toggle-button-lg-dark'
+                    : 'o2-toggle-button-lg-light'
+                "
               />
               <div>
                 <q-icon
@@ -591,19 +759,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="sticky-footer">
         <q-btn
-          class="text-bold"
           :label="t('dashboard.cancel')"
-          text-color="light-text"
-          no-caps
+          class="o2-secondary-button tw:h-[36px]"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
+          flat
           @click="close"
           data-test="dashboard-variable-cancel-btn"
         />
         <q-btn
           type="submit"
           :loading="saveVariableApiCall.isLoading.value"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          no-caps
+          class="o2-primary-button tw:h-[36px] q-ml-md"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
+          flat
           @click="addVariableForm?.submit()"
           data-test="dashboard-variable-save-btn"
           >Save</q-btn
@@ -625,6 +801,7 @@ import {
   toRaw,
   type Ref,
   computed,
+  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
@@ -642,21 +819,93 @@ import {
   buildVariablesDependencyGraph,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "AddSettingVariable",
-  props: ["variableName", "dashboardVariablesList"],
+  props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
   components: { DashboardHeader, CommonAutoComplete },
   emits: ["close", "save"],
   setup(props, { emit }) {
+    // Store dashboard data
+    const dashboardData = ref<any>({ tabs: [] });
+
+    // Store selected tabs and panels
+    const selectedTabs = ref<string[]>([]);
+    const selectedPanels = ref<string[]>([]);
+
+    // Format tabs for selection from dashboard data
+    const tabsOptions = computed(() =>
+      dashboardData.value.tabs.map((tab: any) => ({
+        label: tab.name,
+        value: tab.tabId,
+      })),
+    );
+
+    // Compute grouped panels options with tabs as separators
+    const groupedPanelsOptions = computed(() => {
+      // Check if we're editing an existing panel (panelId exists in route)
+      const isEditingPanel = !!route.query.panelId;
+
+      // If called from Add Panel and no tabs selected, show Current Panel at the top without grouping
+      // But only if NOT editing an existing panel
+      if (
+        props.isFromAddPanel &&
+        selectedTabs.value.length === 0 &&
+        !isEditingPanel
+      ) {
+        return [
+          {
+            label: "Current Panel",
+            value: "current_panel",
+            isCurrentPanel: true,
+          },
+        ];
+      }
+
+      // Add existing panels grouped by tabs
+      const options = dashboardData.value.tabs
+        .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
+        .flatMap((tab: any) => {
+          const panelOptions = [{ label: tab.name, isTab: true }];
+
+          // Add "Current Panel" option first if from Add Panel
+          // But only if NOT editing an existing panel
+          if (props.isFromAddPanel && !isEditingPanel) {
+            panelOptions.push({
+              label: "Current Panel",
+              value: "current_panel",
+              isCurrentPanel: true,
+            });
+          }
+
+          // Add existing panels from this tab
+          panelOptions.push(
+            ...(tab.panels || []).map((panel: any) => ({
+              label: panel.title,
+              value: panel.id,
+            })),
+          );
+
+          return panelOptions;
+        });
+
+      return options;
+    });
     const { t } = useI18n();
     const store = useStore();
     const addVariableForm: Ref<any> = ref(null);
     const data: any = reactive({
       schemaResponse: [],
-      streamType: ["logs", "metrics", "traces", "enrichment_tables", "metadata"],
+      streamType: [
+        "logs",
+        "metrics",
+        "traces",
+        "enrichment_tables",
+        "metadata",
+      ],
       streams: [],
       currentFieldsList: [],
 
@@ -715,12 +964,22 @@ export default defineComponent({
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
       escapeSingleQuotes: false,
+      // Add these properties for tab/panel binding
+      scope: "global", // Can be 'global', 'tabs', or 'panels'
+      tabs: [], // Store selected tab IDs
+      panels: [], // Store selected panel IDs
     });
 
     const filterCycleError: any = ref("");
 
     // select all values as default value for custom typed variable
     const customSelectAllModel: any = ref(false);
+
+    const scopeOptions = computed(() => [
+      { label: "Global", value: "global" },
+      { label: "Selected Tabs", value: "tabs" },
+      { label: "Selected Panels", value: "panels" },
+    ]);
 
     const handleCustomSelectAll = () => {
       // if all values are selected, then check customSelectAllModel = true
@@ -777,7 +1036,7 @@ export default defineComponent({
         if (newVal === "") {
           variableData.query_data.max_record_size = null;
         }
-      }
+      },
     );
 
     // watch for filter changes and set default value for Is Null and Is Not Null operators
@@ -792,52 +1051,159 @@ export default defineComponent({
           });
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     onMounted(async () => {
-      if (props.variableName) {
-        editMode.value = true;
-        title.value = "Edit Variable";
-        // Fetch dashboard data
-        const data = JSON.parse(
-          JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
-        )?.variables?.list;
-
-        // Find the variable to edit
-        const edit = (data || []).find(
-          (it: any) => it.name === props.variableName
+      try {
+        const data = await getDashboard(
+          store,
+          route.query.dashboard,
+          route.query.folder,
         );
 
-        // for already created variable, need to add selected fields
-        // check if variable type is custom
-        if (edit?.type === "custom") {
-          //  loop on on options, and assign selected = false if selected key is not found
-          edit.options.forEach((option: any) => {
-            if (option.selected === undefined || option.selected === null) {
-              option.selected = false;
-            }
-          });
+        dashboardData.value = data;
 
-          // for custom, check if all are selected
-          const allSelected = edit.options.every(
-            (option: any) => option.selected === true
+        if (props.variableName) {
+          editMode.value = true;
+          title.value = "Edit Variable";
+
+          const variablesList = data.variables?.list || [];
+          const variable = variablesList.find(
+            (v: any) => v.name === props.variableName,
           );
-          if (allSelected) {
-            customSelectAllModel.value = true;
+
+          if (variable) {
+            // First, set the basic variable data
+            Object.assign(variableData, JSON.parse(JSON.stringify(variable)));
+
+            // Set scope type correctly
+            if (variable.panels?.length > 0) {
+              variableData.scope = "panels";
+            } else if (variable.tabs?.length > 0) {
+              variableData.scope = "tabs";
+            } else {
+              variableData.scope = "global";
+            }
+
+            // Set initial values synchronously
+            selectedTabs.value = variable.tabs ? [...variable.tabs] : [];
+            selectedPanels.value = variable.panels ? [...variable.panels] : [];
+
+            // Force update panel options
+            nextTick(() => {
+              if (variableData.scope === "panels") {
+                updatePanels();
+              }
+            });
+          }
+          // for already created variable, need to add selected fields
+          // check if variable type is custom
+          if (variable?.type === "custom") {
+            //  loop on on options, and assign selected = false if selected key is not found
+            variable.options.forEach((option: any) => {
+              if (option.selected === undefined || option.selected === null) {
+                option.selected = false;
+              }
+            });
+
+            // for custom, check if all are selected
+            const allSelected = variable.options.every(
+              (option: any) => option.selected === true,
+            );
+            if (allSelected) {
+              customSelectAllModel.value = true;
+            }
+          }
+
+          // Assign edit data to variableData
+          Object.assign(variableData, variable);
+        } else {
+          // default variable type will be query_values
+          variableData.type = "query_values";
+          editMode.value = false;
+
+          // Set default scope and selections when creating from Add Panel
+          if (props.isFromAddPanel) {
+            // Get current tab and panel from route
+            const currentTabId = route.query.tab as string;
+            const currentPanelId = route.query.panelId as string;
+
+            // Set default scope to "panels"
+            variableData.scope = "panels";
+
+            // Set default tab selection to current tab
+            if (currentTabId) {
+              selectedTabs.value = [currentTabId];
+            }
+
+            // Set default panel selection
+            // If editing an existing panel, select the actual panel ID
+            // If creating a new panel, select "current_panel"
+            if (currentPanelId) {
+              selectedPanels.value = [currentPanelId];
+            } else {
+              selectedPanels.value = ["current_panel"];
+            }
+
+            // Force update panel options
+            nextTick(() => {
+              updatePanels();
+            });
           }
         }
-
-        // Assign edit data to variableData
-        Object.assign(variableData, edit);
-      } else {
-        // default variable type will be query_values
-        variableData.type = "query_values";
-        editMode.value = false;
+      } catch (error) {
+        showErrorNotification("Failed to load dashboard data");
       }
     });
+
+    // Modify the watch on scope
+    watch(
+      () => variableData.scope,
+      (newScope) => {
+        if (newScope === "global") {
+          selectedTabs.value = [];
+          selectedPanels.value = [];
+        } else if (newScope === "tabs") {
+          selectedPanels.value = [];
+        } else if (newScope === "panels" && selectedTabs.value.length > 0) {
+          nextTick(() => {
+            updatePanels();
+          });
+        }
+      },
+      { immediate: true },
+    );
+
+    // Modify updatePanels function
+    const updatePanels = () => {
+      if (variableData.scope === "panels" && selectedTabs.value.length > 0) {
+        const validPanelIds = dashboardData.value.tabs
+          .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
+          .flatMap((tab: any) =>
+            (tab.panels || []).map((panel: any) => panel.id),
+          );
+
+        // Keep only valid panels from the current selection
+        // Also preserve "current_panel" if it exists (used when creating from Add Panel)
+        selectedPanels.value = selectedPanels.value.filter(
+          (id: any) => validPanelIds.includes(id) || id === "current_panel",
+        );
+      }
+    };
+
+    // Add a watch for selectedTabs
+    watch(
+      selectedTabs,
+      (newTabs) => {
+        if (variableData.scope === "panels") {
+          nextTick(() => {
+            updatePanels();
+          });
+        }
+      },
+      { deep: true },
+    );
 
     // check if type is query_values then get stream list and field list
     watch(
@@ -863,7 +1229,7 @@ export default defineComponent({
               // get all streams from current stream type
               const streamList: any = await getStreams(
                 variableData?.query_data?.stream_type,
-                false
+                false,
               );
               data.streams = streamList.list ?? [];
 
@@ -873,7 +1239,7 @@ export default defineComponent({
                 const fieldWithSchema: any = await getStream(
                   variableData?.query_data?.stream,
                   variableData.query_data.stream_type,
-                  true
+                  true,
                 );
 
                 // assign the schema
@@ -893,7 +1259,7 @@ export default defineComponent({
             });
           }
         }
-      }
+      },
     );
 
     const addField = () => {
@@ -937,7 +1303,40 @@ export default defineComponent({
         variableData.selectAllValueForMultiSelect = "";
         variableData.customMultiSelectValue = [];
       }
+      // Set tabs and panels based on the selected scope
+      if (variableData.scope === "global") {
+        variableData.tabs = [];
+        variableData.panels = [];
+      } else if (variableData.scope === "tabs") {
+        variableData.tabs = [...selectedTabs.value];
+        variableData.panels = [];
+      } else if (variableData.scope === "panels") {
+        variableData.tabs = [...selectedTabs.value];
 
+        // Keep "current_panel" in the panels array - it will be replaced with actual panel ID when panel is saved
+        // Only replace it now if we're editing an existing panel (route.query.panelId exists)
+        const panels = [...selectedPanels.value];
+        const currentPanelIndex = panels.indexOf("current_panel");
+        if (currentPanelIndex !== -1 && route.query.panelId) {
+          // We're editing an existing panel, replace "current_panel" with actual panel ID
+          panels[currentPanelIndex] = route.query.panelId as string;
+        }
+        // If no panelId in route, keep "current_panel" - it will be updated when panel is saved
+
+        variableData.panels = panels;
+      }
+
+      // If called from Add Panel, emit the variable data instead of saving to DB
+      if (props.isFromAddPanel) {
+        emit("save", {
+          variableData: toRaw(variableData),
+          isEdit: editMode.value,
+          oldVariableName: props.variableName,
+        });
+        return;
+      }
+
+      // Original logic: save to database via API
       if (editMode.value) {
         try {
           await updateVariable(
@@ -945,7 +1344,7 @@ export default defineComponent({
             dashId,
             props.variableName,
             toRaw(variableData),
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
@@ -953,7 +1352,7 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable update failed"
+                "Variable update failed",
             );
           } else {
             showErrorNotification(error.message ?? "Variable update failed", {
@@ -967,7 +1366,7 @@ export default defineComponent({
             store,
             dashId,
             variableData,
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
@@ -975,7 +1374,7 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable creation failed"
+                "Variable creation failed",
             );
           } else {
             showErrorNotification(error.message ?? "Variable creation failed", {
@@ -993,8 +1392,12 @@ export default defineComponent({
         // get all variables data.
         let variablesData: any = JSON.parse(
           JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder,
+            ),
+          ),
         )?.variables?.list;
 
         // current updated variable data need to merge/update in above variablesData.
@@ -1003,7 +1406,7 @@ export default defineComponent({
         if (editMode.value) {
           //if name already exists
           const variableIndex = variablesData.findIndex(
-            (variable: any) => variable.name == props.variableName
+            (variable: any) => variable.name == props.variableName,
           );
 
           // Update the variable data in the list
@@ -1026,7 +1429,7 @@ export default defineComponent({
         if (hasCycle) {
           // filter has cycle, so show error and return
           filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->"
+            "->",
           )} -> ${hasCycle[0]}`;
           return true;
         }
@@ -1039,7 +1442,7 @@ export default defineComponent({
           err?.message ??
             (editMode.value
               ? "Variable update failed"
-              : "Variable creation failed")
+              : "Variable creation failed"),
         );
         return true;
       }
@@ -1076,7 +1479,7 @@ export default defineComponent({
             err?.message ??
               (editMode.value
                 ? "Variable update failed"
-                : "Variable creation failed")
+                : "Variable creation failed"),
           );
         });
       });
@@ -1100,7 +1503,7 @@ export default defineComponent({
         // get all streams from current stream type
         const streamList: any = await getStreams(
           variableData?.query_data?.stream_type,
-          false
+          false,
         );
 
         // assign the stream list
@@ -1125,7 +1528,7 @@ export default defineComponent({
           const fieldWithSchema: any = await getStream(
             variableData?.query_data?.stream,
             variableData.query_data.stream_type,
-            true
+            true,
           );
 
           // assign the schema
@@ -1145,14 +1548,75 @@ export default defineComponent({
       emit("close");
     };
 
-    const dashboardVariablesFilterItems = computed(() =>
-      props.dashboardVariablesList
-        .map((it: any) => ({
-          label: it.name,
-          value: "$" + it.name,
-        }))
-        .filter((it: any) => it.label !== variableData.name)
-    );
+    const dashboardVariablesFilterItems = computed(() => {
+      // Get current variable's scope context
+      const currentVarScope = variableData.scope || "global";
+      const currentTabs = selectedTabs.value || [];
+      const currentPanels = selectedPanels.value || [];
+
+      // Filter variables based on visibility rules:
+      // - Global variable: can see global only
+      // - Tab variable: can see global + tab (same tab)
+      // - Panel variable: can see global + tab (parent tab) + panel (same panel)
+      const filteredVars = props.dashboardVariablesList.filter((v: any) => {
+        // Exclude the current variable itself
+        if (v.name === variableData.name) return false;
+
+        const scopeType = getScopeType(v);
+
+        // Global variables are always visible
+        if (scopeType === "global") {
+          return true;
+        }
+
+        // If current variable is global, it can only see other global variables
+        if (currentVarScope === "global") {
+          return false;
+        }
+
+        // Tab-scoped variables
+        if (scopeType === "tabs") {
+          if (currentVarScope === "tabs") {
+            // Tab variables can see tab variables from the same tab
+            const hasCommonTab = currentTabs.some((tab: string) =>
+              v.tabs?.includes(tab),
+            );
+            return hasCommonTab;
+          }
+
+          if (currentVarScope === "panels") {
+            // Panel variables can see tab variables from their parent tab
+            const hasCommonTab = currentTabs.some((tab: string) =>
+              v.tabs?.includes(tab),
+            );
+            return hasCommonTab;
+          }
+        }
+
+        // Panel-scoped variables
+        if (scopeType === "panels") {
+          if (currentVarScope === "tabs") {
+            // Tab variables cannot see panel variables (child level)
+            return false;
+          }
+
+          if (currentVarScope === "panels") {
+            // Panel variables can see panel variables from the same panel
+            const hasCommonPanel = currentPanels.some((panel: string) =>
+              v.panels?.includes(panel),
+            );
+            return hasCommonPanel;
+          }
+        }
+
+        return false;
+      });
+
+      return filteredVars.map((it: any) => ({
+        label: it.name,
+        value: "$" + it.name,
+      }));
+    });
 
     // Add new custom value to the array
     const addCustomValue = () => {
@@ -1181,7 +1645,7 @@ export default defineComponent({
             }
           }
         }
-      }
+      },
     );
 
     watch(
@@ -1190,7 +1654,7 @@ export default defineComponent({
         if (newVal != "custom") {
           variableData.customMultiSelectValue = [];
         }
-      }
+      },
     );
 
     const onCheckboxClick = (index: any) => {
@@ -1247,6 +1711,13 @@ export default defineComponent({
       onCheckboxClick,
       customSelectAllModel,
       onCustomSelectAllClick,
+      selectedTabs,
+      updatePanels,
+      selectedPanels,
+      tabsOptions,
+      groupedPanelsOptions,
+      scopeOptions,
+      editMode,
     };
   },
 });

@@ -80,7 +80,8 @@ vi.mock("@/utils/zincutils", () => ({
   timestampToTimezoneDate: vi.fn(),
   b64EncodeUnicode: vi.fn((str) => btoa(str)),
   b64DecodeUnicode: vi.fn((str) => atob(str)),
-  convertDateToTimestamp: vi.fn()
+  convertDateToTimestamp: vi.fn(),
+  useLocalWrapContent: vi.fn(() => false),
 }));
 
 // Mock navigator.clipboard
@@ -250,17 +251,6 @@ describe("SearchSchedulersList Component", () => {
         align: "left",
         sortable: false
       });
-    });
-
-    it("should set correct column widths", () => {
-      const mockData = [{ user_id: "test", Actions: "delete" }];
-      const columns = wrapper.vm.generateColumns(mockData);
-      
-      const userIdColumn = columns.find(col => col.name === "user_id");
-      const actionsColumn = columns.find(col => col.name === "Actions");
-      
-      expect(userIdColumn.style).toContain("200px");
-      expect(actionsColumn.style).toContain("200px");
     });
 
     it("should set correct alignment for different columns", () => {
@@ -688,40 +678,6 @@ describe("SearchSchedulersList Component", () => {
     });
   });
 
-  describe("Pagination", () => {
-    beforeEach(() => {
-      wrapper.vm.dataToBeLoaded = Array.from({ length: 250 }, (_, i) => ({ id: i }));
-      wrapper.vm.qTableSchedule = { setPagination: vi.fn() };
-    });
-
-    it("should change pagination correctly", () => {
-      const newPage = { label: "50", value: 50 };
-      
-      wrapper.vm.changePagination(newPage);
-      
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.qTableSchedule.setPagination).toHaveBeenCalledWith(wrapper.vm.pagination);
-    });
-
-    it("should handle 'All' option correctly", () => {
-      const allOption = { label: "All", value: 0 };
-      
-      wrapper.vm.changePagination(allOption);
-      
-      expect(wrapper.vm.selectedPerPage).toBe(250);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(250);
-    });
-
-    it("should maintain current page when changing page size", () => {
-      wrapper.vm.pagination.page = 3;
-      const newPage = { label: "20", value: 20 };
-      
-      wrapper.vm.changePagination(newPage);
-      
-      expect(wrapper.vm.pagination.page).toBe(3);
-    });
-  });
 
   describe("DateTime Management", () => {
     it("should update datetime correctly", async () => {

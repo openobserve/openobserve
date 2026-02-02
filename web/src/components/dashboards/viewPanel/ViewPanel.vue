@@ -22,12 +22,17 @@
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex q-gutter-sm items-center">
+      <div class="flex items-center" style="gap: 0.5rem">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="q-ml-sm"
+          @update:modelValue="
+            (newValue: any) => {
+              histogramInterval = newValue.value;
+            }
+          "
+          class="viewpanel-icons"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
@@ -35,6 +40,7 @@
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
+          class="viewpanel-icons"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -45,7 +51,9 @@
           :min-refresh-interval="
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
+          style="padding-left: 0px; padding-right: 0px"
           @trigger="refreshData"
+          class="viewpanel-icons"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <q-btn
@@ -54,7 +62,7 @@
             searchRequestTraceIds.length &&
             disable
           "
-          class="q-ml-sm"
+          class="viewpanel-icons el-border"
           outline
           padding="xs"
           no-caps
@@ -69,7 +77,7 @@
         </q-btn>
         <q-btn
           v-else
-          class="q-ml-sm"
+          class="viewpanel-icons el-border"
           :outline="isVariablesChanged ? true : false"
           padding="xs"
           no-caps
@@ -92,7 +100,7 @@
           no-caps
           @click="goBack"
           padding="xs"
-          class="q-ml-md"
+          class="viewpanel-icons el-border"
           flat
           icon="close"
           data-test="dashboard-viewpanel-close-btn"
@@ -110,16 +118,79 @@
                 :showDynamicFilters="
                   currentDashboardData.data?.variables?.showDynamicFilters
                 "
-                :selectedTimeDate="dateTimeForVariables || dashboardPanelData.meta.dateTime"
+                :selectedTimeDate="
+                  dateTimeForVariables || dashboardPanelData.meta.dateTime
+                "
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
+                :showAllVisible="true"
+                :tabId="currentTabId"
+                :panelId="currentPanelId"
               />
               <div style="flex: 1; overflow: hidden">
                 <div
-                  class="tw-flex tw-justify-end tw-mr-2"
+                  class="tw:flex tw:justify-end tw:mr-2 tw:items-center"
                   data-test="view-panel-last-refreshed-at"
                 >
+                  <!-- Error/Warning tooltips -->
+                  <q-btn
+                    v-if="errorMessage"
+                    :icon="outlinedWarning"
+                    flat
+                    size="xs"
+                    padding="2px"
+                    data-test="viewpanel-error-data"
+                    class="warning q-mr-xs"
+                  >
+                    <q-tooltip
+                      anchor="bottom right"
+                      self="top right"
+                      max-width="220px"
+                    >
+                      <div style="white-space: pre-wrap">
+                        {{ errorMessage }}
+                      </div>
+                    </q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="maxQueryRangeWarning"
+                    :icon="outlinedWarning"
+                    flat
+                    size="xs"
+                    padding="2px"
+                    data-test="viewpanel-max-duration-warning"
+                    class="warning q-mr-xs"
+                  >
+                    <q-tooltip
+                      anchor="bottom right"
+                      self="top right"
+                      max-width="220px"
+                    >
+                      <div style="white-space: pre-wrap">
+                        {{ maxQueryRangeWarning }}
+                      </div>
+                    </q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="limitNumberOfSeriesWarningMessage"
+                    :icon="symOutlinedDataInfoAlert"
+                    flat
+                    size="xs"
+                    padding="2px"
+                    data-test="viewpanel-series-limit-warning"
+                    class="warning q-mr-xs"
+                  >
+                    <q-tooltip
+                      anchor="bottom right"
+                      self="top right"
+                      max-width="220px"
+                    >
+                      <div style="white-space: pre-wrap">
+                        {{ limitNumberOfSeriesWarningMessage }}
+                      </div>
+                    </q-tooltip>
+                  </q-btn>
                   <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                     <span class="lastRefreshedAtIcon">🕑</span
                     ><RelativeTime
@@ -136,14 +207,24 @@
                   :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
                   :variablesData="currentVariablesDataRef"
+                  :currentVariablesData="liveVariablesData"
+                  :tabId="currentTabId"
+                  :panelId="currentPanelId"
                   :width="6"
                   :searchType="searchType"
+                  :showLegendsButton="true"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
                   @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                  @result-metadata-update="handleResultMetadataUpdate"
+                  @limit-number-of-series-warning-message-update="
+                    handleLimitNumberOfSeriesWarningMessage
+                  "
+                  @show-legends="showLegendsDialog = true"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
                   style="height: calc(100% - 21px)"
+                  ref="panelSchemaRendererRef"
                 />
               </div>
               <DashboardErrorsComponent
@@ -155,6 +236,12 @@
         </div>
       </div>
     </div>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -191,9 +278,19 @@ import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { inject, provide, computed } from "vue";
+import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
+import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { defineAsyncComponent } from "vue";
+
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
 
 export default defineComponent({
   name: "ViewPanel",
@@ -205,6 +302,7 @@ export default defineComponent({
     AutoRefreshInterval,
     HistogramIntervalDropDown,
     RelativeTime,
+    ShowLegendsPopup,
   },
   props: {
     panelId: {
@@ -235,10 +333,20 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+
+    // IMPORTANT: Always create a NEW isolated instance for ViewPanel
+    // ViewPanel should NEVER share the variables manager with the parent dashboard
+    // This ensures that variable changes in ViewPanel don't affect the parent dashboard
+    const variablesManager = useVariablesManager();
+
+    // Provide to child components (ViewPanel's own isolated instance)
+    provide("variablesManager", variablesManager);
 
     const currentVariablesDataRef: any = reactive({});
 
@@ -276,7 +384,6 @@ export default defineComponent({
 
         return;
       } catch (error) {
-        console.error("Error updating variables data:", error);
       }
 
       // resize the chart when variables data is updated
@@ -292,10 +399,7 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // histogram interval
-    const histogramInterval: any = ref({
-      value: null,
-      label: "Auto",
-    });
+    const histogramInterval: any = ref(null);
 
     // array of histogram fields
     let histogramFields: any = ref([]);
@@ -305,6 +409,11 @@ export default defineComponent({
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
+
+    // Warning messages
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = ref("");
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -325,52 +434,13 @@ export default defineComponent({
         }
         // replace the histogram interval in the query by finding histogram aggregation
         dashboardPanelData?.data?.queries?.forEach((query: any) => {
-          const ast: any = parser.astify(query?.query);
+          const originalQuery = query.query;
+          const updatedQuery = replaceHistogramInterval(originalQuery, histogramInterval.value);
 
-          // Iterate over the columns to check if the column is histogram
-          ast.columns.forEach((column: any) => {
-            // check if the column is histogram
-            if (
-              column.expr.type === "function" &&
-              column?.expr?.name?.name[0]?.value === "histogram"
-            ) {
-              const histogramExpr = column.expr;
-              if (
-                histogramExpr.args &&
-                histogramExpr.args.type === "expr_list"
-              ) {
-                // if selected histogramInterval is null then remove interval argument
-                if (!histogramInterval.value.value) {
-                  histogramExpr.args.value = histogramExpr.args.value.slice(
-                    0,
-                    1,
-                  );
-                }
-
-                // else update interval argument
-                else {
-                  // check if there is existing interval value
-                  // if have then simply update
-                  // else insert new arg
-                  if (histogramExpr.args.value[1]) {
-                    // Update existing interval value
-                    histogramExpr.args.value[1] = {
-                      type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
-                    };
-                  } else {
-                    // create new arg for interval
-                    histogramExpr.args.value.push({
-                      type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
-                    });
-                  }
-                }
-              }
-            }
-            const sql = parser.sqlify(ast);
-            query.query = sql.replace(/`/g, '"');
-          });
+          // Only update if the query actually changed
+          if (updatedQuery !== originalQuery) {
+            query.query = updatedQuery;
+          }
         });
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -414,7 +484,7 @@ export default defineComponent({
           route.query.dashboard,
           props.panelId,
           route.query.folder,
-          route.query.tab ?? dashboardPanelData.data.panels[0]?.tabId,
+          route.query.tab ?? dashboardPanelData.data.panels?.[0]?.tabId,
         );
         Object.assign(
           dashboardPanelData.data,
@@ -431,7 +501,7 @@ export default defineComponent({
           : dashboardPanelData.data.queries
               .map((q: any) =>
                 [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
-                  (f: any) => f.aggregationFunction == "histogram",
+                  (f: any) => f.functionName == "histogram",
                 ),
               )
               .filter((field: any) => field != undefined);
@@ -442,13 +512,42 @@ export default defineComponent({
         for (let i = 0; i < histogramFields.value.length; i++) {
           if (
             histogramFields.value[i]?.args &&
-            histogramFields.value[i]?.args[0]?.value
+            histogramFields.value[i]?.args.length > 0
           ) {
-            histogramInterval.value = {
-              value: histogramFields.value[i]?.args[0]?.value,
-              label: histogramFields.value[i]?.args[0]?.value,
-            };
-            break;
+            // Histogram function signature: histogram(field, interval)
+            // args[0] = timestamp field (object)
+            // args[1] = interval (string like '5m', '1h', etc.)
+
+            // Check if there's a second argument (the interval)
+            if (histogramFields.value[i].args.length > 1 && histogramFields.value[i].args[1]) {
+              const intervalArg = histogramFields.value[i].args[1];
+
+              // Extract interval value with explicit type checking
+              let intervalValue: string | null = null;
+
+              if (typeof intervalArg === 'string') {
+                // Direct string value
+                intervalValue = intervalArg;
+              } else if (typeof intervalArg === 'object' && intervalArg !== null) {
+                // Object with value property
+                if ('value' in intervalArg && typeof intervalArg.value === 'string') {
+                  intervalValue = intervalArg.value;
+                }
+              }
+
+              // Set the histogram interval only if we have a valid non-empty string
+              if (intervalValue && intervalValue.trim() !== '') {
+                histogramInterval.value = intervalValue;
+              } else {
+                // No valid interval - use Auto mode
+                histogramInterval.value = null;
+              }
+              break;
+            } else {
+              // No interval specified - this is "Auto" mode
+              histogramInterval.value = null;
+              break;
+            }
           }
         }
       }
@@ -506,6 +605,32 @@ export default defineComponent({
       );
       currentDashboardData.data = data;
 
+      // Initialize variables manager with dashboard variables
+      try {
+        // Get current tab and panel IDs for initialization
+        const tabId =
+          (route.query.tab as string) ??
+          currentDashboardData.data?.tabs?.[0]?.tabId;
+
+        // Initialize with panel-to-tab mapping (3rd parameter is critical for panel variables!)
+        await variablesManager.initialize(
+          currentDashboardData.data?.variables?.list || [],
+          currentDashboardData.data,
+          props.panelId ? { [props.panelId]: tabId || "" } : {},
+        );
+
+        // Mark current tab and panel as visible so their variables can load
+        if (tabId) {
+          variablesManager.setTabVisibility(tabId, true);
+        }
+
+        // Mark the panel as visible
+        if (props.panelId) {
+          variablesManager.setPanelVisibility(props.panelId, true);
+        }
+      } catch (error) {
+      }
+
       // if variables data is null, set it to empty list
       if (
         !(
@@ -523,7 +648,7 @@ export default defineComponent({
     });
 
     const dateTimeForVariables = ref(null);
-    
+
     const setTimeForVariables = () => {
       const date = dateTimePickerRef.value?.getConsumableDateTime();
       const startTime = new Date(date.startTime);
@@ -551,15 +676,28 @@ export default defineComponent({
       emit("closePanel");
     };
 
-    const handleChartApiError = (errorMessage: {
+    const handleChartApiError = (errorMsg: {
       message: string;
       code: string;
     }) => {
-      if (errorMessage?.message) {
+      if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message;
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
-        errorList.push(errorMessage.message);
+        errorList.push(errorMsg.message);
       }
+    };
+
+    // Handle limit number of series warning from PanelSchemaRenderer
+    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    const handleResultMetadataUpdate = (metadata: any) => {
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
     };
 
     const getInitialVariablesData = () => {
@@ -629,6 +767,45 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    // Computed properties for current tab and panel IDs
+    const currentTabId = computed(() => {
+      return (
+        (route.query.tab as string) ??
+        currentDashboardData.data?.tabs?.[0]?.tabId
+      );
+    });
+
+    const currentPanelId = computed(() => {
+      return props.panelId;
+    });
+
+    // Computed property for LIVE merged variables (for HTML/Markdown panels and drilldown)
+    // This includes global + tab + panel scoped variables with proper precedence
+    const liveVariablesData = computed(() => {
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        const mergedVars = variablesManager.getVariablesForPanel(
+          currentPanelId.value,
+          currentTabId.value || "",
+        );
+        
+        return {
+          isVariablesLoading: variablesManager.isLoading.value,
+          values: mergedVars,
+        };
+      } else {
+        // Fallback to variablesData
+        return variablesData;
+      }
+    });
+
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
+
     return {
       t,
       setTimeForVariables,
@@ -641,9 +818,12 @@ export default defineComponent({
       selectedDate,
       errorData,
       handleChartApiError,
+      handleResultMetadataUpdate,
+      handleLimitNumberOfSeriesWarningMessage,
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
+      liveVariablesData,
       dateTimePickerRef,
       refreshInterval,
       refreshData,
@@ -662,6 +842,16 @@ export default defineComponent({
       currentVariablesDataRef,
       isVariablesChanged,
       store,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
+      currentTabId,
+      currentPanelId,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });
@@ -671,5 +861,42 @@ export default defineComponent({
 .layout-panel-container {
   display: flex;
   flex-direction: column;
+}
+
+.warning {
+  color: var(--q-warning);
+}
+
+.viewpanel-icons {
+  height: 30px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  :deep(.date-time-button) {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  :deep(.q-btn-dropdown) {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
+
+    .q-btn__content {
+      line-height: normal;
+      align-items: center;
+    }
+  }
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
 }
 </style>

@@ -38,6 +38,7 @@ pub struct MergeResult {
 
 pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>), anyhow::Error>>;
 
+#[derive(Clone)]
 pub struct MergeJob {
     pub org_id: String,
     pub stream_type: StreamType,
@@ -129,6 +130,14 @@ impl JobScheduler {
                                     e
                                 );
                             }
+                            // release locked stream
+                            let key = format!(
+                                "{}/{}/{}",
+                                job.org_id,
+                                job.stream_type.as_str(),
+                                job.stream_name
+                            );
+                            crate::service::db::compact::stream::clear_running(&key);
                         }
                     }
                 }

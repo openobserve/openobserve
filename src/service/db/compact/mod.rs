@@ -15,8 +15,8 @@
 
 pub mod compactor_manual_jobs;
 pub mod downsampling;
-pub mod file_list;
 pub mod files;
 pub mod organization;
 pub mod retention;
 pub mod stats;
+pub mod stream;

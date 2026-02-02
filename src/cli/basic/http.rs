@@ -318,6 +318,84 @@ pub async fn consistent_hash(files: Vec<String>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn refresh_user_sessions() -> Result<(), anyhow::Error> {
+    let url = "/node/refresh_user_sessions";
+    let response = request(url, None, reqwest::Method::GET).await?;
+    if response.is_some() {
+        println!("user sessions refresh successfully");
+    } else {
+        println!("user sessions refresh failed");
+    }
+    Ok(())
+}
+
+pub async fn refresh_nodes_list() -> Result<(), anyhow::Error> {
+    let url = "/node/refresh_nodes_list";
+    let response = request(url, None, reqwest::Method::GET).await?;
+    if response.is_some() {
+        println!("node list refresh successfully");
+    } else {
+        println!("node list refresh failed");
+    }
+    Ok(())
+}
+
+pub async fn node_reload(modules: Vec<String>) -> Result<(), anyhow::Error> {
+    let modules_str = modules.join(",");
+    let url = format!("/node/reload?module={}", modules_str);
+    let response = request(&url, None, reqwest::Method::GET).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("node reload failed"));
+    };
+
+    let response: serde_json::Value = serde_json::from_str(&body)?;
+    let status = response
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let results = response.get("results").and_then(|v| v.as_object());
+    let summary = response.get("summary").and_then(|v| v.as_object());
+
+    println!("Cache reload status: {}", status);
+    println!();
+
+    if let Some(results) = results {
+        let mut table = prettytable::Table::new();
+        table.add_row(prettytable::Row::new(vec![
+            prettytable::Cell::new("MODULE"),
+            prettytable::Cell::new("STATUS"),
+        ]));
+
+        for (module, status) in results.iter() {
+            table.add_row(prettytable::Row::new(vec![
+                prettytable::Cell::new(module),
+                prettytable::Cell::new(status.as_str().unwrap_or("unknown")),
+            ]));
+        }
+
+        table.printstd();
+    }
+
+    if let Some(summary) = summary {
+        println!();
+        println!("Summary:");
+        println!(
+            "  Total: {}",
+            summary.get("total").and_then(|v| v.as_u64()).unwrap_or(0)
+        );
+        println!(
+            "  Success: {}",
+            summary.get("success").and_then(|v| v.as_u64()).unwrap_or(0)
+        );
+        println!(
+            "  Failed: {}",
+            summary.get("failed").and_then(|v| v.as_u64()).unwrap_or(0)
+        );
+    }
+
+    Ok(())
+}
+
 async fn request(
     url: &str,
     body: Option<Vec<u8>>,
@@ -325,7 +403,7 @@ async fn request(
 ) -> Result<Option<String>, anyhow::Error> {
     let cfg = config::get_config();
     let client = reqwest::Client::new();
-    let local = config::cluster::load_local_node();
+    let local = config::cluster::LOCAL_NODE.clone();
     let url = format!("{}{}", local.http_addr, url);
     let user = cfg.auth.root_user_email.clone();
     let password = cfg.auth.root_user_password.clone();
@@ -562,7 +640,7 @@ mod tests {
         use config::meta::cluster::Node;
 
         // Test node sorting logic as used in node_list functions
-        let mut nodes = vec![
+        let mut nodes = [
             Node {
                 id: 3,
                 ..Default::default()

@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt::Debug, pin::Pin, task::Poll};
+use std::{fmt::Debug, pin::Pin, sync::atomic::Ordering, task::Poll};
 
 use arrow::array::RecordBatch;
 use arrow_flight::{FlightData, error::Result};
 use arrow_schema::SchemaRef;
-use config::{meta::search::ScanStats, utils::size::bytes_to_human_readable};
-use datafusion::physical_plan::metrics::{BaselineMetrics, RecordOutput};
+use config::{
+    meta::search::ScanStats,
+    utils::{record_batch_ext::RecordBatchExt, size::bytes_to_human_readable},
+};
 use flight::{
-    common::{CustomMessage, FlightMessage},
+    common::{CustomMessage, FlightMessage, RemoteScanMetrics},
     decoder::FlightDataDecoder,
 };
 use futures::{Stream, StreamExt, ready};
@@ -35,7 +37,7 @@ use crate::service::search::{
 #[derive(Debug)]
 pub struct FlightDecoderStream {
     inner: FlightDataDecoder,
-    metrics: BaselineMetrics,
+    metrics: RemoteScanMetrics,
     query_context: QueryContext,
     scan_stats: ScanStats,
 }
@@ -45,7 +47,7 @@ impl FlightDecoderStream {
     pub fn new(
         inner: Streaming<FlightData>,
         schema: SchemaRef,
-        metrics: BaselineMetrics,
+        metrics: RemoteScanMetrics,
         query_context: QueryContext,
     ) -> Self {
         Self {
@@ -65,6 +67,11 @@ impl FlightDecoderStream {
             CustomMessage::Metrics(metrics) => {
                 self.query_context.cluster_metrics.lock().extend(metrics);
             }
+            CustomMessage::PeakMemory(peak_memory) => {
+                self.query_context
+                    .peak_memory
+                    .fetch_max(peak_memory, Ordering::Relaxed);
+            }
         }
     }
 }
@@ -80,18 +87,31 @@ impl Stream for FlightDecoderStream {
     ) -> Poll<Option<Result<RecordBatch>>> {
         let poll;
         loop {
+            let timer = std::time::Instant::now();
             let res = ready!(self.inner.poll_next_unpin(cx));
+            self.metrics.fetch_time.add_duration(timer.elapsed());
             match res {
                 // Inner exhausted
                 None => {
+                    if self.query_context.print_key_event {
+                        log::info!(
+                            "[trace_id {}] flight->search: stream receive Poll::Ready(None) from node: {}, name: {}, is_super: {}, took: {} ms",
+                            self.query_context.trace_id,
+                            self.query_context.node.get_grpc_addr(),
+                            self.query_context.node.get_name(),
+                            self.query_context.is_super,
+                            self.query_context.req_last_time.elapsed().as_millis()
+                        );
+                    }
                     poll = Poll::Ready(None);
                     break;
                 }
                 Some(Err(e)) => {
                     log::error!(
-                        "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
+                        "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
                         self.query_context.trace_id,
                         self.query_context.node.get_grpc_addr(),
+                        self.query_context.node.get_name(),
                         self.query_context.is_super,
                         self.query_context.is_querier,
                         self.query_context.start.elapsed().as_millis(),
@@ -104,10 +124,43 @@ impl Stream for FlightDecoderStream {
                 Some(Ok(data)) => match data {
                     FlightMessage::RecordBatch(batch) => {
                         self.query_context.num_rows += batch.num_rows();
+                        self.query_context.req_id += 1;
+                        let took = self.query_context.req_last_time.elapsed().as_millis();
+                        self.query_context.req_last_time = std::time::Instant::now();
+                        if self.query_context.print_key_event
+                            && (took > 100
+                                || config::utils::util::is_power_of_two(self.query_context.req_id))
+                        {
+                            let num_bytes = batch.size();
+                            log::info!(
+                                "[trace_id {}] flight->search: stream receive RecordBatch #{} from node: {}, name: {}, is_super: {}, bytes: {num_bytes}, took: {took} ms",
+                                self.query_context.trace_id,
+                                self.query_context.req_id,
+                                self.query_context.node.get_grpc_addr(),
+                                self.query_context.node.get_name(),
+                                self.query_context.is_super,
+                            );
+                        }
                         poll = Poll::Ready(Some(Ok(batch)));
                         break;
                     }
                     FlightMessage::CustomMessage(message) => {
+                        self.query_context.req_id += 1;
+                        let took = self.query_context.req_last_time.elapsed().as_millis();
+                        self.query_context.req_last_time = std::time::Instant::now();
+                        if self.query_context.print_key_event
+                            && (took > 100
+                                || config::utils::util::is_power_of_two(self.query_context.req_id))
+                        {
+                            log::info!(
+                                "[trace_id {}] flight->search: stream receive CustomMessage #{} from node: {}, name: {}, is_super: {}, took: {took} ms",
+                                self.query_context.trace_id,
+                                self.query_context.req_id,
+                                self.query_context.node.get_grpc_addr(),
+                                self.query_context.node.get_name(),
+                                self.query_context.is_super,
+                            );
+                        }
                         self.process_custom_message(message);
                     }
                     FlightMessage::Schema(_) => {
@@ -143,14 +196,11 @@ impl Drop for FlightDecoderStream {
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
-                    trace_id,
+                    "[trace_id {trace_id}] flight->search: response node: {}, name: {}, is_super: {is_super}, is_querier: {is_querier}, files: {}, scan_size: {} mb, num_rows: {num_rows}, took: {} ms",
                     node.get_grpc_addr(),
-                    is_super,
-                    is_querier,
+                    node.get_name(),
                     scan_stats.files,
                     scan_stats.original_size / 1024 / 1024,
-                    num_rows,
                     start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()
@@ -173,17 +223,13 @@ impl Drop for FlightDecoderStream {
 }
 
 fn record_poll(
-    metrics: &BaselineMetrics,
+    metrics: &RemoteScanMetrics,
     poll: Poll<Option<Result<RecordBatch>>>,
 ) -> Poll<Option<Result<RecordBatch>>> {
-    if let Poll::Ready(maybe_batch) = &poll {
-        match maybe_batch {
-            Some(Ok(batch)) => {
-                batch.record_output(metrics);
-            }
-            Some(Err(_)) => metrics.done(),
-            None => metrics.done(),
-        }
+    if let Poll::Ready(maybe_batch) = &poll
+        && let Some(Ok(batch)) = maybe_batch
+    {
+        metrics.record_output(batch.num_rows());
     }
     poll
 }

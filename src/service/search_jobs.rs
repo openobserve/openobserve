@@ -23,6 +23,7 @@ use config::{
     utils::json,
 };
 use infra::{
+    client::grpc::make_grpc_search_client,
     errors::{Error, ErrorCodes},
     storage,
     table::entity::{search_job_partitions::Model as PartitionJob, search_jobs::Model as Job},
@@ -36,7 +37,6 @@ use o2_enterprise::enterprise::{
 };
 use tokio::sync::mpsc;
 
-use super::grpc::make_grpc_search_client;
 use crate::service::{
     db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
     search::grpc_search::{grpc_search, grpc_search_partition},
@@ -283,8 +283,8 @@ fn generate_result_path(
         month = datetime.month(),
         day = datetime.day(),
         trace_id = trace_id,
-        partition_id = if partition_id.is_some() {
-            partition_id.unwrap().to_string()
+        partition_id = if let Some(partition_id) = partition_id {
+            partition_id.to_string()
         } else {
             "final".to_string()
         }

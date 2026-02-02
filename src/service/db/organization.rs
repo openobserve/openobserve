@@ -94,15 +94,50 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
         ret.free_trial_expiry = trial_period_expiry;
         return Ok(ret);
     }
-    let _settings = db::get(&key).await?;
-    let mut settings: OrganizationSetting = json::from_slice(&_settings)?;
-    // cache the org setting
+
+    // Try to get settings from DB, but use default if not found
+    let mut settings: OrganizationSetting = match db::get(&key).await {
+        Ok(settings) => json::from_slice(&settings)?,
+        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
+            OrganizationSetting::default()
+        }
+        Err(e) => return Err(e),
+    };
+
+    // Cache the org setting (even if it's default)
     ORGANIZATION_SETTING
         .write()
         .await
         .insert(key.to_string(), settings.clone());
     settings.free_trial_expiry = trial_period_expiry;
     Ok(settings)
+}
+
+/// Get the toggle ingestion logs setting for an org
+/// If the setting is not found, return false
+/// we add a separate function for avoid clone the setting
+pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool, Error> {
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+        return Ok(v.toggle_ingestion_logs);
+    }
+
+    // Try to get settings from DB, but use default if not found
+    let settings: OrganizationSetting = match db::get(&key).await {
+        Ok(settings) => json::from_slice(&settings)?,
+        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
+            OrganizationSetting::default()
+        }
+        Err(e) => return Err(e),
+    };
+    let toggle_ingestion_logs = settings.toggle_ingestion_logs;
+
+    // Cache the org setting (even if it's default)
+    ORGANIZATION_SETTING
+        .write()
+        .await
+        .insert(key.to_string(), settings);
+    Ok(toggle_ingestion_logs)
 }
 
 /// Cache the existing org settings in the beginning
@@ -203,6 +238,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             } else {
                 json::from_slice(&item_value).unwrap()
             };
+            organizations::invalidate_cache(Some(item_key)).await;
             ORGANIZATIONS
                 .clone()
                 .write()
@@ -227,6 +263,7 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
         log::error!("Error saving org: {e}");
         return Err(anyhow::anyhow!("Error saving org: {}", e));
     }
+    organizations::invalidate_cache(Some(&entry.identifier)).await;
 
     let key = format!("{}{}", ORG_KEY_PREFIX, entry.identifier);
     let _ = put_into_db_coordinator(&key, json::to_vec(entry).unwrap().into(), true, None).await;
@@ -244,6 +281,7 @@ pub async fn rename_org(org_id: &str, new_name: &str) -> Result<Organization, an
         log::error!("Error updating org: {e}");
         return Err(anyhow::anyhow!("Error updating org: {}", e));
     }
+    organizations::invalidate_cache(Some(org_id)).await;
     let org = get_org(org_id).await?;
     let key = format!("{ORG_KEY_PREFIX}{org_id}");
     let _ = put_into_db_coordinator(&key, json::to_vec(&org).unwrap().into(), true, None).await;
@@ -261,6 +299,7 @@ pub async fn get_org_from_db(org_id: &str) -> Result<Organization, anyhow::Error
         identifier: org.identifier,
         name: org.org_name,
         org_type: org.org_type.to_string(),
+        service_account: None,
     })
 }
 
@@ -275,6 +314,7 @@ pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
         identifier: org.identifier,
         name: org.org_name,
         org_type: org.org_type.to_string(),
+        service_account: None,
     })
 }
 
@@ -283,6 +323,7 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
         log::error!("Error deleting org: {e}");
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
+    organizations::invalidate_cache(Some(org_id)).await;
     #[cfg(feature = "enterprise")]
     super_cluster::organization_delete(&format!("{ORG_KEY_PREFIX}{org_id}")).await?;
     Ok(())
@@ -299,6 +340,7 @@ pub(crate) async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow
             identifier: org.identifier,
             name: org.org_name,
             org_type: org.org_type.to_string(),
+            service_account: None,
         })
         .collect())
 }

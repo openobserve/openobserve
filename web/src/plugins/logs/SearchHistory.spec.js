@@ -202,7 +202,7 @@ describe("SearchHistory Component", () => {
     it("has correct table columns", () => {
       const data = [{ some: 'data' }]; // Pass non-empty array to trigger column generation
       const columns = wrapper.vm.generateColumns(data);
-      
+
       expect(columns).toEqual([
         {
           name: "#",
@@ -213,14 +213,14 @@ describe("SearchHistory Component", () => {
         },
         {
           name: "executed_time",
-          label: "Executed At",
+          label: "search_history.executed_at",
           field: "executed_time",
           align: "left",
           sortable: true
         },
         {
           name: "sql",
-          label: "SQL Query",
+          label: "search_history.sql_query",
           field: "sql",
           align: "left",
           sortable: true

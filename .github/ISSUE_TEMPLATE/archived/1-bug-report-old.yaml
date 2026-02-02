@@ -1,0 +1,72 @@
+name: Bug Report (OLD - Archived)
+description: "[ARCHIVED] Old bug report template - Do not use"
+labels: ["☢️ Bug"]
+
+body:
+  - type: dropdown
+    id: affected-functionalities
+    attributes:
+      label: Which OpenObserve functionalities are the source of the bug?
+      options:
+        - login
+        - home
+        - log search
+        - dashboards
+        - users
+        - streams
+        - functions
+        - ingestion
+        - alerts
+        - localization
+        - pipeline
+        - metrics
+        - traces
+        - real user monitoring
+        - Don't known / other
+      multiple: true
+    validations:
+      required: true
+
+  - type: dropdown
+    id: is-regression
+    attributes:
+      label: Is this a regression?
+      options:
+        - 'Yes'
+        - 'No'
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+
+  - type: input
+    id: reproduction
+    attributes:
+      label: Please provide a link to a minimal reproduction of the bug
+
+  - type: textarea
+    id: exception-or-error
+    attributes:
+      label: Please provide the exception or error you saw
+      render: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Please provide the version you discovered this bug in (check about page for version information)
+      render: true
+      placeholder: |
+        Version: v0.0.1
+        Commit Hash: 9d65f4640b55a952149df8daad5a01d5ff219497
+        Build Date: 2023-02-13T11:29:53Z
+        OS: linux x64
+
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else?

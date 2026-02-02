@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg "  >
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center justify-between tw-w-full">
+  <div class="full-width q-mx-lg q-pt-xs">
+    <div class="row items-center no-wrap card-container tw:mx-[0.625rem]  tw:mb-[0.625rem]">
+      <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
         <div class="flex items-center">
           <div
           data-test="add-alert-back-btn"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             border: 1.5px solid;
             border-radius: 50%;
             width: 22px;
-            height: 22px;
+            height: 22px; 
           "
           title="Go Back"
           @click="router.back()"
@@ -40,10 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.addTitle") }}
         </div>
         </div>
-        <div>
+        <div class="flex items-center tw:gap-2">
           <q-btn
             outline
-            class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
+            class="pipeline-icons q-px-sm hideOnPrintMode"
             size="sm"
             no-caps
             icon="code"
@@ -56,371 +56,388 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
+    <!-- WIZARD VIEW -->
     <div
-      ref="addAlertFormRef"
+      class="wizard-view-container tw:mb-2"
       style="
-        max-height: calc(100vh - 165px);
-        overflow: auto;
+        max-height: calc(100vh - 194px);
+        overflow-y: auto;
         scroll-behavior: smooth;
       "
     >
-      <div class="row flex tw-gap-2 items-start" style="width: 100%">
-        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
-            <!-- alerts setup  section -->
-            <div
-              class="flex tw-mt-1 justify-start items-center flex-wrap "
-            >
-              <div class="tw-w-full tw-ml-2   ">
-                <AlertsContainer 
-                  name="query"
-                  v-model:is-expanded="expandState.alertSetup"
-                  label="Alert Setup"
-                  subLabel="Set the stage for your alert."
-                  icon="edit"
-                  class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-                  :iconClass="'tw-mt-[2px]'"
-              />
-              </div>
-              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container">
-    
-              <div class="tw-w-full ">
-
-                <div
-                  class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
-                  style="padding-top: 12px;"
-                  data-test="add-alert-name-input-container"
-                >
-                  <q-input
-                    data-test="add-alert-name-input row"
-                    v-model="formData.name"
-                    :label="t('alerts.name') + ' *'"
-                    color="input-border"
-                      class="showLabelOnTop col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    hide-bottom-space
-                    v-bind:readonly="beingUpdated"
-                    v-bind:disable="beingUpdated"
-                    :rules="[
-                      (val: any) =>
-                        !!val
-                          ? isValidResourceName(val) ||
-                            `Characters like :, ?, /, #, and spaces are not allowed.`
-                          : t('common.nameRequired'),
-                    ]"
-                    tabindex="0"
-                  />
-                  <div class="col" style="height: 62px;">
-                    <SelectFolderDropDown
-                      :disableDropdown="beingUpdated"
-                      :type="'alerts'"
-                      :style="'height: 30px'"
-                      @folder-selected="updateActiveFolderId"
-                      :activeFolderId="activeFolderId"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                  />
-                  </div>
-                
-                </div>
-              </div>
-
-              <div
-                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
-                  style="padding-top: 0px"
-                  data-test="add-alert-stream-type-select-container"
-                >
-                  <div
-                    data-test="add-alert-stream-type-select"
-                    class="alert-stream-type o2-input tw-w-full col "
-                    style="padding-top: 0"
-
-                  >
-                    <q-select
-                      data-test="add-alert-stream-type-select-dropdown"
-                      v-model="formData.stream_type"
-                      :options="streamTypes"
-                      :label="t('alerts.streamType') + ' *'"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
-                      class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      v-bind:readonly="beingUpdated"
-                      v-bind:disable="beingUpdated"
-                      @update:model-value="updateStreams()"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                    />
-                  </div>
-                  <div
-                    data-test="add-alert-stream-select"
-                    class="o2-input col"
-                    style="padding-top: 0"
-                  >
-                    <q-select
-                      data-test="add-alert-stream-name-select-dropdown"
-                      v-model="formData.stream_name"
-                      :options="filteredStreams"
-                      :label="t('alerts.stream_name') + ' *'"
-                      :loading="isFetchingStreams"
-                      color="input-border"
-                      class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                      filled
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      v-bind:readonly="beingUpdated"
-                      v-bind:disable="beingUpdated"
-                      @filter="filterStreams"
-                      @update:model-value="
-                        updateStreamFields(formData.stream_name)
-                      "
-                      behavior="menu"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                    />
-                  </div>
-                </div>
-                <div class="tw-flex tw-items-center tw-gap-5">
-                <q-radio
-                  data-test="add-alert-scheduled-alert-radio"
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  v-model="formData.is_real_time"
-                  :checked="formData.is_real_time"
-                  val="false"
-                  dense
-                  :label="t('alerts.scheduled')"
-                  class="q-ml-none"
-                />
-                <q-radio
-                  data-test="add-alert-realtime-alert-radio"
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  v-model="formData.is_real_time"
-                  :checked="!formData.is_real_time"
-                  val="true"
-                  dense
-                  :label="t('alerts.realTime')"
-                  class="q-ml-none"
-                />
-              </div>
-              </div>
-            </div>
-            
-
-            <div
-              v-if="formData.is_real_time === 'true'"
-              class="q-pr-sm q-pa-none q-ma-none"
-              data-test="add-alert-query-input-title"
-            >
-              <real-time-alert
-                ref="realTimeAlertRef"
-                :columns="filteredColumns"
-                :conditions="formData.query_condition?.conditions || {}"
-                @input:update="onInputUpdate"
-                :expandState = expandState
-                @update:expandState="updateExpandState"
-                :trigger="formData.trigger_condition"
-                :destinations="formData.destinations"
-                :formattedDestinations="getFormattedDestinations"
-                @refresh:destinations="refreshDestinations"
-                @update:destinations="updateDestinations"
-                @update:group="updateGroup"
-                @remove:group="removeConditionGroup"
-
-              />
-            </div>
-            <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
-              <scheduled-alert
-                ref="scheduledAlertRef"
-                :columns="filteredColumns"
-                :conditions="formData.query_condition?.conditions || {}"
-                :expandState = expandState
-                :alertData="formData"
-                :sqlQueryErrorMsg="sqlQueryErrorMsg"
-                :vrlFunctionError="vrlFunctionError"
-                :showTimezoneWarning="showTimezoneWarning"
-                :selectedStream="formData.stream_name"
-                :selected-stream-type="formData.stream_type"
-                :destinations="formData.destinations"
-                :formattedDestinations="getFormattedDestinations"
-                v-model:trigger="formData.trigger_condition"
-                v-model:sql="formData.query_condition.sql"
-                v-model:promql="formData.query_condition.promql"
-                v-model:query_type="formData.query_condition.type"
-                v-model:aggregation="formData.query_condition.aggregation"
-                v-model:silence="formData.trigger_condition.silence"
-                v-model:promql_condition="
-                  formData.query_condition.promql_condition
-                "
-                v-model:multi_time_range="
-                  formData.query_condition.multi_time_range
-                "
-                v-model:vrl_function="formData.query_condition.vrl_function"
-                v-model:isAggregationEnabled="isAggregationEnabled"
-                v-model:showVrlFunction="showVrlFunction"
-                @update:group="updateGroup"
-                @remove:group="removeConditionGroup"
-                @input:update="onInputUpdate"
-                @validate-sql="validateSqlQuery"
-                @update:showVrlFunction="updateFunctionVisibility"
-                @update:multi_time_range="updateMultiTimeRange"
-                @update:expandState="updateExpandState"
-                @update:silence="updateSilence"
-                @refresh:destinations="refreshDestinations"
-                @update:destinations="updateDestinations"
-                class="q-mt-sm"
-              />
-            </div>
-  
-            <!-- additional setup starts here -->
-            <div
-              class="flex tw-mt-1 justify-start items-center q-pb-sm flex-wrap "
-            >
-              <div class="tw-w-full tw-ml-2   ">
-                <AlertsContainer 
-                    name="advanced"
-                    v-model:is-expanded="expandState.advancedSetup"
-                    label="Advanced Setup"
-                    :icon="'add'"
-                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-                    />
-            </div>
-            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container" >
-
-            <div class="tw-w-full row" >
-              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full">
-              <variables-input
-                class="o2-input"
-                :variables="formData.context_attributes"
-                @add:variable="addVariable"
-                @remove:variable="removeVariable"
-              />
-            </div>
-
-            <div v-if="expandState.advancedSetup" class=" tw-w-full">
-              <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
-                <div class="flex items-center q-mb-sm ">
-                  <span class="text-bold custom-input-label">Description</span>
-                </div>
-                <q-input
-                  v-model="formData.description"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="showLabelOnTop q-mb-sm q-text-area-input"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  tabindex="0"
-                  style="width: 100%; resize: none;"
-                  type="textarea"
-                  placeholder="Type something"
-                  rows="5"
-                  
-                />
-              </div>
-              <div data-test="add-alert-row-input tw-w-full">
-                <div class="flex items-center q-mb-sm">
-                  <span class="text-bold custom-input-label">Row Template</span>
-                  <q-btn
-                    data-test="add-alert-row-input-info-btn"
-                    style="color: #A0A0A0;"
-                    no-caps
-                    padding="xs"
-                    class="q-ml-xs"
-                    size="sm"
-                    flat
-                    icon="info_outline"
-                  >
-                <q-tooltip>
-               Row Template is used to format the alert message.
-              </q-tooltip>
-          </q-btn>
-          </div>
-                <q-input
-                  data-test="add-alert-row-input-textarea"
-                  v-model="formData.row_template"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="row-template-input"
-                  :class="store.state.theme === 'dark' ? 'dark-mode-row-template' : 'light-mode-row-template'"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  tabindex="0"
-                  style="width: 100%; resize: none;"
-                  type="textarea"
-                  placeholder="e.g - Alert was triggered at {timestamp} "
-                  rows="5"
-                >
-                
-              </q-input>
-              </div>
-            </div>
-            </div>
-
-            </div>
-            </div>
-            
-
-
-
-
-          </q-form>
-
-        </div>
-        <div
-          style="width: 420px; height: 320px; position: sticky; top: 0 "
-          class=" col-2"
+      <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2">
+        <!-- Stepper Header (Full Width) -->
+        <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+        <q-stepper
+          v-model="wizardStep"
+          ref="wizardStepper"
+          color="primary"
+          flat
+          class="alert-wizard-stepper"
+          header-nav
+          keep-alive
         >
-          <preview-alert
-            style="border: 1px solid #ececec; height: 300px; width: 412px;"
-            ref="previewAlertRef"
-            :formData="formData"
-            :query="previewQuery"
-            :selectedTab="scheduledAlertRef?.tab || 'custom'"
-            :isAggregationEnabled="isAggregationEnabled"
-          />
+        <!-- Persistent Step Caption (Between Header and Content) -->
+        <template v-slot:message>
+          <div
+            v-if="currentStepCaption"
+            class="persistent-step-caption tw:px-3 tw:py-1 tw:mb-1 tw:mt-2"
+            :class="store.state.theme === 'dark' ? 'dark-mode-caption' : 'light-mode-caption'"
+          >
+            {{ currentStepCaption }}
+          </div>
+        </template>
 
-        </div>
-        
+        <!-- Step 1: Alert Setup -->
+        <q-step
+          :name="1"
+          :title="t('alerts.steps.alertSetup') + ' *'"
+          caption=""
+          icon="settings"
+          :done="wizardStep > 1"
+          :disable="1 > lastValidStep"
+        >
+          <!-- 60/40 Split Layout with Equal Heights -->
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
+                <AlertSetup
+                  ref="step1Ref"
+                  :formData="formData"
+                  :beingUpdated="beingUpdated"
+                  :streamTypes="streamTypes"
+                  :filteredStreams="filteredStreams"
+                  :isFetchingStreams="isFetchingStreams"
+                  :activeFolderId="Array.isArray(activeFolderId) ? activeFolderId[0] : activeFolderId"
+                  :streamFieldRef="streamFieldRef"
+                  :streamTypeFieldRef="streamTypeFieldRef"
+                  @update:streams="updateStreams()"
+                  @filter:streams="filterStreams"
+                  @update:stream-name="updateStreamFields"
+                  @update:active-folder-id="updateActiveFolderId"
+                />
+              </div>
+
+            </div>
+
+            <div class="tw:flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 2: Query Configuration -->
+        <q-step
+          :name="2"
+          :title="t('alerts.steps.conditions') + ' *'"
+          caption=""
+          icon="search"
+          :done="wizardStep > 2"
+          :disable="2 > lastValidStep"
+        >
+          <!-- 60/40 Split Layout with Equal Heights -->
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
+                <QueryConfig
+                  ref="step2Ref"
+                  :tab="formData.query_condition.type || 'custom'"
+                  :multiTimeRange="formData.query_condition.multi_time_range"
+                  :columns="filteredColumns"
+                  :streamFieldsMap="streamFieldsMap"
+                  :generatedSqlQuery="generatedSqlQuery"
+                  :inputData="formData.query_condition"
+                  :streamType="formData.stream_type"
+                  :isRealTime="formData.is_real_time"
+                  :sqlQuery="formData.query_condition.sql"
+                  :promqlQuery="formData.query_condition.promql"
+                  :vrlFunction="decodedVrlFunction"
+                  :streamName="formData.stream_name"
+                  :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                  @update:tab="updateTab"
+                  @update-group="updateGroup"
+                  @remove-group="removeConditionGroup"
+                  @input:update="onInputUpdate"
+                  @update:sqlQuery="(value) => formData.query_condition.sql = value"
+                  @update:promqlQuery="(value) => formData.query_condition.promql = value"
+                  @update:vrlFunction="(value) => formData.query_condition.vrl_function = value"
+                  @validate-sql="validateSqlQuery"
+                  @clear-multi-windows="clearMultiWindows"
+                />
+              </div>
+
+            </div>
+
+            <div class="tw:flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 3: Compare with Past (Scheduled only) -->
+        <q-step
+          v-if="formData.is_real_time === 'false'"
+          :name="3"
+          :title="t('alerts.steps.compareWithPast')"
+          caption=""
+          icon="compare_arrows"
+          :done="wizardStep > 3"
+          :disable="3 > lastValidStep"
+        >
+          <!-- 60/40 Split Layout with Equal Heights -->
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: 100%; overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
+                <CompareWithPast
+                  ref="step3Ref"
+                  :multiTimeRange="formData.query_condition.multi_time_range"
+                  :period="formData.trigger_condition.period"
+                  :frequency="formData.trigger_condition.frequency"
+                  :frequencyType="formData.trigger_condition.frequency_type"
+                  :cron="formData.trigger_condition.cron"
+                  :selectedTab="formData.query_condition.type || 'custom'"
+                  @update:multiTimeRange="(val) => formData.query_condition.multi_time_range = val"
+                  @goToSqlEditor="handleGoToSqlEditor"
+                />
+              </div>
+
+            </div>
+
+            <div class="tw:flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 4: Alert Settings -->
+        <q-step
+          :name="4"
+          :title="t('alerts.steps.alertSettings') + ' *'"
+          caption=""
+          icon="tune"
+          :done="wizardStep > 4"
+          :disable="4 > lastValidStep"
+        >
+          <!-- 60/40 Split Layout with Equal Heights -->
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
+                <AlertSettings
+                  ref="step4Ref"
+                  :formData="formData"
+                  :isRealTime="formData.is_real_time"
+                  :columns="filteredColumns"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :destinations="formData.destinations"
+                  :formattedDestinations="getFormattedDestinations"
+                  @update:trigger="(val) => formData.trigger_condition = val"
+                  @update:aggregation="(val) => formData.query_condition.aggregation = val"
+                  @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
+                  @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
+                  @update:destinations="updateDestinations"
+                  @refresh:destinations="refreshDestinations"
+                />
+              </div>
+
+            </div>
+
+            <div class="tw:flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 5: Deduplication (Scheduled only) -->
+        <q-step
+          v-if="formData.is_real_time === 'false'"
+          :name="5"
+          :title="t('alerts.steps.deduplication')"
+          caption=""
+          icon="filter_list"
+          :done="wizardStep > 5"
+          :disable="5 > lastValidStep"
+        >
+          <!-- 60/40 Split Layout with Equal Heights -->
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
+                <Deduplication
+                  :deduplication="formData.deduplication"
+                  :columns="filteredColumns"
+                  @update:deduplication="(val) => formData.deduplication = val"
+                />
+              </div>
+
+            </div>
+
+            <div class="tw:flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 6: Advanced Settings -->
+        <q-step
+          :name="6"
+          :title="t('alerts.steps.advanced')"
+          caption=""
+          icon="settings_applications"
+          :done="false"
+          :disable="6 > lastValidStep"
+        >
+          <!-- 60/40 Split Layout with Equal Heights -->
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: 100%; overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
+                <Advanced
+                  :contextAttributes="formData.context_attributes"
+                  :description="formData.description"
+                  :rowTemplate="formData.row_template"
+                  :rowTemplateType="formData.row_template_type"
+                  @update:contextAttributes="(val) => formData.context_attributes = val"
+                  @update:description="(val) => formData.description = val"
+                  @update:rowTemplate="(val) => formData.row_template = val"
+                  @update:rowTemplateType="(val) => formData.row_template_type = val"
+                />
+              </div>
+
+            </div>
+
+            <div class="tw:flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
+              />
+            </div>
+          </div>
+        </q-step>
+      </q-stepper>
+      </q-form>
       </div>
-
     </div>
-    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; right: 0; height: 70px !important; z-index: 100;">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class=" text-bold"
-        :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
-        no-caps
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class=" text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        type="submit"
-        @click="onSubmit"
-        no-caps
-      />
+    <div class="tw:mx-2">
+      <div
+          class="flex q-px-md full-width tw:py-3 card-container tw:justify-end"
+          style="position: sticky; bottom: 0px; z-index: 2"
+        >
+        <!-- All Buttons (Right Side) -->
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <!-- Wizard Navigation Buttons -->
+          <q-btn
+            flat
+            label="Back"
+            icon="arrow_back"
+            class="o2-secondary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :disable="wizardStep === 1"
+            no-caps
+            @click="goToPreviousStep"
+          />
+          <q-btn
+            flat
+            label="Continue"
+            icon-right="arrow_forward"
+            class="o2-secondary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :disable="isLastStep"
+            no-caps
+            @click="goToNextStep"
+          />
+          <q-separator vertical class="tw:mx-2" style="height: 36px;" />
+
+          <!-- Cancel and Save Buttons -->
+          <q-btn
+            data-test="add-alert-cancel-btn"
+            v-close-popup="true"
+            class="o2-secondary-button tw:h-[36px]"
+            :label="t('alerts.cancel')"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            @click="$emit('cancel:hideform')"
+          />
+          <q-btn
+            data-test="add-alert-submit-btn"
+            class="o2-primary-button no-border tw:h-[36px]"
+            :label="t('alerts.save')"
+            type="submit"
+            no-caps
+            flat
+            :disable="!isLastStep"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            @click="onSubmit"
+          />
+        </div>
+      </div>
     </div>
 
   </div>
@@ -443,7 +460,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-dialog>
 
-
 </template>
 
 <script lang="ts">
@@ -451,6 +467,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onUnmounted,
   watch,
   type Ref,
   computed,
@@ -467,7 +484,6 @@ import segment from "../../services/segment_analytics";
 import {
   getUUID,
   getTimezoneOffset,
-  b64EncodeUnicode,
   b64DecodeUnicode,
   isValidResourceName,
   getTimezonesByOffset,
@@ -478,14 +494,53 @@ import useStreams from "@/composables/useStreams";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+import {
+  generateSqlQuery,
+} from "@/utils/alerts/alertQueryBuilder";
+import {
+  validateInputs as validateInputsUtil,
+  validateSqlQuery as validateSqlQueryUtil,
+  saveAlertJson as saveAlertJsonUtil,
+  type ValidationContext,
+  type JsonValidationContext,
+} from "@/utils/alerts/alertValidation";
+import {
+  getAlertPayload as getAlertPayloadUtil,
+  prepareAndSaveAlert as prepareAndSaveAlertUtil,
+  type PayloadContext,
+  type SaveAlertContext,
+} from "@/utils/alerts/alertPayload";
+import {
+  getParser as getParserUtil,
+  addHavingClauseToQuery,
+  type SqlUtilsContext,
+} from "@/utils/alerts/alertSqlUtils";
 
-import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
-import cronParser from "cron-parser";
-import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
-import { validateAlert } from "@/utils/validateAlerts";
+import { useReo } from "@/services/reodotdev_analytics";
+import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
+import HorizontalStepper from "./HorizontalStepper.vue";
+import AlertSetup from "./steps/AlertSetup.vue";
+import QueryConfig from "./steps/QueryConfig.vue";
+import AlertSettings from "./steps/AlertSettings.vue";
+import CompareWithPast from "./steps/CompareWithPast.vue";
+import Deduplication from "./steps/Deduplication.vue";
+import Advanced from "./steps/Advanced.vue";
+import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
+import {
+  updateGroup as updateGroupUtil,
+  removeConditionGroup as removeConditionGroupUtil,
+  transformFEToBE as transformFEToBEUtil,
+  retransformBEToFE as retransformBEToFEUtil,
+  detectConditionsVersion,
+  convertV0ToV2,
+  convertV1ToV2,
+  convertV1BEToV2,
+  ensureIds,
+  type TransformContext,
+} from "@/utils/alerts/alertDataTransforms";
+import { AlertFocusManager } from "@/utils/alerts/focusManager";
 
 const defaultValue: any = () => {
   return {
@@ -494,16 +549,12 @@ const defaultValue: any = () => {
     stream_name: "",
     is_real_time: "false",
     query_condition: {
-      conditions: 
+      conditions:
       {
-        "or": [
-            {
-                "column": "",
-                "operator": ">",
-                "value": "",
-                "ignore_case": false
-            }
-        ]
+        filterType: "group",
+        logicalOperator: "AND",
+        groupId: "",
+        conditions: []
         },
       sql: "",
       promql: "",
@@ -524,7 +575,7 @@ const defaultValue: any = () => {
     trigger_condition: {
       period: 10,
       operator: ">=",
-      frequency: 1,
+      frequency: 10,
       cron: "",
       threshold: 3,
       silence: 10,
@@ -535,6 +586,8 @@ const defaultValue: any = () => {
     context_attributes: [],
     enabled: true,
     description: "",
+    row_template: "",
+    row_template_type: "String",
     lastTriggeredAt: 0,
     createdAt: "",
     updatedAt: "",
@@ -562,13 +615,15 @@ export default defineComponent({
   },
   emits: ["update:list", "cancel:hideform", "refresh:destinations"],
   components: {
-    ScheduledAlert: defineAsyncComponent(() => import("./ScheduledAlert.vue")),
-    RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
-    VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
-    PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
-    SelectFolderDropDown,
-    AlertsContainer,
     JsonEditor,
+    HorizontalStepper,
+    AlertSetup,
+    QueryConfig,
+    AlertSettings,
+    CompareWithPast,
+    Deduplication,
+    Advanced,
+    AlertWizardRightColumn,
   },
   setup(props, { emit }) {
     const store: any = useStore();
@@ -593,7 +648,6 @@ export default defineComponent({
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
-    const realTimeAlertRef: any = ref(null);
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
@@ -616,6 +670,10 @@ export default defineComponent({
     const showVrlFunction = ref(false);
     const isFetchingStreams = ref(false);
     const streamTypes = ["logs", "metrics", "traces"];
+    const rowTemplateTypeOptions = [
+      { label: 'String', value: 'String' },
+      { label: 'JSON', value: 'Json' }
+    ];
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
@@ -625,7 +683,15 @@ export default defineComponent({
 
     const { buildQueryPayload } = useQuery();
 
+    // Focus manager for alert summary clickable fields
+    const focusManager = new AlertFocusManager();
+    const streamFieldRef = ref(null);
+    const streamTypeFieldRef = ref(null);
+
     const previewQuery = ref("");
+
+    // Flag to track if we're using backend-generated SQL for preview
+    const isUsingBackendSql = ref(false);
 
     const sqlQueryErrorMsg = ref("");
 
@@ -634,7 +700,7 @@ export default defineComponent({
     const addAlertFormRef = ref(null);
 
     const router = useRouter();
-    const scheduledAlertRef: any = ref(null);
+    const viewSqlEditorDialog = ref(false);
 
     const plotChart: any = ref(null);
 
@@ -645,14 +711,52 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
-    
+
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
+
+    const isLoadingPanelData = ref(false);
+
+    const { track } = useReo();
 
     const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
+    };
+
+    // Wizard step state
+    const wizardStep = ref(1);
+    const wizardStepper = ref(null);
+    const step1Ref = ref(null);
+    const step2Ref = ref(null);
+    const step3Ref = ref(null);
+    const step4Ref = ref(null);
+    const lastValidStep = ref(1); // Track the last successfully validated step
+
+    // Computed property for step captions to avoid flickering
+    const currentStepCaption = computed(() => {
+      const captions: Record<number, string> = {
+        1: t('alerts.stepCaptions.alertSetup'),
+        2: t('alerts.stepCaptions.conditions'),
+        3: t('alerts.stepCaptions.compareWithPast'),
+        4: t('alerts.stepCaptions.alertSettings'),
+        5: t('alerts.stepCaptions.deduplication'),
+        6: t('alerts.stepCaptions.advanced'),
+      };
+      return captions[wizardStep.value] || '';
+    });
+
+    const goToStep2 = async () => {
+      // Validate step 1 before proceeding
+      if (step1Ref.value && typeof step1Ref.value.validate === 'function') {
+        const isValid = await step1Ref.value.validate();
+        if (isValid) {
+          wizardStep.value = 2;
+        }
+      } else {
+        wizardStep.value = 2;
+      }
     };
 
     onBeforeMount(async () => {
@@ -678,37 +782,201 @@ export default defineComponent({
       return formData.value.stream_type && formData.value.stream_name;
     });
 
-    const updateConditions = (e: any) => {
-      try {
-        const ast = parser.astify(e.target.value);
-        if (ast) sqlAST.value = ast;
-        else return;
+    const rowTemplatePlaceholder = computed(() => {
+      return formData.value.row_template_type === 'Json'
+        ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
+        : 'e.g - Alert was triggered at {timestamp}';
+    });
 
-        // If sqlAST.value.columns is not type of array then return
-        if (!sqlAST.value) return;
-        if (!Array.isArray(sqlAST.value?.columns)) return;
-
-        sqlAST.value.columns.forEach(function (item: any) {
-          let val;
-          if (item["as"] === undefined || item["as"] === null) {
-            val = item["expr"]["column"];
-          } else {
-            val = item["as"];
-          }
-          if (!triggerCols.value.includes(val)) {
-            triggerCols.value.push(val);
-          }
-        });
-      } catch (e) {
-        console.log("Alerts: Error while parsing SQL query");
+    const decodedVrlFunction = computed(() => {
+      if (!formData.value.query_condition.vrl_function) {
+        return "";
       }
-    };
+      try {
+        return b64DecodeUnicode(formData.value.query_condition.vrl_function);
+      } catch (e) {
+        return formData.value.query_condition.vrl_function;
+      }
+    });
+
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
-    onMounted(async () => {});
+    onMounted(async () => {
+      // Set up alerts context provider
+      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      contextRegistry.register('alerts', alertsProvider);
+      contextRegistry.setActive('alerts');
+
+      // Register fields with focus manager for clickable summary
+      // Wait for next tick to ensure refs are available
+      await nextTick();
+      focusManager.registerField('streamType', {
+        ref: streamTypeFieldRef,
+        onBeforeFocus: () => {
+          // Navigate to step 1 for wizard mode
+          if (wizardStep.value !== 1) {
+            wizardStep.value = 1;
+          }
+        }
+      });
+      focusManager.registerField('stream', {
+        ref: streamFieldRef,
+        onBeforeFocus: () => {
+          // Navigate to step 1 for wizard mode
+          if (wizardStep.value !== 1) {
+            wizardStep.value = 1;
+          }
+        }
+      });
+      focusManager.registerField('alertType', {
+        ref: streamTypeFieldRef, // Use any ref, we just need navigation
+        onBeforeFocus: () => {
+          // Navigate to step 1 for wizard mode
+          if (wizardStep.value !== 1) {
+            wizardStep.value = 1;
+          }
+        }
+      });
+      // Note: query, conditions, period, threshold, destinations, and silence fields
+      // are registered in their respective component watchers (step2Ref, step4Ref)
+      // with proper field refs for highlighting
+    });
+
+    // Watch for step4Ref (AlertSettings) to register wizard mode field refs
+    watch(step4Ref, (newVal) => {
+      if (newVal) {
+        nextTick(() => {
+          // Register wizard mode fields with proper navigation and highlighting
+          if (newVal.periodFieldRef) {
+            focusManager.registerField('period', {
+              ref: newVal.periodFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+          if (newVal.thresholdFieldRef) {
+            focusManager.registerField('threshold', {
+              ref: newVal.thresholdFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+          if (newVal.silenceFieldRef) {
+            focusManager.registerField('silence', {
+              ref: newVal.silenceFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+          if (newVal.destinationsFieldRef) {
+            focusManager.registerField('destinations', {
+              ref: newVal.destinationsFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+        });
+      }
+    }, { immediate: true });
+
+    // Watch for step2Ref to register query field
+    watch(step2Ref, (newVal) => {
+      if (newVal) {
+        nextTick(() => {
+          // Determine which ref to use based on query type
+          const queryType = formData.value.query_condition?.type || 'custom';
+
+          // Register the query field with appropriate ref based on query type
+          if (queryType === 'custom' && newVal.customPreviewRef) {
+            focusManager.registerField('query', {
+              ref: newVal.customPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          } else if ((queryType === 'sql' || queryType === 'promql') && newVal.sqlPromqlPreviewRef) {
+            focusManager.registerField('query', {
+              ref: newVal.sqlPromqlPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          }
+        });
+      }
+    }, { immediate: true });
+
+    // Watch for step3Ref (CompareWithPast) to register multiwindow field
+    watch(step3Ref, (newVal) => {
+      if (newVal && newVal.multiWindowContainerRef) {
+        nextTick(() => {
+          focusManager.registerField('multiwindow', {
+            ref: newVal.multiWindowContainerRef,
+            onBeforeFocus: () => {
+              if (wizardStep.value !== 3) {
+                wizardStep.value = 3;
+              }
+            }
+          });
+        });
+      }
+    }, { immediate: true });
+
+    // Watch for query type changes and re-register with correct ref
+    watch(() => formData.value.query_condition?.type, (newType) => {
+      if (step2Ref.value && newType) {
+        nextTick(() => {
+          // Re-register the query field with the correct ref for the new type
+          if (newType === 'custom' && step2Ref.value.customPreviewRef) {
+            focusManager.registerField('query', {
+              ref: step2Ref.value.customPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          } else if ((newType === 'sql' || newType === 'promql') && step2Ref.value.sqlPromqlPreviewRef) {
+            focusManager.registerField('query', {
+              ref: step2Ref.value.sqlPromqlPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    onUnmounted(() => {
+      // Clean up alerts-specific context provider
+      contextRegistry.unregister('alerts');
+      contextRegistry.setActive('');
+
+      // Clean up focus manager
+      focusManager.clear();
+    });
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
@@ -741,12 +1009,15 @@ export default defineComponent({
 
     const updateStreamFields = async (stream_name: any) => {
       let streamCols: any = [];
+
+      // Fetch stream details including schema and settings
       const streams: any = await getStream(
         stream_name,
         formData.value.stream_type,
         true,
       );
 
+      // Map all schema fields to column objects with label, value, and type
       if (streams && Array.isArray(streams.schema)) {
         streamCols = streams.schema.map((column: any) => ({
           label: column.name,
@@ -755,6 +1026,37 @@ export default defineComponent({
         }));
       }
 
+      // Check if User Defined Schema (UDS) fields are configured
+      // If defined_schema_fields exists and is not empty, we should filter to show only those fields
+      if (
+        streams?.settings?.defined_schema_fields &&
+        Array.isArray(streams.settings.defined_schema_fields) &&
+        streams.settings.defined_schema_fields.length > 0
+      ) {
+        const definedFields = streams.settings.defined_schema_fields;
+
+        // get timestamp and all fields 
+        // why we need this because we need to show timestamp and all fields in defined schema fields 
+        // we dont get them in defined_schema_fields so if they are present in schema then we should keep them as it is
+        const timestampColumn = store.state.zoConfig?.timestamp_column || '_timestamp';
+        const allFieldsName = store.state.zoConfig?.all_fields_name;
+
+        // Filter the columns to include:
+        // 1.(timestamp and all_fields) (_timestamp , _all) --> this will be varied depending upon the env variables
+        // 2. User-defined schema fields - only the fields user explicitly configured as UDS
+        streamCols = streamCols.filter((col: any) => {
+          // Always include timestamp column (e.g., '_timestamp')
+          // Always include all fields column (e.g., '_all')
+          if (col.value === timestampColumn || col.value === allFieldsName) {
+            return true;
+          }
+          // Include field only if it's in the defined_schema_fields list
+          return definedFields.includes(col.value);
+        });
+      }
+      // If defined_schema_fields is not present or empty, show all schema fields (default behavior)
+
+      // Store the filtered/unfiltered columns for use in the component
       originalStreamFields.value = [...streamCols];
       filteredColumns.value = [...streamCols];
 
@@ -848,12 +1150,71 @@ export default defineComponent({
     };
 
     const getSelectedTab = computed(() => {
-      return scheduledAlertRef.value?.tab || null;
+      return formData.value.query_condition.type || null;
     });
+
+    const openEditorDialog = () => {
+      viewSqlEditorDialog.value = true;
+    };
+
+    // Watch for SQL query changes and update preview
+    watch(() => formData.value.query_condition?.sql, (newValue) => {
+      if (getSelectedTab.value === 'sql') {
+        previewQuery.value = newValue ? newValue.trim() : '';
+      }
+    });
+
+    // Watch for PromQL query changes and update preview
+    watch(() => formData.value.query_condition?.promql, (newValue) => {
+      if (getSelectedTab.value === 'promql') {
+        previewQuery.value = newValue ? newValue.trim() : '';
+      }
+    });
+
+    // Watch for tab changes and update preview query
+    watch(() => formData.value.query_condition?.type, (newType) => {
+      if (newType === 'sql') {
+        previewQuery.value = formData.value.query_condition?.sql ? formData.value.query_condition.sql.trim() : '';
+        isUsingBackendSql.value = false;
+      } else if (newType === 'promql') {
+        previewQuery.value = formData.value.query_condition?.promql ? formData.value.query_condition.promql.trim() : '';
+        isUsingBackendSql.value = false;
+        // Initialize promql_condition if it doesn't exist
+        if (!formData.value.query_condition.promql_condition) {
+          formData.value.query_condition.promql_condition = {
+            column: 'value',
+            operator: '>=',
+            value: 1,
+          };
+        }
+      } else if (newType === 'custom') {
+        // Start with local SQL, backend SQL will update it when ready
+        previewQuery.value = generateSqlQueryLocal();
+        isUsingBackendSql.value = false;
+        // Trigger backend SQL generation for preview
+        debouncedGenerateSql();
+      }
+    });
+
+    // Watch for changes in conditions or stream to regenerate SQL
+    watch(
+      () => [
+        formData.value.query_condition?.conditions,
+        formData.value.stream_name,
+        formData.value.query_condition?.aggregation,
+        isAggregationEnabled.value,
+      ],
+      () => {
+        if (formData.value.query_condition?.type === 'custom') {
+          debouncedGenerateSql();
+        }
+      },
+      { deep: true }
+    );
 
     const previewAlert = async () => {
       if (getSelectedTab.value === "custom"){
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
 
       }
       else if (getSelectedTab.value === "sql")
@@ -862,7 +1223,7 @@ export default defineComponent({
         previewQuery.value = formData.value.query_condition.promql.trim();
 
       if (formData.value.is_real_time === "true") {
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
       }
 
       await nextTick();
@@ -871,427 +1232,315 @@ export default defineComponent({
       }
     };
 
-    const getFormattedCondition = (
-      column: string,
-      operator: string,
-      value: number | string,
-    ) => {
-      let condition = "";
-      switch (operator) {
-        case "=":
-        case "<>":
-        case "<":
-        case ">":
-        case "<=":
-        case ">=":
-          condition = column + ` ${operator} ${value}`;
-          break;
-          //this is done because when we get from BE the response includes the operator in lowercase
-          //so we need to handle it separately
-        case "contains":
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-        //this is done because when we get from BE the response includes the operator in lowercase and converted NotContains to not_contains
-        //so we need to handle it separately
-        case "not_contains":
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-          //so we need to handle it separately
-        case 'Contains':
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-        case 'NotContains':
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-        default:
-          condition = column + ` ${operator} ${value}`;
-          break;
-      }
 
-      return condition;
+
+
+    const generateSqlQueryLocal = () => {
+      return generateSqlQuery(
+        formData.value,
+        streamFieldsMap.value,
+        isAggregationEnabled.value,
+        store.state.zoConfig.timestamp_column || "_timestamp"
+      );
     };
 
-    //this method is used to generate the where clause
-    //for new format of conditions we need to iterate over the items and get the conditions
-    //and then we need to format the conditions
-    // then we need to return the where clause
+    // Generated SQL query for preview in FilterGroup
+    // This will be updated via API call when conditions change
+    const generatedSqlQuery = ref('');
 
-    function generateWhereClause(group: any, streamFieldsMap: any) {
-      //this method is used to format the value
-      //if the value is a number or a string and the operator is contains or not contains then we need to return the value as it is
-      //else we need to return the value as a string and add single quotes to it
-      function formatValue(column: any, operator: any, value: any) {
-        return streamFieldsMap[column]?.type === "Int64" ||
-          operator === "contains" ||
-          operator === "not_contains" ||
-          operator === "Contains" ||
-          operator === "NotContains"
-          ? value
-          : `'${value}'`;
+    // Helper function to check if all conditions have valid column and value
+    const allConditionsValid = (conditions: any): boolean => {
+      if (!conditions || typeof conditions !== 'object') {
+        return false;
       }
 
-      //this method is used to format the condition
-      //if the column and operator and value are present then we need to return the condition
-      //else we need to return an empty string
-      function formatCondition(column: any, operator: any, value: any) {
-        return `${column} ${operator} ${value}`;
+      // If it's a condition (not a group), check if column and value are filled
+      if (conditions.filterType === 'condition') {
+        return !!(conditions.column && conditions.value !== undefined && conditions.value !== '');
       }
 
-      //this method is used to parse the group
-      //if the group is not present or the items are not present then we need to return an empty string
-      //else we need to iterate over the items and get the conditions
-      //and then we need to return the where clause
-      function parseGroup(groupNode: any) {
-        if (!groupNode || !Array.isArray(groupNode.items)) return "";
-
-        const parts = groupNode.items.map((item: any) => {
-          // Nested group
-          if (item.items && Array.isArray(item.items)) {
-            return `(${parseGroup(item)})`;
-          }
-
-          // Single condition
-          if (item.column && item.operator && item.value !== undefined) {
-            const formattedValue = formatValue(item.column, item.operator, item.value);
-              return getFormattedCondition(item.column, item.operator, formattedValue);
-          }
-
-          return "";
-        }).filter(Boolean);
-
-        return parts.join(` ${groupNode.label.toUpperCase()} `);
+      // If it's a group, recursively check all nested conditions
+      if (conditions.filterType === 'group' && Array.isArray(conditions.conditions)) {
+        // All conditions must be valid (using .every() instead of .some())
+        return conditions.conditions.every((cond: any) => allConditionsValid(cond));
       }
 
-      //this method is used to generate the where clause
+      return false;
+    };
 
-      const clause = parseGroup(group);
-      return clause.trim().length ? "WHERE " + clause : "";
-  }
-
-
-    const generateSqlQuery = () => {
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
-
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val, geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
-      let query = `SELECT histogram(${
-        store.state.zoConfig.timestamp_column || "_timestamp"
-      }) AS zo_sql_key,`;
-      //this method is used to generate the where clause
-      //previously it was just iterating over the conditions and getting the where clause
-      //now we are using the new format of conditions and getting the where clause using generateWhereClause method
-      let whereClause = generateWhereClause(formData.value.query_condition.conditions, streamFieldsMap);
-
+    // Helper function to validate aggregation having clause
+    const isAggregationValid = (): boolean => {
+      // If aggregation is disabled, it's valid (will be removed from payload)
       if (!isAggregationEnabled.value) {
-        query +=
-          ` COUNT(*) as zo_sql_val FROM \"${formData.value.stream_name}\" ` +
-          whereClause +
-          " GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
-      } else {
-        const aggFn = formData.value.query_condition.aggregation.function;
-        const column = formData.value.query_condition.aggregation.having.column;
+        return true;
+      }
 
-        const isAggValid = aggFn?.trim()?.length && column?.trim()?.length;
+      const aggregation = formData.value.query_condition.aggregation;
 
-        let groupByAlias = "";
-        let groupByCols: string[] = [];
-        formData.value.query_condition.aggregation.group_by.forEach(
-          (column: any) => {
-            if (column.trim().length) groupByCols.push(column);
-          },
-        );
+      // If aggregation is enabled but no aggregation object, skip
+      if (!aggregation) {
+        return false;
+      }
 
-        let concatGroupBy = "";
-        if (groupByCols.length) {
-          groupByAlias = ", x_axis_2";
-          concatGroupBy = `, concat(${groupByCols.join(
-            ",' : ',",
-          )}) as x_axis_2`;
+      // If having clause exists, validate it has required fields
+      if (aggregation.having) {
+        const { column, operator, value } = aggregation.having;
+        // All having fields must be filled
+        return !!(column && operator && value !== undefined && value !== '');
+      }
+
+      // If no having clause but aggregation is enabled, it's still valid
+      // (group_by can exist without having)
+      return true;
+    };
+
+    // Function to generate SQL from backend API
+    const generateSqlFromBackend = async () => {
+      try {
+        // Only generate if we have conditions and stream info
+        if (!formData.value.stream_name ||
+            !formData.value.query_condition?.conditions ||
+            Object.keys(formData.value.query_condition.conditions).length === 0) {
+          // Don't clear SQL, just skip the API call
+          return;
         }
 
-        const percentileFunctions: any = {
-          p50: 0.5,
-          p75: 0.75,
-          p90: 0.9,
-          p95: 0.95,
-          p99: 0.99,
+        // Skip if not in custom mode
+        if (formData.value.query_condition.type !== 'custom') {
+          return;
+        }
+
+        // Check if all conditions have valid column and value
+        // If any condition is empty, skip the API call but keep the previous preview
+        if (!allConditionsValid(formData.value.query_condition.conditions)) {
+          // Don't clear the previous SQL, just skip the API call
+          return;
+        }
+
+        // Validate aggregation (having clause if present)
+        if (!isAggregationValid()) {
+          // Don't clear the previous SQL, just skip the API call
+          return;
+        }
+
+        // Prepare payload
+        const payload: any = {
+          stream_name: formData.value.stream_name,
+          stream_type: formData.value.stream_type || 'logs',
+          query_condition: {
+            type: 'custom',
+            conditions: {
+              version: 2,
+              conditions: formData.value.query_condition.conditions,
+            },
+          },
         };
 
-        if (isAggValid) {
-          if (percentileFunctions[aggFn]) {
-            query +=
-              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          } else {
-            query +=
-              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          }
-        } else {
-          query +=
-            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-            whereClause +
-            ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
+        // Only include aggregation if enabled
+        if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+          payload.query_condition.aggregation = formData.value.query_condition.aggregation;
         }
-      }
 
-      return query;
+        const response = await alertsService.generate_sql(
+          store.state.selectedOrganization.identifier,
+          payload
+        );
+
+        if (response.data && response.data.sql) {
+          generatedSqlQuery.value = response.data.sql;
+          // Update preview query with backend SQL
+          previewQuery.value = response.data.sql;
+          // Set flag to indicate we're using backend-generated SQL
+          isUsingBackendSql.value = true;
+        }
+      } catch (error) {
+        console.error('Error generating SQL from backend:', error);
+        // Fallback to local generation if API fails
+        const localSql = generateSqlQueryLocal();
+        generatedSqlQuery.value = localSql;
+        previewQuery.value = localSql;
+        isUsingBackendSql.value = false;
+      }
     };
+
+    // Debounced version for heavy debouncing (1 second)
+    const debouncedGenerateSql = debounce(generateSqlFromBackend, 1000);
 
     const debouncedPreviewAlert = debounce(previewAlert, 500);
 
     const onInputUpdate = async (name: string, value: any) => {
-      if (showPreview.value) {
+      // Trigger SQL generation when conditions change
+      // SQL generation will automatically update previewQuery and trigger preview refresh
+      if (formData.value.query_condition.type === 'custom') {
+        debouncedGenerateSql();
+      } else if (showPreview.value) {
+        // Only call preview directly if not in custom mode
         debouncedPreviewAlert();
       }
     };
     const getParser = (sqlQuery: string) => {
-      try {
-        // As default is a reserved keyword in sql-parser, we are replacing it with default1
-        const regex = /\bdefault\b/g;
-        const columns = parser.astify(
-          sqlQuery.replace(regex, "default1"),
-        ).columns;
-        for (const column of columns) {
-          if (column.expr.column === "*") {
-            sqlQueryErrorMsg.value = "Selecting all columns is not allowed";
-            return false;
-          }
-        }
-        return true;
-      } catch (error) {
-        // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
-        // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
-        // Query will be validated in the backend
-        console.log(error);
-        return true;
-      }
+      const sqlUtilsContext: SqlUtilsContext = {
+        parser,
+        sqlQueryErrorMsg,
+      };
+      return getParserUtil(sqlQuery, sqlUtilsContext);
     };
 
     const getAlertPayload = () => {
-      const payload = cloneDeep(formData.value);
-
-      // Deleting uuid from payload as it was added for reference of frontend
-      if (payload.uuid) delete payload.uuid;
-
-      payload.is_real_time = payload.is_real_time === "true";
-
-      payload.context_attributes = {};
-
-      payload.query_condition.type = payload.is_real_time
-        ? "custom"
-        : formData.value.query_condition.type;
-
-      formData.value.context_attributes.forEach((attr: any) => {
-        if (attr.key?.trim() && attr.value?.trim())
-          payload.context_attributes[attr.key] = attr.value;
-      });
-
-      payload.trigger_condition.threshold = parseInt(
-        formData.value.trigger_condition.threshold,
-      );
-
-      payload.trigger_condition.period = parseInt(
-        formData.value.trigger_condition.period,
-      );
-
-      payload.trigger_condition.frequency = parseInt(
-        formData.value.trigger_condition.frequency,
-      );
-
-      payload.trigger_condition.silence = parseInt(
-        formData.value.trigger_condition.silence,
-      );
-
-      payload.description = formData.value.description.trim();
-
-      if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
-        payload.query_condition.aggregation = null;
-      }
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
-        payload.query_condition.conditions = [];
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
-        payload.query_condition.promql_condition = null;
-      }
-
-      if (getSelectedTab.value === "promql") {
-        payload.query_condition.sql = "";
-      }
-
-      if (formData.value.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function.trim(),
-        );
-      }
-
-      if (beingUpdated) {
-        payload.updatedAt = new Date().toISOString();
-        payload.lastEditedBy = store.state.userInfo.email;
-      } else {
-        payload.createdAt = new Date().toISOString();
-        payload.owner = store.state.userInfo.email;
-        payload.lastTriggeredAt = new Date().getTime();
-        payload.lastEditedBy = store.state.userInfo.email;
-        formData.value.updatedAt = new Date().toISOString();
-      }
-
-      return payload;
+      const payloadContext: PayloadContext = {
+        store,
+        isAggregationEnabled,
+        getSelectedTab,
+        beingUpdated,
+      };
+      return getAlertPayloadUtil(formData.value, payloadContext);
     };
 
     const validateInputs = (input: any, notify: boolean = true) => {
-      if (isNaN(Number(input.trigger_condition.silence))) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Silence Notification should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.is_real_time) return true;
-
-      if (
-        Number(input.trigger_condition.period) < 1 ||
-        isNaN(Number(input.trigger_condition.period))
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Period should be greater than 0",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.query_condition.aggregation) {
-        if (
-          isNaN(input.trigger_condition.threshold) ||
-          !input.query_condition.aggregation.having.value.toString().trim()
-            .length ||
-          !input.query_condition.aggregation.having.column ||
-          !input.query_condition.aggregation.having.operator
-        ) {
-          notify &&
-            q.notify({
-              type: "negative",
-              message: "Threshold should not be empty",
-              timeout: 1500,
-            });
-          return false;
-        }
-
-        return true;
-      }
-
-      if (
-        isNaN(input.trigger_condition.threshold) ||
-        input.trigger_condition.threshold < 1 ||
-        !input.trigger_condition.operator
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Threshold should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.trigger_condition.frequency_type === "cron") {
-        try {
-          cronParser.parseExpression(input.trigger_condition.cron);
-        } catch (err) {
-          console.log(err);
-          scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
-          return;
-        }
-      }
-
-      scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
-
-      if (scheduledAlertRef.value.cronJobError) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: scheduledAlertRef.value.cronJobError,
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      return true;
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateInputsUtil(input, validationContext, notify);
     };
 
     const validateSqlQuery = async () => {
-      // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateSqlQueryUtil(formData.value, validationContext);
+    };
 
-      if (!getParser(formData.value.query_condition.sql)) {
-        return;
+    /**
+     * Validates that all condition fields are in the available filtered fields when UDS is configured
+     * This ensures users only create conditions using fields that are part of the defined schema
+     *
+     * Note: We skip validation for "sql" and "promql" query types as users write custom queries there
+     * We use the already filtered originalStreamFields instead of fetching stream again for efficiency
+     *
+     * @returns {{ isValid: boolean, invalidFields: string[] }} Validation result with invalid fields list
+     */
+    const validateConditionsAgainstUDS = () => {
+      // Skip validation if no stream is selected or no fields are available
+      if (
+        !formData.value.stream_name ||
+        !formData.value.stream_type ||
+        !originalStreamFields.value ||
+        originalStreamFields.value.length === 0
+      ) {
+        return { isValid: true, invalidFields: [] };
       }
 
-      const query = buildQueryPayload({
-        sqlMode: true,
-        streamName: formData.value.stream_name,
-      });
+      // For scheduled alerts: Skip validation if query type is "sql" or "promql" - users write custom queries there
+      // For real-time alerts: Always validate since they use the conditions UI
+      const isRealTime = formData.value.is_real_time === "true" || formData.value.is_real_time === true;
+      const isScheduled = !isRealTime;
+      const queryType = formData.value.query_condition?.type;
 
-      delete query.aggs;
+      if (isScheduled && (queryType === "sql" || queryType === "promql")) {
+        return { isValid: true, invalidFields: [] };
+      }
 
-      // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
-      query.query.start_time = query.query.start_time + 780000000;
+      // Use the already filtered fields from originalStreamFields
+      // These are already filtered by UDS in updateStreamFields function
+      const allowedFieldNames = new Set(
+        originalStreamFields.value.map((field: any) => field.value)
+      );
 
-      query.query.sql = formData.value.query_condition.sql;
 
-      if (formData.value.query_condition.vrl_function)
-        query.query.query_fn = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function,
-        );
 
-      validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-        searchService
-          .search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            page_type: formData.value.stream_type,
-          })
-          .then((res: any) => {
-            sqlQueryErrorMsg.value = "";
+      // Recursively collect all column names used in conditions
+      const invalidFields: string[] = [];
 
-            if (res.data?.function_error) {
-              vrlFunctionError.value = res.data.function_error;
-              q.notify({
-                type: "negative",
-                message: "Invalid VRL Function",
-                timeout: 3000,
-              });
-              reject("function_error");
-            } else vrlFunctionError.value = "";
+      const checkConditionFields = (condition: any) => {
+        if (!condition) return;
 
-            resolve("");
-          })
-          .catch((err: any) => {
-            sqlQueryErrorMsg.value = err.response?.data?.message
-              ? err.response?.data?.message
-              : "Invalid SQL Query";
-
-            // Show error only if it is not real time alert
-            // This case happens when user enters invalid query and then switches to real time alert
-            if (formData.value.query_condition.type === "sql")
-              q.notify({
-                type: "negative",
-                message: "Invalid SQL Query : " + err.response?.data?.message,
-                timeout: 3000,
-              });
-
-            reject("sql_error");
+        // V2: If it's a condition group (has conditions array with filterType: "group")
+        if (condition.filterType === "group" && condition.conditions && Array.isArray(condition.conditions)) {
+          condition.conditions.forEach((item: any) => {
+            checkConditionFields(item);
           });
-      });
+        }
+        // V1: If it's a condition group (has items array)
+        else if (condition.items && Array.isArray(condition.items)) {
+          condition.items.forEach((item: any) => {
+            checkConditionFields(item);
+          });
+        }
+        // If it's a single condition (has column property)
+        else if (condition.column) {
+          // Check if the column is in the allowed fields
+          // Skip empty columns
+          if (condition.column && condition.column !== "" && !allowedFieldNames.has(condition.column)) {
+            // Add to invalid fields if not already present
+            if (!invalidFields.includes(condition.column)) {
+              invalidFields.push(condition.column);
+            }
+          }
+        }
+      };
+
+      // Check conditions based on alert type
+      if (isRealTime) {
+        // Real-time alerts: Always check conditions since they use the conditions UI
+        if (formData.value.query_condition?.conditions) {
+          checkConditionFields(formData.value.query_condition.conditions);
+        }
+      } else {
+        // Scheduled alerts: Only check if query type is "custom"
+        if (
+          formData.value.query_condition?.conditions &&
+          queryType === "custom"
+        ) {
+          checkConditionFields(formData.value.query_condition.conditions);
+        }
+
+        // Also check aggregation having clause if present (for scheduled alerts with custom query type)
+        if (
+          isAggregationEnabled.value &&
+          queryType === "custom" &&
+          formData.value.query_condition?.aggregation?.having?.column
+        ) {
+          const havingColumn = formData.value.query_condition.aggregation.having.column;
+          if (havingColumn && havingColumn !== "" && !allowedFieldNames.has(havingColumn)) {
+            if (!invalidFields.includes(havingColumn)) {
+              invalidFields.push(havingColumn);
+            }
+          }
+        }
+
+        // Also check group_by fields if present (for scheduled alerts with custom query type)
+        if (
+          isAggregationEnabled.value &&
+          queryType === "custom" &&
+          formData.value.query_condition?.aggregation?.group_by &&
+          Array.isArray(formData.value.query_condition.aggregation.group_by)
+        ) {
+          formData.value.query_condition.aggregation.group_by.forEach((field: string) => {
+            if (field && field !== "" && !allowedFieldNames.has(field)) {
+              if (!invalidFields.includes(field)) {
+                invalidFields.push(field);
+              }
+            }
+          });
+        }
+      }
+
+      return {
+        isValid: invalidFields.length === 0,
+        invalidFields
+      };
     };
 
     const updateFunctionVisibility = () => {
@@ -1330,7 +1579,7 @@ export default defineComponent({
         console.log(err);
         q.notify({
           type: "negative",
-          message: err.response?.data?.message || err.response?.data?.error,
+          message: err.response?.data?.message || err.response?.data?.error || err.response?.data,
         });
       }
     };
@@ -1345,43 +1594,31 @@ export default defineComponent({
       formData.value.destinations = destinations;
     }
 
+    const updateTab = (tab: string) => {
+      // Save to formData so it persists when navigating between steps
+      formData.value.query_condition.type = tab;
+    }
+
+    const handleGoToSqlEditor = () => {
+      // Switch to SQL mode
+      formData.value.query_condition.type = 'sql';
+      // Navigate to step 2 (Query Config)
+      wizardStep.value = 2;
+    }
+
+    const clearMultiWindows = () => {
+      formData.value.query_condition.multi_time_range = [];
+    }
+
 
 // Method to handle the emitted changes and update the structure
-//this method is used to update the group
-//we need to update the group if it is changed 
-  function updateGroup(updatedGroup:any) {
-    formData.value.query_condition.conditions.items.forEach((element:any) => {
-      if(element.groupId === updatedGroup.groupId){
-        element.items = updatedGroup.items;
-      }
-    });
-  }
-//this method is used to remove the condition group
-//we need to remove the condition group if it is empty because we cannot simply show empty group in the UI
-  const removeConditionGroup = (targetGroupId: string, currentGroup: any = formData.value.query_condition.conditions) => {
-    if (!currentGroup?.items || !Array.isArray(currentGroup.items)) return;
-
-    // Recursive function to filter empty groups
-    const filterEmptyGroups = (items: any[]): any[] => {
-      return items.filter((item: any) => {
-        // If this is the target group to remove, filter it out
-        if (item.groupId === targetGroupId) {
-          return false;
-        }
-
-        // If it's a group, recursively filter its items
-        if (item.items && Array.isArray(item.items)) {
-          item.items = filterEmptyGroups(item.items);
-          // Remove groups that are empty after filtering
-          return item.items.length > 0;
-        }
-
-        return true;
-      });
-    };
-
-    // Apply the filtering to the root group
-    currentGroup.items = filterEmptyGroups(currentGroup.items);
+  const updateGroup = (updatedGroup: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    updateGroupUtil(updatedGroup, transformContext);
+  };
+  const removeConditionGroup = (targetGroupId: string, currentGroup?: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    removeConditionGroupUtil(targetGroupId, currentGroup, transformContext);
   };
 
 
@@ -1397,33 +1634,9 @@ export default defineComponent({
   // {
   //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-    const transformFEToBE = (node:any) => {
-    if (!node || !node.items || !Array.isArray(node.items)) return {};
-
-    const groupLabel = node.label?.toLowerCase(); // 'or' or 'and'
-    if (!groupLabel || (groupLabel !== 'or' && groupLabel !== 'and')) return {};
-
-    const transformedItems = node.items.map((item:any) => {
-      // If the item has its own groupId and items, it's a nested group
-      //that means the item is a group and we need to iterate over that group to get further conditions
-      if (item.groupId && item.items) {
-        return transformFEToBE(item);
-      }
-
-      //if not its a condition so we can simply return the condition
-      return {
-        column: item.column,
-        operator: item.operator,
-        value: item.value,
-        ignore_case: !!item.ignore_case
-      };
-    });
-
-    //return the transformed items in the format of the backend
-    return {
-      [groupLabel]: transformedItems
-    };
-  }
+  const transformFEToBE = (node: any) => {
+    return transformFEToBEUtil(node);
+  };
 
   // Method to transform the backend data to the frontend format
   //when we get response from the BE we need to transform it to the frontend format
@@ -1437,43 +1650,9 @@ export default defineComponent({
   //   label: 'and',
   //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-  const retransformBEToFE = (data:any) => {
-    if(!data) return null;
-    const keys = Object.keys(data);
-    if (keys.length !== 1) return null;
-
-    const label = keys[0]; // 'and' or 'or'
-    const itemsArray = data[label];
-
-    const items = itemsArray.map((item: any) => {
-      if (item.and || item.or) {
-          // Nested group
-          //so we need to iterate over the item and get the conditions and map that to one group
-        return retransformBEToFE(item);
-      } else {
-        //if not its a condition so we can simply return the condition
-        return {
-          column: item.column,
-          operator: item.operator,
-          value: item.value,
-          ignore_case: item.ignore_case,
-          id: getUUID()
-        };
-      }
-    });
-    //here we will return the group with the conditions
-    //the foramt looks like 
-    //{
-    //   groupId: '123',
-    //   label: 'and',
-    //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-    // }
-    return {
-      groupId:  getUUID(),
-      label,
-      items
-    };
-  }
+  const retransformBEToFE = (data: any) => {
+    return retransformBEToFEUtil(data);
+  };
   const validateFormAndNavigateToErrorField = async (formRef: any) => {
       const isValid = await formRef.validate().then(async (valid: any) => {
         return valid;
@@ -1487,172 +1666,461 @@ export default defineComponent({
 
     const navigateToErrorField = (formRef: any) => {
       const errorField = formRef.$el.querySelector('.q-field--error');
-      if (errorField) { 
+      if (errorField) {
         errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+
+    const loadPanelDataIfPresent = async () => {
+      const route = router.currentRoute.value;
+
+      if (route.query.fromPanel === "true" && route.query.panelData) {
+        isLoadingPanelData.value = true;
+        try {
+          const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+
+          if (panelData.queries && panelData.queries.length > 0) {
+            const query = panelData.queries[0];
+
+            // Sanitize panel title for use in alert name
+            // Remove invalid characters (: # ? & % ' " and whitespace)
+            // Collapse multiple underscores, trim leading/trailing underscores
+            // Limit length to 200 characters (reasonable limit for alert names)
+            const sanitizePanelTitle = (title: string | undefined): string => {
+              if (!title || title.trim() === '') {
+                return 'panel';
+              }
+
+              // Replace invalid characters with underscores
+              let sanitized = title.replace(/[:#?&%'"\s]+/g, '_');
+
+              // Collapse multiple consecutive underscores into single underscore
+              sanitized = sanitized.replace(/_+/g, '_');
+
+              // Remove leading/trailing underscores
+              sanitized = sanitized.replace(/^_+|_+$/g, '');
+
+              // If empty after sanitization, use default
+              if (sanitized === '') {
+                return 'panel';
+              }
+
+              // Truncate to reasonable length (leaving room for "Alert_from_" prefix)
+              const maxLength = 200;
+              if (sanitized.length > maxLength) {
+                sanitized = sanitized.substring(0, maxLength);
+                // Remove trailing underscore if truncation created one
+                sanitized = sanitized.replace(/_+$/, '');
+              }
+
+              return sanitized;
+            };
+
+            formData.value.name = `Alert_from_${sanitizePanelTitle(panelData.panelTitle)}`;
+
+            // Show notification that query was imported
+            q.notify({
+              type: "positive",
+              message: t("alerts.importedFromPanel", { panelTitle: panelData.panelTitle }),
+              timeout: 3000,
+            });
+
+            if (query.fields?.stream_type) {
+              formData.value.stream_type = query.fields.stream_type;
+            }
+
+            if (query.fields?.stream) {
+              formData.value.stream_name = query.fields.stream;
+              await updateStreams(false);
+              await updateStreamFields(query.fields.stream);
+            }
+
+            // Set query type based on panel (SQL or PromQL)
+            // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
+            if (panelData.queryType === "sql") {
+              formData.value.query_condition.type = "sql";
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                let sqlQuery = sourceQuery;
+
+                // If threshold is provided and we have a SQL query with GROUP BY,
+                // add a HAVING clause to filter the aggregated column
+                if (panelData.threshold !== undefined && panelData.condition && panelData.yAxisColumn) {
+                  const threshold = panelData.threshold;
+                  const operator = panelData.condition === 'above' ? '>=' : '<=';
+                  const yAxisColumn = panelData.yAxisColumn;
+
+                  // Use node-sql-parser to properly insert HAVING clause in the correct position
+                  // This handles queries with ORDER BY, LIMIT, OFFSET, etc.
+                  // Ensure parser is initialized first
+                  if (!parser) {
+                    await importSqlParser();
+                  }
+                  sqlQuery = addHavingClauseToQuery(sqlQuery, yAxisColumn, operator, threshold, parser);
+                }
+
+                formData.value.query_condition.sql = sqlQuery;
+              }
+            } else if (panelData.queryType === "promql") {
+              formData.value.query_condition.type = "promql";
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                formData.value.query_condition.promql = sourceQuery;
+              }
+            } else {
+              // Default to SQL mode if queryType is not specified
+              // This prevents falling back to quick mode
+              formData.value.query_condition.type = "sql";
+            }
+
+            // Handle query builder fields for SQL panels
+            if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
+              // Enable aggregation for query builder generated SQL
+              isAggregationEnabled.value = true;
+
+              if (query.fields.x && query.fields.x.length > 0) {
+                if (!formData.value.query_condition.aggregation) {
+                  formData.value.query_condition.aggregation = {
+                    group_by: [],
+                    function: "count",
+                    having: {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    },
+                  };
+                }
+                formData.value.query_condition.aggregation.group_by = query.fields.x.map((x: any) => x.alias || x.column);
+              }
+
+              if (query.fields.y && query.fields.y.length > 0) {
+                const yField = query.fields.y[0];
+                if (yField.aggregationFunction) {
+                  if (!formData.value.query_condition.aggregation) {
+                    formData.value.query_condition.aggregation = {
+                      group_by: [""],
+                      function: "count",
+                      having: {
+                        column: "",
+                        operator: ">=",
+                        value: 1,
+                      },
+                    };
+                  }
+                  formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                  // Set the having.column to the Y-axis field for threshold comparison
+                  formData.value.query_condition.aggregation.having.column = yField.alias || yField.column;
+                }
+              }
+
+              if (query.fields.filter && query.fields.filter.length > 0) {
+                const conditions: any[] = [];
+                query.fields.filter.forEach((filter: any) => {
+                  if (filter.type === 'list' && filter.values && filter.values.length > 0) {
+                    // V2: Create condition with filterType and logicalOperator
+                    conditions.push({
+                      filterType: 'condition',
+                      column: filter.column,
+                      operator: "=",
+                      value: filter.values[0],
+                      values: [],
+                      logicalOperator: 'AND',
+                      id: getUUID()
+                    });
+                  }
+                });
+
+                if (conditions.length > 0) {
+                  // V2: Create group with filterType and conditions array
+                  formData.value.query_condition.conditions = {
+                    filterType: 'group',
+                    logicalOperator: 'AND',
+                    groupId: getUUID(),
+                    conditions: conditions
+                  };
+                }
+              }
+            }
+
+            if (query.vrlFunctionQuery) {
+              showVrlFunction.value = true;
+              formData.value.query_condition.vrl_function = query.vrlFunctionQuery;
+            }
+
+            if (panelData.timeRange?.value_type === "relative") {
+              const relativeValue = panelData.timeRange.relative_value || 15;
+              const relativePeriod = panelData.timeRange.relative_period || "Minutes";
+
+              let periodInMinutes = relativeValue;
+              if (relativePeriod === "Hours") {
+                periodInMinutes = relativeValue * 60;
+              } else if (relativePeriod === "Days") {
+                periodInMinutes = relativeValue * 60 * 24;
+              } else if (relativePeriod === "Weeks") {
+                periodInMinutes = relativeValue * 60 * 24 * 7;
+              }
+
+              formData.value.trigger_condition.period = periodInMinutes;
+            }
+
+            // Handle threshold and condition from context menu
+            if (panelData.threshold !== undefined && panelData.condition) {
+              // For SQL with aggregation: use HAVING clause for value comparison
+              // For PromQL: use promql_condition for value comparison
+              // In both cases, set trigger_condition.threshold to 1 (fire when any row/result is returned)
+
+              if (panelData.queryType === 'promql') {
+                // For PromQL: Set up promql_condition with the threshold
+                if (!formData.value.query_condition.promql_condition) {
+                  formData.value.query_condition.promql_condition = {
+                    column: 'value',
+                    operator: '>=',
+                    value: 1,
+                  };
+                }
+                formData.value.query_condition.promql_condition.value = panelData.threshold;
+                formData.value.query_condition.promql_condition.operator =
+                  panelData.condition === 'above' ? '>=' : '<=';
+              } else {
+                // For SQL: Set up aggregation HAVING clause with the threshold
+                // If aggregation is enabled, set the having clause
+                if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                  if (!formData.value.query_condition.aggregation.having) {
+                    formData.value.query_condition.aggregation.having = {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    };
+                  }
+                  formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                  formData.value.query_condition.aggregation.having.operator =
+                    panelData.condition === 'above' ? '>=' : '<=';
+                }
+              }
+
+              // Set alert trigger threshold to 1 and operator to >=
+              // This means: fire the alert when ANY row is returned from the query
+              // (The actual value comparison is done in HAVING clause for SQL or in PromQL query)
+              formData.value.trigger_condition.threshold = 1;
+              formData.value.trigger_condition.operator = '>=';
+            }
+          }
+        } catch (error) {
+          console.error("Error loading panel data:", error);
+          q.notify({
+            type: "negative",
+            message: "Failed to load panel data",
+            timeout: 2000
+          });
+        } finally {
+          isLoadingPanelData.value = false;
+        }
+      }
+    };
+
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
     };
 
     const saveAlertJson = async (json: any) => {
-      let jsonPayload = JSON.parse(json);
-      let destinationsList = [];
-      props.destinations.forEach((destination: any) => {
-        destinationsList.push(destination.name);
-      });
-      let streamList = [];
-      if(!streams.value[jsonPayload.stream_type]){
-        try{
-          const response: any = await getStreams(jsonPayload.stream_type,false);
-          streams.value[jsonPayload.stream_type] = response.list;
-        }catch(err: any){
-          if(err.response.status !== 403){
-            q.notify({
-              type: "negative",
-              message: err.response?.data?.message || "Error fetching streams",
-              timeout: 3000,
-            });
-          }
-        }
-      }
-      streams.value[jsonPayload.stream_type].forEach((stream: any) => {
-        streamList.push(stream.name);
-      });
+      const saveContext: SaveAlertContext = {
+        q,
+        store,
+        props,
+        emit,
+        router,
+        isAggregationEnabled,
+        activeFolderId: { value: Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value },
+        handleAlertError,
+      };
 
-      const validationResult = validateAlert(jsonPayload,{
-        streamList: streamList,
-        selectedOrgId: store.state.selectedOrganization.identifier,
-        destinationsList: destinationsList
-      });
-      
-      if (!validationResult.isValid) {
-        validationErrors.value = validationResult.errors;
-        return;
-      }
-      
-      // Validate SQL query if type is sql and not real-time
-      if (jsonPayload.is_real_time === false && jsonPayload.query_condition.type === 'sql') {
-        try {
-          // First check if query has SELECT *
-          if (!getParser(jsonPayload.query_condition.sql)) {
-            validationErrors.value = ['Selecting all columns is not allowed. Please specify the columns explicitly'];
-            return;
-          }
+      const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
 
-          // Set up query for validation
-          const query = buildQueryPayload({
-            sqlMode: true,
-            streamName: jsonPayload.stream_name,
-          });
+      const jsonValidationContext: JsonValidationContext = {
+        q,
+        store,
+        streams,
+        getParser,
+        buildQueryPayload,
+        prepareAndSaveAlert: prepareAndSaveAlertFunction,
+      };
 
-          delete query.aggs;
-          query.query.start_time = query.query.start_time + 780000000;
-          query.query.sql = jsonPayload.query_condition.sql;
-
-          if (jsonPayload.query_condition.vrl_function) {
-            query.query.query_fn = b64EncodeUnicode(jsonPayload.query_condition.vrl_function);
-          }
-
-          // Validate SQL query
-          await searchService.search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            page_type: jsonPayload.stream_type,
-          });
-
-          // If we get here, SQL is valid
-          showJsonEditorDialog.value = false;
-          formData.value = jsonPayload;
-          await prepareAndSaveAlert(jsonPayload);
-
-        } catch (err: any) {
-          // Handle SQL validation errors
-          const errorMessage = err.response?.data?.message || 'Invalid SQL Query';
-          validationErrors.value = [`SQL validation error: ${errorMessage}`];
-          return;
-        }
-      } else {
-        // If not SQL or is real-time, just close and update
-        showJsonEditorDialog.value = false;
-        formData.value = jsonPayload;
-        await prepareAndSaveAlert(jsonPayload);
-      }
+      await saveAlertJsonUtil(
+        json,
+        props,
+        validationErrors,
+        showJsonEditorDialog,
+        formData,
+        jsonValidationContext,
+      );
     };
-    const prepareAndSaveAlert = async (data: any) => {
-      const payload = cloneDeep(data);
-      if(!isAggregationEnabled.value){
-        payload.query_condition.aggregation = null;
-      }
-      if(Array.isArray(payload.context_attributes) && payload.context_attributes.length == 0){
-        payload.context_attributes = {};
-      }
-      
-      // Transform conditions to backend format
-      payload.query_condition.conditions = transformFEToBE(payload.query_condition.conditions);
-      
-      // Convert string boolean to actual boolean
-      payload.is_real_time = payload.is_real_time === "true" || payload.is_real_time === true;
-      
-      // Handle VRL function encoding if present
-      if (payload.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
-          payload.query_condition.vrl_function.trim()
-        );
+
+    // Wizard step navigation logic
+    const goToNextStep = async () => {
+      // Validate current step before moving to next
+      const isValid = await validateCurrentStep();
+      if (!isValid) {
+        return; // Stop navigation if validation fails
       }
 
-      // Set timestamps and metadata
-      if (props.isUpdated) {
-        payload.updatedAt = new Date().toISOString();
-        payload.lastEditedBy = store.state.userInfo.email;
-        payload.folder_id = router.currentRoute.value.query.folder || "default";
-      } else {
-        payload.createdAt = new Date().toISOString();
-        payload.owner = store.state.userInfo.email;
-        payload.lastTriggeredAt = new Date().getTime();
-        payload.lastEditedBy = store.state.userInfo.email;
-        payload.folder_id = activeFolderId.value;
-      }
-
-      try {
-        const dismiss = q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
-
-
-        if (props.isUpdated) {
-          await alertsService.update_by_alert_id(
-            store.state.selectedOrganization.identifier,
-            payload,
-            activeFolderId.value
-          );
-          emit("update:list", activeFolderId.value);
-          q.notify({
-            type: "positive",
-            message: "Alert updated successfully.",
-          });
+      if (formData.value.is_real_time === 'true') {
+        // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
+        if (wizardStep.value === 2) {
+          wizardStep.value = 4;
+        } else if (wizardStep.value === 4) {
+          wizardStep.value = 6;
         } else {
-          await alertsService.create_by_alert_id(
-            store.state.selectedOrganization.identifier,
-            payload,
-            activeFolderId.value
-          );
-          emit("update:list", activeFolderId.value);
-          q.notify({
-            type: "positive",
-            message: "Alert saved successfully.",
-          });
+          wizardStep.value = wizardStep.value + 1;
         }
-        dismiss();
-      } catch (err: any) {
-        handleAlertError(err);
+      } else {
+        // For scheduled alerts: normal progression 1 -> 2 -> 3 -> 4 -> 5 -> 6
+        wizardStep.value = wizardStep.value + 1;
+      }
+
+      // Only update lastValidStep if moving forward (don't reduce it when editing)
+      if (wizardStep.value > lastValidStep.value) {
+        lastValidStep.value = wizardStep.value;
       }
     };
 
+    // Validate a specific step (used by both Continue button and header navigation)
+    const validateStep = async (stepNumber: number) => {
+      // Step 1: Alert Setup
+      if (stepNumber === 1) {
+        if (step1Ref.value && (step1Ref.value as any).validate) {
+          const isValid = await (step1Ref.value as any).validate();
+          if (!isValid) {
+            // Focus on the first invalid field
+            focusOnFirstError();
+            return false;
+          }
+        }
+      }
 
+
+      // Step 2: Query Config
+      if (stepNumber === 2) {
+        if (step2Ref.value && (step2Ref.value as any).validate) {
+          const validationResult = (step2Ref.value as any).validate();
+
+          // Handle async validation
+          const isValid = validationResult instanceof Promise
+            ? await validationResult
+            : validationResult;
+
+          if (!isValid) {
+            // Don't show toast notification for custom mode
+            // The fields themselves should show validation errors
+            const queryType = formData.value.query_condition.type || 'custom';
+
+            // Only show toast for SQL mode
+            if (queryType === 'sql') {
+              let errorMsg = '';
+              if (sqlQueryErrorMsg.value) {
+                errorMsg = `SQL validation error: ${sqlQueryErrorMsg.value}`;
+              } else {
+                errorMsg = 'Please provide a valid SQL query.';
+              }
+
+              q.notify({
+                type: 'negative',
+                message: errorMsg,
+                timeout: 2000,
+              });
+            }
+
+            return false;
+          }
+        }
+      }
+
+      // Step 4: Alert Settings
+      if (stepNumber === 4) {
+        if (step4Ref.value && (step4Ref.value as any).validate) {
+          const validationResult = (step4Ref.value as any).validate();
+
+          // Handle async validation
+          const result = validationResult instanceof Promise
+            ? await validationResult
+            : validationResult;
+
+          // Handle validation result - could be boolean (backward compat) or object
+          const isValid = typeof result === 'boolean' ? result : result.valid;
+          const errorMessage = typeof result === 'object' ? result.message : null;
+
+          if (!isValid) {
+            // Show toaster only if there's a specific error message
+            // If message is null, it means inline validation errors are sufficient
+            if (errorMessage) {
+              q.notify({
+                type: 'negative',
+                message: errorMessage,
+                timeout: 1500,
+              });
+            }
+            return false;
+          }
+        }
+      }
+
+      // Add validation for other steps here in the future
+      // Step 3: Compare with Past (skipped - optional)
+      // Step 5: Deduplication
+      // Step 6: Advanced
+
+      return true;
+    };
+
+    // Validate current step (convenience wrapper)
+    const validateCurrentStep = async () => {
+      return await validateStep(wizardStep.value);
+    };
+
+    // Focus on first error field
+    const focusOnFirstError = () => {
+      // Use nextTick to ensure DOM is updated with error states
+      nextTick(() => {
+        // Find the first field with error class
+        const errorField = document.querySelector('.q-field--error input, .q-field--error .q-select__dropdown-icon');
+        if (errorField) {
+          (errorField as HTMLElement).focus();
+          // Scroll to the error field
+          errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    };
+
+    // Simpler approach: Remove header-nav and only allow Continue/Back buttons
+    // This way we don't fight with Quasar's navigation system
+
+    const goToPreviousStep = () => {
+      if (formData.value.is_real_time === 'true') {
+        // For real-time alerts: 6 -> 4 -> 2 -> 1 (skip 5 and 3)
+        if (wizardStep.value === 6) {
+          wizardStep.value = 4;
+        } else if (wizardStep.value === 4) {
+          wizardStep.value = 2;
+        } else {
+          wizardStep.value = wizardStep.value - 1;
+        }
+      } else {
+        // For scheduled alerts: normal progression 6 -> 5 -> 4 -> 3 -> 2 -> 1
+        wizardStep.value = wizardStep.value - 1;
+      }
+    };
+
+    const isLastStep = computed(() => {
+      if (formData.value.is_real_time === 'true') {
+        // For real-time alerts, step 6 is the last step
+        return wizardStep.value === 6;
+      } else {
+        // For scheduled alerts, step 6 is also the last step
+        return wizardStep.value === 6;
+      }
+    });
 
     return {
       t,
@@ -1672,7 +2140,6 @@ export default defineComponent({
       selectedRelativePeriod,
       relativePeriods,
       editorUpdate,
-      updateConditions,
       updateStreamFields,
       updateEditorContent,
       triggerCols,
@@ -1681,6 +2148,7 @@ export default defineComponent({
       schemaList,
       filteredColumns,
       streamTypes,
+      rowTemplateTypeOptions,
       streams,
       updateStreams,
       isFetchingStreams,
@@ -1689,7 +2157,6 @@ export default defineComponent({
       removeVariable,
       addVariable,
       selectedDestinations,
-      scheduledAlertRef,
       router,
       isAggregationEnabled,
       plotChart,
@@ -1700,14 +2167,18 @@ export default defineComponent({
       getParser,
       onInputUpdate,
       showPreview,
+      rowTemplatePlaceholder,
       streamFieldsMap,
+      generatedSqlQuery,
       previewQuery,
       previewAlertRef,
+      isUsingBackendSql,
       outlinedInfo,
       getTimezoneOffset,
       showVrlFunction,
       validateSqlQuery,
       validateSqlQueryPromise,
+      validateConditionsAgainstUDS,
       isValidResourceName,
       sqlQueryErrorMsg,
       vrlFunctionError,
@@ -1726,36 +2197,70 @@ export default defineComponent({
       updateSilence,
       refreshDestinations,
       updateDestinations,
+      updateTab,
       updateGroup,
       removeConditionGroup,
       transformFEToBE,
       retransformBEToFE,
       validateFormAndNavigateToErrorField,
+      openEditorDialog,
+      decodedVrlFunction,
+      viewSqlEditorDialog,
       navigateToErrorField,
-      realTimeAlertRef,
       openJsonEditor,
       showJsonEditorDialog,
       saveAlertJson,
       validationErrors,
       originalStreamFields,
-      generateSqlQuery,
-      generateWhereClause
+      generateSqlQuery: generateSqlQueryLocal,
+      track,
+      loadPanelDataIfPresent,
+      isLoadingPanelData,
+      focusManager,
+      streamFieldRef,
+      streamTypeFieldRef,
+      wizardStep,
+      wizardStepper,
+      step1Ref,
+      currentStepCaption,
+      goToStep2,
+      goToNextStep,
+      goToPreviousStep,
+      isLastStep,
+      step2Ref,
+      step3Ref,
+      step4Ref,
+      lastValidStep,
+      clearMultiWindows,
+      validateStep,
+      handleGoToSqlEditor,
     };
   },
 
-  created() {
+  async created() {
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
+
+    // Check if this is from a dashboard panel - if so, don't set default query type
+    const route = this.router.currentRoute.value;
+    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+
     if(!this.isUpdated){
       this.formData.is_real_time = this.alertType === 'realTime'? true : false;
     }
       this.formData.is_real_time = this.formData.is_real_time.toString();
 
+    // If from panel, load panel data BEFORE initializing child components
+    if (isFromPanel) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPanelDataIfPresent(); // Load panel data and set correct type
+    }
+
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
       this.formData.trigger_condition.frequency = Math.ceil(
-        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 1,
+        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
       );
 
     this.beingUpdated = this.isUpdated;
@@ -1771,6 +2276,25 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+
+      // Defensive initialization for legacy or malformed promql_condition
+      // Ensures all required fields are present (column, operator, value)
+      // this makes sure that we dont pass any null values while creating or updating an existing alert
+      if (this.formData.query_condition.promql_condition) {
+        if (!this.formData.query_condition.promql_condition.column) {
+          this.formData.query_condition.promql_condition.column = 'value';
+        }
+        if (!this.formData.query_condition.promql_condition.operator) {
+          this.formData.query_condition.promql_condition.operator = '>=';
+        }
+        if (this.formData.query_condition.promql_condition.value === undefined ||
+            this.formData.query_condition.promql_condition.value === null) {
+          this.formData.query_condition.promql_condition.value = 1;
+        }
+      }
+
+      // Enable all steps when editing an existing alert
+      this.lastValidStep = 6;
 
       if (!this.formData.trigger_condition?.timezone) {
         if (this.formData.tz_offset === 0) {
@@ -1794,27 +2318,69 @@ export default defineComponent({
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
-    this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes,
-    ).map((attr) => {
-      return {
-        key: attr,
-        value: this.formData.context_attributes[attr],
-        id: getUUID(),
-      };
-    });
-    //this is done because 
-    //if we are getting the conditions as null or undefined then we need to create a new group 
-    //if we are getting the conditions as an object then we need to transform it to the frontend format
-    if(this.formData.query_condition.conditions && ( !Array.isArray(this.formData.query_condition.conditions) && Object.keys(this.formData.query_condition.conditions).length != 0)){
-      this.formData.query_condition.conditions = this.retransformBEToFE(this.formData.query_condition.conditions);
+    // Convert context_attributes from object to array format (only if it's an object)
+    if (this.formData.context_attributes && typeof this.formData.context_attributes === 'object' && !Array.isArray(this.formData.context_attributes)) {
+      this.formData.context_attributes = Object.keys(
+        this.formData.context_attributes,
+      ).map((attr) => {
+        return {
+          key: attr,
+          value: this.formData.context_attributes[attr],
+          id: getUUID(),
+        };
+      });
+    } else if (!this.formData.context_attributes) {
+      // If null or undefined, initialize as empty array
+      this.formData.context_attributes = [];
+    }
+    // VERSION DETECTION AND CONVERSION
+    // Supports three versions:
+    // - V0: Flat array of conditions with implicit AND between all (no groups)
+    // - V1: Tree-based structure with {and: [...]} or {or: [...]} or {label, items, groupId}
+    // - V2: Linear structure with filterType, logicalOperator per condition
+
+    // Check for V2 format from backend
+    // Backend sends: query_condition: { conditions: { version: 2, conditions: {...} } }
+    if (this.formData.query_condition.conditions?.version === "2" || this.formData.query_condition.conditions?.version === 2) {
+      // V2: Extract the nested conditions object
+      // Backend sends { version: 2, conditions: {...} }, we need just the inner conditions
+      this.formData.query_condition.conditions = ensureIds(this.formData.query_condition.conditions.conditions);
+    } else if(this.formData.query_condition.conditions && ( !Array.isArray(this.formData.query_condition.conditions) && Object.keys(this.formData.query_condition.conditions).length != 0)){
+      // No version field - could be V1 or old V2
+      // Detect version by structure
+      const version = detectConditionsVersion(this.formData.query_condition.conditions);
+
+      if (version === 0) {
+        // V0: Flat array format - convert to V2
+        // V0 had implicit AND between all conditions (no groups)
+        this.formData.query_condition.conditions = ensureIds(convertV0ToV2(this.formData.query_condition.conditions));
+      } else if (version === 1) {
+        // V1 format - need to convert to V2
+        // First check if it's BE format ({and: [...]}) or FE format ({label, items, groupId})
+        if (this.formData.query_condition.conditions.and || this.formData.query_condition.conditions.or) {
+          // V1 Backend format - convert to V2
+          this.formData.query_condition.conditions = ensureIds(convertV1BEToV2(this.formData.query_condition.conditions));
+        } else if (this.formData.query_condition.conditions.label && this.formData.query_condition.conditions.items) {
+          // V1 Frontend format - convert to V2
+          // this wont be executed atleast once but we are keeping it incase any FE logics got saved already 
+          this.formData.query_condition.conditions = ensureIds(convertV1ToV2(this.formData.query_condition.conditions));
+        }
+      } else {
+        // V2 format - ensure all IDs exist
+        this.formData.query_condition.conditions = ensureIds(this.formData.query_condition.conditions);
+      }
+    } else if (Array.isArray(this.formData.query_condition.conditions) && this.formData.query_condition.conditions.length > 0) {
+      // V0: Flat array of conditions - convert to V2
+      // This handles the case where conditions is directly an array at the top level
+      this.formData.query_condition.conditions = ensureIds(convertV0ToV2(this.formData.query_condition.conditions));
     }
     else if (this.formData.query_condition.conditions == null || this.formData.query_condition.conditions == undefined || this.formData.query_condition.conditions.length == 0 || Object.keys(this.formData.query_condition.conditions).length == 0){
-
+      // No conditions - create empty V2 group
       this.formData.query_condition.conditions = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [],
         groupId: getUUID(),
-        label: 'and',
-        items: []
       }
     }
   },
@@ -1839,12 +2405,70 @@ export default defineComponent({
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
 
+      // FINAL VALIDATION CHECKPOINT
+      // Validate all steps before submission to catch any errors from navigating back
+
+      // Validate Step 1: Alert Setup
+      if (this.$refs.step1Ref && (this.$refs.step1Ref as any).validate) {
+        const isValid = await (this.$refs.step1Ref as any).validate();
+        if (!isValid) {
+          this.wizardStep = 1;
+          this.q.notify({
+            type: "negative",
+            message: "Please complete Alert Setup step correctly.",
+            timeout: 2000,
+          });
+          return false;
+        }
+      }
+
+      // Validate Step 2: Query Config
+      if (this.$refs.step2Ref && (this.$refs.step2Ref as any).validate) {
+        const validationResult = (this.$refs.step2Ref as any).validate();
+        const isValid = validationResult instanceof Promise
+          ? await validationResult
+          : validationResult;
+        if (!isValid) {
+          this.wizardStep = 2;
+          this.q.notify({
+            type: "negative",
+            message: "Please complete Query Configuration step correctly.",
+            timeout: 2000,
+          });
+          return false;
+        }
+      }
+
+      // Validate Step 3: Compare with Past (only if not real-time)
+      // Step 3 is optional, no strict validation needed
+
+      // Validate Step 4: Alert Settings
+      if (this.$refs.step4Ref && (this.$refs.step4Ref as any).validate) {
+        const validationResult = (this.$refs.step4Ref as any).validate();
+        const result = validationResult instanceof Promise
+          ? await validationResult
+          : validationResult;
+
+        // Handle validation result - could be boolean (backward compat) or object
+        const isValid = typeof result === 'boolean' ? result : result.valid;
+
+        if (!isValid) {
+          this.wizardStep = 4;
+          this.q.notify({
+            type: "negative",
+            message: "Please complete Alert Settings step correctly.",
+            timeout: 2000,
+          });
+          return false;
+        }
+      }
 
       if (
         this.formData.is_real_time == "false" &&
         this.formData.query_condition.type == "sql" &&
         !this.getParser(this.formData.query_condition.sql)
       ) {
+        this.wizardStep = 2; // Navigate to query step
         this.q.notify({
           type: "negative",
           message: "Selecting all Columns in SQL query is not allowed.",
@@ -1853,14 +2477,6 @@ export default defineComponent({
         return false;
       }
 
-      // if (this.formData.stream_name == "") {
-      //   this.q.notify({
-      //     type: "negative",
-      //     message: "Please select stream name.",
-      //     timeout: 1500,
-      //   });
-      //   return false;
-      // }
 
       if (
         this.formData.is_real_time == "false" &&
@@ -1891,34 +2507,41 @@ export default defineComponent({
 
         this.formData.tz_offset = convertedDateTime.offset;
       }
+              // Validate that conditions use only available fields (respects UDS filtering if configured)
+        // Only validates "custom" query type - skips "sql" and "promql" as users write custom queries
+        const udsValidation = this.validateConditionsAgainstUDS();
+        if (!udsValidation.isValid) {
+          const invalidCount = udsValidation.invalidFields.length;
+          let message = '';
 
-            //from here validation starts so if there are any errors we need to navigate user to that paricular field
-      //this is for main form validation
-      let isAlertValid = true;
-      let isScheduledAlertValid = true;
-      let isRealTimeAlertValid = true;
-        isAlertValid = await this.validateFormAndNavigateToErrorField(this.addAlertForm);
-        //we need to handle scheduled alert validation separately 
-        //if there are any scheduled alert errors then we need to navigate user to that field
-        if(this.formData.is_real_time == "false"){
-          isScheduledAlertValid = this.scheduledAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
-        }
-        else{
-          isRealTimeAlertValid = this.realTimeAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
-        }
-        if( isAlertValid && !isScheduledAlertValid){
-          this.navigateToErrorField(this.scheduledAlertRef); 
-        }
-        if( isAlertValid && !isRealTimeAlertValid){
-          this.navigateToErrorField(this.realTimeAlertRef);
-        }
-        if (!isAlertValid || !isScheduledAlertValid || !isRealTimeAlertValid) return false;
+          if (invalidCount === 1) {
+            // Single field - show the field name
+            message = `Field "${udsValidation.invalidFields[0]}" is not available. Please use only the available fields in your conditions.`;
+          } else if (invalidCount <= 3) {
+            // 2-3 fields - show all field names
+            message = `Fields ${udsValidation.invalidFields.map((f: string) => `"${f}"`).join(', ')} are not available. Please use only the available fields in your conditions.`;
+          } else {
+            // More than 3 fields - show count and first few fields
+            const firstThree = udsValidation.invalidFields.slice(0, 3).map((f: string) => `"${f}"`).join(', ');
+            const remaining = invalidCount - 3;
+            message = `${invalidCount} fields are not available (${firstThree} and ${remaining} more). Please use only the available fields in your conditions.`;
+          }
 
+          this.q.notify({
+            type: "negative",
+            message: message,
+            timeout: 6000,
+          });
 
-        const payload = this.getAlertPayload();
-        if (!this.validateInputs(payload)) return;
+          // Navigate back to step 2 (Query) where fields can be corrected
+          this.wizardStep = 2;
 
-        const dismiss = this.q.notify({
+          return false;
+        }
+
+      const payload = this.getAlertPayload();
+
+      const dismiss = this.q.notify({
           spinner: true,
           message: "Please wait...",
           timeout: 2000,
@@ -1942,13 +2565,19 @@ export default defineComponent({
               message: "Error while validating sql query. Please check the query and try again.",
               timeout: 1500,
             });
-            console.log("Error while validating sql query",error);
+            console.error("Error while validating sql query",error);
             return false;
           }
         }
 
-        // Transform the form data to the backend format
-        payload.query_condition.conditions = this.transformFEToBE(this.formData.query_condition.conditions);
+        // VERSION HANDLING
+        // All conditions are converted to V2 format during data loading,
+        // so we always wrap with version field for backend
+        // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
+        payload.query_condition.conditions = {
+          version: 2,
+          conditions: this.formData.query_condition.conditions,
+        };
 
         if (this.beingUpdated) {
           payload.folder_id = this.router.currentRoute.value.query.folder || "default";
@@ -1972,6 +2601,10 @@ export default defineComponent({
               dismiss();
               this.handleAlertError(err);
             });
+          this.track("Button Click", {
+            button: "Update Alert",
+            page: "Alerts"
+          });
           segment.track("Button Click", {
             button: "Update Alert",
             user_org: this.store.state.selectedOrganization.identifier,
@@ -2004,6 +2637,10 @@ export default defineComponent({
               dismiss();
               this.handleAlertError(err);
             });
+          this.track("Button Click", {
+            button: "Create Alert",
+            page: "Alerts"
+          });
           segment.track("Button Click", {
             button: "Save Alert",
             user_org: this.store.state.selectedOrganization.identifier,
@@ -2165,8 +2802,113 @@ export default defineComponent({
 }
 
 
+.o2-alert-tab-border{
+  border-top: 0.0625rem solid var(--o2-border-color);
+}
 
-  
+// Wizard Stepper Styles
+.alert-wizard-stepper {
+  box-shadow: none;
+  .q-stepper__step-inner{
+    padding: 0.375rem !important;
+  }
+  .q-stepper__tab{
+    padding-left: 0.375rem !important;
+    min-height: 30px !important;
 
+  }
+
+  :deep(.q-stepper__header) {
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  :deep(.q-stepper__tab) {
+    padding: 12px 16px;
+    min-height: 60px;
+  }
+
+  // Hide captions for inactive steps
+  :deep(.q-stepper__tab) {
+    .q-stepper__caption {
+      display: none !important;
+    }
+  }
+
+  // Show caption only on active step
+  :deep(.q-stepper__tab--active) {
+    .q-stepper__caption {
+      display: block !important;
+      opacity: 0.7;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  }
+
+  :deep(.q-stepper__tab--active) {
+    color: #1976d2;
+    font-weight: 600;
+  }
+
+  :deep(.q-stepper__tab--done) {
+    color: #4caf50;
+    cursor: pointer;
+  }
+
+  :deep(.q-stepper__dot) {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .q-stepper--horizontal .q-stepper__step-inner {
+    padding: 8px !important;
+  }
+
+  // Make step titles more compact
+  :deep(.q-stepper__title) {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+}
+
+.wizard-view-container {
+  .q-stepper {
+    background: transparent !important;
+  }
+}
+
+// Dark mode adjustments
+.dark-mode1 {
+  .alert-wizard-stepper {
+    :deep(.q-stepper__header) {
+      border-bottom-color: #424242;
+    }
+  }
+}
+
+// Persistent step caption styles (helper text style)
+.persistent-step-caption {
+  font-size: 12px;
+  line-height: 1.6;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-weight: 400;
+  margin-left: 0.375rem;
+  letter-spacing: 0.01em;
+}
+
+.dark-mode-caption {
+  background-color: transparent;
+  color: #9e9e9e;
+  border-left: 3px solid #5a5a5a;
+  padding-left: 12px !important;
+}
+
+.light-mode-caption {
+  background-color: transparent;
+  color: #757575;
+  border-left: 3px solid #bdbdbd;
+  padding-left: 12px !important;
+}
 
 </style>

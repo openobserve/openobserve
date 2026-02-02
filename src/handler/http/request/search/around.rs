@@ -159,6 +159,8 @@ pub(crate) async fn around(
             query_fn: query_fn.clone(),
             action_id: None,
             skip_wal: false,
+            sampling_config: None,
+            sampling_ratio: None,
             streaming_output: false,
             streaming_id: None,
             histogram_interval: 0,
@@ -170,6 +172,7 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
     let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
@@ -195,6 +198,8 @@ pub(crate) async fn around(
             query_fn: query_fn.clone(),
             action_id: None,
             skip_wal: false,
+            sampling_config: None,
+            sampling_ratio: None,
             streaming_output: false,
             streaming_id: None,
             histogram_interval: 0,
@@ -206,6 +211,7 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
     let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
@@ -254,6 +260,13 @@ pub(crate) async fn around(
             resp_forward.work_group.clone(),
             resp_backward.work_group.clone(),
         ]),
+        // get max peak memory usage from forward and backward
+        peak_memory_usage: Some(
+            resp_forward
+                .peak_memory_usage
+                .unwrap_or(0.0)
+                .max(resp_backward.peak_memory_usage.unwrap_or(0.0)),
+        ),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { validateAlert, ValidationResult } from "./validateAlerts";
+import { validateAlert, ValidationResult } from "./alerts/alertValidation";
 
 describe("Alert Validation", () => {
   const validAlert = {

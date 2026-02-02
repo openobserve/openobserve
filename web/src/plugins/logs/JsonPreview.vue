@@ -3,8 +3,7 @@
     <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="logs-json-preview-tabs q-mr-sm"
-        style="border: 1px solid #8a8a8a; border-radius: 4px; overflow: hidden"
+        class="tw:mb-[0.375rem] logs-json-preview-tabs q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -16,10 +15,27 @@
         dense
         size="sm"
         no-caps
-        class="q-px-sm copy-log-btn q-mr-sm"
+        class="tw:mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
         icon="content_copy"
         @click="copyLogToClipboard"
       />
+      <q-btn
+        v-if="showViewRelatedBtn"
+        :label="t('search.viewRelated')"
+        dense
+        size="sm"
+        no-caps
+        class="log-preview-btn q-px-sm q-mr-sm"
+        icon="link"
+        color="secondary"
+        outline
+        @click="openCorrelation"
+        data-test="log-correlation-btn"
+      >
+        <q-tooltip>
+          {{ t('search.viewRelatedTooltip') }}
+        </q-tooltip>
+      </q-btn>
       <div
         v-if="
           showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
@@ -101,7 +117,8 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <q-spinner-hourglass v-if="loading"
+size="lg" color="primary" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -131,7 +148,7 @@
           :name="'img:' + getImageURL('images/common/add_icon.svg')"
           aria-label="Add icon"
         >
-          <q-list>
+          <q-list class="logs-table-list">
             <q-item
               clickable
               v-close-popup
@@ -269,19 +286,16 @@
           </q-list>
         </q-btn-dropdown>
 
-        <span class="q-pl-xs" :data-test="`log-expand-detail-key-${key}`">
-          <span
-            :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'"
-            :data-test="`log-expand-detail-key-${key}-text`"
-            >{{ key }}:</span
-          ><span class="q-pl-xs" :data-test="`log-expand-detail-value-${key}`"
-            ><template v-if="index < Object.keys(value).length - 1"
-              >{{ value[key] }},</template
-            >
-            <template v-else>
-              {{ value[key] }}
-            </template>
-          </span>
+        <span
+          class="q-pl-xs"
+          :data-test="`log-expand-detail-key-${key}`"
+          :class="store.state.theme === 'dark' ? 'dark' : ''"
+        >
+          <LogsHighLighting
+            :data="{ [key]: value[key] }"
+            :show-braces="false"
+            :query-string="highlightQuery"
+          /><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
       }
@@ -301,7 +315,8 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <q-icon name="content_copy"
+size="xs" class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
@@ -380,7 +395,6 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
-import useLogs from "../../composables/useLogs";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -390,6 +404,9 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import { searchState } from "@/composables/useLogs/searchState";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 export default {
   name: "JsonPreview",
@@ -412,11 +429,21 @@ export default {
       default: "",
       required: false,
     },
+    highlightQuery: {
+      type: String,
+      default: "",
+      required: false,
+    },
+    hideViewRelated: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     NotEqualIcon,
     EqualIcon,
     AppTabs,
+    LogsHighLighting,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -428,6 +455,7 @@ export default {
     "view-trace",
     "sendToAiChat",
     "closeTable",
+    "show-correlation",
   ],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
@@ -492,10 +520,43 @@ export default {
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);
     };
-    const { searchObj, searchAggData } = useLogs();
+    const { searchObj, searchAggData } = searchState();
     let multiStreamFields: any = ref([]);
 
     const showViewTraceBtn = ref(false);
+    const showViewRelatedBtn = ref(false);
+
+    // Initialize service correlation composable
+    const { isCorrelationAvailable } = useServiceCorrelation();
+
+    // Simple check: just verify correlation feature is available
+    // The actual metric availability check happens when the button is clicked (in SearchResult.vue)
+    onMounted(async () => {
+      try {
+        // Gate correlation feature behind enterprise check to avoid 403 errors
+        if (config.isEnterprise !== "true") {
+          console.log("[JsonPreview] Correlation feature requires enterprise license");
+          showViewRelatedBtn.value = false;
+          return;
+        }
+
+        const available = await isCorrelationAvailable();
+        console.log("[JsonPreview] Correlation feature available:", available, "Mode:", props.mode);
+
+        // Show button if correlation is available AND we're in detail view (sidebar or expanded)
+        // AND service_streams is enabled in config
+        // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
+        // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
+        const isDetailView = props.mode === 'sidebar' || props.mode === 'expanded';
+        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
+        showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+
+        console.log("[JsonPreview] showViewRelatedBtn set to:", showViewRelatedBtn.value, "isDetailView:", isDetailView, "serviceStreamsEnabled:", serviceStreamsEnabled, "hideViewRelated:", props.hideViewRelated);
+      } catch (err) {
+        console.error("[JsonPreview] Error checking correlation availability:", err);
+        showViewRelatedBtn.value = false;
+      }
+    });
 
     const getTracesStreams = async () => {
       isTracesStreamsLoading.value = true;
@@ -533,15 +594,8 @@ export default {
     };
 
     onBeforeMount(() => {
-      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        if (
-          item.streams?.length == searchObj.data.stream.selectedStream.length
-        ) {
-          multiStreamFields.value.push(item.name);
-        }
-      });
       setViewTraceBtn();
-
+      updateMultiStreamFields();
       previewId.value = getUUID();
     });
 
@@ -661,12 +715,32 @@ export default {
       }
     };
 
+    const updateMultiStreamFields = () => {
+      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
+        if (
+          item.streams?.length == searchObj.data.stream.selectedStream.length
+        ) {
+          multiStreamFields.value.push(item.name);
+        }
+      });
+    }
+
     watch(activeTab, async () => {
       if (activeTab.value === "unflattened") {
         unflattendData.value = "";
         await getOriginalData();
       }
     });
+
+    watch(
+      () => searchObj.data.stream.selectedStreamFields,
+      () => {
+        updateMultiStreamFields();
+      },
+      {
+        deep: true,
+      },
+    );
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -678,6 +752,14 @@ export default {
 
     const redirectToTraces = () => {
       emit("view-trace");
+    };
+
+    const openCorrelation = () => {
+      console.log(
+        "[JsonPreview] openCorrelation clicked, emitting show-correlation event with value:",
+        props.value,
+      );
+      emit("show-correlation", props.value);
     };
 
     const handleTabChange = async () => {
@@ -808,11 +890,13 @@ export default {
       searchObj,
       multiStreamFields,
       redirectToTraces,
+      openCorrelation,
       filteredTracesStreamOptions,
       filterStreamFn,
       streamSearchValue,
       activeTab,
       showViewTraceBtn,
+      showViewRelatedBtn,
       queryEditorRef,
       previewId,
       loading,
@@ -847,113 +931,5 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.monaco-editor {
-  --vscode-focusBorder: #515151 !important;
-}
-.log_json_content {
-  white-space: pre-wrap;
-  font-family: monospace;
-  font-size: 12px;
-}
-.monaco-editor {
-  width: calc(100% - 16px) !important;
-  height: calc(100vh - 250px) !important;
-
-  &.expanded {
-    height: 300px !important;
-    max-width: 1024px !important;
-  }
-}
-</style>
-
-<style lang="scss">
-.logs-trace-selector {
-  .q-select {
-    .q-field__control {
-      min-height: 30px !important;
-      height: 30px !important;
-      padding: 0px 8px !important;
-      width: 220px !important;
-
-      .q-field,
-      .q-field__native {
-        span {
-          display: inline-block;
-          width: 180px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          text-align: left;
-          font-weight: 400;
-        }
-      }
-
-      .q-field__append {
-        height: 27px !important;
-      }
-    }
-  }
-
-  .q-btn {
-    height: 30px !important;
-    padding: 2px 8px !important;
-    margin-left: -1px;
-
-    .q-btn__content {
-      span {
-        font-size: 11px;
-        font-weight: 400;
-      }
-    }
-  }
-}
-
-.logs-json-preview-tabs {
-  height: fit-content;
-  .rum-tab {
-    width: fit-content !important;
-    padding: 2px 12px !important;
-    border: none !important;
-    font-size: 12px !important;
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-
-.context-menu {
-  min-width: 200px;
-  padding: 4px 0;
-  font-size: 13px;
-
-  .context-menu-item {
-    padding: 6px 12px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-}
-
-.context-menu-dark {
-  background-color: #1a1a1a;
-  border: 1px solid #4a5568;
-  .context-menu-item {
-    color: #e2e8f0;
-    &:hover {
-      background-color: #4a5568;
-    }
-  }
-}
-.context-menu-light {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  .context-menu-item {
-    &:hover {
-      background-color: #f3f4f6;
-    }
-  }
-}
+@import "@/styles/logs/json-preview.scss";
 </style>

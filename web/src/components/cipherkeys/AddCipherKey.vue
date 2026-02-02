@@ -14,17 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center">
+  <q-page class="q-pa-none" style="min-height: inherit;">
+    <div class="row items-center no-wrap q-mx-md q-pt-sm">
+      <div class="flex items-center tw:py-2">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
+          no-caps
+            padding="xs"
+            outline
+            icon="arrow_back_ios_new"
+            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -46,18 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addCipherKeyFormRef"
       @submit="onSubmit"
     >
+    <div style="height: calc(100vh - 180px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">
           <q-input
             data-test="add-cipher-key-name-input"
             v-model="formData.name"
             :label="t('cipherKey.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop full-width"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             v-bind:readonly="isUpdatingCipherKey"
             v-bind:disable="isUpdatingCipherKey"
@@ -107,9 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 bg-color="input-bg"
                 class="showLabelOnTop full-width"
                 stack-label
-                outlined
-                filled
                 dense
+                borderless
+                hide-bottom-space
                 :options="cipherKeyTypes"
                 option-value="value"
                 option-label="label"
@@ -132,9 +128,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="add-report-step1-continue-btn"
               @click="validateForm(2)"
-              color="secondary"
-              label="Continue"
+              class="o2-primary-button tw:h-[36px]"
+              flat
               no-caps
+              :label="'Continue'"
             />
           </q-stepper-navigation>
         </q-step>
@@ -147,27 +144,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 2"
         >
           <add-encryption-mechanism v-model:formData="formData" />
-          <q-stepper-navigation>
+          <q-stepper-navigation class="q-pa-none">
             <q-btn
               data-test="add-cipher-key-step2-back-btn"
               flat
               @click="step = 1"
-              color="primary"
+              class="o2-secondary-button tw:h-[36px] q-mb-sm"
               :label="t('common.back')"
-              class="q-ml-sm"
               no-caps
             />
           </q-stepper-navigation>
         </q-step>
       </q-stepper>
-      <div class="flex justify-start q-px-md q-py-sm full-width">
+    </div>
+    <div class="tw:mx-2">
+            <div class="flex justify-end q-px-sm q-py-lg full-width"
+      style="position: sticky; bottom: 0px; z-index: 2"
+      >
         <q-btn
           data-test="add-cipher-key-cancel-btn"
-          class="text-bold"
+          class="q-mr-md o2-secondary-button tw:h-[36px]"
           :label="t('common.cancel')"
-          text-color="light-text"
-          padding="sm md"
           no-caps
+          flat
           @click="openCancelDialog"
         />
         <q-btn
@@ -175,14 +174,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (step === 1 && isUpdatingCipherKey == false) || isSubmitting
           "
           data-test="add-cipher-key-save-btn"
+          class="o2-primary-button no-border tw:h-[36px]"
           :label="t('common.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
           type="submit"
+          no-caps
+          flat
         />
       </div>
+    </div>
     </q-form>
     <ConfirmDialog
       v-model="dialog.show"

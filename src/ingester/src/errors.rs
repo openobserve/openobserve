@@ -107,16 +107,15 @@ pub enum Error {
         source: tokio::sync::mpsc::error::SendError<PathBuf>,
     },
     TokioMpscSendEntriesError {
-        source: tokio::sync::mpsc::error::SendError<(
-            crate::WriterSignal,
-            Vec<crate::entry::Entry>,
-            bool,
-        )>,
+        source:
+            tokio::sync::mpsc::error::SendError<(crate::WriterSignal, crate::ProcessedBatch, bool)>,
     },
     #[snafu(display("MemoryTableOverflowError"))]
     MemoryTableOverflowError {},
     #[snafu(display("MemoryCircuitBreakerError"))]
     MemoryCircuitBreakerError {},
+    #[snafu(display("DiskCircuitBreakerError"))]
+    DiskCircuitBreakerError {},
     ExternalError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },

@@ -33,10 +33,14 @@ const Quota = () => import("@/components/iam/quota/Quota.vue");
 const Organizations = () =>
   import("@/components/iam/organizations/AppOrganizations.vue");
 
-const ActionScipts = () =>
-  import("@/components/actionScripts/ActionScipts.vue");
+const ActionScripts = () =>
+  import("@/components/actionScripts/ActionScripts.vue");
+
+const Invitations = () => import("@/views/Invitations.vue");
 
 import Users from "@/views/User.vue";
+
+const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 
 const useEnterpriseRoutes = () => {
   const routes: any = [
@@ -51,6 +55,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "users",
           name: "users",
+          meta: {
+            title: "Users",
+          },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -59,6 +66,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "serviceAccounts",
           name: "serviceAccounts",
+          meta: {
+            title: "Service Accounts",
+          },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -67,6 +77,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "organizations",
           name: "organizations",
+          meta: {
+            title: "Organizations",
+          },
           component: Organizations,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -79,10 +92,35 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    routes.push(
+      {
+        path: "incidents",
+        name: "incidentList",
+        component: IncidentList,
+        meta: {
+          title: "Incidents",
+        },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "incidents/:id",
+        name: "incidentDetail",
+        component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
+        meta: {
+          title: "Incident Detail",
+        },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+    );
+
     routes.push({
       path: "actions",
       name: "actionScripts",
-      component: ActionScipts,
+      component: ActionScripts,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -92,6 +130,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "groups",
           name: "groups",
+          meta: {
+            title: "Groups",
+          },
           component: AppGroups,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -100,6 +141,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "groups/edit/:group_name",
           name: "editGroup",
+          meta: {
+            title: "Edit Group",
+          },
           component: EditGroup,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -108,6 +152,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "roles",
           name: "roles",
+          meta: {
+            title: "Roles",
+          },
           component: AppRoles,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -116,6 +163,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "roles/edit/:role_name",
           name: "editRole",
+          meta: {
+            title: "Edit Role",
+          },
           component: EditRole,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -124,13 +174,24 @@ const useEnterpriseRoutes = () => {
         {
           path: "quota",
           name: "quota",
-          component: Quota ,
+          component: Quota,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
         },
-      ]
+      ],
     );
+
+    if (config.isCloud == "true") {
+      routes[0].children.push({
+        path: "invitations",
+        name: "invitations",
+        component: Invitations,
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      });
+    }
   }
 
   return routes;

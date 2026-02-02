@@ -8,6 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     pub work_group: String,
+    pub org_id: String,
     pub user_id: String,
     pub trace_id: String,
     pub created_at: i64,

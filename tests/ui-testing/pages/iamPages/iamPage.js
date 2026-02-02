@@ -9,7 +9,7 @@ export class IamPage {
 
         this.serviceAccountsLink = "//a[contains(@data-test,'service-accounts')]";
 
-        this.addServiceAccountButton = "//span[text()='Add Service Account']";
+        this.addServiceAccountButton = "//span[text()='New service account']";
 
         this.emailInput = "//input[@aria-label='Email *']";
 
@@ -69,7 +69,7 @@ export class IamPage {
 
     async iamPageAddServiceAccount() {
 
-        await this.page.getByRole('button', { name: 'Add Service Account' }).click();
+        await this.page.getByRole('button', { name: 'New service account' }).click();
 
     }
 
@@ -141,9 +141,10 @@ export class IamPage {
     }
 
     async waitResEmailServiceAccount(emailName) {
+        const orgName = process.env.ORGNAME || 'default';
         await this.page.waitForResponse(
             (response) =>
-                response.url().includes("/api/default/service_accounts/${emailName}") && response.status() === 200
+                response.url().includes(`/api/${orgName}/service_accounts/${emailName}`) && response.status() === 200
         );
 
     }
@@ -167,7 +168,7 @@ export class IamPage {
 
     async clickServiceAccountPopUpClosed() {
 
-        await this.page.locator('button').filter({ hasText: 'close' }).click();
+        await this.page.locator('[data-test="sa-cancel-button"]').click();
 
     }
 

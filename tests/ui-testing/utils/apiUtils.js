@@ -14,15 +14,14 @@ export const getIngestionUrl = (orgId, streamName) => {
 };
 
 export const sendRequest = async (page, url, payload, headers) => {
-  return await page.evaluate(
-    async ({ url, headers, payload }) => {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-      });
-      return await response.json();
-    },
-    { url, headers, payload }
-  );
+  // Use Node.js fetch instead of browser fetch to avoid CORS issues with deployed environments
+  const fetch = (await import('node-fetch')).default;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: headers,
+    body: JSON.stringify(payload),
+  });
+
+  return await response.json();
 }; 

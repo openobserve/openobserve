@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, web};
+use config::meta::search::Request;
 #[cfg(feature = "enterprise")]
 use {
     crate::handler::http::request::search::{
@@ -36,7 +37,7 @@ use {
     config::{
         get_config,
         meta::{
-            search::{Request, Response, SearchEventType},
+            search::{Response, SearchEventType},
             sql::resolve_stream_names,
             stream::StreamType,
         },
@@ -51,22 +52,26 @@ use {
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 // 1. submit
 /// SearchSQL
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
-    operation_id = "SearchSQL",
+    operation_id = "SubmitSearchJob",
+    summary = "Submit search job",
+    description = "Submits a new asynchronous search job for execution. Search jobs are useful for long-running queries that \
+                   might exceed normal timeout limits or for scheduling queries to run in the background. The job is \
+                   queued for execution and returns a job ID that can be used to monitor progress and retrieve results later.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = inline(config::meta::search::Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -76,16 +81,21 @@ use crate::service::organization::is_org_in_free_trial_period;
         }
     })),
     responses(
-        (status = 200, description = "Search Job submitted successfully", body = MetaHttpResponse),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 500, description = "Internal Server Error", body = MetaHttpResponse),
+        (status = 200, description = "Search Job submitted successfully", body = Object),
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 500, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Submit async search job"}))
     )
 )]
 #[post("/{org_id}/search_jobs")]
 pub async fn submit_job(
     org_id: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    web::Json(req): web::Json<Request>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -99,12 +109,7 @@ pub async fn submit_job(
         };
 
         let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
         #[cfg(feature = "cloud")]
         {
@@ -131,11 +136,7 @@ pub async fn submit_job(
         };
         let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-        // handle encoding for query and aggs
-        let mut req: config::meta::search::Request = match json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
+        let mut req = req;
         if let Err(e) = req.decode() {
             return Ok(MetaHttpResponse::bad_request(e));
         }
@@ -210,19 +211,22 @@ pub async fn submit_job(
     {
         drop(org_id);
         drop(in_req);
-        drop(body);
+        drop(req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
 
 // 2. status_all
 /// ListSearchJobs
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "ListSearchJobs",
+    summary = "List search jobs",
+    description = "Retrieves a list of all search jobs for the organization, including their current status, execution details, \
+                   and metadata. This includes both active and completed jobs, allowing you to monitor the progress of \
+                   running searches and access historical job information for analysis and debugging purposes.",
     security(
         ("Authorization"= [])
     ),
@@ -230,7 +234,7 @@ pub async fn submit_job(
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = 200, description = "List of search jobs", body = Vec<JobModel>, example = json!([{
+        (status = 200, description = "List of search jobs", body = inline(Vec<Object>), example = json!([{
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -246,7 +250,11 @@ pub async fn submit_job(
             "cluster": "cluster1",
             "result_path": "/path/to/result"
         }])),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all search jobs"}))
     )
 )]
 #[get("/{org_id}/search_jobs")]
@@ -271,12 +279,13 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
 
 // 3. status
 /// GetSearchJobStatus
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "GetSearchJobStatus",
+    summary = "Get search job status",
+    description = "Retrieves the current status and metadata for a specific search job. This includes execution state, timing information, error messages if any, and other job details. Use this to monitor job progress and determine when results are ready for retrieval or if the job encountered any issues during execution.",
     security(
         ("Authorization"= [])
     ),
@@ -285,7 +294,7 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job status", body = JobModel, example = json!({
+        (status = 200, description = "Search job status", body = Object, example = json!({
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -301,22 +310,21 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
             "cluster": "cluster1",
             "result_path": "/path/to/result"
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search job status"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/status")]
 pub async fn get_status(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
         let org_id = path.0.clone();
         let job_id = path.1.clone();
@@ -336,19 +344,19 @@ pub async fn get_status(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
 
 // 4. cancel
 /// CancelSearchJob
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "CancelSearchJob",
+    summary = "Cancel search job",
+    description = "Cancels a running or pending search job, stopping its execution and freeing up resources. This is useful for stopping long-running queries that are no longer needed or consuming too many resources. Once cancelled, the job cannot be resumed and no results will be available.",
     security(
         ("Authorization"= [])
     ),
@@ -357,29 +365,26 @@ pub async fn get_status(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job cancelled successfully", body = MetaHttpResponse, example = json!({
+        (status = 200, description = "Search job cancelled successfully", body = Object, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job cancelled successfully."
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Cancel a running search job"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/cancel")]
 pub async fn cancel_job(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
+        let user_id = _user_email.user_id;
+        let (org_id, job_id) = path.into_inner();
         match cancel_job_inner(&org_id, &job_id, &user_id).await {
             Ok(res) if res.status() != StatusCode::OK => Ok(res),
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -392,19 +397,21 @@ pub async fn cancel_job(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
 
 // 5. get
 /// GetSearchJobResult
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "GetSearchJobResult",
+    summary = "Get search job results",
+    description = "Retrieves the results from a completed search job with optional pagination. The job must have finished \
+                   successfully before results can be accessed. Results include the matching records, total count, execution \
+                   timing, and metadata. Use pagination parameters to retrieve large result sets in manageable chunks.",
     security(
         ("Authorization"= [])
     ),
@@ -415,31 +422,30 @@ pub async fn cancel_job(
         ("size" = Option<i64>, Query, description = "Number of results to return")
     ),
     responses(
-        (status = 200, description = "Search job results", body = Response, example = json!({
+        (status = 200, description = "Search job results", body = Object, example = json!({
             "took": 155,
             "hits": [],
             "total": 27179431,
             "from": 0,
             "size": 100
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 404, description = "Not Found", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 404, description = "Not Found", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search job results"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/result")]
 pub async fn get_job_result(
     path: web::Path<(String, String)>,
     req: web::Query<config::meta::search::PaginationQuery>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
         let from = req.from.unwrap_or(0);
         let size = req.size.unwrap_or(100);
@@ -483,19 +489,19 @@ pub async fn get_job_result(
     {
         drop(path);
         let _ = req;
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
 
 // 6. delete
 /// DeleteSearchJob
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "DeleteSearchJob",
+    summary = "Delete search job",
+    description = "Permanently deletes a search job and its associated results from the system. This action first cancels the job if it's still running, then removes all job data including metadata and stored results. Use this to clean up completed jobs and free up storage space. This operation cannot be undone.",
     security(
         ("Authorization"= [])
     ),
@@ -504,30 +510,27 @@ pub async fn get_job_result(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job deleted successfully", body = MetaHttpResponse, example = json!({
+        (status = 200, description = "Search job deleted successfully", body = Object, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job deleted successfully."
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 404, description = "Not Found", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 404, description = "Not Found", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a search job"}))
     )
 )]
 #[delete("/{org_id}/search_jobs/{job_id}")]
 pub async fn delete_job(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
+        let user_id = _user_email.user_id;
+        let (org_id, job_id) = path.into_inner();
 
         // 1. cancel the query
         match cancel_job_inner(&org_id, &job_id, &user_id).await {
@@ -555,19 +558,19 @@ pub async fn delete_job(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
 
 // 7. retry
 /// RetrySearchJob
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "RetrySearchJob",
+    summary = "Retry search job",
+    description = "Retries a previously failed or cancelled search job by resubmitting it for execution. This is useful for handling transient failures or resource constraints that may have caused the original job to fail. Only cancelled or finished (failed) jobs can be retried. The job will be re-queued with the same original parameters and query.",
     security(
         ("Authorization"= [])
     ),
@@ -576,30 +579,28 @@ pub async fn delete_job(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job retry initiated successfully", body = MetaHttpResponse, example = json!({
+        (status = 200, description = "Search job retry initiated successfully", body = Object, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Search Job retry successfully."
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 403, description = "Forbidden - Job cannot be retried", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 403, description = "Forbidden - Job cannot be retried", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Retry a failed search job"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/retry")]
 pub async fn retry_job(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
+        let (org_id, job_id) = path.into_inner();
 
         // 1. check the status of the job, only cancel, finish can be retry
         let status = get(&job_id, &org_id).await;
@@ -631,7 +632,6 @@ pub async fn retry_job(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(in_req);
         drop(path);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }

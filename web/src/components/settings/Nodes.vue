@@ -16,27 +16,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none">
-    <q-separator class="separator" />
+  <q-page>
     <q-splitter
       v-model="splitterModel"
       :limits="[0, 250]"
       unit="px"
-      style="min-height: 90vh; overflow: hidden"
+      style="overflow: hidden; height: calc(100vh - 40px);"
     >
-      <template style="background-color: red" v-slot:before>
-        <div class="full-height  q-pt-sm">
+      <template v-slot:before>
+        <div class=" q-pt-sm tw:mt-4"
+        style="height: calc(100vh - 80px);"
+        >
           <div class="sticky-header q-px-sm">
             <span class="q-ma-none q-pa-sm" style="font-size: 18px;">
               {{t("nodes.filter_header")}} <q-icon name="filter_list" />
-              <div class="float-right"><a class="cursor-pointer text-caption tw-underline"
+              <div class="float-right"><a class="cursor-pointer text-caption tw:underline"
                 :class="filterApplied ? 'text-primary' : ''"
                  @click="clearAll()">{{t("nodes.clear_all")}}</a></div>
             </span>
           </div>
-          <q-separator class="q-mt-sm q-px-none q-mx-none" />
 
-          <div>
+          <div class="tw:h-[calc(100vh-110px)] tw:overflow-y-auto">
             <q-list>
               <q-expansion-item
                 v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
@@ -64,14 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterRegionData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
                         <q-checkbox 
                           :model-value="scope.selected" 
                           size="xs" 
-                          color="secondary" 
                           @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
@@ -133,11 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterClusterData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -195,11 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-none q-ma-none node-list-filter-table"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -232,13 +231,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model:selected="selectedStatuses" 
                       id="nodesStatusFilter"
                       class="q-pa-none q-ma-none node-list-filter-table"
+                      :style="hasVisibleRows
+                        ? 'width: 100%; height: calc(100vh - 115px); overflow-y: auto;' 
+                        : 'width: 100%'"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -264,9 +266,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input data-test="nodes-filter-cpuusage-min" type="number" dense class="tw-w-[35%]" min="0" max="100" v-model="cpuUsage.min" />
+                      <q-input data-test="nodes-filter-cpuusage-min" type="number" dense class="tw:w-[35%]" min="0" max="100" v-model="cpuUsage.min" />
                       <span class="q-px-sm">to</span>
-                      <q-input data-test="nodes-filter-cpuusage-max" type="number" dense class="tw-w-[35%]" min="0" max="100" v-model="cpuUsage.max" />
+                      <q-input data-test="nodes-filter-cpuusage-max" type="number" dense class="tw:w-[35%]" min="0" max="100" v-model="cpuUsage.max" />
                     </div>
                     <q-range
                        data-test="nodes-filter-cpuusage-range-slider"
@@ -276,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxCPUUsage"
                       label-side
                       size="25px"
-                      class="tw-w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
                 </q-card>
@@ -290,9 +292,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input data-test="nodes-filter-memoryusage-min" type="number" dense class="tw-w-[35%]" min="0" max="100" v-model="memoryUsage.min" />
+                      <q-input data-test="nodes-filter-memoryusage-min" type="number" dense class="tw:w-[35%]" min="0" max="100" v-model="memoryUsage.min" />
                       <span class="q-px-sm">to</span>
-                      <q-input data-test="nodes-filter-memoryusage-max" type="number" dense class="tw-w-[35%]" min="0" max="100" v-model="memoryUsage.max" />
+                      <q-input data-test="nodes-filter-memoryusage-max" type="number" dense class="tw:w-[35%]" min="0" max="100" v-model="memoryUsage.max" />
                     </div>
                     <q-range
                        data-test="nodes-filter-memoryusage-range-slider"
@@ -302,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxMemoryUsage"
                       label-side
                       size="25px"
-                      class="tw-w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
                 </q-card>
@@ -317,9 +319,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-card-section class="q-pa-none q-ma-none">
                     <q-checkbox type="checkbox" size="xs" v-model="establishedToggle" :label="t('nodes.establishedLabel')" />
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input :disable="!establishedToggle" data-test="nodes-filter-established-min" type="number" dense class="tw-w-[35%]" min="0" :max="maxEstablished" v-model="establishedUsage.min" />
+                      <q-input :disable="!establishedToggle" data-test="nodes-filter-established-min" type="number" dense class="tw:w-[35%]" min="0" :max="maxEstablished" v-model="establishedUsage.min" />
                       <span class="q-px-sm">to</span>
-                      <q-input :disable="!establishedToggle" data-test="nodes-filter-established-max" type="number" dense class="tw-w-[35%]" min="0" :max="maxEstablished" v-model="establishedUsage.max" />
+                      <q-input :disable="!establishedToggle" data-test="nodes-filter-established-max" type="number" dense class="tw:w-[35%]" min="0" :max="maxEstablished" v-model="establishedUsage.max" />
                     </div>
                     <q-range
                       :disable="!establishedToggle"
@@ -330,14 +332,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxEstablished"
                       label-side
                       size="25px"
-                      class="tw-w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] q-mt-md q-ml-md"
                     />
 
                     <q-checkbox type="checkbox" class="q-mt-sm" size="xs" v-model="closewaitToggle" :label="t('nodes.closewaitLabel')" />
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input :disable="!closewaitToggle" data-test="nodes-filter-closewait-min" type="number" dense class="tw-w-[35%]" min="0" :max="maxClosewait" v-model="closewaitUsage.min" />
+                      <q-input :disable="!closewaitToggle" data-test="nodes-filter-closewait-min" type="number" dense class="tw:w-[35%]" min="0" :max="maxClosewait" v-model="closewaitUsage.min" />
                       <span class="q-px-sm">to</span>
-                      <q-input :disable="!closewaitToggle" data-test="nodes-filter-closewait-max" type="number" dense class="tw-w-[35%]" min="0" :max="maxClosewait" v-model="closewaitUsage.max" />
+                      <q-input :disable="!closewaitToggle" data-test="nodes-filter-closewait-max" type="number" dense class="tw:w-[35%]" min="0" :max="maxClosewait" v-model="closewaitUsage.max" />
                     </div>
                     <q-range
                       :disable="!closewaitToggle"
@@ -348,14 +350,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxClosewait"
                       label-side
                       size="25px"
-                      class="tw-w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] q-mt-md q-ml-md"
                     />
 
                     <q-checkbox type="checkbox" class="q-mt-sm" size="xs" v-model="waittimeToggle" :label="t('nodes.waittimeLabel')" />
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input :disable="!waittimeToggle" data-test="nodes-filter-waittime-min" type="number" dense class="tw-w-[35%]" min="0" :max="maxWaittime" v-model="waittimeUsage.min" />
+                      <q-input :disable="!waittimeToggle" data-test="nodes-filter-waittime-min" type="number" dense class="tw:w-[35%]" min="0" :max="maxWaittime" v-model="waittimeUsage.min" />
                       <span class="q-px-sm">to</span>
-                      <q-input :disable="!waittimeToggle" data-test="nodes-filter-waittime-max" type="number" dense class="tw-w-[35%]" min="0" :max="maxWaittime" v-model="waittimeUsage.max" />
+                      <q-input :disable="!waittimeToggle" data-test="nodes-filter-waittime-max" type="number" dense class="tw:w-[35%]" min="0" :max="maxWaittime" v-model="waittimeUsage.max" />
                     </div>
                     <q-range
                       :disable="!waittimeToggle"
@@ -366,27 +368,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxWaittime"
                       label-side
                       size="25px"
-                      class="tw-w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
                 </q-card>
               </q-expansion-item>
 
+              <q-btn 
+                :label="t('nodes.applyFilter')" 
+                class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-primary-button tw:h-[36px]" 
+                flat
+                @click="applyFilter()"
+              >
+              </q-btn>
 
             </q-list>
           </div>
-          <div>
-            <q-btn 
-              :label="t('nodes.applyFilter')" 
-              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm" 
-              color="secondary"
-              @click="applyFilter()"
-            >
-            </q-btn>
-          </div>
         </div>
       </template>
-      <template style="background-color: red" v-slot:after>
+      <template v-slot:after>
         <q-table
           ref="qTable"
           :rows="tabledata"
@@ -396,8 +396,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filter="filterQuery"
           :filter-method="filterData"
           :loading="loading"
-          class="nodes-list-table"
+          class="nodes-list-table tw:border-l tw:border-solid tw:border-gray-1200 tw:rounded-none"
           dense
+          style="width: 100%; height: calc(100vh - 50px); overflow-y: auto;"
         >
           <template #no-data><NoData /></template>
           <template #top="scope">
@@ -411,19 +412,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="col-auto flex q-mb-sm ">
                 <q-input
                   v-model="filterQuery"
-                  filled
                   dense
-                  class="q-ml-none q-mb-xs q-mr-md"
+                  class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
+                  borderless
                   style="width: 400px;"
                   :placeholder="t('nodes.search')"
-                  clearable
                 >
                   <template #prepend>
-                    <q-icon name="search" />
+                    <q-icon name="search" class="o2-search-input-icon" />
                   </template>
                 </q-input>
-                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize no-border"
-                color="secondary" style="height: 40px; width: 90px;" @click="getData(true)"></q-btn>
+                <q-btn 
+                  :label="t('common.refresh')" 
+                  class="o2-secondary-button tw:h-[36px]"
+                  padding="sm"
+                  no-caps
+                  flat
+                  @click="getData(true)">
+                </q-btn>
               </div>
 
             </div>
@@ -481,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-linear-progress
                 dark
                 size="10px"
-                class="progresbar tw-w-[80%] inline-block"
+                class="progresbar tw:w-[80%] inline-block"
                 rounded
                 :value="props.row.cpu_usage / 100"
                 :color="props.row.cpu_usage > 85 ? 'red-9' : 'primary'"
@@ -495,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-linear-progress
                 dark
                 size="10px"
-                class="progresbar tw-w-[80%] inline-block"
+                class="progresbar tw:w-[80%] inline-block"
                 rounded
                 :value="props.row.percentage_memory_usage / 100"
                 :color="props.row.percentage_memory_usage > 85 ? 'red-9' : 'primary'"

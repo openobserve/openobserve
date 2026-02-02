@@ -16,13 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center q-px-sm header_bg border border-bottom border-top"
-    :style="{ height: '30px' }"
+    class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
     data-test="trace-details-sidebar-header"
   >
     <div
       :title="span.operation_name"
-      :style="{ width: 'calc(100% - 22px)' }"
+      :style="{ width: 'calc(100% - 24px)' }"
       class="q-pb-none ellipsis flex justify-between"
       data-test="trace-details-sidebar-header-operation-name"
     >
@@ -95,12 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn
-        class="q-mx-xs view-span-logs-btn"
+        class="q-mx-xs view-span-logs-btn tw:border tw:py-[0.3rem]!"
         size="10px"
         icon="search"
         dense
         padding="xs sm"
         no-caps
+        color="primary"
         :title="t('traces.viewLogs')"
         @click.stop="viewSpanLogs"
         data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
@@ -152,95 +152,124 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="text-transform: capitalize"
       data-test="trace-details-sidebar-tabs-attributes"
     />
+    <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+    <q-tab
+      v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+      name="correlated-logs"
+      :label="t('correlation.correlatedLogs')"
+      style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-correlated-logs"
+    />
+    <q-tab
+      v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+      name="correlated-metrics"
+      :label="t('correlation.correlatedMetrics')"
+      style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-correlated-metrics"
+    />
   </q-tabs>
   <q-separator style="width: 100%" />
-  <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
+  <q-tab-panels
+    v-model="activeTab"
+    class="span_details_tab-panels tw:pb-[0.375rem]"
+  >
     <q-tab-panel name="tags">
-      <table class="q-my-sm" data-test="trace-details-sidebar-tags-table">
-        <tbody>
-          <template v-for="(val, key) in tags" :key="key">
-            <tr :data-test="`trace-details-sidebar-tags-${key}`">
-              <td
-                class="q-py-xs q-px-sm"
-                :class="
-                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
-                "
-              >
-                {{ key }}
-              </td>
-              <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(String(val))"></span>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <q-table
+        ref="qTable"
+        data-test="schema-log-stream-field-mapping-table"
+        :rows="getTagRows"
+        :columns="tagColumns"
+        :row-key="(row) => 'tr_' + row.name"
+        :rows-per-page-options="[0]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        id="schemaFieldList"
+        dense
+      >
+        <template v-slot:body-cell="props">
+          <q-td
+            class="text-left tw:text-[0.85rem]!"
+            :class="
+              props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
+            "
+          >
+            <span
+              v-if="props.col.name === 'value'"
+              v-html="
+                highlightTextMatch(props.row[props.col.name], searchQuery)
+              "
+            />
+            <span v-else>
+              {{ props.row[props.col.name] }}
+            </span>
+          </q-td>
+        </template>
+      </q-table>
     </q-tab-panel>
     <q-tab-panel name="process">
-      <table class="q-my-sm" data-test="trace-details-sidebar-process-table">
-        <tbody>
-          <template v-for="(val, key) in processes" :key="key">
-            <tr :data-test="`trace-details-sidebar-process-${key}`">
-              <td
-                class="q-py-xs q-px-sm"
-                :class="
-                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
-                "
-              >
-                {{ key }}
-              </td>
-              <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(val)"></span>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <q-table
+        ref="qTable"
+        data-test="trace-details-sidebar-process-table"
+        :rows="getProcessRows"
+        :columns="processColumns"
+        :row-key="(row) => 'tr_' + row.name"
+        :rows-per-page-options="[0]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        dense
+      >
+        <template v-slot:body-cell="props">
+          <q-td
+            class="text-left tw:text-[0.85rem]!"
+            :class="
+              props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
+            "
+          >
+            <span
+              v-if="props.col.name === 'value'"
+              v-html="
+                highlightTextMatch(props.row[props.col.name], searchQuery)
+              "
+            />
+            <span v-else>
+              {{ props.row[props.col.name] }}
+            </span>
+          </q-td>
+        </template>
+      </q-table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
       <pre
         class="attr-text"
-        v-html="highlightedAttributes(spanDetails.attrs)"
+        v-html="highlightedAttributes"
         data-test="trace-details-sidebar-attributes-table"
       ></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
-      <q-virtual-scroll
-        type="table"
-        ref="searchTableRef"
-        style="max-height: 100%; min-height: 100px"
-        :items="spanDetails.events"
+      <q-table
+        v-if="spanDetails.events.length"
+        ref="qTable"
         data-test="trace-details-sidebar-events-table"
+        :rows="spanDetails.events"
+        :columns="eventColumns"
+        row-key="name"
+        :rows-per-page-options="[0]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        dense
+        style="max-height: 400px"
       >
-        <template v-slot:before>
-          <thead class="thead-sticky text-left">
-            <tr>
-              <th
-                v-for="(col, index) in eventColumns"
-                :key="'result_' + index"
-                class="table-header"
-                :data-test="`trace-events-table-th-${col.label}`"
-              >
-                {{ col.label }}
-              </th>
-            </tr>
-          </thead>
-        </template>
-
-        <template v-slot="{ item: row, index }">
+        <template v-slot:body="props">
           <q-tr
             :data-test="`trace-event-details-${
-              row[store.state.zoConfig.timestamp_column]
+              props.row[store.state.zoConfig.timestamp_column]
             }`"
-            :key="'expand_' + index"
-            @click="expandEvent(index)"
+            :key="props.key"
+            @click="expandEvent(props.rowIndex)"
             style="cursor: pointer"
             class="pointer"
           >
             <q-td
               v-for="(column, columnIndex) in eventColumns"
-              :key="index + '-' + column.name"
-              class="field_list"
+              :key="props.rowIndex + '-' + column.name"
+              class="field_list text-left"
               style="cursor: pointer"
               :style="
                 columnIndex > 0
@@ -252,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="column.name === '@timestamp'"
                   :icon="
-                    expandedEvents[index.toString()]
+                    expandedEvents[props.rowIndex.toString()]
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -260,79 +289,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   flat
                   class="q-mr-xs"
-                  @click.stop="expandEvent(index)"
+                  @click.stop="expandEvent(props.rowIndex)"
                 ></q-btn>
                 <span
                   v-if="column.name !== '@timestamp'"
-                  v-html="highlightSearch(column.prop(row))"
-                ></span>
-                <span v-else> {{ column.prop(row) }}</span>
+                  v-html="
+                    highlightTextMatch(column.prop(props.row), searchQuery)
+                  "
+                />
+                <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
           </q-tr>
-          <q-tr v-if="expandedEvents[index.toString()]">
-            <td colspan="2">
-              <!-- <pre class="log_json_content">{{ row }}</pre> -->
+          <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
+            <q-td colspan="2">
               <pre
                 class="log_json_content"
-                v-html="highlightedAttributes(row)"
-              ></pre>
-            </td>
+                v-html="highlightedJSON(props.row)"
+              />
+            </q-td>
           </q-tr>
         </template>
-      </q-virtual-scroll>
+      </q-table>
       <div
         class="full-width text-center q-pt-lg text-bold"
-        v-if="!spanDetails.events.length"
+        v-else
         data-test="trace-details-sidebar-no-events"
       >
         No events present for this span
       </div>
     </q-tab-panel>
     <q-tab-panel name="exceptions">
-      <q-virtual-scroll
-        type="table"
-        ref="searchTableRef"
-        style="max-height: 100%"
-        :items="getExceptionEvents"
+      <q-table
+        v-if="getExceptionEvents.length"
+        ref="qTable"
         data-test="trace-details-sidebar-exceptions-table"
+        :rows="getExceptionEvents"
+        :columns="exceptionEventColumns"
+        row-key="name"
+        :rows-per-page-options="[0]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        dense
+        style="max-height: 400px"
       >
-        <template v-slot:before>
-          <thead class="thead-sticky text-left">
-            <tr>
-              <th
-                v-for="(col, index) in exceptionEventColumns"
-                :key="'result_' + index"
-                class="table-header"
-                :data-test="`trace-events-table-th-${col.label}`"
-              >
-                {{ col.label }}
-              </th>
-            </tr>
-          </thead>
-        </template>
-
-        <template v-slot="{ item: row, index }">
+        <template v-slot:body="props">
           <q-tr
             :data-test="`trace-event-detail-${
-              row[store.state.zoConfig.timestamp_column]
+              props.row[store.state.zoConfig.timestamp_column]
             }`"
-            :key="'expand_' + index"
-            @click="expandEvent(index)"
+            :key="props.key"
+            @click="expandEvent(props.rowIndex)"
             style="cursor: pointer"
             class="pointer"
           >
             <q-td
               v-for="column in exceptionEventColumns"
-              :key="index + '-' + column.name"
-              class="field_list"
+              :key="props.rowIndex + '-' + column.name"
+              class="field_list text-left"
               style="cursor: pointer"
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
                   v-if="column.name === '@timestamp'"
                   :icon="
-                    expandedEvents[index.toString()]
+                    expandedEvents[props.rowIndex.toString()]
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -340,62 +360,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   flat
                   class="q-mr-xs"
-                  @click.stop="expandEvent(index)"
-                  :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${index}`"
+                  @click.stop="expandEvent(props.rowIndex)"
+                  :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
                 ></q-btn>
                 <span
                   v-if="column.name !== '@timestamp'"
-                  v-html="highlightSearch(column.prop(row))"
-                ></span>
-                <span v-else> {{ column.prop(row) }}</span>
+                  v-html="
+                    highlightTextMatch(column.prop(props.row), searchQuery)
+                  "
+                />
+                <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
           </q-tr>
           <q-tr
-            v-if="expandedEvents[index.toString()]"
-            :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${index}`"
+            v-if="expandedEvents[props.rowIndex.toString()]"
+            :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
           >
-            <td colspan="2" style="font-size: 12px; font-family: monospace">
+            <q-td colspan="2" style="font-size: 12px; font-family: monospace">
               <div class="q-pl-sm">
                 <div>
                   <span>Type: </span>
-                  <span>"{{ row["exception.type"] }}"</span>
+                  <span>"{{ props.row["exception.type"] }}"</span>
                 </div>
 
                 <div class="q-mt-xs">
                   <span>Message: </span>
-                  <span>"{{ row["exception.message"] }}"</span>
+                  <span>"{{ props.row["exception.message"] }}"</span>
                 </div>
 
                 <div class="q-mt-xs">
                   <span>Escaped: </span>
-                  <span>"{{ row["exception.escaped"] }}"</span>
+                  <span>"{{ props.row["exception.escaped"] }}"</span>
                 </div>
 
                 <div class="q-mt-xs">
                   <span>Stacktrace: </span>
                   <div
                     class="q-px-sm q-mt-xs"
-                    style="
-                      border: 1px solid #c1c1c1;
-                      border-radius: 4px;
-                    "
+                    style="border: 1px solid #c1c1c1; border-radius: 4px"
                   >
                     <pre
                       style="font-size: 12px; text-wrap: wrap"
                       class="q-mt-xs"
-                      >{{ formatStackTrace(row["exception.stacktrace"]) }}</pre
+                      >{{ formatStackTrace(props.row["exception.stacktrace"]) }}</pre
                     >
                   </div>
                 </div>
               </div>
-            </td>
+            </q-td>
           </q-tr>
         </template>
-      </q-virtual-scroll>
+      </q-table>
       <div
         class="full-width text-center q-pt-lg text-bold"
-        v-if="!getExceptionEvents.length"
+        v-else
         data-test="trace-details-sidebar-no-exceptions"
       >
         No exceptions present for this span
@@ -407,12 +426,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-virtual-scroll
           type="table"
           ref="searchTableRef"
-          style="max-height: 100%"
+          style="max-height: 20rem"
           :items="spanLinks"
+          class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
           data-test="trace-details-sidebar-links-table"
         >
           <template v-slot:before>
-            <thead class="thead-sticky text-left">
+            <thead class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table">
               <tr>
                 <th
                   v-for="(col, index) in linkColumns"
@@ -427,14 +447,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template v-slot="{ item: row, index }">
-            <q-tr
+            <tr
               :data-test="`trace-event-detail-link-${index}`"
               :key="'expand_' + index"
               @click="openReferenceTrace('span', row)"
               style="cursor: pointer"
               class="pointer"
             >
-              <q-td
+              <td
                 v-for="column in linkColumns"
                 :key="index + '-' + column.name"
                 class="field_list"
@@ -443,8 +463,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex row items-center no-wrap">
                   {{ column.prop(row) }}
                 </div>
-              </q-td>
-            </q-tr>
+              </td>
+            </tr>
           </template>
         </q-virtual-scroll>
       </div>
@@ -454,6 +474,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="trace-details-sidebar-no-links"
       >
         No links present for this span
+      </div>
+    </q-tab-panel>
+
+    <!-- Correlated Logs Tab Panel -->
+    <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
+      <TelemetryCorrelationDashboard
+        v-if="correlationProps"
+        mode="embedded-tabs"
+        external-active-tab="logs"
+        :service-name="correlationProps.serviceName"
+        :matched-dimensions="correlationProps.matchedDimensions"
+        :additional-dimensions="correlationProps.additionalDimensions"
+        :metric-streams="correlationProps.metricStreams"
+        :log-streams="correlationProps.logStreams"
+        :trace-streams="correlationProps.traceStreams"
+        :source-stream="correlationProps.sourceStream"
+        :source-type="correlationProps.sourceType"
+        :available-dimensions="correlationProps.availableDimensions"
+        :fts-fields="correlationProps.ftsFields"
+        :time-range="correlationProps.timeRange"
+        @close="activeTab = 'tags'"
+      />
+      <!-- Loading/Empty state when no data -->
+      <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+        <div class="tw:text-center">
+          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+          <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+          <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+        </div>
+      </div>
+    </q-tab-panel>
+
+    <!-- Correlated Metrics Tab Panel -->
+    <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
+      <TelemetryCorrelationDashboard
+        v-if="correlationProps"
+        mode="embedded-tabs"
+        external-active-tab="metrics"
+        :service-name="correlationProps.serviceName"
+        :matched-dimensions="correlationProps.matchedDimensions"
+        :additional-dimensions="correlationProps.additionalDimensions"
+        :metric-streams="correlationProps.metricStreams"
+        :log-streams="correlationProps.logStreams"
+        :trace-streams="correlationProps.traceStreams"
+        :source-stream="correlationProps.sourceStream"
+        :source-type="correlationProps.sourceType"
+        :available-dimensions="correlationProps.availableDimensions"
+        :fts-fields="correlationProps.ftsFields"
+        :time-range="correlationProps.timeRange"
+        @close="activeTab = 'tags'"
+      />
+      <!-- Loading/Empty state when no data -->
+      <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+        <div class="tw:text-center">
+          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+          <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+          <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+        </div>
       </div>
     </q-tab-panel>
   </q-tab-panels>
@@ -466,10 +544,15 @@ import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
-import { formatTimeWithSuffix, convertTimeFromNsToMs } from "@/utils/zincutils";
+import { formatTimeWithSuffix, convertTimeFromNsToUs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import { onMounted } from "vue";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -486,8 +569,20 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    streamName: {
+      type: String,
+      default: "",
+    },
+    serviceStreamsEnabled: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["close", "view-logs", "select-span", "open-trace"],
+  components: {
+    LogsHighLighting,
+    TelemetryCorrelationDashboard,
+  },
+  emits: ["close", "view-logs", "select-span", "open-trace", "show-correlation"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const activeTab = ref("tags");
@@ -506,45 +601,106 @@ export default defineComponent({
     const q = useQuasar();
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const router = useRouter();
-    const highlightSearch = (
-      value: any,
-      preserveString: any = false,
-    ): string => {
-      if (!props.searchQuery) {
-        // Return the object/JSON value as is if there's no search query
-        return typeof value === "object" && value !== null
-          ? JSON.stringify(value, null, 2)
-          : value;
-      }
 
-      if (typeof value === "string") {
-        // Highlight text in string values
-        const regex = new RegExp(`(${props.searchQuery})`, "gi");
-        if (preserveString) {
-          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`)}"`;
-        } else {
-          return value.replace(
-            regex,
-            (match) =>
-              `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`,
-          );
-        }
-      } else if (Array.isArray(value)) {
-        return `[${value.map((item) => highlightSearch(item)).join(", ")}]`;
-      } else if (typeof value === "object" && value !== null) {
-        const highlightedEntries = Object.entries(value).map(([key, val]) => {
-          // Do not highlight the keys; only process the values
-          const highlightedVal = highlightSearch(val, true);
-          return `"${key}": ${highlightedVal}`;
-        });
-        return `{\n  ${highlightedEntries.join(",\n  ")}\n}`;
-      } else {
-        return JSON.stringify(value);
+    // JSON syntax highlighting colors - using CSS variables for theme-aware colors
+    const themeColors = {
+      key: "var(--o2-json-key)",
+      stringValue: "var(--o2-json-string)",
+      numberValue: "var(--o2-json-number)",
+      booleanValue: "var(--o2-json-boolean)",
+      nullValue: "var(--o2-json-null)",
+      objectValue: "var(--o2-json-object)",
+    };
+
+    const escapeHtml = (text: string): string => {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    };
+
+    const highlightTextMatch = (text: string, query: string): string => {
+      if (!query) return escapeHtml(text);
+      try {
+        // Escape special regex characters
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escapedQuery})`, "gi");
+        return escapeHtml(text).replace(
+          regex,
+          (match) => `<span class="highlight">${match}</span>`
+        );
+      } catch (e) {
+        return escapeHtml(text);
       }
     };
 
+    const highlightedJSON = (value) => {
+      const colors = themeColors;
+      const attrs = value;
+      const query = props.searchQuery;
+
+      const formatValue = (value: any): string => {
+        if (value === null) {
+          return `<span style="color: ${colors.nullValue};">${highlightTextMatch("null", query)}</span>`;
+        } else if (typeof value === "boolean") {
+          return `<span style="color: ${colors.booleanValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "number") {
+          return `<span style="color: ${colors.numberValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "string") {
+          return `<span style="color: ${colors.stringValue};">"${highlightTextMatch(value, query)}"</span>`;
+        } else if (typeof value === "object") {
+          return `<span style="color: ${colors.objectValue};">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
+        }
+        return highlightTextMatch(String(value), query);
+      };
+
+      const lines: string[] = [];
+      lines.push('<span style="color: #9ca3af;">{</span>');
+
+      const entries = Object.entries(attrs);
+      entries.forEach(([key, value], index) => {
+        const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
+        const valueHtml = formatValue(value);
+        const comma = index < entries.length - 1 ? '<span style="color: #9ca3af;">,</span>' : '';
+        lines.push(`  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`);
+      });
+
+      lines.push('<span style="color: #9ca3af;">}</span>');
+      return lines.join("\n");
+    };
+
     const highlightedAttributes = computed(() => {
-      return (value: any) => highlightSearch(value, true);
+      const colors = themeColors;
+      const attrs = spanDetails.value.attrs;
+      const query = props.searchQuery;
+
+      const formatValue = (value: any): string => {
+        if (value === null) {
+          return `<span style="color: ${colors.nullValue};">${highlightTextMatch("null", query)}</span>`;
+        } else if (typeof value === "boolean") {
+          return `<span style="color: ${colors.booleanValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "number") {
+          return `<span style="color: ${colors.numberValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "string") {
+          return `<span style="color: ${colors.stringValue};">"${highlightTextMatch(value, query)}"</span>`;
+        } else if (typeof value === "object") {
+          return `<span style="color: ${colors.objectValue};">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
+        }
+        return highlightTextMatch(String(value), query);
+      };
+
+      const lines: string[] = [];
+      lines.push('<span style="color: #9ca3af;">{</span>');
+
+      const entries = Object.entries(attrs);
+      entries.forEach(([key, value], index) => {
+        const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
+        const valueHtml = formatValue(value);
+        const comma = index < entries.length - 1 ? '<span style="color: #9ca3af;">,</span>' : '';
+        lines.push(`  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`);
+      });
+
+      lines.push('<span style="color: #9ca3af;">}</span>');
+      return lines.join("\n");
     });
 
     watch(
@@ -559,6 +715,54 @@ export default defineComponent({
       },
     );
 
+    const tagColumns = [
+      {
+        name: "field",
+        label: "Field",
+        field: "field",
+        align: "left" as const,
+        headerClasses: "tw:text-left!",
+      },
+      {
+        name: "value",
+        label: "Value",
+        field: "value",
+        align: "left" as const,
+        headerClasses: "tw:text-left!",
+      },
+    ];
+
+    const getTagRows = computed(() => {
+      return Object.entries(tags.value).map(([key, value]) => ({
+        field: key,
+        value: value,
+      }));
+    });
+
+    const processColumns = [
+      {
+        name: "field",
+        label: "Field",
+        field: "field",
+        align: "left" as const,
+        headerClasses: "tw:text-left!",
+      },
+      {
+        name: "value",
+        label: "Value",
+        field: "value",
+        align: "left" as const,
+        headerClasses: "tw:text-left!",
+      },
+    ];
+
+    const getProcessRows = computed(() => {
+      return Object.entries(processes.value).map(([key, value]) => ({
+        field: key,
+        value: value,
+      }));
+    });
+
     const getDuration = computed(() =>
       formatTimeWithSuffix(props.span.duration),
     );
@@ -572,20 +776,22 @@ export default defineComponent({
     const eventColumns = ref([
       {
         name: "@timestamp",
+        field: "@timestamp",
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
             "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
       {
         name: "source",
+        field: "source",
         prop: (row: any) => JSON.stringify(row),
         label: "source",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
     ]);
@@ -593,20 +799,22 @@ export default defineComponent({
     const exceptionEventColumns = ref([
       {
         name: "@timestamp",
+        field: "@timestamp",
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
             "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
       {
         name: "type",
+        field: "exception.type",
         prop: (row: any) => row["exception.type"],
         label: "Type",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
     ]);
@@ -742,9 +950,8 @@ export default defineComponent({
 
     const getStartTime = computed(() => {
       return (
-        convertTimeFromNsToMs(props.span.start_time) -
-        (props.baseTracePosition?.startTimeMs || 0) +
-        "ms"
+        formatTimeWithSuffix(convertTimeFromNsToUs(props.span.start_time) -
+        (props.baseTracePosition?.startTimeUs || 0))
       );
     });
 
@@ -765,8 +972,8 @@ export default defineComponent({
           trace_id: link.context.traceId,
           span_id: link.context.spanId,
           from:
-            convertTimeFromNsToMs(props.span.start_time) * 1000 - 3600000000,
-          to: convertTimeFromNsToMs(props.span.end_time) * 1000 + 3600000000,
+          convertTimeFromNsToUs(props.span.start_time) - 3600000000,
+          to: convertTimeFromNsToUs(props.span.end_time) + 3600000000,
           org_identifier: store.state.selectedOrganization.identifier,
         };
 
@@ -786,12 +993,232 @@ export default defineComponent({
 
     const spanLinks = computed(() => {
       try {
-        return typeof props.span.links === "string"
+        const parsedLinks = typeof props.span.links === "string"
           ? JSON.parse(props.span.links)
           : props.span.links;
+
+        return parsedLinks;
       } catch (e) {
         console.log("Error parsing span links:", e);
-        return [];
+        // Return sample data even on error for testing
+        return [
+          {
+            context: {
+              traceId: "sample-trace-id-1",
+              spanId: "sample-span-id-1",
+            },
+          },
+          {
+            context: {
+              traceId: "sample-trace-id-2",
+              spanId: "sample-span-id-2",
+            },
+          },
+        ];
+      }
+    });
+
+    // Correlation state
+    const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
+    const correlationProps = ref<any>(null);
+    const { findRelatedTelemetry } = useServiceCorrelation();
+
+    /**
+     * Extract dimensions from span attributes for correlation
+     * Maps trace span attributes to semantic dimension names
+     */
+    const extractSpanDimensions = (span: any): Record<string, string> => {
+      const dimensions: Record<string, string> = {};
+
+      // Direct service name
+      if (span.service_name) {
+        dimensions['service-name'] = span.service_name;
+      }
+
+      // Common trace attributes that map to dimensions
+      const attributeMappings: Record<string, string> = {
+        // Kubernetes attributes
+        'k8s_namespace_name': 'k8s-namespace',
+        'k8s.namespace.name': 'k8s-namespace',
+        'k8s_deployment_name': 'k8s-deployment',
+        'k8s.deployment.name': 'k8s-deployment',
+        'k8s_pod_name': 'k8s-pod',
+        'k8s.pod.name': 'k8s-pod',
+        'k8s_container_name': 'k8s-container',
+        'k8s.container.name': 'k8s-container',
+        'k8s_statefulset_name': 'k8s-statefulset',
+        'k8s.statefulset.name': 'k8s-statefulset',
+        'k8s_daemonset_name': 'k8s-daemonset',
+        'k8s.daemonset.name': 'k8s-daemonset',
+        'k8s_replicaset_name': 'k8s-replicaset',
+        'k8s.replicaset.name': 'k8s-replicaset',
+        'k8s_job_name': 'k8s-job',
+        'k8s.job.name': 'k8s-job',
+        'k8s_cronjob_name': 'k8s-cronjob',
+        'k8s.cronjob.name': 'k8s-cronjob',
+        'k8s_node_name': 'k8s-node',
+        'k8s.node.name': 'k8s-node',
+        'k8s_cluster_name': 'k8s-cluster',
+        'k8s.cluster.name': 'k8s-cluster',
+        // Host attributes
+        'host_name': 'host-name',
+        'host.name': 'host-name',
+        // Cloud attributes
+        'cloud_region': 'cloud-region',
+        'cloud.region': 'cloud-region',
+        'cloud_availability_zone': 'cloud-availability-zone',
+        'cloud.availability_zone': 'cloud-availability-zone',
+        // Container attributes
+        'container_name': 'container-name',
+        'container.name': 'container-name',
+        'container_id': 'container-id',
+        'container.id': 'container-id',
+      };
+
+      // Check all span attributes
+      for (const [attrName, dimName] of Object.entries(attributeMappings)) {
+        if (span[attrName] && !dimensions[dimName]) {
+          dimensions[dimName] = String(span[attrName]);
+        }
+      }
+
+      return dimensions;
+    };
+
+    /**
+     * Load correlation data for this span (called when user clicks on correlation tabs)
+     */
+    const loadCorrelation = async () => {
+      // Skip if already loaded or loading
+      if (correlationProps.value || correlationLoading.value) {
+        return;
+      }
+
+      // Gate correlation feature behind enterprise check to avoid 403 errors
+      if (config.isEnterprise !== "true") {
+        console.log("[TraceDetailsSidebar] Correlation feature requires enterprise license");
+        correlationError.value = "Correlation feature requires enterprise license";
+        return;
+      }
+
+      if (!props.span || !props.streamName) {
+        console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
+        correlationError.value = "Missing span or stream name";
+        return;
+      }
+
+      correlationLoading.value = true;
+      correlationError.value = null;
+
+      try {
+        // Build telemetry context from span
+        const context: TelemetryContext = {
+          timestamp: convertTimeFromNsToUs(props.span.start_time) * 1000, // Convert to nanoseconds
+          fields: { ...props.span },
+          streamName: props.streamName,
+        };
+
+        // Extract dimensions from span attributes
+        const spanDimensions = extractSpanDimensions(props.span);
+        // Merge span dimensions into context fields for semantic extraction
+        Object.assign(context.fields, spanDimensions);
+
+        console.log("[TraceDetailsSidebar] Correlation context:", {
+          streamName: props.streamName,
+          serviceName: props.span.service_name,
+          dimensions: spanDimensions,
+        });
+
+        // Find related telemetry
+        const result = await findRelatedTelemetry(
+          context,
+          "traces",
+          5, // 5 minute time window
+          props.streamName
+        );
+
+        if (result && result.correlationData) {
+          const correlationData = result.correlationData;
+
+          // Calculate time range (span start/end with buffer)
+          const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
+          const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
+          const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
+
+          // Build availableDimensions from raw span attributes (actual field names)
+          // This is critical for log queries to use the correct field names (e.g., k8s_pod_name)
+          // Filter to only include string values that are correlation-relevant
+          const rawSpanDimensions: Record<string, string> = {};
+          for (const [key, value] of Object.entries(props.span)) {
+            if (typeof value !== 'string' || !value) continue;
+            if (key.startsWith('_')) continue; // Skip internal fields
+
+            // Include known correlation-relevant dimensions
+            const isRelevant =
+              key.startsWith('k8s_') ||
+              key.startsWith('k8s.') ||
+              key.startsWith('host') ||
+              key.startsWith('container') ||
+              key.startsWith('pod') ||
+              key.startsWith('namespace') ||
+              key.startsWith('deployment') ||
+              key.startsWith('service') ||
+              key.startsWith('node') ||
+              key.startsWith('os_') ||
+              key === 'version' ||
+              key === 'region' ||
+              key === 'cluster' ||
+              key === 'environment' ||
+              key === 'env';
+
+            if (isRelevant) {
+              rawSpanDimensions[key] = value;
+            }
+          }
+
+          console.log("[TraceDetailsSidebar] Raw span dimensions for log queries:", rawSpanDimensions);
+
+          correlationProps.value = {
+            serviceName: correlationData.service_name,
+            matchedDimensions: correlationData.matched_dimensions,
+            additionalDimensions: correlationData.additional_dimensions || {},
+            metricStreams: correlationData.related_streams.metrics,
+            logStreams: correlationData.related_streams.logs,
+            traceStreams: correlationData.related_streams.traces,
+            sourceStream: props.streamName,
+            sourceType: "traces",
+            // Use raw span attributes as availableDimensions for log query filters
+            availableDimensions: rawSpanDimensions,
+            ftsFields: [],
+            timeRange: {
+              startTime: spanStartUs - bufferUs,
+              endTime: spanEndUs + bufferUs,
+            },
+          };
+
+          console.log("[TraceDetailsSidebar] Correlation successful:", correlationProps.value);
+        } else {
+          correlationError.value = "No related services found for this trace span";
+        }
+      } catch (err: any) {
+        console.error("[TraceDetailsSidebar] Correlation failed:", err);
+        correlationError.value = err.message || "Failed to load correlation data";
+      } finally {
+        correlationLoading.value = false;
+      }
+    };
+
+    // Clear correlation when span changes
+    watch(() => props.span, () => {
+      correlationProps.value = null;
+      correlationError.value = null;
+    }, { deep: true });
+
+    // Load correlation data when user clicks on correlation tabs
+    watch(activeTab, (newTab) => {
+      if (newTab === "correlated-logs" || newTab === "correlated-metrics") {
+        loadCorrelation();
       }
     });
 
@@ -817,8 +1244,18 @@ export default defineComponent({
       openReferenceTrace,
       spanLinks,
       linkColumns,
-      highlightSearch,
+      getTagRows,
+      tagColumns,
+      processColumns,
+      getProcessRows,
       highlightedAttributes,
+      highlightTextMatch,
+      highlightedJSON,
+      // Correlation
+      correlationLoading,
+      correlationError,
+      correlationProps,
+      config,
     };
   },
 });
@@ -827,19 +1264,55 @@ export default defineComponent({
 <style scoped lang="scss">
 .span_details_tab-panels {
   table {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     width: 100%;
-    /* Other styling properties */
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(0.625rem);
+    border-radius: 0.5rem;
+    border: 0.125rem solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
   }
 
   th,
   td {
-    border: 1px solid #f0f0f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
     text-align: left;
-    padding: 4px 8px !important;
+    padding: 8px 12px !important;
     font-size: 13px;
-    /* Other styling properties */
   }
+
+  th:last-child,
+  td:last-child {
+    border-right: none;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:first-child td:first-child {
+    border-top-left-radius: 0.5rem;
+  }
+
+  tbody tr:first-child td:last-child {
+    border-top-right-radius: 0.5rem;
+  }
+
+  tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 0.5rem;
+  }
+
+  tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 0.5rem;
+  }
+}
+
+.span_details_tab-panels table.q-table {
+  background: rgba(240, 240, 245, 0.8);
+  backdrop-filter: blur(0.625rem);
+  border: 0.125rem solid rgba(100, 100, 120, 0.5);
 }
 .attr-text {
   font-size: 12px;
@@ -849,7 +1322,6 @@ export default defineComponent({
   // text-transform: capitalize;
 
   .table-head-chip {
-    background-color: $accent;
     padding: 0px;
 
     .q-chip__content {
@@ -940,13 +1412,8 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: #f5f5f5;
 }
 
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
 .thead-sticky tr:last-child > * {
   top: 0;
 }
@@ -961,49 +1428,14 @@ export default defineComponent({
   position: relative;
   overflow: visible;
   cursor: default;
-  font-size: 12px;
-  font-family: monospace;
-
-  .field_overlay {
-    position: absolute;
-    height: 100%;
-    right: 0;
-    top: 0;
-    background-color: #ffffff;
-    border-radius: 6px;
-    padding: 0 6px;
-    visibility: hidden;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s linear;
-
-    .q-icon {
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.3s linear;
-      margin: 0 1px;
-    }
-  }
-
-  &:hover {
-    .field_overlay {
-      visibility: visible;
-
-      .q-icon {
-        opacity: 1;
-      }
-    }
-  }
 }
 .span_details_tab-panels {
-  height: calc(100% - 104px);
+  height: calc(100% - 6.75rem);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .header_bg {
-  border-top: 1px solid $border-color;
-  background-color: color-mix(in srgb, currentColor 5%, transparent);
 }
 </style>
 
@@ -1019,7 +1451,7 @@ export default defineComponent({
 
 .span_details_tab-panels {
   .q-tab-panel {
-    padding: 8px 0 8px 8px;
+    padding: 8px 8px 8px 8px;
   }
 }
 
@@ -1027,7 +1459,7 @@ export default defineComponent({
   .q-btn__content {
     display: flex;
     align-items: center;
-    font-size: 11px;
+    font-size: 12px;
 
     .q-icon {
       margin-right: 2px !important;
@@ -1038,5 +1470,39 @@ export default defineComponent({
 }
 .highlight {
   background-color: yellow; /* Adjust background color as desired */
+}
+</style>
+
+<style lang="scss">
+// Dark theme support for glassmorphic tables
+.body--dark {
+  .span_details_tab-panels {
+    table {
+      // background: rgba(255, 255, 255, 0.05);
+      // border: 0.125rem solid rgba(255, 255, 255, 0.3);
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+    }
+  }
+}
+
+// Light theme support for glassmorphic tables
+.body--light {
+  .span_details_tab-panels {
+    table {
+      // background: rgba(240, 240, 245, 0.8);
+      // border: 0.125rem solid rgba(100, 100, 120, 0.5);
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid rgba(100, 100, 120, 0.2);
+      border-right: 1px solid rgba(100, 100, 120, 0.3);
+    }
+  }
 }
 </style>

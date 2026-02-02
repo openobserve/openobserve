@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { getDataValue } from "./aliasUtils";
+
 /**
  * Converts SQL data into a format suitable for rendering a chart.
  *
@@ -42,18 +44,24 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   const filteredData = panelSchema.queries.map((query: any, index: any) => {
     return searchQueryData[index].filter((item: any) => {
       return (
-        item[query.fields.source.alias] != null &&
-        item[query.fields.target.alias] != null &&
-        item[query.fields.value.alias] != null
+        getDataValue(item, query.fields.source.alias) != null &&
+        getDataValue(item, query.fields.target.alias) != null &&
+        getDataValue(item, query.fields.value.alias) != null
       );
     });
   });
 
   filteredData.forEach((queryData: any) => {
     queryData.forEach((item: any) => {
-      const source = item[panelSchema.queries[0].fields.source.alias];
-      const target = item[panelSchema.queries[0].fields.target.alias];
-      let value = item[panelSchema.queries[0].fields.value.alias];
+      const source = getDataValue(
+        item,
+        panelSchema.queries[0].fields.source.alias,
+      );
+      const target = getDataValue(
+        item,
+        panelSchema.queries[0].fields.target.alias,
+      );
+      let value = getDataValue(item, panelSchema.queries[0].fields.value.alias);
 
       if (source && target && value) {
         nodes.add(source);

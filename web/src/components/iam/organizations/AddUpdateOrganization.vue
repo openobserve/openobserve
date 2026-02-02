@@ -15,105 +15,122 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
+  <q-card class="o2-side-dialog column full-height">
+    <q-card-section class="q-py-md tw:w-full">
+      <div class="row items-center no-wrap q-py-sm">
         <div class="col">
           <div
             v-if="beingUpdated"
-            class="text-body1 text-bold"
             data-test="update-org"
+            style="font-size: 18px"
           >
             {{ t("organization.updateOrganization") }}
           </div>
-          <div v-else class="text-body1 text-bold" data-test="create-org">
+          <div v-else style="font-size: 18px" data-test="create-org">
             {{ t("organization.createOrganization") }}
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            data-test="close-organizations-modal"
-            v-close-popup="true"
-            round
-            flat
-            icon="close"
-            @click="router.replace({ name: 'organizations' })"
+          <q-icon
+            data-test="add-org-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="$emit('cancel:hideform')"
           />
         </div>
       </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-w-md">
-      <q-form ref="addOrganizationForm" @submit="onSubmit">
-        <q-input
-          v-if="beingUpdated"
-          v-model="organizationData.id"
-          :readonly="beingUpdated"
-          :disabled="beingUpdated"
-          :label="t('organization.id')"
-        />
 
-        <q-input
-          v-model="organizationData.name"
-          :label="t('organization.name') + '*'"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || t('organization.nameRequired')]"
-          data-test="org-name"
-          maxlength="100"
-        />
+      <q-separator />
+      <div>
+        <q-form ref="addOrganizationForm" @submit="onSubmit">
+          <q-input
+            v-if="beingUpdated"
+            v-model="organizationData.id"
+            :readonly="beingUpdated"
+            :disabled="beingUpdated"
+            stack-label
+            borderless
+            hide-bottom-space
+            dense
+            :label="t('organization.id')"
+            class="showLabelOnTop tw:mt-2"
+          />
 
-        <div class="flex q-mt-lg">
-          <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold"
-            :label="t('organization.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="router.replace({ name: 'organizations' })"
-            data-test="cancel-organizations-modal"
-          />
-          <q-btn
-            :disable="organizationData.name === '' && !proPlanRequired"
-            :label="t('organization.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-            data-test="add-org"
-          />
-        </div>
+          <q-input
+            v-model.trim="organizationData.name"
+            :label="t('organization.name') + '*'"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop tw:mt-2"
+            stack-label
+            borderless
+            dense
+            :rules="[
+              (val: any) =>
+                !!val
+                  ? isValidOrgName ||
+                    'Use alphanumeric characters, space and underscore only.'
+                  : t('organization.nameRequired'),
+            ]"
+            data-test="org-name"
+            maxlength="100"
+            hide-bottom-space
+          >
+            <template v-slot:hint>
+              Use alphanumeric characters, space and underscore only.
+            </template>
+          </q-input>
 
-        <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
-          <q-btn
-            class="q-mb-md text-bold no-border q-ml-md"
-            :label="t('organization.proceed_subscription')"
-            text-color="light-text"
-            padding="sm xl"
-            color="secondary"
-            no-caps
-            @click="completeSubscriptionProcess"
-          />
-        </div>
-      </q-form>
+          <div class="flex justify-start tw:mt-6">
+            <q-btn
+              v-close-popup="true"
+              class="q-mr-md o2-secondary-button tw:h-[36px]"
+              :label="t('organization.cancel')"
+              no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              @click="router.replace({ name: 'organizations' })"
+              data-test="cancel-organizations-modal"
+            />
+            <q-btn
+              :disable="organizationData.name === '' && !proPlanRequired"
+              :label="t('organization.save')"
+              class="o2-primary-button no-border tw:h-[36px]"
+              type="submit"
+              no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              data-test="add-org"
+            />
+          </div>
+
+          <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
+            <q-btn
+              class="q-mb-md text-bold no-border q-ml-md"
+              :label="t('organization.proceed_subscription')"
+              text-color="light-text"
+              padding="sm xl"
+              color="secondary"
+              no-caps
+              @click="completeSubscriptionProcess"
+            />
+          </div>
+        </q-form>
+      </div>
     </q-card-section>
   </q-card>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
+import { useReo } from "@/services/reodotdev_analytics";
+import { useQuasar } from "quasar";
 
 const defaultValue = () => {
   return {
@@ -139,7 +156,7 @@ export default defineComponent({
       newOrgIdentifier: "",
     };
   },
-  emits: ["update:modelValue", "updated", "finish"],
+  emits: ["update:modelValue", "updated", "finish", "cancel:hideform"],
   setup() {
     const store: any = useStore();
     const router: any = useRouter();
@@ -149,6 +166,14 @@ export default defineComponent({
     const organizationData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const { track } = useReo();
+    const q = useQuasar();
+
+    const isValidOrgName = computed(() => {
+      const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;
+      return orgNameRegex.test(organizationData.value.name);
+    });
+
 
     return {
       t,
@@ -160,6 +185,8 @@ export default defineComponent({
       addOrganizationForm,
       store,
       isValidIdentifier,
+      track,
+      isValidOrgName,
     };
   },
   created() {
@@ -191,7 +218,6 @@ export default defineComponent({
       });
     },
     completeSubscriptionProcess() {
-      console.log(this.store.state);
       // this.store.state.dispatch("setSelectedOrganization",)
       this.router.push(
         `/billings/plans?org_identifier=${this.newOrgIdentifier}`
@@ -199,6 +225,9 @@ export default defineComponent({
     },
     onSubmit() {
       this.organizationData.name = this.organizationData.name.trim();
+      if(!this.isValidOrgName){
+        return;
+      }
       const dismiss = this.$q.notify({
         spinner: true,
         message: "Please wait...",
@@ -210,17 +239,18 @@ export default defineComponent({
         }
 
         const organizationId = this.organizationData.id;
-        delete this.organizationData.id;
-
-        if (organizationId == "") {
+        //here we will check if organizationId is there or not because we only get org id when we are updating the organization
+        //if organizationId is not there we will create a new organization else we will update the existing organization
+        if (!organizationId) {
+          delete this.organizationData.id;
           callOrganization = organizationService.create(this.organizationData);
         }
-        // else {
-        //   callOrganization = organizationService.update(
-        //     organizationId,
-        //     this.organizationData
-        //   );
-        // }
+        else {
+          callOrganization = organizationService.rename_organization(
+            organizationId,
+            this.organizationData.name,
+          );
+        }
 
         callOrganization
           .then((res: any) => {
@@ -264,10 +294,14 @@ export default defineComponent({
             this.$q.notify({
               type: "negative",
               message: JSON.stringify(
-                err?.response?.data["message"] || "Organization creation failed."
+                err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
               ),
             });
             dismiss();
+          });
+          this.track("Button Click", {
+            button: "Save Organization",
+            page: "Add Organization"
           });
       });
     },

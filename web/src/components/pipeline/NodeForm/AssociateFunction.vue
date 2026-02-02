@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     :style="computedStyleForFunction"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
       {{ t("pipeline.associateFunction") }}
+      <div>
+          <q-btn v-close-popup="true" round flat icon="cancel" >
+          </q-btn>
+        </div>
     </div>
     <q-separator />
 
@@ -42,16 +46,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md"
     >
-      <div class="tw-flex tw-items-center">
+      <div class="tw:flex tw:items-center">
         <q-toggle
           data-test="create-function-toggle"
-          class="q-mb-sm tw-inline-block"
+          class="q-mb-sm tw:inline-block tw:h-[36px] o2-toggle-button-lg"
+          size="lg"
+          :class="[store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light', !createNewFunction ? '-tw:ml-4' : '']"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
           v-model="createNewFunction"
         />
         <div
           v-if="createNewFunction"
-          class="q-pb-sm container text-body2 tw-inline-block tw-pl-4 tw-text-gray-600"
+          class="q-pb-sm container text-body2 tw:inline-block tw:pl-4 tw:text-gray-600"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
@@ -94,7 +100,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div  v-if="createNewFunction" class="pipeline-add-function tw-w-[95vw]">
+        <!-- Function Definition Display -->
+        <div v-if="!createNewFunction && selectedFunction && pipelineObj.functions[selectedFunction]" class="function-definition-section">
+          <q-card class="function-definition-card">
+            <q-card-section class="function-definition-header q-pb-sm">
+              <div class="text-body1 text-weight-medium text-primary">
+                {{ t('function.function_definition') }}
+              </div>
+            </q-card-section>
+            <q-separator />
+            <q-card-section class="function-definition-content q-pa-none">
+              <div class="function-code-container">
+                <pre class="function-code">{{ pipelineObj.functions[selectedFunction]?.function || 'No definition available' }}</pre>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <div  v-if="createNewFunction" class="pipeline-add-function tw:w-[95vw]">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"
@@ -111,23 +134,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-toggle
             data-test="associate-function-after-flattening-toggle"
-            class="q-mb-sm"
+            class="q-mb-sm tw:h-[36px] o2-toggle-button-lg tw:mr-3 -tw:ml-4"
+            size="lg"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
           />
+          
+          <!-- Info note explaining RAF/RBF -->
+          <q-card class="note-container">
+            <q-card-section class="q-pa-sm">
+              <div class="note-heading">Function Execution Guidelines:</div>
+              <q-banner inline dense class="note-info">
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span><span class="highlight">RBF (Run Before Flattening):</span> Function executes before data structure is flattened</span>
+                </div>
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span><span class="highlight">RAF (Run After Flattening):</span> Function executes after data structure is flattened</span>
+                </div>
+              </q-banner>
+            </q-card-section>
+          </q-card>
         </div>
 
         <div
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+        <q-btn
+            v-if="pipelineObj.isEditNode && !createNewFunction"
+            data-test="associate-function-delete-btn"
+            class="o2-secondary-button tw:h-[36px] q-mr-md"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            @click="openDeleteDialog"
+          >
+          <q-icon name="delete" class="q-mr-xs" />
+          {{ t('pipeline.deleteNode') }}
+        </q-btn>
           <q-btn
             v-if="!createNewFunction"
             data-test="associate-function-cancel-btn"
-            class="text-bold"
+            class="o2-secondary-button tw:h-[36px]"
             :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             @click="openCancelDialog"
           />
@@ -137,21 +191,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="
               createNewFunction ? t('alerts.createFunction') : t('alerts.save')
             "
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             no-caps
             type="submit"
-          />
-          <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="associate-function-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
           />
         </div>
       </q-form>
@@ -389,7 +433,7 @@ const filterFunctions = (val: any, update: any) => {
 
 <style scoped lang="scss">
 .stream-routing-title {
-  font-size: 20px;
+  font-size: 18px;
   padding-top: 16px;
 }
 .stream-routing-container {
@@ -403,6 +447,177 @@ const filterFunctions = (val: any, update: any) => {
   :deep(.add-function-title) {
     display: none;
   }
+}
+
+.note-container {
+  background-color: #F9F290;
+  border-radius: 4px;
+  border: 1px solid #F5A623;
+  color: #865300;
+  width: 100%;
+  margin-bottom: 20px;
+  margin-top: 10px;
+}
+
+.note-container .highlight {
+  font-weight: bold;
+  color: #007bff; /* Blue color to highlight key terms */
+}
+
+.note-container .emphasis {
+  font-style: italic;
+  color: #555; /* Subtle dark gray for emphasis */
+}
+
+.note-container .code {
+  font-family: monospace;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #d63384; /* Soft pinkish-red for code */
+}
+
+.note-heading {
+  font-size: medium;
+}
+
+.note-info {
+  font-size: small;
+  color: #865300;
+  background-color: #F9F290;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: space-between;
+}
+
+/* Function definition display - OpenObserve style */
+.function-definition-section {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.function-definition-card {
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.function-definition-header {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.function-definition-header .text-primary {
+  color: #2d3748 !important;
+  font-weight: 600;
+}
+
+
+.function-code-container {
+  background-color: #fafbfc;
+  border-radius: 0;
+  max-width: 584px;
+  max-height: 250px;
+  overflow-y: auto;
+  position: relative;
+}
+
+
+.function-code {
+  color: #2d3748;
+  background-color: transparent;
+  margin: 0;
+  padding: 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  border: none;
+  font-weight: 400;
+  cursor: default;
+  user-select: text;
+}
+
+.function-code::selection {
+  background-color: #bee3f8;
+}
+
+/* Custom scrollbar */
+.function-code-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.function-code-container::-webkit-scrollbar-track {
+  background: #f7fafc;
+}
+
+.function-code-container::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.function-code-container::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Dark mode - Enhanced OpenObserve style */
+.body--dark .function-definition-card {
+  border-color: #2d3748;
+  background-color: #1a202c;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.body--dark .function-definition-header {
+  background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+  border-bottom-color: #4a5568;
+}
+
+.body--dark .function-definition-header .text-primary {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.body--dark .readonly-chip {
+  background-color: #2d3748 !important;
+  border-color: #4a5568 !important;
+  color: #a0aec0 !important;
+}
+
+.body--dark .function-code-container {
+  background-color: #0d1117;
+  border: 1px solid #21262d;
+}
+
+
+.body--dark .function-code {
+  color: #f7fafc;
+  background-color: transparent;
+}
+
+.body--dark .function-code::selection {
+  background-color: #2b6cb0;
+  color: #ffffff;
+}
+
+.body--dark .function-code-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.body--dark .function-code-container::-webkit-scrollbar-track {
+  background: #0d1117;
+  border-radius: 4px;
+}
+
+.body--dark .function-code-container::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+  border: 1px solid #2d3748;
+}
+
+.body--dark .function-code-container::-webkit-scrollbar-thumb:hover {
+  background: #718096;
 }
 </style>
 

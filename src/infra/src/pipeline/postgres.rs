@@ -23,7 +23,7 @@ use config::{
 };
 
 use crate::{
-    db::postgres::{CLIENT, CLIENT_DDL, CLIENT_RO},
+    db::postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, drop_column},
     errors::{DbError, Error, Result},
 };
 
@@ -61,13 +61,16 @@ CREATE TABLE IF NOT EXISTS pipeline
     stream_type     VARCHAR(50),
     derived_stream  TEXT,
     nodes           TEXT,
-    edges           TEXT,
-    created_at      TIMESTAMP default CURRENT_TIMESTAMP
+    edges           TEXT
 );
             "#,
         )
         .execute(&pool)
         .await?;
+
+        // drop created_at column for old version <= 0.40.0
+        drop_column("pipeline", "created_at").await?;
+
         Ok(())
     }
 
@@ -85,6 +88,7 @@ CREATE TABLE IF NOT EXISTS pipeline
                 return Err(e.into());
             }
         }
+
         Ok(())
     }
 

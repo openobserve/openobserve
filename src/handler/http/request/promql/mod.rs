@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,14 +16,24 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
-use config::utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros};
+use config::{
+    meta::search::{CardinalityLevel, StreamResponses, generate_aggregation_search_interval},
+    utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros},
+};
+use futures::StreamExt;
 use infra::errors;
 use promql_parser::parser;
 #[cfg(feature = "enterprise")]
 use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
+    common::{
+        meta::{http::HttpResponse as MetaHttpResponse, ingestion::IngestUser},
+        utils::{auth::UserEmail, http::get_or_create_trace_id},
+    },
+    handler::http::{
+        extractors::Headers, request::search::error_utils::map_error_to_http_response,
+    },
     service::{metrics, promql},
 };
 
@@ -32,6 +42,8 @@ use crate::{
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRemoteWrite",
+    summary = "Ingest Prometheus metrics",
+    description = "Receives Prometheus metrics data via remote write protocol. Accepts protobuf-encoded WriteRequest payloads containing time series data and stores them for querying. Compatible with standard Prometheus remote write configuration.",
         security(
         ("Authorization"= [])
     ),
@@ -40,24 +52,31 @@ use crate::{
     ),
     request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/prometheus/api/v1/write")]
 pub async fn remote_write(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    let user = IngestUser::from_user_email(&user_email.user_id);
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type == "application/x-protobuf" {
-        Ok(match metrics::prom::remote_write(&org_id, body).await {
-            Ok(_) => HttpResponse::Ok().into(),
-            Err(e) => HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)),
-        })
+        Ok(
+            match metrics::prom::remote_write(&org_id, body, user).await {
+                Ok(_) => HttpResponse::Ok().into(),
+                Err(e) => HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)),
+            },
+        )
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
@@ -67,13 +86,14 @@ pub async fn remote_write(
 }
 
 /// prometheus instant queries
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQuery",
+    summary = "Execute Prometheus instant query",
+    description = "Executes a Prometheus instant query at a single point in time. Returns current values for metrics matching the query expression. Compatible with Prometheus instant query API for seamless integration with existing monitoring tools.",
     security(
         ("Authorization"= [])
     ),
@@ -84,7 +104,7 @@ pub async fn remote_write(
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "vector",
@@ -108,16 +128,27 @@ pub async fn remote_write(
                ]
             }
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Execute PromQL instant query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query")]
 pub async fn query_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query(&org_id.into_inner(), req.into_inner(), in_req).await
+    query(
+        &org_id.into_inner(),
+        req.into_inner(),
+        &user_email.user_id,
+        in_req,
+    )
+    .await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query")]
@@ -125,6 +156,7 @@ pub async fn query_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestQuery>,
     web::Form(form): web::Form<config::meta::promql::RequestQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -132,12 +164,13 @@ pub async fn query_post(
     } else {
         req.into_inner()
     };
-    query(&org_id.into_inner(), req, in_req).await
+    query(&org_id.into_inner(), req, &user_email.user_id, in_req).await
 }
 
 async fn query(
     org_id: &str,
     req: config::meta::promql::RequestQuery,
+    user_email: &str,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let cfg = config::get_config();
@@ -150,11 +183,16 @@ async fn query(
         tracing::Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
-    let user_id = in_req.headers().get("user_id").unwrap();
-    let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
         use crate::{
             common::utils::auth::{AuthExtractor, is_root_user},
             service::db::org_users::get_cached_user_org,
@@ -203,7 +241,7 @@ async fn query(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
                 ));
             }
         },
@@ -217,20 +255,24 @@ async fn query(
         end,
         step: 300_000_000, // 5m
         query_exemplars: false,
-        no_cache: None,
+        use_cache: None,
+        search_type: None,
+        regions: vec![],
+        clusters: vec![],
     };
 
-    search(&trace_id, org_id, &req, user_email, timeout).await
+    search(&trace_id, org_id, req, user_email, timeout).await
 }
 
 /// prometheus range queries
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRangeQuery",
+    summary = "Execute Prometheus range query",
+    description = "Executes a Prometheus range query over a specified time period. Returns time series data with multiple data points for metrics matching the query expression. Compatible with Prometheus range query API for time series analysis and visualization.",
     security(
         ("Authorization"= [])
     ),
@@ -243,7 +285,7 @@ async fn query(
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "matrix",
@@ -275,16 +317,28 @@ async fn query(
                ]
             }
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Execute PromQL range query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_range")]
 pub async fn query_range_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner(), in_req, false).await
+    query_range(
+        &org_id.into_inner(),
+        req.into_inner(),
+        &user_email.user_id,
+        in_req,
+        false,
+    )
+    .await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_range")]
@@ -292,6 +346,7 @@ pub async fn query_range_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
     web::Form(form): web::Form<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -299,17 +354,25 @@ pub async fn query_range_post(
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req, in_req, false).await
+    query_range(
+        &org_id.into_inner(),
+        req,
+        &user_email.user_id,
+        in_req,
+        false,
+    )
+    .await
 }
 
 /// prometheus query exemplars
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQueryExemplars",
+    summary = "Query Prometheus exemplars",
+    description = "Queries exemplars for metrics within a specified time range. Exemplars are references to trace data that are associated with specific metric data points, enabling correlation between metrics and traces for observability workflows.",
     security(
         ("Authorization"= [])
     ),
@@ -320,7 +383,7 @@ pub async fn query_range_post(
         ("end" = String, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status": "success",
             "data": [
                 {
@@ -366,16 +429,27 @@ pub async fn query_range_post(
                 }
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_exemplars")]
 pub async fn query_exemplars_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner(), in_req, true).await
+    query_range(
+        &org_id.into_inner(),
+        req.into_inner(),
+        &user_email.user_id,
+        in_req,
+        true,
+    )
+    .await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_exemplars")]
@@ -383,6 +457,7 @@ pub async fn query_exemplars_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
     web::Form(form): web::Form<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -390,12 +465,13 @@ pub async fn query_exemplars_post(
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req, in_req, true).await
+    query_range(&org_id.into_inner(), req, &user_email.user_id, in_req, true).await
 }
 
 async fn query_range(
     org_id: &str,
     req: config::meta::promql::RequestRangeQuery,
+    user_email: &str,
     in_req: HttpRequest,
     query_exemplars: bool,
 ) -> Result<HttpResponse, Error> {
@@ -409,9 +485,6 @@ async fn query_range(
         tracing::Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
-    let user_id = in_req.headers().get("user_id").unwrap();
-    let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
         use crate::{
@@ -419,12 +492,24 @@ async fn query_range(
             service::db::org_users::get_cached_user_org,
         };
 
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
                 log::error!("[trace_id: {trace_id}] parse promql error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         };
@@ -471,7 +556,10 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         },
@@ -483,7 +571,10 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         },
@@ -495,7 +586,10 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         },
@@ -509,25 +603,36 @@ async fn query_range(
 
     let timeout = search_timeout(req.timeout);
 
-    let req = promql::MetricsQueryRequest {
+    let search_req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
         step,
         query_exemplars,
-        no_cache: req.no_cache,
+        use_cache: req.use_cache,
+        search_type: req.search_type,
+        regions: req.regions,
+        clusters: req.clusters,
     };
-    search(&trace_id, org_id, &req, user_email, timeout).await
+    if let Some(use_streaming) = req.use_streaming
+        && use_streaming
+        && !query_exemplars
+    {
+        search_streaming(&trace_id, org_id, search_req, user_email, timeout).await
+    } else {
+        search(&trace_id, org_id, search_req, user_email, timeout).await
+    }
 }
 
 /// prometheus query metric metadata
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
+    summary = "Get metric metadata",
+    description = "Retrieves metadata information about metrics including their type, help text, and units. Provides essential information for understanding metric semantics and proper usage in queries and visualizations.",
     security(
         ("Authorization"= [])
     ),
@@ -537,7 +642,7 @@ async fn query_range(
         ("metric" = Option<String>, Query, description = "A metric name to filter metadata for. All metric metadata is retrieved if left empty"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status": "success",
             "data": {
               "cortex_ring_tokens": [
@@ -561,7 +666,11 @@ async fn query_range(
               ]
             }
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus metadata"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/metadata")]
@@ -571,11 +680,16 @@ pub async fn metadata(
 ) -> Result<HttpResponse, Error> {
     Ok(
         match metrics::prom::get_metadata(&org_id, req.into_inner()).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_metadata failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -583,13 +697,14 @@ pub async fn metadata(
 }
 
 /// prometheus finding series by label matchers
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusSeries",
+    summary = "Find metric series",
+    description = "Finds time series that match given label matchers. Returns the unique combinations of metric names and labels that exist in the specified time range. Useful for discovering available metrics and their label combinations.",
     security(
         ("Authorization"= [])
     ),
@@ -600,7 +715,7 @@ pub async fn metadata(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : [
                {
@@ -620,22 +735,28 @@ pub async fn metadata(
                }
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus series"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestSeries>,
+    Headers(user_email): Headers<UserEmail>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    series(&org_id, req.into_inner(), _in_req).await
+    series(&org_id, req.into_inner(), &user_email.user_id, _in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestSeries>,
+    Headers(user_email): Headers<UserEmail>,
     _in_req: HttpRequest,
     web::Form(form): web::Form<config::meta::promql::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
@@ -644,12 +765,13 @@ pub async fn series_post(
     } else {
         req.into_inner()
     };
-    series(&org_id, req, _in_req).await
+    series(&org_id, req, &user_email.user_id, _in_req).await
 }
 
 async fn series(
     org_id: &str,
     req: config::meta::promql::RequestSeries,
+    _user_email: &str,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let config::meta::promql::RequestSeries {
@@ -660,10 +782,23 @@ async fn series(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e, None),
+            ));
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -680,15 +815,12 @@ async fn series(
             None => "".to_string(),
         };
 
-        let user_id = _in_req.headers().get("user_id").unwrap();
-        let user_email = user_id.to_str().unwrap();
-
-        if !is_root_user(user_email) {
-            let user: config::meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
+        if !is_root_user(_user_email) {
+            let user: config::meta::user::User = get_cached_user_org(org_id, _user_email).unwrap();
             let stream_type_str = StreamType::Metrics.as_str();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
-                    user_email,
+                    _user_email,
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
@@ -715,11 +847,16 @@ async fn series(
 
     Ok(
         match metrics::prom::get_series(org_id, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_series failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -727,13 +864,14 @@ async fn series(
 }
 
 /// prometheus getting label names
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabels",
+    summary = "Get metric label names",
+    description = "Returns a list of label names available in the metric data within the specified time range. Optionally filter by series selector to get labels for specific metrics. Useful for building dynamic queries and understanding data structure.",
     security(
         ("Authorization"= [])
     ),
@@ -744,7 +882,7 @@ async fn series(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status": "success",
             "data": [
                 "__name__",
@@ -770,7 +908,11 @@ async fn series(
                 "version"
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label names"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/labels")]
@@ -807,17 +949,23 @@ async fn labels(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e, None),
+            ));
         }
     };
     Ok(
         match metrics::prom::get_labels(org_id, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_labels failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -825,13 +973,14 @@ async fn labels(
 }
 
 /// prometheus query label values
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
+    summary = "Get label values",
+    description = "Returns all possible values for a specific label name within the specified time range. Optionally filter by series selector to get values for specific metrics. Essential for building filters and understanding label cardinality.",
     security(
         ("Authorization"= [])
     ),
@@ -843,14 +992,18 @@ async fn labels(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : [
                "node",
                "prometheus"
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label values"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
@@ -867,17 +1020,23 @@ pub async fn label_values(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e, None),
+            ));
         }
     };
     Ok(
         match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_label_values failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -925,27 +1084,32 @@ fn validate_metadata_params(
             }
         },
     };
-    let start = if start.is_none() || start.as_ref().unwrap().is_empty() {
+    let start = if let Some(start) = start
+        && !start.is_empty()
+    {
+        parse_str_to_timestamp_micros(&start).map_err(|e| e.to_string())?
+    } else {
         0
-    } else {
-        parse_str_to_timestamp_micros(&start.unwrap()).map_err(|e| e.to_string())?
     };
-    let end = if end.is_none() || end.as_ref().unwrap().is_empty() {
-        now_micros()
+    let end = if let Some(end) = end
+        && !end.is_empty()
+    {
+        parse_str_to_timestamp_micros(&end).map_err(|e| e.to_string())?
     } else {
-        parse_str_to_timestamp_micros(&end.unwrap()).map_err(|e| e.to_string())?
+        now_micros()
     };
     Ok((selector, start, end))
 }
 
 /// prometheus formatting query expressions
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusFormatQuery",
+    summary = "Format Prometheus query",
+    description = "Formats and prettifies a Prometheus query expression. Returns the query in a standardized, readable format which helps with query validation, debugging, and ensuring consistent query formatting across applications.",
     security(
         ("Authorization"= [])
     ),
@@ -953,11 +1117,15 @@ fn validate_metadata_params(
         ("query" = String, Query, description = "Prometheus expression query string."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : "foo / bar"
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Format PromQL query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/format_query")]
@@ -988,11 +1156,17 @@ fn format_query(_org_id: &str, query: &str, _in_req: HttpRequest) -> Result<Http
     let expr = match promql_parser::parser::parse(query) {
         Ok(expr) => expr,
         Err(err) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(err, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(err, None),
+            ));
         }
     };
-    Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(expr.prettify(), None)))
+    Ok(
+        HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(
+            expr.prettify(),
+            None,
+        )),
+    )
 }
 
 fn search_timeout(timeout: Option<String>) -> i64 {
@@ -1011,35 +1185,367 @@ fn search_timeout(timeout: Option<String>) -> i64 {
 async fn search(
     trace_id: &str,
     org_id: &str,
-    req: &promql::MetricsQueryRequest,
+    req: promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    match promql::search::search(trace_id, org_id, req, user_email, timeout).await {
-        Ok(data) if !req.query_exemplars => {
-            Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
-                promql::QueryResult {
+    // check super cluster
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+
+    match promql::search::search(
+        trace_id,
+        org_id,
+        &req,
+        user_email,
+        timeout,
+        is_super_cluster,
+    )
+    .await
+    {
+        Ok(data) if !req.query_exemplars => Ok(HttpResponse::Ok().json(
+            config::meta::promql::ApiFuncResponse::ok(
+                config::meta::promql::QueryResult {
                     result_type: data.get_type().to_string(),
                     result: data,
                 },
                 Some(trace_id.to_string()),
-            )))
-        }
-        Ok(data) => Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
-            data,
-            Some(trace_id.to_string()),
-        ))),
+            ),
+        )),
+        Ok(data) => Ok(
+            HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(
+                data,
+                Some(trace_id.to_string()),
+            )),
+        ),
         Err(err) => {
             let err = match err {
                 errors::Error::ErrorCode(code) => code.get_error_detail(),
                 _ => err.to_string(),
             };
-            Ok(
-                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(
+            Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
                     err,
                     Some(trace_id.to_string()),
-                )),
-            )
+                ),
+            ))
         }
+    }
+}
+
+async fn search_streaming(
+    trace_id: &str,
+    org_id: &str,
+    req: promql::MetricsQueryRequest,
+    user_email: &str,
+    timeout: i64,
+) -> Result<HttpResponse, Error> {
+    // check super cluster
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+
+    // adjust start and end time
+    let (start, end) = promql::adjust_start_end(req.start, req.end, req.step);
+    // generate partitions
+    let partitions = generate_search_partition(&req.query, start, end, req.step);
+    log::info!(
+        "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions with time range [{start},{end}], partitions: {partitions:?}",
+        partitions.len(),
+    );
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(
+        partitions.len(),
+    );
+    // Spawn the search task in a separate task
+    let req_trace_id = trace_id.to_string();
+    let org_id = org_id.to_string();
+    let user_email = user_email.to_string();
+    let req_step = req.step;
+    actix_web::rt::spawn(async move {
+        // Send metadata first before any responses
+        let promql_metadata = StreamResponses::PromqlMetadata {
+            step: req_step,
+            trace_id: Some(req_trace_id.clone()),
+        };
+        if tx.send(Ok(promql_metadata)).await.is_err() {
+            log::warn!(
+                "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending metadata to client",
+            );
+            return;
+        }
+
+        let total_partitions = partitions.len();
+        for (i, (start, end)) in partitions.into_iter().enumerate() {
+            let mut req = req.clone();
+            req.start = start;
+            req.end = end;
+            match promql::search::search(
+                &req_trace_id,
+                &org_id,
+                &req,
+                &user_email,
+                timeout,
+                is_super_cluster,
+            )
+            .await
+            {
+                Ok(data) => {
+                    let res = StreamResponses::PromqlResponse {
+                        data: config::meta::promql::QueryResult {
+                            result_type: data.get_type().to_string(),
+                            result: data,
+                        },
+                        trace_id: Some(req_trace_id.clone()),
+                    };
+                    if tx.send(Ok(res)).await.is_err() {
+                        log::warn!(
+                            "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending data to client",
+                        );
+                        break;
+                    }
+                }
+                Err(err) => {
+                    log::error!(
+                        "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Error in search: {err}"
+                    );
+                    let err_res = match err {
+                        infra::errors::Error::ErrorCode(ref code) => {
+                            let message = code.get_message();
+                            let error_detail = code.get_error_detail();
+                            let http_response = map_error_to_http_response(&err, None);
+                            StreamResponses::Error {
+                                code: http_response.status().into(),
+                                message,
+                                error_detail: Some(error_detail),
+                            }
+                        }
+                        _ => StreamResponses::Error {
+                            code: 500,
+                            message: err.to_string(),
+                            error_detail: None,
+                        },
+                    };
+                    if tx.send(Ok(err_res)).await.is_err() {
+                        log::warn!(
+                            "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending error to client",
+                        );
+                        break;
+                    }
+                }
+            }
+
+            // Send progress
+            let percent = ((i + 1) * 100) / total_partitions;
+            if tx
+                .send(Ok(StreamResponses::Progress { percent }))
+                .await
+                .is_err()
+            {
+                log::warn!(
+                    "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending progress event to client",
+                );
+                break;
+            }
+        }
+        // Send Done
+        if tx.send(Ok(StreamResponses::Done)).await.is_err() {
+            log::warn!(
+                "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending done event to client",
+            );
+        }
+    });
+
+    // Return streaming response
+    let trace_id = trace_id.to_string();
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
+        let chunks_iter = match result {
+            Ok(v) => v.to_chunks(),
+            Err(err) => {
+                log::error!(
+                    "[HTTP2_STREAM PromQL trace_id {trace_id}] Error in search stream: {err}"
+                );
+                let err_res = match err {
+                    infra::errors::Error::ErrorCode(ref code) => {
+                        // if err code is cancelled return cancelled response
+                        match code {
+                            infra::errors::ErrorCodes::SearchCancelQuery(_) => {
+                                StreamResponses::Cancelled
+                            }
+                            _ => {
+                                let message = code.get_message();
+                                let error_detail = code.get_error_detail();
+                                let http_response = map_error_to_http_response(&err, None);
+
+                                StreamResponses::Error {
+                                    code: http_response.status().into(),
+                                    message,
+                                    error_detail: Some(error_detail),
+                                }
+                            }
+                        }
+                    }
+                    _ => StreamResponses::Error {
+                        code: 500,
+                        message: err.to_string(),
+                        error_detail: None,
+                    },
+                };
+                err_res.to_chunks()
+            }
+        };
+
+        // Convert the iterator to a stream only once
+        futures::stream::iter(chunks_iter)
+    });
+
+    Ok(HttpResponse::Ok()
+        .content_type("text/event-stream")
+        .streaming(stream))
+}
+
+/// Generate search partitions based on the query's lookback window and step
+/// The mini partition should be at least twice the size of the lookback window to avoid redundant
+/// computations on the same data.
+/// Partitions are aligned to natural time boundaries (e.g., hour boundaries for 1h step,
+/// 30-minute boundaries for 30m step). The first and last partitions may not be fully aligned
+/// to accommodate the query's actual start/end times.
+fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Vec<(i64, i64)> {
+    if start >= end {
+        return vec![(start, end)];
+    }
+    let mut lookback_window = get_max_lookback_window(query);
+    if lookback_window == 0 {
+        lookback_window = promql::micros(promql::DEFAULT_LOOKBACK);
+    }
+    let mini_step = std::cmp::max(lookback_window * 2, step);
+    let interval = generate_aggregation_search_interval(start, end, CardinalityLevel::Low);
+    let mut partition_step = interval.get_interval_microseconds();
+    if partition_step < mini_step {
+        partition_step = mini_step;
+    }
+    partition_step -= partition_step % step;
+
+    // Ensure partition_step is at least 3x step to avoid empty partitions
+    if partition_step <= step {
+        partition_step = step * 3;
+    }
+
+    if end - start <= partition_step {
+        return vec![(start, end)];
+    }
+
+    let mut groups: Vec<(i64, i64)> = Vec::new();
+
+    // Calculate the offset from the aligned boundary
+    // For example, if partition_step is 1 hour and start is 10:23, offset is 23 minutes
+    let offset = start % partition_step;
+
+    // Determine where aligned partitions start
+    let mut group_start = if offset == 0 {
+        // Start is already aligned, begin from start
+        start
+    } else {
+        // First partition: from start to next aligned boundary
+        // we need to subtract the step to avoid the overlap of the next partition
+        let mut next_aligned_boundary = start - offset + partition_step - step;
+        if start == next_aligned_boundary {
+            next_aligned_boundary += partition_step - step;
+        }
+        if next_aligned_boundary <= end {
+            groups.push((start, next_aligned_boundary));
+        }
+        next_aligned_boundary + step
+    };
+    while group_start < end {
+        let mut group_end = std::cmp::min(group_start + partition_step, end);
+
+        // If this would be the last partition and it's too small, merge with previous
+        if group_end == end && !groups.is_empty() && (group_end - group_start < step * 3) {
+            groups.last_mut().unwrap().1 = group_end;
+            break;
+        }
+        // we need to subtract the step to avoid the overlap of the next partition
+        if group_end < end {
+            group_end -= step;
+        }
+        groups.push((group_start, group_end));
+
+        // because of each partition will return data point with start and end timestamp,
+        // so the next partition should start from next data point after current end
+        group_start = group_end + step;
+    }
+
+    // Handle case where entire range is within one partition
+    if groups.is_empty() {
+        groups.push((start, end));
+    }
+
+    groups
+}
+
+fn get_max_lookback_window(query: &str) -> i64 {
+    let ast = match promql_parser::parser::parse(query) {
+        Ok(ast) => ast,
+        Err(_) => {
+            return 0;
+        }
+    };
+    let mut visitor = MaxLookbackWindowVisitor::default();
+    if let Err(err) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        log::error!("visit promql expr error: {err}");
+        return 0;
+    }
+    visitor.get_range_micros()
+}
+
+use promql_parser::parser::Expr;
+
+struct MaxLookbackWindowVisitor {
+    range: std::time::Duration,
+}
+
+impl MaxLookbackWindowVisitor {
+    fn new() -> Self {
+        MaxLookbackWindowVisitor {
+            range: std::time::Duration::from_micros(0),
+        }
+    }
+
+    fn get_range_micros(&self) -> i64 {
+        promql::micros(self.range)
+    }
+}
+
+impl Default for MaxLookbackWindowVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
+    type Error = &'static str;
+
+    fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
+        match expr {
+            Expr::VectorSelector(_) => {
+                return Ok(false);
+            }
+            Expr::MatrixSelector(ms) => {
+                if ms.range > self.range {
+                    self.range = ms.range;
+                }
+                return Ok(false);
+            }
+            Expr::NumberLiteral(_) | Expr::StringLiteral(_) => return Ok(false),
+            _ => (),
+        }
+        Ok(true)
     }
 }

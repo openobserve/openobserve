@@ -4,15 +4,21 @@ export const useAnnotations = (
   organization: string,
   dashboardId: string,
   panelId: string,
+  enableAnnotations: boolean = true,
 ) => {
   const refreshAnnotations = async (start_time: number, end_time: number) => {
+    // Skip annotations API call if disabled
+    if (!enableAnnotations) {
+      return null;
+    }
+
     if (!panelId) {
       return;
     }
     if (!dashboardId) {
       return;
     }
-    
+
     try {
       const response = await annotationService.get_timed_annotations(
         organization,

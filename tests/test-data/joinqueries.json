@@ -39,6 +39,21 @@
     {
         "test_name": "Total Orders Query",
         "sql_query": "WITH total AS (SELECT COUNT(*) AS total_count FROM orders) SELECT u1.name, u1.status, o.amount, total.total_count AS total_orders FROM u1 JOIN orders o ON u1.user_id = o.user_id CROSS JOIN total"
+    },
+    {
+        "test_name": "INTERSECT query: Common user_ids in both streams",
+        "sql_query": "SELECT user_id FROM \"u1\" INTERSECT SELECT user_id FROM \"orders\""
+    },
+    {
+        "test_name": "EXCEPT query: Users without orders",
+        "sql_query": "SELECT user_id FROM \"u1\" EXCEPT SELECT user_id FROM \"orders\""
+    },
+    {
+        "test_name": "INTERSECT with WHERE clause: Active users with orders",
+        "sql_query": "SELECT user_id FROM \"u1\" WHERE status = 'active' INTERSECT SELECT user_id FROM \"orders\""
+    },
+    {
+        "test_name": "EXCEPT with multiple columns: Users details without orders",
+        "sql_query": "SELECT user_id, name FROM \"u1\" EXCEPT SELECT user_id, 'placeholder' FROM \"orders\""
     }
   ]
-  

@@ -15,6 +15,8 @@
 
 use proto::cluster_rpc;
 
+pub const UNKNOWN_NAME: &str = "__o2__unknown__field__";
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),
@@ -71,19 +73,6 @@ impl std::fmt::Display for IndexOptimizeMode {
 impl From<cluster_rpc::IdxOptimizeMode> for IndexOptimizeMode {
     fn from(cluster_rpc_mode: cluster_rpc::IdxOptimizeMode) -> Self {
         match cluster_rpc_mode.mode {
-            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleSelect(select)) => {
-                IndexOptimizeMode::SimpleSelect(select.index as usize, select.asc)
-            }
-            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(_)) => {
-                IndexOptimizeMode::SimpleCount
-            }
-            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(select)) => {
-                IndexOptimizeMode::SimpleHistogram(
-                    select.min_value,
-                    select.bucket_width,
-                    select.num_buckets as usize,
-                )
-            }
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(select)) => {
                 IndexOptimizeMode::SimpleTopN(select.field, select.limit as usize, select.asc)
             }
@@ -98,30 +87,6 @@ impl From<cluster_rpc::IdxOptimizeMode> for IndexOptimizeMode {
 impl From<IndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
     fn from(mode: IndexOptimizeMode) -> Self {
         match mode {
-            IndexOptimizeMode::SimpleSelect(index, asc) => cluster_rpc::IdxOptimizeMode {
-                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleSelect(
-                    cluster_rpc::SimpleSelect {
-                        index: index as u32,
-                        asc,
-                    },
-                )),
-            },
-            IndexOptimizeMode::SimpleCount => cluster_rpc::IdxOptimizeMode {
-                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(
-                    cluster_rpc::SimpleCount {},
-                )),
-            },
-            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
-                cluster_rpc::IdxOptimizeMode {
-                    mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(
-                        cluster_rpc::SimpleHistogram {
-                            min_value,
-                            bucket_width,
-                            num_buckets: num_buckets as u32,
-                        },
-                    )),
-                }
-            }
             IndexOptimizeMode::SimpleTopN(field, limit, asc) => cluster_rpc::IdxOptimizeMode {
                 mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(
                     cluster_rpc::SimpleTopN {
@@ -140,6 +105,7 @@ impl From<IndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                     },
                 )),
             },
+            other => panic!("Invalid IndexOptimizeMode: {other:?}"),
         }
     }
 }
@@ -195,56 +161,9 @@ mod tests {
     #[test]
     fn test_from_cluster_rpc_to_index_optimize_mode() {
         // Test conversion from cluster_rpc::IdxOptimizeMode to IndexOptimizeMode
-        use cluster_rpc::{
-            IdxOptimizeMode, SimpleCount, SimpleDistinct, SimpleHistogram, SimpleSelect,
-            SimpleTopN, idx_optimize_mode::Mode,
-        };
+        use cluster_rpc::{IdxOptimizeMode, SimpleDistinct, SimpleTopN, idx_optimize_mode::Mode};
 
         let test_cases = [
-            (
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleSelect(SimpleSelect {
-                        index: 100,
-                        asc: true,
-                    })),
-                },
-                IndexOptimizeMode::SimpleSelect(100, true),
-            ),
-            (
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleSelect(SimpleSelect {
-                        index: 50,
-                        asc: false,
-                    })),
-                },
-                IndexOptimizeMode::SimpleSelect(50, false),
-            ),
-            (
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleCount(SimpleCount {})),
-                },
-                IndexOptimizeMode::SimpleCount,
-            ),
-            (
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleHistogram(SimpleHistogram {
-                        min_value: 0,
-                        bucket_width: 10,
-                        num_buckets: 5,
-                    })),
-                },
-                IndexOptimizeMode::SimpleHistogram(0, 10, 5),
-            ),
-            (
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleHistogram(SimpleHistogram {
-                        min_value: -100,
-                        bucket_width: 25,
-                        num_buckets: 20,
-                    })),
-                },
-                IndexOptimizeMode::SimpleHistogram(-100, 25, 20),
-            ),
             (
                 IdxOptimizeMode {
                     mode: Some(Mode::SimpleTopn(SimpleTopN {
@@ -296,56 +215,9 @@ mod tests {
     #[test]
     fn test_from_index_optimize_mode_to_cluster_rpc() {
         // Test conversion from IndexOptimizeMode to cluster_rpc::IdxOptimizeMode
-        use cluster_rpc::{
-            IdxOptimizeMode, SimpleCount, SimpleDistinct, SimpleHistogram, SimpleSelect,
-            SimpleTopN, idx_optimize_mode::Mode,
-        };
+        use cluster_rpc::{IdxOptimizeMode, SimpleDistinct, SimpleTopN, idx_optimize_mode::Mode};
 
         let test_cases = [
-            (
-                IndexOptimizeMode::SimpleSelect(100, true),
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleSelect(SimpleSelect {
-                        index: 100,
-                        asc: true,
-                    })),
-                },
-            ),
-            (
-                IndexOptimizeMode::SimpleSelect(50, false),
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleSelect(SimpleSelect {
-                        index: 50,
-                        asc: false,
-                    })),
-                },
-            ),
-            (
-                IndexOptimizeMode::SimpleCount,
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleCount(SimpleCount {})),
-                },
-            ),
-            (
-                IndexOptimizeMode::SimpleHistogram(0, 10, 5),
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleHistogram(SimpleHistogram {
-                        min_value: 0,
-                        bucket_width: 10,
-                        num_buckets: 5,
-                    })),
-                },
-            ),
-            (
-                IndexOptimizeMode::SimpleHistogram(-100, 25, 20),
-                IdxOptimizeMode {
-                    mode: Some(Mode::SimpleHistogram(SimpleHistogram {
-                        min_value: -100,
-                        bucket_width: 25,
-                        num_buckets: 20,
-                    })),
-                },
-            ),
             (
                 IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),
                 IdxOptimizeMode {
@@ -399,11 +271,6 @@ mod tests {
         // Test that converting from IndexOptimizeMode to cluster_rpc and back preserves the
         // original
         let test_modes = [
-            IndexOptimizeMode::SimpleSelect(100, true),
-            IndexOptimizeMode::SimpleSelect(50, false),
-            IndexOptimizeMode::SimpleCount,
-            IndexOptimizeMode::SimpleHistogram(0, 10, 5),
-            IndexOptimizeMode::SimpleHistogram(-100, 25, 20),
             IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),
             IndexOptimizeMode::SimpleTopN("memory_usage".to_string(), 5, false),
             IndexOptimizeMode::SimpleDistinct("user_id".to_string(), 100, true),
@@ -430,13 +297,9 @@ mod tests {
         // Test edge cases and boundary values
         let edge_cases = [
             // Zero values
-            IndexOptimizeMode::SimpleSelect(0, true),
-            IndexOptimizeMode::SimpleHistogram(0, 0, 0),
             IndexOptimizeMode::SimpleTopN("".to_string(), 0, false),
             IndexOptimizeMode::SimpleDistinct("".to_string(), 0, true),
             // Large values (using u32::MAX to avoid overflow in conversion)
-            IndexOptimizeMode::SimpleSelect(u32::MAX as usize, false),
-            IndexOptimizeMode::SimpleHistogram(i64::MAX, u64::MAX, u32::MAX as usize),
             IndexOptimizeMode::SimpleTopN(
                 "very_long_field_name_that_might_exceed_normal_lengths".to_string(),
                 u32::MAX as usize,
@@ -447,8 +310,6 @@ mod tests {
                 u32::MAX as usize,
                 false,
             ),
-            // Negative values for histogram
-            IndexOptimizeMode::SimpleHistogram(i64::MIN, 1, 1),
         ];
 
         for mode in edge_cases {

@@ -1,0 +1,172 @@
+name: Playwright Auto-Rerun
+
+run-name: "Playwright Auto-Rerun - ${{ github.event.workflow_run.head_branch || 'Manual Trigger' }}"
+
+on:
+  workflow_run:
+    workflows: ["Playwright UI Tests"]
+    types:
+      - completed
+    branches:
+      - main
+      - '**'  # Also trigger on all branches for testing
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to rerun (for manual testing)'
+        required: true
+        type: string
+
+jobs:
+  auto_rerun_on_failure:
+    name: Auto Rerun Failed Jobs
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    # Only trigger if the workflow failed on first attempt (for automatic triggers)
+    # OR if manually triggered (for testing)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.run_attempt == 1)
+    steps:
+      - name: Debug - Print trigger information
+        run: |
+          echo "::group::Trigger Information"
+          echo "Event name: ${{ github.event_name }}"
+          echo "Repository: ${{ github.repository }}"
+
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "::notice::🔄 Auto-rerun triggered for branch: ${{ github.event.workflow_run.head_branch }}"
+            echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
+            echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+            echo "Workflow run attempt: ${{ github.event.workflow_run.run_attempt }}"
+            echo "Workflow run status: ${{ github.event.workflow_run.status }}"
+            echo "Workflow name: ${{ github.event.workflow_run.name }}"
+            echo "Branch: ${{ github.event.workflow_run.head_branch }}"
+            echo "Commit: ${{ github.event.workflow_run.head_sha }}"
+            echo "Event type: ${{ github.event.workflow_run.event }}"
+
+            # For PR events, extract PR number from head_branch (format: refs/pull/123/merge or branch name)
+            if [ "${{ github.event.workflow_run.event }}" = "pull_request" ]; then
+              echo "::notice::📋 Triggered by PR event"
+              echo "PR Head Repo: ${{ github.event.workflow_run.head_repository.full_name }}"
+            fi
+          else
+            echo "Manual run_id input: ${{ inputs.run_id }}"
+          fi
+          echo "::endgroup::"
+
+      - name: Install GitHub CLI
+        run: |
+          echo "::group::Installing GitHub CLI"
+
+          # Check if gh is already installed
+          if command -v gh &> /dev/null; then
+            echo "::notice::GitHub CLI already installed"
+            gh --version
+          else
+            echo "::notice::Installing GitHub CLI..."
+            type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+            echo "::notice::GitHub CLI installed successfully"
+            gh --version
+          fi
+
+          echo "::endgroup::"
+
+      - name: Verify workflow status and trigger rerun
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "::group::Determining workflow run ID"
+
+          # Determine run ID based on trigger type
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RUN_ID=${{ inputs.run_id }}
+            echo "::notice::Manual trigger mode"
+            echo "::notice::Run ID from input: $RUN_ID"
+          else
+            RUN_ID=${{ github.event.workflow_run.id }}
+            echo "::notice::Automatic trigger mode (workflow_run)"
+            echo "::notice::Run ID from workflow_run event: $RUN_ID"
+          fi
+
+          echo "::endgroup::"
+
+          # Verify the run exists and get its details
+          echo "::group::Fetching workflow run details"
+
+          RUN_INFO=$(gh run view $RUN_ID --repo $GH_REPO --json conclusion,status,databaseId,attempt,event 2>&1)
+
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to fetch run information for run ID $RUN_ID"
+            echo "::error::Error: $RUN_INFO"
+            exit 1
+          fi
+
+          echo "Run information:"
+          echo "$RUN_INFO" | jq '.'
+
+          CONCLUSION=$(echo "$RUN_INFO" | jq -r '.conclusion')
+          STATUS=$(echo "$RUN_INFO" | jq -r '.status')
+          ATTEMPT=$(echo "$RUN_INFO" | jq -r '.attempt')
+
+          echo "::notice::Workflow conclusion: $CONCLUSION"
+          echo "::notice::Workflow status: $STATUS"
+          echo "::notice::Current attempt: $ATTEMPT"
+
+          echo "::endgroup::"
+
+          # Verify workflow is in correct state for rerun
+          echo "::group::Validating rerun eligibility"
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::Workflow is not completed (status: $STATUS). Cannot rerun a workflow that is still running."
+            exit 1
+          fi
+
+          if [ "$CONCLUSION" != "failure" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "::warning::Workflow did not fail (conclusion: $CONCLUSION). Skipping rerun."
+            echo "::notice::This is expected if the workflow succeeded or was cancelled manually."
+            exit 0
+          fi
+
+          echo "::notice::✅ Workflow is eligible for rerun"
+          echo "::endgroup::"
+
+          # Trigger the rerun
+          echo "::group::Triggering workflow rerun"
+          echo "::notice::Executing: gh run rerun $RUN_ID --failed --repo $GH_REPO"
+
+          RERUN_OUTPUT=$(gh run rerun $RUN_ID --failed --repo $GH_REPO 2>&1)
+          RERUN_EXIT_CODE=$?
+
+          if [ $RERUN_EXIT_CODE -eq 0 ]; then
+            echo "::notice::✅ Successfully triggered rerun of failed jobs"
+            echo "::notice::Run ID: $RUN_ID"
+            echo "::notice::Only failed and cancelled jobs will be rerun"
+            echo "::notice::TestDino will optimize the rerun to only execute failed tests"
+            echo "$RERUN_OUTPUT"
+          else
+            echo "::error::❌ Failed to trigger rerun (exit code: $RERUN_EXIT_CODE)"
+            echo "::error::Error output:"
+            echo "$RERUN_OUTPUT"
+
+            # Provide helpful debugging information
+            echo "::error::Possible issues:"
+            echo "::error::1. Workflow may already be running a rerun"
+            echo "::error::2. Insufficient permissions (needs 'actions: write')"
+            echo "::error::3. Workflow run may be too old or deleted"
+            echo "::error::4. GitHub API rate limit reached"
+
+            exit 1
+          fi
+
+          echo "::endgroup::"

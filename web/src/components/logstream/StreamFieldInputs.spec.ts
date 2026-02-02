@@ -22,10 +22,20 @@ import { createStore } from 'vuex';
 
 const i18n = createI18n({
   locale: 'en',
+  legacy: false,
   messages: {
     en: {
       alert_templates: {
         edit: 'Edit'
+      },
+      logStream: {
+        fields: 'Fields',
+        addField: 'Add Field',
+        fieldName: 'Field Name',
+        fieldRequired: 'Field is required!',
+        indexType: 'Index Type',
+        dataType: 'Data Type',
+        dataTypeRequired: 'Data Type is required!'
       }
     }
   }
@@ -162,7 +172,7 @@ describe('StreamFieldInputs', () => {
         fields: mockFields,
         visibleInputs: { name: true, data_type: true, index_type: false }
       });
-      const indexTypeSelects = wrapper.findAll('.stream-schema-index-select');
+      const indexTypeSelects = wrapper.findAll('[data-test="add-stream-field-type-select-input"]');
       expect(indexTypeSelects.filter(el => el.attributes('multiple') !== undefined)).toHaveLength(0);
     });
 
@@ -415,10 +425,10 @@ describe('StreamFieldInputs', () => {
 
     it('should show data type validation rule', async () => {
       await wrapper.setProps({ fields: mockFields });
-      const dataTypeSelects = wrapper.findAll('.stream-schema-index-select');
+      const dataTypeSelects = wrapper.findAll('[data-test="add-stream-field-type-select-input"]');
       expect(dataTypeSelects.length).toBeGreaterThan(0);
       // Validation rules are internal to QSelect component
-      expect(wrapper.html()).toContain('stream-schema-index-select');
+      expect(wrapper.html()).toContain('add-stream-field-type-select-input');
     });
   });
 

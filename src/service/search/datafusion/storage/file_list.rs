@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use chrono::{TimeZone, Utc};
 use config::meta::{bitvec::BitVec, stream::FileKey};
 use hashbrown::HashMap;
@@ -22,7 +24,7 @@ use parking_lot::RwLock;
 
 use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
 
-type SegmentData = HashMap<String, BitVec>;
+type SegmentData = HashMap<String, Arc<BitVec>>;
 
 static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
 static SEGMENTS: Lazy<RwLock<HashMap<String, SegmentData>>> = Lazy::new(Default::default);
@@ -35,7 +37,7 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data)
 }
 
-pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
+pub async fn set(trace_id: &str, schema_key: &str, files: Vec<FileKey>) {
     let key = format!("{trace_id}/schema={schema_key}");
     let mut values = Vec::with_capacity(files.len());
     let mut segment_data = HashMap::new();
@@ -56,8 +58,8 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
             e_tag: None,
             version: None,
         });
-        if let Some(bin_data) = file.segment_ids.as_ref() {
-            segment_data.insert(file.key.clone(), bin_data.clone());
+        if let Some(bin_data) = file.segment_ids {
+            segment_data.insert(file.key, bin_data);
         }
     }
     FILES.write().insert(key.clone(), values);
@@ -90,7 +92,7 @@ pub fn clear(trace_id: &str) {
     drop(w);
 }
 
-pub fn get_segment_ids(file_key: &str) -> Option<BitVec> {
+pub fn get_segment_ids(file_key: &str) -> Option<Arc<BitVec>> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
     let r = SEGMENTS.read();
     let data = r.get(trace_id)?;

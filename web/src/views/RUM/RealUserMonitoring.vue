@@ -15,17 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :style="{ height: 'calc(100vh - 57px)', overflow: 'hidden' }">
+  <div class="tw:h-[calc(100vh-2.5625rem)] tw:overflow-hidden tw:mt-[0.325rem]">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center"
-        style="height: calc(100vh - 190px)"
+        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
       >
         <div>
           <q-spinner-hourglass
             color="primary"
-            size="40px"
-            style="margin: 0 auto; display: block"
+            size="2.5rem"
+            class="tw:mx-auto tw:block"
           />
           <div class="text-center full-width">
             Hold on tight, we're loading RUM data.
@@ -34,15 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <AppTabs
-        :show="showTabs"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="changeTab"
-      />
+      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem] q-pt-xs">
+        <AppTabs
+          :show="showTabs"
+          :tabs="tabs"
+          class="card-container"
+          v-model:active-tab="activeTab"
+          @update:active-tab="changeTab"
+        />
+      </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
-          <keep-alive>
+          <keep-alive
+            :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'"
+          >
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -51,43 +55,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <component
-            :is="Component"
-            :isRumEnabled="isRumEnabled"
-            :isSessionReplayEnabled="isSessionReplayEnabled"
-          />
+          <div :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'">
+            <component
+              :is="Component"
+              :isRumEnabled="isRumEnabled"
+              :isSessionReplayEnabled="isSessionReplayEnabled"
+            />
+          </div>
         </template>
       </router-view>
     </template>
     <template v-else>
-      <div class="q-pa-lg enable-rum">
-        <div class="q-pb-lg">
-          <div class="text-left text-h6 text-bold q-pb-md">
-            {{ t("rum.aboutRUMTitle") }}
-          </div>
-          <div class="text-subtitle1">
-            {{ t("rum.aboutRUMMessage") }}
-          </div>
-          <div>
-            <div></div>
-          </div>
-        </div>
-        <q-btn
-          class="bg-secondary rounded text-white"
-          no-caps
-          :title="t('rum.getStartedTitle')"
-          @click="getStarted"
+      <div class="">
+        <div
+          class="card-container q-pa-lg tw:mx-[0.625rem] tw:max-w-full tw:max-h-full tw:h-[calc(100vh - 3.125rem)]"
         >
-          {{ t("rum.getStartedLabel") }}
-          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
-        </q-btn>
+          <div class="q-pb-lg">
+            <div class="text-left text-h6 text-bold q-pb-md">
+              {{ t("rum.aboutRUMTitle") }}
+            </div>
+            <div class="text-subtitle1">
+              {{ t("rum.aboutRUMMessage") }}
+            </div>
+            <div>
+              <div></div>
+            </div>
+          </div>
+          <q-btn
+            class="o2-primary-button tw:h-[36px]"
+            flat
+            no-caps
+            :title="t('rum.getStartedTitle')"
+            @click="getStarted"
+          >
+            {{ t("rum.getStartedLabel") }}
+            <q-icon name="arrow_forward" size="1.25rem"
+  class="q-ml-xs" />
+          </q-btn>
+        </div>
       </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
@@ -182,13 +194,42 @@ onMounted(async () => {
     changeTab(activeTab.value);
 });
 
+onUpdated(async () => {
+  if (routeName.value === "RUM") {
+    const routeNameMapping: { [key: string]: string } = {
+      SessionViewer: "sessions",
+      ErrorTracking: "error_tracking",
+      RumPerformance: "performance",
+      ErrorViewer: "error_tracking",
+      Sessions: "sessions",
+      rumPerformanceSummary: "performance",
+    };
+
+    if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
+      activeTab.value =
+        routeNameMapping[
+          router.currentRoute.value.name?.toString() || "placeholder"
+        ];
+    } else {
+      activeTab.value = "performance";
+    }
+
+    // This is temporary fix, as we have kept sessionViewer keep-alive as false.
+    // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
+    const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+
+    if (!ignoreRoutes.includes(routeName.value as string))
+      changeTab(activeTab.value);
+  }
+});
+
 onActivated(async () => {
   await checkIfRumEnabled();
 });
 
 watch(
   () => routeName.value,
-  () => updateTabOnRouteChange()
+  () => updateTabOnRouteChange(),
 );
 
 const updateTabOnRouteChange = () => {
@@ -252,7 +293,10 @@ const changeTab = (tab: string) => {
   if (tab === "performance") {
     router.push({
       name: "rumPerformanceSummary",
-      query: getQueryParams(performanceState.data.datetime, ""),
+      query: {
+        ...getQueryParams(performanceState.data.datetime, ""),
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
     return;
   }
@@ -262,7 +306,7 @@ const changeTab = (tab: string) => {
       name: "ErrorTracking",
       query: getQueryParams(
         performanceState.data.datetime,
-        errorTrackingState.data.editorValue
+        errorTrackingState.data.editorValue,
       ),
     });
     return;
@@ -273,7 +317,7 @@ const changeTab = (tab: string) => {
       name: "Sessions",
       query: getQueryParams(
         performanceState.data.datetime,
-        sessionState.data.editorValue
+        sessionState.data.editorValue,
       ),
     });
     return;
@@ -340,20 +384,3 @@ const getRumDataFields = () => {
   });
 };
 </script>
-
-<style scoped lang="scss">
-.rum-tabs {
-  border-bottom: 1px solid #e0e0e0;
-  .rum-tab {
-    border-bottom: 2px solid transparent;
-    width: 140px;
-  }
-  .active {
-    border-bottom: 2px solid $primary;
-  }
-}
-
-.enable-rum {
-  max-width: 1024px;
-}
-</style>

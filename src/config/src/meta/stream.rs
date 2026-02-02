@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display, str::FromStr};
+use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
@@ -27,7 +27,7 @@ use crate::{
     meta::self_reporting::usage::Stats,
     utils::{
         hash::{Sum64, gxhash},
-        json::{self, Map, Value},
+        json::{self, Value},
     },
 };
 
@@ -106,10 +106,11 @@ impl PartialEq for DataField {
     }
 }
 
-pub const ALL_STREAM_TYPES: [StreamType; 7] = [
+pub const ALL_STREAM_TYPES: [StreamType; 8] = [
     StreamType::Logs,
     StreamType::Metrics,
     StreamType::Traces,
+    StreamType::ServiceGraph,
     StreamType::EnrichmentTables,
     StreamType::Filelist,
     StreamType::Metadata,
@@ -123,6 +124,8 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    #[serde(rename = "service_graph")]
+    ServiceGraph,
     #[serde(rename = "enrichment_tables")]
     EnrichmentTables,
     #[serde(rename = "file_list")]
@@ -132,7 +135,14 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    pub fn is_basic_type(&self) -> bool {
+    pub fn support_index(&self) -> bool {
+        matches!(
+            *self,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Metadata
+        )
+    }
+
+    pub fn support_uds(&self) -> bool {
         matches!(
             *self,
             StreamType::Logs | StreamType::Metrics | StreamType::Traces
@@ -144,6 +154,7 @@ impl StreamType {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",
             StreamType::Traces => "traces",
+            StreamType::ServiceGraph => "service_graph",
             StreamType::EnrichmentTables => "enrichment_tables",
             StreamType::Filelist => "file_list",
             StreamType::Metadata => "metadata",
@@ -158,6 +169,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
+            "service_graph" => StreamType::ServiceGraph,
             "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
@@ -179,6 +191,7 @@ impl std::fmt::Display for StreamType {
             StreamType::Logs => write!(f, "logs"),
             StreamType::Metrics => write!(f, "metrics"),
             StreamType::Traces => write!(f, "traces"),
+            StreamType::ServiceGraph => write!(f, "service_graph"),
             StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
             StreamType::Filelist => write!(f, "file_list"),
             StreamType::Metadata => write!(f, "metadata"),
@@ -187,18 +200,22 @@ impl std::fmt::Display for StreamType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct StreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct RemoteStreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub destination_name: faststr::FastStr,
 }
 
@@ -248,7 +265,7 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
-    pub segment_ids: Option<BitVec>,
+    pub segment_ids: Option<Arc<BitVec>>,
 }
 
 impl FileKey {
@@ -275,7 +292,7 @@ impl FileKey {
     }
 
     pub fn with_segment_ids(&mut self, segment_ids: BitVec) {
-        self.segment_ids = Some(segment_ids);
+        self.segment_ids = Some(Arc::new(segment_ids));
     }
 }
 
@@ -324,7 +341,7 @@ pub struct FileListDeleted {
     pub flattened: bool,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub enum QueryPartitionStrategy {
     #[default]
     FileNum,
@@ -407,14 +424,17 @@ impl StreamStats {
     pub fn add_file_meta(&mut self, meta: &FileMeta) {
         self.file_num += 1;
         self.doc_num = max(0, self.doc_num + meta.records);
-        self.doc_time_min = self.doc_time_min.min(meta.min_ts);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            meta.min_ts
+        } else if meta.min_ts == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(meta.min_ts)
+        };
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
         self.storage_size += meta.original_size as f64;
         self.compressed_size += meta.compressed_size as f64;
         self.index_size += meta.index_size as f64;
-        if self.doc_time_min == 0 {
-            self.doc_time_min = meta.min_ts;
-        }
         if self.storage_size < 0.0 {
             self.storage_size = 0.0;
         }
@@ -432,16 +452,25 @@ impl StreamStats {
         self.storage_size = stats.storage_size;
         self.compressed_size = stats.compressed_size;
         self.index_size = stats.index_size;
-        self.doc_time_min = self.doc_time_min.min(stats.doc_time_min);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            stats.doc_time_min
+        } else if stats.doc_time_min == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(stats.doc_time_min)
+        };
         self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
-        if self.doc_time_min == 0 {
-            self.doc_time_min = stats.doc_time_min;
-        }
     }
 
     pub fn merge(&mut self, other: &StreamStats) {
         self.created_at = self.created_at.min(other.created_at);
-        self.doc_time_min = self.doc_time_min.min(other.doc_time_min);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            other.doc_time_min
+        } else if other.doc_time_min == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(other.doc_time_min)
+        };
         self.doc_time_max = self.doc_time_max.max(other.doc_time_max);
         self.doc_num += other.doc_num;
         self.file_num += other.file_num;
@@ -488,20 +517,22 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn sub(self, rhs: &StreamStats) -> Self::Output {
-        let mut ret = StreamStats {
+        StreamStats {
             created_at: self.created_at,
             file_num: self.file_num - rhs.file_num,
             doc_num: self.doc_num - rhs.doc_num,
-            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_min: if self.doc_time_min == 0 {
+                rhs.doc_time_min
+            } else if rhs.doc_time_min == 0 {
+                self.doc_time_min
+            } else {
+                self.doc_time_min.min(rhs.doc_time_min)
+            },
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size - rhs.storage_size,
             compressed_size: self.compressed_size - rhs.compressed_size,
             index_size: self.index_size - rhs.index_size,
-        };
-        if ret.doc_time_min == 0 {
-            ret.doc_time_min = rhs.doc_time_min;
         }
-        ret
     }
 }
 
@@ -509,20 +540,22 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn add(self, rhs: &StreamStats) -> Self::Output {
-        let mut ret = StreamStats {
+        StreamStats {
             created_at: self.created_at,
             file_num: self.file_num + rhs.file_num,
             doc_num: self.doc_num + rhs.doc_num,
-            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_min: if self.doc_time_min == 0 {
+                rhs.doc_time_min
+            } else if rhs.doc_time_min == 0 {
+                self.doc_time_min
+            } else {
+                self.doc_time_min.min(rhs.doc_time_min)
+            },
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size + rhs.storage_size,
             compressed_size: self.compressed_size + rhs.compressed_size,
             index_size: self.index_size + rhs.index_size,
-        };
-        if ret.doc_time_min == 0 {
-            ret.doc_time_min = rhs.doc_time_min;
         }
-        ret
     }
 }
 
@@ -627,7 +660,7 @@ pub struct UpdateSettingsWrapper<D> {
     pub remove: Vec<D>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, ToSchema)]
 pub struct PatternAssociation {
     pub field: String,
     pub pattern_name: String,
@@ -682,6 +715,8 @@ pub struct UpdateStreamSettings {
     pub pattern_associations: UpdateSettingsWrapper<PatternAssociation>,
     #[serde(default)]
     pub enable_distinct_fields: Option<bool>,
+    #[serde(default)]
+    pub enable_log_patterns_extraction: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -812,6 +847,8 @@ pub struct StreamSettings {
     pub index_all_values: bool,
     #[serde(default)]
     pub enable_distinct_fields: bool,
+    #[serde(default)]
+    pub enable_log_patterns_extraction: bool,
 }
 
 impl Default for StreamSettings {
@@ -834,6 +871,7 @@ impl Default for StreamSettings {
             index_original_data: false,
             index_all_values: false,
             enable_distinct_fields: true,
+            enable_log_patterns_extraction: false,
         }
     }
 }
@@ -866,6 +904,10 @@ impl Serialize for StreamSettings {
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
         state.serialize_field("enable_distinct_fields", &self.enable_distinct_fields)?;
+        state.serialize_field(
+            "enable_log_patterns_extraction",
+            &self.enable_log_patterns_extraction,
+        )?;
 
         if !self.defined_schema_fields.is_empty() {
             let mut fields = self.defined_schema_fields.clone();
@@ -966,16 +1008,16 @@ impl From<&str> for StreamSettings {
             defined_schema_fields = fields;
         }
 
-        let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
+        let flatten_level = settings.get("flatten_level").and_then(Value::as_i64);
 
         let store_original_data = settings
             .get("store_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let approx_partition = settings
             .get("approx_partition")
-            .and_then(|v| v.as_bool())
+            .and_then(Value::as_bool)
             .unwrap_or(
                 get_config()
                     .common
@@ -993,7 +1035,7 @@ impl From<&str> for StreamSettings {
 
         let index_updated_at = settings
             .get("index_updated_at")
-            .and_then(|v| v.as_i64())
+            .and_then(Value::as_i64)
             .unwrap_or_default();
 
         let mut extended_retention_days = vec![];
@@ -1004,26 +1046,30 @@ impl From<&str> for StreamSettings {
             for item in values {
                 let start = item
                     .get("start")
-                    .and_then(|v| v.as_i64())
+                    .and_then(Value::as_i64)
                     .unwrap_or_default();
-                let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
+                let end = item.get("end").and_then(Value::as_i64).unwrap_or_default();
                 extended_retention_days.push(TimeRange::new(start, end));
             }
         }
 
         let index_original_data = settings
             .get("index_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let index_all_values = settings
             .get("index_all_values")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         let enable_distinct_fields = settings
             .get("enable_distinct_fields")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
+        let enable_log_patterns_extraction = settings
+            .get("enable_log_patterns_extraction")
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         Self {
             partition_time_level,
             partition_keys,
@@ -1042,6 +1088,7 @@ impl From<&str> for StreamSettings {
             index_original_data,
             index_all_values,
             enable_distinct_fields,
+            enable_log_patterns_extraction,
         }
     }
 }
@@ -1133,132 +1180,40 @@ pub struct PartitioningDetails {
     pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
-// Code Duplicated from alerts
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct RoutingCondition {
-    pub column: String,
-    pub operator: Operator,
-    #[schema(value_type = Object)]
-    pub value: Value,
-    #[serde(default)]
-    pub ignore_case: bool,
-}
-// Code Duplicated from alerts
-impl RoutingCondition {
-    pub fn evaluate(&self, row: &Map<String, Value>) -> bool {
-        let val = match row.get(&self.column) {
-            Some(val) => val,
-            None => {
-                // field not found -> dropped
-                return false;
-            }
-        };
-        match val {
-            Value::String(v) => {
-                let val = v.as_str();
-                let con_val = self.value.as_str().unwrap_or_default().trim_matches('"'); // "" is interpreted as empty string
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    Operator::Contains => val.contains(con_val),
-                    Operator::NotContains => !val.contains(con_val),
-                }
-            }
-            Value::Number(_) => {
-                let val = val.as_f64().unwrap_or_default();
-                let con_val = if self.value.is_number() {
-                    self.value.as_f64().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    _ => false,
-                }
-            }
-            Value::Bool(v) => {
-                let val = v.to_owned();
-                let con_val = if self.value.is_boolean() {
-                    self.value.as_bool().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    _ => false,
-                }
-            }
-            Value::Null => {
-                matches!(self.operator, Operator::EqualTo)
-                    && matches!(&self.value, Value::String(v) if v == "null")
-            }
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub enum Operator {
-    #[serde(rename = "=")]
-    EqualTo,
-    #[serde(rename = "!=")]
-    NotEqualTo,
-    #[serde(rename = ">")]
-    GreaterThan,
-    #[serde(rename = ">=")]
-    GreaterThanEquals,
-    #[serde(rename = "<")]
-    LessThan,
-    #[serde(rename = "<=")]
-    LessThanEquals,
-    Contains,
-    NotContains,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self::EqualTo
-    }
-}
-
-impl std::fmt::Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Operator::EqualTo => write!(f, "="),
-            Operator::NotEqualTo => write!(f, "!="),
-            Operator::GreaterThan => write!(f, ">"),
-            Operator::GreaterThanEquals => write!(f, ">="),
-            Operator::LessThan => write!(f, "<"),
-            Operator::LessThanEquals => write!(f, "<="),
-            Operator::Contains => write!(f, "contains"),
-            Operator::NotContains => write!(f, "not contains"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EnrichmentTableMetaStreamStats {
     pub start_time: i64,
     pub end_time: i64,
     pub size: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub enum FileListBookKeepMode {
+    History,
+    #[default]
+    Deleted,
+    None,
+}
+
+impl std::fmt::Display for FileListBookKeepMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileListBookKeepMode::History => write!(f, "history"),
+            FileListBookKeepMode::Deleted => write!(f, "deleted"),
+            FileListBookKeepMode::None => write!(f, "none"),
+        }
+    }
+}
+
+impl From<&str> for FileListBookKeepMode {
+    fn from(s: &str) -> Self {
+        match s {
+            "history" => FileListBookKeepMode::History,
+            "deleted" => FileListBookKeepMode::Deleted,
+            "none" => FileListBookKeepMode::None,
+            _ => FileListBookKeepMode::default(),
+        }
+    }
 }
 
 #[cfg(test)]

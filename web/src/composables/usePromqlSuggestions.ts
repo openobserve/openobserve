@@ -2,7 +2,7 @@ import searchService from "@/services/search";
 import { nextTick, ref } from "vue";
 import { useStore } from "vuex";
 
-const usePromlqSuggestions = () => {
+const usePromqlSuggestions = () => {
   const autoCompleteData = ref({
     query: "",
     text: "",
@@ -292,4 +292,4 @@ const usePromlqSuggestions = () => {
   };
 };
 
-export default usePromlqSuggestions;
+export default usePromqlSuggestions;

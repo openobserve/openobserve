@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::remove_file, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use arrow_schema::Schema;
 use bytes::Bytes;
@@ -26,8 +26,8 @@ use config::{
     },
     metrics,
     utils::{
-        async_file::get_file_meta,
-        file::{get_file_size, scan_files_with_channel},
+        async_file::{get_file_meta, get_file_size},
+        file::scan_files_with_channel,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
@@ -44,7 +44,10 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    fs::remove_file,
+    sync::{Mutex, RwLock},
+};
 
 use crate::{
     common::infra::wal,
@@ -90,14 +93,39 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // prepare files
+    #[cfg(feature = "enterprise")]
+    let mut drain_backoff_ms = 50u64; // Start with 50ms backoff
     loop {
-        if cluster::is_offline() {
-            break;
+        #[cfg(feature = "enterprise")]
+        // Check if we're in draining mode - if so, skip sleep and process immediately
+        let is_draining = o2_enterprise::enterprise::drain::is_draining();
+
+        #[cfg(feature = "enterprise")]
+        if !is_draining {
+            // Normal operation: sleep between scans
+            if cluster::is_offline() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                get_config().limit.file_push_interval,
+            ))
+            .await;
+        } else {
+            log::info!("[INGESTER:JOB] Draining mode active, processing files immediately");
         }
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().limit.file_push_interval,
-        ))
-        .await;
+
+        #[cfg(not(feature = "enterprise"))]
+        {
+            // Normal operation: sleep between scans
+            if cluster::is_offline() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                get_config().limit.file_push_interval,
+            ))
+            .await;
+        }
+
         // check pending delete files
         if let Err(e) = scan_pending_delete_files().await {
             log::error!("[INGESTER:JOB] Error scan pending delete files: {e}");
@@ -105,6 +133,29 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // scan wal files
         if let Err(e) = scan_wal_files(tx.clone()).await {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {e}");
+        }
+
+        #[cfg(feature = "enterprise")]
+        {
+            // If draining and no more files to process, we can exit
+            if is_draining {
+                // Check if there are any remaining files to process
+                let processing_count = PROCESSING_FILES.read().await.len();
+                let has_pending_files =
+                    o2_enterprise::enterprise::drain::parquet::check_has_pending_files(
+                        processing_count,
+                    )
+                    .await;
+                if !has_pending_files {
+                    log::info!("[INGESTER:JOB] Draining complete, all files uploaded to S3");
+                    break;
+                } else {
+                    // Backoff to avoid tight loop while draining
+                    tokio::time::sleep(tokio::time::Duration::from_millis(drain_backoff_ms)).await;
+                    // Exponential backoff up to 1 second
+                    drain_backoff_ms = (drain_backoff_ms * 2).min(1000);
+                }
+            }
         }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
@@ -125,13 +176,13 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         }
         log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
         let file = wal_dir.join(&file_key);
-        let Ok(file_size) = get_file_size(&file) else {
+        let Ok(file_size) = get_file_size(&file).await else {
             continue;
         };
         // delete metadata from cache
         WAL_PARQUET_METADATA.write().await.remove(&file_key);
         // delete file from disk
-        if let Err(e) = remove_file(&file) {
+        if let Err(e) = remove_file(&file).await {
             log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
         }
         // need release the file
@@ -143,7 +194,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         // deleted successfully then update metrics
         let (org_id, stream_type, ..) = split_perfix(&file_key);
         metrics::INGEST_WAL_USED_BYTES
-            .with_label_values(&[&org_id, stream_type.as_str()])
+            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
             .sub(file_size as i64);
     }
 
@@ -263,7 +314,7 @@ async fn prepare_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file_key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file)) {
+            if let Err(e) = remove_file(wal_dir.join(&file)).await {
                 log::error!("[INGESTER:JOB] Failed to remove parquet file from disk: {file}, {e}");
             }
             continue;
@@ -315,7 +366,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -361,7 +412,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -403,7 +454,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+                if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                         file.key,
@@ -546,7 +597,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                match remove_file(wal_dir.join(&file.key)) {
+                match remove_file(wal_dir.join(&file.key)).await {
                     Err(e) => {
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
@@ -573,7 +624,7 @@ async fn move_files(
                         PROCESSING_FILES.write().await.remove(&file.key);
                         // deleted successfully then update metrics
                         metrics::INGEST_WAL_USED_BYTES
-                            .with_label_values(&[&org_id, stream_type.as_str()])
+                            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
                             .sub(file.meta.compressed_size);
                     }
                 }
@@ -584,7 +635,7 @@ async fn move_files(
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
-                .with_label_values(&[&org_id, stream_type.as_str()])
+                .with_label_values(&[org_id.as_str(), stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
         }
 
@@ -683,6 +734,9 @@ async fn merge_files(
 
     // get latest version of schema
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
+    #[cfg(feature = "enterprise")]
+    let log_patterns_enabled =
+        infra::schema::get_stream_setting_log_patterns_enabled(&stream_settings);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -699,6 +753,7 @@ async fn merge_files(
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
+            stream_type,
             &latest_schema,
             &defined_schema_fields,
             need_original,
@@ -732,11 +787,9 @@ async fn merge_files(
         work_group: None,
         target_partitions: 0,
     };
-    let rules = hashbrown::HashMap::new();
     let table = TableBuilder::new()
-        .rules(rules)
         .sorted_by_time(true)
-        .build(session, &new_file_list, schema.clone())
+        .build(session, new_file_list, schema.clone())
         .await?;
     let tables = vec![table];
 
@@ -794,6 +847,37 @@ async fn merge_files(
         start.elapsed().as_millis(),
     );
 
+    // Enterprise: Extract patterns from merged parquet (ingester nodes only)
+    #[cfg(feature = "enterprise")]
+    {
+        use config::cluster::LOCAL_NODE;
+        if LOCAL_NODE.is_ingester() && stream_type == StreamType::Logs && log_patterns_enabled {
+            let buf_clone = buf.clone();
+            let org_id_clone = org_id.clone();
+            let stream_name_clone = stream_name.clone();
+            let fts_fields = full_text_search_fields.clone();
+
+            // Spawn pattern extraction task (don't block file movement)
+            tokio::spawn(async move {
+                if let Err(e) = extract_patterns_from_parquet(
+                    &org_id_clone,
+                    &stream_name_clone,
+                    &buf_clone,
+                    &fts_fields,
+                )
+                .await
+                {
+                    log::error!(
+                        "[PatternExtraction] Failed to extract patterns for {}/{}: {}",
+                        org_id_clone,
+                        stream_name_clone,
+                        e
+                    );
+                }
+            });
+        }
+    }
+
     // upload file
     let buf = Bytes::from(buf);
     if cfg.cache_latest_files.enabled
@@ -807,8 +891,63 @@ async fn merge_files(
     let account = storage::get_account(&new_file_key).unwrap_or_default();
     storage::put(&account, &new_file_key, buf.clone()).await?;
 
-    // skip index generation if not enabled or not basic type
-    if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
+    // Enterprise: Extract service metadata during data processing
+    // This runs BEFORE indexing checks to ensure all stream types are discovered
+    #[cfg(feature = "enterprise")]
+    {
+        use config::cluster::LOCAL_NODE;
+        let service_streams_config =
+            &o2_enterprise::enterprise::common::config::get_config().service_streams;
+
+        // Only process in ingester mode (if mode is "compactor", this will be handled during merge)
+        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
+        if LOCAL_NODE.is_ingester()
+            && service_streams_config.enabled
+            && service_streams_config.is_ingester_mode()
+            && org_id != config::META_ORG_ID
+            && (stream_type == StreamType::Logs
+                || stream_type == StreamType::Metrics
+                || stream_type == StreamType::Traces)
+        {
+            // Check if we should process this file (per-stream-type sampling)
+            let should_process =
+                o2_enterprise::enterprise::service_streams::sampler::should_process_file(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    &new_file_key,
+                );
+
+            if should_process {
+                let buf_clone = buf.clone();
+                let org_id_clone = org_id.clone();
+                let stream_name_clone = stream_name.clone();
+
+                // Queue services for batched processing (non-blocking)
+                tokio::spawn(async move {
+                    if let Err(e) = queue_services_from_parquet(
+                        &org_id_clone,
+                        stream_type,
+                        &stream_name_clone,
+                        &buf_clone,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[ServiceStreams] Failed to queue services for {}/{}/{}: {}",
+                            org_id_clone,
+                            stream_type,
+                            stream_name_clone,
+                            e
+                        );
+                    }
+                });
+            }
+        }
+    }
+
+    // skip index generation if not enabled or not supported by stream type
+    if !cfg.common.inverted_index_enabled || !stream_type.support_index() {
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
@@ -828,13 +967,13 @@ async fn merge_files(
     }
 
     // generate tantivy inverted index and write to storage
-    let (schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+    let (_parquet_schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
         &full_text_search_fields,
         &index_fields,
-        schema,
+        latest_schema.clone(), // Use stream schema to include all configured fields
         reader,
     )
     .await
@@ -855,4 +994,345 @@ fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
     let stream_name = columns[3].to_string();
     let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
     (org_id, stream_type, stream_name, prefix_date)
+}
+
+#[cfg(feature = "enterprise")]
+async fn extract_patterns_from_parquet(
+    org_id: &str,
+    stream_name: &str,
+    parquet_data: &[u8],
+    fts_fields: &[String],
+) -> Result<(), anyhow::Error> {
+    use config::utils::json;
+
+    let start = std::time::Instant::now();
+
+    // Read parquet data and extract log messages
+    let parquet_bytes = Bytes::from(parquet_data.to_vec());
+    let (_schema, mut reader) = get_recordbatch_reader_from_bytes(&parquet_bytes).await?;
+    let mut log_messages = Vec::new();
+    let read_start = std::time::Instant::now();
+
+    // ParquetRecordBatchStream is a Stream, use .next().await
+    use futures::StreamExt;
+
+    use crate::common::meta::ingestion::{IngestUser, SystemJobType};
+    while let Some(batch_result) = reader.next().await {
+        let batch = batch_result?;
+
+        // Try to find FTS fields in the batch
+        for fts_field in fts_fields {
+            if let Some(column) = batch.column_by_name(fts_field) {
+                // Extract string values from the column
+                use arrow::array::Array;
+                if let Some(string_array) =
+                    column.as_any().downcast_ref::<arrow::array::StringArray>()
+                {
+                    for i in 0..string_array.len() {
+                        if !string_array.is_null(i) {
+                            log_messages.push((
+                                0i64, // timestamp not needed for pattern extraction
+                                {
+                                    let mut map = json::Map::new();
+                                    map.insert(
+                                        fts_field.clone(),
+                                        json::Value::String(string_array.value(i).to_string()),
+                                    );
+                                    map
+                                },
+                            ));
+                        }
+                    }
+                    break; // Found FTS field, no need to check others
+                }
+            }
+        }
+    }
+
+    let read_duration = read_start.elapsed();
+
+    if log_messages.is_empty() {
+        log::debug!(
+            "[PatternExtraction] No log messages found in parquet for {}/{}",
+            org_id,
+            stream_name
+        );
+        return Ok(());
+    }
+
+    log::info!(
+        "[PatternExtraction] Read {} log messages from parquet in {:?} for {}/{}",
+        log_messages.len(),
+        read_duration,
+        org_id,
+        stream_name
+    );
+
+    // Record parquet read time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "read_parquet"])
+        .observe(read_duration.as_secs_f64());
+
+    // Extract patterns directly using XDrain (no in-memory accumulation needed)
+    let extraction_start = std::time::Instant::now();
+    let patterns = o2_enterprise::enterprise::log_patterns::extract_patterns_from_logs(
+        &log_messages,
+        fts_fields,
+    )
+    .map_err(|e| anyhow::anyhow!("Pattern extraction failed: {}", e))?;
+    let extraction_duration = extraction_start.elapsed();
+
+    if patterns.is_empty() {
+        log::debug!(
+            "[PatternExtraction] No patterns found for {}/{}",
+            org_id,
+            stream_name
+        );
+        return Ok(());
+    }
+
+    log::info!(
+        "[PatternExtraction] Extracted {} patterns from {} logs in {:?} for {}/{}",
+        patterns.len(),
+        log_messages.len(),
+        extraction_duration,
+        org_id,
+        stream_name
+    );
+
+    // Record pattern extraction time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "extraction"])
+        .observe(extraction_duration.as_secs_f64());
+
+    // Ingest patterns immediately
+    let ingest_start = std::time::Instant::now();
+    crate::service::logs::patterns::ingest_patterns(
+        org_id,
+        stream_name,
+        patterns,
+        IngestUser::SystemJob(SystemJobType::LogPatterns),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
+    let ingest_duration = ingest_start.elapsed();
+
+    let total_duration = start.elapsed();
+
+    log::info!(
+        "[PatternExtraction] Completed in {:?} (read: {:?}, extract: {:?}, ingest: {:?}) for {}/{}",
+        total_duration,
+        read_duration,
+        extraction_duration,
+        ingest_duration,
+        org_id,
+        stream_name
+    );
+
+    // Record ingestion time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "ingestion"])
+        .observe(ingest_duration.as_secs_f64());
+
+    // Record total pattern extraction time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "total"])
+        .observe(total_duration.as_secs_f64());
+
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn queue_services_from_parquet(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    parquet_data: &[u8],
+) -> Result<(), anyhow::Error> {
+    use std::collections::HashMap;
+
+    use tokio::sync::mpsc;
+
+    let start = std::time::Instant::now();
+
+    // Get semantic field groups and FQN priority upfront (before spawning tasks)
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+    let fqn_priority =
+        crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
+
+    // Get config values for channel capacity
+    let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
+    let channel_capacity = ss_config.channel_capacity;
+
+    // Create bounded channel for backpressure - drops records if consumer can't keep up
+    // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
+    let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(channel_capacity);
+
+    // Clone data needed for producer task
+    let parquet_bytes = Bytes::copy_from_slice(parquet_data);
+
+    // Spawn producer task to read parquet and send Arrow batches through channel
+    // ARROW-NATIVE: No HashMap conversion! Sends RecordBatch directly.
+    let producer_handle = tokio::spawn(async move {
+        let mut records_sent = 0u64;
+        let mut records_dropped = 0u64;
+        let mut batches_sent = 0u64;
+
+        let reader_result = get_recordbatch_reader_from_bytes(&parquet_bytes).await;
+        let (_schema, mut reader) = match reader_result {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("[ServiceStreams] Failed to read parquet: {}", e);
+                return (records_sent, records_dropped);
+            }
+        };
+
+        use futures::StreamExt;
+        while let Some(batch_result) = reader.next().await {
+            let batch = match batch_result {
+                Ok(b) => b,
+                Err(e) => {
+                    log::error!("[ServiceStreams] Error reading batch: {}", e);
+                    continue;
+                }
+            };
+
+            let num_rows = batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // Send Arrow batch directly (no conversion!)
+            match tx.try_send(batch) {
+                Ok(()) => {
+                    batches_sent += 1;
+                    records_sent += num_rows as u64;
+                }
+                Err(mpsc::error::TrySendError::Full(dropped_batch)) => {
+                    let dropped = dropped_batch.num_rows() as u64;
+                    records_dropped += dropped;
+                    log::debug!("[ServiceStreams] Channel full, dropped {} records", dropped);
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    // Consumer closed, stop producing
+                    log::debug!(
+                        "[ServiceStreams] Consumer closed, stopping producer (sent {} batches, {} records)",
+                        batches_sent,
+                        records_sent
+                    );
+                    return (records_sent, records_dropped);
+                }
+            }
+        }
+
+        log::debug!(
+            "[ServiceStreams] Producer finished: sent {} batches ({} records), dropped {} records",
+            batches_sent,
+            records_sent,
+            records_dropped
+        );
+
+        (records_sent, records_dropped)
+    });
+
+    // Consumer: Process batches as they arrive
+    let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
+        org_id.to_string(),
+        semantic_groups,
+        fqn_priority,
+    );
+
+    let mut all_services: HashMap<
+        String,
+        o2_enterprise::enterprise::service_streams::meta::ServiceMetadata,
+    > = HashMap::new();
+    let mut total_records_processed = 0u64;
+
+    // Process Arrow batches from channel
+    // ARROW-NATIVE: Process RecordBatch directly (no HashMap conversion!)
+    while let Some(batch) = rx.recv().await {
+        let batch_len = batch.num_rows();
+
+        // Process Arrow batch using Arrow-native method
+        let services = processor
+            .process_arrow_batch(&batch, stream_type, stream_name)
+            .await;
+
+        // Merge discovered services
+        for (key, service) in services {
+            all_services
+                .entry(key)
+                .and_modify(|existing| existing.merge(&service))
+                .or_insert(service);
+        }
+
+        total_records_processed += batch_len as u64;
+    }
+
+    // Wait for producer to finish and get stats
+    let (records_sent, records_dropped) = producer_handle.await.unwrap_or((0, 0));
+
+    if records_dropped > 0 {
+        log::warn!(
+            "[ServiceStreams] Dropped {} records due to backpressure for {}/{}",
+            records_dropped,
+            org_id,
+            stream_name
+        );
+        metrics::SERVICE_STREAMS_RECORDS_DROPPED
+            .with_label_values(&[org_id, &stream_type.to_string()])
+            .inc_by(records_dropped);
+    }
+
+    // Log blocked dimensions
+    let blocked = processor.get_blocked_dimensions().await;
+    if !blocked.is_empty() {
+        log::warn!(
+            "[ServiceStreams] Blocked high-cardinality dimensions for {}/{}: {:?}",
+            org_id,
+            stream_name,
+            blocked
+        );
+        for (dimension, _count) in &blocked {
+            metrics::SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED
+                .with_label_values(&[org_id, dimension])
+                .inc();
+        }
+    }
+
+    if all_services.is_empty() {
+        return Ok(());
+    }
+
+    // Record metrics
+    let service_count = all_services.len() as u64;
+    metrics::SERVICE_STREAMS_SERVICES_DISCOVERED
+        .with_label_values(&[org_id, &stream_type.to_string()])
+        .inc_by(service_count);
+
+    let duration = start.elapsed();
+    metrics::SERVICE_STREAMS_PROCESSING_TIME
+        .with_label_values(&[org_id])
+        .observe(duration.as_secs_f64());
+
+    log::debug!(
+        "[ServiceStreams] Processed {} records, discovered {} services in {:?} for {}/{} (sent: {}, dropped: {})",
+        total_records_processed,
+        service_count,
+        duration,
+        org_id,
+        stream_name,
+        records_sent,
+        records_dropped
+    );
+
+    // Queue services for batched processing
+    o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
+        org_id.to_string(),
+        all_services,
+    )
+    .await;
+
+    Ok(())
 }

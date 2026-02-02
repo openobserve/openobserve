@@ -1,8 +1,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 const logsdata = require('../../../test-data/logs_data.json');
-const testLogger = require('../utils/test-logger.js');
 
 // Utility Functions
 
@@ -33,7 +33,7 @@ async function ingestTestData(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 test.describe("Logs Histogram testcases", () => {
@@ -60,15 +60,24 @@ test.describe("Logs Histogram testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await pm.logsPage.selectStream("e2e_automate"); 
-    
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    await pm.logsPage.selectStream("e2e_automate");
+    await page.waitForTimeout(1000);
+
+    // Wait for initial search to complete
+    const orgName = process.env.ORGNAME || 'default';
+    const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await allsearch;
+    await page.waitForTimeout(1000);
+
     testLogger.info('Histogram test setup completed');
   });
 
   test.afterEach(async ({ page }) => {
     try {
-      await pm.commonActions.flipStreaming();
+      // await pm.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
     } catch (error) {
       testLogger.warn('Streaming flip failed', { error: error.message });
@@ -79,7 +88,7 @@ test.describe("Logs Histogram testcases", () => {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing error handling and no results found with histogram');
-    
+
     // Check if histogram is off and toggle it on if needed
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
@@ -87,26 +96,33 @@ test.describe("Logs Histogram testcases", () => {
     }
 
     // Type invalid query and verify error
-    await pm.logsPage.typeQuery("match_all('invalid')");
+    await pm.logsPage.clearAndFillQueryEditor("match_all('invalid')");
     await pm.logsPage.setDateTimeFilter();
-    // Strategic 500ms wait for query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.waitForTimeout(1000);
+
+    // Wait for search response before checking for error
+    const orgName = process.env.ORGNAME || 'default';
+    const searchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    // Strategic 500ms wait for refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await searchResponse;
+    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickErrorMessage();
     await pm.logsPage.clickResetFilters();
 
     // Type SQL query and verify no results
-    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    // Strategic 500ms wait for SQL query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clearAndFillQueryEditor("SELECT count(*) FROM 'e2e_automate' where code > 500");
+    await pm.logsPage.waitForTimeout(1000);
+
+    // Wait for search response before checking for no data
+    const sqlSearchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    // Strategic 500ms wait for SQL refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await sqlSearchResponse;
+    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickNoDataFound();
     await pm.logsPage.clickResultDetail();
-    
+
     testLogger.info('Error handling and no results verification completed');
   });
 

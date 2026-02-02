@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,18 +22,18 @@ use std::{
         Arc,
         atomic::{AtomicU16, Ordering},
     },
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
-use config::{get_config, utils::size::bytes_to_human_readable};
-use log::LevelFilter;
-#[cfg(feature = "enterprise")]
-use openobserve::handler::http::{
-    auth::script_server::validator as script_server_validator, request::script_server,
+use config::{
+    META_ORG_ID, get_config,
+    meta::triggers::{Trigger, TriggerModule, TriggerStatus},
+    utils::size::bytes_to_human_readable,
 };
+use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
@@ -59,12 +59,17 @@ use openobserve::{
     },
     job, migration, router,
     service::{
-        cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
-        self_reporting, tls::http_tls_config,
+        cluster_info::ClusterInfoService,
+        db::{self, scheduler::TriggerModule::QueryRecommendations},
+        metadata,
+        node::NodeService,
+        search::SEARCH_SERVER,
+        self_reporting,
+        tls::http_tls_config,
     },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
@@ -91,7 +96,14 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 #[cfg(feature = "enterprise")]
-use {config::Config, o2_enterprise::enterprise::common::config::O2Config};
+use {
+    config::Config,
+    o2_enterprise::enterprise::{ai, common::config::O2Config},
+    openobserve::handler::http::{
+        auth::script_server::validator as script_server_validator, request::script_server,
+    },
+    utoipa::OpenApi,
+};
 
 #[cfg(all(feature = "mimalloc", not(feature = "jemalloc")))]
 #[global_allocator]
@@ -105,6 +117,16 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // CLI provides the path to the config file (if any)
+    // In case a custom path is provided, the file will be read first
+    // and config variables will be loaded.
+    // This has to happen as the foremost step as any call to
+    // get_config without this would be loaded from local `.env`
+    // or environment itself.
+    if cli::cli().await? {
+        return Ok(());
+    }
+
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
@@ -159,11 +181,6 @@ async fn main() -> Result<(), anyhow::Error> {
         None
     };
 
-    // cli mode
-    if cli::cli().await? {
-        return Ok(());
-    }
-
     let cfg = get_config();
 
     // setup logs
@@ -183,10 +200,28 @@ async fn main() -> Result<(), anyhow::Error> {
         })?;
         None
     } else if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        log::info!("OpenTelemetry tracing enabled - initializing tracer provider");
         tracer_provider = Some(enable_tracing()?);
+        log::info!("Tracer provider initialized successfully");
         None
     } else {
-        Some(setup_logs())
+        // Check if AI tracing is enabled independently
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+            let o2_cfg = get_o2_config();
+
+            if o2_cfg.ai.traces_enabled {
+                tracer_provider = Some(enable_tracing()?);
+                None
+            } else {
+                Some(setup_logs())
+            }
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            Some(setup_logs())
+        }
     };
 
     log::info!("Starting OpenObserve {}", config::VERSION);
@@ -203,6 +238,13 @@ async fn main() -> Result<(), anyhow::Error> {
         bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
         bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
+
+    // install ring as the default crypto provider if TLS is enabled
+    if cfg.http.tls_enabled || cfg.grpc.tls_enabled {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
+    }
 
     // init script server
     #[cfg(feature = "enterprise")]
@@ -277,24 +319,19 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("job init failed: {e}");
             }
 
-            // init meter provider
-            let Ok(meter_provider) = job::metrics::init_meter_provider().await else {
-                job_init_tx.send(false).ok();
-                panic!("meter provider init failed");
-            };
+            // Register job runtime for metrics collection
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
+            }
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
 
-            // shutdown meter provider
-            let _ = meter_provider.shutdown();
-
             // flush distinct values
             _ = metadata::close().await;
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
-            common_infra::wal::flush_all_to_disk().await;
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
             // flush db
@@ -327,6 +364,13 @@ async fn main() -> Result<(), anyhow::Error> {
             .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
             .build()
             .expect("grpc runtime init failed");
+
+        // Register gRPC runtime for metrics collection
+        openobserve::service::runtime_metrics::register_runtime(
+            "grpc".to_string(),
+            rt.handle().clone(),
+        );
+
         let _guard = rt.enter();
         rt.block_on(async move {
             let ret = if config::cluster::LOCAL_NODE.is_router() {
@@ -344,8 +388,16 @@ async fn main() -> Result<(), anyhow::Error> {
     // wait for gRPC init
     grpc_init_rx.await.ok();
 
+    // Register main HTTP runtime for metrics collection
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        openobserve::service::runtime_metrics::register_runtime("http".to_string(), handle);
+    }
+
+    // Start runtime metrics collector
+    openobserve::service::runtime_metrics::start_metrics_collector().await;
+
     // let node online
-    let _ = cluster::set_online(false).await;
+    let _ = cluster::set_online().await;
 
     // initialize the jobs are deferred until the gRPC service starts
     job::init_deferred()
@@ -381,6 +433,48 @@ async fn main() -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("set node schedulable failed"));
     }
 
+    // Check for query recommendations trigger and create one
+    match db::scheduler::list(Some(QueryRecommendations)).await {
+        Ok(list) if list.len() == 1 => {}
+        _ => {
+            let _ = db::scheduler::delete(
+                META_ORG_ID,
+                TriggerModule::QueryRecommendations,
+                "QueryRecommendations",
+            )
+            .await
+            .inspect_err(|e| {
+                log::error!("Error while purging recommendations triggers. e={:?}", e);
+            });
+            let now = SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_micros() as i64;
+            // Get the next minute on the clock (e.g., if now is 10:37:25am, next_minute is
+            // 10:38:00am)
+            let minute_micros = 60 * 1_000_000; // 60 seconds in microseconds
+            let next_minute = (now / minute_micros + 1) * minute_micros;
+            let trigger = Trigger {
+                org: META_ORG_ID.to_string(),
+                module: TriggerModule::QueryRecommendations,
+                module_key: "QueryRecommendations".to_string(),
+                next_run_at: next_minute,
+                status: TriggerStatus::Waiting,
+                start_time: Some(next_minute),
+                end_time: None,
+                retries: 3,
+                ..Default::default()
+            };
+            let _ = db::scheduler::push(trigger).await.inspect_err(|e| {
+                log::error!(
+                    "Failed to setup the initial trigger for recommendations. e={:?}",
+                    e
+                )
+            });
+            log::info!("[QUERY_RECOMMENDATIONS] Setup the initial trigger.");
+        }
+    };
+
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         if let Err(e) = init_http_server_without_tracing().await {
@@ -399,6 +493,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush usage report
     self_reporting::flush().await;
+
+    // flush service discovery
+    #[cfg(feature = "enterprise")]
+    {
+        log::info!("Flushing service discovery...");
+        if let Err(e) =
+            o2_enterprise::enterprise::service_streams::batch_processor::flush_all().await
+        {
+            log::error!("Failed to flush service discovery: {}", e);
+        }
+    }
 
     // leave the cluster
     _ = cluster::leave().await;
@@ -564,7 +669,7 @@ async fn init_common_grpc_server(
         tonic::transport::Server::builder()
     };
     let ret = builder
-        .layer(tonic::service::interceptor(check_auth))
+        .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
         .add_service(metrics_svc)
@@ -629,7 +734,7 @@ async fn init_router_grpc_server(
         tonic::transport::Server::builder()
     };
     let ret = builder
-        .layer(tonic::service::interceptor(check_auth))
+        .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)
         .add_service(traces_svc)
@@ -664,7 +769,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {
@@ -675,8 +780,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client =
-                router::http::create_http_client().expect("Failed to create http tls client");
             let factory = web::scope(&cfg.common.base_uri);
             #[cfg(feature = "enterprise")]
             let factory = factory.wrap(
@@ -685,28 +788,25 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 )),
             );
 
-            app = app
-                .service(
-                    // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                    factory
-                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
-                        .service(get_metrics)
-                        .service(router::http::config)
-                        .service(router::http::config_paths)
-                        .service(router::http::api)
-                        .service(router::http::aws)
-                        .service(router::http::gcp)
-                        .service(router::http::rum)
-                        .configure(get_basic_routes)
-                        .configure(get_proxy_routes),
-                )
-                .app_data(web::Data::new(http_client))
+            app = app.service(
+                // if `cfg.common.base_uri` is empty, scope("") still works as expected.
+                factory
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
+                    .service(get_metrics)
+                    .configure(get_config_routes)
+                    .service(router::http::config)
+                    .service(router::http::config_paths)
+                    .service(router::http::api)
+                    .service(router::http::aws)
+                    .service(router::http::gcp)
+                    .service(router::http::rum)
+                    .configure(get_basic_routes)
+                    .configure(get_proxy_routes),
+            )
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
@@ -722,8 +822,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
             .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            .wrap(middleware::Logger::new(&get_http_access_log_format()
             ))
             .wrap(RequestTracing::new())
     })
@@ -769,7 +868,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
 
@@ -782,8 +881,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client =
-                router::http::create_http_client().expect("Failed to create http tls client");
             let factory = web::scope(&cfg.common.base_uri);
             #[cfg(feature = "enterprise")]
             let factory = factory.wrap(
@@ -792,28 +889,25 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 )),
             );
 
-            app = app
-                .service(
-                    // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                    factory
-                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
-                        .service(get_metrics)
-                        .service(router::http::config)
-                        .service(router::http::config_paths)
-                        .service(router::http::api)
-                        .service(router::http::aws)
-                        .service(router::http::gcp)
-                        .service(router::http::rum)
-                        .configure(get_basic_routes)
-                        .configure(get_proxy_routes),
-                )
-                .app_data(web::Data::new(http_client))
+            app = app.service(
+                // if `cfg.common.base_uri` is empty, scope("") still works as expected.
+                factory
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
+                    .service(get_metrics)
+                    .configure(get_config_routes)
+                    .service(router::http::config)
+                    .service(router::http::config_paths)
+                    .service(router::http::api)
+                    .service(router::http::aws)
+                    .service(router::http::gcp)
+                    .service(router::http::rum)
+                    .configure(get_basic_routes)
+                    .configure(get_proxy_routes),
+            )
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
@@ -829,8 +923,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
             .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            .wrap(middleware::Logger::new(&get_http_access_log_format()
             ))
     })
     .keep_alive(if cfg.limit.http_keep_alive_disabled {
@@ -894,7 +987,7 @@ async fn graceful_shutdown(handle: ServerHandle) {
     // println!("ctrl-c received!");
 
     // offline the node
-    if let Err(e) = cluster::set_offline(true).await {
+    if let Err(e) = cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
@@ -949,65 +1042,283 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     guard
 }
 
-fn enable_tracing() -> Result<opentelemetry_sdk::trace::TracerProvider, anyhow::Error> {
+/// Custom span processor that filters spans based on their name prefix
+#[cfg(feature = "enterprise")]
+#[derive(Debug)]
+struct FilteringSpanProcessor<P> {
+    inner: P,
+    prefix_filter: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+impl<P> FilteringSpanProcessor<P> {
+    fn new(inner: P, prefix_filter: Option<String>) -> Self {
+        Self {
+            inner,
+            prefix_filter,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl<P: opentelemetry_sdk::trace::SpanProcessor> opentelemetry_sdk::trace::SpanProcessor
+    for FilteringSpanProcessor<P>
+{
+    fn on_start(&self, span: &mut opentelemetry_sdk::trace::Span, cx: &opentelemetry::Context) {
+        // Always call inner on_start - we can only filter on_end when we have the full span data
+        self.inner.on_start(span, cx);
+    }
+
+    fn on_end(&self, span: opentelemetry_sdk::trace::SpanData) {
+        // If no filter is set, pass through all spans
+        if let Some(prefix) = &self.prefix_filter {
+            let span_name = span.name.as_ref();
+            // Only process spans that match the prefix
+            if !span_name.starts_with(prefix) {
+                return;
+            }
+        }
+        self.inner.on_end(span);
+    }
+
+    fn force_flush(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
+        self.inner.force_flush()
+    }
+
+    fn shutdown(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
+        self.inner.shutdown()
+    }
+
+    fn shutdown_with_timeout(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
+        self.inner.shutdown_with_timeout(timeout)
+    }
+}
+
+fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
-    let tracer = opentelemetry_otlp::new_pipeline().tracing();
-    let tracer = if cfg.common.otel_otlp_grpc_url.is_empty() {
-        tracer.with_exporter({
-            let mut headers = HashMap::new();
-            headers.insert(
-                cfg.common.tracing_header_key.clone(),
-                cfg.common.tracing_header_value.clone(),
-            );
-            opentelemetry_otlp::new_exporter()
-                .http()
-                .with_http_client(
-                    reqwest::Client::builder()
+
+    let mut tracer_builder = opentelemetry_sdk::trace::SdkTracerProvider::builder();
+
+    // Add main OpenObserve OTLP exporter (if general tracing is enabled)
+    if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        tracer_builder = if cfg.common.otel_otlp_grpc_url.is_empty() {
+            tracer_builder.with_span_processor(
+            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                {
+                    let mut headers = HashMap::new();
+                    headers.insert(
+                        cfg.common.tracing_header_key.clone(),
+                        cfg.common.tracing_header_value.clone(),
+                    );
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_http()
+                        .with_http_client(
+                            reqwest::Client::builder()
                         .danger_accept_invalid_certs(true)
                         .timeout(Duration::from_secs(10))           // Overall request timeout
                         .connect_timeout(Duration::from_secs(5))    // Connection establishment timeout
                         .pool_idle_timeout(Duration::from_secs(60)) // How long to keep idle connections
                         .pool_max_idle_per_host(10) // How many idle connections to keep per host
                         .build()?,
+                        )
+                        .with_endpoint(&cfg.common.otel_otlp_url)
+                        .with_headers(headers)
+                        .build()?
+                },
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build(),
+        )
+        } else {
+            tracer_builder.with_span_processor(
+            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                {
+                    let mut metadata = MetadataMap::new();
+                    metadata.insert(
+                        MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
+                        MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
+                    );
+                    metadata.insert(
+                        MetadataKey::from_str(&cfg.grpc.org_header_key).unwrap(),
+                        MetadataValue::from_str(&cfg.common.tracing_grpc_header_org).unwrap(),
+                    );
+                    metadata.insert(
+                        MetadataKey::from_str(&cfg.grpc.stream_header_key).unwrap(),
+                        MetadataValue::from_str(&cfg.common.tracing_grpc_header_stream_name)
+                            .unwrap(),
+                    );
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_tonic()
+                        .with_endpoint(&cfg.common.otel_otlp_grpc_url)
+                        .with_metadata(metadata)
+                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                        .build()?
+                },
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build(),
+        )
+        };
+        log::info!("Main OpenObserve OTLP exporter configured");
+    }
+
+    // Handle AI tracing (enterprise feature)
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        let o2_cfg = get_o2_config();
+
+        // If AI tracing is enabled but general tracing is NOT enabled,
+        // we need to add OpenObserve OTLP exporter for AI traces
+        if o2_cfg.ai.traces_enabled
+            && !cfg.common.tracing_enabled
+            && !cfg.common.tracing_search_enabled
+        {
+            log::info!("AI tracing enabled independently - configuring OpenObserve OTLP exporter");
+
+            // Add OpenObserve exporter for AI traces
+            if !cfg.common.otel_otlp_url.is_empty() {
+                let mut headers = HashMap::new();
+                headers.insert(
+                    cfg.common.tracing_header_key.clone(),
+                    cfg.common.tracing_header_value.clone(),
+                );
+
+                let oo_exporter = opentelemetry_otlp::SpanExporter::builder()
+                    .with_http()
+                    .with_http_client(
+                        reqwest::Client::builder()
+                            .danger_accept_invalid_certs(true)
+                            .timeout(Duration::from_secs(10))
+                            .connect_timeout(Duration::from_secs(5))
+                            .pool_idle_timeout(Duration::from_secs(60))
+                            .pool_max_idle_per_host(10)
+                            .build()?,
+                    )
+                    .with_endpoint(&cfg.common.otel_otlp_url)
+                    .with_headers(headers)
+                    .build()?;
+
+                let oo_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                    oo_exporter,
+                    opentelemetry_sdk::runtime::Tokio,
                 )
-                .with_endpoint(&cfg.common.otel_otlp_url)
-                .with_headers(headers)
-        })
-    } else {
-        tracer.with_exporter({
-            let mut metadata = MetadataMap::new();
-            metadata.insert(
-                MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
-                MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
+                .build();
+
+                // Wrap with filtering processor to only send AI traces
+                let filtered_processor = FilteringSpanProcessor::new(
+                    oo_processor,
+                    Some("ai.".to_string()), // Only send spans starting with "ai."
+                );
+
+                tracer_builder = tracer_builder.with_span_processor(filtered_processor);
+                log::info!(
+                    "AI traces (ai.* spans only) will be sent to OpenObserve: {}",
+                    cfg.common.otel_otlp_url
+                );
+            } else if !cfg.common.otel_otlp_grpc_url.is_empty() {
+                let mut metadata = MetadataMap::new();
+                metadata.insert(
+                    MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
+                    MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
+                );
+
+                let oo_exporter = opentelemetry_otlp::SpanExporter::builder()
+                    .with_tonic()
+                    .with_endpoint(&cfg.common.otel_otlp_grpc_url)
+                    .with_metadata(metadata)
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .build()?;
+
+                let oo_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                    oo_exporter,
+                    opentelemetry_sdk::runtime::Tokio,
+                )
+                .build();
+
+                // Wrap with filtering processor to only send AI traces
+                let filtered_processor = FilteringSpanProcessor::new(
+                    oo_processor,
+                    Some("ai.".to_string()), // Only send spans starting with "ai."
+                );
+
+                tracer_builder = tracer_builder.with_span_processor(filtered_processor);
+                log::info!(
+                    "AI traces (ai.* spans only) will be sent to OpenObserve (gRPC): {}",
+                    cfg.common.otel_otlp_grpc_url
+                );
+            } else {
+                log::warn!(
+                    "AI tracing enabled but ZO_OTEL_OTLP_URL not configured - AI traces will not be exported"
+                );
+            }
+        }
+
+        // Additionally, if O2_AI_EVAL_OTLP_ENDPOINT is set, send AI traces to evaluation platform
+        // too
+        let eval_endpoint = std::env::var("O2_AI_EVAL_OTLP_ENDPOINT")
+            .ok()
+            .or_else(|| o2_cfg.ai.eval_otlp_endpoint.clone())
+            .filter(|s| !s.is_empty());
+
+        if let Some(endpoint) = eval_endpoint {
+            log::info!(
+                "Configuring additional AI evaluation OTLP exporter to: {}",
+                endpoint
             );
-            metadata.insert(
-                MetadataKey::from_str(&cfg.grpc.org_header_key).unwrap(),
-                MetadataValue::from_str(&cfg.common.tracing_grpc_header_org).unwrap(),
+
+            let eval_exporter = opentelemetry_otlp::SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint)
+                .with_timeout(std::time::Duration::from_secs(10))
+                .build()?;
+
+            let eval_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                eval_exporter,
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build();
+
+            // Wrap with filtering processor to only send AI traces
+            let filtered_eval_processor =
+                FilteringSpanProcessor::new(eval_processor, Some("ai.".to_string()));
+
+            tracer_builder = tracer_builder.with_span_processor(filtered_eval_processor);
+            log::info!(
+                "AI evaluation OTLP exporter configured - AI traces (ai.* spans only) will be sent to evaluation platform"
             );
-            metadata.insert(
-                MetadataKey::from_str(&cfg.grpc.stream_header_key).unwrap(),
-                MetadataValue::from_str(&cfg.common.tracing_grpc_header_stream_name).unwrap(),
-            );
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(&cfg.common.otel_otlp_grpc_url)
-                .with_metadata(metadata)
-                .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-        })
-    };
+        }
+    }
+
+    // Add UUID v7 ID generator and resource attributes
+    tracer_builder = tracer_builder.with_id_generator({
+        #[cfg(feature = "enterprise")]
+        {
+            ai::agent::tracing::UuidV7IdGenerator
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            opentelemetry_sdk::trace::RandomIdGenerator::default()
+        }
+    });
 
     // Store the tracer provider before installing batch processor
-    let tracer = tracer.with_trace_config(
-        opentelemetry_sdk::trace::Config::default().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", cfg.common.node_role.to_string()),
-            KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-            KeyValue::new("service.version", config::VERSION),
-        ])),
+    let tracer = tracer_builder.with_resource(
+        Resource::builder()
+            .with_attributes(vec![
+                KeyValue::new("service.name", cfg.common.node_role.to_string()),
+                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+                KeyValue::new("service.version", config::VERSION),
+            ])
+            .build(),
     );
 
-    // Install batch processor
-    let tracer = tracer.install_batch(opentelemetry_sdk::runtime::Tokio)?;
+    // build
+    let tracer = tracer.build();
 
     let layer = if cfg.log.json_format {
         tracing_subscriber::fmt::layer()
@@ -1054,7 +1365,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {
@@ -1069,8 +1380,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
             .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            .wrap(middleware::Logger::new(&get_http_access_log_format()
             ))
             .wrap(RequestTracing::new())
     })
@@ -1149,6 +1459,14 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
+    // Initialize OpenAPI spec for AI and MCP modules (includes agent client)
+    let api = openapi::ApiDoc::openapi();
+    if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components(api) {
+        log::error!("Failed to init AI/MCP/Agent: {e}");
+    } else {
+        log::info!("Initialized AI, MCP, and Agent components");
+    }
+
     // check ratelimit config
     let cfg = config::get_config();
     let o2cfg = o2_enterprise::enterprise::common::config::get_config();
@@ -1183,6 +1501,33 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
         ));
     }
     Ok(())
+}
+
+/// Get the HTTP access log format from configuration, or return the default if not set
+///
+/// %a - Remote IP address
+/// %t - Time when the request was received
+/// %r - First line of request
+/// %s - Response status code
+/// %b - Size of response in bytes, excluding HTTP headers
+/// %U - URL path requested
+/// %T - Time taken to serve the request, in seconds
+/// %D - Time taken to serve the request, in microseconds
+/// %i - Header line(s) from request
+/// %o - Header line(s) from response
+/// %{Content-Length}i - Size of request payload in bytes
+/// %{Referer}i - Referer header
+/// %{User-Agent}i - User-Agent header
+fn get_http_access_log_format() -> String {
+    let log_format = get_config().http.access_log_format.to_string();
+    if log_format.is_empty() || log_format.to_lowercase() == "common" {
+        r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#.to_string()
+    } else if log_format.to_lowercase() == "json" {
+        r#"{ "remote_ip": "%a", "request": "%r", "status": %s, "response_size": %b, "request_size": "%{Content-Length}i", "referer": "%{Referer}i", "user_agent": "%{User-Agent}i", "response_time_secs": %T }"#
+            .to_string()
+    } else {
+        log_format
+    }
 }
 
 #[cfg(test)]
@@ -1222,16 +1567,10 @@ mod tests {
         // 2. Missing configuration
         // 3. Network issues
         // We're testing that it doesn't panic unexpectedly beyond expected tracing setup issues
-        if result.is_err() {
-            // If there was a panic, it's likely the expected "global subscriber already set" error
-            // This is acceptable in test environments when tests run in parallel
-            println!(
-                "enable_tracing() panicked (expected in test environment when tests run in parallel)"
-            );
-        }
         // Don't assert result.is_ok() because parallel tests will fail due to global subscriber
-        // conflicts The important thing is that we can call the function without unexpected
-        // panics
+        // conflicts (expected in test environment when tests run in parallel)
+        // The important thing is that we can call the function without unexpected panics
+        let _ = result;
     }
 
     #[cfg(feature = "enterprise")]
@@ -1372,7 +1711,7 @@ mod tests {
     #[test]
     fn test_log_formatting_patterns() {
         // Test the log format string used in HTTP server setup
-        let log_format = r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#;
+        let log_format = get_http_access_log_format();
 
         assert!(log_format.contains("%a")); // Remote IP
         assert!(log_format.contains("%r")); // Request line

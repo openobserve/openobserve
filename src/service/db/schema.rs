@@ -28,6 +28,7 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
+    cluster::get_cached_online_querier_nodes,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
         SchemaCache, unwrap_stream_settings,
@@ -41,10 +42,7 @@ use {
 
 use crate::{
     common::{
-        infra::{
-            cluster::get_cached_online_querier_nodes,
-            config::{ENRICHMENT_TABLES, ORGANIZATIONS},
-        },
+        infra::config::{ENRICHMENT_TABLES, ORGANIZATIONS},
         meta::stream::StreamSchema,
     },
     service::{db, enrichment::StreamTable, organization::check_and_create_org},
@@ -300,7 +298,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let key_columns = ev.key.split('/').collect::<Vec<&str>>();
-                let (ev_key, ev_start_dt) = if key_columns.len() > 5 {
+                let (ev_key, mut ev_start_dt) = if key_columns.len() > 5 {
                     (
                         key_columns[..5].join("/"),
                         key_columns[5].parse::<i64>().unwrap_or(0),
@@ -308,6 +306,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     (ev.key.to_string(), ev.start_dt.unwrap_or_default())
                 };
+                if ev_start_dt == 0 && ev.start_dt.is_some() {
+                    ev_start_dt = ev.start_dt.unwrap();
+                }
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
                 let r = STREAM_SCHEMAS.read().await;
@@ -405,11 +406,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
 
+                #[cfg(feature = "enterprise")]
+                let usage_enabled = true;
+                #[cfg(not(feature = "enterprise"))]
+                let usage_enabled = cfg.common.usage_enabled;
+
                 // if create_org_through_ingestion is enabled, we need to create the org
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
-                if (cfg.common.create_org_through_ingestion
-                    || cfg.common.usage_enabled
-                    || audit_enabled)
+                if (cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled)
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
                     && let Err(e) = check_and_create_org(org_id).await
                 {
@@ -424,8 +428,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_name = columns[2];
                 let start_dt = match columns.get(3) {
                     Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
-                    None => 0,
+                    None => ev.start_dt.unwrap_or_default(),
                 };
+                log::warn!(
+                    "[Schema:watch] Deleting schema cache for {org_id}/{stream_type}/{stream_name} with start_dt {start_dt}",
+                );
                 if start_dt > 0 {
                     // delete only one version
                     continue;
@@ -494,7 +501,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
-        if i % 1000 == 0 {
+        if i.is_multiple_of(1000) {
             log::info!("Cache schema progress: {i}/{items_num}");
         }
     }
@@ -551,7 +558,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let mut w = STREAM_SCHEMAS.write().await;
         w.insert(item_key.to_string(), schema_versions);
         drop(w);
-        if i % 1000 == 0 {
+        if i.is_multiple_of(1000) {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }
@@ -562,6 +569,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let mut tables = HashMap::new();
+    let mut org_tables: HashMap<String, Vec<(String, String)>> = HashMap::new(); // org_id -> [(key, table_name)]
+
     for schema_key in r.keys() {
         if !schema_key.contains(format!("/{}/", StreamType::EnrichmentTables).as_str()) {
             continue;
@@ -573,12 +582,19 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             continue;
         }
+
+        // Group by org_id for batch fetching URL jobs
+        org_tables
+            .entry(org_id.to_string())
+            .or_default()
+            .push((schema_key.to_owned(), stream_name.to_string()));
+
         tables.insert(
             schema_key.to_owned(),
             StreamTable {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                data: vec![],
+                data: vec![].into(),
             },
         );
     }
@@ -587,6 +603,89 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         log::info!("EnrichmentTables Cached");
         return Ok(());
     }
+
+    // Fetch all URL jobs per organization to check completion status
+    // This avoids making individual database calls for each enrichment table
+    // Since multiple URL jobs can exist per table, we group by table_name
+    let mut url_jobs_by_org: HashMap<
+        String,
+        HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>>,
+    > = HashMap::new();
+    for org_id in org_tables.keys() {
+        match db::enrichment_table::list_url_jobs(org_id).await {
+            Ok(jobs) => {
+                // Group jobs by table_name since multiple jobs can exist per table
+                let mut jobs_map: HashMap<
+                    String,
+                    Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>,
+                > = HashMap::new();
+                for job in jobs {
+                    jobs_map
+                        .entry(job.table_name.clone())
+                        .or_default()
+                        .push(job);
+                }
+                log::debug!(
+                    "[CACHE] Fetched {} URL jobs across {} tables for org {}",
+                    jobs_map.values().map(|v| v.len()).sum::<usize>(),
+                    jobs_map.len(),
+                    org_id
+                );
+                url_jobs_by_org.insert(org_id.clone(), jobs_map);
+            }
+            Err(e) => {
+                log::warn!("[CACHE] Failed to fetch URL jobs for org {}: {}", org_id, e);
+                url_jobs_by_org.insert(org_id.clone(), HashMap::new());
+            }
+        }
+    }
+
+    // Filter out enrichment tables that have NO completed URL jobs
+    // Only cache tables if:
+    // 1. They are file-based (no URL jobs), OR
+    // 2. They have at least one completed URL job (even if other jobs are incomplete/failed)
+    let mut tables_to_cache = Vec::new();
+    for (key, tbl) in tables.iter() {
+        let should_cache = if let Some(org_jobs) = url_jobs_by_org.get(&tbl.org_id) {
+            if let Some(url_jobs) = org_jobs.get(&tbl.stream_name) {
+                // This is a URL-based enrichment table with multiple possible jobs
+                // Only cache if at least ONE job is completed
+                let has_completed_job = url_jobs.iter().any(|job| {
+                    job.status == config::meta::enrichment_table::EnrichmentTableStatus::Completed
+                });
+                if !has_completed_job {
+                    log::info!(
+                        "[CACHE] Skipping enrichment table {}/{} - no completed URL jobs (total jobs: {})",
+                        tbl.org_id,
+                        tbl.stream_name,
+                        url_jobs.len()
+                    );
+                }
+                has_completed_job
+            } else {
+                // No URL job found - this is a file-based enrichment table, cache it
+                true
+            }
+        } else {
+            // No jobs for this org (shouldn't happen but handle gracefully)
+            true
+        };
+
+        if should_cache {
+            tables_to_cache.push((key.clone(), tbl.clone()));
+        }
+    }
+
+    if tables_to_cache.is_empty() {
+        log::info!("EnrichmentTables Cached (0 tables ready)");
+        return Ok(());
+    }
+
+    log::info!(
+        "[CACHE] Caching {} enrichment tables (filtered {} incomplete URL jobs)",
+        tables_to_cache.len(),
+        tables.len() - tables_to_cache.len()
+    );
 
     // waiting for querier to be ready
     let expect_querier_num = get_config().limit.starting_expect_querier_num;
@@ -602,19 +701,32 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     }
 
     // fill data
-    for (key, tbl) in tables {
+    let total = std::time::Instant::now();
+    for (key, tbl) in tables_to_cache {
+        let start = std::time::Instant::now();
+        // Only use the primary region if specified to fetch enrichment table data assuming only the
+        // primary region contains the data.
         let data =
-            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name).await?;
+            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
+                .await?;
+        let len = data.len();
         ENRICHMENT_TABLES.insert(
             key,
             StreamTable {
-                org_id: tbl.org_id,
-                stream_name: tbl.stream_name,
+                org_id: tbl.org_id.clone(),
+                stream_name: tbl.stream_name.clone(),
                 data,
             },
         );
+        log::info!(
+            "EnrichmentTables Cached: org_id: {}, stream_name: {}, len: {}, took {:?}",
+            tbl.org_id,
+            tbl.stream_name,
+            len,
+            start.elapsed()
+        );
     }
-    log::info!("EnrichmentTables Cached");
+    log::info!("EnrichmentTables Cached, took {:?}", total.elapsed());
     Ok(())
 }
 

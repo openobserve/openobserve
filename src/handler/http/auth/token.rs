@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{Error, dev::ServiceRequest};
 #[cfg(feature = "enterprise")]
-use actix_web::{
-    error::ErrorUnauthorized,
-    http::{Method, header},
-};
+use actix_web::http::{Method, header};
+use actix_web::{Error, dev::ServiceRequest, error::ErrorUnauthorized};
 #[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
 
@@ -50,12 +47,25 @@ pub async fn token_validator(
     };
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
+    // Check if this is an MCP endpoint request or has the MCP header
+    let is_mcp_endpoint = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
+    let has_mcp_header = req
+        .headers()
+        .get("x-o2-mcp")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v == "true")
+        .unwrap_or_default();
+    let is_mcp_request = is_mcp_endpoint || has_mcp_header;
+
+    // For MCP requests with dynamic clients, skip audience validation
+    let login_flow = !is_mcp_request;
+
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &get_dex_config().client_id,
         false,
-        true,
+        login_flow,
     ) {
         Ok(res) => {
             let user_id = &res.0.user_email;
@@ -69,10 +79,20 @@ pub async fn token_validator(
                 let is_member_subscription = path_columns
                     .get(1)
                     .is_some_and(|p| p.eq(&"member_subscription"));
+                // this is for /invites call, which is only based on user, similar to
+                // member subscription. Furthermore, because we are listing the invites of
+                // that particular user only, we can skip other checks, and allow listing
+                let is_list_invite_call = path_columns.len() <= 2
+                    && path_columns.first().is_some_and(|p| p.eq(&"invites"))
+                    && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
+
+                // For MCP endpoints, allow any authenticated user from Dex
+                let allow_nonexistent_user = is_mcp_request;
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
                     || is_member_subscription
+                    || is_list_invite_call
                 {
                     let db_user = db::user::get_db_user(user_id).await;
                     user = match db_user {
@@ -81,7 +101,12 @@ pub async fn token_validator(
                             if all_users.is_empty() {
                                 None
                             } else {
-                                all_users.first().cloned()
+                                // For organizations/clusters endpoints, prioritize _meta org
+                                all_users
+                                    .iter()
+                                    .find(|u| u.org == config::META_ORG_ID)
+                                    .cloned()
+                                    .or_else(|| all_users.first().cloned())
                             }
                         }
                         Err(e) => {
@@ -100,10 +125,70 @@ pub async fn token_validator(
                                 };
                             users::get_user(Some(org_id), user_id).await
                         }
-                        None => users::get_user(None, user_id).await,
+                        None => {
+                            if path_columns.len() == 1 && path_columns[0] == "license" {
+                                // for get license, as long as user is part of o2, it is fine
+                                if req.method().as_str() == "GET" {
+                                    if let Ok(v) = db::user::get_user_record(user_id).await {
+                                        Some(config::meta::user::User {
+                                            email: v.email,
+                                            first_name: v.first_name,
+                                            last_name: v.last_name,
+                                            password: v.password,
+                                            salt: v.salt,
+                                            token: "".into(),
+                                            rum_token: None,
+                                            role: config::meta::user::UserRole::User,
+                                            org: "".into(),
+                                            is_external: v.user_type
+                                                == config::meta::user::UserType::External,
+                                            password_ext: v.password_ext,
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    // for anything else, which will mostly be PUT/POST calls,
+                                    // the user must be in _meta org
+                                    users::get_user(Some("_meta"), user_id).await
+                                }
+                            } else {
+                                users::get_user(None, user_id).await
+                            }
+                        }
                     }
                 };
                 match user {
+                    // specifically for list invite call, even if the user is not present
+                    // in db, which can be the case when a new user is joining o2 cloud for first
+                    // time we can get None. if the API call is specifically
+                    // /invite, then it should be ok to allow, because we list
+                    // invite based on the user email got from sso provider, and
+                    // nothing else. Similarly for accepting invite, we will not have the
+                    // user in db anymore, and the fn checks based on email and token, so ok to
+                    // bypass
+                    None if (is_list_invite_call
+                        || is_member_subscription
+                        || allow_nonexistent_user) =>
+                    {
+                        let mut req = req;
+
+                        if req.method().eq(&Method::POST)
+                            && !req.headers().contains_key("content-type")
+                        {
+                            req.headers_mut().insert(
+                                header::CONTENT_TYPE,
+                                header::HeaderValue::from_static(
+                                    "application/x-www-form-urlencoded",
+                                ),
+                            );
+                        }
+                        req.headers_mut().insert(
+                            header::HeaderName::from_static("user_id"),
+                            header::HeaderValue::from_str(&res.0.user_email).unwrap(),
+                        );
+                        Ok(req)
+                    }
                     Some(user) => {
                         // / Hack for prometheus, need support POST and check the header
                         let mut req = req;
@@ -128,13 +213,13 @@ pub async fn token_validator(
                         {
                             Ok(req)
                         } else {
-                            Err((ErrorForbidden("Unauthorized Access"), req))
+                            Err((ErrorForbidden("Forbidden"), req))
                         }
                     }
-                    _ => Err((ErrorForbidden("Unauthorized Access"), req)),
+                    _ => Err((ErrorUnauthorized("Unauthorized Access"), req)),
                 }
             } else {
-                Err((ErrorForbidden("Unauthorized Access"), req))
+                Err((ErrorUnauthorized("Unauthorized Access"), req))
             }
         }
         Err(err) => Err((ErrorUnauthorized(err), req)),
@@ -167,7 +252,5 @@ pub async fn token_validator(
     req: ServiceRequest,
     _token: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    use actix_web::error::ErrorForbidden;
-
-    Err((ErrorForbidden("Not Supported"), req))
+    Err((ErrorUnauthorized("Not Supported"), req))
 }

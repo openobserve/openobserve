@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive } from "vue";
+import { reactive, computed } from "vue";
 import {
   b64EncodeStandard,
   b64EncodeUnicode,
@@ -27,6 +27,7 @@ const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
   loading: false,
+  loadingStream: false,
 
   config: {
     splitterModel: 20,
@@ -77,6 +78,12 @@ const defaultObject = {
     serviceColors: {} as any,
     redirectedFromLogs: false,
     searchApplied: false,
+    metricsRangeFilters: new Map<
+      string,
+      { panelTitle: string; start: number; end: number }
+    >(),
+    showErrorOnly: false,
+    queryEditorPlaceholderFlag: true,
   },
   data: {
     query: "",
@@ -177,7 +184,7 @@ const useTraces = () => {
     searchObj.data.traceDetails.isLoadingTraceDetails = false;
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };
-  
+
   const updatedLocalLogFilterField = (): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
@@ -216,7 +223,7 @@ const useTraces = () => {
   }
 
   const copyTracesUrl = (
-    customTimeRange: { from: string; to: string } | null = null
+    customTimeRange: { from: string; to: string } | null = null,
   ) => {
     const queryParams = getUrlQueryParams(true);
 
@@ -300,6 +307,28 @@ const useTraces = () => {
     });
   };
 
+  /**
+   * Computed property for traces share URL
+   * Generates the full shareable URL with all query parameters
+   */
+  const tracesShareURL = computed(() => {
+    const queryParams = getUrlQueryParams(true);
+
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(queryParams)) {
+      searchParams.append(key, String(value));
+    }
+    const queryString = searchParams.toString();
+
+    let shareURL = window.location.origin + window.location.pathname;
+
+    if (queryString != "") {
+      shareURL += "?" + queryString;
+    }
+
+    return shareURL;
+  });
+
   return {
     searchObj,
     resetSearchObj,
@@ -308,6 +337,7 @@ const useTraces = () => {
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,
+    tracesShareURL,
   };
 };
 

@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="row">
-      <div class="float-right col q-mb-xs flex">
-        <div class="button-group logs-visualize-toggle q-ml-xs">
+    <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-start!">
+      <div class="float-right col flex">
+        <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
             <div>
               <q-btn
@@ -36,8 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm"
-                style="height: 32px"
+                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm btn-height-32"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -47,23 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <q-btn
                 data-test="logs-visualize-toggle"
-                :class="
-                  searchObj.meta.logsVisualizeToggle === 'visualize'
-                    ? 'selected'
-                    : ''
-                "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm"
+                :class="[
+                  searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
+                  config.isEnterprise == 'true' ? 'button button-center tw:rounded-none' : 'button button-right tw:rounded-l-none!',
+                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
+                ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
                 no-caps
                 size="sm"
-                style="height: 32px"
+                :icon="outlinedShowChart"
               >
-                <img
-                  :src="visualizeIcon"
-                  alt="Visualize"
-                  style="width: 20px; height: 20px"
-                />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -72,42 +65,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
               </q-btn>
             </div>
+            <div v-if="config.isEnterprise == 'true'">
+              <q-btn
+                data-test="logs-patterns-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'patterns'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm btn-height-32"
+                @click="onLogsVisualizeToggleUpdate('patterns')"
+                no-caps
+                size="sm"
+                icon="pattern"
+              >
+                <q-tooltip>
+                  {{ t("search.showPatternsLabel") }}
+                </q-tooltip>
+              </q-btn>
+            </div>
           </div>
         </div>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs"
+          class="toolbar-toggle-container element-box-shadow"
           v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
-            <img
-              :src="histogramIcon"
-              alt="Histogram"
-              style="width: 20px; height: 20px"
-            />
-            <q-tooltip>
-              {{ t("search.showHistogramLabel") }}
-            </q-tooltip>
           </q-toggle>
+          <img :src="histogramIcon" alt="Histogram" class="toolbar-icon" />
+          <q-tooltip class="toolbar-icon" />
+          <q-tooltip>
+            {{ t("search.showHistogramLabel") }}
+          </q-tooltip>
         </div>
-        <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs"
-        >
+        <div class="toolbar-toggle-container element-box-shadow">
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
             :disable="isSqlModeDisabled"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
-            <img
-              :src="sqlIcon"
-              alt="SQL Mode"
-              style="width: 20px; height: 20px"
-            />
+            <img :src="sqlIcon"
+alt="SQL Mode" class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -116,14 +134,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-toggle>
         </div>
+        <!-- Explain Query Button -->
+        <q-btn
+          v-if="!store.state.isAiChatEnabled && searchObj.meta.sqlMode"
+          data-test="logs-search-bar-explain-query-btn"
+          no-caps
+          flat
+          dense
+          icon="lightbulb"
+          class="toolbar-reset-btn"
+          :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
+          @click="openExplainDialog"
+        >
+          <q-tooltip>
+            {{ t("search.explainTooltip") }}
+          </q-tooltip>
+        </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <q-btn
           v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-reset-filters-btn"
           no-caps
-          size="13px"
+          flat
+          dense
           icon="restart_alt"
-          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
+          class="toolbar-reset-btn element-box-shadow"
           @click="resetFilters"
         >
           <q-tooltip>
@@ -135,19 +170,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
+          class="syntax-guide-in-toolbar element-box-shadow"
         >
         </syntax-guide>
-        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
+        <q-btn-group class="q-ml-xs q-pa-none element-box-shadow el-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
-            size="12px"
-            icon="save"
-            icon-right="saved_search"
             @click="fnSavedView"
             @show="loadSavedView"
             split
-            class="no-outline saved-views-dropdown no-border"
+            icon="save"
+            icon-right="saved_search"
+            class="saved-views-dropdown no-border"
+            content-class="saved-views-dropdown-menu"
           >
             <q-list
               :style="
@@ -186,15 +222,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="log-search-saved-view-field-search-input"
                           v-model="searchObj.data.savedViewFilterFields"
                           data-cy="index-field-search-input"
-                          filled
                           borderless
                           dense
                           clearable
                           debounce="1"
+                          class="tw:mx-2 tw:my-2"
                           :placeholder="t('search.searchSavedView')"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <q-icon name="search"  />
                           </template>
                         </q-input>
                       </div>
@@ -221,9 +257,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list" no-hover>
+                      <q-td :props="props"
+class="field_list" no-hover>
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -234,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 188px"
+                              style="max-width: 140px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -322,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ><q-item-label
                           header
                           class="q-pa-sm text-bold favorite-label"
-                          >Favorite Views</q-item-label
+                          >{{ t("search.favoriteViews") }}</q-item-label
                         ></q-item
                       >
                       <q-separator horizontal inset></q-separator>
@@ -330,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-slot:body-cell-view_name="props">
                       <q-td :props="props" class="field_list q-pa-xs">
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -340,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 185px"
+                              style="max-width: 90px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -410,133 +447,206 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
         <q-btn
           v-if="store.state.isAiChatEnabled"
-          class="tw-text-[12px] tw-font-[500] q-ml-xs q-px-sm"
+          class="group-menu-btn element-box-shadow"
           no-caps
           menu-anchor="bottom left"
           menu-self="top left"
           icon="menu"
-          size="sm"
-          dense
+          flat
         >
           <q-menu>
-            <div class="row tw-gap-2">
-              <div class="q-mt-xs">
-                <div
-                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-center"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-toggle
-                      data-test="logs-search-bar-show-histogram-toggle-btn"
-                      v-model="searchObj.meta.showHistogram"
-                      dense
-                      class="q-pb-xs"
-                      size="32px"
-                    ></q-toggle>
-                  </div>
-                  <q-item-label>
+            <q-list>
+              <!-- Histogram Toggle -->
+              <q-item
+                clickable
+                @click="
+                  searchObj.meta.showHistogram = !searchObj.meta.showHistogram
+                "
+                data-test="logs-search-bar-show-histogram-toggle-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
+                      <q-toggle
+                        v-model="searchObj.meta.showHistogram"
+                        size="xs"
+                        flat
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop
+                      />
+                    </div>
                     {{ t("search.showHistogramLabel") }}
                   </q-item-label>
-                </div>
+                </q-item-section>
+              </q-item>
 
-                <q-separator />
+              <q-separator />
 
-                <div
-                  class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-start"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-toggle
-                      data-test="logs-search-bar-wrap-table-content-toggle-btn"
-                      v-model="searchObj.meta.toggleSourceWrap"
-                      icon="wrap_text"
-                      style="margin: 0px"
-                      size="32px"
-                      class="q-pb-xs"
-                      dense
-                    ></q-toggle>
-                  </div>
-                  <q-item-label> Wrap Content </q-item-label>
-                </div>
-                <q-separator />
+              <!-- Wrap Content Toggle -->
+              <q-item
+                clickable
+                @click="
+                  searchObj.meta.toggleSourceWrap =
+                    !searchObj.meta.toggleSourceWrap
+                "
+                data-test="logs-search-bar-wrap-table-content-toggle-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
+                      <q-toggle
+                        v-model="searchObj.meta.toggleSourceWrap"
+                        size="xs"
+                        flat
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop
+                      />
+                    </div>
+                    {{ t("search.wrapContent") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
 
-                <div
-                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-start"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-toggle
-                      data-test="logs-search-bar-quick-mode-toggle-btn"
-                      v-model="searchObj.meta.quickMode"
-                      @click="handleQuickMode"
-                      class="q-pb-xs"
-                      size="32px"
-                      dense
-                    ></q-toggle>
-                  </div>
-                  <q-item-label>
+              <q-separator />
+
+              <!-- Quick Mode Toggle -->
+              <q-item
+                clickable
+                @click="
+                  searchObj.meta.quickMode = !searchObj.meta.quickMode;
+                  handleQuickMode();
+                "
+                data-test="logs-search-bar-quick-mode-toggle-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
+                      <q-toggle
+                        v-model="searchObj.meta.quickMode"
+                        size="xs"
+                        flat
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop="handleQuickMode"
+                      />
+                    </div>
                     {{ t("search.quickModeLabel") }}
                   </q-item-label>
-                </div>
-                <q-separator />
+                </q-item-section>
+              </q-item>
 
-                <div
-                  class="row tw-h-[30px] q-pl-sm q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center"
-                >
-                  <div class="tw-w-[30%]">
-                    <syntax-guide
-                      data-test="logs-search-bar-sql-mode-toggle-btn"
-                      :sqlmode="searchObj.meta.sqlMode"
-                      size="10px"
-                      style="margin: 0px"
-                      :style="{
-                        border: !searchObj.meta.sqlMode
-                          ? '1px solid #c4c4c4'
-                          : 'none',
-                      }"
+              <q-separator />
+
+              <!-- Syntax Guide -->
+              <q-item clickable class="q-pa-sm saved-view-item">
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 12px;
+                      "
                     >
-                    </syntax-guide>
-                  </div>
-                  <q-item-label> Syntax Guide </q-item-label>
-                </div>
-                <q-separator />
-                <div
-                  class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-btn
-                      data-test="logs-search-bar-reset-filters-btn"
-                      no-caps
-                      icon="restart_alt"
-                      size="10px"
-                      dense
-                      class="q-pa-xs"
-                      @click="resetFilters"
+                      <syntax-guide
+                        data-test="logs-search-bar-sql-mode-toggle-btn"
+                        :sqlmode="searchObj.meta.sqlMode"
+                        size="0.875rem"
+                        class="syntax-guide-in-menu"
+                      />
+                    </div>
+                    Syntax Guide
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <!-- Reset Filters -->
+              <q-item
+                clickable
+                @click="resetFilters"
+                data-test="logs-search-bar-reset-filters-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 8px;
+                        margin-left: 3px;
+                      "
                     >
-                    </q-btn>
-                  </div>
-                  <q-item-label>
+                      <q-icon name="restart_alt" size="20px" />
+                    </div>
                     {{ t("search.resetFilters") }}
                   </q-item-label>
-                </div>
-              </div>
-              <div></div>
-            </div>
+                </q-item-section>
+              </q-item>
+            </q-list>
           </q-menu>
         </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs"
+          class="toolbar-toggle-container element-box-shadow"
           v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
             data-test="logs-search-bar-quick-mode-toggle-btn"
             v-model="searchObj.meta.quickMode"
             @click="handleQuickMode"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
-            <img
-              :src="quickModeIcon"
-              alt="Quick Mode"
-              style="width: 20px; height: 20px"
-            />
+            <img :src="quickModeIcon"
+alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -544,25 +654,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="float-right col-auto q-mb-xs">
+      <div class="float-right col-auto">
         <!-- this is moved to dropdown if ai chat is enabled -->
-        <q-toggle
+        <div
           v-if="!store.state.isAiChatEnabled"
-          data-test="logs-search-bar-wrap-table-content-toggle-btn"
-          v-model="searchObj.meta.toggleSourceWrap"
-          icon="wrap_text"
-          class="float-left"
-          size="32px"
-          :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
+          class="toolbar-toggle-container float-left"
         >
-          <q-tooltip>
-            {{
-              searchObj.meta.logsVisualizeToggle === "visualize"
-                ? "Not supported for visualization"
-                : t("search.messageWrapContent")
-            }}
-          </q-tooltip>
-        </q-toggle>
+          <q-toggle
+            data-test="logs-search-bar-wrap-table-content-toggle-btn"
+            v-model="searchObj.meta.toggleSourceWrap"
+            class="o2-toggle-button-xs element-box-shadow"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
+            :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
+          >
+            <q-icon name="wrap_text" class="toolbar-icon-in-toggle" />
+            <q-tooltip>
+              {{
+                searchObj.meta.logsVisualizeToggle === "visualize"
+                  ? t("search.notSupportedForVisualization")
+                  : t("search.messageWrapContent")
+              }}
+            </q-tooltip>
+          </q-toggle>
+        </div>
 
         <transform-selector
           v-if="isActionsEnabled"
@@ -576,25 +696,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
-        <q-btn
+        <share-button
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
-          icon="share"
-          @click="shareLink.execute()"
-          :loading="shareLink.isLoading.value"
-        >
-          <q-tooltip>
-            {{ t("search.shareLink") }}
-          </q-tooltip>
-        </q-btn>
+          :url="shareURL"
+          button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+          button-size="xs"
+        />
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
-          icon="menu"
+          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
         >
+        <Menu size="1rem" />
           <q-menu>
             <q-list>
               <q-item
@@ -604,31 +717,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-close-popup
               >
                 <q-item-section @click.stop="showSearchHistoryfn">
-                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <img
                       :src="searchHistoryIcon"
                       alt="Search History"
                       style="width: 20px; height: 20px"
                     />
-
-                    Search History</q-item-label
+                    {{ t("search.searchHistory") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
               <q-separator />
               <q-item
                 style="min-width: 150px"
-                class="q-pa-sm saved-view-item"
+                class="q-pa-sm saved-view-item download-menu-parent"
                 clickable
                 v-close-popup
-                v-bind:disable="
-                  searchObj.data.queryResults &&
-                  searchObj.data.queryResults.hasOwnProperty('hits') &&
-                  !searchObj.data.queryResults.hits.length
-                "
+
+                @mouseenter="showDownloadMenu = true"
               >
                 <q-item-section class="cursor-pointer">
-                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <img
                       :src="downloadTableIcon"
                       alt="Download Table"
@@ -644,6 +753,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="showDownloadMenu"
                   anchor="top end"
                   self="top start"
+                  :offset="[0, 0]"
+                  @mouseenter="showDownloadMenu = true"
+                  @mouseleave="showDownloadMenu = false"
                 >
                   <q-list>
                     <q-item
@@ -655,10 +767,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon name="grid_on" size="14px" class="q-pr-sm" />
+                      <q-icon name="grid_on" size="14px"
+class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
-                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
                         >
                           {{ t("search.downloadCSV") }}
                         </q-item-label>
@@ -673,10 +786,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon name="data_object" size="14px" class="q-pr-sm" />
+                      <q-icon name="data_object" size="14px"
+class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
-                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
                         >
                           {{ t("search.downloadJSON") }}
                         </q-item-label>
@@ -695,7 +809,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
                 >
-                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <img
                       :src="customRangeIcon"
                       alt="Custom Range"
@@ -708,6 +822,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
               <q-separator />
               <q-item
+                v-if="searchObj.meta.sqlMode"
+                data-test="logs-search-bar-explain-query-menu-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
+                @click="openExplainDialog"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon name="lightbulb" size="20px" />
+                    {{ t("search.explainQuery") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator v-if="searchObj.meta.sqlMode" />
+              <q-item
                 v-if="config.isEnterprise == 'true'"
                 data-test="search-scheduler-create-new-btn"
                 class="q-pa-sm saved-view-item"
@@ -717,7 +848,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section v-close-popup>
                   <q-item-label
-                    class="tw-flex tw-items-center tw-gap-2"
+                    class="tw:flex tw:items-center tw:gap-2"
                     data-test="search-scheduler-create-new-label"
                   >
                     <img
@@ -725,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alt="Create Scheduled Search"
                       style="width: 20px; height: 20px"
                     />
-                    Create Scheduled Search</q-item-label
+                    {{ t("search.createScheduledSearch") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -739,7 +870,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section v-close-popup>
                   <q-item-label
-                    class="tw-flex tw-items-center tw-gap-2"
+                    class="tw:flex tw:items-center tw:gap-2"
                     data-test="search-scheduler-list-label"
                   >
                     <img
@@ -747,8 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alt="List Scheduled Search"
                       style="width: 20px; height: 20px"
                     />
-
-                    List Scheduled Search</q-item-label
+                    {{ t("search.listScheduledSearch") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -758,7 +888,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
-        <div class="float-left">
+        <div class="float-left tw:mr-[-4px]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -778,6 +908,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
+            class="element-box-shadow"
           />
         </div>
         <div class="search-time float-left q-mr-xs">
@@ -793,7 +924,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger="$emit('onAutoIntervalTrigger')"
             />
             <q-btn-group
-              class="no-outline q-pa-none no-border q-mr-xs"
+              class="q-pa-none q-mr-xs element-box-shadow el-border"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -804,27 +935,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-region-btn"
                 class="region-dropdown-btn q-px-xs"
                 :title="t('search.regionTitle')"
-                label="Region"
+                :label="t('search.region')"
               >
                 <q-input
                   ref="reginFilterRef"
-                  filled
-                  flat
+                  borderless
                   dense
+                  clearable
+                  class="tw:mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
                   v-model="regionFilter"
                   :label="t('search.regionFilterMsg')"
                 >
-                  <template v-slot:append>
-                    <q-icon
-                      v-if="regionFilter !== ''"
-                      name="clear"
-                      class="cursor-pointer"
-                      @click="resetRegionFilter"
-                    />
-                  </template>
                 </q-input>
                 <q-tree
-                  class="col-12 col-sm-6"
+                  class="col-12 col-sm-6 q-mx-sm q-mb-sm"
                   :nodes="store.state.regionInfo"
                   node-key="label"
                   :filter="regionFilter"
@@ -835,32 +959,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-btn-dropdown>
             </q-btn-group>
             <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
-              <q-btn
+              <div v-if="config.isEnterprise == 'true'" class="tw:flex">
+                <q-btn
                 v-if="
-                  config.isEnterprise == 'true' &&
-                  visualizeSearchRequestTraceIds.length
+                  visualizeSearchRequestTraceIds.length > 0
                 "
                 data-test="logs-search-bar-visualize-cancel-btn"
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
+                "
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
               <q-btn
-                v-else
-                data-test="logs-search-bar-visualize-refresh-btn"
-                dense
+                  v-else
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  >{{ t("search.runQuery") }}</q-btn
+                >
+              <q-separator class="tw:h-[29px] tw:w-[1px]" />
+              <q-btn-dropdown
                 flat
-                :title="t('search.runQuery')"
-                class="q-pa-none search-button"
-                @click="handleRunQueryFn"
-                :disable="disable"
-                >{{ t("search.runQuery") }}</q-btn
+                class="tw:h-[29px] search-button-dropdown"
+                :class="[
+                  config.isEnterprise == 'true' &&
+                  visualizeSearchRequestTraceIds.length
+                    ? 'o2-color-cancel'
+                    : 'o2-color-primary',
+                  config.isEnterprise == 'true'
+                    ? 'search-button-dropdown-enterprise-border-radius'
+                    : 'search-button-normal-border-radius',
+                ]"
+                unelevated
+                dense
               >
+                <q-btn
+                  data-test="logs-search-bar-refresh-btn"
+                  data-cy="search-bar-visuzlie-hard-refresh-button"
+                  dense
+                  flat
+                  no-caps
+                  :title="t('search.refreshCacheAndRunQuery')"
+                  class="q-pa-sm search-button-dropdown tw:text-[12px]"
+                  v-close-popup
+                  @click="handleRunQueryFn(true)"
+                  :disable="
+                    config.isEnterprise == 'true' &&
+                    !!visualizeSearchRequestTraceIds.length
+                  "
+                >
+                  <q-icon name="refresh" class="q-mr-xs" />
+                  {{ t("search.refreshCacheAndRunQuery") }}</q-btn
+                >
+              </q-btn-dropdown>
+              </div>
+              <div v-else class="tw:flex">
+                <q-btn
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  :disable="disable"
+                  >{{ t("search.runQuery") }}</q-btn
+                >
+              </div>
             </div>
-            <div v-else>
+            <div v-else class="tw:flex">
               <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
@@ -872,9 +1060,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -883,61 +1071,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.runQuery')"
-                class="q-pa-none search-button"
+                class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
+                no-caps
                 @click="handleRunQueryFn"
+                :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
+               <q-separator  class="tw:h-[29px] tw:w-[1px]" />
+              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw:h-[29px]"
+                :class="[
+                config.isEnterprise == 'true' &&
+                    (!!searchObj.data.searchRequestTraceIds.length ||
+                      !!searchObj.data.searchWebSocketTraceIds.length) &&
+                    (searchObj.loading == true ||
+                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
+                config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
+                ]"
+               unelevated dense >
+                    <q-btn
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-refresh-button"
+                      dense
+                      flat
+                      no-caps
+                      :title="t('search.refreshCacheAndRunQuery')"
+                      class="q-pa-sm tw:text-[12px] "
+                      v-close-popup
+                      @click="handleRunQueryFn(true)"
+                      :disable="
+                        searchObj.loading == true ||
+                        searchObj.loadingHistogram == true
+                      "
+                      >
+                      <q-icon name="refresh" class="q-mr-xs" />
+                      {{ t("search.refreshCacheAndRunQuery") }}</q-btn>
+              </q-btn-dropdown>
             </div>
           </div>
         </div>
       </div>
     </div>
-
     <div class="row query-editor-container">
       <div
-        class="col"
-        style="border-top: 1px solid #dbdbdb; height: 100%"
+        class="col tw:h-full"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
         <q-splitter
-          class="logs-search-splitter"
+          class="logs-search-splitter tw:h-full!"
           no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%; height: 100%"
         >
           <template #before>
-            <code-query-editor
-              v-if="router.currentRoute.value.name === 'logs'"
-              data-test="logs-search-bar-query-editor"
-              editor-id="logsQueryEditor"
-              ref="queryEditorRef"
-              class="monaco-editor"
-              :style="editorWidthToggleFunction"
-              v-model:query="searchObj.data.query"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
-              :debounceTime="100"
-              @update:query="updateQueryValue"
-              @run-query="handleRunQueryFn"
-              @keydown="handleKeyDown"
-              :class="
-                searchObj.data.editorValue == '' &&
-                searchObj.meta.queryEditorPlaceholderFlag
-                  ? 'empty-query'
-                  : ''
-              "
-              language="sql"
-              @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-              @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
-            />
+            <div
+              class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
+              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
+            >
+              <code-query-editor
+                v-if="router.currentRoute.value.name === 'logs'"
+                data-test="logs-search-bar-query-editor"
+                editor-id="logsQueryEditor"
+                ref="queryEditorRef"
+                class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
+                :style="editorWidthToggleFunction"
+                v-model:query="searchObj.data.query"
+                :keywords="autoCompleteKeywords"
+                :suggestions="autoCompleteSuggestions"
+                :debounceTime="100"
+                @update:query="updateQueryValue"
+                @run-query="handleRunQueryFn"
+                @keydown="handleKeyDown"
+                :class="
+                  searchObj.data.editorValue == '' &&
+                  searchObj.meta.queryEditorPlaceholderFlag
+                    ? 'empty-query'
+                    : ''
+                "
+                language="sql"
+                @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
+                @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+              />
+            </div>
           </template>
           <template #after>
             <div
@@ -946,39 +1167,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
-                <div class="tw-relative tw-h-full tw-w-full">
-                  <code-query-editor
-                    v-if="router.currentRoute.value.name === 'logs'"
-                    data-test="logs-vrl-function-editor"
-                    ref="fnEditorRef"
-                    editor-id="fnEditor"
-                    class="monaco-editor"
-                    v-model:query="searchObj.data.tempFunctionContent"
-                    :class="
-                      searchObj.data.tempFunctionContent == '' &&
-                      searchObj.meta.functionEditorPlaceholderFlag
-                        ? 'empty-function'
-                        : ''
-                    "
-                    :readOnly="
-                      searchObj.meta.logsVisualizeToggle === 'visualize'
-                    "
-                    @keydown="handleKeyDown"
-                    language="vrl"
-                    @focus="
-                      searchObj.meta.functionEditorPlaceholderFlag = false
-                    "
-                    @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-                  />
+                <div class="tw:relative tw:h-full tw:w-full">
+                  <div
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
+                  >
+                    <code-query-editor
+                      v-if="router.currentRoute.value.name === 'logs'"
+                      data-test="logs-vrl-function-editor"
+                      ref="fnEditorRef"
+                      editor-id="fnEditor"
+                      class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
+                      v-model:query="searchObj.data.tempFunctionContent"
+                      :class="
+                        searchObj.data.tempFunctionContent == '' &&
+                        searchObj.meta.functionEditorPlaceholderFlag
+                          ? 'empty-function'
+                          : ''
+                      "
+                      :readOnly="
+                        searchObj.meta.logsVisualizeToggle === 'visualize'
+                      "
+                      @keydown="handleKeyDown"
+                      language="vrl"
+                      @focus="
+                        searchObj.meta.functionEditorPlaceholderFlag = false
+                      "
+                      @blur="
+                        searchObj.meta.functionEditorPlaceholderFlag = true
+                      "
+                    />
+                  </div>
                 </div>
                 <div
                   v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
                   :class="
                     store.state.theme == 'dark'
-                      ? 'tw-bg-white tw-bg-opacity-10'
-                      : 'tw-bg-black tw-bg-opacity-10'
+                      ? 'tw:bg-white tw:bg-opacity-10'
+                      : 'tw:bg-black tw:bg-opacity-10'
                   "
-                  class="tw-absolute tw-bottom-0 tw-w-full"
+                  class="tw:absolute tw:bottom-0 tw:w-full"
                   style="margin-top: 12px; display: flex; align-items: center; flex"
                 >
                   <q-icon
@@ -1013,15 +1240,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-btn
         data-test="logs-query-editor-full_screen-btn"
-        :icon="isFocused ? 'fullscreen_exit' : 'fullscreen'"
-        :title="isFocused ? 'Collapse' : 'Expand'"
+        :title="isFocused ? t('search.collapse') : t('search.expand')"
         dense
         size="10px"
         round
         color="primary"
         @click="isFocused = !isFocused"
-        style="position: absolute; top: 42px; right: 10px; z-index: 20"
-      ></q-btn>
+        class="q-pa-xs tw:absolute! tw:top-[3.3rem]! tw:right-[1.2rem]! tw:z-50"
+      >
+      <Maximize size='0.8rem' v-if="!isFocused" />
+      <Minimize size="0.8rem" v-else />
+    </q-btn>
     </div>
 
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
@@ -1135,19 +1364,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-primary-button"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             :label="t('search.btnDownload')"
-            color="primary"
             @click="downloadRangeData"
           />
         </q-card-actions>
@@ -1169,8 +1396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
@@ -1194,22 +1420,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-white text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="saved-view-dialog-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
@@ -1218,8 +1442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('common.save')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="handleSavedView"
           />
           <q-btn
@@ -1241,7 +1464,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <span>Update</span>
+          <div class="tw:flex tw:items-center ">
+          <span class="tw:mt-2">Update</span>
           <q-toggle
             data-test="saved-function-action-toggle"
             v-bind:disable="functionOptions.length == 0"
@@ -1250,20 +1474,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             true-value="create"
             false-value="update"
             label=""
+            size="lg"
+            class="o2-toggle-button-lg"
             @change="savedFunctionName = ''"
           />
-          <span>Create</span>
+          <span class="tw:mt-2">Create</span>
+          </div>
           <div v-if="isSavedFunctionAction == 'create'">
             <q-input
               data-test="saved-function-name-input"
               v-model="savedFunctionName"
               :label="t('search.saveFunctionName')"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
@@ -1283,26 +1507,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('search.saveFunctionName')"
               placeholder="Select Function Name"
               :popup-content-style="{ textTransform: 'capitalize' }"
-              color="input-border"
-              bg-color="input-bg"
               class="q-py-sm showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-white text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="saved-function-dialog-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
@@ -1311,8 +1531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('confirmDialog.ok')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="saveFunction"
           />
           <q-btn
@@ -1321,8 +1540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('confirmDialog.loading')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
           />
         </q-card-actions>
       </q-card>
@@ -1330,24 +1548,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="searchSchedulerJob">
       <q-card style="width: 700px; max-width: 80vw">
         <q-card-section>
-          <div class="text-h6">Schedule Search Job</div>
+          <div class="text-h6">{{ t("search.scheduleSearchJob") }}</div>
         </q-card-section>
 
         <q-card-section class="q-pt-none">
           <div>
             <div class="text-left q-mb-xs">
-              No of Records:
+              {{ t("search.noOfRecords") }}:
               <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
                   max-width="300px"
                 >
-                  <span style="font-size: 14px"
-                    >Number of records can be specified eg: if the no. of
-                    records is 1000 then user can get maximum of 1000
-                    records</span
-                  >
+                  <span style="font-size: 14px">{{
+                    t("search.noOfRecordsTooltip")
+                  }}</span>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -1360,33 +1576,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               tabindex="0"
               min="100"
             />
           </div>
           <div class="text-left">
-            Maximum 100000 events can be returned in schedule job
+            {{ t("search.maxEventsScheduleJob") }}
           </div>
           <div
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
             <q-icon name="warning" color="red" class="q-mr-sm" />
-            <span>Histogram will be disabled for the schedule job</span>
+            <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="search-scheduler-max-records-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
             @click="
               {
@@ -1400,8 +1614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('confirmDialog.ok')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="addJobScheduler"
             v-close-popup
           />
@@ -1421,6 +1634,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmUpdateSavedViews"
       @update:cancel="confirmUpdate = false"
       v-model="confirmUpdate"
+    />
+    <!-- Query Plan Dialog -->
+    <QueryPlanDialog
+      v-model="showExplainDialog"
+      :searchObj="searchObj"
     />
   </div>
 </template>
@@ -1444,9 +1662,10 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard, is } from "quasar";
+import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useLogs from "@/composables/useLogs";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -1461,6 +1680,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { json2csv } from "json-2-csv";
+import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -1470,6 +1690,7 @@ import {
   queryIndexSplit,
   timestampToTimezoneDate,
   b64EncodeUnicode,
+  buildDateTimeObject,
 } from "@/utils/zincutils";
 
 import savedviewsService from "@/services/saved_views";
@@ -1486,6 +1707,19 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { searchState } from "@/composables/useLogs/searchState";
+import {
+  getVisualizationConfig,
+  encodeVisualizationConfig,
+  decodeVisualizationConfig,
+} from "@/composables/useLogs/logsVisualization";
+
+import useSearchBar from "@/composables/useLogs/useSearchBar";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
+import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 
 const defaultValue: any = () => {
   return {
@@ -1500,12 +1734,23 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
+    ShareButton,
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
     TransformSelector,
     FunctionSelector,
     CodeQueryEditor,
+    QueryPlanDialog,
+    ScanSearch,
+    ChartLine,
+    ChartNoAxesColumn,
+    RefreshCcw,
+    Bookmark,
+    Share,
+    Menu,
+    Maximize,
+    Minimize,
   },
   emits: [
     "searchdata",
@@ -1515,6 +1760,7 @@ export default defineComponent({
     "handleRunQueryFn",
     "onAutoIntervalTrigger",
     "showSearchHistory",
+    "extractPatterns",
   ],
   methods: {
     searchData() {
@@ -1581,6 +1827,15 @@ export default defineComponent({
         });
         return;
       }
+      if(!this.searchObj?.data?.customDownloadQueryObj?.query){
+        this.$q.notify({
+            message: "Please run a query first before downloading.",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return;
+      }
       // const queryReq = this.buildSearch();
       this.searchObj.data.customDownloadQueryObj.query.from =
         initNumber == 0 ? 0 : initNumber - 1;
@@ -1603,7 +1858,7 @@ export default defineComponent({
             this.$q.notify({
               message: "No data found to download.",
               color: "positive",
-              position: "top",
+              position: "bottom",
               timeout: 2000,
             });
           }
@@ -1612,7 +1867,7 @@ export default defineComponent({
           this.$q.notify({
             message: err.message,
             color: "negative",
-            position: "top",
+            position: "bottom",
             timeout: 2000,
           });
         });
@@ -1638,36 +1893,36 @@ export default defineComponent({
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
+    const { resetStreamData, searchObj } = searchState();
+    const { buildSearch } = useSearchStream();
 
     const {
-      searchObj,
-      refreshData,
-      handleRunQuery,
-      updatedLocalLogFilterField,
-      getSavedViews,
-      getQueryData,
-      getStreams,
-      updateUrlQueryParams,
-      generateURLQuery,
-      buildSearch,
-      resetStreamData,
-      loadStreamLists,
       fnParsedSQL,
       fnUnparsedSQL,
-      onStreamChange,
-      moveItemsToTop,
-      validateFilterForMultiStream,
-      extractFields,
-      cancelQuery,
+      updatedLocalLogFilterField,
+      updateUrlQueryParams,
+      generateURLQuery,
+      isActionsEnabled,
+      checkTimestampAlias,
+    } = logsUtils();
+    const {
+      getSavedViews,
       setSelectedStreams,
+      onStreamChange,
+      getQueryData,
+      cancelQuery,
+    } = useSearchBar();
+    const { loadStreamLists, extractFields } = useStreamFields();
+
+    const {
+      refreshData,
+      handleRunQuery,
       getJobData,
       routeToSearchSchedule,
-      isActionsEnabled,
-      getVisualizationConfig,
-      encodeVisualizationConfig,
+      getHistogramTitle,
     } = useLogs();
 
-    const { isStreamExists, isStreamFetched } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -1731,6 +1986,7 @@ export default defineComponent({
     const isSavedViewAction = ref("create");
     const savedViewName = ref("");
     const savedViewSelectedName = ref("");
+    const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
     const savedViewDropdownModel = ref(false);
@@ -2227,39 +2483,62 @@ export default defineComponent({
     };
 
     const downloadLogs = async (data, format) => {
-      let filename = "logs-data";
-      let dataobj;
-      if (format === "csv") {
-        filename += ".csv";
-        dataobj = await json2csv(data);
-      } else {
-        filename += ".json";
-        dataobj = JSON.stringify(data, null, 2);
-      }
-      if (dataobj.length === 0) {
+      //here we are using a package json2csv which converts json to csv data
+      //why package because we faced one issue where user has , in some of the fields so
+      //it is treating it as seperate fields
+      //eg: {body:"hey this is the email body , with some info in it "}
+      //after converting it will treat hey this is the email body this as the body and remaining will be the next column
+      //to solve this issue we are using json2csv package
+
+      if (!data || data.length === 0) {
         $q.notify({
-          type: "negative",
-          message: "No data available to download.",
+          message: "No data found to download.",
+          color: "positive",
+          position: "bottom",
+          timeout: 2000,
         });
         return;
       }
-      if (format === "csv") {
-        dataobj = new Blob([dataobj], { type: "text/csv" });
-      } else {
-        dataobj = new Blob([dataobj], { type: "application/json" });
+
+      try {
+        let filename = "logs-data";
+        let dataobj;
+        const options = {
+          emptyFieldValue: "",
+        };
+
+        if (format === "csv") {
+          filename += ".csv";
+          dataobj = await json2csv(data, options);
+        } else {
+          filename += ".json";
+          dataobj = JSON.stringify(data, null, 2);
+        }
+        if (format === "csv") {
+          dataobj = new Blob([dataobj], { type: "text/csv" });
+        } else {
+          dataobj = new Blob([dataobj], { type: "application/json" });
+        }
+        const file = new File([dataobj], filename, {
+          type: format === "csv" ? "text/csv" : "application/json",
+        });
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showDownloadMenu.value = false;
+      } catch (error) {
+        showDownloadMenu.value = false;
+        $q.notify({
+          type: "negative",
+          message: "Error downloading logs",
+          timeout: 2000,
+        });
       }
-      const file = new File([dataobj], filename, {
-        type: format === "csv" ? "text/csv" : "application/json",
-      });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showDownloadMenu.value = false;
     };
 
     onMounted(async () => {
@@ -2462,7 +2741,7 @@ export default defineComponent({
       searchObj.data.actionId = actionId.id;
     };
 
-    const populateFunctionImplementation = (fnValue, flag = false) => {
+    const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
       if (flag) {
         $q.notify({
           type: "positive",
@@ -2471,7 +2750,10 @@ export default defineComponent({
         });
       }
 
-      searchObj.config.fnSplitterModel = 60;
+      if (openEditor) {
+        searchObj.meta.showTransformEditor = true;
+        searchObj.config.fnSplitterModel = 60;
+      }
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
@@ -2563,7 +2845,8 @@ export default defineComponent({
       }
 
       // Sync visualization data to URL
-      const currentVisualizationData = getVisualizationConfig(dashboardPanelData);
+      const currentVisualizationData =
+        getVisualizationConfig(dashboardPanelData);
       if (currentVisualizationData) {
         const encoded = encodeVisualizationConfig(currentVisualizationData);
         if (encoded) {
@@ -2572,7 +2855,7 @@ export default defineComponent({
 
           await router.replace({
             name: router.currentRoute.value.name,
-            query: currentQuery
+            query: currentQuery,
           });
         }
       }
@@ -2683,21 +2966,25 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
+              //here we are merging deep to the searchObj with the extractedObj
               mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
 
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-                await restoreVisualizationData(extractedObj.data.visualizationData);
+                await restoreVisualizationData(
+                  extractedObj.data.visualizationData,
+                );
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
                   {
                     name: "",
-                    function: searchObj.data.tempFunctionContent,
+                    function: extractedObj.data.tempFunctionContent,
                   },
                   false,
+                  extractedObj.meta.showTransformEditor, // Use saved view's editor state
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -2712,9 +2999,102 @@ export default defineComponent({
                     function: "",
                   },
                   false,
+                  extractedObj.meta.showTransformEditor, // No function content, so don't open editor
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
+              }
+
+
+              //here we are getting data so we need to check here
+              //before we set the time to the dateTimeRef.value we need to check if the startTime and endTime difference is greater than maxQueryRange in hours
+              //solution will be we will do endTime - startTime and convert that difference into hours and check with both global and stream level maxQueryRange and if it is less than or equal to that we will keep that as it is
+              //if that exceeds the maxQueryRange we will convert that to relative type (because we cannot assume the start and end date) or we can do that by converting present time - maxQueryRange
+
+              // Validate and adjust time range based on maxQueryRange
+              //before we check all this we need to get the current selected stream max query range and also global max query range
+              //we need to compare so if max query range of stream is there we will use that otherwise we will use the global max query if both are not present
+              //we will skip this below process
+
+              // Get max query range for all selected streams and take the minimum
+              // Preference: stream max query range > global max query range
+              const globalMaxQueryRange = store.state.zoConfig.max_query_range || 0;
+              let effectiveMaxQueryRange = -1;
+
+              if (selectedStreams && selectedStreams.length > 0) {
+                // Fetch all stream data in parallel
+                const streamDataPromises = selectedStreams.map((streamName) =>
+                  getStream(streamName, searchObj.data.stream.streamType, false)
+                );
+
+                try {
+                  const streamDataList = await Promise.all(streamDataPromises);
+
+                  // Extract max_query_range from each stream's settings
+                  const streamMaxQueryRanges = streamDataList
+                    .map((streamData) => streamData?.settings?.max_query_range || 0)
+                    .filter((range) => range > 0); // Only consider positive values
+
+                  // If we have stream-specific max query ranges, find the minimum (stream takes preference)
+                  if (streamMaxQueryRanges.length > 0) {
+                    effectiveMaxQueryRange = Math.min(...streamMaxQueryRanges);
+                  } else if (globalMaxQueryRange > 0) {
+                    // No stream-specific ranges, fall back to global max query range
+                    effectiveMaxQueryRange = globalMaxQueryRange;
+                  }
+                } catch (error) {
+                  // On error, fall back to global max query range
+                  effectiveMaxQueryRange = globalMaxQueryRange > 0 ? globalMaxQueryRange : -1;
+                }
+              } else if (globalMaxQueryRange > 0) {
+                // No selected streams, use global max query range
+                effectiveMaxQueryRange = globalMaxQueryRange;
+              }
+
+              // Validate and adjust time range if effective max query range exists
+              if (
+                effectiveMaxQueryRange > 0 &&
+                searchObj.data.datetime?.startTime &&
+                searchObj.data.datetime?.endTime
+              ) {
+                // Calculate time difference in hours
+                const startTimeMicros = parseInt(searchObj.data.datetime.startTime);
+                const endTimeMicros = parseInt(searchObj.data.datetime.endTime);
+                const timeDiffInHours = (endTimeMicros - startTimeMicros) / (60 * 60 * 1000000);
+
+                // Check if time difference exceeds effective max query range
+                if (timeDiffInHours > effectiveMaxQueryRange) {
+                  // Adjust to current time - maxQueryRange
+                  const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
+                  const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
+
+                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
+                  const adjustedEndTime = currentTimeMicros;
+
+                  // Get the current datetime type
+                  const currentType = searchObj.data.datetime.type || "relative";
+
+                  // Build the complete datetime object with all required fields
+                  const updatedDateTime = buildDateTimeObject(
+                    adjustedStartTime,
+                    adjustedEndTime,
+                    currentType
+                  );
+
+                  // Update searchObj.data.datetime with all fields
+                  searchObj.data.datetime.startTime = adjustedStartTime;
+                  searchObj.data.datetime.endTime = adjustedEndTime;
+
+                  if (currentType === "relative") {
+                    // For relative type, update relativeTimePeriod
+                    searchObj.data.datetime.relativeTimePeriod = updatedDateTime.relativeTimePeriod;
+                  } else if (currentType === "absolute") {
+                    // For absolute type, update selectedDate and selectedTime
+                    searchObj.data.datetime.selectedDate = updatedDateTime.selectedDate;
+                    searchObj.data.datetime.selectedTime = updatedDateTime.selectedTime;
+                    searchObj.data.datetime.relativeTimePeriod = null;
+                  }
+                }
               }
 
               dateTimeRef.value.setSavedDate(searchObj.data.datetime);
@@ -2724,7 +3104,13 @@ export default defineComponent({
                 clearInterval(store.state.refreshIntervalID);
               }
               searchObj.data.stream.selectedStream.push(...selectedStreams);
-              await updatedLocalLogFilterField();
+              // we dont need to update local log filter field because 
+              // if visualize is there for any saved views we will get right any previous local filter fields 
+              // they will get applied to the current visualize selected stream 
+              // so we need to make sure we dont update that local filter fields when it is visualize
+              if(extractedObj.meta.logsVisualizeToggle ==  "logs"){
+                await updatedLocalLogFilterField();
+              }
               await getStreams("logs", true);
             } else {
               // ----- Here we are explicitly handling stream change -----
@@ -2778,7 +3164,9 @@ export default defineComponent({
 
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-                await restoreVisualizationData(extractedObj.data.visualizationData);
+                await restoreVisualizationData(
+                  extractedObj.data.visualizationData,
+                );
               }
 
               const streamData = await getStreams(
@@ -2808,9 +3196,10 @@ export default defineComponent({
                 populateFunctionImplementation(
                   {
                     name: "",
-                    function: searchObj.data.tempFunctionContent,
+                    function: extractedObj.data.tempFunctionContent,
                   },
                   false,
+                  extractedObj.meta.showTransformEditor, // Use saved view's editor state
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -2822,6 +3211,7 @@ export default defineComponent({
                     function: "",
                   },
                   false,
+                  false, // No function content, so don't open editor
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -2832,11 +3222,18 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              await updatedLocalLogFilterField();
+              // we dont need to update local log filter field because 
+              // if visualize is there for any saved views we will get right any previous local filter fields 
+              // they will get applied to the current visualize selected stream 
+              // so we need to make sure we dont update that local filter fields when it is visualize
+              if(extractedObj.meta.logsVisualizeToggle ==  "logs" ){
+                await updatedLocalLogFilterField();
+              }
             }
 
-            if (searchObj.meta.toggleFunction == false) {
-              searchObj.config.fnSplitterModel = 99.5;
+            // Only reset function content if there's no function in the saved view
+            if (searchObj.meta.toggleFunction == false && !extractedObj.data.tempFunctionContent) {
+              searchObj.config.fnSplitterModel = 100;
               resetFunctionContent();
             }
 
@@ -2850,8 +3247,11 @@ export default defineComponent({
             });
             setTimeout(async () => {
               try {
+                searchObj.loadingHistogram = false;
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
+                // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
+                searchObj.communicationMethod = "streaming";                
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -2872,7 +3272,7 @@ export default defineComponent({
               searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
-                ];
+                ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;
@@ -2986,7 +3386,7 @@ export default defineComponent({
             //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
               $q.notify({
-                message: `View deleted successfully.`,
+                message: t("search.viewDeletedSuccessfully"),
                 color: "positive",
                 position: "bottom",
                 timeout: 1000,
@@ -2994,7 +3394,7 @@ export default defineComponent({
               getSavedViews();
             } else {
               $q.notify({
-                message: `Error while deleting saved view. ${res.data.error_detail}`,
+                message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
                 timeout: 1000,
@@ -3003,7 +3403,7 @@ export default defineComponent({
           })
           .catch((err) => {
             $q.notify({
-              message: `Error while deleting saved view.`,
+              message: t("search.errorDeletingSavedView"),
               color: "negative",
               position: "bottom",
               timeout: 1000,
@@ -3031,6 +3431,14 @@ export default defineComponent({
         delete savedSearchObj.data.savedViews;
         delete savedSearchObj.data.transforms;
 
+
+        // Turn off all loaders before saving view
+        savedSearchObj.loading = false;
+        savedSearchObj.loadingHistogram = false;
+        savedSearchObj.loadingCounter = false;
+        savedSearchObj.loadingStream = false;
+        savedSearchObj.loadingSavedView = false;
+        
         savedSearchObj.data.timezone = store.state.timezone;
 
         if (savedSearchObj.data.parsedQuery) {
@@ -3038,7 +3446,10 @@ export default defineComponent({
         }
 
         // Include visualization data if in visualization mode
-        if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
+        if (
+          searchObj.meta.logsVisualizeToggle === "visualize" &&
+          dashboardPanelData
+        ) {
           const visualizationData = getVisualizationConfig(dashboardPanelData);
           if (visualizationData) {
             savedSearchObj.data.visualizationData = visualizationData;
@@ -3085,7 +3496,7 @@ export default defineComponent({
                 view_name: viewName,
               });
               $q.notify({
-                message: `View created successfully.`,
+                message: t("search.viewCreatedSuccessfully"),
                 color: "positive",
                 position: "bottom",
                 timeout: 1000,
@@ -3097,7 +3508,7 @@ export default defineComponent({
             } else {
               saveViewLoader.value = false;
               $q.notify({
-                message: `Error while creating saved view. ${res.data.error_detail}`,
+                message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
                 timeout: 1000,
@@ -3107,7 +3518,7 @@ export default defineComponent({
           .catch((err) => {
             saveViewLoader.value = false;
             $q.notify({
-              message: `Error while creating saved view.`,
+              message: t("search.errorCreatingSavedView"),
               color: "negative",
               position: "bottom",
               timeout: 1000,
@@ -3158,7 +3569,7 @@ export default defineComponent({
               );
 
               $q.notify({
-                message: `View updated successfully.`,
+                message: t("search.viewUpdatedSuccessfully"),
                 color: "positive",
                 position: "bottom",
                 timeout: 1000,
@@ -3170,7 +3581,7 @@ export default defineComponent({
             } else {
               saveViewLoader.value = false;
               $q.notify({
-                message: `Error while updating saved view. ${res.data.error_detail}`,
+                message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
                 timeout: 1000,
@@ -3181,7 +3592,7 @@ export default defineComponent({
             dismiss();
             saveViewLoader.value = false;
             $q.notify({
-              message: `Error while updating saved view.`,
+              message: t("search.errorUpdatingSavedView"),
               color: "negative",
               position: "bottom",
               timeout: 1000,
@@ -3202,7 +3613,11 @@ export default defineComponent({
       }
     };
 
-    const shareLink = useLoading(async () => {
+    /**
+     * Computed property for share URL
+     * Generates the full shareable URL with all query parameters
+     */
+    const shareURL = computed(() => {
       const queryObj = generateURLQuery(true, dashboardPanelData);
       // Removed the 'type' property from the object to avoid issues when navigating from the stream to the logs page,
       // especially when the user performs multi-select on streams and shares the URL.
@@ -3214,41 +3629,13 @@ export default defineComponent({
         )
         .join("&");
 
-      let shareURL = window.location.origin + window.location.pathname;
+      let url = window.location.origin + window.location.pathname;
 
       if (queryString != "") {
-        shareURL += "?" + queryString;
+        url += "?" + queryString;
       }
 
-      await shortURLService
-        .create(store.state.selectedOrganization.identifier, shareURL)
-        .then((res: any) => {
-          if (res.status == 200) {
-            shareURL = res.data.short_url;
-            copyToClipboard(shareURL)
-              .then(() => {
-                $q.notify({
-                  type: "positive",
-                  message: "Link Copied Successfully!",
-                  timeout: 5000,
-                });
-              })
-              .catch(() => {
-                $q.notify({
-                  type: "negative",
-                  message: "Error while copy link.",
-                  timeout: 5000,
-                });
-              });
-          }
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Error while shortening link.",
-            timeout: 5000,
-          });
-        });
+      return url;
     });
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
@@ -3331,7 +3718,7 @@ export default defineComponent({
             })
             .filter(Boolean);
 
-          searchObj.data.query = queries.join(" UNION ");
+          searchObj.data.query = queries.join(" UNION ALL BY NAME ");
           searchObj.data.editorValue = searchObj.data.query;
         }
       } else {
@@ -3471,11 +3858,11 @@ export default defineComponent({
 
     const handleHistogramMode = () => {};
 
-    const handleRunQueryFn = () => {
-      if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        emit("handleRunQueryFn");
+    const handleRunQueryFn = (clear_cache = false) => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns") {
+        emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
-        handleRunQuery();
+        handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
       }
     };
 
@@ -3499,6 +3886,7 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
+
         if (
           searchObj.meta.logsVisualizeDirtyFlag === true ||
           !Object.hasOwn(searchObj.data?.queryResults, "hits") ||
@@ -3512,6 +3900,35 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
+      } else if (
+        value == "logs" &&
+        searchObj.meta.logsVisualizeToggle == "patterns"
+      ) {
+        // Switching from patterns to logs - check if we need to fetch logs
+        const hasLogs =
+          searchObj.data?.queryResults?.hits &&
+          searchObj.data.queryResults.hits.length > 0;
+
+        // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+
+        if (!hasLogs) {
+          // No logs data - fetch them
+          // console.log("[SearchBar] Fetching logs data");
+          searchObj.loading = true;
+          searchObj.meta.refreshHistogram = true;
+          getQueryData();
+        } else {
+          // Logs exist - just switch the view
+          // console.log("[SearchBar] Reusing existing logs data");
+        }
+      } else if (
+        value == "patterns" &&
+        (searchObj.meta.logsVisualizeToggle == "logs" ||
+          searchObj.meta.logsVisualizeToggle == "visualize")
+      ) {
+        // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
+        emit("extractPatterns");
+        // console.log("[SearchBar] Switching to patterns mode");
       } else if (
         value == "visualize" &&
         searchObj.meta.logsVisualizeToggle == "logs"
@@ -3548,6 +3965,14 @@ export default defineComponent({
           return;
         }
 
+        // validate that timestamp column is not used as an alias
+        if (!checkTimestampAlias(logsPageQuery)) {
+          showErrorNotification(
+            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+          );
+          return;
+        }
+
         // validate sql query that all fields have alias
         if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
           showErrorNotification(
@@ -3561,6 +3986,16 @@ export default defineComponent({
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
+
+      if (searchObj.meta.logsVisualizeToggle === "logs") {
+        const hasLogs =
+          searchObj.data?.queryResults?.hits &&
+          searchObj.data.queryResults.hits.length > 0;
+
+        if (hasLogs) {
+          searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
+        }
+      }
 
       // dispatch resize event
       window.dispatchEvent(new Event("resize"));
@@ -3598,14 +4033,14 @@ export default defineComponent({
         backgroundColor:
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
-              ? "#575A5A"
-              : "#E0E0E0" // Dark mode: grey, Light mode: yellow (or any color)
+              ? "var(--o2-card-bg)"
+              : "white" // Dark mode: grey, Light mode: yellow (or any color)
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
-              ? "2px solid #575A5A "
-              : "2px solid #E0E0E0"
+              ? "0.375rem solid var(--o2-card-bg)"
+              : "0.375rem solid var(--o2-card-bg)"
             : "none",
       };
     });
@@ -3643,6 +4078,7 @@ export default defineComponent({
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
+
     const iconRight = computed(() => {
       return (
         "img:" +
@@ -3668,11 +4104,18 @@ export default defineComponent({
         // if(searchObj.meta.jobId != ""){
         //   searchObj.meta.jobId = "";
         // }
+        if (!searchObj.data.stream.selectedStream || searchObj.data.stream.selectedStream.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: "Please select a stream before scheduling a job",
+            timeout: 3000,
+          });
+          return;
+        }
         if (searchObj.meta.jobId != "") {
           $q.notify({
             type: "negative",
-            message:
-              "Job Already Scheduled , please change some parameters to schedule new job",
+            message: t("search.jobAlreadyScheduled"),
             timeout: 3000,
           });
           return;
@@ -3684,7 +4127,7 @@ export default defineComponent({
         ) {
           $q.notify({
             type: "negative",
-            message: "Job Scheduler should be between 1 and 100000",
+            message: t("search.jobSchedulerRange"),
             timeout: 3000,
           });
           return;
@@ -3697,7 +4140,7 @@ export default defineComponent({
         if (e.response.status != 403) {
           $q.notify({
             type: "negative",
-            message: "Error while adding job",
+            message: t("search.errorAddingJob"),
             timeout: 3000,
           });
           return;
@@ -3759,16 +4202,20 @@ export default defineComponent({
         if (searchObj.meta.showTransformEditor) {
           searchObj.config.fnSplitterModel = 60;
         } else {
-          searchObj.config.fnSplitterModel = 99.5;
+          searchObj.config.fnSplitterModel = 100;
         }
       } else {
-        searchObj.config.fnSplitterModel = 99.5;
+        searchObj.config.fnSplitterModel = 100;
       }
     };
+    //so if it is active we need light this is fixed 
+    //if it is inactive we will be having 2 conditions
+    //1. if dark mode show light color
+    //2.if light mode show dark color
     const visualizeIcon = computed(() => {
       return searchObj.meta.logsVisualizeToggle === "visualize"
         ? getImageURL("images/common/visualize_icon_light.svg")
-        : getImageURL("images/common/visualize_icon_dark.svg");
+        : store.state.theme == 'dark' ? getImageURL("images/common/visualize_icon_light.svg") : getImageURL("images/common/visualize_icon_dark.svg");
     });
     const histogramIcon = computed(() => {
       return store.state.theme === "dark"
@@ -3812,6 +4259,14 @@ export default defineComponent({
     });
 
     // [END] cancel running queries
+
+    // [START] explain query functionality
+    const openExplainDialog = () => {
+      if (searchObj.data.query && searchObj.data.query.trim() !== "") {
+        showExplainDialog.value = true;
+      }
+    };
+    // [END] explain query functionality
 
     return {
       $q,
@@ -3865,7 +4320,7 @@ export default defineComponent({
       savedFunctionName,
       savedFunctionSelectedName,
       saveFunctionLoader,
-      shareLink,
+      shareURL,
       showSearchHistoryfn,
       getImageURL,
       resetFilters,
@@ -3889,7 +4344,6 @@ export default defineComponent({
       regionFilterRef,
       regionFilter,
       resetRegionFilter,
-      validateFilterForMultiStream,
       cancelQuery,
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
@@ -3947,13 +4401,13 @@ export default defineComponent({
       updateAutoComplete,
       handleEscKey,
       applyAction,
-      showSavedViewConfirmDialog,
       getFieldList,
       buildStreamQuery,
-      regionFilterMethod,
-      resetRegionFilter,
       updateActionSelection,
       updateEditorWidth,
+      showExplainDialog,
+      openExplainDialog,
+      outlinedShowChart,
     };
   },
   computed: {
@@ -4062,6 +4516,17 @@ export default defineComponent({
                     filter +
                     " order by" +
                     afterOrderBy;
+                } else if (query.toLowerCase().includes("group by")) {
+                  const [beforeGroupBy, afterGroupBy] = queryIndexSplit(
+                    query,
+                    "group by",
+                  );
+                  query =
+                    beforeGroupBy.trim() +
+                    " AND " +
+                    filter +
+                    " group by" +
+                    afterGroupBy;
                 } else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
@@ -4088,6 +4553,17 @@ export default defineComponent({
                     filter +
                     " order by" +
                     afterOrderBy;
+                } else if (query.toLowerCase().includes("group by")) {
+                  const [beforeGroupBy, afterGroupBy] = queryIndexSplit(
+                    query,
+                    "group by",
+                  );
+                  query =
+                    beforeGroupBy.trim() +
+                    " where " +
+                    filter +
+                    " group by" +
+                    afterGroupBy;
                 } else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
@@ -4128,7 +4604,7 @@ export default defineComponent({
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {
-        this.searchObj.config.fnSplitterModel = 99.5;
+        this.searchObj.config.fnSplitterModel = 100;
       } else {
         this.searchObj.config.fnSplitterModel = 60;
       }
@@ -4147,467 +4623,164 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.logs-saved-view-icon:hover {
-  color: black !important;
-  background-color: lightgray !important;
-}
-.logs-search-bar-component {
-  padding-bottom: 1px;
-  height: 100%;
-  overflow: visible;
-
-  .reset-filters {
-    width: 32px;
-    height: 32px;
-
-    .q-icon {
-      margin-right: 0;
-    }
-  }
-
-  #logsQueryEditor,
-  #fnEditor {
-    height: 100% !important;
-  }
-  #fnEditor {
-    width: 100%;
-    border-radius: 5px;
-    border: 0px solid #dbdbdb;
-    overflow: hidden;
-  }
-
-  .q-field--standard .q-field__control:before,
-  .q-field--standard .q-field__control:focus:before,
-  .q-field--standard .q-field__control:hover:before {
-    border: 0px !important;
-    border-color: none;
-    transition: none;
-  }
-
-  .row:nth-child(2) {
-    height: 100%; /* or any other height you want to set */
-  }
-
-  .empty-query .cm-scroller {
-    background-image: url("../../assets/images/common/query-editor.png");
-    background-repeat: no-repeat;
-    background-size: 115px;
-    background-position: 5px 5px;
-  }
-  .empty-query .cm-gutters {
-    display: none;
-  }
-
-  .empty-function .cm-scroller {
-    background-image: url("../../assets/images/common/vrl-function.png");
-    background-repeat: no-repeat;
-    background-size: 170px;
-    background-position: 5px 5px;
-  }
-
-  .empty-function .cm-gutters {
-    display: none;
-  }
-
-  .function-dropdown {
-    width: 205px;
-    padding-bottom: 0px;
-    border: 1px solid #dbdbdb;
-    border-radius: 5px;
-    cursor: pointer;
-
-    .q-field__input {
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .q-field__native,
-    .q-field__control {
-      min-height: 29px;
-      height: 29px;
-      padding: 0px 0px 0px 4px;
-    }
-
-    .q-field__marginal {
-      height: 30px;
-    }
-  }
-
-  .q-toggle__inner {
-    font-size: 30px;
-  }
-
-  .q-toggle__label {
-    font-size: 12px;
-  }
-
-  .casesensitive-btn {
-    padding: 8px;
-    margin-left: -6px;
-    background-color: #d5d5d5;
-    border-radius: 0px 3px 3px 0px;
-  }
-
-  .search-field .q-field {
-    &__control {
-      border-radius: 3px 0px 0px 3px !important;
-    }
-
-    &__native {
-      font-weight: 600;
-    }
-  }
-
-  .search-time {
-    // width: 120px;
-    .q-btn-group {
-      border-radius: 3px;
-
-      .q-btn {
-        min-height: auto;
-      }
-    }
-  }
-
-  .search-dropdown {
-    padding: 0px;
-
-    .block {
-      color: $dark-page;
-      font-weight: 600;
-      font-size: 12px;
-    }
-
-    .q-btn-dropdown__arrow-container {
-      color: $light-text2;
-    }
-  }
-
-  .refresh-rate-dropdown-container {
-    width: 220px;
-
-    * .q-btn {
-      font-size: 12px !important;
-      padding-left: 8px;
-      padding-right: 8px;
-    }
-  }
-
-  .flex-start {
-    justify-content: flex-start;
-    align-items: flex-start;
-    display: flex;
-  }
-
-  .resultsOverChart {
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: $dark-page;
-    font-weight: 700;
-  }
-
-  .ddlWrapper {
-    position: relative;
-    z-index: 10;
-
-    .listWrapper {
-      box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-      transition: height 0.25s ease;
-      height: calc(100vh - 146px);
-      background-color: white;
-      position: absolute;
-      top: 2.75rem;
-      width: 100%;
-      left: 0;
-
-      &:empty {
-        height: 0;
-      }
-
-      &,
-      .q-list {
-        border-radius: 3px;
-      }
-    }
-  }
-
-  .fields_autocomplete {
-    max-height: 250px;
-  }
-
-  .search-button {
-    min-width: 77px;
-    line-height: 29px;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 11px;
-    color: white;
-
-    .q-btn__content {
-      background: $secondary;
-      border-radius: 3px 3px 3px 3px;
-      padding: 0px 5px;
-
-      .q-icon {
-        font-size: 15px;
-        color: #ffffff;
-      }
-    }
-  }
-
-  .cancel-search-button {
-    .q-btn__content {
-      background: $negative !important;
-    }
-  }
-
-  .download-logs-btn {
-    height: 30px;
-  }
-
-  .save-transform-btn {
-    height: 31px;
-  }
-
-  .query-editor-container {
-    height: calc(100% - 35px) !important;
-  }
-
-  .logs-auto-refresh-interval {
-    .q-btn {
-      min-height: 30px;
-      max-height: 30px;
-      padding: 0 4px;
-    }
-  }
-
-  .saved-views-dropdown {
-    border-radius: 4px;
-    button {
-      padding: 4px 5px;
-    }
-  }
-
-  .savedview-dropdown {
-    width: 215px;
-    display: inline-block;
-    border: 1px solid #dbdbdb;
-
-    .q-field__input {
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .q-field__native,
-    .q-field__control {
-      min-height: 29px !important;
-      height: 29px;
-      padding: 0px 0px 0px 4px;
-    }
-
-    .q-field__marginal {
-      height: 30px;
-    }
-  }
-
-  .saved-view-item {
-    padding: 2px 4px !important;
-  }
-
-  .body--dark {
-    .btn-function {
-      filter: brightness(100);
-    }
-  }
-
-  .btn-function {
-    .q-icon {
-      &.on-left {
-        margin-right: 6px !important;
-        font-size: 16px;
-      }
-    }
-  }
-
-  .q-pagination__middle > .q-btn {
-    min-width: 30px !important;
-    max-width: 30px !important;
-  }
-
-  .q-item {
-    padding: 0px !important;
-  }
-
-  .q-focus-helper:hover {
-    background: transparent !important;
-  }
-
-  .favorite-label {
-    line-height: 24px !important;
-    font-weight: bold !important;
-  }
-
-  .region-dropdown-btn {
-    text-transform: capitalize;
-    font-weight: 600;
-    font-size: 12px;
-    padding-left: 8px;
-    height: 30px;
-    padding-top: 3px;
-
-    .q-btn-dropdown__arrow {
-      margin-left: 0px !important;
-    }
-  }
-
-  .download-logs-btn {
-    .q-btn-dropdown__arrow {
-      margin-left: 0px !important;
-    }
-  }
-
-  .region-dropdown-list {
-    min-width: 150px;
-
-    .q-item__section {
-      display: inline-block;
-    }
-
-    .q-item__label {
-      margin-left: 20px;
-      text-transform: capitalize;
-      margin-top: 2px;
-    }
-  }
-}
-.saved-view-table {
-  td {
-    padding: 0;
-    height: 25px !important;
-    min-height: 25px !important;
-  }
-
-  .q-table__control {
-    margin: 0px !important;
-    width: 100% !important;
-    text-align: right;
-  }
-
-  .q-table__bottom {
-    padding: 0px !important;
-    min-height: 35px;
-
-    .q-table__control {
-      padding: 0px 10px !important;
-    }
-  }
-
-  .q-table__top {
-    padding: 0px !important;
-    margin: 0px !important;
-    left: 0px;
-    width: 100%;
-
-    .q-table__separator {
-      display: none;
-    }
-
-    .q-table__control {
-      padding: 0px !important;
-    }
-  }
-
-  .q-field--filled .q-field__control {
-    padding: 0px 5px !important;
-  }
-
-  .saved-view-item {
-    padding: 4px 5px 4px 10px !important;
-  }
-
-  .q-item__section--main ~ .q-item__section--side {
-    padding-left: 5px !important;
-  }
-}
-
-.logs-visualize-toggle {
-  .button-group {
-    border: 1px solid gray !important;
-    border-radius: 9px;
-  }
-
-  .button {
-    background-color: #f0eaea;
-  }
-
-  .button-left {
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
-    color: black;
-  }
-
-  .button-right {
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-    color: black;
-  }
-  .selected {
-    background-color: var(--q-primary) !important;
-    color: white;
-  }
-}
-
-.file-type-button-group {
-  .q-btn {
-    border: 1px solid var(--q-border-color, #e0e0e0);
-    background-color: var(--q-field-bg, #fafafa);
-    color: var(--q-text-color, #000);
-
-    &.selected {
-      background-color: var(--q-primary) !important;
-      color: white !important;
-      border-color: var(--q-primary) !important;
-    }
-
-    &:first-child {
-      border-top-left-radius: 4px;
-      border-bottom-left-radius: 4px;
-    }
-
-    &:last-child {
-      border-top-right-radius: 4px;
-      border-bottom-right-radius: 4px;
-    }
-
-    &:not(:last-child) {
-      border-right: none;
-    }
-
-    &:hover:not(.selected) {
-      background-color: var(--q-hover-color, #f5f5f5);
-    }
-  }
-}
-</style>
-<style scoped>
+<style scoped lang="scss">
 .expand-on-focus {
-  height: calc(100vh - 200px) !important;
+  position: fixed !important;
+  height: calc(100vh - 12.5rem) !important;
   z-index: 20 !important;
+  width: calc(100% - 104px);
 }
 
 .file-type label {
   transform: translate(-0.75rem, -175%);
   font-weight: bold;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.6);
+  font-size: 0.875rem; // 14px
+  color: var(--o2-text-secondary);
 }
 .q-dark .q-btn {
   font-weight: 600;
-  border: 0px solid rgba(255, 255, 255, 0.2);
+  border: 0 solid rgba(255, 255, 255, 0.2);
 }
 .q-dark .file-type label,
 .q-dark .file-type .q-btn {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--o2-text-secondary);
+}
+
+// Toolbar Icon and Toggle Styles
+.toolbar-toggle-container {
+  padding: 0 0.175rem; // 0 ~2.8px
+  margin-left: 0.25rem; // 8px
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid var(--o2-border-color); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.dark-theme .toolbar-toggle-container {
+  border: 0.0625rem solid var(--o2-border-color);
+}
+
+.toolbar-icon {
+  width: 1rem; // 16px
+  height: 1rem; // 16px
+  object-fit: contain;
+}
+
+.q-dark .toolbar-icon {
+  filter: invert(1);
+}
+
+.toolbar-icon-in-toggle {
+  font-size: 0.9rem; // ~14.4px
+}
+
+.syntax-guide-in-menu {
+  :deep(.q-btn) {
+    border: none !important;
+    margin-left: 0 !important;
+
+    &:hover {
+      background-color: transparent !important;
+    }
+
+    &::before {
+      display: none !important;
+    }
+  }
+}
+
+.toolbar-reset-btn {
+  padding: 0.25rem 0.375rem; // 4px 6px
+  margin-left: 0.25rem; // 8px
+  border: 0.0625rem solid var(--o2-border-color); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  min-height: 1.875rem; // 30px
+
+  .q-icon {
+    font-size: 1.215rem; // 16px
+  }
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  &.theme-dark {
+    border-color: var(--o2-border-color) !important;
+  }
+}
+
+.q-dark .toolbar-reset-btn,
+.dark-theme .toolbar-reset-btn {
+  border-color: var(--o2-border-color);
+}
+
+.group-menu-btn {
+  padding: 0.25rem 0.25rem !important; // 4px 8px
+  margin-left: 0.25rem; // 8px
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12) !important; // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  min-height: 1.875rem !important; // 30px
+  font-size: 0.75rem; // 12px
+  font-weight: 500;
+
+  .q-icon {
+    font-size: 1.125rem; // 18px
+  }
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.dark-theme .group-menu-btn,
+.q-dark .group-menu-btn {
+  border: 0.0625rem solid var(--o2-border-color) !important;
+}
+.o2-run-query-button{
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  width: 92px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+}
+.o2-color-primary{
+    background-color: var(--o2-primary-btn-bg);
+    color: var(--o2-primary-btn-text);
+    &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+.search-button-enterprise-border-radius {
+  border-radius: 0.375rem 0px 0px 0.375rem !important;
+}
+.search-button-normal-border-radius {
+  border-radius: 0.375rem;
+}
+.search-button-dropdown-enterprise-border-radius {
+  border-radius: 0px 0.375rem 0.375rem 0px !important;
+}
+
+.o2-color-cancel {
+  background-color: #f67a7a;
+  color: var(--o2-primary-btn-text);
+}
+
+.logs-search-splitter {
+  :deep(.q-splitter__separator) {
+    height: 100%;
+  }
 }
 </style>

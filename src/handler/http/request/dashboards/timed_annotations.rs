@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::meta::timed_annotations::{
     ListTimedAnnotationsQuery, TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq,
 };
@@ -25,19 +25,20 @@ use crate::{
 };
 
 /// Create Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     post,
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "CreateAnnotations",
+    summary = "Create timed annotations for dashboard",
+    description = "Creates new timed annotations for specific panels within a dashboard",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
     request_body(
-        content = TimedAnnotationReq,
+        content = inline(TimedAnnotationReq),
         description = "Timed annotation request payload",
         content_type = "application/json",
     ),
@@ -50,14 +51,17 @@ use crate::{
         ),
         (status = 500, description = "Failed to create timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create time annotations"}))
+    )
 )]
 #[post("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn create_annotations(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    web::Json(req): web::Json<TimedAnnotationReq>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id) = path.into_inner();
-    let req = serde_json::from_slice::<TimedAnnotationReq>(&body)?;
     if let Err(validation_err) = req.validate() {
         return Ok(MetaHttpResponse::bad_request(validation_err));
     }
@@ -66,24 +70,22 @@ pub async fn create_annotations(
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
             log::error!("Error creating timed annotations: {e}");
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to create timed annotations",
-                )),
-            )
+            Ok(MetaHttpResponse::internal_error(
+                "Failed to create timed annotations",
+            ))
         }
     }
 }
 
 /// Get Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     get,
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "GetAnnotations",
+    summary = "Get timed annotations for dashboard",
+    description = "Retrieves timed annotations for dashboard panels within a specified time range",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
@@ -101,6 +103,10 @@ pub async fn create_annotations(
         (status = 400, description = "Invalid query parameters", content_type = "application/json"),
         (status = 500, description = "Failed to get timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "Get annotations"}))
+    )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn get_annotations(
@@ -126,30 +132,28 @@ pub async fn get_annotations(
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => {
             log::error!("Error getting timed annotations: {e}");
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to get timed annotations",
-                )),
-            )
+            Ok(MetaHttpResponse::internal_error(
+                "Failed to get timed annotations",
+            ))
         }
     }
 }
 
 /// Delete Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     delete,
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "DeleteAnnotations",
+    summary = "Delete timed annotations from dashboard",
+    description = "Removes timed annotations from dashboard panels based on specified criteria",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
     request_body(
-        content = TimedAnnotationDelete,
+        content = inline(TimedAnnotationDelete),
         description = "Timed annotation delete request payload",
         content_type = "application/json",
     ),
@@ -160,14 +164,17 @@ pub async fn get_annotations(
         ),
         (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete annotations"}))
+    )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn delete_annotations(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    web::Json(req): web::Json<TimedAnnotationDelete>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id) = path.into_inner();
-    let req: TimedAnnotationDelete = serde_json::from_slice(&body)?;
     if let Err(validation_err) = req.validate() {
         return Ok(MetaHttpResponse::bad_request(validation_err));
     }
@@ -176,30 +183,28 @@ pub async fn delete_annotations(
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
             log::error!("Error deleting timed annotations: {e}");
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to delete timed annotations",
-                )),
-            )
+            Ok(MetaHttpResponse::internal_error(
+                "Failed to delete timed annotations",
+            ))
         }
     }
 }
 
 /// Update Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     put,
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "UpdateAnnotations",
+    summary = "Update timed annotation",
+    description = "Updates an existing timed annotation with new content or metadata",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}",
     security(
         ("Authorization" = [])
     ),
     request_body(
-        content = TimedAnnotation,
+        content = inline(TimedAnnotation),
         description = "Timed annotation update request payload",
         content_type = "application/json",
     ),
@@ -210,14 +215,17 @@ pub async fn delete_annotations(
         ),
         (status = 500, description = "Failed to update timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update annotations"}))
+    )
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}")]
 pub async fn update_annotations(
     path: web::Path<(String, String, String)>,
-    body: web::Bytes,
+    web::Json(mut req): web::Json<TimedAnnotation>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id, timed_annotation_id) = path.into_inner();
-    let mut req: TimedAnnotation = serde_json::from_slice(&body)?;
     // ensure the annotation id is always set for update
     req.annotation_id = Some(timed_annotation_id.clone());
     if let Err(validation_err) = req.validate() {
@@ -230,30 +238,28 @@ pub async fn update_annotations(
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
             log::error!("Error updating timed annotations: {e}");
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to update timed annotations",
-                )),
-            )
+            Ok(MetaHttpResponse::internal_error(
+                "Failed to update timed annotations",
+            ))
         }
     }
 }
 
 /// Delete Timed Annotation Panels
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     delete,
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "RemoveTimedAnnotationFromPanel",
+    summary = "Remove timed annotation from panel",
+    description = "Removes a specific timed annotation from a dashboard panel",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}",
     security(
         ("Authorization" = [])
     ),
     request_body(
-        content = Vec<String>,
+        content = inline(Vec<String>),
         description = "IDs of dashboard panels from which to remove the timed annotation",
         content_type = "application/json",
     ),
@@ -264,14 +270,17 @@ pub async fn update_annotations(
         ),
         (status = 500, description = "Failed to remove timed annotation from panels", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Remove annotation from panel"}))
+    )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]
 pub async fn delete_annotation_panels(
     path: web::Path<(String, String, String)>,
-    body: web::Bytes,
+    web::Json(panels): web::Json<Vec<String>>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, _dashboard_id, timed_annotation_id) = path.into_inner();
-    let panels: Vec<String> = serde_json::from_slice(&body)?;
     if panels.is_empty() {
         return Ok(MetaHttpResponse::bad_request(
             "panels cannot be empty".to_string(),
@@ -281,12 +290,9 @@ pub async fn delete_annotation_panels(
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
             log::error!("Error deleting timed annotation panels: {e}");
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to delete timed annotation panels",
-                )),
-            )
+            Ok(MetaHttpResponse::internal_error(
+                "Failed to delete timed annotation panels",
+            ))
         }
     }
 }

@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
+    datafusion::request::Request,
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
     metrics::QUERY_PARQUET_CACHE_RATIO,
     utils::{
@@ -35,7 +36,9 @@ use o2_enterprise::enterprise::actions::{
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::service::search::{cluster::flight, request::Request, sql::Sql};
+use crate::service::search::{
+    SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded,
+};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
@@ -54,59 +57,23 @@ pub async fn search(
     let meta = Sql::new_from_req(&req, &query).await?;
     let sql = Arc::new(meta);
 
-    for s in sql.stream_names.iter() {
-        // Get the schema from `TableReference` for join queries
-        // Since it resolves queries where stream_name is prefixed with the stream_type
-        // e.g. `logs.my_stream`, `enrich.my_stream`
-        let stream_type = if s.stream_type().is_empty() {
-            sql.stream_type
-        } else {
-            config::meta::stream::StreamType::from(s.stream_type())
-        };
-        let schema = infra::schema::get_cache(&sql.org_id, &s.stream_name(), stream_type).await?;
-        if schema.schema().fields().is_empty() {
-            let mut result = search::Response::new(sql.offset, sql.limit);
-            result.function_error = vec![format!("Stream not found {}", &s.stream_name())];
-            result.is_partial = true;
-            return Ok(result);
-        }
-    }
-
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
     let use_query_fn = query.uses_zo_fn;
-    let mut query_fn = query.query_fn.clone();
+    let query_fn = query.query_fn.clone();
     #[cfg(feature = "enterprise")]
     let action_id = query.action_id.clone();
 
-    #[cfg(feature = "enterprise")]
-    let local_cluster_search = _req_regions == vec!["local"]
-        && !_req_clusters.is_empty()
-        && (_req_clusters == vec!["local"] || _req_clusters == vec![config::get_cluster_name()]);
-
-    // handle query function
-    #[cfg(feature = "enterprise")]
-    let ret = if _need_super_cluster
-        && o2_enterprise::enterprise::common::config::get_config()
-            .super_cluster
-            .enabled
-        && !local_cluster_search
-    {
-        super::super::super_cluster::leader::search(
-            &trace_id,
-            sql.clone(),
-            req,
-            query,
-            _req_regions,
-            _req_clusters,
-        )
-        .await
-    } else {
-        flight::search(&trace_id, sql.clone(), req).await
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let ret = flight::search(&trace_id, sql.clone(), req).await;
+    let ret = search_inner(
+        req,
+        query,
+        _req_regions,
+        _req_clusters,
+        _need_super_cluster,
+        Some(sql.clone()),
+    )
+    .await;
 
     let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
         Ok(v) => v,
@@ -123,8 +90,16 @@ pub async fn search(
     if !merge_batches.is_empty() {
         let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
-        let json_rows = record_batches_to_json_rows(&batches_query_ref)
+        let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+        // Check if query limit exceeded, if so truncate and do not truncate if query is a limit
+        // query
+        let default_query_limit = config::get_config().limit.query_default_limit as usize;
+        if is_default_query_limit_exceeded(json_rows.len(), &sql) {
+            json_rows.truncate(default_query_limit);
+        }
+
         let mut sources: Vec<json::Value> = if query_fn.is_empty() {
             json_rows
                 .into_iter()
@@ -136,9 +111,6 @@ pub async fn search(
             let input_fn = query_fn.trim();
 
             let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
-            if apply_over_hits {
-                query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
-            }
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =
                 match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
@@ -183,12 +155,13 @@ pub async fn search(
                             .ok_or(Error::Message("Expected array".to_string()))?
                             .iter()
                             .filter_map(|v| {
-                                (!v.is_null()).then_some(flatten::flatten(v.clone()).map_err(|e| {
-                                    log::error!("Failed to flatten value: {}", e);
-                                    Error::Message(format!("Failed to flatten value: {e}"))
-                                }))
+                                if !v.is_null() && v.is_object() {
+                                    flatten::flatten(v.clone()).ok()
+                                } else {
+                                    None
+                                }
                             })
-                            .collect::<Result<Vec<_>, _>>()?
+                            .collect::<Vec<_>>()
                     } else {
                         json_rows
                             .into_iter()
@@ -204,14 +177,13 @@ pub async fn search(
                                     &sql.org_id,
                                     &stream_names,
                                 );
-                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).map_err(
-                                    |e| {
-                                        log::error!("Failed to flatten value: {}", e);
-                                        Error::Message(format!("Failed to flatten value: {e}"))
-                                    },
-                                ))
+                                if !ret_val.is_null() && ret_val.is_object() {
+                                    flatten::flatten(ret_val).ok()
+                                } else {
+                                    None
+                                }
                             })
-                            .collect::<Result<Vec<_>, _>>()?
+                            .collect::<Vec<_>>()
                     }
                 }
                 None => json_rows
@@ -255,8 +227,13 @@ pub async fn search(
 
         if use_query_fn {
             for source in sources {
-                result
-                    .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);
+                if source.is_object() {
+                    result.add_hit(
+                        &flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
+                    );
+                } else {
+                    result.add_hit(&source);
+                }
             }
         } else {
             for source in sources {
@@ -296,6 +273,7 @@ pub async fn search(
     result.set_scan_records(scan_stats.records as usize);
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
     result.set_result_cache_ratio(scan_stats.aggs_cache_ratio as usize);
+    result.set_peak_memory_usage(scan_stats.peak_memory_usage as f64);
 
     if scan_stats.querier_files > 0 {
         let cached_ratio = (scan_stats.querier_memory_cached_files
@@ -330,4 +308,54 @@ pub async fn search(
     );
 
     Ok(result)
+}
+
+// internal search function that return record batches
+// NOTE: careful use it, before enter it, should add trace_id to query_manager
+pub async fn search_inner(
+    req: Request,
+    query: SearchQuery,
+    _req_regions: Vec<String>,
+    _req_clusters: Vec<String>,
+    _need_super_cluster: bool,
+    sql: Option<Arc<Sql>>,
+) -> Result<SearchResult> {
+    let trace_id = req.trace_id.clone();
+    let sql = match sql {
+        Some(s) => s,
+        None => {
+            let meta = Sql::new_from_req(&req, &query).await?;
+            Arc::new(meta)
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    let local_cluster_search = _req_regions == vec!["local"]
+        && !_req_clusters.is_empty()
+        && (_req_clusters == vec!["local"] || _req_clusters == vec![config::get_cluster_name()]);
+
+    // handle query function
+    #[cfg(feature = "enterprise")]
+    let ret = if _need_super_cluster
+        && o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+        && !local_cluster_search
+    {
+        super::super::super_cluster::leader::search(
+            &trace_id,
+            sql.clone(),
+            req,
+            query,
+            _req_regions,
+            _req_clusters,
+        )
+        .await
+    } else {
+        flight::search(&trace_id, sql.clone(), req).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let ret = flight::search(&trace_id, sql.clone(), req).await;
+
+    ret
 }

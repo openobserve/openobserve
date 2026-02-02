@@ -15,7 +15,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    io::Write,
     sync::Arc,
     time::Instant,
 };
@@ -23,7 +22,7 @@ use std::{
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    DISTINCT_FIELDS, SIZE_IN_MB, get_config,
+    DISTINCT_FIELDS, META_ORG_ID, SIZE_IN_MB, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -31,9 +30,10 @@ use config::{
     },
     metrics,
     utils::{
-        json::{Map, Value, estimate_json_bytes, get_string_value, pickup_string_value},
+        json::{Map, Value, estimate_json_bytes, get_string_value},
         schema_ext::SchemaExt,
         time::now_micros,
+        util::DISTINCT_STREAM_PREFIX,
     },
 };
 use infra::{
@@ -41,22 +41,16 @@ use infra::{
     schema::{SchemaCache, unwrap_partition_time_level},
 };
 
-use super::{
-    db::organization::get_org_setting,
-    ingestion::{TriggerAlertData, evaluate_trigger, write_file},
-    metadata::{
-        MetadataItem, MetadataType,
-        distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
-        write,
-    },
-    schema::stream_schema_exists,
-};
 #[cfg(feature = "cloud")]
 use crate::service::stream::get_stream;
 use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
-        alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
+        alerts::alert::AlertExt,
+        db,
+        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+        metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
+        schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
     },
 };
@@ -66,14 +60,13 @@ pub mod hec;
 pub mod ingest;
 pub mod loki;
 pub mod otlp;
-#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
-pub mod syslog;
+pub mod patterns;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
-fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
+fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object().unwrap();
     for action in BULK_OPERATORS {
         if let Some(val) = local_val.get(action) {
@@ -81,16 +74,11 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
                 log::warn!("Invalid bulk index action: {action}");
                 continue;
             };
-            let Some(index) = local_val
-                .get("_index")
-                .and_then(|v| v.as_str().map(|v| v.to_string()))
-            else {
+            let Some(index) = local_val.get("_index").and_then(|v| v.as_str()) else {
                 continue;
             };
-            let doc_id = local_val
-                .get("_id")
-                .and_then(|v| v.as_str().map(|v| v.to_string()));
-            return Some((action.to_string(), index, doc_id));
+            let doc_id = local_val.get("_id").and_then(|v| v.as_str());
+            return Some((action, index, doc_id));
         };
     }
     None
@@ -457,7 +445,7 @@ async fn write_logs(
                         log_failed_record(log_ingest_errors, &record_val, &e.to_string());
                         bulk::add_record_status(
                             stream_name.to_string(),
-                            &doc_id,
+                            doc_id,
                             "".to_string(),
                             Some(Value::Object(record_val.clone())),
                             bulk_res,
@@ -496,7 +484,12 @@ async fn write_logs(
                         triggers.push((alert.clone(), trigger_results.data.unwrap()));
                         evaluated_alerts.insert(key);
                     }
-                    _ => {}
+                    Ok(_) => {
+                        // the data doesn't satisfy the alert condition
+                    }
+                    Err(e) => {
+                        log::error!("[LOGS] Error while evaluating realtime alert: {e}");
+                    }
                 }
             }
         }
@@ -554,7 +547,7 @@ async fn write_logs(
             IngestionStatus::Bulk(bulk_res) => {
                 bulk::add_record_status(
                     stream_name.to_string(),
-                    &doc_id,
+                    doc_id,
                     "".to_string(),
                     None,
                     bulk_res,
@@ -570,6 +563,7 @@ async fn write_logs(
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
+        org_id,
         stream_name,
         write_buf,
         !cfg.common.wal_fsync_disabled,
@@ -586,56 +580,21 @@ async fn write_logs(
     }
 
     // only one trigger per request
-    evaluate_trigger(triggers).await;
+    if !triggers.is_empty() {
+        tokio::spawn(async move { evaluate_trigger(triggers).await });
+    }
 
     Ok(req_stats)
 }
 
-pub fn refactor_map(
-    original_map: Map<String, Value>,
-    defined_schema_keys: &HashSet<String>,
-) -> Map<String, Value> {
-    let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
-    let mut non_schema_map = Vec::with_capacity(1024); // 1KB
-
-    let mut has_elements = false;
-    non_schema_map.write_all(b"{").unwrap();
-    for (key, value) in original_map {
-        if defined_schema_keys.contains(&key) {
-            new_map.insert(key, value);
-        } else {
-            if has_elements {
-                non_schema_map.write_all(b",").unwrap();
-            } else {
-                has_elements = true;
-            }
-            non_schema_map.write_all(b"\"").unwrap();
-            non_schema_map.write_all(key.as_bytes()).unwrap();
-            non_schema_map.write_all(b"\":\"").unwrap();
-            non_schema_map
-                .write_all(pickup_string_value(value).as_bytes())
-                .unwrap();
-            non_schema_map.write_all(b"\"").unwrap();
-        }
-    }
-    non_schema_map.write_all(b"}").unwrap();
-
-    if has_elements {
-        new_map.insert(
-            get_config().common.column_all.to_string(),
-            Value::String(String::from_utf8(non_schema_map).unwrap()),
-        );
-    }
-
-    new_map
-}
-
 async fn ingestion_log_enabled() -> bool {
-    // the logging will be enabled through meta only, so hardcoded
-    match get_org_setting("_meta").await {
-        Ok(org_settings) => org_settings.toggle_ingestion_logs,
-        Err(_) => false,
+    if !get_config().common.ingestion_log_enabled {
+        return false;
     }
+    // the logging will be enabled through meta only
+    db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
+        .await
+        .unwrap_or(false)
 }
 
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {

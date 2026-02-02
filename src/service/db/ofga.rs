@@ -25,6 +25,7 @@ use o2_openfga::{
 };
 
 use crate::service::db;
+pub const OFGA_KEY_PREFIX: &str = "/ofga/model";
 
 pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
     let meta = read_ofga_model().await;
@@ -68,7 +69,7 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
 }
 
 pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     meta.model = None;
     match db::put(
         key,
@@ -84,7 +85,7 @@ pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow:
 }
 
 pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     let ret = db::get(key).await?;
     let mut loc_value: OFGAModel = json::from_slice(&ret).unwrap();
     loc_value.version = loc_value.version.trim_matches('"').to_string();
@@ -92,11 +93,11 @@ pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching /ofga/model");
+    log::info!("Start watching {OFGA_KEY_PREFIX}");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -133,7 +134,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     let ret = db::list(key).await?;
     for (_, item_value) in ret {
         let json_val: OFGAModel = json::from_slice(&item_value).unwrap();

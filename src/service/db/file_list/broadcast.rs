@@ -24,12 +24,11 @@ use config::{
     },
 };
 use hashbrown::HashMap;
+use infra::{client::grpc::get_cached_channel, cluster};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use tokio::sync::{RwLock, mpsc};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
-
-use crate::{common::infra::cluster, service::grpc::get_cached_channel};
 
 /// use queue to batch send broadcast to other nodes
 pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
@@ -51,7 +50,6 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     })
     .await
     .unwrap_or_default();
-    let mut events = EVENTS.write().await;
     for node in nodes {
         if node.uuid.eq(&LOCAL_NODE.uuid) {
             continue;
@@ -107,23 +105,30 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         let mut ok = false;
         for _i in 0..5 {
             let node = node.clone();
-            let channel = events.entry(node_uuid.clone()).or_insert_with(|| {
-                let (tx, mut rx) = mpsc::unbounded_channel();
-                tokio::task::spawn(async move {
-                    let node_addr = node.grpc_addr.clone();
-                    if let Err(e) = send_to_node(node, &mut rx).await {
-                        log::error!(
-                            "[broadcast] send event to node[{}] channel failed, channel closed: {}",
-                            &node_addr,
-                            e
-                        );
-                    }
-                });
-                Arc::new(tx)
-            });
+            // Acquire lock only when accessing the HashMap
+            let channel = {
+                let mut events = EVENTS.write().await;
+                events.entry(node_uuid.clone()).or_insert_with(|| {
+                    let (tx, mut rx) = mpsc::unbounded_channel();
+                    tokio::task::spawn(async move {
+                        let node_addr = node.grpc_addr.clone();
+                        if let Err(e) = send_to_node(node, &mut rx).await {
+                            log::error!(
+                                "[broadcast] send event to node[{}] channel failed, channel closed: {}",
+                                &node_addr,
+                                e
+                            );
+                        }
+                    });
+                    Arc::new(tx)
+                }).clone()
+            };
             tokio::task::yield_now().await;
             if let Err(e) = channel.clone().send(node_items.clone()) {
-                events.remove(&node_uuid);
+                // Acquire lock only when removing from the HashMap
+                {
+                    EVENTS.write().await.remove(&node_uuid);
+                }
                 log::error!(
                     "[broadcast] send event to node[{}] channel failed, {}, retrying...",
                     &node_addr,
@@ -266,8 +271,94 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_send() {
+    async fn test_send_empty() {
         let items: Vec<FileKey> = vec![];
         assert!(send(&items).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_send_with_items() {
+        let items = vec![
+            FileKey {
+                id: 1,
+                account: "test_org".to_string(),
+                key: "test_file.parquet".to_string(),
+                meta: config::meta::stream::FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            },
+            FileKey {
+                id: 2,
+                account: "test_org".to_string(),
+                key: "test_file2.parquet".to_string(),
+                meta: config::meta::stream::FileMeta::default(),
+                deleted: true,
+                segment_ids: None,
+            },
+        ];
+
+        // This will complete successfully in local mode
+        assert!(send(&items).await.is_ok());
+    }
+
+    #[test]
+    fn test_event_channel_creation() {
+        // Test that we can create an event channel
+        let (tx, _rx) = mpsc::unbounded_channel::<Vec<FileKey>>();
+        let channel: EventChannel = Arc::new(tx);
+        assert!(channel.send(vec![]).is_ok());
+    }
+
+    #[test]
+    fn test_broadcast_queue_static() {
+        // Test that the broadcast queue static is accessible
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let mut queue = BROADCAST_QUEUE.write().await;
+            let initial_len = queue.len();
+
+            queue.push(FileKey {
+                id: 1,
+                account: "test".to_string(),
+                key: "test.parquet".to_string(),
+                meta: config::meta::stream::FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            });
+
+            assert_eq!(queue.len(), initial_len + 1);
+            queue.clear(); // Clean up
+        });
+    }
+
+    #[test]
+    fn test_events_static() {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let events = EVENTS.read().await;
+            // Just test that we can access the static
+            let _count = events.len();
+        });
+    }
+
+    fn create_test_file_key(id: i64, account: &str, key: &str, deleted: bool) -> FileKey {
+        FileKey {
+            id,
+            account: account.to_string(),
+            key: key.to_string(),
+            meta: config::meta::stream::FileMeta::default(),
+            deleted,
+            segment_ids: None,
+        }
+    }
+
+    #[test]
+    fn test_file_key_creation_helpers() {
+        let file_key = create_test_file_key(1, "org1", "file1.parquet", false);
+        assert_eq!(file_key.id, 1);
+        assert_eq!(file_key.account, "org1");
+        assert_eq!(file_key.key, "file1.parquet");
+        assert!(!file_key.deleted);
+
+        let deleted_file_key = create_test_file_key(2, "org2", "file2.parquet", true);
+        assert!(deleted_file_key.deleted);
     }
 }

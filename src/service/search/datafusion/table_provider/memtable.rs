@@ -29,8 +29,10 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 
-use super::{apply_filter, apply_projection};
-use crate::service::search::index::IndexCondition;
+use crate::service::search::{
+    datafusion::table_provider::helpers::{apply_filter, apply_projection},
+    index::IndexCondition,
+};
 
 #[derive(Debug)]
 pub(crate) struct NewMemTable {

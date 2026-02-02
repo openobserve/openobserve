@@ -155,8 +155,8 @@ describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   // Test 6: Component renders template correctly
   it('should render template with correct structure', () => {
     wrapper = createWrapper();
-    expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-    expect(wrapper.find('.tw-text-\\[16px\\]').exists()).toBe(true);
+    expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
   });
 
   // Test 7: CopyContent component is rendered
@@ -280,11 +280,11 @@ describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   // Test 35: Template structure validation
   it('should have correct template structure and classes', () => {
     wrapper = createWrapper();
-    expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-    expect(wrapper.find('.tw-text-\\[16px\\]').exists()).toBe(true);
-    expect(wrapper.find('.tw-font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw-pt-6').exists()).toBe(true);
-    expect(wrapper.find('.tw-pb-2').exists()).toBe(true);
+    expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:pt-6').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:pb-2').exists()).toBe(true);
   });
 
   // Test 36: Link attributes validation

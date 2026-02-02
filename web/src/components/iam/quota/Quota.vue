@@ -14,174 +14,152 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
-
+<!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
   <q-page
-    class="quota-page text-left"
+    class="quota-page text-left card-container"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
     style="min-height: inherit"
   >
     <div :style="{ height: '100%', marginTop: 0 }" class="app-table-container">
-      <div class="q-px-md q-pt-sm">
-        <div
-          class="q-table__title full-width q-pb-sm"
-          data-test="user-title-text"
-        >
-          {{ t("quota.header") }}
-        </div>
-        <div class="flex items-center justify-between full-width q-mb-sm">
-          <div class="flex items-center">
-            <q-select
-              :loading="isOrgLoading"
-              v-model="selectedOrganization"
-              :options="organizationToDisplay"
-              @filter="filterOrganizations"
-              placeholder="Select Organization"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm no-case q-mr-md input-width org-select"
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              hide-selected
-              fill-input
-              @update:model-value="updateOrganization()"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            >
-            </q-select>
-            <div class="quota-tabs">
-              <q-tabs
-                data-test="quota-tabs"
-                :model-value="activeTab"
-                no-caps
-                outside-arrows
-                size="sm"
-                mobile-arrows
-                class="bg-white text-primary"
-                @update:model-value="updateActiveTab"
+      <div class="card-container tw:mb-[0.625rem]">
+        <div class="q-px-md q-py-sm">
+          <div
+            class="q-table__title full-width q-pb-sm"
+            data-test="user-title-text"
+          >
+            {{ t("quota.header") }}
+          </div>
+          <div class="flex items-center justify-between full-width q-mb-sm">
+            <div class="flex items-center">
+              <q-select
+                :loading="isOrgLoading"
+                v-model="selectedOrganization"
+                :options="organizationToDisplay"
+                @filter="filterOrganizations"
+                placeholder="Select Organization"
+                :popup-content-style="{ textTransform: 'lowercase' }"
+                color="input-border"
+                bg-color="input-bg"
+                class="q-py-sm no-case q-mr-md input-width org-select"
+                stack-label
+                outlined
+                filled
+                dense
+                use-input
+                hide-selected
+                fill-input
+                @update:model-value="updateOrganization()"
+                :rules="[(val: any) => !!val || 'Field is required!']"
               >
-                <q-tab
-                  data-test="quota-api-limit-tab"
-                  name="api-limits"
-                  :label="t('quota.api-limits')"
+              </q-select>
+              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+                <app-tabs
+                  data-test="quota-tabs"
+                  class="tabs-selection-container"
+                  :tabs="tabs"
+                  v-model:active-tab="activeTab"
+                  @update:active-tab="updateActiveTab"
                 />
-                <q-tab
-                  data-test="quota-role-limit-tab"
-                  name="role-limits"
-                  :label="t('quota.role-limits')"
+              </div>
+            </div>
+            <div class="flex items-center" v-if="selectedOrganization">
+              <q-btn
+                v-if="!editTable"
+                data-test="edit-table-btn"
+                label="Edit Quota"
+                flat
+                class="border title-height o2-secondary-button tw:h-[36px]"
+                :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                no-caps
+                :disable="activeTab == 'role-limits' && !expandedRow"
+                @click="editTableWithInput"
+              >
+                <q-icon
+                  name="edit"
+                  style="font-weight: 200; opacity: 0.7"
+                  class="q-ml-sm"
                 />
-              </q-tabs>
+              </q-btn>
             </div>
           </div>
-          <div class="flex items-center" v-if="selectedOrganization">
-            <q-btn
-              v-if="!editTable"
-              data-test="edit-table-btn"
-              label="Edit Quota"
-              class="border title-height"
-              no-caps
-              :disable="activeTab == 'role-limits' && !expandedRow"
-              @click="editTableWithInput"
+          <div class="flex items-center justify-between full-width q-mb-sm">
+            <div
+              v-if="selectedOrganization && activeType == 'table'"
+              class="flex items-center"
             >
-              <q-icon
-                name="edit"
-                style="font-weight: 200; opacity: 0.7"
-                class="q-ml-sm"
+              <q-input
+                data-test="pipeline-list-search-input"
+                v-model="searchQuery"
+                borderless
+                flat
+                class="no-border input-width o2-search-input"
+                :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                :placeholder="
+                  {
+                    'api-limits': t('quota.api-search'),
+                    'role-limits': t('quota.role-search'),
+                  }[activeTab]
+                "
+
+              >
+                <template #prepend>
+                  <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                </template>
+              </q-input>
+              <q-select
+                v-if="activeTab == 'role-limits'"
+                :loading="isApiCategoryLoading"
+                v-model="selectedApiCategory"
+                :options="filteredApiCategoryToDisplayOptions"
+                placeholder="Select API Category"
+                color="input-border"
+                style="padding: 0px"
+                bg-color="input-bg"
+                class="no-case q-mr-md input-width q-ml-md category-select"
+                stack-label
+                outlined
+                filled
+                dense
+                use-input
+                hide-selected
+                fill-input
+                clearable
+                @filter="filterApiCategoriesToDisplayOptions"
+                @update:model-value="filterModulesBasedOnCategory()"
+              >
+              </q-select>
+            </div>
+            <div
+              v-if="selectedOrganization"
+              class="app-tabs-container tw:h-[36px] tw:w-fit float-right q-ml-auto"
+            >
+              <app-tabs
+                data-test="table-json-type-selection-tabs"
+                class="tabs-selection-container"
+                :tabs="typeTabs"
+                v-model:active-tab="activeType"
+                @update:active-tab="updateActiveType"
               />
-            </q-btn>
-          </div>
-        </div>
-        <div class="flex items-center justify-between full-width q-mb-sm">
-          <div
-            v-if="selectedOrganization && activeType == 'table'"
-            class="flex items-center"
-          >
-            <q-input
-              data-test="pipeline-list-search-input"
-              v-model="searchQuery"
-              borderless
-              filled
-              dense
-              class="no-border input-width"
-              :placeholder="
-                {
-                  'api-limits': t('quota.api-search'),
-                  'role-limits': t('quota.role-search'),
-                }[activeTab]
-              "
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
-            <q-select
-              v-if="activeTab == 'role-limits'"
-              :loading="isApiCategoryLoading"
-              v-model="selectedApiCategory"
-              :options="filteredApiCategoryToDisplayOptions"
-              placeholder="Select API Category"
-              color="input-border"
-              style="padding: 0px"
-              bg-color="input-bg"
-              class="no-case q-mr-md input-width q-ml-md category-select"
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              hide-selected
-              fill-input
-              clearable
-              @filter="filterApiCategoriesToDisplayOptions"
-              @update:model-value="filterModulesBasedOnCategory()"
-            >
-            </q-select>
-          </div>
-          <div
-            v-if="selectedOrganization"
-            class="quota-tabs float-right q-ml-auto"
-          >
-            <q-tabs
-              data-test="table-json-type-selection-tabs"
-              :model-value="activeType"
-              no-caps
-              outside-arrows
-              size="sm"
-              mobile-arrows
-              class="bg-white text-primary"
-              @update:model-value="updateActiveType"
-            >
-              <q-tab
-                data-test="table-json-type-selection-tab"
-                name="table"
-                :label="t('quota.table')"
-              />
-              <q-tab
-                :disable="activeTab == 'role-limits' && !expandedRow"
-                data-test="table-json-type-selection-tab"
-                name="json"
-                :label="t('quota.json')"
-              />
-            </q-tabs>
+            </div>
           </div>
         </div>
       </div>
-
+      <!-- this table for api limits -->
+      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw:h-[calc(100vh-218px)]">
       <q-table
         :rows="apiLimitsRows"
         :columns="generateColumns()"
         row-key="name"
+        :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark' : 'o2-last-row-border-light'"
         :pagination="pagination"
         :filter="searchQuery"
         :filter-method="filteredData"
-        v-if="activeTab == 'api-limits' && activeType == 'table'"
+        v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading"
+        style="height: calc(100vh - 220px);"
         dense
-        class="q-mx-md"
       >
         <template v-slot:header="props">
           <q-tr :props="props" class="thead-sticky">
@@ -195,7 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-th>
           </q-tr>
         </template>
-        <template #no-data></template>
+        <template #no-data>
+        </template>
 
         <template #bottom="scope">
           <q-table-pagination
@@ -272,10 +251,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
       </q-table>
+      </div>
+
+      <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
+        <q-spinner-hourglass color="primary" size="lg" />
+      </div>
       <div
-        class="q-mt-md"
+        class="card-container tw:pb-[0.625rem]"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
-        style="height: calc(100vh - 245px)"
+        style="height: calc(100vh - 220px)"
       >
         <query-editor
           data-test="json-view-roles-editor"
@@ -289,17 +273,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :read-only="!editTable"
         />
       </div>
-      <q-table
-        :rows="rolesLimitRows"
-        :columns="roleLimitsColumns"
-        row-key="name"
-        :pagination="pagination"
-        :filter="searchQuery"
-        :filter-method="filteredData"
-        dense
-        v-if="activeTab == 'role-limits' && activeType == 'table'"
-        class="q-mx-md"
-      >
+      <!-- this table for role limits -->
+       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw:h-[calc(100vh-218px)]">
+        <q-table
+          :rows="rolesLimitRows"
+          :columns="roleLimitsColumns"
+          row-key="name"
+          :pagination="pagination"
+          :filter="searchQuery"
+          :filter-method="filteredData"
+          dense
+          v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"
+          :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark' : 'o2-last-row-border-light'"
+          :style="rolesLimitRows.length > 0 ? 'height: calc(100vh - 218px)' : ''"
+        >
         <template v-slot:header="props">
           <q-tr :props="props" class="thead-sticky">
             <q-th
@@ -352,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </q-tr>
           <q-tr
-            v-if="!editTable && !roleLevelLoading"
+            v-if="!editTable && !isRoleLimitsLoading"
             v-for="(row, index) in filteredRoleLevelModuleRows"
             data-test="scheduled-pipeline-row-expand"
             v-show="expandedRow === props.row.uuid"
@@ -372,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </q-tr>
           <q-tr
-            v-if="editTable && !roleLevelLoading"
+            v-if="editTable && !roleLevelLoading && !isRoleLimitsLoading"
             v-for="(row, index) in filteredRoleLevelModuleRows"
             data-test="scheduled-pipeline-row-expand"
             v-show="expandedRow === props.row.uuid"
@@ -426,12 +413,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-td>
           </q-tr>
+          <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
+            <q-td v-for="col in props.cols" :key="col.name">
+              <div v-if="col.name == 'create'" class="tw:h-[50vh] tw:w-full tw:flex tw:justify-center tw:items-center">
+              <q-spinner-hourglass color="primary" size="lg" />
+            </div>
+            </q-td>
+          </q-tr>
         </template>
       </q-table>
+      </div>
+      <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center">
+        <q-spinner-hourglass color="primary" size="lg" />
+      </div>
       <div
-        class="q-mt-md"
+        class="card-container"
         v-if="activeTab == 'role-limits' && activeType == 'json'"
-        style="height: calc(100vh - 245px)"
+        style="height: calc(100vh - 220px)"
       >
         <query-editor
           data-test="json-view-roles-editor"
@@ -471,55 +469,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="
-          activeTab == 'api-limits' && !loading && !apiLimitsRows.length
+          activeTab == 'api-limits' && !loading && !apiLimitsRows.length && !isApiLimitsLoading
         "
       >
         <NoData />
       </div>
       <div
         v-else-if="
-          activeTab == 'role-limits' && !loading && !rolesLimitRows.length
+          activeTab == 'role-limits' && !loading && !rolesLimitRows.length && !isRolesLoading
         "
       >
         <NoData />
       </div>
       <div
-        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md"
+        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md tw:py-2"
         v-if="editTable && activeType == 'table'"
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw:h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelChanges"
         />
         <q-btn
-          label="Save Changes"
-          class="text-bold no-border q-ml-md"
-          :color="Object.keys(changedValues).length > 0 ? 'secondary' : 'grey'"
+          label="Save"
+          class="o2-primary-button no-border tw:h-[36px]"
           :disable="Object.keys(changedValues).length === 0"
-          padding="sm md"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveChanges"
         />
       </div>
       <div
-        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md q-mt-md"
+        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md q-mt-md"
         v-if="editTable && activeType == 'json'"
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw:h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelJsonChanges"
           :disable="isSavingJson"
         />
         <q-btn
           :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm md"
+          class="o2-primary-button no-border tw:h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveJsonChanges"
           :disable="isSavingJson"
         />
@@ -604,11 +606,13 @@ export default defineComponent({
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);
-    const perPageOptions = ref<number[]>([10, 20, 50, 100]);
+    const perPageOptions = ref<number[]>([20, 50, 100, 250, 500]);
     const {
       getApiLimitsByOrganization,
       getRoleLimitsByOrganization,
       getModulesToDisplay,
+      isRoleLimitsLoading,
+      isApiLimitsLoading,
     } = useRateLimiter();
     const pagination: any = ref({
       rowsPerPage: 20,
@@ -624,6 +628,17 @@ export default defineComponent({
       {
         label: "Role Limits",
         value: "role-limits",
+      },
+    ]);
+    const typeTabs = computed(() => [
+      {
+        label: "Table",
+        value: "table",
+      },
+      {
+        label: "JSON",
+        value: "json",
+        disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
     const apiLimitsColumns: any = [
@@ -761,6 +776,7 @@ export default defineComponent({
 
     const selectedPerPage = ref<number>(20);
     const qTable = ref<any>(null);
+    const isRolesLoading = ref<boolean>(false);
 
     onMounted(async () => {
       await getOrganizations();
@@ -978,6 +994,7 @@ export default defineComponent({
       //as we are not storing the roles in the store
       //so we need to get the roles from the api
       try {
+        isRolesLoading.value = true;
         const response = await getRoles(selectedOrganization.value?.value);
         rolesLimitRows.value = response.data.map((role: any) => ({
           role_name: role,
@@ -989,8 +1006,10 @@ export default defineComponent({
           delete: 10,
         }));
         resultTotal.value = rolesLimitRows.value.length;
+        isRolesLoading.value = false;
       } catch (error) {
         console.log(error);
+        isRolesLoading.value = false;
       }
     };
     const restrictToNumbers = (event: any) => {
@@ -1322,6 +1341,8 @@ export default defineComponent({
         openedRole.value = null;
       } else {
         openedRole.value = props.row.role_name;
+        //expand the row at first only because we need to show the loading state for the user 
+        expandedRow.value = props.row.uuid;
         let roleLimits: any;
         if (
           !store.state.allRoleLimitsByOrgIdByRole[
@@ -1340,7 +1361,6 @@ export default defineComponent({
         }
         filterModulesBasedOnCategory();
         // Otherwise, expand the clicked row and collapse any other row
-        expandedRow.value = props.row.uuid;
       }
     };
 
@@ -1537,6 +1557,7 @@ export default defineComponent({
       activeTab,
       updateActiveTab,
       tabs,
+      typeTabs,
       editTable,
       searchQuery,
       resultTotal,
@@ -1617,6 +1638,9 @@ export default defineComponent({
       transformData,
       convertUploadRulesToJson,
       jsonDiff,
+      isRoleLimitsLoading,
+      isApiLimitsLoading,
+      isRolesLoading,
     };
   },
 });
@@ -1628,27 +1652,6 @@ export default defineComponent({
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
-  }
-  .quota-tabs {
-    border: 1px solid $primary;
-    width: 200px;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .quota-tabs {
-    .q-tab--active {
-      background-color: $primary;
-      color: $white;
-    }
-
-    .q-tab__indicator {
-      display: none;
-    }
-
-    .q-tab {
-      height: 30px;
-      min-height: 30px;
-    }
   }
   .title-height {
     height: 40px;
@@ -1771,6 +1774,13 @@ export default defineComponent({
 }
 
 .app-table-container {
+  .q-table{
+    thead{
+          tr {
+      background: var(--o2-table-header-bg) !important;
+    }
+    }
+  }
   .thead-sticky,
   .tfoot-sticky {
     position: sticky;

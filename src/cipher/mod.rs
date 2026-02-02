@@ -22,18 +22,21 @@ pub mod registry;
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct KeyAddRequest {
     pub name: String,
+    #[schema(value_type = Object)]
     pub key: HttpKey,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct KeyGetResponse {
     pub name: String,
+    #[schema(value_type = Object)]
     pub key: HttpKey,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct KeyInfo {
     pub name: String,
+    #[schema(value_type = Object)]
     pub key: HttpKey,
 }
 
@@ -41,7 +44,6 @@ pub struct KeyInfo {
 pub struct KeyListResponse {
     pub keys: Vec<KeyInfo>,
 }
-
 #[cfg(test)]
 mod tests {
     use o2_enterprise::enterprise::cipher::http_repr::{HttpMechanism, HttpStore};

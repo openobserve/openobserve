@@ -523,6 +523,7 @@ describe("stream service", () => {
       const params = {
         org_identifier: "org123",
         stream_name: "test_stream",
+        stream_type: "metrics",
         fields: ["field1", "field2"],
       };
 
@@ -531,11 +532,12 @@ describe("stream service", () => {
       await stream.deleteFields(
         params.org_identifier,
         params.stream_name,
+        params.stream_type,
         params.fields as [],
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/delete_fields`,
+        `/api/${params.org_identifier}/streams/${params.stream_name}/delete_fields?type=${params.stream_type}`,
         {
           fields: params.fields,
         },
@@ -546,6 +548,7 @@ describe("stream service", () => {
       const params = {
         org_identifier: "org123",
         stream_name: "test_stream",
+        stream_type: "traces",
         fields: [],
       };
 
@@ -554,11 +557,12 @@ describe("stream service", () => {
       await stream.deleteFields(
         params.org_identifier,
         params.stream_name,
+        params.stream_type,
         params.fields as [],
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/delete_fields`,
+        `/api/${params.org_identifier}/streams/${params.stream_name}/delete_fields?type=${params.stream_type}`,
         {
           fields: [],
         },

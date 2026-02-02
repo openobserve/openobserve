@@ -23,15 +23,19 @@ use crate::{
 };
 
 pub mod action_scripts;
+pub mod alert_incidents;
 pub mod alerts;
+pub mod backfill_jobs;
 pub mod cipher;
 pub mod compactor_manual_jobs;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
+pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
 pub mod folders;
+pub mod kv_store;
 mod migration;
 pub mod org_users;
 pub mod organizations;
@@ -41,8 +45,12 @@ pub mod re_pattern_stream_map;
 pub mod reports;
 pub mod search_job;
 pub mod search_queue;
+pub mod service_streams;
+pub mod service_streams_dimensions;
+pub mod sessions;
 pub mod short_urls;
 pub mod system_prompts;
+pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
@@ -51,6 +59,8 @@ pub mod users;
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
+    service_streams::init().await?;
+    service_streams_dimensions::init().await?;
     Ok(())
 }
 

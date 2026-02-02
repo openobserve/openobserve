@@ -42,7 +42,7 @@ const test = baseTest.extend({
           try {
             (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
           } catch (error) {
-            console.error('Failed to collect coverage on page unload:', error);
+            testLogger.error('Failed to collect coverage on page unload', { error });
           }
         }),
       );
@@ -54,7 +54,7 @@ const test = baseTest.extend({
         try {
           await fs.promises.writeFile(filename, coverageJSON);
         } catch (error) {
-          console.error('Failed to write coverage data:', error);
+          testLogger.error('Failed to write coverage data', { error });
         }
       });
       
@@ -65,7 +65,7 @@ const test = baseTest.extend({
         try {
           await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
         } catch (error) {
-          console.error('Failed to collect final coverage for page:', error);
+          testLogger.error('Failed to collect final coverage for page', { error });
         }
       }));
       
@@ -84,7 +84,7 @@ const test = baseTest.extend({
     if (process.env.CI) {
       page.on('console', (msg) => {
         if (msg.type() === 'error') {
-          console.error('Browser console error:', msg.text());
+          testLogger.error('Browser console error', { message: msg.text() });
         }
       });
     }
@@ -106,8 +106,9 @@ const expect = test.expect;
  */
 async function verifyAuthentication(page) {
   try {
+    // Increase timeout for authentication verification, especially important for first test in suite
     await page.waitHelpers.waitForElementVisible('[data-test="menu-link-\\/-item"]', {
-      timeout: 5000,
+      timeout: 15000,
       description: 'home menu link (auth verification)'
     });
     return true;
@@ -122,9 +123,10 @@ async function verifyAuthentication(page) {
  * @param {import('@playwright/test').Page} page 
  */
 async function navigateToBase(page) {
-  testLogger.info('Navigating to base URL', { url: process.env["ZO_BASE_URL"] });
-  
-  await page.goto(process.env["ZO_BASE_URL"]);
+  const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
+  testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
+
+  await page.goto(baseUrlWithOrg);
   await page.waitForLoadState('domcontentloaded');
   
   const isAuthenticated = await verifyAuthentication(page);

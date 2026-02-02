@@ -1,0 +1,87 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+env:
+  REVIEW_MARKER: "<!-- claude-pr-review -->"
+
+jobs:
+  review-with-tracking:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Full history needed to check what changed
+
+      - name: PR Review with Progress Tracking
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            ## CRITICAL: ONE COMMENT ONLY
+
+            You must post EXACTLY ONE comment on this PR. Never post multiple comments.
+            Never post a summary AND a review - combine everything into ONE comment.
+
+            ### Step 1: Check for Existing Review
+
+            Run: `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- claude-pr-review -->")) | .id'`
+
+            ### Step 2: Review the Code
+
+            Run: `gh pr diff ${{ github.event.pull_request.number }}`
+
+            Focus on bugs, security issues, and performance problems only.
+            Skip style suggestions, documentation, and "nice to have" improvements.
+
+            ### Step 3: Post or Update Comment
+
+            **If existing comment found (Step 1 returned an ID):**
+            Use `gh api` to update it:
+            ```
+            gh api repos/${{ github.repository }}/issues/comments/{COMMENT_ID} -X PATCH -f body='...'
+            ```
+
+            **If no existing comment:**
+            Create one: `gh pr comment ${{ github.event.pull_request.number }} --body '...'`
+
+            ### Comment Format (EXACT FORMAT - NO ADDITIONS)
+
+            ```
+            <!-- claude-pr-review -->
+            ## Code Review
+
+            **Status:** [X issues / LGTM ✅] | **Commit:** [short SHA]
+
+            | File | Issue | Severity |
+            |------|-------|----------|
+            | `file:line` | Brief description. Fix: suggestion | High/Med/Low |
+
+            ### Resolved
+            - ~~Fixed issue~~
+            ```
+
+            ### STRICT RULES
+
+            - **ONE comment only** - never post multiple comments
+            - **No summaries** - no "Review Complete", no "Security Assessment", no highlights
+            - **No praise** - no "excellent", "strong", "great work" sections
+            - **2 sentences max** per issue
+            - **Max 10 issues** - prioritize by severity
+            - **LGTM if clean** - just show "Status: LGTM ✅" with empty table
+
+          claude_args: |
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Read,Grep,Glob"

@@ -17,111 +17,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <div class="text-bold q-px-md q-pt-sm">
-       Folders
-    </div>
-    <div class="folders-tabs">
-    <!-- Search Input -->
-    <div style="width: 100%;" class="flex folder-item q-py-xs">
-          <q-input
-          v-model="searchQuery"   
-          dense
-          filled
-          borderless
-          data-test="folder-search"
-          placeholder="Search Folder"
-          style="width: 100%;"
-          clearable
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-              <div>
-        </div>
-          </div>
-      <q-tabs
-        indicator-color="transparent"
-        inline-label
-        vertical
-        v-model="activeFolderId"
-        data-test="dashboards-folder-tabs"
-    >
-        <q-tab
-        v-for="(tab, index) in filteredTabs"
-        :key="tab.folderId"
-        :name="tab.folderId"
-        content-class="tab_content full-width"
-        class="test-class"
-        :data-test="`dashboard-folder-tab-${tab.folderId}`"
-        >
-        <div class="folder-item full-width row justify-between no-wrap">
-            <span class="folder-name" :title="tab.name">{{
-            tab.name
-            }}</span>
-            <div class="hover-actions">
+  <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
+      <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
+        <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
+          {{ t('dashboard.folders') }}
+          <div>
             <q-btn
-                v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
-                dense
-                flat
-                no-caps
-                icon="more_vert"
-                style="cursor: pointer; justify-self: end; height: 0.5rem"
-                size="sm"
-                data-test="dashboard-more-icon"
+              class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              no-caps
+              flat
+              @click.stop="addFolder"
+              data-test="dashboard-new-folder-btn"
+              title="Add Folder"
             >
-                <q-menu>
-                <q-list dense>
-                    <q-item
-                    v-close-popup
-                    clickable
-                    @click.stop="editFolder(tab.folderId)"
-                    data-test="dashboard-edit-folder-icon"
-                    >
-                    <q-item-section avatar>
-                        <q-icon :name="outlinedEdit" size="xs" />
-                    </q-item-section>
-                    <q-item-section>
-                        <q-item-label>Edit</q-item-label>
-                    </q-item-section>
-                    </q-item>
-                    <q-item
-                    v-close-popup
-                    clickable
-                    @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                    data-test="dashboard-delete-folder-icon"
-                    >
-                    <q-item-section avatar>
-                        <q-icon :name="outlinedDelete" size="xs" />
-                    </q-item-section>
-                    <q-item-section>
-                        <q-item-label>Delete</q-item-label>
-                    </q-item-section>
-                    </q-item>
-                </q-list>
-                </q-menu>
-            </q-btn>
-            </div>
+            <q-icon name="add" size="xs" />
+          </q-btn>
+          </div>
         </div>
-        <q-separator />
-        </q-tab>
-    </q-tabs>
-    </div>
-    <div
-        class="row justify-center full-width q-px-xs q-pb-xs"
-        style="position: sticky; bottom: 0px"
-    >
-      <q-btn
-          class="text-bold no-border full-width"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          label="New Folder"
-          @click.stop="addFolder"
-          data-test="dashboard-new-folder-btn"
-        />
-    </div>
+        <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
 
+        <!-- Search Input -->
+        <div style="width: 100%;" class="flex folder-item q-py-xs">
+          <q-input
+            v-model="searchQuery"
+            dense
+            borderless
+            data-test="folder-search"
+            :placeholder="t('dashboard.searchFolder')"
+            style="width: 100%;"
+            clearable
+            class="tw:mx-2 q-px-xs"
+            :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+            </template>
+          </q-input>
+        </div>
+      </div>
+      <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
+        <q-tabs
+          indicator-color="transparent"
+          inline-label
+          vertical
+          v-model="activeFolderId"
+          data-test="dashboards-folder-tabs"
+      >
+          <q-tab
+          v-for="(tab, index) in filteredTabs"
+          :key="tab.folderId"
+          :name="tab.folderId"
+          content-class="tab_content full-width"
+          class="test-class"
+          :data-test="`dashboard-folder-tab-${tab.folderId}`"
+          >
+          <div class="folder-item full-width row justify-between no-wrap">
+              <span class="folder-name" :title="tab.name">{{
+              tab.name
+              }}</span>
+              <div class="hover-actions">
+              <q-btn
+                  v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
+                  dense
+                  flat
+                  no-caps
+                  icon="more_vert"
+                  style="cursor: pointer; justify-self: end; height: 0.5rem"
+                  size="sm"
+                  data-test="dashboard-more-icon"
+              >
+                  <q-menu>
+                  <q-list dense>
+                      <q-item
+                      v-close-popup
+                      clickable
+                      @click.stop="editFolder(tab.folderId)"
+                      data-test="dashboard-edit-folder-icon"
+                      >
+                      <q-item-section avatar>
+                          <q-icon :name="outlinedEdit" size="xs" />
+                      </q-item-section>
+                      <q-item-section>
+                          <q-item-label>{{ t('common.edit') }}</q-item-label>
+                      </q-item-section>
+                      </q-item>
+                      <q-item
+                      v-close-popup
+                      clickable
+                      @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                      data-test="dashboard-delete-folder-icon"
+                      >
+                      <q-item-section avatar>
+                          <q-icon :name="outlinedDelete" size="xs" />
+                      </q-item-section>
+                      <q-item-section>
+                          <q-item-label>{{ t('common.delete') }}</q-item-label>
+                      </q-item-section>
+                      </q-item>
+                  </q-list>
+                  </q-menu>
+              </q-btn>
+              </div>
+          </div>
+          <q-separator />
+          </q-tab>
+      </q-tabs>
+      </div>
+    </div>
       <q-dialog
           v-model="showAddFolderDialog"
           position="right"
@@ -130,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-folder-dialog"
         >
         <AddFolder  
+        style="width: 30vw;"
         @update:modelValue="updateFolderList"
         :edit-mode="isFolderEditMode"
         :folder-id="selectedFolderToEdit ?? 'default'"
@@ -137,9 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-dialog>
     <ConfirmDialog
-    title="Delete Folder"
+    :title="t('dashboard.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"
-    message="Are you sure you want to delete this Folder?"
+    :message="t('dashboard.deleteFolderMessage')"
     @update:ok="deleteFolder"
     @update:cancel="confirmDeleteFolderDialog = false"
     v-model="confirmDeleteFolderDialog"
@@ -191,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { filter, forIn } from "lodash-es";
   import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
   import { useLoading } from "@/composables/useLoading";
+  import { useReo } from "@/services/reodotdev_analytics";
 
   const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
     return import("@/components/common/sidebar/MoveAcrossFolders.vue");
@@ -219,6 +224,7 @@ export default defineComponent({
     emits: ['update:folders', 'update:activeFolderId'],
     setup(props, { emit }) {
       const store = useStore();
+      const { t } = useI18n();
       const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const activeFolderId = ref("");
@@ -228,6 +234,7 @@ export default defineComponent({
       const selectedFolderDelete = ref(null);
       const confirmDeleteFolderDialog = ref(false);
       const searchQuery = ref('');
+      const { track } = useReo();
 
 
       const router = useRouter();
@@ -251,6 +258,10 @@ export default defineComponent({
       const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
+      track("Button Click", {
+        button: "Add Folder",
+        page: "Folders",
+      });
      };
 
       const updateFolderList = async (folders: any) => {
@@ -314,6 +325,7 @@ export default defineComponent({
 
 
       return {
+        t,
         activeFolderId,
         showAddFolderDialog,
         isFolderEditMode,
@@ -337,7 +349,29 @@ export default defineComponent({
   </script>
 
 <style lang="scss" scoped>
+.folder-header {
+  &.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  &.folder-header-light {
+    background-color: white;
+  }
+
+  &.folder-header-dark {
+    background-color: #1a1a1a;
+  }
+  border-radius: 0.625rem;
+}
+
 .folders-tabs {
+  .q-tabs {
+    height: auto !important;
+    max-height: none !important;
+  }
+
   .test-class {
     min-height: 1.5rem;
     margin-bottom: 6px;
@@ -393,7 +427,7 @@ export default defineComponent({
         }
 
         &--active {
-          background-color: $primary;
+          background-color: var(--o2-primary-btn-bg);
           color: white;
         }
       }

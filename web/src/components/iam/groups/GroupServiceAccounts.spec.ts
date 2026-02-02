@@ -526,7 +526,8 @@ describe("GroupServiceAccounts Component", () => {
       });
 
       const filters = wrapper.find('[data-test="iam-service-accounts-selection-filters"]');
-      expect(filters.classes()).toContain('bg-dark');
+      expect(filters.exists()).toBe(true);
+      // Theme classes have been removed from the component
     });
   });
 

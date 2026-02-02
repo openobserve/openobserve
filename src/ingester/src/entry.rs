@@ -28,6 +28,7 @@ use snafu::ResultExt;
 use crate::errors::*;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Entry {
+    pub org_id: Arc<str>,
     pub stream: Arc<str>,
     pub schema: Option<Arc<Schema>>,
     pub schema_key: Arc<str>,
@@ -39,6 +40,7 @@ pub struct Entry {
 impl Entry {
     pub fn new() -> Self {
         Self {
+            org_id: "".into(),
             stream: "".into(),
             schema: None,
             schema_key: "".into(),
@@ -67,6 +69,12 @@ impl Entry {
         buf.write_u32::<BigEndian>(data_size as u32)
             .context(WriteDataSnafu)?;
         buf.extend_from_slice(&data);
+
+        // add org_id, we need to write to the end for backward compatibility
+        buf.write_u16::<BigEndian>(self.org_id.len() as u16)
+            .context(WriteDataSnafu)?;
+        buf.extend_from_slice(self.org_id.as_bytes());
+
         Ok(buf)
     }
 
@@ -90,7 +98,19 @@ impl Entry {
         let mut data = vec![0; data_len as usize];
         cursor.read_exact(&mut data).context(ReadDataSnafu)?;
         let data = serde_json::from_slice(&data).context(JSONSerializationSnafu)?;
+
+        // read org_id if available
+        let org_id = if (cursor.position() as usize) < value.len() {
+            let org_id_len = cursor.read_u16::<BigEndian>().context(ReadDataSnafu)?;
+            let mut org_id_buf = vec![0; org_id_len as usize];
+            cursor.read_exact(&mut org_id_buf).context(ReadDataSnafu)?;
+            String::from_utf8(org_id_buf).context(FromUtf8Snafu)?
+        } else {
+            "".to_string()
+        };
+
         Ok(Self {
+            org_id: org_id.into(),
             stream: stream.into(),
             schema: None,
             schema_key: schema_key.into(),

@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+    sync::Arc,
+};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
@@ -35,7 +39,6 @@ use config::{
         time::now_micros,
     },
 };
-use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -63,7 +66,11 @@ use crate::{
     },
 };
 
-pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, std::io::Error> {
+pub async fn otlp_proto(
+    org_id: &str,
+    body: web::Bytes,
+    user: crate::common::meta::ingestion::IngestUser,
+) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
@@ -74,18 +81,30 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf).await {
+    match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf, user).await {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
                 "[METRICS:OTLP] Error while handling grpc metrics request: org_id: {org_id}, error: {e}"
             );
+            // Check if this is a schema validation error (columns limit)
+            let error_msg = e.to_string();
+            if error_msg.contains("ZO_COLS_PER_RECORD_LIMIT") {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    error_msg,
+                )));
+            }
             Err(Error::other(e))
         }
     }
 }
 
-pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, std::io::Error> {
+pub async fn otlp_json(
+    org_id: &str,
+    body: web::Bytes,
+    user: crate::common::meta::ingestion::IngestUser,
+) -> Result<HttpResponse, std::io::Error> {
     let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
@@ -96,10 +115,18 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson).await {
+    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, user).await {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
+            // Check if this is a schema validation error (columns limit)
+            let error_msg = e.to_string();
+            if error_msg.contains("ZO_COLS_PER_RECORD_LIMIT") {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    error_msg,
+                )));
+            }
             Err(Error::other(e))
         }
     }
@@ -109,16 +136,27 @@ pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
+    user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
-        log::error!("[METRICS:OTLP] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
+        // we do not want to log trial period expired errors
+        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        } else {
+            log::error!("[METRICS:OTLP] ingestion error: {e}");
+            return Ok(
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                )),
+            );
+        }
     }
 
     let start = std::time::Instant::now();
@@ -128,6 +166,12 @@ pub async fn handle_otlp_request(
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
+
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    // End get user defined schema
 
     // associated pipeline
     let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
@@ -141,7 +185,7 @@ pub async fn handle_otlp_request(
     let mut partial_success = ExportMetricsPartialSuccess::default();
 
     // records buffer
-    let mut json_data_by_stream: HashMap<String, Vec<json::Value>> = HashMap::new();
+    let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
@@ -149,22 +193,22 @@ pub async fn handle_otlp_request(
         }
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
-                let metric_name = &format_stream_name(&metric.name);
+                let metric_name = format_stream_name(metric.name.to_string());
                 // check for schema
                 let schema_exists = stream_schema_exists(
                     org_id,
-                    metric_name,
+                    &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
                 )
                 .await;
 
                 // get partition keys
-                if !stream_partitioning_map.contains_key(metric_name) {
+                if !stream_partitioning_map.contains_key(&metric_name) {
                     let partition_det = crate::service::ingestion::get_stream_partition_keys(
                         org_id,
                         &StreamType::Metrics,
-                        metric_name,
+                        &metric_name,
                     )
                     .await;
                     stream_partitioning_map
@@ -172,28 +216,30 @@ pub async fn handle_otlp_request(
                 }
 
                 // Start get stream alerts
+                let stream_param = StreamParams::new(org_id, &metric_name, StreamType::Metrics);
                 crate::service::ingestion::get_stream_alerts(
-                    &[StreamParams {
-                        org_id: org_id.to_owned().into(),
-                        stream_name: metric_name.to_owned().into(),
-                        stream_type: StreamType::Metrics,
-                    }],
+                    std::slice::from_ref(&stream_param),
                     &mut stream_alerts_map,
                 )
                 .await;
                 // End get stream alert
 
                 // get stream pipeline
-                if !stream_executable_pipelines.contains_key(metric_name) {
+                if !stream_executable_pipelines.contains_key(&metric_name) {
                     let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipeline(
-                            org_id,
-                            metric_name,
-                            &StreamType::Metrics,
-                        )
-                        .await;
+                        crate::service::ingestion::get_stream_executable_pipeline(&stream_param)
+                            .await;
                     stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
                 }
+
+                // get user defined schema
+                crate::service::ingestion::get_uds_and_original_data_streams(
+                    std::slice::from_ref(&stream_param),
+                    &mut user_defined_schema_map,
+                    &mut streams_need_original_map,
+                    &mut streams_need_all_values_map,
+                )
+                .await;
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
@@ -209,8 +255,8 @@ pub async fn handle_otlp_request(
                 }
                 rec[NAME_LABEL] = metric_name.to_owned().into();
 
-                // metadata handling
-                let mut metadata = Metadata {
+                // process metadata
+                let metadata = Metadata {
                     metric_family_name: rec[NAME_LABEL].to_string(),
                     metric_type: MetricType::Unknown,
                     help: metric.description.to_owned(),
@@ -221,108 +267,138 @@ pub async fn handle_otlp_request(
                 let records = match &metric.data {
                     Some(data) => match data {
                         Data::Gauge(gauge) => {
-                            process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta)
+                            process_gauge(&mut rec, gauge, metadata, &mut prom_meta)
                         }
-                        Data::Sum(sum) => process_sum(&mut rec, sum, &mut metadata, &mut prom_meta),
+                        Data::Sum(sum) => process_sum(&mut rec, sum, metadata, &mut prom_meta),
                         Data::Histogram(hist) => {
-                            process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta)
+                            process_histogram(&mut rec, hist, metadata, &mut prom_meta)
                         }
                         Data::ExponentialHistogram(exp_hist) => process_exponential_histogram(
                             &mut rec,
                             exp_hist,
-                            &mut metadata,
+                            metadata,
                             &mut prom_meta,
                         ),
                         Data::Summary(summary) => {
-                            process_summary(&rec, summary, &mut metadata, &mut prom_meta)
+                            process_summary(&rec, summary, metadata, &mut prom_meta)
                         }
                     },
                     None => vec![],
                 };
 
                 // update schema metadata
-                if !schema_exists.has_metadata
-                    && let Err(e) = db::schema::update_setting(
+                if !schema_exists.has_metrics_metadata {
+                    if !prom_meta.contains_key(METADATA_LABEL) {
+                        prom_meta.insert(
+                            METADATA_LABEL.to_string(),
+                            json::to_string(&Metadata::new(&metric_name)).unwrap(),
+                        );
+                    }
+                    log::info!(
+                        "Metadata for stream {org_id}/metrics/{metric_name} needs to be updated"
+                    );
+                    if let Err(e) = db::schema::update_setting(
                         org_id,
-                        metric_name,
+                        &metric_name,
                         StreamType::Metrics,
                         prom_meta,
                     )
                     .await
-                {
-                    log::error!("Failed to set metadata for metric: {metric_name} with error: {e}");
+                    {
+                        log::error!(
+                            "Failed to set metadata for metric: {metric_name} with error: {e}"
+                        );
+                    }
                 }
+
+                // process data points
                 for mut rec in records {
                     // flattening
                     rec = flatten::flatten(rec)?;
 
-                    let local_metric_name =
-                        &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
+                    let local_metric_name = format_stream_name(
+                        rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
+                    );
 
                     if local_metric_name != metric_name {
                         // check for schema
                         stream_schema_exists(
                             org_id,
-                            local_metric_name,
+                            &local_metric_name,
                             StreamType::Metrics,
                             &mut metric_schema_map,
                         )
                         .await;
 
                         // get partition keys
-                        if !stream_partitioning_map.contains_key(local_metric_name) {
+                        if !stream_partitioning_map.contains_key(&local_metric_name) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
                                     org_id,
                                     &StreamType::Metrics,
-                                    local_metric_name,
+                                    &local_metric_name,
                                 )
                                 .await;
                             stream_partitioning_map
-                                .insert(local_metric_name.to_owned(), partition_det.clone());
+                                .insert(local_metric_name.clone(), partition_det.clone());
                         }
 
                         // Start get stream alerts
+                        let stream_param =
+                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
                         crate::service::ingestion::get_stream_alerts(
-                            &[StreamParams {
-                                org_id: org_id.to_owned().into(),
-                                stream_name: local_metric_name.to_owned().into(),
-                                stream_type: StreamType::Metrics,
-                            }],
+                            std::slice::from_ref(&stream_param),
                             &mut stream_alerts_map,
                         )
                         .await;
                         // End get stream alert
 
                         // get stream pipeline
-                        if !stream_executable_pipelines.contains_key(local_metric_name) {
+                        if !stream_executable_pipelines.contains_key(&local_metric_name) {
                             let pipeline_params =
                                 crate::service::ingestion::get_stream_executable_pipeline(
-                                    org_id,
-                                    local_metric_name,
-                                    &StreamType::Metrics,
+                                    &stream_param,
                                 )
                                 .await;
                             stream_executable_pipelines
                                 .insert(local_metric_name.clone(), pipeline_params);
                         }
+
+                        crate::service::ingestion::get_uds_and_original_data_streams(
+                            std::slice::from_ref(&stream_param),
+                            &mut user_defined_schema_map,
+                            &mut streams_need_original_map,
+                            &mut streams_need_all_values_map,
+                        )
+                        .await;
                     }
 
                     // ready to be buffered for downstream processing
                     if stream_executable_pipelines
-                        .get(local_metric_name)
+                        .get(&local_metric_name)
                         .unwrap()
                         .is_some()
                     {
                         stream_pipeline_inputs
-                            .entry(local_metric_name.to_string())
+                            .entry(local_metric_name.clone())
                             .or_default()
                             .push(rec);
                     } else {
+                        // get json object
+                        let mut local_val = match rec.take() {
+                            json::Value::Object(val) => val,
+                            _ => unreachable!(),
+                        };
+
+                        if let Some(Some(fields)) = user_defined_schema_map.get(&local_metric_name)
+                        {
+                            local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                        }
+
                         json_data_by_stream
-                            .entry(local_metric_name.to_string())
+                            .entry(local_metric_name.clone())
                             .or_default()
-                            .push(rec);
+                            .push(local_val);
                     }
                 }
             }
@@ -360,27 +436,40 @@ pub async fn handle_otlp_request(
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }
+
+                        let destination_stream = stream_params.stream_name.to_string();
+
                         // add partition keys
-                        if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
-                        {
+                        if !stream_partitioning_map.contains_key(&destination_stream) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
                                     org_id,
                                     &StreamType::Metrics,
-                                    &stream_params.stream_name,
+                                    &destination_stream,
                                 )
                                 .await;
-                            stream_partitioning_map.insert(
-                                stream_params.stream_name.to_string(),
-                                partition_det.clone(),
-                            );
+                            stream_partitioning_map
+                                .insert(destination_stream.clone(), partition_det.clone());
                         }
-                        for (_, res) in stream_pl_results {
+                        for (_, mut res) in stream_pl_results {
+                            // get json object
+                            let mut local_val = match res.take() {
+                                json::Value::Object(v) => v,
+                                _ => unreachable!(),
+                            };
+
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&destination_stream)
+                            {
+                                local_val =
+                                    crate::service::ingestion::refactor_map(local_val, fields);
+                            }
+
                             // buffer to downstream processing directly
                             json_data_by_stream
-                                .entry(stream_params.stream_name.to_string())
+                                .entry(destination_stream.clone())
                                 .or_default()
-                                .push(res);
+                                .push(local_val);
                         }
                     }
                 }
@@ -395,11 +484,7 @@ pub async fn handle_otlp_request(
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
-        for mut rec in json_data {
-            // get json object
-            let val_map: &mut serde_json::Map<String, serde_json::Value> =
-                rec.as_object_mut().unwrap();
-
+        for val_map in json_data {
             let timestamp = val_map
                 .get(TIMESTAMP_COL_NAME)
                 .and_then(|ts| ts.as_i64())
@@ -425,20 +510,20 @@ pub async fn handle_otlp_request(
                 }
             }
             drop(schema_fields);
-            if need_schema_check
-                && check_for_schema(
+            if need_schema_check {
+                let (schema_evolution, _infer_schema) = check_for_schema(
                     org_id,
                     &local_metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    vec![val_map],
+                    vec![&val_map],
                     timestamp,
                     false, // is_derived is false for metrics
                 )
-                .await
-                .is_ok()
-            {
-                schema_evolved.insert(local_metric_name.to_owned(), true);
+                .await?;
+                if schema_evolution.is_schema_changed {
+                    schema_evolved.insert(local_metric_name.to_owned(), true);
+                }
             }
 
             let buf = metric_data_map
@@ -457,7 +542,7 @@ pub async fn handle_otlp_request(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                val_map,
+                &val_map,
                 Some(&schema_key),
             );
             let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
@@ -481,7 +566,7 @@ pub async fn handle_otlp_request(
                     let alert_end_time = now_micros();
                     for alert in alerts {
                         if let Ok(Some(data)) = alert
-                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .evaluate(Some(&val_map), (None, alert_end_time), None)
                             .await
                             .map(|res| res.data)
                         {
@@ -518,7 +603,7 @@ pub async fn handle_otlp_request(
             ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
-        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await?;
+        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
         let fns_length: usize =
             stream_executable_pipelines
@@ -529,6 +614,12 @@ pub async fn handle_otlp_request(
                         .map_or(0, |exec_pl| exec_pl.num_of_func())
                 });
         req_stats.response_time = start.elapsed().as_secs_f64();
+        let email_str = user.to_email();
+        req_stats.user_email = if email_str.is_empty() {
+            None
+        } else {
+            Some(email_str)
+        };
         report_request_usage_stats(
             req_stats,
             org_id,
@@ -555,7 +646,7 @@ pub async fn handle_otlp_request(
         .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .inc();
 
-    // only one trigger per request, as it updates etcd
+    // only one trigger per request
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
             evaluate_trigger(entry).await;
@@ -568,7 +659,7 @@ pub async fn handle_otlp_request(
 fn process_gauge(
     rec: &mut json::Value,
     gauge: &Gauge,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     let mut records = vec![];
@@ -593,7 +684,7 @@ fn process_gauge(
 fn process_sum(
     rec: &mut json::Value,
     sum: &Sum,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -620,7 +711,7 @@ fn process_sum(
 fn process_histogram(
     rec: &mut json::Value,
     hist: &Histogram,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -647,7 +738,7 @@ fn process_histogram(
 fn process_exponential_histogram(
     rec: &mut json::Value,
     hist: &ExponentialHistogram,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -673,7 +764,7 @@ fn process_exponential_histogram(
 fn process_summary(
     rec: &json::Value,
     summary: &Summary,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -1107,7 +1198,7 @@ mod tests {
             "__name__": "test_gauge",
             "__type__": "gauge"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_gauge".to_string(),
             help: "Test gauge metric".to_string(),
@@ -1116,10 +1207,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             let processed_data = &result[0];
             assert_eq!(processed_data["__name__"], "test_gauge");
             assert_eq!(processed_data["__type__"], "gauge");
@@ -1137,7 +1232,7 @@ mod tests {
             "__name__": "test_counter",
             "__type__": "counter"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_counter".to_string(),
             help: "Test counter metric".to_string(),
@@ -1146,10 +1241,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Sum(sum)) = &metric.data {
-            let result = process_sum(&mut rec, sum, &mut metadata, &mut prom_meta);
+            let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             let processed_data = &result[0];
             assert_eq!(processed_data["__name__"], "test_counter");
             assert_eq!(processed_data["__type__"], "counter");
@@ -1172,7 +1271,7 @@ mod tests {
             "__name__": "test_histogram",
             "__type__": "histogram"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_histogram".to_string(),
             help: "Test histogram metric".to_string(),
@@ -1181,10 +1280,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Histogram(hist)) = &metric.data {
-            let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+            let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::Histogram);
 
             // Should have count, sum, min, max, and bucket records
@@ -1201,7 +1304,7 @@ mod tests {
             "__name__": "test_exp_histogram",
             "__type__": "exponential_histogram"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_exp_histogram".to_string(),
             help: "Test exponential histogram metric".to_string(),
@@ -1210,11 +1313,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::ExponentialHistogram(hist)) = &metric.data {
-            let result =
-                process_exponential_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+            let result = process_exponential_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::ExponentialHistogram);
         } else {
             panic!("Expected exponential histogram metric");
@@ -1228,7 +1334,7 @@ mod tests {
             "__name__": "test_summary",
             "__type__": "summary"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_summary".to_string(),
             help: "Test summary metric".to_string(),
@@ -1237,10 +1343,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Summary(summary)) = &metric.data {
-            let result = process_summary(&rec, summary, &mut metadata, &mut prom_meta);
+            let result = process_summary(&rec, summary, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::Summary);
         } else {
             panic!("Expected summary metric");
@@ -1498,7 +1608,7 @@ mod tests {
             "__name__": "test_metric_with_attrs",
             "__type__": "gauge"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_metric_with_attrs".to_string(),
             help: "Test metric with attributes".to_string(),
@@ -1507,7 +1617,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data has required fields
             assert!(!result.is_empty());
@@ -1602,7 +1712,7 @@ mod tests {
         fn test_gauge_with_zero_value() {
             let metric = create_test_gauge_metric("zero_gauge", 0.0);
             let mut rec = json!({"__name__": "zero_gauge", "__type__": "gauge"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1611,7 +1721,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], 0.0);
             }
@@ -1621,7 +1731,7 @@ mod tests {
         fn test_gauge_with_negative_value() {
             let metric = create_test_gauge_metric("negative_gauge", -42.5);
             let mut rec = json!({"__name__": "negative_gauge", "__type__": "gauge"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1630,7 +1740,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], -42.5);
             }
@@ -1640,7 +1750,7 @@ mod tests {
         fn test_gauge_with_infinity() {
             let metric = create_test_gauge_metric("infinity_gauge", f64::INFINITY);
             let mut rec = json!({"__name__": "infinity_gauge", "__type__": "gauge"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1649,7 +1759,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 // Check that the value is infinite (JSON might not preserve exact infinity)
                 let value = &result[0]["value"];
@@ -1668,7 +1778,7 @@ mod tests {
         fn test_sum_non_monotonic() {
             let metric = create_test_sum_metric("non_monotonic_sum", 50.0, false);
             let mut rec = json!({"__name__": "non_monotonic_sum", "__type__": "counter"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1677,7 +1787,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Sum(sum)) = &metric.data {
-                let result = process_sum(&mut rec, sum, &mut metadata, &mut prom_meta);
+                let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["is_monotonic"], "false");
             }
@@ -1687,7 +1797,7 @@ mod tests {
         fn test_histogram_empty_buckets() {
             let metric = create_test_histogram_metric("empty_hist", vec![], vec![]);
             let mut rec = json!({"__name__": "empty_hist", "__type__": "histogram"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1696,7 +1806,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should still have count, sum, min, max records
                 assert!(result.len() >= 4);
             }
@@ -1706,7 +1816,7 @@ mod tests {
         fn test_histogram_single_bucket() {
             let metric = create_test_histogram_metric("single_bucket", vec![100], vec![10.0]);
             let mut rec = json!({"__name__": "single_bucket", "__type__": "histogram"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1715,7 +1825,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should have count, sum, min, max, and 1 bucket
                 assert_eq!(result.len(), 5);
 
@@ -1733,7 +1843,7 @@ mod tests {
             let bounds = vec![1.0, 2.0, 3.0, 4.0, 5.0];
             let metric = create_test_histogram_metric("many_buckets", counts, bounds);
             let mut rec = json!({"__name__": "many_buckets", "__type__": "histogram"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1742,7 +1852,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should have count, sum, min, max, and 5 buckets
                 assert_eq!(result.len(), 9);
             }

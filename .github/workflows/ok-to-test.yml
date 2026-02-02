@@ -5,6 +5,10 @@ on:
   issue_comment:
     types: [created]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ok-to-test:
     runs-on: ubuntu-latest

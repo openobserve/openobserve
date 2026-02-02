@@ -51,7 +51,7 @@ const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Ar
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
-type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end';
+type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result' | 'promql_response';
 
 const useHttpStreaming = () => {
   const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
@@ -110,13 +110,14 @@ const useHttpStreaming = () => {
 
   const fetchQueryDataWithHttpStream = async (
     data: {
-      queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount" | "values";
+      queryReq: SearchRequestPayload | any;
+      type: "search" | "histogram" | "pageCount" | "values" | "promql";
       traceId: string;
       org_id: string;
-      pageType: string;
-      searchType: string;
-      meta: any;
+      pageType?: string;
+      searchType?: string;
+      meta?: any;
+      clear_cache?: boolean;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -160,13 +161,14 @@ const useHttpStreaming = () => {
 
   const initiateStreamConnection = async (
     data: {
-      queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount" | "values";
+      queryReq: SearchRequestPayload | any;
+      type: "search" | "histogram" | "pageCount" | "values" | "promql";
       traceId: string;
       org_id: string;
-      pageType: string;
-      searchType: string;
-      meta: any;
+      pageType?: string;
+      searchType?: string;
+      meta?: any;
+      clear_cache?: boolean;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -175,7 +177,7 @@ const useHttpStreaming = () => {
       reset: (data: any, response: any) => void;
     }
   ) => {
-    const { traceId, org_id, type, queryReq, searchType, pageType, meta } = data;
+    const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache } = data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -188,11 +190,20 @@ const useHttpStreaming = () => {
       ? (window as any).use_cache
       : true;
 
+    // Check if this is a multi-stream request (similar to search.ts logic)
+    const isMultiStream = typeof queryReq.query?.sql !== "string";
+
     //TODO OK: Create method to get the url based on the type
     if (type === "search" || type === "histogram" || type === "pageCount") {
-      url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
+      const streamEndpoint = isMultiStream ? "_multi_search_stream" : "_search_stream";
+      
+      url = `/${streamEndpoint}?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
+      if (meta?.dashboard_name)
+        url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
       if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
+      if (meta?.folder_name)
+        url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
       if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
       if (meta?.panel_name)
         url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
@@ -202,10 +213,39 @@ const useHttpStreaming = () => {
         url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
+      if (clear_cache)
+        url += `&clear_cache=${clear_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+
+      if(type === "histogram") {
+        let is_multi_stream_search = false;
+        if (queryReq.query?.sql.indexOf(' UNION ALL ') !== -1) is_multi_stream_search = true;
+        url += `&is_multi_stream_search=${is_multi_stream_search}`;
+      }
+
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");
       url = `/_values_stream`;
+    } else if (type === "promql") {
+      // PromQL streaming endpoint
+      // For instant queries, set start == end to get a single evaluation point
+      const queryType = queryReq.query_type || "range";
+      const startTime = queryType === "instant" ? queryReq.end_time : queryReq.start_time;
+      const endTime = queryReq.end_time;
+
+      // Always use query_range endpoint (returns matrix format)
+      url = `/prometheus/api/v1/query_range?use_streaming=true&use_cache=${use_cache}&start=${startTime}&end=${endTime}&step=${queryReq.step}&query=${encodeURIComponent(queryReq.query)}`;
+
+      // Add common metadata parameters
+      if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
+      if (meta?.dashboard_name) url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
+      if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
+      if (meta?.folder_name) url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
+      if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
+      if (meta?.panel_name) url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
+      if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
+      if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
+      if (meta?.tab_name) url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
     }
 
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
@@ -213,24 +253,35 @@ const useHttpStreaming = () => {
     try {
       const spanId = getUUID().replace(/-/g, "").slice(0, 16);
       const traceparent = `00-${traceId}-${spanId}-01`;
+
       // Make the HTTP/2 streaming request
-      const response = await fetch(url, {
-        method: 'POST',
+      const fetchOptions: any = {
+        method: type === "promql" ? 'GET' : 'POST',
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
           'traceparent': traceparent,
         },
-        body: JSON.stringify(queryReq),
         signal: abortController.signal,
-      });
+      };
+
+      // Add Content-Type and body only for POST requests
+      if (type !== "promql") {
+        fetchOptions.headers['Content-Type'] = 'application/json';
+        fetchOptions.body = JSON.stringify((isMultiStream && type != "values") ? queryReq.query : queryReq);
+      }
+
+      const response = await fetch(url, fetchOptions);
 
       if (!response.ok) {
-        onError(traceId, {
-          status: response.status,
-          ...(await response.json()),
-        });
-        return;
+        try {
+          onError(traceId, {
+            status: response.status,
+            ...(await response.json()),
+          });
+          return;
+        } catch (e) {
+          throw response;
+        }
       }
 
       // Set up worker for stream processing
@@ -246,6 +297,12 @@ const useHttpStreaming = () => {
               break;
             case 'search_response_hits':
               onData(eventTraceId, 'search_response_hits', data);
+              break;
+            case 'pattern_extraction_result':
+              onData(eventTraceId, 'pattern_extraction_result', data);
+              break;
+            case 'promql_response':
+              onData(eventTraceId, 'promql_response', data);
               break;
             case 'progress':
               onData(eventTraceId, 'progress', data);
@@ -320,6 +377,11 @@ const useHttpStreaming = () => {
             if ((error as any).name === 'AbortError') {
               // console.log('Stream reading was cancelled for traceId:', traceId);
               // Don't call onError for expected cancellations
+            } else if((error as any).status === 401) {
+              store.dispatch("logout");
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.reload();
             } else {
               console.error('Error reading stream:', error);
               onError(traceId, error);
@@ -344,6 +406,11 @@ const useHttpStreaming = () => {
     } catch (error) {
       if ((error as any).name === 'AbortError') {
        // console.error('Stream was canceled');
+      } else if((error as any).status === 401) {
+        store.dispatch("logout");
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
       } else {
         onError(traceId, error);
       }
@@ -471,9 +538,30 @@ const useHttpStreaming = () => {
     }
   }
 
+  const convertToPatternResult = (type: string, data: any) => {
+    return {
+      type: "pattern_extraction_result",
+      content: data,
+    }
+  }
+
+  const convertToPromQLResponse = (traceId: string, response: any, type: StreamResponseType) => {
+    // Backend sends: PromqlResponse { data: QueryResult { result_type, result } }
+    // We need to extract the QueryResult and return it in a format compatible with the old API
+    return {
+      content: {
+        results: response.data || response, // This contains { result_type, result }
+        trace_id: traceId,
+      },
+      type: "promql_response",
+    }
+  }
+
   const wsMapper = {
     'search_response_metadata': convertToWsResponse,
     'search_response_hits': convertToWsResponse,
+    'pattern_extraction_result': convertToPatternResult,
+    'promql_response': convertToPromQLResponse,
     'progress': convertToWsEventProgress,
     'error': convertToWsError,
     'end': convertToWsEnd,

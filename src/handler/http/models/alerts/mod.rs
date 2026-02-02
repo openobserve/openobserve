@@ -17,7 +17,7 @@ pub mod requests;
 pub mod responses;
 
 use config::meta::{
-    alerts::{self as meta_alerts, default_align_time},
+    alerts::{self as meta_alerts, deduplication::DeduplicationConfig, default_align_time},
     search as meta_search, stream as meta_stream,
     triggers::Trigger,
 };
@@ -31,6 +31,7 @@ use utoipa::ToSchema;
 pub struct Alert {
     #[serde(default)]
     #[schema(read_only)]
+    #[schema(value_type = Option<String>)]
     pub id: Option<Ksuid>,
 
     #[serde(default)]
@@ -61,6 +62,9 @@ pub struct Alert {
 
     #[serde(default)]
     pub row_template: String,
+
+    #[serde(default)]
+    pub row_template_type: meta_alerts::alert::RowTemplateType,
 
     #[serde(default)]
     pub description: String,
@@ -94,6 +98,10 @@ pub struct Alert {
     #[serde(default)]
     #[schema(read_only)]
     pub last_edited_by: Option<String>,
+
+    /// Optional deduplication configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deduplication: Option<DeduplicationConfig>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -154,7 +162,8 @@ pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
-    pub conditions: Option<meta_alerts::ConditionList>,
+    #[schema(value_type = Option<Object>)]
+    pub conditions: Option<meta_alerts::AlertConditionParams>,
     pub sql: Option<String>,
     pub promql: Option<String>,
     pub promql_condition: Option<Condition>,
@@ -221,9 +230,10 @@ pub struct Condition {
     pub ignore_case: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 pub enum Operator {
     #[serde(rename = "=")]
+    #[default]
     EqualTo,
     #[serde(rename = "!=")]
     NotEqualTo,
@@ -237,12 +247,6 @@ pub enum Operator {
     LessThanEquals,
     Contains,
     NotContains,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self::EqualTo
-    }
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -297,6 +301,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             destinations: alert.destinations,
             context_attributes: alert.context_attributes,
             row_template: alert.row_template,
+            row_template_type: alert.row_template_type,
             description: alert.description,
             enabled: alert.enabled,
             tz_offset: alert.tz_offset,
@@ -305,6 +310,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             owner: alert.owner,
             updated_at: alert.updated_at.map(|t| t.timestamp()),
             last_edited_by: alert.last_edited_by,
+            deduplication: alert.deduplication,
         }
     }
 }
@@ -347,6 +353,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
     fn from(value: meta_alerts::QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
+            // Pass AlertConditionParams directly (supports both V1 and V2)
             conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
@@ -448,6 +455,9 @@ impl From<meta_stream::StreamType> for StreamType {
             meta_stream::StreamType::Logs => Self::Logs,
             meta_stream::StreamType::Metrics => Self::Metrics,
             meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::ServiceGraph => Self::Metadata, // ServiceGraph not
+            // alertable, map to
+            // Metadata
             meta_stream::StreamType::EnrichmentTables => Self::EnrichmentTables,
             meta_stream::StreamType::Filelist => Self::Filelist,
             meta_stream::StreamType::Metadata => Self::Metadata,
@@ -473,10 +483,12 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.destinations = value.destinations;
         alert.context_attributes = value.context_attributes;
         alert.row_template = value.row_template;
+        alert.row_template_type = value.row_template_type;
         alert.description = value.description;
         alert.enabled = value.enabled;
         alert.tz_offset = value.tz_offset;
         alert.owner = value.owner;
+        alert.deduplication = value.deduplication;
 
         alert
     }
@@ -520,6 +532,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
     fn from(value: QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
+            // Pass AlertConditionParams directly (supports both V1 and V2)
             conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
@@ -625,6 +638,118 @@ impl From<StreamType> for meta_stream::StreamType {
             StreamType::Filelist => Self::Filelist,
             StreamType::Metadata => Self::Metadata,
             StreamType::Index => Self::Index,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_condition_v2_deserialization() {
+        // Test that the API layer can deserialize V2 conditions
+        let json = r#"{
+            "type": "custom",
+            "conditions": {
+                "version": 2,
+                "conditions": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": [
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "level",
+                            "operator": "=",
+                            "value": "error",
+                            "logicalOperator": "AND"
+                        },
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "service",
+                            "operator": "=",
+                            "value": "api",
+                            "logicalOperator": "OR"
+                        }
+                    ]
+                }
+            },
+            "sql": null,
+            "promql": null,
+            "aggregation": null,
+            "promql_condition": null,
+            "vrl_function": null,
+            "search_event_type": null,
+            "multi_time_range": null
+        }"#;
+
+        let result: Result<QueryCondition, _> = serde_json::from_str(json);
+        assert!(
+            result.is_ok(),
+            "V2 deserialization failed: {:?}",
+            result.err()
+        );
+
+        let query_cond = result.unwrap();
+        assert_eq!(query_cond.query_type, QueryType::Custom);
+        assert!(query_cond.conditions.is_some());
+
+        // Verify it's V2
+        match query_cond.conditions.unwrap() {
+            meta_alerts::AlertConditionParams::V2(group) => {
+                assert_eq!(group.filter_type, "group");
+                assert_eq!(group.conditions.len(), 2);
+            }
+            _ => panic!("Expected V2 variant"),
+        }
+    }
+
+    #[test]
+    fn test_query_condition_v1_deserialization() {
+        // Test that the API layer still supports V1 conditions
+        let json = r#"{
+            "type": "custom",
+            "conditions": {
+                "and": [
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error",
+                        "ignore_case": false
+                    },
+                    {
+                        "column": "service",
+                        "operator": "=",
+                        "value": "api",
+                        "ignore_case": false
+                    }
+                ]
+            },
+            "sql": null,
+            "promql": null,
+            "aggregation": null,
+            "promql_condition": null,
+            "vrl_function": null,
+            "search_event_type": null,
+            "multi_time_range": null
+        }"#;
+
+        let result: Result<QueryCondition, _> = serde_json::from_str(json);
+        assert!(
+            result.is_ok(),
+            "V1 deserialization failed: {:?}",
+            result.err()
+        );
+
+        let query_cond = result.unwrap();
+        assert!(query_cond.conditions.is_some());
+
+        // Verify it's V1
+        match query_cond.conditions.unwrap() {
+            meta_alerts::AlertConditionParams::V1(_) => {}
+            _ => panic!("Expected V1 variant"),
         }
     }
 }

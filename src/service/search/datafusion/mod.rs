@@ -17,8 +17,8 @@ use std::str::FromStr;
 
 pub mod distributed_plan;
 pub mod exec;
-pub mod file_type;
 pub mod optimizer;
+pub mod peak_memory_pool;
 pub mod plan;
 pub mod planner;
 pub mod storage;
@@ -38,8 +38,8 @@ impl FromStr for MemoryPoolType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "greedy" => Ok(MemoryPoolType::Greedy),
-            "fair" | "" => Ok(MemoryPoolType::Fair), // default is fair
+            "greedy" | "" => Ok(MemoryPoolType::Greedy),
+            "fair" => Ok(MemoryPoolType::Fair),
             "none" | "off" => Ok(MemoryPoolType::None),
             _ => Err(format!("Invalid memory pool type '{s}'")),
         }

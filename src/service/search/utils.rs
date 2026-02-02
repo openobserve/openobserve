@@ -13,14 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, atomic::Ordering},
+};
 
-use config::meta::search::ScanStats;
+use config::meta::{
+    inverted_index::UNKNOWN_NAME,
+    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats},
+};
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
+use infra::runtime::DATAFUSION_RUNTIME;
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
 
-use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan::RemoteScanExec};
+use super::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+use crate::{common::meta::search::CAPPED_RESULTS_MSG, service::search::sql::Sql};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -54,6 +63,7 @@ impl Drop for AsyncDefer {
 #[derive(Debug)]
 pub struct ScanStatsVisitor {
     pub scan_stats: ScanStats,
+    pub peak_memory: usize,
     pub partial_err: String,
 }
 
@@ -61,6 +71,7 @@ impl ScanStatsVisitor {
     pub fn new() -> Self {
         ScanStatsVisitor {
             scan_stats: ScanStats::default(),
+            peak_memory: 0,
             partial_err: String::new(),
         }
     }
@@ -81,6 +92,10 @@ impl ExecutionPlanVisitor for ScanStatsVisitor {
                 let guard = remote_scan_exec.partial_err.lock();
                 let err = (*guard).clone();
                 self.partial_err.push_str(&err);
+            }
+            {
+                let peak_memory = remote_scan_exec.peak_memory().load(Ordering::Relaxed);
+                self.peak_memory = peak_memory.max(self.peak_memory);
             }
         }
         Ok(true)
@@ -173,8 +188,46 @@ pub fn get_field_name(expr: &Expr) -> String {
     match expr {
         Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
         Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
+        _ => UNKNOWN_NAME.to_string(),
     }
+}
+
+pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
+    if is_default_query_limit_exceeded(num_rows, sql) {
+        let capped_err = CAPPED_RESULTS_MSG.to_string();
+        if !partial_err.is_empty() {
+            partial_err.push('\n');
+            partial_err.push_str(&capped_err);
+        } else {
+            *partial_err = capped_err;
+        }
+    }
+}
+
+pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
+    let default_query_limit = config::get_config().limit.query_default_limit as usize;
+    if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
+        num_rows > default_query_limit
+    } else {
+        false
+    }
+}
+
+pub fn is_permissable_function_error(function_error: &[String]) -> bool {
+    if function_error.is_empty() {
+        return true;
+    }
+
+    function_error.iter().all(|error| {
+        // Empty or whitespace-only errors are cachable (no actual error)
+        let trimmed = error.trim();
+        if trimmed.is_empty() {
+            return true;
+        }
+
+        // Check if error contains only cachable messages
+        error.contains(CAPPED_RESULTS_MSG) || error.contains(PARTIAL_ERROR_RESPONSE_MESSAGE)
+    })
 }
 
 #[cfg(test)]
@@ -182,6 +235,43 @@ mod tests {
     use sqlparser::ast::{BinaryOperator, Expr, Ident, Value};
 
     use super::*;
+
+    #[test]
+    fn test_is_cachable_function_error() {
+        let error = vec![];
+        assert!(is_permissable_function_error(&error));
+
+        let error = vec!["".to_string()];
+        assert!(is_permissable_function_error(&error));
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert!(is_permissable_function_error(&error)); // only this is cachable
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+            "parquet not found".to_string(),
+        ];
+        assert!(!is_permissable_function_error(&error));
+
+        let error = vec![
+            "parquet not found".to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert!(!is_permissable_function_error(&error));
+
+        let error = vec!["parquet not found".to_string()];
+        assert!(!is_permissable_function_error(&error));
+
+        let error = vec![
+            "parquet not found".to_string(),
+            CAPPED_RESULTS_MSG.to_string(),
+        ];
+        assert!(!is_permissable_function_error(&error));
+    }
 
     #[test]
     fn test_split_conjunction() {

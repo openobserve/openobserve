@@ -164,13 +164,13 @@ describe("ListOrganizations", () => {
     });
 
     it("should have correct pagination settings", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(25);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
       expect(wrapper.vm.perPageOptions).toHaveLength(5);
     });
 
     it("should setup columns correctly", () => {
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(5); // Base columns without plan
+      expect(columns).toHaveLength(6); // Base columns without plan
       expect(columns.map(c => c.name)).toContain("name");
       expect(columns.map(c => c.name)).toContain("identifier");
     });
@@ -207,7 +207,7 @@ describe("ListOrganizations", () => {
       });
       
       await wrapperWithCloud.vm.$nextTick();
-      expect(wrapperWithCloud.vm.columns).toHaveLength(5); // Including plan column
+      expect(wrapperWithCloud.vm.columns).toHaveLength(6); // Including plan column
       wrapperWithCloud.unmount();
     });
   });
@@ -283,7 +283,7 @@ describe("ListOrganizations", () => {
     });
 
     it("should have correct initial pagination state", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(25);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
     });
 
     it("should update table pagination", async () => {
@@ -376,51 +376,6 @@ describe("ListOrganizations", () => {
     });
   });
 
-  describe("Theme Handling", () => {
-    it("should apply correct theme class to table header", () => {
-      const headerDiv = wrapper.find("[data-test='organizations-title-text']").element.parentElement;
-      expect(headerDiv.classList.contains("o2-table-header-light")).toBe(true);
-    });
-
-    it("should apply correct theme class to table", () => {
-      const table = wrapper.find(".o2-quasar-table");
-      expect(table.classes()).toContain("o2-quasar-table-light");
-    });
-
-    it("should handle dark theme", async () => {
-      const darkWrapper = mount(ListOrganizations, {
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: {
-              ...mockStore,
-              state: {
-                ...mockStore.state,
-                theme: "dark"
-              }
-            },
-          },
-          stubs: {
-            QTable: {
-              template: '<div class="o2-quasar-table" :class="$attrs.class"><slot></slot></div>',
-              props: ['rows', 'columns']
-            },
-            QInput: true,
-            QIcon: true,
-            QBtn: true,
-            QDialog: true,
-            QTablePagination: true,
-            NoData: true,
-          },
-        },
-      });
-      
-      await darkWrapper.vm.$nextTick();
-      const table = darkWrapper.find(".o2-quasar-table");
-      expect(table.classes()).toContain("o2-quasar-table-dark");
-      darkWrapper.unmount();
-    });
-  });
 
   describe("Error Handling", () => {
 

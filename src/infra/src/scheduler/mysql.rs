@@ -28,7 +28,7 @@ use super::{
 use crate::{
     db::{
         self, IndexStatement,
-        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
+        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, drop_column},
     },
     errors::{DbError, Error, Result},
 };
@@ -70,7 +70,6 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
     data         LONGTEXT not null
 );
             "#,
@@ -79,15 +78,11 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         .await?;
 
         // create data column for old version <= 0.10.9
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "information_schema.columns"])
-            .inc();
-        let has_data_column = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='scheduled_jobs' AND column_name='data';")
-            .fetch_one(&pool)
-            .await?;
-        if has_data_column == 0 {
-            add_data_column().await?;
-        }
+        add_column("scheduled_jobs", "data", "LONGTEXT NOT NULL DEFAULT ''").await?;
+
+        // drop created_at column for old version <= 0.40.0
+        drop_column("scheduled_jobs", "created_at").await?;
+
         Ok(())
     }
 
@@ -325,6 +320,163 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         Ok(())
     }
 
+    async fn bulk_update_triggers(&self, triggers: Vec<Trigger>) -> Result<()> {
+        if triggers.is_empty() {
+            return Ok(());
+        }
+
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["bulk_update", "scheduled_jobs"])
+            .inc();
+
+        // For MySQL, we'll use individual updates within a transaction for better reliability
+        let mut transaction = pool.begin().await?;
+
+        for trigger in &triggers {
+            let query = sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
+    WHERE org = ? AND module_key = ? AND module = ?;"#,
+            )
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module);
+
+            if let Err(e) = query.execute(&mut *transaction).await {
+                log::warn!(
+                    "Error updating trigger {}/{}/{}: {}",
+                    trigger.org,
+                    trigger.module,
+                    trigger.module_key,
+                    e
+                );
+                transaction.rollback().await?;
+                // Fallback to individual updates
+                for trigger in triggers {
+                    self.update_trigger(trigger, false).await?;
+                }
+                return Ok(());
+            }
+        }
+
+        if let Err(e) = transaction.commit().await {
+            log::warn!("Bulk update transaction failed: {}", e);
+            // Fallback to individual updates
+            for trigger in triggers {
+                self.update_trigger(trigger, false).await?;
+            }
+            return Ok(());
+        }
+
+        // Handle cluster coordinator for realtime alerts
+        for trigger in &triggers {
+            if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+                let key = format!(
+                    "{TRIGGERS_KEY}{}/{}/{}",
+                    trigger.module, &trigger.org, &trigger.module_key
+                );
+                let cluster_coordinator = db::get_coordinator().await;
+                if let Err(e) = cluster_coordinator
+                    .put(&key, Bytes::from(""), true, None)
+                    .await
+                {
+                    log::error!(
+                        "Error updating cluster coordinator for trigger {}: {}",
+                        key,
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn bulk_update_status(
+        &self,
+        updates: Vec<(
+            String,
+            TriggerModule,
+            String,
+            TriggerStatus,
+            i32,
+            Option<String>,
+        )>,
+    ) -> Result<()> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["bulk_update_status", "scheduled_jobs"])
+            .inc();
+
+        // Use transaction for better reliability
+        let mut transaction = pool.begin().await?;
+
+        for (org, module, module_key, status, retries, data) in &updates {
+            let query = match data {
+                Some(data) => {
+                    sqlx::query(
+                        r#"UPDATE scheduled_jobs SET status = ?, retries = ?, data = ? WHERE org = ? AND module_key = ? AND module = ?;"#,
+                    )
+                    .bind(status)
+                    .bind(*retries)
+                    .bind(data)
+                    .bind(org)
+                    .bind(module_key)
+                    .bind(module)
+                }
+                None => {
+                    sqlx::query(
+                        r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module_key = ? AND module = ?;"#,
+                    )
+                    .bind(status)
+                    .bind(*retries)
+                    .bind(org)
+                    .bind(module_key)
+                    .bind(module)
+                }
+            };
+
+            if let Err(e) = query.execute(&mut *transaction).await {
+                log::warn!(
+                    "Error updating status for trigger {}/{}/{}: {}",
+                    org,
+                    module,
+                    module_key,
+                    e
+                );
+                transaction.rollback().await?;
+                // Fallback to individual updates
+                for (org, module, module_key, status, retries, data) in updates {
+                    self.update_status(&org, module, &module_key, status, retries, data.as_deref())
+                        .await?;
+                }
+                return Ok(());
+            }
+        }
+
+        if let Err(e) = transaction.commit().await {
+            log::warn!("Bulk status update transaction failed: {}", e);
+            // Fallback to individual updates
+            for (org, module, module_key, status, retries, data) in updates {
+                self.update_status(&org, module, &module_key, status, retries, data.as_deref())
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Keeps the trigger alive
     async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()> {
         let now = now_micros();
@@ -348,9 +500,9 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         );
         let pool = CLIENT.clone();
         sqlx::query(&sql)
-            .bind(TriggerModule::Alert)
-            .bind(alert_max_time)
+            .bind(TriggerModule::Report)
             .bind(report_max_time)
+            .bind(alert_max_time)
             .execute(&pool)
             .await?;
 
@@ -507,9 +659,9 @@ WHERE id IN ({});",
         if let Err(e) = sqlx::query(&query)
             .bind(TriggerStatus::Processing)
             .bind(now)
-            .bind(TriggerModule::Alert)
-            .bind(alert_max_time)
+            .bind(TriggerModule::Report)
             .bind(report_max_time)
+            .bind(alert_max_time)
             .execute(&mut *tx)
             .await
         {
@@ -729,22 +881,4 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
 
         Ok(())
     }
-}
-
-async fn add_data_column() -> Result<()> {
-    log::info!("[MYSQL] Adding data column to scheduled_jobs table");
-    let pool = CLIENT_DDL.clone();
-    DB_QUERY_NUMS
-        .with_label_values(&["alter", "scheduled_jobs"])
-        .inc();
-    if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
-        .execute(&pool)
-        .await
-        && !e.to_string().contains("Duplicate column name")
-    {
-        // Check for the specific MySQL error code for duplicate column
-        log::error!("[MYSQL] Unexpected error in adding column: {e}");
-        return Err(e.into());
-    }
-    Ok(())
 }

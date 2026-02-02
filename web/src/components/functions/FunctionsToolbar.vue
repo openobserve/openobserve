@@ -1,39 +1,34 @@
 <template>
   <div
-    class="functions-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
+    class="tw:w-full tw:flex tw:justify-between tw:items-center"
   >
-    <div class="tw-flex tw-items-center">
-      <div class="tw-mr-2 add-function-back-btn">
+    <div class="tw:flex tw:items-center">
+      <div class="add-function-back-btn">
         <div
           data-test="add-function-back-btn"
-          class="flex justify-center items-center cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
+          no-caps
+          padding="xs"
+          outline
+          icon="arrow_back_ios_new"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="redirectToFunctions"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
       </div>
-      <div class="tw-text-lg tw-w-full add-function-title q-mr-md">
-        Add Function
+      <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
+        {{ t('function.addFunction') }}
       </div>
-      <q-form ref="addFunctionForm" class="o2-input">
-        <div class="tw-flex tw-items-center">
+      <q-form ref="addFunctionForm" class="o2-input tw:flex tw:items-center tw:gap-6">
+        <div class="tw:flex tw:items-center">
           <q-input
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pa-none tw-w-full"
+            class="q-pa-none tw:w-full"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             v-bind:readonly="disableName"
             v-bind:disable="disableName"
@@ -53,22 +48,54 @@
             :name="outlinedInfo"
             size="20px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
             <q-tooltip
               anchor="center right"
               self="center left"
               max-width="300px"
               :offset="[2, 0]"
-              class="tw-text-[12px]"
+              class="tw:text-[12px]"
             >
               {{ isValidMethodName() }}
             </q-tooltip>
           </q-icon>
         </div>
+        <!-- Transform Type Radio Buttons -->
+        <div class="tw:flex tw:items-center tw:gap-4">
+          <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
+            <q-radio
+              v-model="selectedTransType"
+              val="0"
+              size="xs"
+              class="tw:mb-0"
+            />
+            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
+          </div>
+          <!-- JavaScript option only shown in _meta organization -->
+          <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
+            <q-radio
+              v-model="selectedTransType"
+              val="1"
+              size="xs"
+              class="tw:mb-0"
+            />
+            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
+          </div>
+          <!-- Info icon with tooltip -->
+          <q-icon
+            name="info_outline"
+            size="xs"
+            class="tw:cursor-pointer"
+          >
+            <q-tooltip class="bg-grey-8">
+              <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+              <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+            </q-tooltip>
+          </q-icon>
+        </div>
       </q-form>
     </div>
-    <div class="add-function-actions flex justify-center">
+    <div class="add-function-actions flex justify-center tw:gap-2">
       <q-btn
             v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
             :ripple="false"
@@ -85,48 +112,44 @@
             @mouseleave="isHovered = false"
 
           >
-            <div class="row items-center no-wrap tw-gap-2  ">
+            <div class="row items-center no-wrap tw:gap-2  ">
               <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
           </q-btn>
       <q-btn
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
-        class="text-bold tw-border-primary add-function-fullscreen-btn"
+        class="o2-secondary-button tw:h-[36px]"
         :label="t('common.fullscreen')"
-        :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
-        padding="sm"
         no-caps
+        flat
         icon="fullscreen"
         @click="handleFullScreen"
       />
       <q-btn
         data-test="add-function-test-btn"
         :label="t('function.testFunction')"
-        class="text-bold no-border tw-ml-[12px] add-function-test-btn"
-        color="primary"
-        padding="sm md"
+        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
         no-caps
+        icon="play_arrow"
         @click="emit('test')"
+      />
+      <q-btn
+        data-test="add-function-cancel-btn"
+        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
+        flat
+        :label="t('function.cancel')"
+        no-caps
+        @click="emit('cancel')"
       />
       <q-btn
         data-test="add-function-save-btn"
         :label="t('function.save')"
-        class="text-bold no-border tw-ml-[12px] add-function-save-btn"
-        color="secondary"
-        padding="sm md"
+        class="tw:ml-[12px] o2-primary-button no-border tw:h-[36px]"
+        flat
         type="submit"
         no-caps
         @click="onSave"
-      />
-      <q-btn
-        data-test="add-function-cancel-btn"
-        class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600 add-function-cancel-btn"
-        :label="t('function.cancel')"
-        text-color="negative"
-        padding="sm md"
-        no-caps
-        @click="emit('cancel')"
       />
     </div>
   </div>
@@ -140,9 +163,9 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 const { t } = useI18n();
 
 const q = useQuasar();
@@ -164,9 +187,17 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  transType: {
+    type: String,
+    default: "0",
+  },
+  transformTypeOptions: {
+    type: Array,
+    default: () => [],
+  },
 });
 
-const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat"]);
+const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat", "update:transType"]);
 
 const addFunctionForm = ref(null);
 
@@ -189,6 +220,14 @@ const onUpdate = () => {
 const functionName = computed({
   get: () => props.name,
   set: (value) => emit("update:name", value),
+});
+
+const selectedTransType = computed({
+  get: () => {
+    // Ensure the value is always a string for radio button comparison
+    return String(props.transType || "0");
+  },
+  set: (value) => emit("update:transType", value),
 });
 
 const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))

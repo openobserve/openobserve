@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use config::datafusion::request::Request;
 use datafusion::{
     common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     logical_expr::LogicalPlan,
@@ -25,7 +26,6 @@ use hashbrown::HashSet;
 use crate::service::search::{
     cache::cacher::handle_histogram,
     cluster::flight::{SearchContextBuilder, register_table},
-    request::Request,
     sql::Sql,
 };
 
@@ -328,6 +328,7 @@ mod tests {
             skip_wal: false,
             action_id: "".to_string(),
             histogram_interval: 5,
+            sampling_ratio: None,
         };
         Sql::new(&query, "parse_test", StreamType::Logs, None)
             .await

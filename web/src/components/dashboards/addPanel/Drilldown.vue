@@ -17,7 +17,7 @@
 <template>
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
-      <span>Drilldown</span>
+      <span>{{ t("dashboard.drilldown") }}</span>
       <q-btn
         no-caps
         padding="xs"
@@ -33,8 +33,7 @@
           self="top middle"
           max-width="250px"
         >
-          Navigate to a another dashboard or specified URL, carrying over all
-          current variables for seamless data exploration.
+          {{ t("dashboard.drilldownTooltip") }}
         </q-tooltip>
       </q-btn>
     </div>
@@ -77,6 +76,7 @@
       @click="addNewDrilldown"
       style="cursor: pointer; padding: 0px 5px"
       label="+ Add"
+      class="el-border"
       no-caps
       data-test="dashboard-addpanel-config-drilldown-add-btn"
     />
@@ -94,6 +94,7 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -105,6 +106,7 @@ export default defineComponent({
   components: { DrilldownPopUp, AppDialog },
   props: ["variablesData"],
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const showDrilldownPopUp = ref(false);
     const isDrilldownEditMode = ref(false);
@@ -148,6 +150,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       dashboardPanelData,
       onDrilldownClick,

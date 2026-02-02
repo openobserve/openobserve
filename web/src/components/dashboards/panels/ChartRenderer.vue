@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     id="chart1"
+    class="chart-container"
     @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
@@ -32,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
       }
     "
+    @contextmenu="handleNativeContextMenu"
     style="height: 100%; width: 100%"
   ></div>
 </template>
@@ -197,6 +199,8 @@ export default defineComponent({
     "mouseover",
     "mousemove",
     "mouseout",
+    "contextmenu",
+    "domcontextmenu",
   ],
   props: {
     data: {
@@ -228,6 +232,7 @@ export default defineComponent({
       chart?.off("dataZoom");
       chart?.off("click");
       chart?.off("mouseover");
+      chart?.off("contextmenu");
 
       //dispose
       if (chart) {
@@ -346,6 +351,133 @@ export default defineComponent({
       });
     };
 
+    // Handle ECharts contextmenu event when clicking on data points
+    const handleContextMenu = (params: any) => {
+      // Get chart type from the first series
+      const chartType = chart?.getOption()?.series?.[0]?.type;
+
+      // Only handle contextmenu for bar and line charts
+      if (!chartType || !["bar", "line"].includes(chartType)) {
+        return;
+      }
+
+      // Prevent default context menu
+      const event = params.event?.event;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      // Extract data point value
+      let dataPointValue = null;
+
+      // For bar and line charts, get the value from the data
+      if (params.value !== undefined && params.value !== null) {
+        // For array format [x, y], take y value
+        if (Array.isArray(params.value)) {
+          dataPointValue =
+            params.value[1] !== undefined ? params.value[1] : params.value[0];
+        } else {
+          dataPointValue = params.value;
+        }
+      } else if (params.data !== undefined && params.data !== null) {
+        // Alternative data format
+        if (Array.isArray(params.data)) {
+          dataPointValue =
+            params.data[1] !== undefined ? params.data[1] : params.data[0];
+        } else if (
+          typeof params.data === "object" &&
+          params.data.value !== undefined
+        ) {
+          dataPointValue = params.data.value;
+        } else {
+          dataPointValue = params.data;
+        }
+      }
+
+      // Only emit if we have a valid data point value
+      if (
+        dataPointValue !== null &&
+        dataPointValue !== undefined &&
+        !isNaN(Number(dataPointValue))
+      ) {
+        emit("contextmenu", {
+          x: event?.clientX || 0,
+          y: event?.clientY || 0,
+          value: Number(dataPointValue),
+          seriesName: params.seriesName,
+          dataIndex: params.dataIndex,
+          seriesIndex: params.seriesIndex,
+        });
+
+        emit("domcontextmenu", {
+          x: event.clientX,
+          y: event.clientY,
+          value: Number(dataPointValue),
+        });
+      }
+    };
+
+    // Handle native DOM contextmenu event for alert creation
+    // This handles right-clicks anywhere on the chart (including empty space)
+    const handleNativeContextMenu = async (event: MouseEvent) => {
+      // Get chart type from the first series
+      await nextTick();
+      const chartType = chart?.getOption()?.series?.[0]?.type;
+
+      // Only handle contextmenu for bar and line charts
+      if (!chartType || !["bar", "line"].includes(chartType)) {
+        return;
+      }
+
+      // Prevent default browser context menu
+      event.preventDefault();
+      event.stopPropagation();
+
+      try {
+        // Get the chart container's bounding rect to calculate relative position
+        const chartContainer = chartRef.value;
+        if (!chartContainer || !chart) {
+          return;
+        }
+
+        const rect = chartContainer.getBoundingClientRect();
+        const pixelPoint = [
+          event.clientX - rect.left,
+          event.clientY - rect.top,
+        ];
+
+        // Convert pixel coordinates to data values using the chart's coordinate system
+        const pointInGrid = chart.convertFromPixel(
+          { gridIndex: 0 },
+          pixelPoint,
+        );
+
+        if (
+          pointInGrid &&
+          Array.isArray(pointInGrid) &&
+          pointInGrid.length >= 2
+        ) {
+          const yAxisValue = pointInGrid[1]; // Y-axis value at cursor position
+
+          // Emit domcontextmenu event for alert creation
+          if (
+            yAxisValue !== null &&
+            yAxisValue !== undefined &&
+            !isNaN(Number(yAxisValue))
+          ) {
+            emit("domcontextmenu", {
+              x: event.clientX,
+              y: event.clientY,
+              value: Number(yAxisValue),
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Could not convert pixel to data point:", error);
+      }
+    };
+
     const chartInitialSetUp = () => {
       chart?.on("mousemove", (params: any) => {
         emit("mousemove", params);
@@ -364,6 +496,7 @@ export default defineComponent({
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
+      chart?.on("contextmenu", handleContextMenu);
       chart?.on("highlight", (params: any) => {
         // reset hovered series name on downplay
         // hoveredSeriesState?.value?.setHoveredSeriesName("");
@@ -396,6 +529,8 @@ export default defineComponent({
           emit("updated:dataZoom", {
             start: params?.batch[0]?.startValue || 0,
             end: params?.batch[0]?.endValue || 0,
+            start1: params?.batch[1]?.startValue || 0,
+            end1: params?.batch[1]?.endValue || 0,
           });
           restoreChart();
         }
@@ -517,7 +652,12 @@ export default defineComponent({
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
         try {
-          chart?.setOption(options, { lazyUpdate: true, notMerge: true });
+          // Use notMerge flag from data prop if available, otherwise default to true
+          const notMerge =
+            props.data?.notMerge !== undefined ? props.data.notMerge : true;
+          const lazyUpdate =
+            props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
+          chart?.setOption(options, { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
@@ -708,7 +848,39 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef, hoveredSeriesState };
+    return { chartRef, hoveredSeriesState, handleNativeContextMenu };
   },
 });
 </script>
+
+<style>
+/**
+ * Print mode styles for ECharts
+ *
+ * These styles must be unscoped (global) to override ECharts' inline styles.
+ * ECharts sets fixed pixel dimensions via inline styles (e.g., width: 740px),
+ * which causes charts to overflow their containers in print mode when GridStack
+ * scales panels down to fit the page.
+ *
+ * The !important declarations override inline styles, forcing both the chart
+ * wrapper div and canvas elements to scale to 100% of their container size.
+ * This ensures charts fit properly when printing, regardless of their original
+ * render dimensions.
+ */
+@media print {
+  /* Clip the ECharts wrapper to prevent chart overflow but don't scale */
+  .chart-container > div[style*="position: relative"] {
+    overflow: hidden !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* Prevent canvas from exceeding container size without scaling */
+  .chart-container canvas,
+  .chart-container svg {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+}
+</style>

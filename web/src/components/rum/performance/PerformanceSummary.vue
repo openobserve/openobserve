@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="relative-position">
+  <div class="relative-position">
     <div
-      class="q-mx-sm performance-dashboard"
-      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+      class="performance-dashboard"
+      :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <RenderDashboardCharts
         ref="performanceChartsRef"
@@ -28,16 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
         searchType="RUM"
+        @variablesManagerReady="onVariablesManagerReady"
       >
         <template v-slot:before_panels>
           <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
-            <div class="text-center" style="width: 25%">
+            <div class="text-center tw:w-[25%]">
               {{ t("rum.webVitalsLabel") }}
             </div>
-            <div class="text-center" style="width: 25%">
+            <div class="text-center tw:w-[25%]">
               {{ t("rum.errorLabel") }}
             </div>
-            <div class="text-center" style="width: 25%">
+            <div class="text-center tw:w-[25%]">
               {{ t("rum.sessionLabel") }}
             </div>
           </div>
@@ -46,19 +47,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
-      style="height: calc(100vh - 250px); top: 0"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
         <q-spinner-hourglass
           color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
+          size="2.5rem"
+          class="tw:mx-auto tw:block"
         />
         <div class="text-center full-width">Loading Dashboard</div>
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -95,7 +95,8 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  setup() {
+  emits: ["variablesManagerReady"],
+  setup(props, { emit }) {
     // onMounted(async () => {
     //   await loadDashboard();
     // });
@@ -116,12 +117,15 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
-      performanceChartsRef.value.layoutUpdate();
+      if (performanceChartsRef?.value)
+        performanceChartsRef.value?.layoutUpdate();
 
       // Dashboards gets overlapped as we have used keep alive
       // Its an internal bug of vue-grid-layout
       // So adding settimeout of 1 sec to fix the issue
-      performanceChartsRef.value.layoutUpdate();
+      if (performanceChartsRef?.value)
+        performanceChartsRef.value?.layoutUpdate();
+
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -198,8 +202,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-        ? "absolute"
-        : "relative",
+          ? "absolute"
+          : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : null,
@@ -303,9 +307,14 @@ export default defineComponent({
         store,
         route.query.dashboard,
         panelId,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
       await loadDashboard();
+    };
+
+    // Variables manager event handler - pass through to parent
+    const onVariablesManagerReady = (manager: any) => {
+      emit("variablesManagerReady", manager);
     };
 
     return {
@@ -323,7 +332,7 @@ export default defineComponent({
       refreshData,
       onDeletePanel,
       variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,

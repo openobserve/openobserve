@@ -22,24 +22,21 @@ use config::{
     utils::json,
 };
 use infra::{
-    db::{NEED_WATCH, get_coordinator, nats},
+    cluster::*,
+    db::{NEED_WATCH, get_coordinator},
     dist_lock,
     errors::{Error, Result},
 };
-use tokio::{sync::mpsc, task};
-
-use crate::common::infra::config::update_cache;
+use tokio::task;
 
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
-    // first, init NATs client with channel communicating NATs events
-    let (nats_event_tx, nats_event_rx) = mpsc::channel::<nats::NatsEvent>(10);
-    if let Err(e) = nats::init_nats_client(nats_event_tx).await {
-        log::error!("[CLUSTER] NATs client init failed: {e}");
-        return Err(e);
+    // if local node is single node or meta store is not nats, return ok
+    let cfg = get_config();
+    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
+    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+        return Ok(());
     }
-    // a child task to handle NATs event
-    task::spawn(async move { update_cache(nats_event_rx).await });
 
     if let Err(e) = register().await {
         log::error!("[CLUSTER] register failed: {e}");
@@ -91,11 +88,23 @@ async fn register() -> Result<()> {
             e
         })?;
 
+    // create the coordinator stream if not exists
+    log::info!("[COORDINATOR] initializing coordinator");
+    if let Err(e) = infra::coordinator::events::init().await {
+        dist_lock::unlock(&locker).await.map_err(|e| {
+            log::error!("[CLUSTER] nats unlock failed: {}", e);
+            e
+        })?;
+        return Err(Error::Message(format!(
+            "[COORDINATOR] Failed to init coordinator events: {e}",
+        )));
+    }
+
     // 2. watch node list
-    task::spawn(async move { super::watch_node_list().await });
+    task::spawn(async move { watch_node_list().await });
 
     // 3. get node list
-    let node_list = match super::list_nodes().await {
+    let node_list = match list_nodes().await {
         Ok(v) => v,
         Err(e) => {
             dist_lock::unlock(&locker).await.map_err(|e| {
@@ -108,28 +117,24 @@ async fn register() -> Result<()> {
 
     // 4. calculate node_id
     let mut node_ids = Vec::new();
-    let mut w = super::NODES.write().await;
     for node in node_list {
         if node.is_interactive_querier() {
-            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
-                .await;
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
         }
         if node.is_background_querier() {
-            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
-                .await;
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         }
         if node.is_compactor() {
-            super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+            add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
         }
         if node.is_flatten_compactor() {
-            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+            add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
         }
         node_ids.push(node.id);
-        w.insert(node.uuid.clone(), node);
+        add_node_to_cache(node).await;
     }
-    drop(w);
 
-    let new_node_id = super::generate_node_id(node_ids);
+    let new_node_id = generate_node_id(node_ids);
     // update local id
     LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
 
@@ -139,18 +144,8 @@ async fn register() -> Result<()> {
         id: new_node_id,
         uuid: LOCAL_NODE.uuid.clone(),
         name: cfg.common.instance_name.clone(),
-        http_addr: format!(
-            "{}://{}:{}",
-            get_http_schema(),
-            get_local_http_ip(),
-            cfg.http.port
-        ),
-        grpc_addr: format!(
-            "{}://{}:{}",
-            get_grpc_schema(),
-            get_local_grpc_ip(),
-            cfg.grpc.port
-        ),
+        http_addr: get_local_http_addr(),
+        grpc_addr: get_local_grpc_addr(),
         role: LOCAL_NODE.role.clone(),
         role_group: LOCAL_NODE.role_group,
         cpu_num: cfg.limit.cpu_num as u64,
@@ -164,23 +159,20 @@ async fn register() -> Result<()> {
 
     // cache local node
     if node.is_interactive_querier() {
-        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
-            .await;
+        add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
     }
     if node.is_background_querier() {
-        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
-            .await;
+        add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
     }
     if node.is_compactor() {
-        super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
     }
     if node.is_flatten_compactor() {
-        super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
     }
 
-    let mut w = super::NODES.write().await;
-    w.insert(LOCAL_NODE.uuid.clone(), node);
-    drop(w);
+    // cache local node
+    add_node_to_cache(node).await;
 
     // 6. register node to cluster
     let client = get_coordinator().await;
@@ -211,7 +203,7 @@ pub(crate) async fn set_offline() -> Result<()> {
 pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let cfg = get_config();
     // set node status to online
-    let mut node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
+    let mut node = match get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await {
         Some(node) => {
             let mut val = node.clone();
             val.status = status.clone();
@@ -221,18 +213,8 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             id: LOCAL_NODE_ID.load(Ordering::Relaxed),
             uuid: LOCAL_NODE.uuid.clone(),
             name: cfg.common.instance_name.clone(),
-            http_addr: format!(
-                "{}://{}:{}",
-                get_http_schema(),
-                get_local_http_ip(),
-                cfg.http.port
-            ),
-            grpc_addr: format!(
-                "{}://{}:{}",
-                get_grpc_schema(),
-                get_local_grpc_ip(),
-                cfg.grpc.port
-            ),
+            http_addr: get_local_http_addr(),
+            grpc_addr: get_local_grpc_addr(),
             role: LOCAL_NODE.role.clone(),
             role_group: LOCAL_NODE.role_group,
             cpu_num: cfg.limit.cpu_num as u64,
@@ -245,16 +227,12 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     };
 
     // check node id if it is duplicated in the node list
-    let r = super::NODES.read().await;
-    let node_ids = r.values().map(|n| n.id).collect::<Vec<_>>();
-    drop(r);
+    let nodes = get_cached_nodes(|_| true).await.unwrap_or_default();
+    let node_ids = nodes.iter().map(|n| n.id).collect::<Vec<_>>();
     if node_ids.iter().filter(|&v| *v == node.id).count() > 1 {
-        let new_node_id = super::generate_node_id(node_ids);
+        let new_node_id = generate_node_id(node_ids);
         node.id = new_node_id;
-        log::warn!(
-            "[CLUSTER] node id is duplicated, generate new node id: {}",
-            new_node_id
-        );
+        log::warn!("[CLUSTER] node id is duplicated, generate new node id: {new_node_id}");
         // update local id
         LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
         // reset snowflake id generator
@@ -262,7 +240,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     }
 
     // update node status metrics
-    node.metrics = super::update_node_status_metrics().await;
+    node.metrics = update_node_status_metrics().await;
 
     let val = json::to_string(&node).unwrap();
 
@@ -323,15 +301,21 @@ mod tests {
         let _ = leave().await.is_err();
     }
 
-    // #[tokio::test]
-    // async fn test_nats_register_and_keep_alive() {
-    //     config::cache_instance_id("instance");
-    //     let _ = register_and_keep_alive().await.is_err();
-    // }
+    #[tokio::test]
+    async fn test_nats_register_and_keep_alive() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+        let ret = register_and_keep_alive().await;
+        println!("[CLUSTER::TEST] test_nats_register_and_keep_alive: {ret:?}");
+        assert!(ret.is_ok());
+    }
 
     #[tokio::test]
     async fn test_nats_register() {
         config::cache_instance_id("instance");
-        let _ = register().await.is_err();
+        infra::db_init().await.unwrap();
+        let ret = register().await;
+        println!("[CLUSTER::TEST] test_nats_register: {ret:?}");
+        assert!(ret.is_ok());
     }
 }

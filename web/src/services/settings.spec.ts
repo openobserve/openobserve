@@ -52,7 +52,7 @@ describe("settings service", () => {
   });
 
   describe("createLogo", () => {
-    it("should make POST request with multipart form data headers", async () => {
+    it("should make POST request with multipart form data headers and default theme", async () => {
       const params = {
         org_identifier: "org123",
         formData: new FormData(),
@@ -70,9 +70,32 @@ describe("settings service", () => {
         "Content-Type": "multipart/form-data",
       });
 
-      // Verify POST request was made with correct URL and form data
+      // Verify POST request was made with correct URL and form data (default theme is 'light')
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/settings/logo`,
+        `/api/${params.org_identifier}/settings/logo?theme=light`,
+        params.formData
+      );
+    });
+
+    it("should make POST request with dark theme parameter", async () => {
+      const params = {
+        org_identifier: "org123",
+        formData: new FormData(),
+        theme: "dark",
+      };
+
+      params.formData.append("logo", new Blob(["test"], { type: "image/png" }), "logo.png");
+
+      mockHttpWithHeaders.post.mockResolvedValue({ data: { success: true } });
+
+      await settings.createLogo(params.org_identifier, params.formData, params.theme);
+
+      expect(http).toHaveBeenCalledWith({
+        "Content-Type": "multipart/form-data",
+      });
+
+      expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
+        `/api/${params.org_identifier}/settings/logo?theme=dark`,
         params.formData
       );
     });
@@ -88,7 +111,7 @@ describe("settings service", () => {
       await settings.createLogo(params.org_identifier, params.formData);
 
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/settings/logo`,
+        `/api/${params.org_identifier}/settings/logo?theme=light`,
         params.formData
       );
     });
@@ -109,7 +132,7 @@ describe("settings service", () => {
   });
 
   describe("deleteLogo", () => {
-    it("should make DELETE request to remove logo", async () => {
+    it("should make DELETE request to remove logo with default theme", async () => {
       const org_identifier = "org123";
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
@@ -119,9 +142,24 @@ describe("settings service", () => {
       // Verify http was called without headers
       expect(http).toHaveBeenCalledWith();
 
-      // Verify DELETE request was made with correct URL
+      // Verify DELETE request was made with correct URL (default theme is 'light')
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/settings/logo`
+        `/api/${org_identifier}/settings/logo?theme=light`
+      );
+    });
+
+    it("should make DELETE request with dark theme parameter", async () => {
+      const org_identifier = "org123";
+      const theme = "dark";
+
+      mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
+
+      await settings.deleteLogo(org_identifier, theme);
+
+      expect(http).toHaveBeenCalledWith();
+
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
+        `/api/${org_identifier}/settings/logo?theme=dark`
       );
     });
 
@@ -280,23 +318,50 @@ describe("settings service", () => {
 
       // Mock successful create
       mockHttpWithHeaders.post.mockResolvedValue({ data: { success: true } });
-      
+
       // Mock successful delete
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
       // Create logo
       await settings.createLogo(org_identifier, formData);
-      
+
       // Delete logo
       await settings.deleteLogo(org_identifier);
 
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
-        `/api/${org_identifier}/settings/logo`,
+        `/api/${org_identifier}/settings/logo?theme=light`,
         formData
       );
-      
+
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/settings/logo`
+        `/api/${org_identifier}/settings/logo?theme=light`
+      );
+    });
+
+    it("should handle complete dark mode logo management workflow", async () => {
+      const org_identifier = "org123";
+      const formData = new FormData();
+      formData.append("logo", new Blob(["logo-dark"], { type: "image/png" }), "logo-dark.png");
+
+      // Mock successful create
+      mockHttpWithHeaders.post.mockResolvedValue({ data: { success: true } });
+
+      // Mock successful delete
+      mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
+
+      // Create dark logo
+      await settings.createLogo(org_identifier, formData, "dark");
+
+      // Delete dark logo
+      await settings.deleteLogo(org_identifier, "dark");
+
+      expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
+        `/api/${org_identifier}/settings/logo?theme=dark`,
+        formData
+      );
+
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
+        `/api/${org_identifier}/settings/logo?theme=dark`
       );
     });
 

@@ -51,7 +51,7 @@ pub(crate) async fn process_msg(msg: AiPromptMessage) -> Result<()> {
             table::system_prompts::add(&prompt).await?;
 
             // Emit cluster coordinator event to notify nodes in current cluster
-            infra::cluster_coordinator::ai_prompts::emit_put_event().await?;
+            infra::coordinator::ai_prompts::emit_put_event().await?;
 
             log::info!("[SUPER_CLUSTER:AI_PROMPT] Created system prompt");
         }
@@ -60,7 +60,7 @@ pub(crate) async fn process_msg(msg: AiPromptMessage) -> Result<()> {
             table::system_prompts::remove("", config::meta::ai::PromptType::User).await?;
 
             // Emit cluster coordinator event to notify nodes in current cluster
-            infra::cluster_coordinator::ai_prompts::emit_rollback_event().await?;
+            infra::coordinator::ai_prompts::emit_rollback_event().await?;
         }
     };
     Ok(())

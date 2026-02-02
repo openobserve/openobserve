@@ -23,7 +23,10 @@ export default class DashboardFolder {
 
   // Verify folder is visible after search
   async verifyFolderVisible(folderName) {
-    await expect(this.page.locator(`text=${folderName}`)).toBeVisible();
+    const folderLocator = this.page.locator('[data-test^="dashboard-folder-tab-"]', {
+      hasText: folderName,
+    });
+    await expect(folderLocator).toBeVisible();
   }
 
   // Create folder

@@ -5,14 +5,12 @@
     label="Histogram interval"
     :options="histogramIntervalOptions"
     behavior="menu"
-    filled
     borderless
     data-test="histogram-interval-dropdown"
     dense
+    class="o2-custom-select-dashboard"
     @update:model-value="$emit('update:modelValue', $event)"
-    :display-value="`${
-        histogramIntervalModel.label ?? 'Auto'
-    }`"
+    :display-value="`${histogramIntervalModel?.label ?? 'Auto'}`"
   >
   </q-select>
 </template>
@@ -24,8 +22,8 @@ export default defineComponent({
   name: "HistogramIntervalDropDown",
   props: {
     modelValue: {
-      type: Object,
-      required: true,
+      type: String,
+      required: false,
     },
   },
   emits: ["update:modelValue"],
@@ -125,14 +123,20 @@ export default defineComponent({
       },
     ];
 
-    const histogramIntervalModel = ref(props.modelValue);
+    const histogramIntervalModel: any = ref(
+      histogramIntervalOptions.find(
+        (v: any) => v.value == (props.modelValue ?? null),
+      ) ?? { label: "Auto", value: null },
+    );
 
     // on modelvalue change, update the model
     watch(
       () => props.modelValue,
       () => {
-        histogramIntervalModel.value = props.modelValue;
-      }
+        histogramIntervalModel.value = histogramIntervalOptions.find(
+          (v: any) => v.value == props.modelValue,
+        );
+      },
     );
 
     return {

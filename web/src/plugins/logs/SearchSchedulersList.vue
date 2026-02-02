@@ -1,13 +1,9 @@
 <template>
   <div
-    :class="
-      store.state.theme === 'dark'
-        ? 'dark-theme-history-page dark-theme'
-        : 'light-theme-history-page light-theme'
-    "
+   class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
   >
-    <div v-if="!showSearchResults">
-      <div class="flex tw-justify-between tw-items-center">
+    <div v-if="!showSearchResults" class="tw:h-full">
+       <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
         <div class="flex items-center q-py-sm q-pl-md">
           <div
             data-test="search-scheduler-back-btn"
@@ -23,25 +19,28 @@
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div class="text-h6" data-test="search-scheduler-title">
-            Search Job Scheduler
+          <div class="text-h6 tw:font-[600]" data-test="search-scheduler-title">
+            {{ t('search_scheduler_job.title') }}
           </div>
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
           <div>
             <q-btn
-              color="secondary"
-              label="Get Jobs"
+              :label="t('search_scheduler_job.get_jobs')"
               @click="fetchSearchHistory"
-              class="q-ml-md"
+              class="q-ml-md o2-primary-button tw:h-[36px] tw:rounded-md"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              no-caps
+              flat
+              dense
               :disable="isLoading"
             />
           </div>
         </div>
       </div>
 
-      <div>
-        <q-page>
+   <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+      <div class=" tw:h-[calc(100vh-128px)] card-container">
           <q-table
             data-test="search-scheduler-table"
             ref="qTableSchedule"
@@ -51,8 +50,8 @@
             :pagination="pagination"
             row-key="trace_id"
             :rows-per-page-options="[]"
-            class="custom-table search-job-list-table"
-            style="width: 100%"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
             :sort-method="sortMethod"
           >
             <template v-slot:body="props">
@@ -105,7 +104,7 @@
                     <q-btn
                       data-test="search-scheduler-cancel-btn"
                       icon="cancel"
-                      :title="'Cancel'"
+                      :title="t('search_scheduler_job.cancel')"
                       class="q-ml-xs"
                       padding="sm"
                       unelevated
@@ -123,7 +122,7 @@
                     <q-btn
                       data-test="search-scheduler-delete-btn"
                       icon="delete"
-                      :title="'Delete'"
+                      :title="t('search_scheduler_job.delete')"
                       class="q-ml-xs"
                       padding="sm"
                       unelevated
@@ -136,7 +135,7 @@
                     <q-btn
                       data-test="search-scheduler-restart-btn"
                       icon="refresh"
-                      :title="'Restart'"
+                      :title="t('search_scheduler_job.restart')"
                       class="q-ml-xs"
                       padding="sm"
                       unelevated
@@ -153,7 +152,7 @@
                     <q-btn
                       data-test="search-scheduler-explore-btn"
                       icon="search"
-                      :title="'Explore'"
+                      :title="t('search_scheduler_job.explore')"
                       class="q-ml-xs"
                       padding="sm"
                       unelevated
@@ -181,10 +180,10 @@
                     />
                   </div>
                   <div v-if="activeTab == 'query'">
-                    <div class="text-left tw-px-2 q-mb-sm expanded-content">
-                      <div class="tw-flex tw-items-center q-py-sm">
+                    <div class="text-left tw:px-2 q-mb-sm expanded-content">
+                      <div class="tw:flex tw:items-center q-py-sm">
                         <strong
-                          >SQL Query :
+                          >{{ t('search_scheduler_job.sql_query') }} :
                           <span>
                             <q-btn
                               @click.stop="
@@ -195,15 +194,15 @@
                               dense
                               flat
                               icon="content_copy"
-                              class="copy-btn-sql tw-ml-2 tw-py-2 tw-px-2" /></span
+                              class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2" /></span
                         ></strong>
                         <q-btn
                           @click.stop="fetchSearchResults(props.row)"
                           data-test="search-scheduler-go-to-logs-btn"
                           size="xs"
-                          label="Logs"
+                          :label="t('search_scheduler_job.logs')"
                           dense
-                          class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
+                          class="copy-btn tw:py-2 tw:mx-2 tw:px-2"
                           icon="search"
                           flat
                           style="
@@ -217,7 +216,7 @@
                           "
                         />
                       </div>
-                      <div class="tw-flex tw-items-start tw-justify-center">
+                      <div class="tw:flex tw:items-start tw:justify-center">
                         <div class="scrollable-content expanded-sql">
                           <pre style="text-wrap: wrap">{{
                             props.row?.sql
@@ -227,11 +226,11 @@
                     </div>
                     <div
                       v-if="props.row?.function"
-                      class="text-left q-mb-sm tw-px-2 expanded-content"
+                      class="text-left q-mb-sm tw:px-2 expanded-content"
                     >
-                      <div class="tw-flex tw-items-center q-py-sm">
+                      <div class="tw:flex tw:items-center q-py-sm">
                         <strong
-                          >Function Definition :
+                          >{{ t('search_scheduler_job.function_definition') }} :
                           <span>
                             <q-btn
                               @click.stop="
@@ -244,11 +243,11 @@
                               dense
                               flat
                               icon="content_copy"
-                              class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2" /></span
+                              class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2" /></span
                         ></strong>
                       </div>
 
-                      <div class="tw-flex tw-items-start tw-justify-center">
+                      <div class="tw:flex tw:items-start tw:justify-center">
                         <div class="scrollable-content expanded-function">
                           <pre style="text-wrap: wrap">{{
                             props.row?.function
@@ -259,7 +258,7 @@
                   </div>
                   <div class="q-py-md" v-else>
                     <div
-                      class="text-left tw-px-2 q-mb-sm expanded-content flex tw-flex-col"
+                      class="text-left tw:px-2 q-mb-sm expanded-content flex tw:flex-col"
                     >
                       <query-editor
                         style="height: 130px"
@@ -278,51 +277,71 @@
               </q-tr>
             </template>
             <template #bottom="scope">
-              <div class="tw-ml-auto tw-mr-2">Max Limit : <b>1000</b></div>
-              <q-separator
-                style="height: 1.5rem; margin: auto 0"
-                vertical
-                inset
-                class="q-mr-md"
-              />
+            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+              {{ resultTotal }} {{ t('search_scheduler_job.results') }}
+            </div>
+            <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
+            <q-separator
+              style="height: 1.5rem; margin: auto 0"
+              vertical
+              inset
+              class="q-mr-md"
+            />
 
-              <div class="q-pl-md">
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
-              </div>
-            </template>
+            <div class="q-pl-md">
+              <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="resultTotal"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+            </div>
+          </div>
+          </template>
             <template #no-data>
-              <div v-if="!isLoading" class="tw-flex tw-mx-auto">
+              <div v-if="!isLoading" class="tw:flex tw:mx-auto">
                 <NoData />
               </div>
               <div
                 v-if="isLoading"
-                class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+                class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
               >
                 <q-spinner-hourglass color="primary" size="lg" />
               </div>
             </template>
+            <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Rendering the of the columns -->
+               <!-- here we can add the classes class so that the head will be sticky -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
           </q-table>
-        </q-page>
         <ConfirmDialog
-          title="Delete Scheduled Search"
-          message="Are you sure you want to delete this scheduled search?"
+          :title="t('search_scheduler_job.delete_job_title')"
+          :message="t('search_scheduler_job.delete_job_message')"
           @update:ok="deleteSearchJob"
           @update:cancel="confirmDelete = false"
           v-model="confirmDelete"
         />
         <ConfirmDialog
-          title="Cancel Scheduled Search"
-          message="Are you sure you want to cancel this scheduled search?"
+          :title="t('search_scheduler_job.cancel_job_title')"
+          :message="t('search_scheduler_job.cancel_job_message')"
           @update:ok="cancelSearchJob"
           @update:cancel="confirmCancel = false"
           v-model="confirmCancel"
         />
+      </div>
       </div>
     </div>
   </div>
@@ -349,7 +368,7 @@ import {
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent, reactive } from "vue";
-import useLogs from "../../composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -402,7 +421,7 @@ export default defineComponent({
     const qTableRef: Ref<InstanceType<typeof qTableSchedule> | null> =
       ref(null);
     const searchDateTimeRef = ref(null);
-    const { searchObj, extractTimestamps } = useLogs();
+    const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
     const dateTimeToBeSent = ref({
       valueType: "relative",
@@ -431,11 +450,11 @@ export default defineComponent({
     ];
     const tabs = reactive([
       {
-        label: "Query / Function",
+        label: t('search_scheduler_job.query_function'),
         value: "query",
       },
       {
-        label: "More Details",
+        label: t('search_scheduler_job.more_details'),
         value: "more_details",
       },
     ]);
@@ -458,17 +477,17 @@ export default defineComponent({
       // Define the desired column order and names
       const desiredColumns = [
         { key: "#", label: "#", align: "center", sortable: false },
-        { key: "user_id", label: "User ID" },
-        { key: "created_at", label: "Created At" },
-
-        { key: "start_time", label: "Start Time" },
-        { key: "duration", label: "Duration" },
-        { key: "status", label: "Status" },
-        { key: "Actions", label: "Actions" },
+        { key: "user_id", label: t('search_scheduler_job.user_id') },
+        { key: "created_at", label: t('search_scheduler_job.created_at') },
+        { key: "start_time", label: t('search_scheduler_job.start_time') },
+        { key: "duration", label: t('search_scheduler_job.duration') },
+        { key: "status", label: t('search_scheduler_job.status') },
+        { key: "Actions", label: t('search_scheduler_job.actions') },
       ];
 
       return desiredColumns.map(({ key, label }) => {
         let columnWidth = 150;
+        let classes = '';
 
         let align = "center";
         let sortable = true;
@@ -478,9 +497,10 @@ export default defineComponent({
           sortable = true;
         }
         if (key === "Actions") {
-          columnWidth = 200;
+          columnWidth = 150;
           align = "left";
           sortable = false;
+          classes = 'actions-column';
         }
         if (key == "trace_id") {
           columnWidth = 250;
@@ -511,10 +531,11 @@ export default defineComponent({
           sortable = false;
         }
         if (key == "#") {
-          columnWidth = 100;
+          columnWidth = 67;
           sortable = false;
           align = "left";
         }
+
 
         // Custom width for each column
         return {
@@ -523,6 +544,7 @@ export default defineComponent({
           field: key, // Field accessor
           align: align,
           sortable: sortable,
+          classes: classes,
           style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
         };
       });
@@ -607,8 +629,7 @@ export default defineComponent({
             if (e.response.status != 403) {
               $q.notify({
                 type: "negative",
-                message:
-                  "Failed to fetch search history. Please try again later.",
+                message: t('search_scheduler_job.fetch_failed'),
                 timeout: 5000,
               });
             }
@@ -620,7 +641,7 @@ export default defineComponent({
         if (error.response.status != 403) {
           $q.notify({
             type: "negative",
-            message: "Failed to fetch search history",
+            message: t('search_scheduler_job.fetch_failed'),
             timeout: 5000,
           });
         }
@@ -637,7 +658,7 @@ export default defineComponent({
         .then((res) => {
           $q.notify({
             type: "positive",
-            message: "Search Job has been cancelled successfully",
+            message: t('search_scheduler_job.job_cancelled_success'),
             timeout: 2000,
           });
         })
@@ -646,7 +667,7 @@ export default defineComponent({
             $q.notify({
               type: "negative",
               message:
-                e.response?.data?.message || "Failed to cancel search job",
+                e.response?.data?.message || t('search_scheduler_job.job_cancel_failed'),
               timeout: 2000,
             });
           }
@@ -664,7 +685,7 @@ export default defineComponent({
         .then((res) => {
           $q.notify({
             type: "positive",
-            message: "Search Job has been restarted successfully",
+            message: t('search_scheduler_job.job_restarted_success'),
             timeout: 2000,
           });
         })
@@ -673,7 +694,7 @@ export default defineComponent({
             $q.notify({
               type: "negative",
               message:
-                e.response?.data?.message || "Failed to restart search job",
+                e.response?.data?.message || t('search_scheduler_job.job_restart_failed'),
               timeout: 2000,
             });
           }
@@ -700,7 +721,7 @@ export default defineComponent({
           fetchSearchHistory();
           $q.notify({
             type: "positive",
-            message: "Search Job has been deleted successfully",
+            message: t('search_scheduler_job.job_deleted_success'),
             timeout: 2000,
           });
         })
@@ -709,7 +730,7 @@ export default defineComponent({
             $q.notify({
               type: "negative",
               message:
-                e.response?.data?.message || "Failed to delete search job",
+                e.response?.data?.message || t('search_scheduler_job.job_delete_failed'),
               timeout: 2000,
             });
           }
@@ -763,14 +784,14 @@ export default defineComponent({
         .then(() => {
           $q.notify({
             type: "positive",
-            message: `${type} Copied Successfully!`,
+            message: `${type} ${t('search_scheduler_job.copy_success')}`,
             timeout: 5000,
           });
         })
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: "Error while copy content.",
+            message: t('search_scheduler_job.copy_error'),
             timeout: 5000,
           });
         });
@@ -892,7 +913,7 @@ export default defineComponent({
 
       $q.notify({
         type: "positive",
-        message: "Search Job have been applied successfully",
+        message: t('search_scheduler_job.job_applied_success'),
         timeout: 2000,
       });
 
@@ -924,15 +945,15 @@ export default defineComponent({
     const getStatusText = (status) => {
       switch (status) {
         case 0:
-          return "Pending";
+          return t('search_scheduler_job.status_pending');
         case 1:
-          return "Running";
+          return t('search_scheduler_job.status_running');
         case 2:
-          return "Finished";
+          return t('search_scheduler_job.status_finished');
         case 3:
-          return "Cancelled";
+          return t('search_scheduler_job.status_cancelled');
         default:
-          return "Unknown";
+          return t('search_scheduler_job.status_unknown');
       }
     };
 
@@ -1033,140 +1054,5 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
-.expanded-content {
-  padding: 0 1rem;
-  min-width: calc(90vw - 20px);
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-
-.q-td {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.custom-table .q-tr > .q-td:nth-child(2) {
-  text-align: left;
-}
-
-.copy-btn-sql {
-  border: #7a54a2 1px solid;
-  color: #7a54a2;
-}
-
-.copy-btn-function {
-  border: #0a7ebc 1px solid;
-  color: #0a7ebc;
-}
-
-.warning-text {
-  color: #f5a623;
-  border: 1px solid #f5a623;
-  border-radius: 2px;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-.expanded-function {
-  border-left: #0a7ebc 3px solid;
-}
-
-.search-job-list-table {
-  th:last-child,
-  td:last-child {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    background: #ffffff;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  }
-}
-td:nth-child(2) {
-  text-align: center !important;
-}
-th:first-child,
-td:first-child {
-  width: 50px;
-}
-
-.dark-theme {
-  th:last-child,
-  td:last-child {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-  }
-}
-
-.light-theme {
-  th:last-child,
-  td:last-child {
-    background: #ffffff;
-  }
-}
-.search-job-exapnded-table {
-}
-.dark-theme {
-  background-color: $dark-page;
-
-  .report-list-tabs {
-    height: fit-content;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
-  }
-}
-
-.report-list-tabs {
-  padding: 0 1rem;
-  height: fit-content;
-  width: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
+@import "@/styles/logs/search-schedulerlist.scss";
 </style>

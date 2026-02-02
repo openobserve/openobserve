@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scroll" style="width: 100%; height: 100%; overflow: auto">
     <div
       :class="[
-        'tw-prose tw-prose-sm tw-max-w-none',
-        store.state?.theme === 'dark' && 'tw-prose-invert',
+        'tw:prose tw:prose-sm tw:max-w-none',
+        store.state?.theme === 'dark' && 'tw:prose-invert',
       ]"
       v-html="DOMPurify.sanitize(processedContent)"
       data-test="html-renderer"
@@ -44,12 +44,24 @@ export default defineComponent({
       type: Object,
       default: () => ({}),
     },
+    tabId: {
+      type: String,
+      default: undefined,
+    },
+    panelId: {
+      type: String,
+      default: undefined,
+    },
   },
   setup(props): any {
     const store = useStore();
 
     const processedContent = computed(() => {
-      return processVariableContent(props.htmlContent, props.variablesData);
+      const context = {
+        tabId: props.tabId,
+        panelId: props.panelId,
+      };
+      return processVariableContent(props.htmlContent, props.variablesData, context);
     });
 
     return {

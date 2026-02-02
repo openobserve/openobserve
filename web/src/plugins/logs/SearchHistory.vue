@@ -1,16 +1,13 @@
 <template>
   <div
-    :class="
-      store.state.theme === 'dark'
-        ? 'dark-theme-history-page'
-        : 'light-theme-history-page'
-    "
+  class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
   >
-    <div class="flex tw-justify-between tw-items-center">
+   <div class="">
+    <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
       <div class="flex items-center q-py-sm q-pl-md">
         <div
           data-test="search-history-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="flex justify-center items-center q-mr-md cursor-pointer tw:font-[600]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -22,39 +19,55 @@
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div class="text-h6" data-test="add-alert-title">Search History</div>
+        <div class="text-h6 tw:font-[600]" data-test="add-alert-title">{{ t('search_history.title') }}</div>
       </div>
-      <div class="flex items-center q-py-sm q-pr-md">
+      <div class="tw:flex tw:items-center q-pr-md">
         <div>
-          <q-toggle v-model="wrapText" label="Wrap Text" class="q-mr-md" />
+          <q-toggle
+            v-model="wrapText"
+            :label="t('search_history.wrapText')"
+            class="o2-toggle-button-xs q-mr-md"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            " />
         </div>
-        <div class="warning-text flex items-center q-py-xs q-px-sm q-mr-md">
+        <div class="warning-text flex items-center q-px-sm q-mr-md tw:h-[36px] tw:rounded-md">
           <q-icon name="info" class="q-mr-xs" size="16px" />
           <div>
-            Search History might be delayed by <b> {{ delayMessage }}</b>
+            {{ t('search_history.delayMessage') }} <b>{{ delayMessage }}</b>
           </div>
         </div>
-        <date-time
-          data-test-name="search-history-date-time"
-          ref="searchDateTimeRef"
-          auto-apply
-          :default-type="searchObj.data.datetime.type"
-          @on:date-change="updateDateTime"
-        />
+        <div style="height: 36px;"
+        >
+          <date-time
+            data-test-name="search-history-date-time"
+            ref="searchDateTimeRef"
+            auto-apply
+            style="height: 36px"
+            :default-type="searchObj.data.datetime.type"
+            @on:date-change="updateDateTime"
+          />
+        </div>
+
         <div>
           <q-btn
-            color="secondary"
-            label="Get History"
+            :label=" t('search_history.get_history')"
+            flat
             @click="fetchSearchHistory"
-            class="q-ml-md"
+            class="q-ml-md o2-primary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            no-caps
             :disable="isLoading"
           />
         </div>
       </div>
     </div>
-
-    <div class="">
-      <q-page>
+   <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+      <div class=" tw:h-[calc(100vh-128px)] card-container">
         <q-table
           ref="qTable"
           dense
@@ -63,9 +76,10 @@
           :pagination.sync="pagination"
           row-key="trace_id"
           :rows-per-page-options="[]"
-          class="custom-table"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :sort-method="sortMethod"
           :wrap-cells="wrapText"
+          :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
         >
           <template v-slot:body="props">
             <q-tr
@@ -110,8 +124,8 @@
                   />
                 </div>
                 <div v-show="activeTab === 'query'">
-                  <div class="text-left tw-px-2 q-mb-sm expanded-content">
-                    <div class="tw-flex tw-items-center q-py-sm">
+                  <div class="text-left tw:px-2 q-mb-sm expanded-content">
+                    <div class="tw:flex tw:items-center q-py-sm">
                       <strong
                         >SQL Query :
                         <span>
@@ -123,14 +137,14 @@
                             dense
                             flat
                             icon="content_copy"
-                            class="copy-btn-sql tw-ml-2 tw-py-2 tw-px-2" /></span
+                            class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2" /></span
                       ></strong>
                       <q-btn
                         @click.stop="goToLogs(props.row)"
                         size="xs"
                         label="Logs"
                         dense
-                        class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
+                        class="copy-btn tw:py-2 tw:mx-2 tw:px-2"
                         icon="search"
                         flat
                         style="
@@ -140,7 +154,7 @@
                         "
                       />
                     </div>
-                    <div class="tw-flex tw-items-start tw-justify-center">
+                    <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-sql">
                         <pre style="text-wrap: wrap">{{ props.row?.sql }}</pre>
                       </div>
@@ -148,9 +162,9 @@
                   </div>
                   <div
                     v-if="props.row?.function"
-                    class="text-left q-mb-sm tw-px-2 expanded-content"
+                    class="text-left q-mb-sm tw:px-2 expanded-content"
                   >
-                    <div class="tw-flex tw-items-center q-py-sm">
+                    <div class="tw:flex tw:items-center q-py-sm">
                       <strong
                         >Function Definition :
                         <span>
@@ -165,11 +179,11 @@
                             dense
                             flat
                             icon="content_copy"
-                            class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2" /></span
+                            class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2" /></span
                       ></strong>
                     </div>
 
-                    <div class="tw-flex tw-items-start tw-justify-center">
+                    <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-function">
                         <pre style="text-wrap: wrap">{{
                           props.row?.function
@@ -193,7 +207,11 @@
             </q-tr>
           </template>
           <template #bottom="scope">
-            <div class="tw-ml-auto tw-mr-2">Max Limit : <b>1000</b></div>
+            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+              {{ resultTotal }} {{ t('search_history.results') }}
+            </div>
+            <div class="tw:ml-auto tw:mr-2">Max Limit : <b>1000</b></div>
             <q-separator
               style="height: 1.5rem; margin: auto 0"
               vertical
@@ -210,9 +228,10 @@
                 @update:changeRecordPerPage="changePagination"
               />
             </div>
+          </div>
           </template>
           <template #no-data>
-            <div v-if="!isLoading" class="tw-flex tw-mx-auto">
+            <div v-if="!isLoading" class="tw:flex tw:mx-auto">
               <NoData />
             </div>
           </template>
@@ -220,11 +239,12 @@
 
         <div
           v-if="isLoading"
-          class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+          class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-      </q-page>
+    </div>
+    </div>
     </div>
   </div>
 
@@ -242,7 +262,7 @@ import {
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent } from "vue";
-import useLogs from "../../composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -252,6 +272,8 @@ import { date, QTable, useQuasar } from "quasar";
 import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -287,7 +309,7 @@ export default defineComponent({
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
-    const { searchObj, extractTimestamps } = useLogs();
+    const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
     const dateTimeToBeSent = ref({
       valueType: "relative",
@@ -300,6 +322,8 @@ export default defineComponent({
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
+
+    const {extractTimestamps} = logsUtils();
 
     const activeTab = ref("query");
     const tabs = ref([
@@ -338,9 +362,8 @@ export default defineComponent({
       // Define the desired column order and names
       const desiredColumns = [
         { key: "#", label: "#" },
-        { key: "executed_time", label: "Executed At" },
-
-        { key: "sql", label: "SQL Query" },
+        { key: "executed_time", label: t('search_history.executed_at') },
+        { key: "sql", label: t('search_history.sql_query') },
       ];
       let aligin = "left";
 
@@ -374,6 +397,28 @@ export default defineComponent({
           dateTimeToBeSent.value.endTime = convertedData.to * 1000;
         }
         const { startTime, endTime } = dateTimeToBeSent.value;
+
+        //check if datetime is present or not
+        //else show the error message
+        if(!startTime) {
+          $q.notify({
+            type: "negative",
+            message: "The selected start time is  invalid. Please choose a valid time",
+            timeout: 5000,
+          });
+          isLoading.value = false;
+          return;
+        }
+        if(!endTime){
+          $q.notify({
+            type: "negative",
+            message: "The selected end time is  invalid. Please choose a valid time",
+            timeout: 5000,
+          });
+          isLoading.value = false;
+          return;
+        }
+
         const response = await searchService.get_history(
           org_identifier,
           startTime,
@@ -715,102 +760,5 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
-.expanded-content {
-  padding: 0 0.5rem 0rem 1rem;
-  width: calc(95vw - 40px);
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-
-.q-td {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.custom-table .q-tr > .q-td:nth-child(2) {
-  text-align: left;
-}
-
-.copy-btn-sql {
-  border: #7a54a2 1px solid;
-  color: #7a54a2;
-}
-
-.copy-btn-function {
-  border: #0a7ebc 1px solid;
-  color: #0a7ebc;
-}
-
-.warning-text {
-  color: #f5a623;
-  border: 1px solid #f5a623;
-  border-radius: 2px;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-.expanded-function {
-  border-left: #0a7ebc 3px solid;
-}
-
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #464646;
-  }
-
-  :deep(.rum-tab) {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-
-.report-list-tabs {
-  padding: 0 1rem;
-  height: fit-content;
-  width: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
+@import '@/styles/logs/search-history.scss';
 </style>

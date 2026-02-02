@@ -1,12 +1,12 @@
 export default {
     namespaced: true,
     state: {
-      logs: {},
-      metrics: {},
-      traces: {},
-      enrichment_tables: {},
-      index: {},
-      metadata: {},
+      logs: null,
+      metrics: null,
+      traces: null,
+      enrichment_tables: null,
+      index: null,
+      metadata: null,
       streamsIndexMapping: {},
       areAllStreamsFetched: false,
     },

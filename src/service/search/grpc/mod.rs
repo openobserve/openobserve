@@ -13,19 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
-use ::datafusion::datasource::TableProvider;
 use config::meta::{search::ScanStats, stream::StreamType};
+use datafusion::datasource::TableProvider;
 use infra::errors::Result;
 
 pub mod flight;
 pub mod storage;
+pub(crate) mod tantivy_result;
 pub(crate) mod tantivy_result_cache;
-pub(crate) mod utils;
 pub mod wal;
 
-pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;
+pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u64>)>;
 
 #[derive(Debug)]
 pub struct QueryParams {

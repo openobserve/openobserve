@@ -15,114 +15,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="add-functions-section tw-pl-4 tw-py-1 tw-pr-0">
-    <div class="add-function-actions tw-pb-2 tw-pt-1">
-      <FunctionsToolbar
-        v-model:name="formData.name"
-        ref="functionsToolbarRef"
-        :disable-name="beingUpdated"
-        @test="onTestFunction"
-        @save="onSubmit"
-        @back="closeAddFunction"
-        @cancel="cancelAddFunction"
-        @open:chat="openChat"
-        :is-add-function-component="isAddFunctionComponent"
-        class="tw-pr-4"
-      />
-      <q-separator />
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+    <div class="card-container tw:mb-[0.8rem]">
+      <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
+          <FunctionsToolbar
+            v-model:name="formData.name"
+            v-model:trans-type="formData.transType"
+            ref="functionsToolbarRef"
+            :disable-name="beingUpdated"
+            :transform-type-options="transformTypeOptions"
+            @test="onTestFunction"
+            @save="onSubmit"
+            @back="closeAddFunction"
+            @cancel="cancelAddFunction"
+            @open:chat="openChat"
+            :is-add-function-component="isAddFunctionComponent"
+            class="tw:pr-4"
+          />
+      </div>
     </div>
-  <div class="tw-flex tw-pr-2">
+
+    <div class="tw:flex">
 
 
-    <div
-      class="tw-flex tw-overflow-auto tw-pr-2 tw-pb-4"
-      :class="`tw-h-[calc(100vh-(112px + ${heightOffset}px))]`"
-      :style="{
-        width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
-      }"
-    >
-      <q-splitter
-        v-model="splitterModel"
-        :limits="[30, Infinity]"
-        class="tw-overflow-hidden tw-w-full"
-        reverse
+      <div
+        class="tw:flex tw:overflow-auto "
+        :style="{
+          width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
+        }"
       >
-        <template v-slot:before>
-          <div class="tw-pr-2">
-            <q-form id="addFunctionForm" ref="addJSTransformForm">
-              <div class="add-function-name-input q-pb-sm o2-input">
-                <FullViewContainer
-                  name="function"
-                  v-model:is-expanded="expandState.functions"
-                  :label="t('function.jsfunction') + '*'"
-                  class="tw-mt-1"
-                />
-                <div
-                  v-show="expandState.functions"
-                  class="tw-border-[1px] tw-border-gray-200"
-                >
-                  <query-editor
-                    data-test="logs-vrl-function-editor"
-                    ref="editorRef"
-                    editor-id="add-function-editor"
-                    class="monaco-editor"
-                    :style="{ height: `calc(100vh - (160px + ${heightOffset}px))` }"
-                    v-model:query="formData.function"
-                    language="vrl"
+        <q-splitter
+          v-model="splitterModel"
+          :limits="[30, Infinity]"
+          class="tw:overflow-hidden tw:w-full"
+          reverse
+        >
+          <template v-slot:before>
+            <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
+              <q-form id="addFunctionForm" ref="addJSTransformForm">
+                <div class="add-function-name-input q-pb-sm o2-input">
+                  <FullViewContainer
+                    name="function"
+                    v-model:is-expanded="expandState.functions"
+                    :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
+                    class="tw-mt-1"
                   />
-                </div>
-                <div class="text-subtitle2">
-                  <div v-if="vrlFunctionError">
-                    <FullViewContainer
-                      name="function"
-                      v-model:is-expanded="expandState.functionError"
-                      :label="t('function.errorDetails')"
-                      labelClass="tw-text-red-600"
+                  <div
+                    v-show="expandState.functions"
+                    class="tw:border-[1px] tw:border-gray-200"
+                  >
+                    <query-editor
+                      data-test="logs-vrl-function-editor"
+                      ref="editorRef"
+                      editor-id="add-function-editor"
+                      class="monaco-editor"
+                      :style="{ height: `calc(100vh - (180px + ${heightOffset}px))` }"
+                      v-model:query="formData.function"
+                      :language="formData.transType === '1' ? 'javascript' : 'vrl'"
                     />
-                    <div
-                      v-if="expandState.functionError"
-                      class="q-px-sm q-pb-sm"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'bg-grey-10'
-                          : 'bg-grey-2'
-                      "
-                    >
-                      <pre class="q-my-none" style="white-space: pre-wrap">{{
-                        vrlFunctionError
-                      }}</pre>
+                  </div>
+                  <div class="text-subtitle2">
+                    <div v-if="vrlFunctionError">
+                      <FullViewContainer
+                        name="function"
+                        v-model:is-expanded="expandState.functionError"
+                        :label="formData.transType === '1' ? 'JavaScript Error Details' : t('function.errorDetails')"
+                        labelClass="tw:text-red-600 tw:font-semibold"
+                      />
+                      <div
+                        v-if="expandState.functionError"
+                        class="q-px-sm q-pb-sm tw:border-l-4 tw:border-red-500"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'bg-grey-10'
+                            : 'bg-grey-2'
+                        "
+                      >
+                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                          vrlFunctionError
+                        }}</pre>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </q-form>
-          </div>
-        </template>
-        <template v-slot:after>
-          <div
-            class="q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max q-ml-sm"
-            :class="
-              store.state.theme === 'dark' ? 'tw-bg-gray-700' : 'tw-bg-zinc-100'
-            "
-          >
-            <TestFunction
-              ref="testFunctionRef"
-              :vrlFunction="formData"
-              @function-error="handleFunctionError"
-              :heightOffset="heightOffset"
-              @sendToAiChat="sendToAiChat"
-            />
-          </div>
-        </template>
-      </q-splitter>
+              </q-form>
+            </div>
+          </template>
+          <template v-slot:after>
+            <div class="q-px-md q-pt-sm q-pb-md tw:h-max q-ml-sm card-container">
+              <TestFunction
+                ref="testFunctionRef"
+                :vrlFunction="formData"
+                @function-error="handleFunctionError"
+                :heightOffset="heightOffset"
+                @sendToAiChat="sendToAiChat"
+              />
+            </div>
+          </template>
+        </q-splitter>
+      </div>
+      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+        <O2AIChat :style="{
+          height: `calc(100vh - (112px + ${heightOffset}px))`
+        }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+      </div>
     </div>
-    <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-      <O2AIChat :style="{
-        height: `calc(100vh - (112px + ${heightOffset}px))`
-      }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
-    </div>
-  </div>
-  </div>
+  </div>  
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -156,6 +154,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { onBeforeRouteLeave } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
+import { useReo } from "@/services/reodotdev_analytics";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -197,7 +196,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const router = useRouter();
-
+    const { track } = useReo();
 
     // let beingUpdated: boolean = false;
     const addJSTransformForm: any = ref(null);
@@ -235,6 +234,20 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     let compilationErr = ref("");
+
+    // Transform type options for radio buttons
+    const transformTypeOptions = computed(() => {
+      const options = [
+        { label: t("function.vrl"), value: "0" },
+      ];
+
+      // JavaScript functions are only allowed in _meta organization (for SSO claim parsing)
+      if (store.state.selectedOrganization.identifier === "_meta") {
+        options.push({ label: t("function.javascript"), value: "1" });
+      }
+
+      return options;
+    });
 
     const beingUpdated = computed(() => props.isUpdated);
 
@@ -318,14 +331,10 @@ export default defineComponent({
       );
     };
     const updateEditorContent = () => {
-      if (formData.value.transType == "1") {
-        prefixCode.value = `function(row)`;
-        suffixCode.value = `
-end`;
-      } else {
-        prefixCode.value = ``;
-        suffixCode.value = ``;
-      }
+      // JS functions don't need prefix/suffix, only VRL functions might
+      // For now, both VRL and JS are written as-is
+      prefixCode.value = ``;
+      suffixCode.value = ``;
 
       formData.value.function = `${prefixCode.value}
     ${formData.value.function}
@@ -355,10 +364,8 @@ end`;
           try {
             if (!beingUpdated.value) {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is lua remove params from form
-              if (formData.value.transType == 1) {
-                formData.value.params = "";
-              }
+              // Both VRL and JS use params field (e.g., "row")
+              // No need to clear params for JS
 
               callTransform = jsTransformService.create(
                 store.state.selectedOrganization.identifier,
@@ -366,10 +373,8 @@ end`;
               );
             } else {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is lua remove params from form
-              if (formData.value.transType == 1) {
-                formData.value.params = "";
-              }
+              // Both VRL and JS use params field (e.g., "row")
+              // No need to clear params for JS
 
               callTransform = jsTransformService.update(
                 store.state.selectedOrganization.identifier,
@@ -415,6 +420,10 @@ end`;
             function_name: formData.value.name,
             page: "Add/Update Function",
           });
+          track("Button Click", {
+            button: "Save Function",
+            page: "Add Function"
+          });
         });
     };
 
@@ -424,6 +433,10 @@ end`;
 
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;
+      // Auto-expand error section when error occurs
+      if (err) {
+        expandState.value.functionError = true;
+      }
     };
 
     const closeAddFunction = () => {
@@ -452,6 +465,10 @@ end`;
       } else {
         emit("cancel:hideform");
       }
+      track("Button Click", {
+        button: "Cancel Function",
+        page: "Add Function"
+      });
     };
 
     const resetConfirmDialog = () => {
@@ -509,6 +526,7 @@ end`;
       splitterModel,
       closeAddFunction,
       confirmDialogMeta,
+      transformTypeOptions,
       resetConfirmDialog,
       cancelAddFunction,
       openChat,
@@ -529,6 +547,10 @@ end`;
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      // Ensure transType is a string for radio button binding
+      if (this.formData.transType !== undefined) {
+        this.formData.transType = String(this.formData.transType);
+      }
     }
   },
 });

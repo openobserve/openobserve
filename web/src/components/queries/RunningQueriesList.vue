@@ -69,14 +69,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-td>
       </template>
+      <template #body-cell-duration="props">
+        <q-td :props="props">
+          {{ durationFormatter(props.row.duration) }}
+        </q-td>
+      </template>
+      <template #body-cell-queryRange="props">
+        <q-td :props="props">
+          {{ durationFormatter(props.row.queryRange) }}
+        </q-td>
+      </template>
 
       <template #bottom="scope">
         <q-btn
           data-test="qm-multiple-cancel-query-btn"
-          class="text-bold"
+          class="o2-secondary-button no-border tw:h-[36px]"
           outline
+          flat
           padding="sm lg"
-          color="red"
           :disable="selectedRowsModel?.length === 0"
           @click="handleMultiQueryCancel"
           no-caps
@@ -118,6 +128,7 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
+import { getDuration, durationFormatter } from "@/utils/zincutils";
 
 // TODO OK : Define types and interfaces for data properties.
 
@@ -211,6 +222,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "query_source",
+        field: "query_source",
+        label: t("queries.querySource"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "duration",
         label: t("queries.duration"),
         align: "left",
@@ -289,6 +307,8 @@ export default defineComponent({
       selectedRowsModel,
       handleMultiQueryCancel,
       pagination,
+      getDuration,
+      durationFormatter,
     };
   },
 });

@@ -15,44 +15,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="height: 100%; min-height: inherit" >
+  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
 
-    <div v-if="!showDestinationEditor && !showImportDestination" style="height: calc(100vh - 112px); overflow-y: auto;" >
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    <div v-if="!showDestinationEditor && !showImportDestination" >
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
-        <div class="q-table__title" data-test="alert-destinations-list-title">
+        <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
           </div>
-          <div class="tw-flex tw-justify-end">
+          <div class="tw:flex tw:justify-end">
             <q-input
-            data-test="destination-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto no-border"
-            :placeholder="t('alert_destinations.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
+              v-model="filterQuery"
+              borderless
+              dense
+              data-test="destination-list-search-input"
+              class="q-ml-auto no-border o2-search-input"
+              :placeholder="t('alert_destinations.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
           <q-btn
-            class="q-ml-md text-bold"
-            padding="sm lg"
-            outline
+            class="o2-secondary-button q-ml-sm tw:h-[36px]"
             no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importDestination"
             data-test="destination-import"
           />
           <q-btn
             data-test="alert-destination-list-add-alert-btn"
-            class="q-ml-md text-bold no-border"
-            padding="sm lg"
-            color="secondary"
+            class="o2-primary-button q-ml-sm tw:h-[36px]"
             no-caps
+            flat
             :disable="!templates.length"
             :label="t(`alert_destinations.add`)"
             @click="editDestination(null)"
@@ -62,15 +58,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-table
         data-test="alert-destinations-list-table"
         ref="qTable"
-        :rows="destinations"
+        :rows="visibleRows"
         :columns="columns"
-        row-key="id"
-        style="width: 100%;"
+        row-key="name"
         :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        class="o2-quasar-table"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+        selection="multiple"
+        v-model:selected="selectedDestinations"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        :style="hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
+            : 'width: 100%'"
       >
         <template #no-data>
           <div
@@ -102,57 +99,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              icon="download"
-              title="Export Destination"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="exportDestination(props.row)"
-              data-test="destination-export"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alert_destinations.edit')"
-              @click="editDestination(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alert_destinations.delete')"
-              @click="conformDeleteDestination(props.row)"
-            ></q-btn>
+            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+              <q-btn
+                data-test="destination-export"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                title="Export Destination"
+                icon="download"
+                @click.stop="exportDestination(props.row)"
+              >
+              </q-btn>
+              <q-btn
+                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="edit"
+                :title="t('alert_destinations.edit')"
+                @click="editDestination(props.row)"
+              >
+              </q-btn>
+              <q-btn
+                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :icon="outlinedDelete"
+                :title="t('alert_destinations.delete')"
+                @click="conformDeleteDestination(props.row)"
+              >
+              </q-btn>
+            </div>
           </q-td>
         </template>
-        <template #top="scope">
 
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('alert_destinations.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+        <template v-slot:body-selection="scope">
+          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
         </template>
 
         <template #bottom="scope">
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-sm">
+                  {{ resultTotal }} {{ t('alert_destinations.header') }}
+                </div>
+            <q-btn
+              v-if="selectedDestinations.length > 0"
+              data-test="destination-list-delete-destinations-btn"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              no-caps
+              dense
+              @click="openBulkDeleteDialog"
+            >
+              <q-icon name="delete" size="16px" />
+              <span class="tw:ml-2">Delete</span>
+            </q-btn>
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
@@ -160,9 +172,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+          </div>
         </template>
         <template v-slot:header="props">
             <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th v-if="columns.length > 0" auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
+                />
+              </q-th>
+
               <!-- Render the table headers -->
               <q-th
                 v-for="col in props.cols"
@@ -201,6 +224,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
+
+    <ConfirmDialog
+      title="Delete Destinations"
+      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      @update:ok="bulkDeleteDestinations"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
   </q-page>
 </template>
 <script lang="ts">
@@ -211,6 +242,7 @@ import {
   watch,
   defineComponent,
   onMounted,
+  computed,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -227,9 +259,10 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
+import { useReo } from "@/services/reodotdev_analytics";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 interface ConformDelete {
   visible: boolean;
@@ -251,6 +284,7 @@ export default defineComponent({
     const { t } = useI18n();
     const q = useQuasar();
     const { getAllActions } = useActions();
+    const { track } = useReo();
 
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -299,6 +333,8 @@ export default defineComponent({
       visible: false,
       data: null,
     });
+    const confirmBulkDelete = ref<boolean>(false);
+    const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
@@ -343,7 +379,7 @@ export default defineComponent({
     const getActions = async () => {
       const dismiss = q.notify({
         spinner: true,
-        message: "Please wait while loading actions...",
+        message: "Please wait while loading alert destination...",
       });
       if (store.state.organizationData.actions.length == 0) {
         await getAllActions()
@@ -420,6 +456,12 @@ export default defineComponent({
       );
     };
     const editDestination = (destination: any) => {
+      if (!destination) {
+        track("Button Click", {
+          button: "Add Destination",
+          page: "Alert Destinations"
+        });
+      }
       toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
@@ -550,6 +592,108 @@ export default defineComponent({
       });
     };
 
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return destinations.value || [];
+      return filterData(destinations.value || [], filterQuery.value);
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteDestinations = async () => {
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Deleting destinations...",
+        timeout: 0,
+      });
+
+      try {
+        if (selectedDestinations.value.length === 0) {
+          q.notify({
+            type: "negative",
+            message: "No destinations selected for deletion",
+            timeout: 2000,
+          });
+          dismiss();
+          return;
+        }
+
+        // Extract destination names for the API call (BE supports names)
+        const payload = {
+          ids: selectedDestinations.value.map((d: any) => d.name),
+        };
+
+        const response = await destinationService.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          payload
+        );
+
+        dismiss();
+
+        // Handle response based on successful/unsuccessful arrays
+        if (response.data) {
+          const { successful = [], unsuccessful = [] } = response.data;
+          const successCount = successful.length;
+          const failCount = unsuccessful.length;
+
+          if (failCount > 0 && successCount > 0) {
+            // Partial success
+            q.notify({
+              type: "warning",
+              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+              timeout: 5000,
+            });
+          } else if (failCount > 0) {
+            // All failed
+            q.notify({
+              type: "negative",
+              message: `Failed to delete ${failCount} destination(s)`,
+              timeout: 3000,
+            });
+          } else {
+            // All successful
+            q.notify({
+              type: "positive",
+              message: `${successCount} destination(s) deleted successfully`,
+              timeout: 2000,
+            });
+          }
+        } else {
+          // Fallback success message
+          q.notify({
+            type: "positive",
+            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
+            timeout: 2000,
+          });
+        }
+
+        selectedDestinations.value = [];
+        // Refresh destinations list
+        getDestinations();
+      } catch (error: any) {
+        dismiss();
+        // Show error message from response if available
+        const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
+        if (error.response?.status != 403 || error?.status != 403) {
+          q.notify({
+            type: "negative",
+            message: errorMessage,
+            timeout: 3000,
+          });
+        }
+      }
+
+      confirmBulkDelete.value = false;
+    };
+
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
+
     return {
       t,
       qTable,
@@ -572,7 +716,6 @@ export default defineComponent({
       perPageOptions,
       resultTotal,
       pagination,
-      outlinedDelete,
       routeTo,
       exportDestination,
       showImportDestination,
@@ -585,8 +728,14 @@ export default defineComponent({
       getDestinationByName,
       resetEditingDestination,
       selectedPerPage,
+      visibleRows,
+      hasVisibleRows,
+      outlinedDelete,
+      openBulkDeleteDialog,
+      bulkDeleteDestinations,
+      confirmBulkDelete,
+      selectedDestinations,
     };
   },
 });
 </script>
-<style lang=""></style>

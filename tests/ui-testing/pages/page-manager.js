@@ -7,6 +7,7 @@ import DashboardPanelConfigs from "./dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "./dashboardPages/dashboard-panel-edit";
 import DashboardSetting from "./dashboardPages/dashboard-settings";
 import DashboardVariables from "./dashboardPages/dashboard-variables";
+import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scoped.js";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
@@ -26,6 +27,7 @@ import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
 import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
+import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -43,12 +45,23 @@ import { UserPage } from "./generalPages/userPage.js";
 import { SanityPage } from "./generalPages/sanityPage.js";
 import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
+import { ThemePage } from "./generalPages/themePage.js";
+import { LanguagePage } from "./generalPages/languagePage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
+const APICleanup = require("./apiCleanup.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
+
+// ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
+import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
+import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
+
+// ===== FUNCTIONS PAGE OBJECTS =====
+const FunctionsPage = require("./functionsPages/functionsPage.js");
 
 class PageManager {
   /**
@@ -56,7 +69,7 @@ class PageManager {
    */
   constructor(page) {
     this.page = page;
-    
+
     // ===== EXISTING DASHBOARD PAGE OBJECTS =====
     this.dashboardCreate = new DashboardCreate(page);
     this.dashboardList = new DashboardListPage(page);
@@ -66,6 +79,7 @@ class PageManager {
     this.dashboardPanelEdit = new DashboardPanel(page);
     this.dashboardSetting = new DashboardSetting(page);
     this.dashboardVariables = new DashboardVariables(page);
+    this.dashboardVariablesScoped = new DashboardVariablesScoped(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardFilter = new DashboardFilter(page);
@@ -75,10 +89,13 @@ class PageManager {
     this.dateTimeHelper = new DateTimeHelper(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
-    
+
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
-    
+
+    // ===== API CLEANUP =====
+    this.apiCleanup = new APICleanup();
+
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
     this.streamsPage = new StreamsPage(page);
@@ -87,7 +104,8 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.loginPage = new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
-    
+    this.ingestionConfigPage = new IngestionConfigPage(page);
+
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
     this.metricsPage = new MetricsPage(page);
@@ -104,12 +122,22 @@ class PageManager {
     this.sanityPage = new SanityPage(page);
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
+    this.themePage = new ThemePage(page);
+    this.languagePage = new LanguagePage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
-    
+
     // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
     this.logsQueryPage = new LogsQueryPage(page);
     this.unflattenedPage = new UnflattenedPage(page);
+
+    // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+    this.sdrPatternsPage = new SDRPatternsPage(page);
+    this.sdrVerificationPage = new SDRVerificationPage(page);
+    this.streamAssociationPage = new StreamAssociationPage(page);
+
+    // ===== FUNCTIONS PAGE OBJECTS =====
+    this.functionsPage = new FunctionsPage(page);
   }
 }
 

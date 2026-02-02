@@ -18,8 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <q-select
       style="min-width: 150px"
-      filled
-      outlined
       dense
       v-model="selectedValue"
       :display-value="displayValue"
@@ -33,13 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       use-input
       stack-label
       @filter="fieldsFilterFn"
-      class="textbox col no-case"
+      class="textbox col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-custom-value-selector"
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
-    >
+     borderless hide-bottom-space>
       <template v-slot:no-option>
         <q-item>
           <q-item-section class="text-italic text-grey">
@@ -109,6 +107,15 @@ export default defineComponent({
       () => {
         options.value = props.variableItem?.options;
       }
+    );
+
+    // Add watch for variableItem value changes
+    watch(
+      () => props.variableItem.value,
+      (newVal) => {
+        selectedValue.value = newVal;
+      },
+      { immediate: true },
     );
 
     // isAllSelected should be true if all options are selected and false otherwise
@@ -187,4 +194,14 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.q-select {
+  max-width: 600px;
+}
+
+:deep(.q-field__native) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

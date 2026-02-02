@@ -17,7 +17,7 @@
 <template>
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
-      <span>Color by series</span>
+      <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
       <q-btn
         no-caps
         padding="xs"
@@ -33,8 +33,7 @@
           self="top middle"
           max-width="250px"
         >
-          Apply colors to series for better visual distinction in charts.
-          Customize colors for each series to enhance data visualization.
+          {{ t("dashboard.colorBySeriesTooltip") }}
         </q-tooltip>
       </q-btn>
     </div>
@@ -43,11 +42,12 @@
       style="cursor: pointer; padding: 0px 5px"
       :label="
         dashboardPanelData?.data?.config?.color?.colorBySeries?.length
-          ? ' Edit color by series'
-          : ' Apply color by series'
+          ? t('dashboard.editColorBySeries')
+          : t('dashboard.applyColorBySeries')
       "
       no-caps
       data-test="dashboard-addpanel-config-colorBySeries-add-btn"
+      class="el-border"
     />
     <q-dialog v-model="showColorBySeriesPopUp">
       <ColorBySeriesPopUp
@@ -65,6 +65,7 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref, computed, onBeforeMount } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
@@ -78,6 +79,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -106,10 +108,39 @@ export default defineComponent({
     };
 
     const seriesOptions = computed(() => {
+      const panelType = dashboardPanelData.data.type;
+      const chartOptions = props.colorBySeriesData?.options;
+      // For pie and donut charts, extract series names from data[].name
+      if (
+        (panelType === "pie" || panelType === "donut") &&
+        chartOptions?.series?.[0]?.data
+      ) {
+        const pieDonutSeriesNames = chartOptions.series[0].data
+          .filter((item: any) => item && item.name) // Filter out invalid items
+          .map((item: any) => ({
+            name: item.name,
+          }));
+        return { series: pieDonutSeriesNames };
+      }
+      // For gauge charts, extract series names from each series' data[0].name
+      if (panelType === "gauge" && chartOptions?.series) {
+        const gaugeSeriesNames = chartOptions.series
+          .filter(
+            (series: any) =>
+              series && series.data && series.data[0] && series.data[0].name,
+          ) // Filter out invalid series
+          .map((series: any) => ({
+            name: series.data[0].name,
+          }));
+        return { series: gaugeSeriesNames };
+      }
+
+      // For other chart types, use the existing logic
       return props.colorBySeriesData?.options || { series: [] };
     });
 
     return {
+      t,
       store,
       dashboardPanelData,
       // colorBySeries:

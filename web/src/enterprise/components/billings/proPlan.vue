@@ -98,15 +98,16 @@ export default defineComponent({
       { name: 'Ingestion (Logs, Metrics, Traces)', price: '$0.30/GB' , is_parent: true},
       { name: 'Query Volume', price: '$0.01/GB' , is_parent: true},
       { name: 'Pipelines', price: '' , is_parent: true},
-      { name: 'Data Processed', price: '$0.10/ GB' , is_parent: false},
+      { name: 'Data Processed', price: '$0.20/ GB' , is_parent: false},
       { name: 'Each additional destination', price: '$0.30/ GB' , is_parent: false},
+      { name: 'Each remote destination', price: '$0.45/ GB' , is_parent: false},
       { name: 'RUM & Session Replay', price: '$1/ 1K sessions' , is_parent: true},
       { name: 'Error Tracking', price: '$0.15/ 1K events' , is_parent: true},
       { name: 'Action Script', price: '$1/ 1K runs' , is_parent: true},
       { name: 'Unlimited Users', price: '' , is_parent: true},
       { name: 'Role-Based Access Control (RBAC)', price: '' , is_parent: true},
-      { name: 'API Access', price: '' , is_parent: true},
       { name: '15-Days Retention', price: '' , is_parent: true},
+      { name: '30 days additional retention', price: '$0.10/GB' , is_parent: true},
     ];
 
     const cancelSubscription = () => {

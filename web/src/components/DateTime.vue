@@ -21,16 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="date-time-button"
       ref="datetimeBtn"
       data-cy="date-time-button"
-      outline
       no-caps
       :label="getDisplayValue"
       icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
       :class="{
-          [selectedType + 'type']: !disableRelative,
-          'hideRelative': disableRelative
-        }"
+        [selectedType + 'type']: !disableRelative,
+        hideRelative: disableRelative,
+      }"
       :disable="disable"
     >
       <q-menu
@@ -54,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :flat="selectedType !== 'relative'"
             @click="setDateType('relative')"
           >
-            Relative
+            {{ t("common.relative") }}
           </q-btn>
           <q-separator vertical inset />
           <q-btn
@@ -66,15 +65,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :flat="selectedType !== 'absolute'"
             @click="setDateType('absolute')"
           >
-            Absolute
+            {{ t("common.absolute") }}
           </q-btn>
         </div>
         <q-separator />
         <q-tab-panels v-model="selectedType" animated>
-          <q-tab-panel v-if="!disableRelative" name="relative" class="q-pa-none">
+          <q-tab-panel
+            v-if="!disableRelative"
+            name="relative"
+            class="q-pa-none"
+          >
             <div class="date-time-table relative column">
               <div
-                class="relative-row q-px-md q-py-sm"
+                class="relative-row q-pl-md q-py-sm"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
@@ -124,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="relative-row q-px-md q-py-sm">
-                <div class="relative-period-name">Custom</div>
+                <div class="relative-period-name">{{ t("common.custom") }}</div>
                 <q-tooltip
                   style="z-index: 10001; font-size: 14px"
                   anchor="center right"
@@ -138,11 +141,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row q-gutter-sm">
                   <div class="col">
                     <q-input
-                      v-model="relativeValue"
+                      v-model.number="relativeValue"
                       type="number"
                       dense
                       filled
                       min="1"
+                      :step="1"
                       :max="
                         relativePeriodsMaxValue[relativePeriod] > 0
                           ? relativePeriodsMaxValue[relativePeriod]
@@ -192,28 +196,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   range
                   :locale="dateLocale"
                   :options="optionsFn"
-                  
                 />
               </div>
-              <div  class="notePara">* You can choose multiple date</div>
+              <div class="notePara">* You can choose multiple date</div>
               <q-separator v-if="!disableRelative" class="q-my-sm" />
 
               <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label tw-px-2">Start time</td>
-                    <td class="label tw-px-2">End time</td>
+                    <td class="label tw:px-2">Start time</td>
+                    <td class="label tw:px-2">End time</td>
                   </tr>
                   <tr>
                     <td>
                       <q-input
                         v-model="selectedTime.startTime"
                         dense
-                        filled
+                        borderless
                         mask="fulltime"
+                        hide-bottom-space
                         :rules="['fulltime']"
                         @blur="
-                          resetTime(selectedTime.startTime, selectedTime.endTime)
+                          resetTime(
+                            selectedTime.startTime,
+                            selectedTime.endTime,
+                          )
                         "
                       >
                         <template #append>
@@ -245,11 +252,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         v-model="selectedTime.endTime"
                         dense
-                        filled
+                        borderless
                         mask="fulltime"
                         :rules="['fulltime']"
+                        hide-bottom-space
                         @blur="
-                          resetTime(selectedTime.startTime, selectedTime.endTime)
+                          resetTime(
+                            selectedTime.startTime,
+                            selectedTime.endTime,
+                          )
                         "
                       >
                         <template #append>
@@ -284,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tab-panel>
         </q-tab-panels>
         <q-select
-        v-if="!hideRelativeTimezone"
+          v-if="!hideRelativeTimezone"
           data-test="datetime-timezone-select"
           v-model="timezone"
           :options="filteredTimezone"
@@ -298,29 +309,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @filter="timezoneFilterFn"
           input-debounce="0"
           dense
-          filled
+          borderless
           emit-value
           fill-input
           hide-selected
           :label="t('logStream.timezone')"
           @update:modelValue="onTimezoneChange"
           :display-value="`Timezone: ${timezone}`"
-          class="timezone-select"
+          class="timezone-select o2-custom-select-dashboard"
           popup-content-style="z-index: 10002"
         >
         </q-select>
-        <div v-if="!autoApply " class="flex justify-end q-py-sm q-px-md">
+        <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
           <q-btn
             data-test="date-time-apply-btn"
-            class="no-border q-py-xs"
-            color="secondary"
+            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
             no-caps
             size="sm"
             @click="saveDate(null)"
             v-close-popup
           >
-            Apply
+            {{ t("common.apply") }}
           </q-btn>
         </div>
       </q-menu>
@@ -396,11 +406,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    hideRelativeTime:{
+    hideRelativeTime: {
       type: Boolean,
       default: false,
     },
-    hideRelativeTimezone:{
+    hideRelativeTimezone: {
       type: Boolean,
       default: false,
     },
@@ -474,21 +484,21 @@ export default defineComponent({
     const filteredTimezone: any = ref([]);
 
     let relativePeriods = [
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ];
 
     let relativePeriodsSelect = ref([
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ]);
 
     const relativeDates = {
@@ -532,7 +542,7 @@ export default defineComponent({
 
     onMounted(() => {
       // updateDisplayValue();
-      if(props.disableRelative) setDateType("absolute");
+      if (props.disableRelative) setDateType("absolute");
       try {
         resetTime("", "");
 
@@ -614,6 +624,9 @@ export default defineComponent({
             ? relativePeriodsMaxValue.value[relativePeriod.value]
             : 15;
       }
+
+      relativeValue.value = parseInt(relativeValue.value);
+
       if (props.autoApply) saveDate("relative-custom");
     };
 
@@ -700,9 +713,9 @@ export default defineComponent({
     const saveDate = (dateType) => {
       // displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
-      if (isNaN(date.endTime) || isNaN(date.startTime)) {
-        return false;
-      }
+      // if (isNaN(date.endTime) || isNaN(date.startTime)) {
+      //   // return false;
+      // }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       // date["relativeTimePeriod"] = "";
@@ -812,8 +825,8 @@ export default defineComponent({
             selectedTime.value.startTime,
           )
         ) {
-          console.error(`Invalid start date/time: ${startDateStr}`);
-          return new Date();
+          // console.warn(`Invalid start date/time: ${startDateStr}`);
+          // return new Date();
         }
 
         const endDateStr =
@@ -824,8 +837,8 @@ export default defineComponent({
             selectedTime.value.endTime,
           )
         ) {
-          console.error(`Invalid end date/time: ${endDateStr}`);
-          return new Date();
+          // console.error(`Invalid end date/time: ${endDateStr}`);
+          // return new Date();
         }
 
         let start, end;
@@ -899,7 +912,7 @@ export default defineComponent({
     };
 
     const getDisplayValue = computed(() => {
-      if(props.disableRelative){
+      if (props.disableRelative) {
         selectedType.value = "absolute";
       }
       if (selectedType.value === "relative") {
@@ -953,14 +966,13 @@ export default defineComponent({
     };
 
     const optionsFn = (date) => {
-
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
         "yyyy/MM/dd",
       );
-      if(props.disableRelative){
-        return date >= props.minDate;
+      if (props.disableRelative) {
+        return date >= props.minDate && date <= formattedDate;
       }
       return date >= "1999/01/01" && date <= formattedDate;
     };
@@ -1065,19 +1077,19 @@ export default defineComponent({
       }
     };
 
-    const showOnlyAbsolute = () =>{
-      if(props.disableRelative){
+    const showOnlyAbsolute = () => {
+      if (props.disableRelative) {
         setDateType("absolute");
       }
-    }
+    };
 
     const onHide = () => {
-      emit("hide")
-    }
+      emit("hide");
+    };
 
     const onShow = () => {
-      emit("show")
-    }
+      emit("show");
+    };
 
     return {
       t,
@@ -1142,8 +1154,7 @@ export default defineComponent({
     &.absolutetype {
       min-width: 286px;
     }
-    &.hideRelative{
-      background-color: red;
+    &.hideRelative {
       width: fit-content;
     }
   }
@@ -1151,15 +1162,23 @@ export default defineComponent({
 </style>
 <style lang="scss">
 .q-btn--rectangle {
-  border-radius: 3px;
+  border-radius: 0.375rem;
 }
 .date-time-button {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 0.375rem;
   padding: 0px 5px;
   font-size: 12px;
   min-width: auto;
-  background: rgba(89, 96, 178, 0.2) !important;
+  border: 0.0625rem solid var(--o2-border-color);
+
+  .q-focus-helper {
+    display: none !important;
+  }
+
+  &::before {
+    border: none !important;
+  }
 
   .q-icon.on-right {
     transition: transform 0.25s ease;
@@ -1174,6 +1193,10 @@ export default defineComponent({
     .block {
       font-weight: 600;
     }
+  }
+
+  &:hover {
+    background: var(--o2-hover-accent) !important;
   }
 }
 
@@ -1253,7 +1276,7 @@ export default defineComponent({
 
 .rp-selector-selected {
   color: #ffffff;
-  background: $primary;
+  background: var(--o2-primary-btn-bg);
 }
 
 .tab-button {
@@ -1312,8 +1335,10 @@ export default defineComponent({
   }
 }
 .startEndTime {
-  .q-field {
-    padding-bottom: 0.125rem;
+  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
+  .q-field__control-container{
+    min-height: 32px;
+    height: 32px;
   }
   .label {
     font-size: 0.75rem;
@@ -1356,5 +1381,6 @@ export default defineComponent({
   .q-item:nth-child(2) {
     border-bottom: 1px solid #dcdcdc;
   }
+  margin: 0.5rem 0.4rem 0.5rem 0.4rem;
 }
 </style>

@@ -17,174 +17,200 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="q-pa-none flex"
-    style="height: calc(100vh - 57px)"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
+    class="flex q-mt-xs"
   >
-  <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4"
-    :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
-    >
-      <div class="q-table__title" data-test="report-list-title">
-        {{ t("reports.header") }}
-      </div>
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem]">
+        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
+          <div class="q-table__title tw:font-[600]" data-test="report-list-title">
+            {{ t("reports.header") }}
+          </div>
 
-      <div class="tw-flex tw-items-center">
-        <div class="app-tabs-container q-mr-md">
-        <app-tabs
-          class="tabs-selection-container"
-          :tabs="tabs"
-          :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
-          v-model:active-tab="activeTab"
-          @update:active-tab="filterReports"
-        />
-        </div>
-        <q-input
-          data-test="report-list-search-input"
-          v-model="filterQuery"
-          borderless
-          filled
-          dense
-          class="q-ml-auto no-border"
-          :placeholder="t('reports.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" class="cursor-pointer" />
-          </template>
-        </q-input>
-        <q-btn
-          data-test="report-list-add-report-btn"
-          class="q-ml-md text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t(`reports.add`)"
-          @click="createNewReport"
-        />
-      </div>
-    </div>
-    <div class="full-width o2-quasar-table"
-    style="height: calc(100vh - 112px) ; overflow-y: auto;"
-    :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
-    >
-      <q-table
-        data-test="report-list-table"
-        ref="reportListTableRef"
-        :rows="reportsTableRows"
-        :columns="columns"
-        row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        style="width: 100%"
-      >
-        <template #no-data>
-          <NoData />
-        </template>
-
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div
-              v-if="reportsStateLoadingMap[props.row.uuid]"
-              data-test="report-list-toggle-report-state-loader"
-              style="display: inline-block; width: 33.14px; height: auto"
-              class="flex justify-center items-center q-ml-xs"
-              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-            >
-              <q-circular-progress
-                indeterminate
-                rounded
-                size="16px"
-                :value="1"
-                color="secondary"
-              />
-            </div>
-            <q-btn
-              v-else
-              :data-test="`report-list-${props.row.name}-pause-start-report`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click="toggleReportState(props.row)"
+          <div class="tw:flex tw:items-center">
+            <div class="app-tabs-container q-mr-sm">
+            <app-tabs
+              class="tabs-selection-container"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="filterReports"
             />
+            </div>
+            <q-input
+              data-test="report-list-search-input"
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
+              :placeholder="t('reports.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
             <q-btn
-              :data-test="`report-list-${props.row.name}-edit-report`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
+              data-test="report-list-add-report-btn"
+              class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
-              :title="t('alerts.edit')"
-              @click="editReport(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`report-list-${props.row.name}-delete-report`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="confirmDeleteReport(props.row)"
-            ></q-btn>
-          </q-td>
-        </template>
+              no-caps
+              :label="t(`reports.add`)"
+              @click="createNewReport"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw:h-[calc(100vh-128px)]">
+          <q-table
+            data-test="report-list-table"
+            ref="reportListTableRef"
+            :rows="visibleRows"
+            :columns="columns"
+            row-key="name"
+            :pagination="pagination"
+            :filter="filterQuery"
+            :filter-method="filterData"
+            selection="multiple"
+            v-model:selected="selectedReports"
+            style="width: 100%"
+            :style="hasVisibleRows
+                ? 'width: 100%; height: calc(100vh - 124px)'
+                : 'width: 100%'"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+          >
+            <template #no-data>
+              <NoData />
+            </template>
 
-        <template v-slot:body-cell-function="props">
-          <q-td :props="props">
-            <q-tooltip>
-              <pre>{{ props.row.sql }}</pre>
-            </q-tooltip>
-            <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-          </q-td>
-        </template>
+            <template v-slot:body-cell-actions="props">
+              <q-td :props="props">
+                <div
+                  v-if="reportsStateLoadingMap[props.row.uuid]"
+                  data-test="report-list-toggle-report-state-loader"
+                  style="display: inline-block; width: 33.14px; height: auto"
+                  class="flex justify-center items-center"
+                  :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                >
+                  <q-circular-progress
+                    indeterminate
+                    rounded
+                    size="16px"
+                    :value="1"
+                    color="secondary"
+                  />
+                </div>
+                <q-btn
+                  v-else
+                  :data-test="`report-list-${props.row.name}-pause-start-report`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  :color="props.row.enabled ? 'negative' : 'positive'"
+                  :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+                  round
+                  flat
+                  :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  @click="toggleReportState(props.row)"
+                >
+              </q-btn>
+                <q-btn
+                  :data-test="`report-list-${props.row.name}-edit-report`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="edit"
+                  :title="t('alerts.edit')"
+                  @click="editReport(props.row)"
+                >
+              </q-btn>
+                <q-btn
+                  :data-test="`report-list-${props.row.name}-delete-report`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  :icon="outlinedDelete"
+                  :title="t('alerts.delete')"
+                  @click="confirmDeleteReport(props.row)"
+                >
+              </q-btn>
+              </q-td>
+            </template>
 
-        <template #top="scope">
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('reports.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
+            <template v-slot:body-cell-function="props">
+              <q-td :props="props">
+                <q-tooltip>
+                  <pre>{{ props.row.sql }}</pre>
+                </q-tooltip>
+                <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
+              </q-td>
+            </template>
 
-        <template #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
+            <template v-slot:body-selection="scope">
+              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+            </template>
 
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the of the columns -->
-               <!-- here we can add the classes class so that the head will be sticky -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-      </q-table>
+            <template #bottom="scope">
+              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
+                      {{ resultTotal }} {{ t('reports.header') }}
+                    </div>
+                <q-btn
+                  v-if="selectedReports.length > 0"
+                  data-test="report-list-delete-reports-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-secondary-button-dark'
+                      : 'o2-secondary-button-light'
+                  "
+                  no-caps
+                  dense
+                  @click="openBulkDeleteDialog"
+                >
+                  <q-icon name="delete" size="16px" />
+                  <span class="tw:ml-2">Delete</span>
+                </q-btn>
+                <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="resultTotal"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+              </div>
+
+            </template>
+
+            <template v-slot:header="props">
+                <q-tr :props="props">
+                  <!-- Adding this block to render the select-all checkbox -->
+                  <q-th v-if="columns.length > 0" auto-width>
+                    <q-checkbox
+                      v-model="props.selected"
+                      size="sm"
+                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                      class="o2-table-checkbox"
+                    />
+                  </q-th>
+
+                  <!-- Rendering the rest of the columns -->
+                  <q-th
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    :class="col.classes"
+                    :style="col.style"
+                  >
+                    {{ col.label }}
+                  </q-th>
+                </q-tr>
+              </template>
+          </q-table>
+        </div>
+      </div>
     </div>
 
     <ConfirmDialog
@@ -194,11 +220,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteReport"
       @update:cancel="deleteDialog.show = false"
     />
+
+    <ConfirmDialog
+      v-model="confirmBulkDelete"
+      title="Delete Reports"
+      :message="`Are you sure you want to delete ${selectedReports.length} report(s)?`"
+      @update:ok="bulkDeleteReports"
+      @update:cancel="confirmBulkDelete = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive } from "vue";
+import { ref, onBeforeMount, reactive, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -215,12 +249,15 @@ import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const reportsTableRows: Ref<any[]> = ref([]);
 
 const { t } = useI18n();
 
 const router = useRouter();
+
+const { track } = useReo();
 
 const confirmDelete = ref(false);
 
@@ -246,12 +283,11 @@ const tabs = reactive([
 ]);
 
 const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
   { label: "100", value: 100 },
-  { label: "All", value: 0 },
+  { label: "250", value: 250 },
+  { label: "500", value: 500 },
 ];
 const resultTotal = ref<number>(0);
 const maxRecordToReturn = ref<number>(100);
@@ -271,6 +307,10 @@ const deleteDialog = ref({
   data: "" as any,
 });
 
+const confirmBulkDelete = ref<boolean>(false);
+
+const selectedReports = ref<any[]>([]);
+
 const reportListTableRef: Ref<any> = ref(null);
 
 const staticReportsList: Ref<any[]> = ref([]);
@@ -280,8 +320,8 @@ const columns: any = ref<QTableProps["columns"]>([
     name: "#",
     label: "#",
     field: "#",
-    align: "left",
-    style: "width: 67px",
+    align: "center",
+    style: "width: 67px;",
   },
   {
     name: "name",
@@ -377,6 +417,8 @@ function convertUnixToQuasarFormat(unixMicroseconds: any) {
   const formattedDate = dateToFormat.toISOString();
   return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 }
+
+
 
 const filterData = (rows: any, terms: any) => {
   var filtered = [];
@@ -498,7 +540,11 @@ const deleteReport = (report: any) => {
 };
 
 const createNewReport = () => {
-  router.push({ name: "createReport" });
+  track("Button Click", {
+    button: "Add Report",
+    page: "Reports"
+  });
+  router.push({ name: "createReport", query: { org_identifier: store.state.selectedOrganization.identifier } });
 };
 
 const filterReports = () => {
@@ -525,6 +571,126 @@ const filterReports = () => {
 
   resultTotal.value = reportsTableRows.value.length;
 };
+
+const visibleRows = computed(() => {
+  if (!filterQuery.value) return reportsTableRows.value || [];
+  return filterData(reportsTableRows.value || [], filterQuery.value);
+});
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+// Watch visibleRows to sync resultTotal with search filter
+watch(visibleRows, (newVisibleRows) => {
+  resultTotal.value = newVisibleRows.length;
+}, { immediate: true });
+
+const openBulkDeleteDialog = () => {
+  confirmBulkDelete.value = true;
+};
+
+const bulkDeleteReports = async () => {
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Deleting reports...",
+    timeout: 0,
+  });
+
+  try {
+    if (selectedReports.value.length === 0) {
+      q.notify({
+        type: "negative",
+        message: "No reports selected for deletion",
+        timeout: 2000,
+      });
+      dismiss();
+      return;
+    }
+
+    // Extract report names for the API call (BE supports names)
+    const payload = {
+      ids: selectedReports.value.map((r: any) => r.name),
+    };
+
+    const response = await reports.bulkDelete(
+      store.state.selectedOrganization.identifier,
+      payload
+    );
+
+    dismiss();
+
+    // Handle response based on successful/unsuccessful arrays
+    if (response.data) {
+      const { successful = [], unsuccessful = [] } = response.data;
+      const successCount = successful.length;
+      const failCount = unsuccessful.length;
+
+      if (failCount > 0 && successCount > 0) {
+        // Partial success
+        q.notify({
+          type: "warning",
+          message: `${successCount} report(s) deleted successfully, ${failCount} failed`,
+          timeout: 5000,
+        });
+      } else if (failCount > 0) {
+        // All failed
+        q.notify({
+          type: "negative",
+          message: `Failed to delete ${failCount} report(s)`,
+          timeout: 3000,
+        });
+      } else {
+        // All successful
+        q.notify({
+          type: "positive",
+          message: `${successCount} report(s) deleted successfully`,
+          timeout: 2000,
+        });
+      }
+
+      // Remove deleted reports from staticReportsList by name 
+      const successfulNames = new Set(successful);
+      staticReportsList.value = staticReportsList.value.filter(
+        (r: any) => !successfulNames.has(r.name)
+      );
+
+      // Refresh the table
+      filterReports();
+    } else {
+      // Fallback success message
+      q.notify({
+        type: "positive",
+        message: `${selectedReports.value.length} report(s) deleted successfully`,
+        timeout: 2000,
+      });
+
+      // Remove all selected reports by name
+      const selectedNames = new Set(selectedReports.value.map((r: any) => r.name));
+      staticReportsList.value = staticReportsList.value.filter(
+        (r: any) => !selectedNames.has(r.name)
+      );
+
+      // Refresh the table
+      filterReports();
+    }
+
+    selectedReports.value = [];
+  } catch (error: any) {
+    dismiss();
+    console.error("Error deleting reports:", error);
+
+    // Show error message from response if available
+    const errorMessage = error.response?.data?.message || error?.message || "Error deleting reports. Please try again.";
+    if (error.response?.status != 403 || error?.status != 403) {
+      q.notify({
+        type: "negative",
+        message: errorMessage,
+        timeout: 3000,
+      });
+    }
+  }
+
+  confirmBulkDelete.value = false;
+};
+
 </script>
 
 <style lang="scss" scoped>

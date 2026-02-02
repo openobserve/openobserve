@@ -16,6 +16,7 @@
 use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     get_config, get_instance_id, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
@@ -36,9 +37,10 @@ pub trait NodeInfo: Debug + Send + Sync {
     fn get_cluster(&self) -> String {
         crate::config::get_cluster_name()
     }
+    fn is_local(&self) -> bool;
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Node {
     pub id: i32,
     pub uuid: String,
@@ -161,6 +163,10 @@ impl NodeInfo for Node {
     fn get_grpc_addr(&self) -> String {
         self.grpc_addr.clone()
     }
+
+    fn is_local(&self) -> bool {
+        self.grpc_addr == crate::cluster::get_local_grpc_addr()
+    }
 }
 
 pub trait IntoArcVec {
@@ -173,7 +179,7 @@ impl IntoArcVec for Vec<Node> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum NodeStatus {
     Prepare = 1,
     Online = 2,
@@ -191,7 +197,7 @@ impl From<i32> for NodeStatus {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum Role {
     All,
     Ingester,
@@ -240,7 +246,7 @@ impl std::fmt::Display for Role {
 /// None        -> All tasks
 /// Background  -> Low-priority tasks
 /// Interactive -> High-priority tasks
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default, ToSchema)]
 pub enum RoleGroup {
     #[default]
     None,
@@ -299,4 +305,76 @@ pub fn get_internal_grpc_token() -> String {
 pub enum CompactionJobType {
     Current,
     Historical,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_node_is_local() {
+        let local_node = &*crate::cluster::LOCAL_NODE;
+        assert!(local_node.is_local());
+    }
+
+    #[test]
+    fn test_node_is_ingester() {
+        let mut node = Node::default();
+
+        // Test with All role
+        node.role = vec![Role::All];
+        assert!(node.is_ingester());
+
+        // Test with Ingester role
+        node.role = vec![Role::Ingester];
+        assert!(node.is_ingester());
+
+        // Test with Querier role (should be false)
+        node.role = vec![Role::Querier];
+        assert!(!node.is_ingester());
+    }
+
+    #[test]
+    fn test_node_is_querier() {
+        let mut node = Node::default();
+
+        // Test with All role
+        node.role = vec![Role::All];
+        assert!(node.is_querier());
+
+        // Test with Querier role
+        node.role = vec![Role::Querier];
+        assert!(node.is_querier());
+
+        // Test with Ingester role (should be false)
+        node.role = vec![Role::Ingester];
+        assert!(!node.is_querier());
+    }
+
+    #[test]
+    fn test_node_role_checks() {
+        let mut node = Node::default();
+
+        // Test router
+        node.role = vec![Role::Router];
+        assert!(node.is_router());
+        assert!(!node.is_compactor());
+
+        // Test compactor
+        node.role = vec![Role::Compactor];
+        assert!(node.is_compactor());
+        assert!(!node.is_router());
+
+        // Test alert manager
+        node.role = vec![Role::AlertManager];
+        assert!(node.is_alert_manager());
+
+        // Test script server
+        node.role = vec![Role::ScriptServer];
+        assert!(node.is_script_server());
+
+        // Test flatten compactor
+        node.role = vec![Role::FlattenCompactor];
+        assert!(node.is_flatten_compactor());
+    }
 }

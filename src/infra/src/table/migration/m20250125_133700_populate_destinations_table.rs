@@ -240,28 +240,6 @@ mod destinations {
 
     impl ActiveModelBehavior for ActiveModel {}
 
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    pub struct Destination {
-        pub id: String,
-        pub org_id: String,
-        pub name: String,
-        pub module: Module,
-    }
-
-    #[derive(Serialize, Debug, Deserialize, Clone)]
-    #[serde(rename_all = "snake_case")]
-    pub enum Module {
-        Alert {
-            template_id: String,
-            destination_type: DestinationType,
-        },
-        Pipeline {
-            pipeline_id: String,
-            endpoint: Endpoint,
-        },
-    }
-
     #[derive(Serialize, Debug, Deserialize, Clone)]
     #[serde(tag = "type")]
     #[serde(rename_all = "snake_case")]

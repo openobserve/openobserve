@@ -29,6 +29,7 @@ pub struct CheckoutSessionDetailRequestQuery {
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct ListInvoicesResponseBody {
+    #[schema(value_type = Vec<utoipa::openapi::Object>)]
     pub invoices: Vec<cloud_billings::StripeInvoice>,
 }
 

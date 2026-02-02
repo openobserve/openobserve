@@ -20,6 +20,8 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 };
 use tonic::{Response, Status};
 
+use crate::common::meta::ingestion::IngestUser;
+
 #[derive(Default)]
 pub struct MetricsIngester;
 
@@ -47,10 +49,21 @@ impl MetricsService for MetricsIngester {
             return Err(Status::invalid_argument(msg));
         }
 
+        let user_email = metadata
+            .get("user_id")
+            .and_then(|id| id.to_str().ok())
+            .unwrap_or_else(|| {
+                log::warn!("[gRPC Metrics] user_id not found in metadata, using empty string");
+                ""
+            });
+
+        let user = IngestUser::from_user_email(user_email);
+
         let resp = crate::service::metrics::otlp::handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
             OtlpRequestType::Grpc,
+            user,
         )
         .await;
         if resp.is_ok() {

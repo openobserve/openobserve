@@ -3,9 +3,9 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-export COVERAGE_FUNCTIONS=${COVERAGE_FUNCTIONS:-63}
-export COVERAGE_LINES=${COVERAGE_LINES:-60}
-export COVERAGE_REGIONS=${COVERAGE_REGIONS:-58}
+export COVERAGE_FUNCTIONS=${COVERAGE_FUNCTIONS:-66}
+export COVERAGE_LINES=${COVERAGE_LINES:-66}
+export COVERAGE_REGIONS=${COVERAGE_REGIONS:-65}
 
 usage() {
     cat <<EOF
@@ -30,10 +30,12 @@ _cov_test() {
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
+        --no-cfg-coverage \
+        --no-cfg-coverage-nightly \
         --ignore-filename-regex 'job|.*generated.*' \
         --test-threads=1 \
         --no-fail-fast \
-        --retries 3 \
+        --retries 1 \
         "$@"
 }
 

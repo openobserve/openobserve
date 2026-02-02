@@ -16,13 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
-    <div v-if="!showAddDialog" style="height: calc(100vh - 112px); overflow-y: auto;">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
+    <div v-if="!showAddDialog" >
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
             <div
-              class="col q-table__title items-start"
+              class="q-table__title tw:font-[600]"
               data-test="cipher-keys-list-title"
             >
               {{ t("cipherKey.header") }}
@@ -30,23 +29,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="col-auto flex">
               <q-input
                 v-model="filterQuery"
-                filled
+                borderless
                 dense
-                class="q-ml-none"
-                style="width: 400px"
+                class="q-ml-auto no-border o2-search-input"
                 :placeholder="t('cipherKey.search')"
-                clearable
               >
                 <template #prepend>
-                  <q-icon name="search" />
+                  <q-icon class="o2-search-input-icon" name="search" />
                 </template>
               </q-input>
               <q-btn
-                class="text-bold no-border q-ml-md"
-                padding="sm lg"
-                color="secondary"
+                class="o2-primary-button q-ml-sm tw:h-[36px]"
                 no-caps
-                dense
+                flat
                 :label="t(`cipherKey.add`)"
                 @click="addCipherKey"
               />
@@ -54,16 +49,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       <q-table
         ref="qTable"
-        :rows="tabledata"
+        :rows="visibleRows"
         :columns="columns"
-        row-key="id"
+        row-key="name"
+        selection="multiple"
+        v-model:selected="selectedKeys"
         :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        class="o2-quasar-table"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        :style="hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
+            : 'width: 100%'"
       >
         <template #no-data><NoData /></template>
+        <template v-slot:body-selection="scope">
+          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+        </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
@@ -92,31 +92,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </q-td>
         </template>
-        <template #top="scope">
-          <div class="row full-width">
+        <template #bottom="scope">
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+              {{ resultTotal }} {{ t('cipherKey.header') }}
+            </div>
+            <q-btn
+              v-if="selectedKeys.length > 0"
+              data-test="cipher-keys-list-delete-keys-btn"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              no-caps
+              dense
+              @click="openBulkDeleteDialog"
+            >
+              <q-icon name="delete" size="16px" />
+              <span class="tw:ml-2">Delete</span>
+            </q-btn>
             <QTablePagination
               :scope="scope"
-              :pageTitle="t('cipherKey.header')"
               :resultTotal="resultTotal"
               :perPageOptions="perPageOptions"
-              position="top"
+              position="bottom"
               @update:changeRecordPerPage="changePagination"
             />
           </div>
         </template>
-
-        <template #bottom="scope">
-          <QTablePagination
-            v-if="resultTotal > 0"
-            :scope="scope"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            position="bottom"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
         <template v-slot:header="props">
             <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th v-if="columns.length > 0" auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
+                />
+              </q-th>
+
               <!-- Render the table headers -->
               <q-th
                 v-for="col in props.cols"
@@ -142,10 +159,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
   />
+
+  <ConfirmDialog
+    title="Delete Cipher Keys"
+    :message="`Are you sure you want to delete ${selectedKeys.length} cipher key(s)?`"
+    @update:ok="bulkDeleteCipherKeys"
+    @update:cancel="confirmBulkDelete = false"
+    v-model="confirmBulkDelete"
+  />
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated, watch, Ref } from "vue";
+import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard, QTableProps } from "quasar";
@@ -178,6 +203,7 @@ export default defineComponent({
     const showAddDialog = ref(false);
     const qTable: any = ref(null);
     const loading = ref(false);
+    const filterQuery = ref("");
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -236,6 +262,8 @@ export default defineComponent({
       visible: boolean;
       data: any;
     }> = ref({ visible: false, data: null });
+    const selectedKeys: Ref<any[]> = ref([]);
+    const confirmBulkDelete = ref(false);
 
     watch(
       () => router.currentRoute.value.query?.action,
@@ -393,6 +421,73 @@ export default defineComponent({
       confirmDelete.value.visible = false;
       confirmDelete.value.data = null;
     };
+    const filterData = (rows: string | any[], terms: string) => {
+        const filtered = [];
+        terms = terms.toLowerCase();
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i]["name"].toLowerCase().includes(terms)) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return tabledata.value || [];
+      return filterData(tabledata.value || [], filterQuery.value);
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
+
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteCipherKeys = () => {
+      const keyNames = selectedKeys.value.map((key: any) => key.name);
+
+      CipherKeysService.bulkDelete(store.state.selectedOrganization.identifier, { ids: keyNames })
+        .then((res) => {
+          const { successful, unsuccessful } = res.data;
+
+          if (successful.length > 0 && unsuccessful.length === 0) {
+            $q.notify({
+              type: "positive",
+              message: `Successfully deleted ${successful.length} cipher key(s)`,
+              timeout: 2000,
+            });
+          } else if (successful.length > 0 && unsuccessful.length > 0) {
+            $q.notify({
+              type: "warning",
+              message: `Deleted ${successful.length} cipher key(s), but ${unsuccessful.length} failed`,
+              timeout: 3000,
+            });
+          } else if (unsuccessful.length > 0) {
+            $q.notify({
+              type: "negative",
+              message: `Failed to delete ${unsuccessful.length} cipher key(s)`,
+              timeout: 2000,
+            });
+          }
+
+          selectedKeys.value = [];
+          confirmBulkDelete.value = false;
+          getData();
+        })
+        .catch((err: any) => {
+          if (err.response?.status != 403 || err?.status != 403) {
+            $q.notify({
+              type: "negative",
+              message: err.response?.data?.message || err?.message || "Error while deleting cipher keys",
+              timeout: 2000,
+            });
+          }
+        });
+    };
 
     return {
       t,
@@ -411,17 +506,7 @@ export default defineComponent({
       selectedPerPage,
       changePagination,
       maxRecordToReturn,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
       hideAddDialog,
       cancelDeleteCipherKey,
       confirmDeleteCipherKey,
@@ -429,6 +514,13 @@ export default defineComponent({
       outlinedDelete,
       editCipherKey,
       deleteCipherKey,
+      visibleRows,
+      hasVisibleRows,
+      filterData,
+      selectedKeys,
+      confirmBulkDelete,
+      openBulkDeleteDialog,
+      bulkDeleteCipherKeys,
     };
   },
 });

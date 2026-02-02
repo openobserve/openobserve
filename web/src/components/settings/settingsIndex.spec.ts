@@ -85,7 +85,7 @@ const mockI18n = createI18n({
         queryManagement: 'Query Management',
         cipherKeys: 'Cipher Keys',
         nodes: 'Nodes',
-        ssoDomainRestrictions: 'SSO Domain Restrictions',
+        ssoDomainRestrictions: 'SSO Management',
         organizationManagement: 'Organization Management',
       },
       alert_destinations: {

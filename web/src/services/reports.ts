@@ -59,6 +59,9 @@ const reports = {
       `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
     );
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/reports/bulk`, { data });
+  },
   triggerReport: (org_identifier: string, reportName: string) => {
     return http().put(
       `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`,

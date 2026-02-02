@@ -46,7 +46,7 @@ pub struct Model {
 
 fn get_text_type() -> DynIden {
     let txt_type = crate::table::migration::get_text_type();
-    SeaRc::new(Alias::new(&txt_type))
+    SeaRc::new(Alias::new(txt_type))
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]

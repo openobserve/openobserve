@@ -43,6 +43,9 @@ const jstransform = {
     const config = force ? { params: { force: true } } : {};
     return http().delete(url, config);
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/functions/bulk`, { data });
+  },
   create_with_index: (
     org_identifier: string,
     stream_name: string,
@@ -104,6 +107,27 @@ const jstransform = {
     return http({ headers: { "Content-Type": "multipart/form-data" } }).post(
       `/api/${org_identifier}/enrichment_tables/${table_name}?append=${append}`,
       data,
+    );
+  },
+  create_enrichment_table_from_url: (
+    org_identifier: string,
+    table_name: string,
+    url: string,
+    append_data: boolean,
+    resume: boolean = false,
+    retry: boolean = false,
+    replace_failed: boolean = false,
+  ) => {
+    return http().post(
+      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=${resume}&retry=${retry}`,
+      { url, replace_failed },
+    );
+  },
+  get_all_enrichment_table_statuses: (
+    org_identifier: string,
+  ) => {
+    return http().get(
+      `/api/${org_identifier}/enrichment_tables/status`,
     );
   },
   test: (org_identifier: string, data: TestFunctionPayload) => {

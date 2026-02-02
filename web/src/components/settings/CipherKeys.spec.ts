@@ -668,23 +668,6 @@ describe("CipherKeys", () => {
     });
   });
 
-  describe("Theme support", () => {
-    it("should apply light theme classes", () => {
-      mockStore.state.theme = "light";
-      const wrapper = createWrapper();
-      
-      const header = wrapper.find(".tw-flex.tw-justify-between.tw-items-center");
-      expect(header.classes()).toContain("o2-table-header-light");
-    });
-
-    it("should apply dark theme classes", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = createWrapper();
-      
-      const header = wrapper.find(".tw-flex.tw-justify-between.tw-items-center");
-      expect(header.classes()).toContain("o2-table-header-dark");
-    });
-  });
 
   describe("Router query handling", () => {
     it("should show add dialog when query action is add", async () => {

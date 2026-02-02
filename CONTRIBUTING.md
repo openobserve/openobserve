@@ -4,7 +4,7 @@
 
 ### Prerequisite
 
-OpenObserve uses Rust & embdeds sled db (For server) & VueJS (For Web UI)
+OpenObserve uses Rust & embdeds sqlite (For server) & VueJS (For Web UI)
 
 You must have following installed:
 

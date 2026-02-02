@@ -16,17 +16,19 @@ class EnrichmentPage {
         // Navigation locators
         this.pipelineMenuItem = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = '[data-test="function-enrichment-table-tab"]';
+        this.enrichmentTablesSearchInput = '[data-test="enrichment-tables-search-input"]';
         
         // Logs table locators
         this.timestampColumn = '[data-test="log-table-column-0-_timestamp"]';
         this.closeDialog = '[data-test="close-dialog"]';
         this.expandMenu = '[data-test="table-row-expand-menu"]';
-        this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword-text"]';
+        this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword"]';
         this.dateTimeBtn = '[data-test="date-time-btn"]';
         
         // VRL editor locator
         this.vrlEditor = '#fnEditor';
         this.refreshButton = "[data-test='logs-search-bar-refresh-btn']";
+        this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"] div';
         
         // Table and validation locators
         this.tableRows = 'tbody tr';
@@ -39,12 +41,122 @@ class EnrichmentPage {
         // Append data locators
         this.enrichmentTablesButton = 'Enrichment Tables';
         this.appendDataToggle = 'Append data to existing';
+
+        // UI Regression locators
+        this.enrichmentTabText = 'text=/enrichment.*table/i';
+        this.quasarTable = '.o2-quasar-table';
+        this.helpMenuItem = '[data-test="menu-link-help-item"]';
+        this.openApiMenuItem = 'text=/openapi/i';
+    }
+
+    // ============================================================================
+    // REGRESSION TEST POM METHODS
+    // ============================================================================
+
+    /**
+     * Click the enrichment tab by text pattern
+     * @returns {Promise<boolean>} True if click succeeded
+     */
+    async clickEnrichmentTabByText() {
+        const enrichmentTab = this.page.locator(this.enrichmentTabText).first();
+        const isVisible = await enrichmentTab.isVisible().catch(() => false);
+        if (isVisible) {
+            await enrichmentTab.click();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if enrichment tab text is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isEnrichmentTabVisible() {
+        const enrichmentTab = this.page.locator(this.enrichmentTabText).first();
+        return await enrichmentTab.isVisible().catch(() => false);
+    }
+
+    /**
+     * Check if enrichment tables search input is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isEnrichmentSearchInputVisible() {
+        const searchInput = this.page.locator(this.enrichmentTablesSearchInput);
+        return await searchInput.isVisible().catch(() => false);
+    }
+
+    /**
+     * Get the quasar table bounding box if visible
+     * @returns {Promise<{width: number, height: number}|null>} Bounding box or null
+     */
+    async getQuasarTableDimensions() {
+        const table = this.page.locator(this.quasarTable).first();
+        const isVisible = await table.isVisible().catch(() => false);
+        if (isVisible) {
+            return await table.boundingBox();
+        }
+        return null;
+    }
+
+    /**
+     * Check if quasar table is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isQuasarTableVisible() {
+        const table = this.page.locator(this.quasarTable).first();
+        return await table.isVisible().catch(() => false);
+    }
+
+    /**
+     * Take screenshot of quasar table
+     * @param {string} filename - The filename to save screenshot
+     */
+    async screenshotQuasarTable(filename) {
+        const table = this.page.locator(this.quasarTable).first();
+        if (await table.isVisible().catch(() => false)) {
+            await table.screenshot({ path: filename });
+        }
+    }
+
+    /**
+     * Click help menu item
+     */
+    async clickHelpMenuItem() {
+        const helpButton = this.page.locator(this.helpMenuItem);
+        await helpButton.waitFor({ state: 'visible', timeout: 10000 });
+        await helpButton.click();
+    }
+
+    /**
+     * Click OpenAPI menu item if visible
+     * @returns {Promise<boolean>} True if click succeeded
+     */
+    async clickOpenApiMenuItemIfVisible() {
+        const openApiMenuItem = this.page.locator(this.openApiMenuItem).first();
+        const isVisible = await openApiMenuItem.isVisible().catch(() => false);
+        if (isVisible) {
+            await openApiMenuItem.click();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if OpenAPI menu item is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isOpenApiMenuItemVisible() {
+        const openApiMenuItem = this.page.locator(this.openApiMenuItem).first();
+        return await openApiMenuItem.isVisible().catch(() => false);
     }
 
     // Navigation Methods
     async navigateToEnrichmentTable() {
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.locator(this.enrichmentTableTab).click();
+        await this.page.waitForLoadState('networkidle');
+        // Wait for the enrichment tables list to be visible
+        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async navigateToAddEnrichmentTable() {
@@ -64,6 +176,12 @@ class EnrichmentPage {
         // Click on 'Save'
         await this.page.getByText(this.saveButton).click({ force: true });
         await this.page.waitForLoadState('networkidle');
+
+        // Wait for the form to disappear (indicates save completed and returned to list)
+        await this.page.getByText('Add Enrichment Table').waitFor({ state: 'hidden', timeout: 15000 });
+
+        // Additional wait for page to stabilize
+        await this.page.waitForTimeout(2000);
     }
 
     async searchForEnrichmentTable(fileName) {
@@ -129,7 +247,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             });
             
             // Get textbox using the original working approach
-            const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
+            const textbox = this.page.locator(this.vrlEditor).locator('.inputarea');
             await textbox.waitFor({ state: 'visible', timeout: 15000 });
             
             // Fill the VRL query
@@ -198,15 +316,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForLoadState('networkidle');
-        
+        await this.page.waitForLoadState('networkidle', { timeout: 60000 });
+        await this.page.waitForTimeout(1000);
+
         // Additional run query clicks to ensure VRL enrichment is fully processed
         const refreshButton = this.page.locator(this.refreshButton);
         if (await refreshButton.isVisible()) {
             for (let i = 0; i < 3; i++) {
                 await refreshButton.click({ force: true });
                 await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForLoadState('networkidle', { timeout: 2000 });
+                await this.page.waitForTimeout(2000);
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 });
             }
         }
         
@@ -396,14 +516,33 @@ abc, err = get_enrichment_table_record("${fileName}", {
         }
         
         // Wait for VRL editor to appear after potential URL modification
-        await this.page.waitForSelector(this.vrlEditor, { 
-            state: 'visible',
-            timeout: 15000 
-        });
+        try {
+            await this.page.waitForSelector(this.vrlEditor, {
+                state: 'visible',
+                timeout: 3000
+            });
+        } catch (error) {
+            testLogger.warn('VRL editor not visible, clicking show query toggle button');
+
+            // Click the show query toggle button to reveal the VRL editor
+            await this.page.locator(this.showQueryToggleBtn).nth(1).click({ force: true });
+            await this.page.waitForTimeout(1000);
+
+            // Retry waiting for VRL editor
+            await this.page.waitForSelector(this.vrlEditor, {
+                state: 'visible',
+                timeout: 10000
+            });
+            testLogger.debug('VRL editor visible after clicking toggle button');
+        }
         
         const vrlEditorExists = await this.page.locator('#fnEditor').count();
         testLogger.debug('VRL Editor count after URL logic', { vrlEditorExists });
-        
+
+        // Wait for enrichment table to be fully indexed and available for querying
+        testLogger.debug('Waiting for enrichment table to be ready for VRL queries');
+        await this.page.waitForTimeout(5000);
+
         // Now proceed with VRL processing
         await this.fillVRLQuery(fileName);
 
@@ -412,6 +551,36 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Apply query with multiple clicks for VRL test reliability
         await this.applyQueryMultipleClicks();
+
+        // Wait for query results to load
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+
+        // Check if error occurred and retry with additional wait
+        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
+        if (await errorDetailsBtn.isVisible()) {
+            testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
+
+            // Wait additional 5 seconds for enrichment table to be fully ready
+            await this.page.waitForTimeout(5000);
+
+            // Retry the query
+            await this.applyQueryMultipleClicks();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForTimeout(2000);
+
+            // Check again if error persists
+            if (await errorDetailsBtn.isVisible()) {
+                testLogger.error('Error persists after retry, capturing details');
+                await errorDetailsBtn.click();
+                await this.page.waitForTimeout(1000);
+                await this.page.screenshot({ path: 'test-results/error-details-vrl-enrichment.png', fullPage: true });
+                testLogger.error('Error details screenshot saved to test-results/error-details-vrl-enrichment.png');
+                throw new Error('VRL query execution failed after retry - check test-results/error-details-vrl-enrichment.png for details');
+            } else {
+                testLogger.info('VRL query succeeded after retry');
+            }
+        }
 
         // Verify that no warning is shown for query execution
         await this.verifyNoQueryWarning();
@@ -502,6 +671,103 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async testCSVValidationError() {
         await this.attemptSaveWithoutFile('test');
+    }
+
+    async attemptSaveWithoutName(filePath) {
+        // Upload file WITHOUT entering name
+        const inputFile = await this.page.locator(this.fileInput);
+        await inputFile.setInputFiles(filePath);
+
+        // Click save without entering name
+        await this.page.getByRole('button', { name: this.saveButton }).click();
+
+        // Wait for and verify error message
+        await this.page.getByText('Field is required!').waitFor({ state: 'visible' });
+    }
+
+    async clickCancelButton() {
+        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifyBackOnEnrichmentList() {
+        // Verify we're back on enrichment tables list page by checking for unique element
+        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible' });
+    }
+
+    async searchEnrichmentTableInList(tableName) {
+        // Wait for page to stabilize
+        await this.page.waitForLoadState('networkidle');
+
+        // Use getByPlaceholder which works reliably with Quasar q-input components
+        // Directly wait for search input instead of title - search input visibility indicates page is ready
+        const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
+        await searchInput.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Fill the search input with table name to filter results
+        await searchInput.fill(tableName);
+        await this.page.waitForLoadState('networkidle');
+
+        // Wait for filtered results to appear - look for table row containing the searched name
+        const tableRow = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await tableRow.first().waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    async verifyTableVisibleInList(tableName) {
+        const exploreBtn = this.page.locator(`[data-test="${tableName}-explore-btn"]`);
+        await expect(exploreBtn).toBeVisible();
+    }
+
+    async clickSchemaButton(tableName) {
+        // Find the row with the table and click schema button (2nd button, list_alt icon)
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
+        await row.locator('button').nth(1).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifySchemaModalVisible() {
+        await this.page.locator('[data-test="schema-title-text"]').waitFor({ state: 'visible' });
+    }
+
+    async clickEditButton(tableName) {
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
+        await row.locator('button').nth(2).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifyUpdateMode() {
+        await this.page.getByText('Update Enrichment Table').waitFor({ state: 'visible' });
+    }
+
+    async verifyNameFieldDisabled() {
+        const nameInput = this.page.locator(this.fileNameInput);
+        // Check if the input is disabled using Playwright's built-in method
+        await expect(nameInput).toBeDisabled();
+    }
+
+    async clickDeleteButton(tableName) {
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
+        await row.locator('button').nth(3).click();
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    async verifyDeleteConfirmationDialog() {
+        // Use more specific selector to avoid duplicate text - look for the dialog container
+        await this.page.locator('.q-dialog').getByText('Delete Enrichment Table', { exact: true }).first().waitFor({ state: 'visible' });
+        await this.page.getByText('Are you sure you want to delete enrichment table?').waitFor({ state: 'visible' });
+    }
+
+    async clickDeleteCancel() {
+        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    async clickDeleteOK() {
+        await this.page.getByRole('button', { name: 'OK' }).click();
+        await this.page.waitForLoadState('networkidle');
     }
 }
 

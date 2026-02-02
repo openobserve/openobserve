@@ -137,3 +137,24 @@ export interface StreamingErrorResponse {
   code?: number;
   error_detail?: string;
 }
+
+// PromQL HTTP2 Streaming interfaces
+export interface PromQLStreamingPayload {
+  queryReq: PromQLQueryPayload;
+  type: "promql";
+  traceId: string;
+  org_id: string;
+  meta?: any;
+}
+
+export interface PromQLQueryPayload {
+  query: string;
+  start_time: number;
+  end_time: number;
+  step: string;
+}
+
+export interface PromQLStreamingResponse {
+  result_type: string; // "vector" or "matrix"
+  result: any; // PromQL result data
+}

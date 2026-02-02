@@ -27,12 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
-          v-close-popup="true"
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+        <q-icon
           data-test="dashboard-settings-close-btn"
+          name="cancel"
+          class="cursor-pointer tw:mr-5"
+          size="20px"
+          v-close-popup="true"
         />
       </div>
     </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-sm q-my-sm scroll" style="width: 50vw">
+        <div class="q-mx-sm q-my-sm scroll" style="width: 60vw">
           <q-tab-panels
             v-model="activeTab"
             animated
@@ -179,11 +179,25 @@ export default defineComponent({
           }
         }
         &--active {
-          background-color: $accent;
-          color: $dark;
+          color: var(--o2-tab-text-color);
+          background-color: var(--o2-tab-bg);
         }
       }
     }
   }
+}
+
+:deep(.q-splitter__before) {
+  border-right: 1px solid $border-color;
+}
+
+.dark-mode {
+  :deep(.q-splitter__before) {
+    border-right-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+:deep(.q-splitter__separator) {
+  display: none !important;
 }
 </style>

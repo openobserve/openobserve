@@ -22,11 +22,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     match temp_msg {
         TemplateMessage::Put { temp } => {
             infra::table::templates::put(temp).await?;
-            infra::cluster_coordinator::destinations::emit_put_event(&event_key).await?;
+            infra::coordinator::destinations::emit_put_event(&event_key).await?;
         }
         TemplateMessage::Delete { org_id, dest_name } => {
             infra::table::templates::delete(&org_id, &dest_name).await?;
-            infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
+            infra::coordinator::destinations::emit_delete_event(&event_key).await?;
         }
     }
     Ok(())

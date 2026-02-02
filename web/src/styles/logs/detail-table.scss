@@ -1,0 +1,74 @@
+.searchdetaildialog {
+  width: 85vw;
+}
+
+.q-item__section {
+  word-break: break-all;
+}
+
+.indexDetailsContainer .q-list .q-item {
+  height: auto;
+  min-height: fit-content;
+  padding: 2px 8px;
+}
+
+.indexDetailsContainer .q-list .q-item .q-item__section {
+  padding: 2px 8px !important;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.indexDetailsContainer {
+  .log_json_content {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+  }
+}
+
+.q-icon {
+  cursor: pointer;
+}
+
+.table-pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  display: inline;
+  font-weight: normal;
+  font-family: monospace;
+  margin: 0;
+  padding: 0;
+}
+
+.json-pre {
+  height: calc(100vh - 290px);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.tab-panels-container {
+  height: calc(100vh - 198px);
+}
+
+.detail-table-list {
+  height: calc(100vh - 290px);
+}
+
+// Add vertical borders between columns for detail table
+.searchdetaildialog .o2-schema-table {
+  :deep(thead th) {
+    border-right: 1px solid var(--o2-border-color) !important;
+
+    &:last-child {
+      border-right: none !important;
+    }
+  }
+
+  tbody td {
+    border-right: 1px solid var(--o2-border-color) !important;
+
+    &:last-child {
+      border-right: none !important;
+    }
+  }
+}

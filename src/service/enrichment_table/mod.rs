@@ -20,6 +20,7 @@ use actix_web::{
     HttpResponse,
     http::{self, StatusCode},
 };
+use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
@@ -27,7 +28,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::stream::StreamType,
-    utils::{flatten::format_key, json, time::BASE_TIME},
+    utils::{flatten::format_key, json, schema::infer_json_schema_from_map, time::BASE_TIME},
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashSet;
@@ -44,14 +45,17 @@ use crate::{
     handler::http::router::ERROR_HEADER,
     service::{
         db,
+        enrichment::storage::Values,
         format_stream_name,
-        // ingestion::write_file,
-        schema::{check_for_schema, stream_schema_exists},
-        // self_reporting::report_request_usage_stats,
+        schema::{check_for_schema, stream_schema_exists}, /* self_reporting::report_request_usage_stats, */
     },
 };
 
 pub mod geoip;
+pub mod url_processor;
+
+// Re-export the initialization function for easy access
+pub use url_processor::init_url_processor;
 
 pub async fn save_enrichment_data(
     org_id: &str,
@@ -66,7 +70,7 @@ pub async fn save_enrichment_data(
     // let mut hour_key = String::new();
     // let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let table_name = table_name.trim();
-    let stream_name = &format_stream_name(table_name);
+    let stream_name = format_stream_name(table_name.to_string());
 
     if !LOCAL_NODE.is_ingester() {
         return Ok(HttpResponse::InternalServerError()
@@ -81,7 +85,7 @@ pub async fn save_enrichment_data(
     if db::compact::retention::is_deleting_stream(
         org_id,
         StreamType::EnrichmentTables,
-        stream_name,
+        &stream_name,
         None,
     ) {
         return Ok(HttpResponse::BadRequest()
@@ -110,7 +114,7 @@ pub async fn save_enrichment_data(
     }
 
     let current_size_in_bytes = if append_data {
-        db::enrichment_table::get_table_size(org_id, stream_name).await
+        db::enrichment_table::get_table_size(org_id, &stream_name).await
     } else {
         // If we are not appending data, we do not need to check the current size
         // we will simply use the payload size to check if it exceeds the max size
@@ -140,7 +144,7 @@ pub async fn save_enrichment_data(
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::EnrichmentTables,
         &mut stream_schema_map,
     )
@@ -151,12 +155,12 @@ pub async fn save_enrichment_data(
         let now = Utc::now().timestamp_micros();
         delete_enrichment_table(
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::EnrichmentTables,
             (start_time, now),
         )
         .await;
-        stream_schema_map.remove(stream_name);
+        stream_schema_map.remove(&stream_name);
     }
 
     let mut records = vec![];
@@ -181,11 +185,33 @@ pub async fn save_enrichment_data(
     for record in records.iter() {
         record_vals.push(record.as_object().unwrap());
     }
-    // check for schema evolution
 
+    // disallow schema change for enrichment tables
+    let value_iter = record_vals.iter().take(1).cloned().collect::<Vec<_>>();
+    let inferred_schema =
+        infer_json_schema_from_map(value_iter.into_iter(), StreamType::EnrichmentTables)
+            .map_err(|_e| std::io::Error::other("Error inferring schema"))?;
+    let db_schema = stream_schema_map
+        .get(&stream_name)
+        .map(|s| s.schema().as_ref().clone())
+        .unwrap_or(Schema::empty());
+    if !db_schema.fields().is_empty() && db_schema.fields().ne(inferred_schema.fields()) {
+        log::error!("Schema mismatch for enrichment table {org_id}/{stream_name}");
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((
+                ERROR_HEADER,
+                format!("Schema mismatch for enrichment table {org_id}/{stream_name}"),
+            ))
+            .json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Schema mismatch for enrichment table {org_id}/{stream_name}"),
+            )));
+    }
+
+    // check for schema evolution
     let _ = check_for_schema(
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::EnrichmentTables,
         &mut stream_schema_map,
         record_vals,
@@ -202,23 +228,13 @@ pub async fn save_enrichment_data(
     }
 
     let schema = stream_schema_map
-        .get(stream_name)
+        .get(&stream_name)
         .unwrap()
         .schema()
         .as_ref()
         .clone()
         .with_metadata(HashMap::new());
     let schema = Arc::new(schema);
-    // let schema_key = schema.hash_key();
-    // buf.insert(
-    //     hour_key,
-    //     SchemaRecords {
-    //         schema_key,
-    //         schema: schema.clone(),
-    //         records,
-    //         records_size,
-    //     },
-    // );
 
     // If data size is less than the merge threshold, we can store it in the database
     let merge_threshold_mb = crate::service::enrichment::storage::remote::get_merge_threshold_mb()
@@ -227,7 +243,7 @@ pub async fn save_enrichment_data(
     if (records_size as f64) < merge_threshold_mb * SIZE_IN_MB {
         if let Err(e) = crate::service::enrichment::storage::database::store(
             org_id,
-            stream_name,
+            &stream_name,
             &records,
             timestamp,
         )
@@ -248,7 +264,7 @@ pub async fn save_enrichment_data(
         // If data size is greater than the merge threshold, we can store it directly to s3
         if let Err(e) = crate::service::enrichment::storage::remote::store(
             org_id,
-            stream_name,
+            &stream_name,
             &records,
             timestamp,
         )
@@ -259,39 +275,18 @@ pub async fn save_enrichment_data(
     }
 
     // write data to local cache
-    if let Err(e) =
-        crate::service::enrichment::storage::local::store(org_id, stream_name, &records, timestamp)
-            .await
+    if let Err(e) = crate::service::enrichment::storage::local::store(
+        org_id,
+        &stream_name,
+        Values::Json(std::sync::Arc::new(records)),
+        timestamp,
+    )
+    .await
     {
         log::error!("Error writing enrichment table to local cache: {e}");
     }
 
-    // write data to s3
-    // crate::service::enrichment::storage::s3::store(org_id, stream_name, records,
-    // timestamp).await?;
-
-    // write data to wal
-    // let writer = ingester::get_writer(
-    //     0,
-    //     org_id,
-    //     StreamType::EnrichmentTables.as_str(),
-    //     stream_name,
-    // )
-    // .await;
-    // let mut req_stats =
-    //     match write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await {
-    //         Ok(stats) => stats,
-    //         Err(e) => {
-    //             return Ok(HttpResponse::InternalServerError()
-    //                 .append_header((ERROR_HEADER, format!("Error writing enrichment table:
-    // {e}")))                 .json(MetaHttpResponse::error(
-    //                     http::StatusCode::INTERNAL_SERVER_ERROR,
-    //                     format!("Error writing enrichment table: {e}"),
-    //                 )));
-    //         }
-    //     };
-
-    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
+    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, &stream_name)
         .await
         .unwrap_or_default();
 
@@ -300,36 +295,23 @@ pub async fn save_enrichment_data(
     }
     if enrich_meta_stats.start_time == 0 {
         enrich_meta_stats.start_time =
-            db::enrichment_table::get_start_time(org_id, stream_name).await;
+            db::enrichment_table::get_start_time(org_id, &stream_name).await;
     }
     enrich_meta_stats.end_time = timestamp;
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
-    let _ =
-        db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
+    let _ = db::enrichment_table::update_meta_table_stats(org_id, &stream_name, enrich_meta_stats)
+        .await;
 
     // notify update
     if !schema.fields().is_empty()
-        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await
+        && let Err(e) = super::db::enrichment_table::notify_update(org_id, &stream_name).await
     {
         log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }
 
-    // req_stats.response_time = start.elapsed().as_secs_f64();
     log::info!("save enrichment data to: {org_id}/{table_name}/{append_data} success with stats");
-
-    // metric + data usage
-    // report_request_usage_stats(
-    //     req_stats,
-    //     org_id,
-    //     stream_name,
-    //     StreamType::Logs,
-    //     UsageType::EnrichmentTable,
-    //     0,
-    //     started_at,
-    // )
-    // .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK,
@@ -358,7 +340,7 @@ pub async fn delete_enrichment_table(
     }
 
     if let Err(e) = delete_from_file_list(org_id, stream_type, stream_name, time_range).await {
-        log::error!("Error deleting enrichment table from file list: {}", e);
+        log::error!("Error deleting enrichment table from file list: {e}");
     }
 
     // delete stream schema cache
@@ -479,6 +461,11 @@ pub async fn cleanup_enrichment_table_resources(
         log::error!("Error deleting enrichment table: {e}");
     }
 
+    // delete URL job record if it exists
+    if let Err(e) = db::enrichment_table::delete_url_job(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table URL job: {e}");
+    }
+
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);
     log::info!("deleted enrichment table  {stream_name}");
@@ -498,7 +485,7 @@ pub async fn delete_from_file_list(
     )
     .await
     .map_err(|e| {
-        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {}", e);
+        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
         e
     })?;
 
@@ -522,10 +509,7 @@ pub async fn delete_from_file_list(
             .await
             {
                 log::error!(
-                    "[ENRICHMENT_TABLE] Error broadcasting enrichment table {}/{} file list delete event: {}",
-                    org_id,
-                    stream_name,
-                    e
+                    "[ENRICHMENT_TABLE] Error broadcasting enrichment table {org_id}/{stream_name} file list delete event: {e}"
                 );
             }
             // let _ = o2_enterprise::enterprise::super_cluster::queue::file_list_delete(
@@ -536,4 +520,382 @@ pub async fn delete_from_file_list(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use actix_multipart::Multipart;
+    use actix_web::test;
+    use bytes::Bytes;
+    use futures::stream;
+
+    use super::*;
+
+    // Helper function to create a mock Multipart from CSV data
+    fn create_multipart_from_csv(csv_data: &str, filename: &str) -> Multipart {
+        let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+        let mut body = Vec::new();
+
+        // Create multipart form data
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        body.extend_from_slice(
+            format!("Content-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n")
+                .as_bytes(),
+        );
+        body.extend_from_slice(b"Content-Type: text/csv\r\n\r\n");
+        body.extend_from_slice(csv_data.as_bytes());
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+
+        // Create a stream from the body
+        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
+
+        // Create HttpRequest with proper headers
+        let req = test::TestRequest::post()
+            .insert_header((
+                "content-type",
+                format!("multipart/form-data; boundary={boundary}"),
+            ))
+            .to_http_request();
+
+        Multipart::new(req.headers(), stream)
+    }
+
+    // Helper function to create empty multipart
+    fn create_empty_multipart() -> Multipart {
+        let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+        let body = format!("--{boundary}--\r\n");
+        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
+
+        let req = test::TestRequest::post()
+            .insert_header((
+                "content-type",
+                format!("multipart/form-data; boundary={boundary}"),
+            ))
+            .to_http_request();
+
+        Multipart::new(req.headers(), stream)
+    }
+
+    // Helper function to create multipart with field without filename
+    fn create_multipart_without_filename() -> Multipart {
+        let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+        let mut body = Vec::new();
+
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        body.extend_from_slice(b"Content-Disposition: form-data; name=\"field\"\r\n\r\n");
+        body.extend_from_slice(b"some value");
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+
+        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
+
+        let req = test::TestRequest::post()
+            .insert_header((
+                "content-type",
+                format!("multipart/form-data; boundary={boundary}"),
+            ))
+            .to_http_request();
+
+        Multipart::new(req.headers(), stream)
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_valid_csv_data() {
+        let csv_data = "name,age,city\nJohn,25,New York\nJane,30,Los Angeles\nBob,35,Chicago";
+        let multipart = create_multipart_from_csv(csv_data, "test.csv");
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 3);
+
+        // Check first record
+        assert_eq!(
+            records[0].get("name"),
+            Some(&json::Value::String("John".to_string()))
+        );
+        assert_eq!(
+            records[0].get("age"),
+            Some(&json::Value::String("25".to_string()))
+        );
+        assert_eq!(
+            records[0].get("city"),
+            Some(&json::Value::String("New York".to_string()))
+        );
+
+        // Check second record
+        assert_eq!(
+            records[1].get("name"),
+            Some(&json::Value::String("Jane".to_string()))
+        );
+        assert_eq!(
+            records[1].get("age"),
+            Some(&json::Value::String("30".to_string()))
+        );
+        assert_eq!(
+            records[1].get("city"),
+            Some(&json::Value::String("Los Angeles".to_string()))
+        );
+
+        // Check third record
+        assert_eq!(
+            records[2].get("name"),
+            Some(&json::Value::String("Bob".to_string()))
+        );
+        assert_eq!(
+            records[2].get("age"),
+            Some(&json::Value::String("35".to_string()))
+        );
+        assert_eq!(
+            records[2].get("city"),
+            Some(&json::Value::String("Chicago".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_headers_only_append_false() {
+        let csv_data = "name,age,city\n";
+        let multipart = create_multipart_from_csv(csv_data, "headers_only.csv");
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 1);
+
+        // Should create a record with empty values for each header
+        assert_eq!(
+            records[0].get("name"),
+            Some(&json::Value::String("".to_string()))
+        );
+        assert_eq!(
+            records[0].get("age"),
+            Some(&json::Value::String("".to_string()))
+        );
+        assert_eq!(
+            records[0].get("city"),
+            Some(&json::Value::String("".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_headers_only_append_true() {
+        let csv_data = "name,age,city\n";
+        let multipart = create_multipart_from_csv(csv_data, "headers_only.csv");
+
+        let result = extract_multipart(multipart, true).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 0); // Should return empty when append_data=true
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_empty_payload() {
+        let multipart = create_empty_multipart();
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_field_without_filename() {
+        let multipart = create_multipart_without_filename();
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 0); // Should skip fields without filename
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_malformed_csv() {
+        let csv_data = "name,age,city\nJohn,25\nJane,30,Los Angeles,Extra"; // Malformed CSV
+        let multipart = create_multipart_from_csv(csv_data, "malformed.csv");
+
+        let result = extract_multipart(multipart, false).await;
+
+        // Should handle malformed CSV gracefully - might return partial data or error
+        // The exact behavior depends on the CSV parser, but it shouldn't panic
+        match result {
+            Ok(records) => {
+                // If it succeeds, it should have processed what it could
+                // records.len() is always >= 0, so we just verify it's a valid result
+                let _ = records.len();
+            }
+            Err(_) => {
+                // If it fails, that's also acceptable for malformed data
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_headers_with_whitespace() {
+        let csv_data = " name , age , city \nJohn,25,New York";
+        let multipart = create_multipart_from_csv(csv_data, "whitespace.csv");
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 1);
+
+        // Headers should be trimmed and formatted
+        assert_eq!(
+            records[0].get("name"),
+            Some(&json::Value::String("John".to_string()))
+        );
+        assert_eq!(
+            records[0].get("age"),
+            Some(&json::Value::String("25".to_string()))
+        );
+        assert_eq!(
+            records[0].get("city"),
+            Some(&json::Value::String("New York".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_empty_records_included() {
+        let csv_data = "name,age,city\nJohn,25,New York\n,,\nJane,30,Los Angeles";
+        let multipart = create_multipart_from_csv(csv_data, "with_empty.csv");
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        // Should have 3 records (empty record is included)
+        assert_eq!(records.len(), 3);
+
+        assert_eq!(
+            records[0].get("name"),
+            Some(&json::Value::String("John".to_string()))
+        );
+        assert_eq!(
+            records[1].get("name"),
+            Some(&json::Value::String("".to_string()))
+        ); // Empty record
+        assert_eq!(
+            records[2].get("name"),
+            Some(&json::Value::String("Jane".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_single_column() {
+        let csv_data = "id\n1\n2\n3";
+        let multipart = create_multipart_from_csv(csv_data, "single_column.csv");
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 3);
+
+        for (i, record) in records.iter().enumerate() {
+            assert_eq!(
+                record.get("id"),
+                Some(&json::Value::String((i + 1).to_string()))
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_special_characters() {
+        let csv_data = "name,description\n\"John, Jr.\",\"A person with, commas\"\nJane,\"A person with \"\"quotes\"\"\"";
+        let multipart = create_multipart_from_csv(csv_data, "special_chars.csv");
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert_eq!(records.len(), 2);
+
+        assert_eq!(
+            records[0].get("name"),
+            Some(&json::Value::String("John, Jr.".to_string()))
+        );
+        assert_eq!(
+            records[0].get("description"),
+            Some(&json::Value::String("A person with, commas".to_string()))
+        );
+        assert_eq!(
+            records[1].get("name"),
+            Some(&json::Value::String("Jane".to_string()))
+        );
+        assert_eq!(
+            records[1].get("description"),
+            Some(&json::Value::String("A person with \"quotes\"".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extract_multipart_multiple_files() {
+        let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+        let mut body = Vec::new();
+
+        // First file
+        let csv1 = "id,name\n1,John\n2,Jane";
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        body.extend_from_slice(
+            b"Content-Disposition: form-data; name=\"file1\"; filename=\"file1.csv\"\r\n",
+        );
+        body.extend_from_slice(b"Content-Type: text/csv\r\n\r\n");
+        body.extend_from_slice(csv1.as_bytes());
+        body.extend_from_slice(b"\r\n");
+
+        // Second file
+        let csv2 = "id,age\n1,25\n2,30";
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        body.extend_from_slice(
+            b"Content-Disposition: form-data; name=\"file2\"; filename=\"file2.csv\"\r\n",
+        );
+        body.extend_from_slice(b"Content-Type: text/csv\r\n\r\n");
+        body.extend_from_slice(csv2.as_bytes());
+        body.extend_from_slice(b"\r\n");
+
+        // End boundary
+        body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+
+        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
+
+        let req = test::TestRequest::post()
+            .insert_header((
+                "content-type",
+                format!("multipart/form-data; boundary={boundary}"),
+            ))
+            .to_http_request();
+
+        let multipart = Multipart::new(req.headers(), stream);
+
+        let result = extract_multipart(multipart, false).await;
+
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        // Should process both files and combine all records
+        assert_eq!(records.len(), 4); // 2 records from each file
+
+        // Check that we have records from both files
+        let has_john = records
+            .iter()
+            .any(|r| r.get("name") == Some(&json::Value::String("John".to_string())));
+        let has_jane = records
+            .iter()
+            .any(|r| r.get("name") == Some(&json::Value::String("Jane".to_string())));
+        let has_age_25 = records
+            .iter()
+            .any(|r| r.get("age") == Some(&json::Value::String("25".to_string())));
+        let has_age_30 = records
+            .iter()
+            .any(|r| r.get("age") == Some(&json::Value::String("30".to_string())));
+
+        assert!(has_john);
+        assert!(has_jane);
+        assert!(has_age_25);
+        assert!(has_age_30);
+    }
 }

@@ -37,17 +37,22 @@ vi.mock('@/aws-exports', () => ({
   }
 }));
 
+// Mock Blob
+class MockBlob {
+  content: any;
+  options: any;
+  constructor(content: any, options: any) {
+    this.content = content;
+    this.options = options;
+  }
+}
+global.Blob = MockBlob as any;
+
 // Mock URL.createObjectURL and URL.revokeObjectURL
 const mockCreateObjectURL = vi.fn(() => 'mock-blob-url');
 const mockRevokeObjectURL = vi.fn();
-Object.defineProperty(global.URL, 'createObjectURL', {
-  value: mockCreateObjectURL,
-  configurable: true
-});
-Object.defineProperty(global.URL, 'revokeObjectURL', {
-  value: mockRevokeObjectURL,
-  configurable: true
-});
+global.URL.createObjectURL = mockCreateObjectURL as any;
+global.URL.revokeObjectURL = mockRevokeObjectURL as any;
 
 // Mock document.createElement
 const mockClick = vi.fn();
@@ -56,16 +61,13 @@ const mockLink = {
   download: '',
   click: mockClick
 };
-Object.defineProperty(document, 'createElement', {
-  value: vi.fn(() => mockLink),
-  configurable: true
-});
-
-// Mock Blob
-global.Blob = vi.fn().mockImplementation((content, options) => ({
-  content,
-  options
-}));
+const originalCreateElement = document.createElement.bind(document);
+document.createElement = vi.fn((tagName: string) => {
+  if (tagName === 'a') {
+    return mockLink as any;
+  }
+  return originalCreateElement(tagName);
+}) as any;
 
 // Mock i18n
 const mockT = vi.fn((key) => key);
@@ -124,20 +126,30 @@ describe('RegexPatternList.vue Component Logic', () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Setup service mocks
     regexPatternsService.list.mockResolvedValue({
       data: {
         patterns: mockRegexPatterns
       }
     });
-    
+
     regexPatternsService.delete.mockResolvedValue({});
-    
-    convertUnixToQuasarFormat.mockImplementation((timestamp) => 
+
+    convertUnixToQuasarFormat.mockImplementation((timestamp) =>
       `2022-01-01 ${timestamp}`
     );
-    
+
+    // Reset URL mocks
+    mockCreateObjectURL.mockClear();
+    mockCreateObjectURL.mockReturnValue('mock-blob-url');
+    mockRevokeObjectURL.mockClear();
+    mockClick.mockClear();
+
+    // Reset mockLink
+    mockLink.href = '';
+    mockLink.download = '';
+
     // Reset router
     mockRouter.currentRoute.value = { query: {} };
     mockRouter.push.mockReset();
@@ -533,18 +545,24 @@ describe('RegexPatternList.vue Component Logic', () => {
   it('should create correct JSON structure in exportRegexPattern', () => {
     const setup = createComponentSetup();
     const testRow = mockRegexPatterns[0];
-    
+
+    // Spy on Blob constructor
+    const blobSpy = vi.spyOn(global, 'Blob' as any);
+
     setup.exportRegexPattern(testRow);
-    
-    const blobCall = vi.mocked(global.Blob).mock.calls[0];
+
+    expect(blobSpy).toHaveBeenCalled();
+    const blobCall = blobSpy.mock.calls[0];
     const jsonString = blobCall[0][0];
     const exportedData = JSON.parse(jsonString);
-    
+
     expect(exportedData).toEqual({
       name: testRow.name,
       pattern: testRow.pattern,
       description: testRow.description
     });
+
+    blobSpy.mockRestore();
   });
 
   // Test 18: closeAddRegexPatternDialog function closes dialog and resets store
@@ -647,22 +665,19 @@ describe('RegexPatternList.vue Component Logic', () => {
 
   // Test 25: exportRegexPattern handles errors
   it('should handle error in exportRegexPattern', () => {
-    mockCreateObjectURL.mockImplementation(() => {
+    mockCreateObjectURL.mockImplementationOnce(() => {
       throw new Error('Blob error');
     });
-    
+
     const setup = createComponentSetup();
-    
+
     setup.exportRegexPattern(mockRegexPatterns[0]);
-    
+
     expect(mockQuasar.notify).toHaveBeenCalledWith({
       message: 'Error exporting regex pattern',
       color: 'negative',
       icon: 'error',
     });
-    
-    // Reset mock
-    mockCreateObjectURL.mockReturnValue('mock-blob-url');
   });
 
   // Test 26: Component handles double digit counter formatting

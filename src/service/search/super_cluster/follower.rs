@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::{FlightSearchRequest, Request},
     meta::{
         cluster::{IntoArcVec, RoleGroup},
         search::{ScanStats, SearchEventType},
@@ -40,19 +41,18 @@ use crate::service::{
     db::enrichment_table,
     search::{
         SEARCH_SERVER,
-        cluster::flight::{check_work_group, get_online_querier_nodes, partition_filt_list},
+        cluster::flight::{get_online_querier_nodes, partition_file_list},
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor,
                 codec::get_physical_extension_codec,
                 node::{RemoteScanNode, SearchInfos},
-                remote_scan::RemoteScanExec,
+                remote_scan_exec::RemoteScanExec,
             },
             exec::{DataFusionContextBuilder, register_udf},
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::{FlightSearchRequest, Request},
-        utils::AsyncDefer,
+        work_group::DeferredLock,
     },
 };
 
@@ -70,10 +70,11 @@ pub async fn search(
 ) -> Result<(
     SessionContext,
     Arc<dyn ExecutionPlan>,
-    AsyncDefer,
+    DeferredLock,
     ScanStats,
 )> {
-    let start = std::time::Instant::now();
+    let mut took_watch = config::utils::took_watcher::TookWatcher::new();
+
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
     let trace_id = trace_id.to_string();
@@ -93,7 +94,7 @@ pub async fn search(
     let proto = get_physical_extension_codec();
     let mut physical_plan = physical_plan_from_bytes_with_extension_codec(
         &flight_request.search_info.plan,
-        &ctx,
+        &ctx.task_ctx(),
         &proto,
     )?;
 
@@ -112,11 +113,18 @@ pub async fn search(
     let stream_type = stream.get_stream_type(req.stream_type);
 
     // 1. get file id list
-    let file_id_list =
-        get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
+    let file_id_list = get_file_id_lists(
+        &trace_id,
+        &req.org_id,
+        stream_type,
+        &stream,
+        req.time_range.unwrap_or_default(),
+    )
+    .await?;
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
-    let file_id_list_took = start.elapsed().as_millis() as usize;
+
+    let file_id_list_took = took_watch.record_split("get_file_list").as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -196,44 +204,27 @@ pub async fn search(
     );
 
     // check work group
-    let (took_wait, work_group_str, work_group) = check_work_group(
-        &req,
+    let _lock = crate::service::search::work_group::acquire_work_group_lock(
         &trace_id,
+        &req,
+        &mut took_watch,
+        "super_cluster_follower",
         &nodes,
         &file_id_list_vec,
-        start,
-        file_id_list_took,
-        "leader".to_string(),
     )
     .await?;
+
+    let took_wait = _lock.took_wait;
+    let work_group_str = _lock.work_group_str.clone();
+
     // add work_group
     req.add_work_group(Some(work_group_str.clone()));
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: add work_group: {work_group_str}, took: {took_wait} ms"
     );
 
-    // release work_group in flight follow search
-    let user_id = req.user_id.clone();
-    let trace_id_move = trace_id.to_string();
-    let defer = AsyncDefer::new({
-        async move {
-            let _ = work_group
-                .as_ref()
-                .unwrap()
-                .done(&trace_id_move, user_id.as_deref())
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[trace_id {trace_id_move}] release work_group in flight follow search error: {e}",
-                    );
-                    e.to_string();
-                });
-            log::info!("[trace_id {trace_id_move}] release work_group in flight follow search");
-        }
-    });
-
     // partition file list
-    let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
+    let partition_file_lists = partition_file_list(file_id_list, &nodes, role_group).await?;
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: get partition_file_lists num: {}",
         partition_file_lists.len()
@@ -273,6 +264,8 @@ pub async fn search(
         use_cache: req.use_cache,
         histogram_interval: req.histogram_interval,
         is_analyze: flight_request.search_info.is_analyze,
+        sampling_config: flight_request.search_info.sampling_config.clone(),
+        clear_cache: req.overwrite_cache,
     };
 
     let context = tracing::Span::current().context();
@@ -301,7 +294,7 @@ pub async fn search(
         ..Default::default()
     };
 
-    Ok((ctx, physical_plan, defer, scan_stats))
+    Ok((ctx, physical_plan, _lock, scan_stats))
 }
 
 #[tracing::instrument(
@@ -313,7 +306,7 @@ pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
     stream: &TableReference,
-    mut time_range: Option<(i64, i64)>,
+    mut time_range: (i64, i64),
 ) -> Result<Vec<FileId>> {
     let stream_name = stream.stream_name();
     let stream_type = stream.get_stream_type(stream_type);
@@ -323,7 +316,7 @@ pub async fn get_file_id_lists(
     {
         let start = enrichment_table::get_start_time(org_id, &stream_name).await;
         let end = config::utils::time::now_micros();
-        time_range = Some((start, end));
+        time_range = (start, end);
     }
     let file_id_list = crate::service::file_list::query_ids(
         trace_id,

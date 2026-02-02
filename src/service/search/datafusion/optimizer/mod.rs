@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
-use add_sort_and_limit::AddSortAndLimitRule;
-use add_timestamp::AddTimestampRule;
-use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
+use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
     common::Result,
     optimizer::{
@@ -35,44 +36,43 @@ use datafusion::{
         scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
         single_distinct_to_groupby::SingleDistinctToGroupBy,
     },
-    physical_optimizer::PhysicalOptimizerRule,
+    physical_optimizer::{PhysicalOptimizerRule, limit_pushdown::LimitPushdown},
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
+    sql::TableReference,
 };
-use infra::schema::get_stream_setting_fts_fields;
-use limit_join_right_side::LimitJoinRightSide;
-use remove_index_fields::RemoveIndexFieldsRule;
-use rewrite_histogram::RewriteHistogram;
-use rewrite_match::RewriteMatch;
+use infra::schema::get_stream_setting_index_fields;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
-    cipher::{RewriteCipherCall, RewriteCipherKey},
+    crate::service::search::datafusion::optimizer::logical_optimizer::cipher::{
+        RewriteCipherCall, RewriteCipherKey,
+    },
     o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
     o2_enterprise::enterprise::search::datafusion::optimizer::eliminate_aggregate::EliminateAggregateRule,
 };
 
 use crate::service::search::{
     datafusion::optimizer::{
-        context::PhysicalOptimizerContext, distribute_analyze::optimize_distribute_analyze,
-        join_reorder::JoinReorderRule, remote_scan::generate_remote_scan_rules,
+        analyze::remove_index_fields::RemoveIndexFieldsRule,
+        context::PhysicalOptimizerContext,
+        logical_optimizer::{
+            add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
+            limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
+        },
+        physical_optimizer::{
+            distribute_analyze::optimize_distribute_analyze,
+            index_optimizer::LeaderIndexOptimizerRule, join_reorder::JoinReorderRule,
+            remote_scan::generate_remote_scan_rules,
+        },
     },
-    request::Request,
     sql::Sql,
 };
 
-pub mod add_sort_and_limit;
-pub mod add_timestamp;
-#[cfg(feature = "enterprise")]
-pub mod cipher;
+pub mod analyze;
 pub mod context;
-pub mod distribute_analyze;
-pub mod join_reorder;
-pub mod limit_join_right_side;
-pub mod remote_scan;
-pub mod remove_index_fields;
-pub mod rewrite_histogram;
-pub mod rewrite_match;
+pub mod logical_optimizer;
+pub mod physical_optimizer;
 pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
@@ -92,33 +92,16 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         if sql.limit > 0 {
             Some(sql.limit as usize)
         } else {
-            Some(config::get_config().limit.query_default_limit as usize)
+            // Additional 5 rows to check if there is data more than the specified default limit
+            Some(cfg.limit.query_default_limit as usize + 5)
         }
     } else {
         None
     };
     let offset = sql.offset as usize;
-    let (start_time, end_time) = sql.time_range.unwrap();
+    let (start_time, end_time) = sql.time_range.unwrap_or_default();
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
-
-    // get full text search fields
-    if sql.has_match_all && sql.stream_names.len() == 1 {
-        let mut fields = Vec::new();
-        let stream_name = &sql.stream_names[0];
-        let schema = sql.schemas.get(stream_name).unwrap();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-        for fts_field in fts_fields {
-            let Some(field) = schema.field_with_name(&fts_field) else {
-                continue;
-            };
-            fields.push((fts_field, field.data_type().clone()));
-        }
-        // *********** custom rules ***********
-        rules.push(Arc::new(RewriteMatch::new(fields)));
-        // ************************************
-    }
 
     rules.push(Arc::new(EliminateNestedUnion::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
@@ -190,6 +173,7 @@ pub fn generate_physical_optimizer_rules(
     contexts: Vec<PhysicalOptimizerContext>,
 ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
     let mut rules = vec![Arc::new(JoinReorderRule::new()) as _];
+
     for context in contexts.into_iter() {
         match context {
             PhysicalOptimizerContext::RemoteScan(context) => {
@@ -213,6 +197,28 @@ pub fn generate_physical_optimizer_rules(
             }
         }
     }
+
+    // should after remote scan
+    let mut index_fields: HashMap<TableReference, HashSet<String>> = HashMap::new();
+    for (stream_name, schema) in sql.schemas.iter() {
+        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+        let idx_fields = get_stream_setting_index_fields(&stream_settings);
+        let idx_fields = idx_fields
+            .into_iter()
+            .filter_map(|index_field| {
+                if schema.contains_field(&index_field) {
+                    Some(index_field)
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>();
+        index_fields.insert(stream_name.clone(), idx_fields);
+    }
+    rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)) as _);
+
+    rules.push(Arc::new(LimitPushdown::new()) as _);
+
     rules
 }
 

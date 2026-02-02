@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -254,6 +254,7 @@ export const getMetricMinMaxValue = (
   let max = -Infinity;
 
   const allValues = searchQueryData
+    .filter((metric) => metric && metric.result)
     .flatMap((metric) => metric.result ?? [])
     .flatMap((result) => result.values ?? [])
     .map(([, value]) => value)

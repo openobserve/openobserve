@@ -31,15 +31,16 @@ use config::{
     utils::{
         json,
         parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
+        time::{BASE_TIME, now_micros},
     },
 };
 use hashbrown::HashSet;
-use infra::{file_list as infra_file_list, storage};
+use infra::{cluster::get_node_from_consistent_hash, file_list as infra_file_list, storage};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use tokio::sync::{Semaphore, mpsc};
 
-use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
+use crate::service::db;
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
@@ -116,7 +117,7 @@ pub async fn generate_by_stream(
         stream_type,
         stream_name,
         PartitionTimeLevel::Hourly,
-        None,
+        (BASE_TIME.timestamp_micros(), now_micros()),
         Some(false),
     )
     .await?;
@@ -143,7 +144,6 @@ pub async fn generate_by_stream(
         worker_tx.send(file).await?;
     }
 
-    PROCESSING_FILES.write().shrink_to_fit();
     Ok(())
 }
 

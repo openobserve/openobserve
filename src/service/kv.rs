@@ -31,6 +31,6 @@ pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
-    let items = kv::list(org_id, prefix).await?;
+    let items = kv::list_keys(org_id, prefix).await?;
     Ok(items)
 }

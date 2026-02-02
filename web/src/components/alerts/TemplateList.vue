@@ -15,43 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div v-if="!showImportTemplate && !showTemplateEditor" style="height: calc(100vh - 112px); overflow-y: auto;">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
+    <div v-if="!showImportTemplate && !showTemplateEditor" >
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
-        <div class="q-table__title" data-test="alert-templates-list-title">
+        <div class="q-table__title tw:font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
-          <div class="tw-flex tw-justify-end">
-          <q-input
-            data-test="template-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alert_templates.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
+          <div class="tw:flex tw:justify-end">
+            <q-input
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input"
+              :placeholder="t('template.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
           <q-btn
-            class="q-ml-md text-bold"
-            padding="sm lg"
-            outline
+            class="o2-secondary-button q-ml-sm tw:h-[36px]"
             no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importTemplate"
             data-test="template-import"
           />
           <q-btn
-            data-test="alert-template-list-add-alert-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
+            data-test="template-list-add-btn"
+            class="o2-primary-button q-ml-sm tw:h-[36px]"
             no-caps
+            flat
             :label="t(`alert_templates.add`)"
             @click="editTemplate(null)"
           />
@@ -60,24 +55,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-table
         data-test="alert-templates-list-table"
         ref="qTableRef"
-        :rows="templates"
+        :rows="visibleRows"
         :columns="columns"
-        row-key="id"
+        row-key="name"
+        selection="multiple"
+        v-model:selected="selectedTemplates"
         style="width: 100%"
         :rows-per-page-options="[0]"
         :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        class="o2-quasar-table"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        :style="hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
+            : 'width: 100%'"
       >
         <template #no-data>
           <NoData />
         </template>
+        <template v-slot:body-selection="scope">
+          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+        </template>
+        <template v-slot:header="props">
+          <q-tr :props="props">
+            <!-- Adding this block to render the select-all checkbox -->
+            <q-th v-if="columns.length > 0" auto-width>
+              <q-checkbox
+                v-model="props.selected"
+                size="sm"
+                :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                class="o2-table-checkbox"
+              />
+            </q-th>
+
+            <!-- render the table headers -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              icon="download"
               title="Export Template"
               class="q-ml-xs"
               padding="sm"
@@ -85,68 +108,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
+              icon="download"
               @click.stop="exportTemplate(props.row)"
               data-test="destination-export"
-            ></q-btn>
+            >
+            </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-update-template`"
-              icon="edit"
               class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
               round
               flat
+              icon="edit"
               :title="t('alert_templates.edit')"
               @click="editTemplate(props.row)"
-            ></q-btn>
+            >
+            </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
               round
               flat
+              :icon="outlinedDelete"
               :title="t('alert_templates.delete')"
               @click="conformDeleteDestination(props.row)"
-            ></q-btn>
+            >
+            </q-btn>
           </q-td>
         </template>
-        <template #top="scope">
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('alert_templates.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
         <template #bottom="scope">
-          <q-table-pagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+              {{ resultTotal }} {{ t('alert_templates.header') }}
+            </div>
+            <q-btn
+              v-if="selectedTemplates.length > 0"
+              data-test="template-list-delete-templates-btn"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              no-caps
+              dense
+              @click="openBulkDeleteDialog"
+            >
+              <q-icon name="delete" size="16px" />
+              <span class="tw:ml-2">Delete</span>
+            </q-btn>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </div>
         </template>
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
       </q-table>
     </div>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
@@ -167,10 +191,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
     />
+
+    <ConfirmDialog
+      title="Delete Templates"
+      :message="`Are you sure you want to delete ${selectedTemplates.length} template(s)?`"
+      @update:ok="bulkDeleteTemplates"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onActivated, onMounted, watch, defineAsyncComponent } from "vue";
+import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -183,6 +215,7 @@ import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -192,6 +225,7 @@ const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
 const q = useQuasar();
+const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -235,6 +269,8 @@ const confirmDelete: Ref<{
   visible: boolean;
   data: any;
 }> = ref({ visible: false, data: null });
+const selectedTemplates: Ref<any[]> = ref([]);
+const confirmBulkDelete = ref(false);
 const pagination: any = ref({
   page: 1,
   rowsPerPage: 20, // 0 means all rows
@@ -308,6 +344,12 @@ const getTemplateByName = (name: string) => {
   return templates.value.find((template) => template.name === name);
 };
 const editTemplate = (template: any = null) => {
+  if (!template) {
+    track("Button Click", {
+      button: "Add Template",
+      page: "Alert Templates"
+    });
+  }
   resetEditingTemplate();
   toggleTemplateEditor();
 
@@ -404,7 +446,6 @@ const filterData = (rows: any, terms: any) => {
       filtered.push(rows[i]);
     }
   }
-  resultTotal.value = filtered.length;
   return filtered;
 };
 const exportTemplate = (row: any) => {
@@ -427,5 +468,64 @@ const exportTemplate = (row: any) => {
   // Clean up the URL object after download
   URL.revokeObjectURL(url);
 };
-</script>
+
+const visibleRows = computed(() => {
+  if (!filterQuery.value) return templates.value || [];
+  return filterData(templates.value || [], filterQuery.value);
+});
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+
+// Watch visibleRows to sync resultTotal with search filter
+watch(visibleRows, (newVisibleRows) => {
+  resultTotal.value = newVisibleRows.length;
+}, { immediate: true });
+
+const openBulkDeleteDialog = () => {
+  confirmBulkDelete.value = true;
+};
+
+const bulkDeleteTemplates = () => {
+  const templateNames = selectedTemplates.value.map((template: any) => template.name);
+
+  templateService
+    .bulkDelete(store.state.selectedOrganization.identifier, { ids: templateNames })
+    .then((res) => {
+      const { successful, unsuccessful } = res.data;
+
+      if (successful.length > 0 && unsuccessful.length === 0) {
+        q.notify({
+          type: "positive",
+          message: `Successfully deleted ${successful.length} template(s)`,
+          timeout: 2000,
+        });
+      } else if (successful.length > 0 && unsuccessful.length > 0) {
+        q.notify({
+          type: "warning",
+          message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
+          timeout: 3000,
+        });
+      } else if (unsuccessful.length > 0) {
+        q.notify({
+          type: "negative",
+          message: `Failed to delete ${unsuccessful.length} template(s)`,
+          timeout: 2000,
+        });
+      }
+
+      selectedTemplates.value = [];
+      confirmBulkDelete.value = false;
+      getTemplates();
+    })
+    .catch((err: any) => {
+      const errorMessage = err.response?.data?.message || err?.message || "Error while deleting templates. Please try again.";
+      if (err.response?.status != 403 || err?.status != 403) {
+        q.notify({
+          type: "negative",
+          message: errorMessage,
+          timeout: 2000,
+        });
+      }
+    });
+};</script>
 <style lang=""></style>

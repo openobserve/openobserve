@@ -216,13 +216,13 @@ describe("TrialPeriod.vue", () => {
     it("should return expired message when due days < 0", () => {
       vi.mocked(getDueDays).mockReturnValue(-1);
       const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has been expired.");
+      expect(message).toBe("Your trial period has expired.");
     });
 
     it("should return expired message when due days is -5", () => {
       vi.mocked(getDueDays).mockReturnValue(-5);
       const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has been expired.");
+      expect(message).toBe("Your trial period has expired.");
     });
 
     it("should return undefined when free_trial_expiry is empty", () => {
@@ -451,14 +451,14 @@ describe("TrialPeriod.vue", () => {
       vi.mocked(getDueDays).mockReturnValue(NaN);
       wrapper = createWrapper({}, mockStore);
       const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has been expired.");
+      expect(message).toBe("Your trial period has expired.");
     });
 
     it("should handle getDueDays returning undefined", () => {
       vi.mocked(getDueDays).mockReturnValue(undefined);
       wrapper = createWrapper({}, mockStore);
       const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has been expired.");
+      expect(message).toBe("Your trial period has expired.");
     });
 
     it("should handle very large positive due days", () => {
@@ -472,7 +472,7 @@ describe("TrialPeriod.vue", () => {
       vi.mocked(getDueDays).mockReturnValue(-999999);
       wrapper = createWrapper({}, mockStore);
       const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has been expired.");
+      expect(message).toBe("Your trial period has expired.");
     });
   });
 

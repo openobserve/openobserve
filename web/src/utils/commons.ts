@@ -243,6 +243,8 @@ export const addPanel = async (
   panelData: any,
   folderId: any,
   tabId: any,
+  variablesToUpdate?: { variableNames: string[], newPanelId: string },
+  newVariables?: any[],
 ) => {
   try {
     // get the object of panel data
@@ -250,6 +252,44 @@ export const addPanel = async (
     // call the update dashboard function
 
     const currentDashboard = await getDashboard(store, dashboardId, folderId);
+
+    // Add new variables first (from Add Panel session)
+    if (newVariables && newVariables.length > 0) {
+      if (!currentDashboard.variables) {
+        currentDashboard.variables = { list: [] };
+      }
+      if (!currentDashboard.variables.list) {
+        currentDashboard.variables.list = [];
+      }
+
+      newVariables.forEach((v: any) => {
+        // Check for duplicates
+        const index = currentDashboard.variables.list.findIndex(
+          (existing: any) => existing.name === v.name,
+        );
+        if (index === -1) {
+          currentDashboard.variables.list.push(v);
+        } else {
+          // If it exists, overwrite it (in case it was updated)
+          currentDashboard.variables.list[index] = v;
+        }
+      });
+    }
+
+    // Update variables if needed (for variables created from Add Panel that use "current_panel")
+    if (variablesToUpdate && variablesToUpdate.variableNames.length > 0) {
+      currentDashboard.variables?.list?.forEach((variable: any) => {
+        if (variablesToUpdate.variableNames.includes(variable.name)) {
+          // Check if variable has "current_panel" in panels array
+          if (variable.panels?.includes("current_panel")) {
+            // Replace "current_panel" with the actual panel ID
+            variable.panels = variable.panels.map((id: string) =>
+              id === "current_panel" ? variablesToUpdate.newPanelId : id,
+            );
+          }
+        }
+      });
+    }
 
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
@@ -262,9 +302,9 @@ export const addPanel = async (
 
     const newLayoutObj = {
       x: 0,
-      y: tab.panels?.length > 0 ? maxY + 10 : 0,
-      w: 24,
-      h: 9,
+      y: tab.panels?.length > 0 ? maxY + 20 : 0,
+      w: 96,
+      h: 18,
       i: maxI + 1,
       panelId: panelData.id,
       static: false,
@@ -273,7 +313,7 @@ export const addPanel = async (
     // check if last panel has enthough space to add new panel
     if (tab.panels.length > 0) {
       //check if new panel can be added
-      if (48 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
+      if (192 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
         newLayoutObj.y = lastPanel.layout.y;
         newLayoutObj.x = lastPanel.layout.x + lastPanel.layout.w;
       }
@@ -551,6 +591,25 @@ export const updateDashboard = async (
   }
 };
 
+// Helper function to ensure variables structure exists with proper defaults
+const ensureVariablesStructure = (dashboard: any): void => {
+  if (!dashboard.variables) {
+    dashboard.variables = {
+      showDynamicFilters: false,
+      list: []
+    };
+  } else {
+    // Ensure showDynamicFilters has a default value
+    if (dashboard.variables.showDynamicFilters === undefined) {
+      dashboard.variables.showDynamicFilters = false;
+    }
+    // Ensure list is an array
+    if (!Array.isArray(dashboard.variables.list)) {
+      dashboard.variables.list = [];
+    }
+  }
+};
+
 export const getDashboard = async (
   store: any,
   dashboardId: any,
@@ -579,6 +638,9 @@ export const getDashboard = async (
     return {};
   }
 
+  // Ensure variables structure always exists (fix for dashboards with no variables)
+  ensureVariablesStructure(dashboardJson);
+
   // Fix duplicate panel IDs and check if any were found
   const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
 
@@ -606,6 +668,9 @@ export const getDashboard = async (
       folderId,
       apiResponse,
     );
+
+    // Ensure variables structure exists after re-fetching too
+    ensureVariablesStructure(dashboardJson);
   }
 
   return dashboardJson;
@@ -752,7 +817,7 @@ export const deleteTab = async (
 
       // for each panel, need to recalculate layout object
       deleteTabData.panels.forEach((panel: any) => {
-        maxY += 10;
+        maxY += 20;
         panel.layout.i = ++maxI;
         panel.layout.y = maxY;
       });
@@ -875,7 +940,7 @@ export const movePanelToAnotherTab = async (
 
     //set layout of new panel
     panelData.layout.i = maxI + 1;
-    panelData.layout.y = maxY + 10;
+    panelData.layout.y = maxY + 20;
     moveToTabData.panels.push(panelData);
 
     return await updateDashboard(

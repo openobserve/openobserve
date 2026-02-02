@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="markdown-editor"
-    style="width: 100%; height: 100%; overflow: auto"
+    class="markdown-editor card-container"
+    style="width: 100%; height: 100%; overflow: hidden"
   >
     <div style="width: 100%; height: 100%">
       <q-splitter
@@ -27,13 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div class="col" style="height: 100%">
+          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
             <CodeQueryEditor
               language="markdown"
               v-model:query="markdownContent"
               :debounceTime="500"
               @update:query="onEditorValueChange"
               data-test="dashboard-markdown-editor"
+              style="height: 100%; flex: 1;"
             />
           </div>
         </template>
@@ -52,6 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <markdown-renderer
             :markdown-content="markdownContent"
             :variables-data="initialVariableValues"
+            :tabId="tabId"
+            :panelId="panelId"
           />
         </template>
       </q-splitter>
@@ -79,6 +82,14 @@ export default defineComponent({
     initialVariableValues: {
       type: Object,
       default: () => ({}),
+    },
+    tabId: {
+      type: String,
+      default: null,
+    },
+    panelId: {
+      type: String,
+      default: null,
     },
   },
   setup(props, { emit }): any {

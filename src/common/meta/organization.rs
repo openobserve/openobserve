@@ -25,7 +25,7 @@ pub const CUSTOM: &str = "custom";
 pub const USER_DEFAULT: &str = "user_default";
 pub const THRESHOLD: i64 = 9383939382;
 
-use config::meta::cluster::Node;
+use config::meta::{cluster::Node, self_reporting::usage};
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct Organization {
@@ -34,6 +34,30 @@ pub struct Organization {
     pub name: String,
     #[serde(default)]
     pub org_type: String,
+    /// Optional service account email to add to the organization
+    /// When specified, only this service account will be added (not the API caller)
+    #[serde(default)]
+    pub service_account: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct ServiceAccountTokenInfo {
+    pub email: String,
+    /// Token is no longer returned directly for security reasons
+    /// Use the assume_service_account API to obtain temporary session tokens
+    #[serde(skip_serializing)]
+    pub token: String,
+    pub role: String,
+    /// Instructions for obtaining a temporary session token
+    pub message: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationCreationResponse {
+    #[serde(flatten)]
+    pub organization: Organization,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_account: Option<ServiceAccountTokenInfo>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
@@ -78,6 +102,7 @@ pub struct OrganizationInviteUserRecord {
     pub status: InviteStatus,
     pub expires_at: i64,
     pub is_external: bool,
+    pub token: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
@@ -163,12 +188,52 @@ pub struct StreamSummary {
 pub struct PipelineSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
+    pub trigger_status: TriggerStatus,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct AlertSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
+    pub trigger_status: TriggerStatus,
+}
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct TriggerStatus {
+    pub healthy: i64,
+    pub failed: i64,
+    pub warning: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TriggerStatusSearchResult {
+    pub module: usage::TriggerDataType,
+    pub status: usage::TriggerDataStatus,
+}
+
+impl TriggerStatus {
+    pub fn from_search_results(
+        results: &Vec<TriggerStatusSearchResult>,
+        module: usage::TriggerDataType,
+    ) -> Self {
+        let mut status = TriggerStatus {
+            healthy: 0,
+            failed: 0,
+            warning: 0,
+        };
+
+        for result in results {
+            if result.module == module {
+                match result.status {
+                    usage::TriggerDataStatus::Completed
+                    | usage::TriggerDataStatus::ConditionNotSatisfied => status.healthy += 1,
+                    usage::TriggerDataStatus::Failed => status.failed += 1,
+                    usage::TriggerDataStatus::Skipped => status.warning += 1,
+                }
+            }
+        }
+
+        status
+    }
 }
 
 /// A container for passcodes and rumtokens
@@ -235,6 +300,11 @@ fn default_enable_streaming_search() -> bool {
     false
 }
 
+#[cfg(feature = "enterprise")]
+fn default_claim_parser_function() -> String {
+    "".to_string()
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -253,6 +323,15 @@ pub struct OrganizationSettingPayload {
     pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_auto_refresh_interval: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub light_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dark_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_series_per_query: Option<usize>,
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claim_parser_function: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -277,10 +356,31 @@ pub struct OrganizationSetting {
     // and only applicable for cloud
     #[serde(skip_serializing_if = "Option::is_none")]
     pub free_trial_expiry: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub light_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dark_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_series_per_query: Option<usize>,
+    #[cfg(feature = "enterprise")]
+    #[serde(default = "default_claim_parser_function")]
+    pub claim_parser_function: String,
 }
 
 impl Default for OrganizationSetting {
     fn default() -> Self {
+        let cfg = config::get_config();
+        let light_mode_theme_color = if cfg.common.default_theme_light_mode_color.is_empty() {
+            None
+        } else {
+            Some(cfg.common.default_theme_light_mode_color.clone())
+        };
+        let dark_mode_theme_color = if cfg.common.default_theme_dark_mode_color.is_empty() {
+            None
+        } else {
+            Some(cfg.common.default_theme_dark_mode_color.clone())
+        };
+
         Self {
             scrape_interval: default_scrape_interval(),
             trace_id_field_name: default_trace_id_field_name(),
@@ -290,6 +390,11 @@ impl Default for OrganizationSetting {
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
             free_trial_expiry: None,
+            light_mode_theme_color,
+            dark_mode_theme_color,
+            max_series_per_query: None,
+            #[cfg(feature = "enterprise")]
+            claim_parser_function: default_claim_parser_function(),
         }
     }
 }
@@ -320,9 +425,10 @@ pub struct RegionInfo<T> {
 /// 1. Regions at the top level as object keys
 /// 2. Clusters within each region as object keys
 /// 3. Nodes as arrays directly under each cluster
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, ToSchema)]
 pub struct NodeListResponse {
     #[serde(flatten)]
+    #[schema(value_type = Object)]
     pub regions: std::collections::HashMap<String, RegionInfo<Vec<Node>>>,
 }
 
@@ -360,7 +466,7 @@ impl NodeListResponse {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
 pub struct ClusterInfo {
     pub pending_jobs: u64,
 }
@@ -370,8 +476,9 @@ pub struct ClusterInfo {
 /// Contains a three-level hierarchy with a flat format:
 /// 1. Regions at the top level as object keys
 /// 2. Clusters within each region as object keys
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, ToSchema)]
 pub struct ClusterInfoResponse {
+    #[schema(value_type = Object)]
     pub regions: std::collections::HashMap<String, RegionInfo<ClusterInfo>>,
 }
 
@@ -512,6 +619,7 @@ mod tests {
             status: InviteStatus::Pending,
             expires_at: 999999,
             is_external: true,
+            token: "12345".to_string(),
         };
 
         assert_eq!(record.status, InviteStatus::Pending);
@@ -524,11 +632,13 @@ mod tests {
             identifier: Default::default(),
             name: "Test Org".to_string(),
             org_type: Default::default(),
+            service_account: None,
         };
 
         assert_eq!(org.identifier, "");
         assert_eq!(org.name, "Test Org");
         assert_eq!(org.org_type, "");
+        assert_eq!(org.service_account, None);
     }
 
     #[test]
@@ -620,44 +730,6 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
-    }
-
-    #[test]
-    fn test_org_summary() {
-        let stream_summary = StreamSummary {
-            num_streams: 10,
-            total_records: 1000000,
-            total_storage_size: 1024.0 * 1024.0 * 100.0, // 100MB
-            total_compressed_size: 1024.0 * 1024.0 * 25.0, // 25MB
-            total_index_size: 1024.0 * 1024.0 * 5.0,     // 5MB
-        };
-
-        let pipeline_summary = PipelineSummary {
-            num_realtime: 5,
-            num_scheduled: 3,
-        };
-
-        let alert_summary = AlertSummary {
-            num_realtime: 12,
-            num_scheduled: 8,
-        };
-
-        let summary = OrgSummary {
-            streams: stream_summary,
-            pipelines: pipeline_summary,
-            alerts: alert_summary,
-            total_functions: 25,
-            total_dashboards: 15,
-        };
-
-        assert_eq!(summary.streams.num_streams, 10);
-        assert_eq!(summary.streams.total_records, 1000000);
-        assert_eq!(summary.pipelines.num_realtime, 5);
-        assert_eq!(summary.pipelines.num_scheduled, 3);
-        assert_eq!(summary.alerts.num_realtime, 12);
-        assert_eq!(summary.alerts.num_scheduled, 8);
-        assert_eq!(summary.total_functions, 25);
-        assert_eq!(summary.total_dashboards, 15);
     }
 
     #[test]
@@ -777,5 +849,207 @@ mod tests {
         assert_eq!(response.message, "Invitation sent successfully");
         assert!(response.data.valid_members.is_some());
         assert_eq!(response.data.valid_members.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_pipelines_all_healthy() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::ConditionNotSatisfied,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 2);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_alerts_with_failures() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 1);
+        assert_eq!(status.failed, 2);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_with_warnings() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 1);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 2);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_mixed_statuses() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::ConditionNotSatisfied,
+            },
+        ];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 2); // Completed + ConditionNotSatisfied
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.warning, 1); // Skipped
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_empty() {
+        let results = vec![];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_filter_by_module() {
+        // Mix of different modules - should only count DerivedStream
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 1);
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_no_matching_module() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        // Query for DerivedStream when only Alert results exist
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_all_failed() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 3);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_all_skipped() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 2);
     }
 }

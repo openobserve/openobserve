@@ -74,7 +74,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         sea_orm::DatabaseBackend::Sqlite => select_query.build(SqliteQueryBuilder),
     };
     let statement = Statement::from_sql_and_values(backend, sql, values);
-    log::info!("[SCHEDULED_TRIGGERS_MIGRATION] select_query: {statement}");
+    log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] select_query: {statement}");
 
     // 1. Get all alert triggers from the scheduled jobs table
     let triggers_result = db
@@ -82,7 +82,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         .await
         .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {e}")))?;
 
-    log::info!(
+    log::debug!(
         "[SCHEDULED_TRIGGERS_MIGRATION] triggers_result length: {}",
         triggers_result.len()
     );
@@ -111,12 +111,12 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             sea_orm::DatabaseBackend::Sqlite => report_query.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
-        log::info!("[SCHEDULED_TRIGGERS_MIGRATION] report_query to get id: {statement}");
+        log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] report_query to get id: {statement}");
         let report_result = db
             .query_one(statement)
             .await
             .map_err(|e| DbErr::Custom(format!("Failed to query report: {e}")))?;
-        log::info!(
+        log::debug!(
             "[SCHEDULED_TRIGGERS_MIGRATION] report_result is found: {}",
             report_result.is_some()
         );
@@ -127,7 +127,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
                 .try_get::<String>("", "id")
                 .map_err(|e| DbErr::Custom(format!("Failed to get report ID: {e}")))?;
 
-            log::info!("[SCHEDULED_TRIGGERS_MIGRATION] report_id to upgrade: {report_id}");
+            log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] report_id to upgrade: {report_id}");
             // Update the trigger module_key
             let update_query = Query::update()
                 .table(ScheduledJobs::Table)
@@ -142,7 +142,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
                 sea_orm::DatabaseBackend::Sqlite => update_query.build(SqliteQueryBuilder),
             };
             let statement = Statement::from_sql_and_values(backend, sql, values);
-            log::info!(
+            log::debug!(
                 "[SCHEDULED_TRIGGERS_MIGRATION] update_query report scheduled job statement: {statement}"
             );
             db.execute(statement)

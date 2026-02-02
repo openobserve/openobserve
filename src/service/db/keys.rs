@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use infra::{
-    cluster_coordinator::get_coordinator,
+    coordinator::get_coordinator,
     db::Event,
     errors::{self, DbError},
     table::cipher::{CipherEntry, EntryKind},

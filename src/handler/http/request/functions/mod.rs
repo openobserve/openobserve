@@ -15,26 +15,44 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
-use config::meta::function::{TestVRLRequest, Transform};
+use actix_web::{HttpResponse, delete, get, post, put, web};
+use config::meta::function::{FunctionList, TestVRLRequest, Transform};
+
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
+use crate::{
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
+    service::functions::FunctionDeleteError,
+};
 
 /// CreateFunction
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
     operation_id = "createFunction",
+    summary = "Create new function",
+    description = "Creates a new custom transformation function using VRL (Vector Remap Language) code. Functions can be \
+                   used in data ingestion pipelines to transform, enrich, or filter incoming log, metric, and trace data. \
+                   Support complex data transformations, field extraction, format conversion, and conditional processing \
+                   to standardize data before storage and indexing.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Transform, description = "Function data", content_type = "application/json"),
+    request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a VRL function"}))
     )
 )]
 #[post("/{org_id}/functions")]
@@ -50,12 +68,16 @@ pub async fn save_function(
 }
 
 /// ListFunctions
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
     operation_id = "listFunctions",
+    summary = "List organization functions",
+    description = "Retrieves all custom transformation functions available in the organization, including their VRL code, \
+                   configuration parameters, and current usage status. Shows function metadata such as creation date, \
+                   last modified time, and pipeline dependencies to help administrators manage data transformation \
+                   logic across the organization.",
     security(
         ("Authorization"= [])
     ),
@@ -63,22 +85,25 @@ pub async fn save_function(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all functions"}))
     )
 )]
 #[get("/{org_id}/functions")]
 async fn list_functions(
     org_id: web::Path<String>,
-    _req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            &user_email.user_id,
             "GET",
             "function",
         )
@@ -100,12 +125,16 @@ async fn list_functions(
 }
 
 /// DeleteFunction
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
     operation_id = "deleteFunction",
+    summary = "Delete function",
+    description = "Permanently deletes a custom transformation function from the organization. The function must not be \
+                   in use by active pipelines unless the force parameter is specified. Once deleted, any pipelines \
+                   previously using this function will need to be updated with alternative transformation logic to \
+                   continue functioning properly.",
     security(
         ("Authorization"= [])
     ),
@@ -115,23 +144,117 @@ async fn list_functions(
         ("force" = bool, Query, description = "Force delete function regardless pipeline dependencies"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a function"}))
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
 async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    crate::service::functions::delete_function(org_id, name).await
+    match crate::service::functions::delete_function(&org_id, &name).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            actix_web::http::StatusCode::OK,
+            "Function deleted",
+        ))),
+        Err(e) => match e {
+            FunctionDeleteError::NotFound => {
+                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::NOT_FOUND,
+                    "Function not found",
+                )))
+            }
+            FunctionDeleteError::FunctionInUse(e) => Ok(HttpResponse::BadRequest().json(
+                MetaHttpResponse::error(actix_web::http::StatusCode::BAD_REQUEST, e),
+            )),
+            FunctionDeleteError::PipelineDependencies(e) => Ok(HttpResponse::Conflict().json(
+                MetaHttpResponse::error(actix_web::http::StatusCode::CONFLICT, e),
+            )),
+        },
+    }
+}
+
+/// DeleteFunctionBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "deleteFunctionBulk",
+    summary = "Delete multiple function",
+    description = "Permanently deletes multiple custom transformation functions from the organization. The functions must not be \
+                   in use by active pipelines unless the force parameter is specified. Once deleted, any pipelines \
+                   previously using this function will need to be updated with alternative transformation logic to \
+                   continue functioning properly.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "Function names to delete", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/functions/bulk")]
+async fn delete_function_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for name in &req.ids {
+        if !check_permissions(name, &org_id, &_user_id, "functions", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match crate::service::functions::delete_function(&org_id, &name).await {
+            Ok(_) | Err(FunctionDeleteError::NotFound) => {
+                successful.push(name);
+            }
+            Err(FunctionDeleteError::FunctionInUse(e))
+            | Err(FunctionDeleteError::PipelineDependencies(e)) => {
+                log::error!("error in deleting function {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e);
+            }
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// UpdateFunction
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
     operation_id = "updateFunction",
+    summary = "Update function",
+    description = "Updates an existing transformation function with new VRL code, parameters, or configuration settings. \
+                   Changes take effect immediately and apply to all data processing pipelines currently using this \
+                   function. Test function changes thoroughly before deployment to avoid data transformation errors \
+                   in production pipelines.",
     security(
         ("Authorization"= [])
     ),
@@ -139,10 +262,14 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("org_id" = String, Path, description = "Organization name"),
         ("name" = String, Path, description = "Function name"),
     ),
-    request_body(content = Transform, description = "Function data", content_type = "application/json"),
+    request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a VRL function"}))
     )
 )]
 #[put("/{org_id}/functions/{name}")]
@@ -159,12 +286,16 @@ pub async fn update_function(
 }
 
 /// FunctionPipelineDependency
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
     operation_id = "functionPipelineDependency",
+    summary = "Get function pipeline dependencies",
+    description = "Lists all data processing pipelines that currently use the specified transformation function. Returns \
+                   pipeline names, types, and usage details to help administrators understand the impact scope before \
+                   making changes to the function. Essential for change management and ensuring data processing \
+                   continuity during function updates.",
     security(
         ("Authorization"= [])
     ),
@@ -173,9 +304,13 @@ pub async fn update_function(
         ("name" = String, Path, description = "Function name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
-        (status = 404, description = "Function not found", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Internal server error", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
+        (status = 404, description = "Function not found", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal server error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Check function dependencies"}))
     )
 )]
 #[get("/{org_id}/functions/{name}")]
@@ -191,16 +326,23 @@ pub async fn list_pipeline_dependencies(
     context_path = "/api",
     tag = "Functions",
     operation_id = "testFunction",
+    summary = "Test function execution",
+    description = "Tests a VRL transformation function against sample events to validate the function logic and preview \
+                   the expected output before deployment to production pipelines. Allows developers to verify data \
+                   transformations, debug VRL code issues, and ensure correct field mappings without affecting live \
+                   data processing workflows.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = TestVRLRequest, description = "Test run function", content_type = "application/json"),
+    request_body(content = inline(TestVRLRequest), description = "Test run function", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
     )
 )]
 #[post("/{org_id}/functions/test")]
@@ -209,10 +351,15 @@ pub async fn test_function(
     req_body: web::Json<TestVRLRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let TestVRLRequest { function, events } = req_body.into_inner();
+    let TestVRLRequest {
+        function,
+        events,
+        trans_type,
+    } = req_body.into_inner();
 
-    // Assuming `test_function` applies the VRL function to each event
-    match crate::service::functions::test_run_function(&org_id, function, events).await {
+    // test_run_function will auto-detect VRL vs JS if trans_type is None
+    match crate::service::functions::test_run_function(&org_id, function, events, trans_type).await
+    {
         Ok(result) => Ok(result),
         Err(err) => Ok(HttpResponse::BadRequest().body(err.to_string())),
     }

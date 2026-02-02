@@ -1,225 +1,240 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
+
+// Test timeout constants (in milliseconds)
+const FIVE_MINUTES_MS = 300000;
+const UI_STABILIZATION_WAIT_MS = 2000;
 
 test.describe("Alerts UI Operations", () => {
-  // Shared test variables
   let pm;
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
+  let validationInfra;
 
-  /**
-   * Setup for each test
-   * - Logs in
-   * - Initializes page objects
-   * - Generates shared random value
-   * - Ingests test data (except for scheduled alert test)
-   * - Navigates to alerts page
-   */
   test.beforeEach(async ({ page }, testInfo) => {
     pm = new PageManager(page);
 
-    // Generate shared random value if not already generated
     if (!sharedRandomValue) {
       sharedRandomValue = pm.alertsPage.generateRandomString();
-      console.log('Generated shared random value for this run:', sharedRandomValue);
+      testLogger.info('Generated shared random value for this run', { sharedRandomValue });
     }
 
-    // Skip data ingestion for scheduled alert test
+    // Skip data ingestion for scheduled alert test - uses different data
     if (!test.info().title.includes('Scheduled Alert')) {
-      // Ingest test data using common actions
       const streamName = 'auto_playwright_stream';
       await pm.commonActions.ingestTestData(streamName);
     }
-    
-    // Navigate to alerts page
+
     await page.goto(
       `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
   });
 
-  /**
-   * Test: Create alert template and destination
-   * Prerequisites for other alert tests
-   */
   test('Create alert template and destination', {
     tag: ['@alertTemplate', '@alertDestination', '@all', '@alerts']
   }, async ({ page }) => {
-    // Create template with shared random value
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.createTemplate(createdTemplateName);
     await pm.alertTemplatesPage.verifyCreatedTemplateExists(createdTemplateName);
-    console.log('Created template:', createdTemplateName);
+    testLogger.info('Created template', { templateName: createdTemplateName });
 
-    // Create destination with shared random value
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
     await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
-    console.log('Created destination:', createdDestinationName);
+    testLogger.info('Created destination', { destinationName: createdDestinationName });
   });
 
-  /**
-   * Test: Delete alert template functionality
-   * Verifies template deletion and in-use scenarios
-   */
   test('Verify Delete alert template functionality', {
     tag: ['@deleteTemplate', '@all', '@alerts']
   }, async ({ page }) => {
-    // Ensure template exists
-    createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
-    await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
+    // Use isolated template to avoid conflicts with other tests
+    const deleteTemplateName = 'auto_playwright_delete_template_' + sharedRandomValue;
+    await pm.alertTemplatesPage.createTemplate(deleteTemplateName);
+    testLogger.info('Created isolated template for deletion test', { templateName: deleteTemplateName });
 
-    // Navigate to templates page
     await pm.alertTemplatesPage.navigateToTemplates();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Test template deletion
-    await pm.alertTemplatesPage.deleteTemplateAndVerify(createdTemplateName);
+    await pm.alertTemplatesPage.deleteTemplateAndVerify(deleteTemplateName);
+    testLogger.info('Successfully deleted isolated template', { templateName: deleteTemplateName });
   });
 
-  /**
-   * Test: Scheduled Alert with SQL Query
-   * Tests creation and deletion of scheduled alerts
-   */
   test('Create and Delete Scheduled Alert with SQL Query', {
-    tag: ['@scheduledAlerts', '@all', '@alerts']
+    tag: ['@scheduledAlerts', '@all', '@alerts'],
+    timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const streamName = 'auto_playwright_stream';
 
-    // Ensure prerequisites exist
+    validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, sharedRandomValue);
+    testLogger.info('Validation infrastructure ready', validationInfra);
+
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
-    createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
-    const slackUrl = "DEMO";
-    await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
-    // Navigate to alerts tab
     await pm.commonActions.navigateToAlerts();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Ingest custom test data
     await pm.commonActions.ingestCustomTestData(streamName);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Create and verify scheduled alert
     const folderName = 'auto_' + sharedRandomValue;
     await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
     await pm.alertsPage.verifyFolderCreated(folderName);
-    console.log('Successfully created folder:', folderName);
+    testLogger.info('Successfully created folder', { folderName });
 
+    // Use auto_playwright_stream - has fewer columns so 'log' is visible in dropdown
+    const triggerStreamName = 'auto_playwright_stream';
     await pm.alertsPage.navigateToFolder(folderName);
-    const alertName = await pm.alertsPage.createScheduledAlertWithSQL(streamName, createdDestinationName, sharedRandomValue);
+    const alertName = await pm.alertsPage.createScheduledAlertWithSQL(triggerStreamName, validationInfra.destinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
-    console.log('Successfully created scheduled alert:', alertName);
+    testLogger.info('Successfully created scheduled alert', { alertName });
 
-    // Clean up
+    // TODO: Investigate scheduled alert trigger validation - currently disabled due to timing issues
+    // Scheduled alerts need evaluation cycles (1+ minute) which exceeds test timeout
+    testLogger.info('Scheduled alert created successfully - trigger validation skipped (needs investigation)', { alertName });
+
+    await pm.commonActions.navigateToAlerts();
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
     await pm.alertsPage.deleteAlertByRow(alertName);
     await pm.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
   });
 
   /**
-   * Test: Alert Module UI Validations and Filters Check
-   * Tests UI validations and filter functionality
+   * Feature #9484: Manual Alert Trigger via UI
+   * https://github.com/openobserve/openobserve/issues/9484
+   * Tests the manual alert trigger functionality accessible via the kebab menu
+   * Uses validation infrastructure (self-referential destination) for reliable testing
    */
+  test('Manual Alert Trigger via UI (Feature #9484)', {
+    tag: ['@manualTrigger', '@all', '@alerts', '@feature9484']
+  }, async ({ page }) => {
+    const streamName = 'auto_playwright_stream';
+    const uniqueSuffix = sharedRandomValue || pm.alertsPage.generateRandomString();
+
+    // Use validation infrastructure - creates a destination that posts back to OpenObserve
+    // This ensures the trigger succeeds without external dependencies
+    validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, uniqueSuffix);
+    testLogger.info('Validation infrastructure ready for manual trigger test', validationInfra);
+
+    await pm.commonActions.navigateToAlerts();
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
+    // Create folder for the test
+    const folderName = 'auto_trigger_' + uniqueSuffix;
+    await pm.alertsPage.createFolder(folderName, 'Manual Trigger Test Folder');
+    await pm.alertsPage.verifyFolderCreated(folderName);
+    testLogger.info('Created folder for manual trigger test', { folderName });
+
+    // Navigate to folder and create alert with validation destination
+    await pm.alertsPage.navigateToFolder(folderName);
+    const column = 'log';
+    const value = 'test';
+    const alertName = await pm.alertsPage.createAlert(streamName, column, value, validationInfra.destinationName, uniqueSuffix);
+    await pm.alertsPage.verifyAlertCreated(alertName);
+    testLogger.info('Successfully created alert for manual trigger test', { alertName });
+
+    // Trigger the alert manually via the UI
+    testLogger.info('Triggering alert manually via UI');
+    const triggerSuccess = await pm.alertsPage.triggerAlertManually(alertName);
+    expect(triggerSuccess).toBe(true);
+    testLogger.info('Manual alert trigger successful', { alertName, triggerSuccess });
+
+    // Note: Alert history verification is optional for this feature test
+    // The core Feature #9484 is about the UI button triggering the API successfully
+    // The success notification confirms the trigger was successful
+
+    // Cleanup: delete the alert and folder
+    await pm.commonActions.navigateToAlerts();
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    await pm.alertsPage.deleteAlertByRow(alertName);
+    await pm.dashboardFolder.searchFolder(folderName);
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
+    await pm.dashboardFolder.deleteFolder(folderName);
+
+    testLogger.info('Feature #9484 test completed: Manual Alert Trigger via UI');
+  });
+
   test('Alert Module UI Validations and Filters Check', {
     tag: ['@all', '@alerts', '@alertsUIValidations']
   }, async ({ page }) => {
-    // Create template
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
-    await pm.alertTemplatesPage.createTemplate(templateName);
-    console.log('Created template:', templateName);
+    await pm.alertTemplatesPage.ensureTemplateExists(templateName);
+    testLogger.info('Template ready for use', { templateName });
 
-    // Create destination
     const destinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
     await pm.alertDestinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
-    console.log('Created destination:', destinationName);
+    testLogger.info('Destination ready for use', { destinationName });
 
-    // Navigate to alerts page
     await pm.commonActions.navigateToAlerts();
 
-    // Create folder
     const folderName = 'auto_' + sharedRandomValue;
     await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
-    console.log('Created folder:', folderName);
+    testLogger.info('Created folder', { folderName });
 
-    // Get initial alert counts
+    // Get initial counts to verify increase after alert creation
     await pm.commonActions.navigateToHome();
     const { scheduledAlertsCount, realTimeAlertsCount } = await pm.alertsPage.verifyAlertCounts();
-    console.log('Initial Active Scheduled Alerts Count:', scheduledAlertsCount);
-    console.log('Initial Active Real-time Alerts Count:', realTimeAlertsCount);
+    testLogger.info('Initial Active Scheduled Alerts Count', { count: scheduledAlertsCount });
+    testLogger.info('Initial Active Real-time Alerts Count', { count: realTimeAlertsCount });
 
-    // Navigate to alerts and verify ui validations
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    console.log('Navigated to folder:', folderName);
 
-    // Verify invalid alert name validation
     await pm.alertsPage.verifyInvalidAlertCreation();
-
-    // Verify field required validation
     await pm.alertsPage.verifyFieldRequiredValidation();
 
-    // Create a valid alert using existing function
+    // Use auto_playwright_stream - has fewer columns so 'log' is visible in dropdown
     const streamName = 'auto_playwright_stream';
-    const column = 'job';
+    const column = 'log';
     const value = 'test';
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     const alertName = await pm.alertsPage.createAlert(streamName, column, value, destinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
-    console.log('Successfully created valid alert:', alertName);
-    await page.waitForTimeout(2000); // Add delay after alert creation
+    testLogger.info('Successfully created valid alert', { alertName });
 
-    // Navigate back to home and verify alert count increased
     await pm.commonActions.navigateToHome();
     const { realTimeAlertsCount: newRealTimeAlertsCount } = await pm.alertsPage.verifyAlertCounts();
-    console.log('New Active Real-time Alerts Count:', newRealTimeAlertsCount);
-    
-    // Verify count increased by 1
+    testLogger.info('New Active Real-time Alerts Count', { count: newRealTimeAlertsCount });
+
     await pm.alertsPage.verifyAlertCountIncreased(realTimeAlertsCount, newRealTimeAlertsCount);
 
-    // Navigate back to alerts and verify clone validation
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    console.log('Navigated back to folder:', folderName);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Verify alert is visible before clone validation
-    await expect(page.getByRole('cell', { name: alertName })).toBeVisible({ timeout: 10000 });
-    console.log('Alert is visible before clone validation:', alertName);
-
-    // Now verify clone validation
+    await pm.alertsPage.verifyAlertCellVisible(alertName);
     await pm.alertsPage.verifyCloneAlertUIValidation(alertName);
 
-    // Continue with rest of the test...
     await pm.alertsPage.verifyTabContents();
     await pm.alertsPage.verifyFolderSearch(folderName);
 
-    // Move alerts to target folder
     const targetFolderName = 'testfoldermove';
     await pm.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
     await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
 
     await pm.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
-    // Verify alerts in target folder
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.dashboardFolder.searchFolder(targetFolderName);
     await pm.alertsPage.navigateToFolder(targetFolderName);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Search and verify alert instance
     await pm.alertsPage.searchAlert(alertName);
     await pm.alertsPage.verifySearchResultsUIValidation(1);
 
-    // Delete the alert
     await pm.alertsPage.deleteAlertByRow(alertName);
   });
-}); 
+});

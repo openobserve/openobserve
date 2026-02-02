@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: 100%; width: 100%">
-    <q-separator></q-separator>
     <div class="row" style="height: 100%">
+      <div class="tw:pl-[0.625rem]" style="overflow-y: auto;">
       <div
-        class="col scroll"
+        class="col scroll card-container tw:mr-[0.625rem]"
         style="
           overflow-y: auto;
           height: 100%;
@@ -37,9 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'scatter',
             'table',
           ]"
-          v-model:selectedChartType="dashboardPanelData.data.type"
-          @update:selected-chart-type="resetAggregationFunction"
+          :selectedChartType="dashboardPanelData.data.type"
+          @update:selected-chart-type="handleChartTypeChange"
         />
+      </div>
       </div>
       <q-separator vertical />
       <!-- for query related chart only -->
@@ -55,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- collapse field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed"
+          class="field-list-sidebar-header-collapsed card-container"
           @click="collapseFieldList"
           style="width: 50px; height: 100%"
         >
@@ -73,7 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div class="col scroll" style="height: 100%; overflow-y: auto">
+            <div class="tw:w-full tw:h-full">
+            <div class="col scroll card-container" style="height: 100%; overflow-y: auto">
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
@@ -82,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FieldList :editMode="true" :hideAllFieldsSelection="true" />
                 </div>
               </div>
+            </div>
             </div>
           </template>
           <template #separator>
@@ -94,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'chevron_left'
                   : 'chevron_right'
               "
+              :class="dashboardPanelData.layout.showFieldList ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               dense
               round
               style="top: 14px; z-index: 100"
@@ -102,12 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row"
+              class="row card-container"
               :style="{
                 height: '100%',
                 width: dashboardPanelData.layout.showFieldList
                   ? '100%'
-                  : 'calc(100% - 50px)',
+                  : 'calc(100% - 58px)',
               }"
             >
               <div class="col" style="height: 100%">
@@ -158,20 +162,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
+                        :showLegendsButton="true"
                         @updated:vrl-function-field-list="
                           updateVrlFunctionFieldList
+                        "
+                        @limit-number-of-series-warning-message-update="
+                          handleLimitNumberOfSeriesWarningMessage
                         "
                         :width="6"
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                        :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
+                        @show-legends="showLegendsDialog = true"
+                        ref="panelSchemaRendererRef"
                       />
                     </div>
                     <div
                       class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
                       style="position: absolute; top: 0px; right: -13px"
                     >
+                      <!-- Error/Warning tooltips -->
+                      <q-btn
+                        v-if="errorMessage"
+                        :icon="outlinedWarning"
+                        flat
+                        size="xs"
+                        padding="2px"
+                        data-test="dashboard-panel-error-data"
+                        class="warning q-mr-xs"
+                      >
+                        <q-tooltip
+                          anchor="bottom right"
+                          self="top right"
+                          max-width="220px"
+                        >
+                          <div style="white-space: pre-wrap">
+                            {{ errorMessage }}
+                          </div>
+                        </q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-if="maxQueryRangeWarning"
+                        :icon="outlinedWarning"
+                        flat
+                        size="xs"
+                        padding="2px"
+                        data-test="dashboard-panel-max-duration-warning"
+                        class="warning q-mr-xs"
+                      >
+                        <q-tooltip
+                          anchor="bottom right"
+                          self="top right"
+                          max-width="220px"
+                        >
+                          <div style="white-space: pre-wrap">
+                            {{ maxQueryRangeWarning }}
+                          </div>
+                        </q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-if="limitNumberOfSeriesWarningMessage"
+                        :icon="symOutlinedDataInfoAlert"
+                        flat
+                        size="xs"
+                        padding="2px"
+                        data-test="dashboard-panel-limit-number-of-series-warning"
+                        class="warning q-mr-xs"
+                      >
+                        <q-tooltip
+                          anchor="bottom right"
+                          self="top right"
+                          max-width="220px"
+                        >
+                          <div style="white-space: pre-wrap">
+                            {{ limitNumberOfSeriesWarningMessage }}
+                          </div>
+                        </q-tooltip>
+                      </q-btn>
                       <q-btn
                         size="md"
                         class="no-border"
@@ -180,12 +250,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="padding: 2px 4px; z-index: 1"
                         color="primary"
                         @click="addToDashboard"
-                        title="Add To Dashboard"
-                        :disabled="
-                          errorData?.errors?.length > 0 ||
-                          errorData?.value?.message !== ''
-                        "
-                        >Add To Dashboard</q-btn
+                        :title="t('search.addToDashboard')"
+                        :disabled="errorData?.errors?.length > 0"
+                        >{{ t("search.addToDashboard") }}</q-btn
                       >
                     </div>
                   </div>
@@ -197,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <q-separator vertical />
-              <div class="col-auto" style="height: 100%;">
+              <div class="col-auto" style="height: 100%">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -214,27 +281,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'html'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
+        class="col column tw:mr-[0.625rem]"
+        style="height: 100%; flex: 1"
       >
-        <CustomHTMLEditor
-          v-model="dashboardPanelData.data.htmlContent"
-          style="width: 100%; height: 100%"
-          class="col"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw:h-full tw:flex tw:flex-col">
+          <CustomHTMLEditor
+            v-model="dashboardPanelData.data.htmlContent"
+            style="flex: 1; min-height: 0"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
+        </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'markdown'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
+        class="col column tw:mr-[0.625rem]"
+        style="height: 100%; flex: 1"
       >
-        <CustomMarkdownEditor
-          v-model="dashboardPanelData.data.markdownContent"
-          style="width: 100%; height: 100%"
-          class="col"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw:h-full tw:flex tw:flex-col">
+          <CustomMarkdownEditor
+            v-model="dashboardPanelData.data.markdownContent"
+            style="flex: 1; min-height: 0"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
+        </div>
       </div>
 
       <div
@@ -289,6 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'chevron_left'
                   : 'chevron_right'
               "
+              :class="dashboardPanelData.layout.showFieldList ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               dense
               round
               style="top: 14px; z-index: 100"
@@ -335,6 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
+                        :showLegendsButton="true"
                         @updated:vrl-function-field-list="
                           updateVrlFunctionFieldList
                         "
@@ -342,7 +413,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                        :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
+                        @show-legends="showLegendsDialog = true"
                       />
                     </template>
                   </q-splitter>
@@ -354,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <q-separator vertical />
-              <div class="col-auto" style="height: 100%;">
+              <div class="col-auto" style="height: 100%">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -370,6 +444,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
     </div>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
     <q-dialog
       v-model="showAddToDashboardDialog"
       position="right"
@@ -405,6 +485,15 @@ import { onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { searchState } from "@/composables/useLogs/searchState";
+import {
+  outlinedWarning,
+  outlinedRunningWithErrors,
+} from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -420,6 +509,10 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
+});
+
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
 });
 
 export default defineComponent({
@@ -442,6 +535,11 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    shouldRefreshWithoutCache: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   components: {
     ChartSelection,
@@ -455,6 +553,7 @@ export default defineComponent({
     CustomMarkdownEditor,
     AddToDashboard,
     CustomChartEditor,
+    ShowLegendsPopup,
   },
   emits: ["handleChartApiError"],
   setup(props, { emit }) {
@@ -469,17 +568,28 @@ export default defineComponent({
     const metaData = ref(null);
     const resultMetaData = ref(null);
     const seriesData = ref([] as any[]);
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
     };
     const splitterModel = ref(50);
+
+    // Warning messages
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = ref("");
 
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
     const { showErrorNotification } = useNotifications();
 
-    const { visualizeChartData, is_ui_histogram }: any = toRefs(props);
+
+    const { searchObj } = searchState();
+    const { buildSearch } = useSearchStream();
+
+    const { visualizeChartData, is_ui_histogram, shouldRefreshWithoutCache }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
 
     const showAddToDashboardDialog = ref(false);
@@ -519,6 +629,36 @@ export default defineComponent({
       },
     );
 
+    // Handle chart type change with validation
+    const handleChartTypeChange = (newType: string) => {
+      // Get the actual logs page query, handling SQL mode
+      let logsPageQuery = "";
+
+      // Handle sql mode - same as in Index.vue
+      if (!searchObj.meta.sqlMode) {
+        const queryBuild = buildSearch();
+        logsPageQuery = queryBuild?.query?.sql ?? "";
+      } else {
+        logsPageQuery = searchObj.data.query;
+      }
+
+      // Check if query is SELECT * and trying to switch chart type
+      if (
+        store.state.zoConfig.quick_mode_enabled === true &&
+        isSimpleSelectAllQuery(logsPageQuery)
+      ) {
+        showErrorNotification(
+          "Select * query is not supported for visualization.",
+        );
+        // Prevent the change by not updating the type
+        return;
+      }
+
+      // If validation passes, proceed with the change
+      dashboardPanelData.data.type = newType;
+      resetAggregationFunction();
+    };
+
     // resize the chart when query editor is opened and closed
     watch(
       () => dashboardPanelData.layout.showQueryBar,
@@ -544,9 +684,28 @@ export default defineComponent({
 
     const expandedSplitterHeight = ref(null);
 
-    const handleChartApiError = (errorMessage: any) => {
-      props.errorData.value = errorMessage.message || errorMessage;
-      emit("handleChartApiError", errorMessage);
+    const handleChartApiError = (errorMsg: any) => {
+      if (typeof errorMsg === "string") {
+        errorMessage.value = errorMsg;
+        const errorList = props.errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg);
+      } else if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message ?? "";
+        const errorList = props.errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg.message);
+        props.errorData.value = errorMsg?.message ?? "";
+      } else {
+        errorMessage.value = "";
+      }
+
+      emit("handleChartApiError", errorMsg);
+    };
+
+    // Handle limit number of series warning from PanelSchemaRenderer
+    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
     };
 
     const hoveredSeriesState = ref({
@@ -576,9 +735,18 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     const addToDashboard = () => {
-
-      // only copy if is_ui_histogram is true
-      if (resultMetaData.value?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
+      if (
+        resultMetaData.value?.[0]?.[0]?.converted_histogram_query &&
+        is_ui_histogram.value === true
+      ) {
+        dashboardPanelData.data.queries[0].query =
+          resultMetaData.value?.[0]?.[0]?.converted_histogram_query;
+      } else if (
+        // Backward compatibility - check if it's old format
+        resultMetaData.value?.[0]?.converted_histogram_query &&
+        is_ui_histogram.value === true &&
+        !Array.isArray(resultMetaData.value?.[0])
+      ) {
         dashboardPanelData.data.queries[0].query =
           resultMetaData.value?.[0]?.converted_histogram_query;
       }
@@ -595,7 +763,6 @@ export default defineComponent({
         );
         return;
       } else {
-
         showAddToDashboardDialog.value = true;
       }
     };
@@ -782,16 +949,22 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const onResultMetadataUpdate = (resultMetaDataParam: any) => {
-      // Store the result metadata
-      resultMetaData.value = resultMetaDataParam;
+    const onResultMetadataUpdate = (resultMetaDataParams: any) => {
+      resultMetaData.value = resultMetaDataParams ?? null;
 
-      // only copy if is_ui_histogram is true
-      // if (resultMetaDataParam?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
-      //   dashboardPanelData.data.queries[0].query =
-      //     resultMetaDataParam?.[0]?.converted_histogram_query;
-      // }
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        resultMetaData.value,
+        store.state.timezone,
+      );
     };
+
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
 
     return {
       t,
@@ -814,63 +987,27 @@ export default defineComponent({
       splitterModel,
       collapseFieldList,
       is_ui_histogram,
+      shouldRefreshWithoutCache,
       onResultMetadataUpdate,
       hoveredSeriesState,
       resultMetaData,
+      isSimpleSelectAllQuery,
+      handleChartTypeChange,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      handleLimitNumberOfSeriesWarningMessage,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
+      outlinedRunningWithErrors,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
-.layout-panel-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-
-.splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  width: 50px;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.field-list-collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-}
+@import "@/styles/logs/visualizelogs-query.scss";
 </style>

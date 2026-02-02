@@ -517,11 +517,6 @@ describe("IndexList Component", () => {
 
       expect(wrapper.props("fieldList")).toEqual(newFieldList);
     });
-
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
   });
 
   describe("Accessibility", () => {

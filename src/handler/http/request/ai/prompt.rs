@@ -17,17 +17,21 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, Result, delete, get, http::StatusCode, put, web};
 use config::meta::ai::PromptType;
-use o2_enterprise::enterprise::ai::prompt::{meta::UpdatePromptRequest, service as prompt_service};
+use o2_enterprise::enterprise::ai::agent::prompt::{
+    meta::UpdatePromptRequest, service as prompt_service,
+};
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::models::ai::PromptResponse,
+};
 
 /// ListPrompts
-///
-/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
     operation_id = "ListPrompts",
+    summary = "List all AI prompts",
+    description = "Retrieves all available AI prompts for the organization",
     security(
         ("Authorization" = [])
     ),
@@ -35,10 +39,13 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = StatusCode::OK, description = "Chat response", body = PromptResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::OK, description = "Chat response", body = inline(PromptResponse)),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "list"}))
+    )
 )]
 #[get("/{org_id}/ai/prompts")]
 pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
@@ -57,12 +64,12 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
 }
 
 /// GetPrompt
-///
-/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
     operation_id = "GetPrompt",
+    summary = "Get AI prompt by type",
+    description = "Retrieves a specific AI prompt configuration by its type identifier",
     security(
         ("Authorization" = [])
     ),
@@ -71,11 +78,14 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
         ("id" = String, Path, description = "Prompt ID")
     ),
     responses(
-        (status = StatusCode::OK, description = "Prompt retrieved", body = PromptResponse),
-        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = MetaHttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::OK, description = "Prompt retrieved", body = inline(PromptResponse)),
+        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "get"}))
+    )
 )]
 #[get("/{org_id}/ai/prompts/{prompt_type}")]
 pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpResponse, Error> {
@@ -95,12 +105,12 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
 }
 
 /// UpdatePrompt
-///
-/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
     operation_id = "UpdatePrompt",
+    summary = "Update AI prompt",
+    description = "Updates an existing AI prompt with new configuration and content",
     security(
         ("Authorization" = [])
     ),
@@ -108,18 +118,21 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = UpdatePromptRequest,
+        content = inline(UpdatePromptRequest),
         description = "Prompt details", 
         example = json!({
             "content": "Write a SQL query to get the top 10 users by response time in the default stream"
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Prompt updated", body = PromptResponse), 
-        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = MetaHttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::OK, description = "Prompt updated", body = inline(PromptResponse)), 
+        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "update"}))
+    )
 )]
 #[put("/{org_id}/ai/prompts")]
 pub async fn update_prompt(
@@ -138,7 +151,7 @@ pub async fn update_prompt(
     match prompt_service::update_prompt(request.content.clone()).await {
         Ok(_) => {
             // Emit cluster coordinator event to notify nodes in current cluster
-            if let Err(e) = infra::cluster_coordinator::ai_prompts::emit_put_event().await {
+            if let Err(e) = infra::coordinator::ai_prompts::emit_put_event().await {
                 log::error!("Failed to emit AI prompt update event to cluster coordinator: {e}");
             }
 
@@ -173,6 +186,8 @@ pub async fn update_prompt(
     context_path = "/api",
     tag = "Ai",
     operation_id = "RollbackPrompt",
+    summary = "Rollback AI prompt to previous version",
+    description = "Reverts an AI prompt to its previous version or configuration",
     security(
         ("Authorization" = [])
     ),
@@ -180,9 +195,9 @@ pub async fn update_prompt(
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = StatusCode::OK, description = "Prompt rolled back to default", body = PromptResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::OK, description = "Prompt rolled back to default", body = inline(PromptResponse)),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[delete("/{org_id}/ai/prompts")]
@@ -198,7 +213,7 @@ pub async fn rollback_prompt(path: web::Path<String>) -> Result<HttpResponse, Er
     match prompt_service::rollback_to_default_prompt().await {
         Ok(()) => {
             // Emit cluster coordinator event to notify nodes in current cluster
-            if let Err(e) = infra::cluster_coordinator::ai_prompts::emit_rollback_event().await {
+            if let Err(e) = infra::coordinator::ai_prompts::emit_rollback_event().await {
                 log::error!("Failed to emit AI prompt rollback event to cluster coordinator: {e}");
             }
 

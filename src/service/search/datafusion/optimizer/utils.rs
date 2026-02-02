@@ -72,6 +72,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
             // skip projection,subqueryalias, analyze, that we can add limit/sort after them
             LogicalPlan::Projection(_)
             | LogicalPlan::SubqueryAlias(_)
+            | LogicalPlan::DescribeTable(_)
             | LogicalPlan::Analyze(_) => {
                 is_stop = false;
                 (Transformed::no(node), None)
@@ -307,17 +308,21 @@ fn generate_table_source_with_sorted_by_time(
 
 pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::Extension(_))))
-        .unwrap()
+        .unwrap_or(true)
 }
 
 // avoid add new plan when the plan is empty relation
 // for example: select * from default where false
 pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::EmptyRelation(_))))
-        .unwrap()
+        .unwrap_or(true)
 }
 
 pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    plan.exists(|plan| Ok(plan.name() == "PlaceholderRowExec" || plan.name() == "EmptyExec"))
-        .unwrap()
+    plan.exists(|plan| {
+        Ok(plan.name() == "PlaceholderRowExec"
+            || plan.name() == "EmptyExec"
+            || plan.name() == "DataSourceExec")
+    })
+    .unwrap_or(true)
 }

@@ -16,7 +16,7 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    HttpRequest, HttpResponse, cookie,
+    HttpResponse, cookie,
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
@@ -37,7 +37,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
-    cache, file_list,
+    cache, cluster, file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
@@ -58,7 +58,7 @@ use {
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
-        settings::{get_logo, get_logo_text},
+        settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -66,12 +66,9 @@ use {
 };
 
 use crate::{
-    common::{
-        infra::{cluster, config::*},
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            user::{AuthTokens, AuthTokensExt},
-        },
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        user::{AuthTokens, AuthTokensExt},
     },
     service::{
         db,
@@ -85,6 +82,13 @@ use crate::{
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
+}
+
+#[cfg(feature = "enterprise")]
+pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
+    refresh_o2_config()
+        .and_then(|_| refresh_dex_config())
+        .and_then(|_| refresh_openfga_config())
 }
 
 #[derive(Serialize)]
@@ -101,7 +105,6 @@ struct ConfigResponse<'a> {
     default_functions: Vec<ZoFunction<'a>>,
     sql_base64_enabled: bool,
     timestamp_column: String,
-    syslog_enabled: bool,
     data_retention_days: i64,
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
@@ -116,6 +119,7 @@ struct ConfigResponse<'a> {
     custom_docs_url: String,
     rum: Rum,
     custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
     custom_hide_menus: String,
     custom_hide_self_logo: bool,
     meta_org: String,
@@ -126,6 +130,7 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     ingestion_url: String,
+    web_url: String,
     #[cfg(feature = "enterprise")]
     streaming_aggregation_enabled: bool,
     min_auto_refresh_interval: u32,
@@ -138,6 +143,30 @@ struct ConfigResponse<'a> {
     ai_enabled: bool,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
+    ingest_flatten_level: u32,
+    #[cfg(feature = "enterprise")]
+    license_expiry: i64,
+    #[cfg(feature = "enterprise")]
+    license_server_url: String,
+    #[cfg(feature = "enterprise")]
+    ingestion_quota_used: f64,
+    log_page_default_field_list: String,
+    query_values_default_num: i64,
+    mysql_deprecated_warning: bool,
+    #[cfg(feature = "enterprise")]
+    service_graph_enabled: bool,
+    #[cfg(not(feature = "enterprise"))]
+    service_graph_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    service_streams_enabled: bool,
+    #[cfg(not(feature = "enterprise"))]
+    service_streams_enabled: bool,
+    /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
+    /// Used by UI to populate the FQN priority dimension selector
+    #[cfg(feature = "enterprise")]
+    fqn_priority_dimensions: Vec<String>,
+    #[cfg(not(feature = "enterprise"))]
+    fqn_priority_dimensions: Vec<String>,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -158,8 +187,16 @@ struct Rum {
 #[utoipa::path(
     path = "/healthz",
     tag = "Meta",
+    operation_id = "HealthCheck",
+    summary = "System health check",
+    description = "Performs a basic health check to verify that the OpenObserve service is running and responding to \
+                   requests. Returns a simple status indicator that can be used by load balancers, monitoring systems, \
+                   and orchestration platforms to determine service availability and readiness.",
     responses(
-        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+        (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/healthz")]
@@ -180,9 +217,17 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
 #[utoipa::path(
     path = "/schedulez",
     tag = "Meta",
+    operation_id = "SchedulerHealthCheck",
+    summary = "Scheduler node health check",
+    description = "Checks the health and scheduling availability of the current node. Returns success only if the node \
+                   is both online and enabled for task scheduling. Used by cluster management systems to determine \
+                   which nodes are available for workload distribution and background job processing.",
     responses(
-        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
-        (status = 404, description="Status Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
+        (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"})),
+        (status = 404, description="Status Not OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "not ok"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/schedulez")]
@@ -206,6 +251,7 @@ pub async fn schedulez() -> Result<HttpResponse, Error> {
 
 #[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
+    let cfg = get_config();
     #[cfg(feature = "enterprise")]
     let o2cfg = get_o2_config();
     #[cfg(feature = "enterprise")]
@@ -259,6 +305,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let logo = None;
 
     #[cfg(feature = "enterprise")]
+    let logo_dark = get_logo_dark().await;
+
+    #[cfg(not(feature = "enterprise"))]
+    let logo_dark = None;
+
+    #[cfg(feature = "enterprise")]
     let custom_hide_menus = &o2cfg.common.custom_hide_menus;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_menus = "";
@@ -273,6 +325,16 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
+    #[cfg(feature = "enterprise")]
+    let service_graph_enabled = o2cfg.service_graph.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_graph_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let service_streams_enabled = o2cfg.service_streams.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_streams_enabled = false;
+
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
     #[cfg(feature = "enterprise")]
@@ -280,7 +342,25 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
 
-    let cfg = get_config();
+    #[cfg(feature = "enterprise")]
+    let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
+    #[cfg(feature = "enterprise")]
+    let license_server_url = o2cfg.common.license_server_url.to_string();
+    #[cfg(feature = "enterprise")]
+    let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
+
+    #[cfg(feature = "enterprise")]
+    let usage_enabled = true;
+    #[cfg(not(feature = "enterprise"))]
+    let usage_enabled = cfg.common.usage_enabled;
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),
@@ -300,7 +380,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
-        syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: cfg.compact.data_retention_days,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
@@ -314,6 +393,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
+        custom_logo_dark_img: logo_dark,
         custom_hide_menus: custom_hide_menus.to_string(),
         custom_hide_self_logo,
         rum: Rum {
@@ -333,9 +413,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
-        usage_enabled: cfg.common.usage_enabled,
-        usage_publish_interval: cfg.common.usage_publish_interval,
+        usage_enabled,
+        usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
+        web_url: cfg.common.web_url.to_string(),
         #[cfg(feature = "enterprise")]
         streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
@@ -348,6 +429,24 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        ingest_flatten_level: cfg.limit.ingest_flatten_level,
+        #[cfg(feature = "enterprise")]
+        license_expiry: expiry_time,
+        log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
+        #[cfg(feature = "enterprise")]
+        license_server_url,
+        #[cfg(feature = "enterprise")]
+        ingestion_quota_used,
+        query_values_default_num: cfg.limit.query_values_default_num,
+        mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
+        service_graph_enabled,
+        service_streams_enabled,
+        #[cfg(feature = "enterprise")]
+        fqn_priority_dimensions: o2_enterprise::enterprise::common::config::get_config()
+            .service_streams
+            .get_fqn_priority_dimensions(),
+        #[cfg(not(feature = "enterprise"))]
+        fqn_priority_dimensions: vec![],
     }))
 }
 
@@ -388,17 +487,18 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
 
     let file_list_num = file_list::len().await;
-    let file_list_max_id = file_list::get_max_pk_value().await.unwrap_or_default();
+    let file_list_last_update_at = file_list::get_max_update_at().await.unwrap_or_default();
+    let (last_check_updated_at, _) = db::compact::stats::get_offset().await;
+
     stats.insert(
         "FILE_LIST",
-        json::json!({"num":file_list_num,"max_id": file_list_max_id}),
+        json::json!({
+            "num":file_list_num,
+            "last_update_at": file_list_last_update_at,
+            "last_check_updated_at": last_check_updated_at,
+        }),
     );
 
-    let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
-    stats.insert(
-        "COMPACT",
-        json::json!({"file_list_offset": last_file_list_offset}),
-    );
     stats.insert(
         "DATAFUSION",
         json::json!({"file_stat_cache": {
@@ -434,10 +534,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         );
     }
     #[cfg(feature = "enterprise")]
-    if let Err(e) = refresh_o2_config()
-        .and_then(|_| refresh_dex_config())
-        .and_then(|_| refresh_openfga_config())
-    {
+    if let Err(e) = reload_enterprise_config() {
         return Ok(
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
@@ -465,6 +562,65 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
 }
 
+fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = value.as_object_mut() {
+        for (key, val) in obj.iter_mut() {
+            let key_lower = key.to_lowercase();
+
+            // Simple rule: contains any of these sensitive keywords
+            // Also hide header values that might contain credentials
+            let is_sensitive = key_lower.contains("password")
+                || key_lower.contains("secret")
+                || key_lower.contains("key")
+                || key_lower.contains("auth")
+                || key_lower.contains("token")
+                || key_lower.contains("credential")
+                || (key_lower.contains("header") && key_lower.contains("value"));
+
+            if is_sensitive && let Some(s) = val.as_str() {
+                *val = if s.is_empty() {
+                    serde_json::Value::String("[not set]".to_string())
+                } else {
+                    serde_json::Value::String("[hidden]".to_string())
+                };
+            }
+
+            if val.is_object() {
+                *val = hide_sensitive_fields(val.clone());
+            }
+        }
+    }
+    value
+}
+
+#[get("/runtime")]
+pub async fn config_runtime() -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    let mut config_value = serde_json::to_value(cfg.as_ref())
+        .map_err(|e| Error::other(format!("Failed to serialize config: {e}")))?;
+
+    config_value = hide_sensitive_fields(config_value);
+
+    let mut final_response = serde_json::Map::new();
+    final_response.insert(
+        "_metadata".to_string(),
+        json::json!({
+            "version": config::VERSION,
+            "commit_hash": config::COMMIT_HASH,
+            "build_date": config::BUILD_DATE,
+            "instance_id": get_instance_id(),
+        }),
+    );
+
+    if let Some(config_obj) = config_value.as_object() {
+        for (key, value) in config_obj {
+            final_response.insert(key.clone(), value.clone());
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(final_response))
+}
+
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
@@ -483,8 +639,6 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     drop(r);
     let r = STREAM_SCHEMAS_LATEST.read().await;
     for (key, schema) in r.iter() {
-        stream_num += 1;
-        stream_schema_num += 1;
         mem_size += std::mem::size_of::<String>() + key.len();
         mem_size += schema.size();
     }
@@ -494,7 +648,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
-pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error> {
     use config::meta::user::UserRole;
 
     use crate::common::meta::user::AuthTokens;
@@ -604,15 +758,21 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
-                    let is_new_usr = process_token(res)
-                        .await
-                        .map(|new_user| format!("&new_user_login={new_user}"));
+                    let url_params = match process_token(res).await {
+                        Ok(v) => v.map(|(new_user, pending_invites)| {
+                            format!("&new_user_login={new_user}&pending_invites={pending_invites}")
+                        }),
+                        Err(_) => {
+                            return Ok(HttpResponse::Unauthorized()
+                                .json("Email Domain not allowed".to_string()));
+                        }
+                    };
                     login_url = format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
-                        is_new_usr.unwrap_or_default()
+                        url_params.unwrap_or_default()
                     );
                 }
                 Err(e) => {
@@ -682,8 +842,8 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
     use o2_dex::meta::auth::PreLoginData;
 
     let login_data: PreLoginData = get_dex_login();
-    let state = login_data.state;
-    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
+    let state = login_data.state.clone();
+    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
     Ok(HttpResponse::Ok().json(login_data.url))
 }
@@ -819,7 +979,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let conf = get_config();
 
     #[cfg(feature = "enterprise")]
-    let auth_str = extract_auth_str(&req);
+    let auth_str = extract_auth_str(&req).await;
     // Only get the user email from the auth_str, no need to check for permissions and others
     #[cfg(feature = "enterprise")]
     let user_email = get_user_email_from_auth_str(&auth_str).await;
@@ -866,23 +1026,53 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
 }
 
 #[put("/enable")]
-async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn enable_node(
+    web::Query(query): web::Query<HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE.uuid.clone();
     let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
 
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let enable = match query.get("value") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
+    let enable = match query.get("value").and_then(|v| v.parse::<bool>().ok()) {
+        Some(v) => v,
+        None => {
+            return Ok(MetaHttpResponse::bad_request(
+                "invalid or missing 'value' query parameter (expected true or false)",
+            ));
+        }
     };
     node.scheduled = enable;
     if !node.scheduled {
         // release all the searching files
         crate::common::infra::wal::clean_lock_files();
+
+        #[cfg(feature = "enterprise")]
+        {
+            log::info!("[NODE] Disabling node, initiating graceful drain");
+
+            // If this is an ingester node, set draining mode and flush
+            if LOCAL_NODE.is_ingester() {
+                // Flush memory to WAL
+                if let Err(e) = ingester::flush_all().await {
+                    log::error!("[NODE] Error flushing ingester during disable: {e}");
+                    return Ok(MetaHttpResponse::internal_error(e));
+                }
+                // Set draining flag to trigger immediate S3 upload after flush memory to disk
+                o2_enterprise::enterprise::drain::set_draining(true);
+                log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
+            }
+        }
+    } else {
+        #[cfg(feature = "enterprise")]
+        {
+            // Re-enabling the node
+            if LOCAL_NODE.is_ingester() {
+                o2_enterprise::enterprise::drain::set_draining(false);
+            }
+        }
     }
-    match cluster::update_local_node(&node).await {
+    match crate::common::infra::cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
@@ -901,6 +1091,14 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/drain_status")]
+async fn drain_status() -> Result<HttpResponse, Error> {
+    let is_ingester = LOCAL_NODE.is_ingester();
+    let response = o2_enterprise::enterprise::drain::get_drain_status(is_ingester);
+    Ok(MetaHttpResponse::json(response))
 }
 
 #[get("/list")]
@@ -943,6 +1141,137 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
         ret.files.insert(file.clone(), nodes);
     }
     Ok(MetaHttpResponse::json(ret))
+}
+
+#[get("/refresh_nodes_list")]
+async fn refresh_nodes_list() -> Result<HttpResponse, Error> {
+    match cluster::cache_node_list().await {
+        Ok(node_ids) => Ok(MetaHttpResponse::json(node_ids)),
+        Err(e) => {
+            log::error!("[CLUSTER] refresh_node_list failed: {}", e);
+            Ok(MetaHttpResponse::internal_error(e.to_string()))
+        }
+    }
+}
+
+#[get("/refresh_user_sessions")]
+async fn refresh_user_sessions() -> Result<HttpResponse, Error> {
+    let _ = db::session::cache().await.map_err(|e| {
+        log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
+        e
+    });
+    Ok(MetaHttpResponse::json("user sessions refreshed"))
+}
+
+// List of all available cache modules
+const CACHE_MODULES: &[&str] = &[
+    "schema",
+    "organization",
+    "user",
+    "session",
+    "functions",
+    "pipeline",
+    "alerts",
+    "destinations",
+    "templates",
+    "short_url",
+    "realtime_triggers",
+    "org_users",
+    "compact_retention",
+];
+
+// Helper function to reload cache for a specific module
+async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
+    match module {
+        "schema" => db::schema::cache().await,
+        "organization" => db::organization::cache().await,
+        "user" => db::user::cache().await,
+        "session" => db::session::cache().await,
+        "functions" => db::functions::cache().await,
+        "pipeline" => db::pipeline::cache().await,
+        "alerts" => db::alerts::alert::cache().await,
+        "destinations" => db::alerts::destinations::cache().await,
+        "templates" => db::alerts::templates::cache().await,
+        "short_url" => db::short_url::cache().await,
+        "realtime_triggers" => db::alerts::realtime_triggers::cache().await,
+        "org_users" => db::org_users::cache().await,
+        "compact_retention" => db::compact::retention::cache().await,
+        _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+#[get("/reload")]
+async fn cache_reload(
+    web::Query(query): web::Query<HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
+    let modules_str = match query.get("module") {
+        Some(m) => m,
+        None => {
+            return Ok(MetaHttpResponse::bad_request(
+                "missing 'module' query parameter (e.g., ?module=schema,user,functions or ?module=all)",
+            ));
+        }
+    };
+
+    let mut modules: Vec<&str> = modules_str.split(',').map(|s| s.trim()).collect();
+    if modules.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(
+            "module parameter cannot be empty",
+        ));
+    }
+
+    // Expand "all" to all available modules
+    if modules.contains(&"all") {
+        modules = CACHE_MODULES.to_vec();
+    }
+
+    let total_modules = modules.len();
+    let mut results: HashMap<String, String> = HashMap::new();
+    let mut success_count = 0;
+    let mut failed_count = 0;
+
+    for module in modules {
+        match reload_module_cache(module).await {
+            Ok(_) => {
+                results.insert(module.to_string(), "success".to_string());
+                success_count += 1;
+                log::info!(
+                    "[CACHE_RELOAD] Successfully reloaded cache for module: {}",
+                    module
+                );
+            }
+            Err(e) => {
+                let error_msg = format!("failed: {}", e);
+                results.insert(module.to_string(), error_msg.clone());
+                failed_count += 1;
+                log::error!(
+                    "[CACHE_RELOAD] Failed to reload cache for module {}: {}",
+                    module,
+                    e
+                );
+            }
+        }
+    }
+
+    let status = if failed_count == 0 {
+        "success"
+    } else if success_count > 0 {
+        "partial"
+    } else {
+        "failed"
+    };
+
+    let response = json::json!({
+        "status": status,
+        "results": results,
+        "summary": {
+            "total": total_modules,
+            "success": success_count,
+            "failed": failed_count,
+        }
+    });
+
+    Ok(MetaHttpResponse::json(response))
 }
 
 #[cfg(test)]

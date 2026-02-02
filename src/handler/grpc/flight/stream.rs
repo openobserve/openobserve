@@ -25,7 +25,7 @@ use futures_core::ready;
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{handler::grpc::flight::clear_session_data, service::search::utils::AsyncDefer};
+use crate::{handler::grpc::flight::clear_session_data, service::search::work_group::DeferredLock};
 
 pub struct FlightEncoderStreamBuilder {
     encoder: FlightDataEncoder,
@@ -33,7 +33,8 @@ pub struct FlightEncoderStreamBuilder {
     custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
-    defer: Option<AsyncDefer>,
+    is_super: bool,
+    defer_lock: Option<DeferredLock>,
     start: std::time::Instant,
 }
 
@@ -44,7 +45,8 @@ impl FlightEncoderStreamBuilder {
             queue: VecDeque::new(),
             custom_messages: vec![],
             trace_id: String::new(),
-            defer: None,
+            is_super: false,
+            defer_lock: None,
             start: std::time::Instant::now(),
         }
     }
@@ -59,8 +61,13 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    pub fn with_defer(mut self, defer: Option<AsyncDefer>) -> Self {
-        self.defer = defer;
+    pub fn with_is_super(mut self, is_super: bool) -> Self {
+        self.is_super = is_super;
+        self
+    }
+
+    pub fn with_defer_lock(mut self, lock: Option<DeferredLock>) -> Self {
+        self.defer_lock = lock;
         self
     }
 
@@ -75,7 +82,7 @@ impl FlightEncoderStreamBuilder {
         span: tracing::Span,
     ) -> FlightEncoderStream {
         let child_span = info_span!("grpc:search:flight:execute_physical_plan");
-        child_span.set_parent(span.context());
+        let _ = child_span.set_parent(span.context());
         FlightEncoderStream {
             inner,
             encoder: self.encoder,
@@ -83,11 +90,15 @@ impl FlightEncoderStreamBuilder {
             done: false,
             custom_messages: self.custom_messages,
             trace_id: self.trace_id,
-            defer: self.defer,
+            is_super: self.is_super,
+            defer_lock: self.defer_lock,
             start: self.start,
             first_batch: true,
             span,
             child_span,
+            req_id: 0,
+            req_last_time: std::time::Instant::now(),
+            print_key_event: config::get_config().common.print_key_event,
         }
     }
 }
@@ -101,10 +112,14 @@ pub struct FlightEncoderStream {
     custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
-    defer: Option<AsyncDefer>,
+    is_super: bool,
+    defer_lock: Option<DeferredLock>,
     start: std::time::Instant,
     span: tracing::Span,
     child_span: tracing::Span,
+    req_id: u64,
+    req_last_time: std::time::Instant,
+    print_key_event: bool,
 }
 
 impl FlightEncoderStream {
@@ -155,10 +170,31 @@ impl Stream for FlightEncoderStream {
     ) -> Poll<Option<Self::Item>> {
         loop {
             if self.done && self.queue.is_empty() {
+                if self.print_key_event {
+                    log::info!(
+                        "[trace_id {}] flight->search: stream Poll::Ready(None) is_super: {}, took: {} ms",
+                        self.trace_id,
+                        self.is_super,
+                        self.req_last_time.elapsed().as_millis(),
+                    );
+                }
                 return Poll::Ready(None);
             }
 
             if let Some(data) = self.queue.pop_front() {
+                self.req_id += 1;
+                let took = self.req_last_time.elapsed().as_millis();
+                self.req_last_time = std::time::Instant::now();
+                if self.print_key_event
+                    && (took > 100 || config::utils::util::is_power_of_two(self.req_id))
+                {
+                    log::info!(
+                        "[trace_id {}] flight->search: stream Poll::Ready(#{}) message, is_super: {}, took: {took} ms",
+                        self.trace_id,
+                        self.req_id,
+                        self.is_super,
+                    );
+                }
                 return Poll::Ready(Some(Ok(data)));
             }
 
@@ -181,8 +217,9 @@ impl Stream for FlightEncoderStream {
                     self.done = true;
                     self.queue.clear();
                     log::error!(
-                        "[trace_id {}] flight->search: stream error: {e:?}, took: {} ms",
+                        "[trace_id {}] flight->search: stream error: {e:?}, is_super: {}, took: {} ms",
                         self.trace_id,
+                        self.is_super,
                         self.start.elapsed().as_millis()
                     );
                     return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
@@ -211,8 +248,11 @@ impl Stream for FlightEncoderStream {
 impl Drop for FlightEncoderStream {
     fn drop(&mut self) {
         let trace_id = &self.trace_id;
+        let is_super = self.is_super;
         let took = self.start.elapsed().as_millis();
-        log::info!("[trace_id {trace_id}] flight->search: stream end, took: {took} ms",);
+        log::info!(
+            "[trace_id {trace_id}] flight->search: stream end, is_super: {is_super}, took: {took} ms"
+        );
 
         let _child_enter = self.child_span.enter();
         let _enter = self.span.enter();
@@ -229,10 +269,12 @@ impl Drop for FlightEncoderStream {
             .inc();
 
         // defer is only set for super cluster follower leader
-        if let Some(defer) = self.defer.take() {
+        if let Some(defer) = self.defer_lock.take() {
             drop(defer);
         } else {
-            log::info!("[trace_id {trace_id}] flight->search: drop FlightEncoderStream",);
+            log::info!(
+                "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+            );
             // clear session data
             clear_session_data(&self.trace_id);
         }

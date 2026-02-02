@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-12 q-py-sm variables-input "
   :class="{
-    'flex tw-gap-2 items-center tw-w-full': variables.length == 0,
+    'flex tw:gap-2 items-center tw:w-full': variables.length == 0,
   }"
   >
     <div class="q-pb-xs custom-input-label text-bold">
@@ -39,23 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
     <template v-if="!variables.length">
-      <div class="flex justify-between items-center tw-ml-auto">
+      <div class="flex justify-between items-center tw:ml-auto">
 
         <q-btn
           data-test="alert-variables-add-btn"
-          label="Add Variable"
           size="sm"
-          class="text-bold add-variable no-border q-py-sm"
-          icon="add"
-          color="primary"
-          style="
-            border-radius: 4px;
-            text-transform: capitalize;
-            color: #fff !important;
-            font-size: 12px;
-          "
+          class="text-bold no-border o2-secondary-button tw:h-[36px]"
+          flat
+          no-caps
           @click="addVariable"
-        />
+        >
+        <q-icon name="add" />
+        <span>Add Variable</span>
+      </q-btn>
       </div>
     </template>
     <template v-else>
@@ -69,12 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             data-test="alert-variables-key-input"
             v-model="variable.key"
-            color="input-border"
-            :class="store.state.theme === 'dark' ? 'input-bg-dark' : 'input-bg-light'"
             stack-label
-          
-            outlined
-            filled
+            borderless
             :placeholder="t('common.name')"
             dense
             tabindex="0"
@@ -85,11 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-variables-value-input"
             v-model="variable.value"
             :placeholder="t('common.value')"
-            color="input-border"
-            :class="store.state.theme === 'dark' ? 'input-bg-dark' : 'input-bg-light'"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             isUpdatingDestination
             tabindex="0"

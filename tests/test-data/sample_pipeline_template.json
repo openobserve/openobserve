@@ -1,0 +1,180 @@
+{
+  "pipeline_id": "7402696020770947072",
+  "version": 0,
+  "enabled": true,
+  "org": "default",
+  "name": "test",
+  "description": "",
+  "source": {
+    "source_type": "realtime",
+    "org_id": "default",
+    "stream_name": "default",
+    "stream_type": "logs"
+  },
+  "nodes": [
+    {
+      "id": "9aab959a-0d22-42a4-be84-f15488862bfa",
+      "data": {
+        "node_type": "stream",
+        "org_id": "default",
+        "stream_name": "default",
+        "stream_type": "logs"
+      },
+      "position": {
+        "x": 597,
+        "y": 222.5
+      },
+      "io_type": "input"
+    },
+    {
+      "id": "95c8ef15-2b44-4ba7-87c8-efc28b0d7b59",
+      "data": {
+        "node_type": "stream",
+        "org_id": "default",
+        "stream_name": "default",
+        "stream_type": "logs"
+      },
+      "position": {
+        "x": 602.5,
+        "y": 537.5
+      },
+      "io_type": "output"
+    },
+    {
+      "id": "c160107d-ba19-427d-8e9b-95cca5973373",
+      "data": {
+        "node_type": "condition",
+        "version": 2,
+        "conditions": {
+          "filterType": "group",
+          "logicalOperator": "AND",
+          "conditions": [
+            {
+              "filterType": "condition",
+              "column": "code",
+              "operator": "=",
+              "value": "test",
+              "logicalOperator": "AND"
+            },
+            {
+              "filterType": "condition",
+              "column": "code",
+              "operator": ">=",
+              "value": "test",
+              "logicalOperator": "OR"
+            },
+            {
+              "filterType": "condition",
+              "column": "code",
+              "operator": "contains",
+              "value": "test",
+              "logicalOperator": "AND"
+            },
+            {
+              "filterType": "condition",
+              "column": "",
+              "operator": "=",
+              "value": "",
+              "logicalOperator": "AND"
+            },
+            {
+              "filterType": "condition",
+              "column": "field",
+              "operator": "=",
+              "value": "rrewt",
+              "logicalOperator": "AND"
+            },
+            {
+              "filterType": "group",
+              "logicalOperator": "OR",
+              "conditions": [
+                {
+                  "filterType": "condition",
+                  "column": "code",
+                  "operator": "<=",
+                  "value": "test",
+                  "logicalOperator": "OR"
+                },
+                {
+                  "filterType": "condition",
+                  "column": "code",
+                  "operator": ">",
+                  "value": "test",
+                  "logicalOperator": "OR"
+                },
+                {
+                  "filterType": "condition",
+                  "column": "code",
+                  "operator": "<",
+                  "value": "test",
+                  "logicalOperator": "AND"
+                }
+              ]
+            },
+            {
+              "filterType": "group",
+              "logicalOperator": "AND",
+              "conditions": [
+                {
+                  "filterType": "condition",
+                  "column": "code",
+                  "operator": "not_contains",
+                  "value": "test",
+                  "logicalOperator": "OR"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "position": {
+        "x": 206.75,
+        "y": 392.5
+      },
+      "io_type": "default"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e9aab959a-0d22-42a4-be84-f15488862bfa-c160107d-ba19-427d-8e9b-95cca5973373",
+      "source": "9aab959a-0d22-42a4-be84-f15488862bfa",
+      "target": "c160107d-ba19-427d-8e9b-95cca5973373",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "width": 20,
+        "height": 20
+      },
+      "type": "custom",
+      "style": {
+        "strokeWidth": 2
+      },
+      "animated": true,
+      "updatable": true
+    },
+    {
+      "id": "ec160107d-ba19-427d-8e9b-95cca5973373-95c8ef15-2b44-4ba7-87c8-efc28b0d7b59",
+      "source": "c160107d-ba19-427d-8e9b-95cca5973373",
+      "target": "95c8ef15-2b44-4ba7-87c8-efc28b0d7b59",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "width": 20,
+        "height": 20
+      },
+      "type": "custom",
+      "style": {
+        "strokeWidth": 2
+      },
+      "animated": true,
+      "updatable": true
+    }
+  ],
+  "paused_at": null,
+  "type": "realtime",
+  "stream_name": "default",
+  "stream_type": "logs",
+  "frequency": "--",
+  "period": "--",
+  "cron": "--",
+  "sql_query": "--",
+  "#": 1
+}

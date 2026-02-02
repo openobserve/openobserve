@@ -20,12 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     dense
     flat
-    class="q-ml-sm q-pa-xs syntax-guide-button"
+    class="q-pa-xs tw:cursor-pointer tw:border tw:border-[var(--o2-border-color)] tw:border-solid tw:bg-transparent! tw:w-[2rem] tw:min-h-[2rem] tw:h-[2rem] tw:rounded-[0.375rem] syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    :label="t('search.syntaxGuideLabel')"
     icon="help"
-    :aria-label="t('search.syntaxGuideLabel')"
   >
+    <q-tooltip>{{ t("search.syntaxGuideLabel") }}</q-tooltip>
     <q-menu
       data-test="syntax-guide-menu"
       class="syntax-guide-menu"
@@ -71,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw-underline text-primary"
+                    class="hover:tw:underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -127,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw-underline text-primary"
+                    class="hover:tw:underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -180,9 +179,9 @@ export default defineComponent({
 .syntax-guide-button {
   cursor: pointer;
   text-transform: capitalize;
-  padding: 5px 5px;
   font-weight: bold;
-  border: 1px solid rgba(89, 96, 178, 0.3);
+  min-height: 33px;
+  padding: 0;
 }
 
 .normal-mode {

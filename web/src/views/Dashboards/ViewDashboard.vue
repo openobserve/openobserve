@@ -17,12 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
+  <q-page :key="store.state.selectedOrganization.identifier" class="tw:h-full">
     <div
       ref="fullscreenDiv"
-      :class="`${isFullscreen ? 'fullscreen' : ''}  ${
-        store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
-      }`"
+      :class="{
+        fullscreen: isFullscreen,
+        'tw:h-[calc(100vh-105px)]': !store.state.printMode,
+        'print-mode-container': store.state.printMode,
+      }"
+      class="tw:mx-[0.625rem] q-pt-xs"
     >
       <div
         :class="`${
@@ -32,11 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'fullscreenHeader'
             : ''
         }`"
+        class="tw:mb-[0.625rem]"
       >
         <div
-          class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0"
+          class="tw:flex justify-between items-center tw:w-full tw:px-[0.626rem] tw:min-w-0 card-container tw:h-[48px]"
         >
-          <div class="tw-flex tw-flex-1 tw-overflow-hidden">
+          <div class="tw:flex tw:flex-1 tw:overflow-hidden">
             <q-btn
               v-if="!isFullscreen"
               no-caps
@@ -45,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outline
               icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
-              class="hideOnPrintMode"
+              class="hideOnPrintMode el-border"
             />
             <span
-              class="q-table__title folder-name tw-px-2 tw-cursor-pointer tw-transition-all tw-rounded-sm tw-ml-2"
+              class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
             </span>
@@ -58,21 +62,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="2em"
             />
             <q-icon
-              class="q-table__title tw-text-gray-400 tw-mt-1"
+              class="q-table__title tw:text-gray-400 tw:mt-1"
               name="chevron_right"
             ></q-icon>
             <span
-              class="q-table__title q-mx-sm tw-truncate tw-flex-1"
+              class="q-table__title q-mx-sm tw:truncate tw:flex-1"
               :title="currentDashboardData.data?.title"
             >
               {{ currentDashboardData.data?.title }}
             </span>
           </div>
-          <div class="tw-flex">
+          <div class="tw:flex">
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="add"
@@ -118,13 +122,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode"
+              class="dashboard-icons hideOnPrintMode q-ml-sm"
+              style="padding-left: 0px; padding-right: 0px"
               size="sm"
             />
             <q-btn
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="cancel"
@@ -137,12 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-else
               :outline="isVariablesChanged ? false : true"
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="refresh"
               @click="refreshData"
               :disable="arePanelsLoading"
+              :loading="arePanelsLoading"
               data-test="dashboard-refresh-btn"
               :color="isVariablesChanged ? 'warning' : ''"
               :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
@@ -158,25 +164,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ExportDashboard
               v-if="!isFullscreen"
-              class="hideOnPrintMode"
+              class="hideOnPrintMode el-border"
               :dashboardId="currentDashboardData.data?.dashboardId"
+            />
+            <share-button
+              v-if="!isFullscreen"
+              :url="dashboardShareURL"
+              button-class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
+              button-size="sm"
+              data-test="dashboard-share-btn"
             />
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
-              size="sm"
-              no-caps
-              icon="share"
-              @click="shareLink.execute()"
-              :loading="shareLink.isLoading.value"
-              data-test="dashboard-share-btn"
-              ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
-            >
-            <q-btn
-              v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="settings"
@@ -187,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons q-px-sm q-ml-sm el-border"
               size="sm"
               no-caps
               :icon="store.state.printMode === true ? 'close' : 'print'"
@@ -201,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               :icon="
@@ -218,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               :icon="outlinedDescription"
@@ -231,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="code"
@@ -251,13 +252,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
         @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
+        @variablesManagerReady="onVariablesManagerReady"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
         :folderId="route.query.folder"
         :reportId="reportId"
         :currentTimeObj="currentTimeObjPerPanel"
+        :shouldRefreshWithoutCacheObj="shouldRefreshWithoutCachePerPanel"
+        :dashboardName="currentDashboardData.data?.title"
+        :folderName="folderNameFromFolderId"
         :selectedDateForViewPanel="selectedDate"
+        :allowAlertCreation="true"
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
@@ -267,6 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
+        :showLegendsButton="true"
         @panelsValues="handleEmittedData"
         @searchRequestTraceIds="searchRequestTraceIds"
         :runId="runId"
@@ -345,6 +352,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import ShareButton from "@/components/common/ShareButton.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
 import {
@@ -372,6 +380,10 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
+import {
+  createDashboardsContextProvider,
+  contextRegistry,
+} from "@/composables/contextProviders";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -390,6 +402,7 @@ export default defineComponent({
   emits: ["onDeletePanel"],
   components: {
     DateTimePickerDashboard,
+    ShareButton,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
@@ -413,6 +426,10 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
+
+    // Variables manager will be initialized by RenderDashboardCharts
+    // and we'll receive a reference to it via the @variablesManagerReady event
+    const variablesManager = ref(null);
 
     let moment: any = () => {};
 
@@ -546,45 +563,59 @@ export default defineComponent({
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
+      // ONLY update the live variables data - DO NOT update URL
+      // URL updates should happen ONLY after commitAll() is called (on refresh button click)
+      // This follows the __global mechanism from the main branch design
       Object.assign(variablesData, data);
-      const variableObj = {};
-      data.values?.forEach((variable) => {
-        if (variable.type === "dynamic_filters") {
-          const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
-          );
-          const encodedFilters = filters.map((item: any) => ({
-            name: item.name,
-            operator: item.operator,
-            value: item.value,
-          }));
-          variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
-          );
-        } else {
-          variableObj[`var-${variable.name}`] = variable.value;
-        }
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: selectedTabId.value,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-          print: store.state.printMode,
-          searchtype: route.query.searchtype,
-        },
-      });
+
+      // NOTE: URL sync has been moved to refreshData() after commitAll()
+      // This ensures URL only reflects COMMITTED variable values, not live changes
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
       Object.assign(refreshedVariablesData, variablesData);
     };
+
+    // Handler for when variables manager is ready from RenderDashboardCharts
+    const onVariablesManagerReady = async (manager: any) => {
+      variablesManager.value = manager;
+
+      // Immediately update URL with initial committed values
+      // This handles variables that don't require loading (constant, textbox, custom_value)
+      await nextTick();
+      if (selectedDate.value && variablesManager.value) {
+        updateUrlWithCurrentState();
+      }
+    };
+
+    // Watch for changes to committed variables data
+    // This will trigger URL updates when variables finish loading (auto-commit for query_values)
+    watch(
+      () => {
+        if (!variablesManager.value) return null;
+        // Watch the committed variables data deeply
+        return JSON.stringify(variablesManager.value.committedVariablesData);
+      },
+      async () => {
+        // When committed variables change, update the URL
+        await nextTick();
+        if (selectedDate.value && variablesManager.value) {
+          updateUrlWithCurrentState();
+        }
+      },
+    );
+
     const isVariablesChanged = computed(() => {
-      // Convert both objects to a consistent format for comparison
+      // If using variables manager, access hasUncommittedChanges directly from the manager
+      // Explicitly dereference to ensure Vue tracks the dependency
+      const manager = variablesManager.value;
+
+      if (manager && 'hasUncommittedChanges' in manager) {
+        // Access the value (Vue auto-unwraps computed refs in composable returns)
+        const hasChanges = manager.hasUncommittedChanges;
+        return hasChanges;
+      }
+      // Legacy mode: Convert both objects to a consistent format for comparison
       const normalizeVariables = (obj) => {
         const normalized = JSON.parse(JSON.stringify(obj));
         // Sort arrays to ensure consistent ordering
@@ -624,6 +655,17 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
+
+      // Set up dashboard context provider
+      const dashboardProvider = createDashboardsContextProvider(
+        route,
+        store,
+        undefined,
+        false,
+        currentDashboardData,
+      );
+      contextRegistry.register("dashboards", dashboardProvider);
+      contextRegistry.setActive("dashboards");
     });
 
     const setTimeString = () => {
@@ -653,39 +695,39 @@ export default defineComponent({
           return;
         }
       }
-      currentDashboardData.data = await getDashboard(
+      const dashboard = await getDashboard(
         store,
         route.query.dashboard,
-        (route.query.folder ?? "default"),
+        route.query.folder ?? "default",
       );
 
       if (
-        !currentDashboardData?.data ||
-        typeof currentDashboardData.data !== "object" ||
-        !Object.keys(currentDashboardData.data).length
+        !dashboard ||
+        typeof dashboard !== "object" ||
+        !Object.keys(dashboard).length
       ) {
         goBackToDashboardList();
         return;
       }
 
+      // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
+      currentDashboardData.data = dashboard;
+
       // set selected tab from query params
-      const selectedTab = currentDashboardData?.data?.tabs?.find(
+      const selectedTab = dashboard?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
       );
 
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
-        : currentDashboardData?.data?.tabs?.[0]?.tabId;
+        : dashboard?.tabs?.[0]?.tabId;
 
       // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
+      if (!(dashboard?.variables && dashboard?.variables?.list.length)) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
+        refreshedVariablesData.isVariablesLoading = false;
+        refreshedVariablesData.values = [];
       }
 
       // check if route has time related query params
@@ -797,6 +839,10 @@ export default defineComponent({
     };
 
     const getQueryParamsForDuration = (data: any) => {
+      if (!data) {
+        return {};
+      }
+
       if (data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
@@ -816,7 +862,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards",
         query: {
-          folder: (route.query.folder ?? "default"),
+          folder: route.query.folder ?? "default",
         },
       });
     };
@@ -828,7 +874,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
-          folder: (route.query.folder ?? "default"),
+          folder: route.query.folder ?? "default",
           tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         },
       });
@@ -838,6 +884,24 @@ export default defineComponent({
       if (!arePanelsLoading.value) {
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
+
+        // Set shouldRefreshWithoutCache to false for all panels
+        const allPanelIds = [];
+        currentDashboardData.data.tabs?.forEach((tab: any) => {
+          tab.panels?.forEach((panel: any) => {
+            if (panel.id) {
+              allPanelIds.push(panel?.id);
+              shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
+            }
+          });
+        });
+
+        // CRITICAL: Commit all live variable changes to committed state
+        // This is the key mechanism that prevents premature API calls
+        // Call commitAllVariables via the RenderDashboardCharts ref
+        renderDashboardChartsRef.value?.commitAllVariables();
+
+        // Refresh the dashboard
         dateTimePicker.value.refresh();
       }
     };
@@ -923,23 +987,72 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
-    // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate, selectedTabId], () => {
-      generateNewDashboardRunId();
+    // Get current variable params from manager (uses new centralized getUrlParams method)
+    const getVariableParamsFromManager = (): Record<string, any> => {
+      if (renderDashboardChartsRef.value?.getUrlParams) {
+        return renderDashboardChartsRef.value.getUrlParams({ useLive: false });
+      }
+      return {};
+    };
+
+    // Helper function to update URL with current state
+    const updateUrlWithCurrentState = () => {
+      // Build variable params - prefer manager if available, otherwise use route.query
+      let variableParams: Record<string, any> = {};
+
+      if (variablesManager.value) {
+        // Get from manager
+        variableParams = getVariableParamsFromManager();
+
+        // If manager returns empty but route.query has variables, use route.query
+        // This handles the case where page just loaded and manager hasn't committed yet
+        if (Object.keys(variableParams).length === 0) {
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              variableParams[key] = route.query[key];
+            }
+          });
+        }
+      } else {
+        // No manager, use route.query
+        Object.keys(route.query).forEach((key) => {
+          if (key.startsWith("var-")) {
+            variableParams[key] = route.query[key];
+          }
+        });
+      }
+
       router.replace({
         query: {
-          ...route.query, // used to keep current variables data as is
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
           tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          ...variableParams, // Use variables from manager or route
           print: store.state.printMode,
           searchtype: route.query.searchtype,
         },
       });
-    });
+    };
+
+    // whenever the refreshInterval is changed, update the query params
+    // Note: We're removing the variablesManager.committedVariablesData watch
+    // because URL updates should only happen when user clicks refresh (handled in refreshData)
+    // This watch is just for time/tab/refresh interval changes
+    watch(
+      [
+        refreshInterval,
+        selectedDate,
+        selectedTabId,
+      ],
+      () => {
+        generateNewDashboardRunId();
+        updateUrlWithCurrentState();
+      },
+      { deep: true },
+    );
 
     const onDeletePanel = async (panelId: any) => {
       try {
@@ -947,7 +1060,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          (route.query.folder ?? "default"),
+          route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         );
         await loadDashboard();
@@ -977,7 +1090,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          (route.query.folder ?? "default"),
+          route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           newTabId,
         );
@@ -1001,7 +1114,13 @@ export default defineComponent({
       }
     };
 
-    const shareLink = useLoading(async () => {
+    /**
+     * Computed property for dashboard share URL
+     * Converts relative time periods to absolute times for sharing
+     */
+    const dashboardShareURL = computed(() => {
+      // Establish reactive dependency on route.fullPath to recompute when URL changes
+      void route.fullPath;
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
@@ -1015,22 +1134,7 @@ export default defineComponent({
         urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
 
-      try {
-        const res = await shortURLService.create(
-          store.state.selectedOrganization.identifier,
-          urlObj?.href,
-        );
-        const shortURL = res?.data?.short_url;
-        copyToClipboard(shortURL)
-          .then(() => {
-            showPositiveNotification("Link copied successfully");
-          })
-          .catch(() => {
-            showErrorNotification("Error while copying link");
-          });
-      } catch (error) {
-        showErrorNotification("Error while sharing link");
-      }
+      return urlObj?.href;
     });
 
     // Fullscreen
@@ -1110,7 +1214,11 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
-      
+
+      // Clean up dashboard context provider
+      contextRegistry.unregister("dashboards");
+      contextRegistry.setActive("");
+
       // Clear all refs
       cleanupRefs();
     });
@@ -1120,10 +1228,17 @@ export default defineComponent({
     });
 
     const currentTimeObjPerPanel = ref({});
+    const shouldRefreshWithoutCachePerPanel = ref({});
 
-    const refreshPanelRequest = (panelId) => {
+    const refreshPanelRequest = (panelId, shouldRefreshWithoutCache) => {
       // Set the panel ID to be refreshed
       panelIdToBeRefreshed.value = panelId;
+
+      // Store the shouldRefreshWithoutCache value for this panel
+      shouldRefreshWithoutCachePerPanel.value = {
+        ...shouldRefreshWithoutCachePerPanel.value,
+        [panelId]: shouldRefreshWithoutCache || false,
+      };
 
       // when the date changes from the picker, update the current time object for the dashboard
       if (selectedDate.value && dateTimePicker.value) {
@@ -1196,6 +1311,7 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------
       refreshData,
@@ -1212,7 +1328,7 @@ export default defineComponent({
       initialVariableValues,
       getQueryParamsForDuration,
       onDataZoom,
-      shareLink,
+      dashboardShareURL,
       selectedTabId,
       onMovePanel,
       printDashboard,
@@ -1245,6 +1361,7 @@ export default defineComponent({
       saveJsonDashboard,
       setTimeForVariables,
       runId,
+      onVariablesManagerReady,
     };
   },
 });
@@ -1279,28 +1396,131 @@ export default defineComponent({
 }
 .stickyHeader.fullscreenHeader {
   top: 0px;
+  z-index: 5100 !important;
 }
 
 .fullscreen {
-  width: 100vw;
-  height: 100vh;
-  overflow-y: auto; /* Enables scrolling within the div */
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 10000; /* Ensure it's on top */
-  /* Additional styling as needed */
+  width: 100vw !important;
+  height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 5000 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--q-color-page-background, #ffffff) !important;
+}
+
+.print-mode-container {
+  height: 100vh !important;
+  overflow-y: auto !important;
+}
+
+@media print {
+  .print-mode-container {
+    height: auto !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
 }
 
 .dashboard-icons {
   height: 30px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  :deep(.date-time-button) {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  :deep(.q-btn-dropdown) {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
+
+    .q-btn__content {
+      line-height: normal;
+      align-items: center;
+    }
+  }
 }
 
 .folder-name {
-  color: $primary !important;
+  color: var(--o2-menu-color) !important;
 }
 
 .folder-name:hover {
-  background-color: $accent !important;
+  border-radius: 0.325rem;
+  background-color: var(--o2-tab-bg) !important;
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
+}
+
+/* Outline state borders */
+.refresh-btn-group .apply-btn-refresh.q-btn--outline::before {
+  border-right: none !important;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
+  border-left: 1px solid $border-color !important;
+}
+
+/* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
+.refresh-btn-group .apply-btn-refresh.q-btn--flat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid $border-color !important;
+  border-right: none !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--flat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid $border-color !important;
+  border-left: 1px solid $border-color !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.apply-btn-refresh {
+  border-top-left-radius: 4px !important;
+  border-bottom-left-radius: 4px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.apply-btn-dropdown {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
 }
 </style>

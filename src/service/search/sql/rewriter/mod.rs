@@ -19,5 +19,6 @@ pub mod add_ordering_term;
 pub mod add_timestamp;
 pub mod approx_percentile;
 pub mod index;
+pub mod match_all_raw;
 pub mod remove_dashboard_placeholder;
 pub mod track_total_hits;

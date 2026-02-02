@@ -25,8 +25,12 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::{auth::UserEmail, redirect_response::RedirectResponseBuilder},
     },
-    handler::http::models::billings::{
-        CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody, ListSubscriptionResponseBody,
+    handler::http::{
+        extractors::Headers,
+        models::billings::{
+            CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody,
+            ListSubscriptionResponseBody,
+        },
     },
     service::{
         organization,
@@ -39,6 +43,8 @@ use crate::{
     context_path = "/api",
     tag = "Billings",
     operation_id = "GetSubscriptionUrl",
+    summary = "Get subscription URL for checkout session",
+    description = "Creates a checkout session URL for subscription upgrades and billing management",
     security(
         ("Authorization" = [])
     ),
@@ -46,15 +52,18 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/billings/hosted_subscription_url")]
 pub async fn create_checkout_session(
     path: web::Path<String>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> impl Responder {
     let org_id = path.into_inner();
@@ -117,6 +126,8 @@ pub async fn create_checkout_session(
     context_path = "/api",
     tag = "Billings",
     operation_id = "ProcessSessionDetail",
+    summary = "Process checkout session detail after payment",
+    description = "Processes successful checkout session details and updates subscription status",
     security(
         ("Authorization" = [])
     ),
@@ -124,15 +135,15 @@ pub async fn create_checkout_session(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/checkout_session_detail")]
 pub async fn process_session_detail(
     path: web::Path<String>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     query: web::Query<CheckoutSessionDetailRequestQuery>,
 ) -> impl Responder {
     let org_id = path.into_inner();
@@ -169,8 +180,18 @@ pub async fn process_session_detail(
                     json::Value::String(query.plan.to_string()),
                 ),
             ]);
-            telemetry::Telemetry::new()
+            let mut telemetry_instance = telemetry::Telemetry::new();
+            telemetry_instance
                 .send_track_event(
+                    "OpenObserve - New subscription started",
+                    Some(segment_event_data.clone()),
+                    false,
+                    false,
+                )
+                .await;
+
+            telemetry_instance
+                .send_keyevent_track_event(
                     "OpenObserve - New subscription started",
                     Some(segment_event_data),
                     false,
@@ -199,6 +220,8 @@ pub async fn process_session_detail(
     context_path = "/api",
     tag = "Billings",
     operation_id = "Unsubscribe",
+    summary = "Unsubscribe from current billing plan",
+    description = "Cancels the current subscription at the end of the billing cycle",
     security(
         ("Authorization" = [])
     ),
@@ -206,13 +229,19 @@ pub async fn process_session_detail(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/billings/unsubscribe")]
-pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl Responder {
+pub async fn unsubscribe(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> impl Responder {
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
 
@@ -244,6 +273,8 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListInvoices",
+    summary = "List organization billing invoices",
+    description = "Retrieves all billing invoices for the specified organization",
     security(
         ("Authorization" = [])
     ),
@@ -251,13 +282,19 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/billings/invoices")]
-pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> impl Responder {
+pub async fn list_invoices(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> impl Responder {
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
     if organization::get_org(&org_id).await.is_none() {
@@ -279,6 +316,8 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListSubscription",
+    summary = "List organization subscription details",
+    description = "Gets current subscription information and billing details for the organization",
     security(
         ("Authorization" = [])
     ),
@@ -286,13 +325,19 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/billings/list_subscription")]
-pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -> impl Responder {
+pub async fn list_subscription(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> impl Responder {
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
     match o2_cloud_billings::get_subscription(email, &org_id).await {
@@ -309,6 +354,8 @@ pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -
     context_path = "/api",
     tag = "Billings",
     operation_id = "CreateBillingPortalSession",
+    summary = "Create customer billing portal session",
+    description = "Creates a Stripe customer portal session for managing subscription and billing",
     security(
         ("Authorization" = [])
     ),
@@ -316,9 +363,12 @@ pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/billings/billing_portal")]
@@ -350,8 +400,11 @@ pub async fn create_billing_portal_session(
 #[utoipa::path(
     context_path = "/webhook",
     tag = "Billings",
+    summary = "Handle Stripe webhook events",
+    description = "Processes webhook events from Stripe for subscription changes and payments",
+    request_body(content = String, description = "Raw Stripe webhook payload"),
     responses(
-        (status = 200, description="Status OK", content_type = "application/json", body = HttpResponse)
+        (status = 200, description="Status OK", content_type = "application/json", body = ())
     )
 )]
 #[post("/stripe")]

@@ -23,6 +23,7 @@ use {
 
 pub mod ai_prompts;
 pub mod alerts;
+pub mod backfill;
 pub mod compact;
 pub mod dashboards;
 pub mod distinct_values;
@@ -32,6 +33,8 @@ pub mod functions;
 #[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
+#[cfg(feature = "enterprise")]
+pub mod license;
 pub mod metas;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
@@ -39,6 +42,7 @@ pub mod ofga;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline;
+pub mod pipeline_errors;
 #[cfg(feature = "enterprise")]
 pub mod re_pattern;
 pub mod saved_view;
@@ -47,8 +51,7 @@ pub mod schema;
 pub mod search_job;
 pub mod session;
 pub mod short_url;
-#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
-pub mod syslog;
+pub mod system_settings;
 pub mod user;
 
 pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
@@ -139,12 +142,6 @@ pub(crate) async fn delete_if_exists(key: &str, with_prefix: bool, need_watch: b
 pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
     let db = infra_db::get_db().await;
     db.list(prefix).await
-}
-
-#[inline]
-pub(crate) async fn list_keys(prefix: &str) -> Result<Vec<String>> {
-    let db = infra_db::get_db().await;
-    db.list_keys(prefix).await
 }
 
 #[inline]

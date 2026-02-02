@@ -16,23 +16,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage" style="min-height: auto">
+  <q-page class="tracePage" id="tracePage"
+style="min-height: auto">
     <div id="tracesSecondLevel">
-      <div class="tw-min-h-[82px]">
+      <div
+        class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+        :class="
+          activeTab === 'service-graph' ? 'tw:min-h-[45px]' : 'tw:min-h-[82px]'
+        "
+      >
+        <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
         <search-bar
           data-test="logs-search-bar"
           ref="searchBarRef"
           :fieldValues="fieldValues"
           :isLoading="searchObj.loading"
+          :activeTab="activeTab"
+          class="card-container"
           @searchdata="searchData"
           @onChangeTimezone="refreshTimezone"
-          @shareLink="copyTracesUrl"
+          @update:activeTab="activeTab = $event"
         />
       </div>
+
+      <!-- Service Graph Tab Content -->
       <div
+        v-if="activeTab === 'service-graph' && store.state.zoConfig.service_graph_enabled"
+        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-98px)] tw:overflow-hidden"
+      >
+        <service-graph class="tw:h-full" />
+      </div>
+
+      <!-- Search Tab Content -->
+      <div
+        v-if="activeTab === 'search'"
         id="tracesThirdLevel"
-        class="row scroll traces-search-result-container"
-        style="width: 100%"
+        class="traces-search-result-container relative-position"
       >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
         <q-splitter
@@ -40,135 +59,117 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="searchObj.config.splitterLimit"
           style="width: 100%"
           @update:model-value="onSplitterUpdate"
+          class="tw:h-full"
         >
-          <template #before v-if="searchObj.meta.showFields">
-            <index-list
-              ref="indexListRef"
-              :field-list="searchObj.data.stream.selectedStreamFields"
-              data-test="logs-search-index-list"
-              :key="searchObj.data.stream.streamLists"
-              @update:changeStream="onChangeStream"
-            />
+          <template #before>
+            <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+              <index-list
+                v-show="searchObj.meta.showFields"
+                ref="indexListRef"
+                :field-list="searchObj.data.stream.selectedStreamFields"
+                data-test="logs-search-index-list"
+                class="card-container"
+                :key="searchObj.data.stream.streamLists"
+                @update:changeStream="onChangeStream"
+              />
+            </div>
           </template>
           <template #separator>
-            <q-avatar
+            <q-btn
+              data-test="logs-search-field-list-collapse-btn"
+              :icon="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'"
+              :title="
+                searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+              "
+              :class="searchObj.meta.showFields ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               color="primary"
-              text-color="white"
-              size="20px"
-              icon="drag_indicator"
-              style="top: 10px"
+              size="sm"
+              dense
+              round
+              @click="collapseFieldList"
             />
           </template>
           <template #after>
             <div
-              class="full-height flex justify-center items-center"
-              v-if="searchObj.loading == true"
+              class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
             >
-              <div class="q-pb-lg">
-                <q-spinner-hourglass
-                  color="primary"
-                  size="40px"
-                  style="margin: 0 auto; display: block"
-                />
-                <span class="text-center">
-                  Hold on tight, we're fetching your traces.
-                </span>
-              </div>
-            </div>
-            <div
-              v-if="
-                searchObj.data.errorMsg !== '' && searchObj.loading == false
-              "
-            >
-              <h5 class="text-center">
+              <div class="card-container tw:h-full">
+                <div
+                  v-if="
+                    searchObj.data.errorMsg !== '' && searchObj.loading == false
+                  "
+                >
+                  <h5 class="text-center">
+                    <div
+                      data-test="logs-search-result-not-found-text"
+                      v-if="
+                        searchObj.data.stream.streamLists.length &&
+                        searchObj.data.errorCode == 0
+                      "
+                    >
+                      {{ t("traces.noTracesFound") }}
+                    </div>
+                    <SanitizedHtmlRenderer
+                      data-test="logs-search-error-message"
+                      :htmlContent="`${searchObj.data.errorMsg}
+                  ${searchObj.data.errorDetail ? `<h6 style='font-size: 14px; margin: 0;'>${searchObj.data.errorDetail}</h6>` : ''}`"
+                    />
+                    <div
+                      data-test="logs-search-error-20003"
+                      v-if="parseInt(searchObj.data.errorCode) == 20003"
+                    >
+                      <q-btn
+                        no-caps
+                        unelevated
+                        size="sm"
+                        bg-secondary
+                        class="no-border bg-secondary text-white"
+                        :to="
+                          '/streams?dialog=' +
+                          searchObj.data.stream.selectedStream.label
+                        "
+                        >Click here</q-btn
+                      >
+                      {{ t("traces.configureFullTextSearch") }}
+                    </div>
+                    <br />
+                    <q-item-label>{{
+                      searchObj.data.additionalErrorMsg
+                    }}</q-item-label>
+                  </h5>
+                </div>
+                <div v-else-if="!isStreamSelected">
+                  <div
+                    data-test="logs-search-no-stream-selected-text"
+                    class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
+                  >
+                    <q-icon name="info" color="primary" size="md" />
+                    {{ t("search.noStreamSelectedMessage") }}
+                </div>
+                </div>
                 <div
                   data-test="logs-search-result-not-found-text"
-                  v-if="
-                    searchObj.data.stream.streamLists.length &&
-                    searchObj.data.errorCode == 0
+                  v-else-if="
+                    isStreamSelected &&
+                    !searchObj.searchApplied &&
+                    !searchObj.data.queryResults?.hits?.length
                   "
+                  class="text-center tw:mx-[10%] tw:py-[40px] tw:text-[20px]"
                 >
-                  Result not found.
+                  <q-icon name="info"
+color="primary" size="md" />
+                  {{ t("search.applySearch") }}
                 </div>
-                <SanitizedHtmlRenderer
-                  data-test="logs-search-error-message"
-                  :htmlContent="
-                    searchObj.data.errorMsg +
-                    '<h6 style=\'font-size: 14px; margin: 0;\'>' +
-                    searchObj.data.errorDetail +
-                    '</h6>'
-                  "
-                />
-                <div
-                  data-test="logs-search-error-20003"
-                  v-if="parseInt(searchObj.data.errorCode) == 20003"
-                >
-                  <q-btn
-                    no-caps
-                    unelevated
-                    size="sm"
-                    bg-secondary
-                    class="no-border bg-secondary text-white"
-                    :to="
-                      '/streams?dialog=' +
-                      searchObj.data.stream.selectedStream.label
-                    "
-                    >Click here</q-btn
-                  >
-                  to configure a full text search field to the stream.
+
+                <div data-test="logs-search-search-result">
+                  <search-result
+                    ref="searchResultRef"
+                    @update:datetime="setHistogramDate"
+                    @update:scroll="getMoreData"
+                    @shareLink="copyTracesUrl"
+                  />
                 </div>
-                <br />
-                <q-item-label>{{
-                  searchObj.data.additionalErrorMsg
-                }}</q-item-label>
-              </h5>
-            </div>
-            <div v-else-if="!isStreamSelected">
-              <h5
-                data-test="logs-search-no-stream-selected-text"
-                class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-              >
-                <q-icon name="info" color="primary" size="md" /> Select a stream
-                and press 'Run query' to continue. Additionally, you can apply
-                additional filters and adjust the date range to enhance search.
-              </h5>
-            </div>
-            <div
-              data-test="logs-search-result-not-found-text"
-              v-else-if="
-                isStreamSelected &&
-                !searchObj.searchApplied &&
-                !searchObj.data.queryResults?.hits?.length
-              "
-              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-            >
-              <q-icon name="info" color="primary" size="md" />
-              {{ t("search.applySearch") }}
-            </div>
-            <div
-              v-else-if="
-                searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults?.hits?.length == 0 &&
-                searchObj.loading == false
-              "
-              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-            >
-              <q-icon name="info" color="primary" size="md" /> No traces found.
-              Please adjust the filters and try again.
-            </div>
-            <div
-              data-test="logs-search-search-result"
-              v-show="
-                searchObj.data.queryResults.hasOwnProperty('total') &&
-                !!searchObj.data.queryResults?.hits?.length
-              "
-            >
-              <search-result
-                ref="searchResultRef"
-                @update:datetime="setHistogramDate"
-                @update:scroll="getMoreData"
-                @shareLink="copyTracesUrl"
-              />
+              </div>
             </div>
           </template>
         </q-splitter>
@@ -220,8 +221,10 @@ const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
 const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
+const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 
 const store = useStore();
+const activeTab = ref("search");
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -237,6 +240,7 @@ const serviceColorIndex = ref(0);
 const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
+const chartRedrawTimeout = ref(null);
 
 searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
@@ -324,7 +328,7 @@ async function getStreamList() {
           });
       })
       .catch((e) => {
-        searchObj.loading = false;
+        searchObj.loadingStream = false;
         $q.notify({
           type: "negative",
           message:
@@ -333,10 +337,10 @@ async function getStreamList() {
         });
       })
       .finally(() => {
-        searchObj.loading = false;
+        searchObj.loadingStream = false;
       });
   } catch (e) {
-    searchObj.loading = false;
+    searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
     showErrorNotification("Error while getting streams");
   }
@@ -599,6 +603,7 @@ async function getQueryData() {
       return false;
     }
     searchObj.data.errorMsg = "";
+    searchObj.data.errorDetail = "";
 
     searchObj.searchApplied = true;
 
@@ -640,7 +645,7 @@ async function getQueryData() {
     if (searchObj.data.resultGrid.currentPage) {
       dismiss = $q.notify({
         type: "positive",
-        message: "Fetching more traces...",
+        message: t("traces.fetchingMoreTraces"),
         actions: [
           {
             icon: "cancel",
@@ -655,18 +660,70 @@ async function getQueryData() {
 
     let filter = searchObj.data.editorValue.trim();
 
+    // Add RED metrics filters to the query
+    const metricsFilters: string[] = [];
+    searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
+      if (rangeFilter.panelTitle === "Duration") {
+        if (rangeFilter.start !== null && rangeFilter.end !== null) {
+          metricsFilters.push(
+            `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+          );
+        } else {
+          metricsFilters.push(
+            `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
+          );
+        }
+      }
+      // Note: Rate and Error filters are not applicable to individual trace queries
+      // They are aggregation metrics, not span-level filters
+    });
+
+    // Add Error Only filter
+    if (searchObj.meta.showErrorOnly) {
+      metricsFilters.push("span_status = 'ERROR'");
+    }
+
+    // Combine editor filter with metrics filters
+    const allFilters = [filter, ...metricsFilters].filter(
+      (f) => f.trim().length > 0,
+    );
+    const combinedFilter = allFilters.join(" AND ");
+
+    if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
+
     searchService
       .get_traces({
         org_identifier: searchObj.organizationIdentifier,
         start_time: queryReq.query.start_time,
         end_time: queryReq.query.end_time,
-        filter: filter || "",
+        filter: combinedFilter || "",
         size: queryReq.query.size,
         from: queryReq.query.from,
         stream_name: selectedStreamName.value,
       })
       .then(async (res) => {
         searchObj.loading = false;
+
+        if (
+          filter &&
+          filter.includes("trace_id") &&
+          res.data.hits.length === 1 &&
+          res.data.hits[0].start_time &&
+          res.data.hits[0].end_time
+        ) {
+          const startTime = Math.floor(res.data.hits[0].start_time / 1000);
+          const endTime = Math.ceil(res.data.hits[0].end_time / 1000);
+          // If the trace is not in the current time range, update the time range
+          if (
+            !(
+              startTime >= queryReq.query.start_time &&
+              endTime <= queryReq.query.end_time
+            )
+          ) {
+            updateNewDateTime(startTime, endTime);
+          }
+        }
+
         const formattedHits = getTracesMetaData(res.data.hits);
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
@@ -680,26 +737,38 @@ async function getQueryData() {
 
         updateFieldValues(res.data.hits);
 
-        generateHistogramData();
-
         //update grid columns
         updateGridColumns();
-
-        // dismiss();
       })
       .catch((err) => {
         searchObj.loading = false;
         // dismiss();
         if (err.response != undefined) {
-          searchObj.data.errorMsg = err.response.data.error;
-        } else {
+          if (err.response.data.error) {
+            searchObj.data.errorMsg = err.response.data.error;
+          } else if (err.response.data.message) {
+            searchObj.data.errorMsg = err.response.data.message;
+          }
+        } else if (err.message) {
           searchObj.data.errorMsg = err.message;
         }
 
-        const customMessage = logsErrorMessage(err.response.data.code);
-        searchObj.data.errorCode = err.response.data.code;
-        if (customMessage != "") {
-          searchObj.data.errorMsg = t(customMessage);
+        if (err.response?.data?.code) {
+          const customMessage = logsErrorMessage(err.response.data.code);
+          searchObj.data.errorCode = err.response.data.code;
+          if (customMessage != "") {
+            searchObj.data.errorMsg = t(customMessage);
+          }
+        }
+
+        if (err.response?.data?.code && err.response?.data?.message) {
+          searchObj.data.errorMsg = err.response.data.message;
+          searchObj.data.errorCode = err.response.data.code;
+        }
+
+        if (err.response?.data?.code && err.response?.data?.error_detail) {
+          searchObj.data.errorDetail = err.response.data.error_detail;
+          searchObj.data.errorCode = err.response.data.code;
         }
 
         // $q.notify({
@@ -716,6 +785,23 @@ async function getQueryData() {
     showErrorNotification("Search request failed");
   }
 }
+
+/**
+ *
+ * @param startTime - start time in microseconds
+ * @param endTime - end time in microseconds
+ */
+const updateNewDateTime = (startTime: number, endTime: number) => {
+  searchBarRef.value?.updateNewDateTime({
+    startTime: startTime,
+    endTime: endTime,
+  });
+  $q.notify({
+    type: "positive",
+    message: t("traces.timeRangeUpdated"),
+    timeout: 5000,
+  });
+};
 
 const getTracesMetaData = (traces) => {
   if (!traces.length) return [];
@@ -976,15 +1062,15 @@ function generateHistogramData() {
     layout: layout,
   };
 
-  if (searchResultRef.value?.reDrawChart) {
-    searchResultRef.value.reDrawChart();
-  }
+  // if (searchResultRef.value?.reDrawChart) {
+  //   searchResultRef.value.reDrawChart();
+  // }
 }
 
 async function loadPageData() {
-  searchObj.loading = true;
-
-  searchObj.data.resultGrid.currentPage = 0;
+  searchObj.loadingStream = true;
+  if (!searchObj.data?.queryResults?.hits?.length)
+    searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
   searchObj.organizationIdentifier =
@@ -1008,9 +1094,20 @@ function refreshStreamData() {
 
 onBeforeMount(async () => {
   restoreUrlQueryParams();
+  // Restore active tab from URL query params
+  const queryParams = router.currentRoute.value.query;
+  if (queryParams.tab === 'service-graph' || queryParams.tab === 'service-maps') {
+    // Support both old 'service-maps' and new 'service-graph' for backwards compatibility
+    // Only allow service graph tab if service graph is enabled
+    if (store.state.zoConfig.service_graph_enabled) {
+      activeTab.value = 'service-graph';
+    } else {
+      // If service graph is disabled, default to search tab
+      activeTab.value = 'search';
+    }
+  }
   await importSqlParser();
   if (searchObj.loading == false) {
-    // eslint-disable-next-line no-prototype-builtins
     await loadPageData();
   }
 });
@@ -1035,7 +1132,7 @@ onActivated(() => {
 
   if (router.currentRoute.value.path.indexOf("/traces") > -1) {
     setTimeout(() => {
-      if (searchResultRef.value) searchResultRef.value.reDrawChart();
+      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
     }, 300);
   }
 });
@@ -1083,7 +1180,7 @@ const refreshTimezone = () => {
   updateGridColumns();
   generateHistogramData();
 
-  searchResultRef.value.reDrawChart();
+  // searchResultRef.value?.reDrawChart();
 };
 
 const restoreFiltersFromQuery = (node: any) => {
@@ -1123,11 +1220,6 @@ const restoreFilters = (query: string) => {
 
 const setHistogramDate = async (date: any) => {
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
-  await nextTick();
-  await nextTick();
-  await nextTick();
-
-  searchData();
 };
 
 const isStreamSelected = computed(() => {
@@ -1145,7 +1237,6 @@ const searchData = () => {
   }
 
   runQueryFn();
-  indexListRef.value.filterExpandedFieldValues();
 
   if (config.isCloud == "true") {
     segment.track("Button Click", {
@@ -1183,6 +1274,11 @@ const onChangeStream = () => {
   extractFields();
 };
 
+const collapseFieldList = () => {
+  if (searchObj.meta.showFields) searchObj.meta.showFields = false;
+  else searchObj.meta.showFields = true;
+};
+
 const showFields = computed(() => {
   return searchObj.meta.showFields;
 });
@@ -1213,33 +1309,34 @@ const runQuery = computed(() => {
 
 watch(showFields, () => {
   if (searchObj.meta.showHistogram == true && searchObj.meta.sqlMode == false) {
-    setTimeout(() => {
-      if (searchResultRef.value) searchResultRef.value.reDrawChart();
+    // Clear any existing timeout
+    if (chartRedrawTimeout.value) {
+      clearTimeout(chartRedrawTimeout);
+    }
+    chartRedrawTimeout.value = setTimeout(() => {
+      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
     }, 100);
   }
   if (searchObj.config.splitterModel > 0) {
     searchObj.config.lastSplitterPosition = searchObj.config.splitterModel;
   }
 
-  this.searchObj.config.splitterModel = this.searchObj.meta.showFields
+  searchObj.config.splitterModel = searchObj.meta.showFields
     ? searchObj.config.lastSplitterPosition
     : 0;
 });
 
-watch(showHistogram, () => {
-  if (
-    searchObj.meta.showHistogram == true &&
-    this.searchObj.meta.sqlMode == false
-  ) {
-    setTimeout(() => {
-      if (this.searchResultRef) this.searchResultRef.reDrawChart();
-    }, 100);
-  }
-});
+// watch(showHistogram, () => {
+//   if (searchObj.meta.showHistogram) {
+//     setTimeout(() => {
+//       if (this.searchResultRef) this.searchResultRef.reDrawChart();
+//     }, 100);
+//   }
+// });
 
 watch(moveSplitter, () => {
   if (searchObj.meta.showFields == false) {
-    searchObj.meta.showFields = this.searchObj.config.splitterModel > 0;
+    searchObj.meta.showFields = searchObj.config.splitterModel > 0;
   }
 });
 
@@ -1269,11 +1366,29 @@ watch(updateSelectedColumns, () => {
     updateGridColumns();
   }, 300);
 });
+
+// Watch for active tab changes and update URL
+watch(activeTab, (newTab) => {
+  const query = { ...router.currentRoute.value.query };
+  if (newTab === 'service-graph') {
+    // Only set service-graph tab if service graph is enabled
+    if (store.state.zoConfig.service_graph_enabled) {
+      query.tab = 'service-graph';
+    } else {
+      // If service graph is disabled, force back to search tab
+      activeTab.value = 'search';
+      delete query.tab;
+    }
+  } else {
+    delete query.tab;
+  }
+  router.replace({ query });
+});
 </script>
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 130px) !important;
+  height: calc(100vh - 144px) !important;
 }
 </style>
 <style lang="scss">

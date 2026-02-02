@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="q-pa-none !tw-w-[300px]"
+    class="q-pa-none tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mx-md">
         <div
           data-test="panel-layout-settings-height"
-          class="o2-input tw-relative"
+          class="o2-input tw:relative"
           style="padding-top: 12px"
         >
           <q-input
@@ -50,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless hide-bottom-space
             dense
             type="number"
             :rules="[
@@ -66,21 +65,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="panel-layout-settings-height-input"
           />
 
-          <div class="tw-text-[12px]">
+          <div class="tw:text-[12px]">
             Approximately
-            <span class="tw-font-bold">{{ getRowCount }}</span> table rows will
+            <span class="tw:font-bold">{{ getRowCount }}</span> table rows will
             be displayed
           </div>
 
           <q-icon
             name="info_outline"
-            class="cursor-pointer q-ml-sm tw-absolute tw-top-[14px] tw-left-[94px]"
+            class="cursor-pointer q-ml-sm tw:absolute tw:top-[14px] tw:left-[94px]"
             size="16px"
           >
             <q-tooltip
               anchor="center end"
               self="center left"
-              class="tw-text-[12px]"
+              class="tw:text-[12px]"
             >
               1 unit = 30px
             </q-tooltip>
@@ -91,17 +90,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           ref="closeBtn"
           v-close-popup="true"
-          class="q-mb-md text-bold"
+          class="o2-secondary-button tw:h-[36px]"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          flat
           :label="t('dashboard.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
           data-test="panel-layout-settings-cancel"
         />
         <q-btn
           :label="t('dashboard.save')"
-          class="q-mb-md text-bold no-border q-ml-md"
-          color="secondary"
+          class="o2-primary-button tw:h-[36px] q-ml-md"
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           padding="sm xl"
           type="submit"
           no-caps

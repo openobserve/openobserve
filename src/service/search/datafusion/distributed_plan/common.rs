@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, atomic::AtomicUsize};
 
 use arrow::array::RecordBatch;
 use arrow_schema::SchemaRef;
@@ -34,8 +34,12 @@ pub struct QueryContext {
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
     pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
+    pub peak_memory: Arc<AtomicUsize>,
     pub start: std::time::Instant,
     pub num_rows: usize,
+    pub req_id: u64,
+    pub req_last_time: std::time::Instant,
+    pub print_key_event: bool,
 }
 
 impl QueryContext {
@@ -47,9 +51,13 @@ impl QueryContext {
             scan_stats: Arc::new(Mutex::new(ScanStats::new())),
             partial_err: Arc::new(Mutex::new(String::new())),
             cluster_metrics: Arc::new(Mutex::new(Vec::new())),
+            peak_memory: Arc::new(AtomicUsize::new(0)),
             trace_id: String::new(),
             start: std::time::Instant::now(),
             num_rows: 0,
+            req_id: 0,
+            req_last_time: std::time::Instant::now(),
+            print_key_event: config::get_config().common.print_key_event,
         }
     }
 
@@ -85,6 +93,11 @@ impl QueryContext {
 
     pub fn with_start_time(mut self, start: std::time::Instant) -> Self {
         self.start = start;
+        self
+    }
+
+    pub fn with_peak_memory(mut self, peak_memory: Arc<AtomicUsize>) -> Self {
+        self.peak_memory = peak_memory;
         self
     }
 }

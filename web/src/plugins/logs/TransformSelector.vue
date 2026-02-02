@@ -15,25 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-toggle
-    data-test="logs-search-bar-show-query-toggle-btn"
-    v-model="searchObj.meta.showTransformEditor"
-    :icon="transformIcon"
-    class="float-left tw-cursor-pointer"
-    size="32px"
-    :disable="!searchObj.data.transformType || searchObj.meta.logsVisualizeToggle === 'visualize'"
-  >
-    <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
-      {{ getTransformLabelTooltip }}
-    </q-tooltip>
-  </q-toggle>
+  <div class="toolbar-toggle-container float-left">
+    <q-toggle
+      data-test="logs-search-bar-show-query-toggle-btn"
+      v-model="searchObj.meta.showTransformEditor"
+      class="o2-toggle-button-xs element-box-shadow"
+      size="xs"
+      flat
+      :disable="
+        !searchObj.data.transformType ||
+        searchObj.meta.logsVisualizeToggle === 'visualize'
+      "
+    >
+      <q-icon :name="transformIcon" class="toolbar-icon-in-toggle" :class="transformsLabel" />
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+        {{ getTransformLabelTooltip }}
+      </q-tooltip>
+    </q-toggle>
+  </div>
 
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="no-outline q-pa-none no-border float-left q-mr-xs transform-selector"
+    class="q-pa-none float-left q-mr-xs tw:h-[32px] transform-selector element-box-shadow el-border"
   >
     <div>
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
         transformsLabel
       }}</q-tooltip>
       <q-btn-dropdown
@@ -43,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="transformIcon"
         :label="transformsLabel"
         no-caps
-        class="saved-views-dropdown btn-function no-case q-pl-sm q-pr-none"
+        class="btn-function no-case q-pl-sm q-pr-none no-border no-outline tw:border-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
         :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
@@ -91,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div v-if="filteredTransformOptions.length">
             <q-item
-              class="tw-border-b saved-view-item"
+              class="tw:border-b saved-view-item"
               clickable
               v-for="(item, i) in filteredTransformOptions"
               :key="'transform-' + item?.name"
@@ -127,13 +133,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-btn
       data-test="logs-search-bar-save-transform-btn"
-      class="q-mr-xs save-transform-btn q-px-sm"
-      size="sm"
+      class=" save-transform-btn q-px-sm"
       icon="save"
       :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
       @click="fnSavedFunctionDialog"
+
     >
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{
           searchObj.data.transformType === "action"
             ? t("search.saveActionDisabled")
@@ -147,7 +153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import useLogs from "@/composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -160,7 +167,9 @@ const emit = defineEmits(["select:function", "save:function"]);
 
 const { t } = useI18n();
 
-const { searchObj, isActionsEnabled } = useLogs();
+const { searchObj } = searchState();
+
+const { isActionsEnabled } = logsUtils();
 
 const store = useStore();
 
@@ -235,15 +244,15 @@ const transformsLabel = computed(() => {
     return searchObj.data.selectedTransform.name;
   }
 
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+  if (searchObj.meta.logsVisualizeToggle === 'visualize') return t("search.functionSelectionNotSupportedVisualization");
 
-  if (!isActionsEnabled.value) return "Function";
+  if (!isActionsEnabled.value) return t("search.functionLabel");
 
   return searchObj.data.transformType === "action"
-    ? "Action"
+    ? t("search.actionLabel")
     : searchObj.data.transformType === "function"
-      ? "Function"
-      : "Transform";
+      ? t("search.functionLabel")
+      : t("search.transformLabel");
 });
 
 const transformIcon = computed(() => {
@@ -307,50 +316,25 @@ const fnSavedFunctionDialog = () => {
 const getTransformLabelTooltip = computed(() => {
 
   // function selection is not supported for visualization
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+  if (searchObj.meta.logsVisualizeToggle === 'visualize') return t("search.functionSelectionNotSupportedVisualization");
 
-  if (!isActionsEnabled.value) return "Toggle Function Editor";
+  if (!isActionsEnabled.value) return t("search.toggleFunctionEditor");
+
+  const editorType = searchObj.data.transformType === "action"
+    ? t("search.actionLabel")
+    : searchObj.data.transformType === "function"
+      ? t("search.functionLabel")
+      : t("search.transformLabel");
 
   return searchObj.meta.showTransformEditor
-    ? "Hide"
-    : "Show" + searchObj.data.transformType === "action"
-      ? "Action"
-      : searchObj.data.transformType === "function"
-        ? "Function"
-        : "Transform" + "Editor";
+    ? t("search.hide")
+    : `${t("search.show")} ${editorType} ${t("search.editor")}`;
 });
 </script>
 
 <style scoped lang="scss">
-.dark-theme {
-  :deep(.transform-icon),
-  :deep(.function-icon) {
-    .q-icon {
-      &.on-left {
-        filter: invert(1);
-      }
-    }
-  }
-}
-
-.transform-selector {
-  :deep(.btn-function) {
-    width: 140px;
-
-    .q-btn__content {
-      justify-content: start !important;
-
-      span {
-        text-overflow: ellipsis;
-        overflow: hidden;
-        white-space: nowrap;
-        width: 80px;
-      }
-
-      .q-btn-dropdown__arrow {
-        margin-left: 4px !important;
-      }
-    }
-  }
+@import '@/styles/logs/transform-selector.scss';
+.save-transform-btn{
+  border-left: 1px solid var(--o2-border-color);
 }
 </style>

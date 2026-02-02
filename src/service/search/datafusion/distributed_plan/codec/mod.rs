@@ -16,17 +16,20 @@
 use std::sync::Arc;
 
 use datafusion::{
-    common::Result, execution::FunctionRegistry, logical_expr::ScalarUDF,
-    physical_plan::ExecutionPlan,
+    common::Result, execution::TaskContext, logical_expr::ScalarUDF, physical_plan::ExecutionPlan,
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 
 #[cfg(feature = "enterprise")]
 mod aggregate_topk_exec;
 mod empty_exec;
+#[cfg(feature = "enterprise")]
+mod enrichment_exec;
 mod physical_plan_node;
 #[cfg(feature = "enterprise")]
 mod streaming_aggs_exec;
+#[cfg(feature = "enterprise")]
+mod tmp_exec;
 
 pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
@@ -48,11 +51,11 @@ impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
         &self,
         buf: &[u8],
         inputs: &[Arc<dyn ExecutionPlan>],
-        registry: &dyn FunctionRegistry,
+        ctx: &TaskContext,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let mut last_err = None;
         for codec in &self.codecs {
-            match codec.try_decode(buf, inputs, registry) {
+            match codec.try_decode(buf, inputs, ctx) {
                 Ok(plan) => return Ok(plan),
                 Err(e) => last_err = Some(e),
             }

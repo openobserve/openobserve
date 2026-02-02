@@ -21,9 +21,15 @@ use config::meta::{
     triggers::{Trigger, TriggerModule},
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+    handler::http::{
+        extractors::Headers,
+        models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
     service::{
         dashboards::reports::{self, ReportError},
         db::scheduler,
@@ -56,12 +62,16 @@ impl From<ReportError> for HttpResponse {
 }
 
 /// CreateReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
     operation_id = "CreateReport",
+    summary = "Create dashboard report",
+    description = "Creates a new automated dashboard report configuration. Reports can be scheduled to automatically \
+                   generate and distribute dashboard snapshots via email or other notification channels. Includes \
+                   support for custom time ranges, recipient lists, delivery schedules, and output formats to keep \
+                   stakeholders informed of key metrics and trends.",
     security(
         ("Authorization" = [])
     ),
@@ -69,7 +79,7 @@ impl From<ReportError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = Report,
+        content = inline(Report),
         description = "Report details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -77,15 +87,19 @@ impl From<ReportError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Report created", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::CREATED, description = "Report created", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a scheduled report"}))
+    )
 )]
 #[post("/{org_id}/reports")]
 pub async fn create_report(
     path: web::Path<String>,
     report: web::Json<Report>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
@@ -100,12 +114,16 @@ pub async fn create_report(
 }
 
 /// UpdateReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
     operation_id = "UpdateReport",
+    summary = "Update dashboard report",
+    description = "Updates an existing dashboard report configuration. Allows modification of report parameters including \
+                   schedule, recipients, dashboard selection, time ranges, and delivery options. Changes take effect on \
+                   the next scheduled execution, ensuring report distribution continues with updated settings and content \
+                   selection.",
     security(
         ("Authorization" = [])
     ),
@@ -114,20 +132,24 @@ pub async fn create_report(
         ("name" = String, Path, description = "Report name"),
     ),
     request_body(
-        content = Report,
+        content = inline(Report),
         description = "Report details",
     ),
     responses(
-        (status = StatusCode::OK, description = "Report updated", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Report not found", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = HttpResponse),
+        (status = StatusCode::OK, description = "Report updated", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a report"}))
+    )
 )]
 #[put("/{org_id}/reports/{name}")]
 async fn update_report(
     path: web::Path<(String, String)>,
     report: web::Json<Report>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let mut report = report.into_inner();
@@ -139,12 +161,16 @@ async fn update_report(
 }
 
 /// ListReports
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
     operation_id = "ListReports",
+    summary = "List dashboard reports",
+    description = "Retrieves a list of all dashboard reports configured for the organization. Optionally filter by folder \
+                   or dashboard to get specific report subsets. Returns report metadata including schedules, status, \
+                   destinations, and execution history to help administrators manage automated reporting and monitor \
+                   delivery performance.",
     security(
         ("Authorization" = [])
     ),
@@ -152,11 +178,19 @@ async fn update_report(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = StatusCode::OK, body = Vec<Report>),
+        (status = StatusCode::OK, body = inline(Vec<Report>)),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all reports"}))
+    )
 )]
 #[get("/{org_id}/reports")]
-async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn list_reports(
+    org_id: web::Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
@@ -175,10 +209,9 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            &user_email.user_id,
             "GET",
             "report",
         )
@@ -231,12 +264,16 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
 }
 
 /// GetReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
     operation_id = "GetReport",
+    summary = "Get dashboard report",
+    description = "Retrieves the complete configuration and details for a specific dashboard report. Returns report \
+                   parameters including schedule settings, dashboard selection, recipient lists, delivery options, and \
+                   execution status. Used for reviewing existing report configurations before making modifications or \
+                   troubleshooting delivery issues.",
     security(
         ("Authorization" = [])
     ),
@@ -245,9 +282,13 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = StatusCode::OK, body = Report),
-        (status = StatusCode::NOT_FOUND, description = "Report not found", body = HttpResponse),
+        (status = StatusCode::OK, body = inline(Report)),
+        (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get report details"}))
+    )
 )]
 #[get("/{org_id}/reports/{name}")]
 async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -259,12 +300,15 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /// DeleteReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
     operation_id = "DeleteReport",
+    summary = "Delete dashboard report",
+    description = "Removes a dashboard report configuration from the organization. This action cancels any scheduled \
+                   report deliveries and permanently removes the report configuration. Recipients will no longer receive \
+                   automated report deliveries, and the report configuration cannot be recovered once deleted.",
     security(
         ("Authorization" = [])
     ),
@@ -273,10 +317,14 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a report"}))
+    )
 )]
 #[delete("/{org_id}/reports/{name}")]
 async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -290,13 +338,86 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
     }
 }
 
+/// DeleteReportBulk
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "DeleteReportBulk",
+    summary = "Delete multiple dashboard reports",
+    description = "Removes multiple dashboard reports configuration from the organization. This action cancels any scheduled \
+                   report deliveries and permanently removes the report configuration. Recipients will no longer receive \
+                   automated report deliveries, and the report configuration cannot be recovered once deleted.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = BulkDeleteRequest,
+        description = "Reports to delete",
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/reports/bulk")]
+async fn delete_report_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match reports::delete(&org_id, &name).await {
+            Ok(_) => successful.push(name),
+            Err(e) => match e {
+                ReportError::ReportNotFound => successful.push(name),
+                e => {
+                    log::error!("error in deleting report {org_id}/{name} : {e}");
+                    unsuccessful.push(name);
+                    err = Some(e.to_string());
+                }
+            },
+        }
+    }
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
 /// EnableReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Report",
     operation_id = "EnableReport",
+    summary = "Enable or disable dashboard report",
+    description = "Enables or disables automated execution of a dashboard report. When disabled, scheduled report \
+                   deliveries are paused but the configuration is preserved. When re-enabled, report deliveries resume \
+                   according to the configured schedule. Useful for temporarily stopping report distribution without \
+                   losing the complete report setup.",
     security(
         ("Authorization"= [])
     ),
@@ -306,9 +427,9 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
         ("value" = bool, Query, description = "Enable or disable report"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/reports/{name}/enable")]
@@ -334,12 +455,16 @@ async fn enable_report(
 }
 
 /// TriggerReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
     operation_id = "TriggerReport",
+    summary = "Manually trigger dashboard report",
+    description = "Manually triggers immediate execution of a dashboard report outside of its regular schedule. Generates \
+                   the report with current data and delivers it to configured destinations. Useful for ad-hoc reporting \
+                   needs, testing report configurations, or providing immediate updates to stakeholders between scheduled \
+                   deliveries.",
     security(
         ("Authorization"= [])
     ),
@@ -348,9 +473,12 @@ async fn enable_report(
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/reports/{name}/trigger")]

@@ -48,7 +48,13 @@ installQuasar({
 // Mock the sqlUtils module
 vi.mock("@/utils/query/sqlUtils", () => ({
   buildSqlQuery: vi.fn(),
-  getFieldsFromQuery: vi.fn()
+  getFieldsFromQuery: vi.fn(),
+  isSimpleSelectAllQuery: vi.fn((query) => {
+    if (!query || typeof query !== 'string') return false;
+    const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+    const selectAllPattern = /^select\s+\*\s+from\s+/i;
+    return selectAllPattern.test(normalizedQuery);
+  })
 }));
 vi.mock("@/composables/useDashboardPanelData", () => ({
   default: () => ({

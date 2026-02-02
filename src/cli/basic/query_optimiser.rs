@@ -42,7 +42,7 @@ pub async fn query_optimiser(
             }
         }
         Err(e) => {
-            log::error!("Failed to get query recommendations: {:?}", e);
+            log::error!("Failed to get query recommendations: {e:?}");
         }
     }
 

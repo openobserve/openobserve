@@ -22,6 +22,7 @@ import logs from "../mockData/logs";
 import organizations from "../mockData/organizations";
 import home from "../mockData/home";
 import regexPatterns from "../mockData/regexPatterns";
+import actionScripts from "../mockData/actionScripts";
 import store from "./store";
 
 // TODO OK: Move below rest handlers to separate file
@@ -103,6 +104,19 @@ export const restHandlers = [
   ),
 
   http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/users/roles`,
+    ({ request }) => {
+      return HttpResponse.json({
+        data: [
+          { label: "Admin", value: "admin" },
+          { label: "Editor", value: "editor" },
+          { label: "Viewer", value: "viewer" },
+        ],
+      });
+    },
+  ),
+
+  http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts`,
     ({ request }) => {
       return HttpResponse.json(alerts.alerts.get);
@@ -120,6 +134,27 @@ export const restHandlers = [
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations`,
     ({ request }) => {
       return HttpResponse.json(alerts.destinations.get);
+    },
+  ),
+
+  http.get(
+    `${store.state.API_ENDPOINT}/api/v2/${store.state.selectedOrganization.identifier}/folders/alerts`,
+    ({ request }) => {
+      return HttpResponse.json({ folders: [] });
+    },
+  ),
+
+  http.options(
+    `${store.state.API_ENDPOINT}/api/v2/${store.state.selectedOrganization.identifier}/folders/alerts`,
+    ({ request }) => {
+      return new HttpResponse(null, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
+      });
     },
   ),
 
@@ -296,7 +331,6 @@ export const restHandlers = [
   // Config Service handler
   http.get(`${store.state.API_ENDPOINT}/config`, () => {
     return HttpResponse.json({
-      websocket_enabled: true,
       streaming_enabled: true,
       custom_logo_text: "Test Logo Text",
       custom_logo_img: "base64imagedata",
@@ -305,4 +339,59 @@ export const restHandlers = [
       default_fts_keys: ["log", "message", "msg", "content", "data"],
     }, { status: 200 });
   }),
+
+  // Action Scripts handlers
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+    () => {
+      return HttpResponse.json(actionScripts.list);
+    },
+  ),
+
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
+    () => {
+      return HttpResponse.json(actionScripts.single);
+    },
+  ),
+
+  http.post(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+    () => {
+      return HttpResponse.json({
+        code: 200,
+        message: "Action script created successfully",
+      });
+    },
+  ),
+
+  http.put(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
+    () => {
+      return HttpResponse.json({
+        code: 200,
+        message: "Action script updated successfully",
+      });
+    },
+  ),
+
+  http.delete(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
+    () => {
+      return HttpResponse.json({
+        code: 200,
+        message: "Action script deleted successfully",
+      });
+    },
+  ),
+
+  // Service Accounts handlers
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/service_accounts`,
+    () => {
+      return HttpResponse.json({
+        data: actionScripts.serviceAccounts,
+      });
+    },
+  ),
 ];

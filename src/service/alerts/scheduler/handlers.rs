@@ -22,6 +22,7 @@ use config::{
     meta::{
         alerts::TriggerCondition,
         dashboards::reports::ReportFrequencyType,
+        pipeline::components::NodeData,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
             usage::{TriggerData, TriggerDataStatus, TriggerDataType},
@@ -40,8 +41,12 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     scheduler::get_scheduler_max_retries,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
 use proto::cluster_rpc;
 
+#[cfg(feature = "enterprise")]
+use crate::service::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
@@ -66,12 +71,17 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::DerivedStream => {
             handle_derived_stream_triggers(trace_id, trigger).await
         }
+        db::scheduler::TriggerModule::QueryRecommendations => {
+            handle_query_recommendations_triggers(trace_id, trigger).await
+        }
+        db::scheduler::TriggerModule::Backfill => handle_backfill_triggers(trace_id, trigger).await,
     }
 }
 
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
 /// `tz_offset` is in minutes
 /// Frequency is in seconds
+#[allow(clippy::too_many_arguments)]
 fn get_skipped_timestamps(
     supposed_to_run_at: i64,
     cron: &str,
@@ -80,6 +90,7 @@ fn get_skipped_timestamps(
     delay: i64,
     align_time: bool,
     now: i64,
+    timezone_str: Option<&str>,
 ) -> (Vec<i64>, i64) {
     let mut skipped_timestamps = Vec::new();
     let mut next_run_at;
@@ -110,6 +121,7 @@ fn get_skipped_timestamps(
                 supposed_to_run_at + second_micros(frequency),
                 tz_offset,
                 Some(frequency),
+                timezone_str,
             )
         } else {
             supposed_to_run_at + second_micros(frequency)
@@ -210,14 +222,8 @@ async fn handle_alert_triggers(
                     start_time: now,
                     end_time: now,
                     next_run_at: now,
-                    skipped_alerts_count: None,
-                    delay_in_secs: None,
-                    evaluation_took_in_secs: None,
-                    query_took: None,
-                    success_response: None,
-                    is_partial: None,
-                })
-                .await;
+                    ..Default::default()
+                });
                 return Err(anyhow::anyhow!("Alert not found"));
             }
             Err(e) => {
@@ -229,7 +235,7 @@ async fn handle_alert_triggers(
                     // next run at is after 5mins
                     let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                     new_trigger.next_run_at = next_run_at;
-                    db::scheduler::update_trigger(new_trigger).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 } else {
                     // Mark the trigger as failed
                     db::scheduler::update_status(
@@ -239,6 +245,8 @@ async fn handle_alert_triggers(
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
                         None,
+                        true,
+                        &query_trace_id,
                     )
                     .await?;
                 }
@@ -258,14 +266,8 @@ async fn handle_alert_triggers(
                     start_time: now,
                     end_time: now,
                     next_run_at: now,
-                    skipped_alerts_count: None,
-                    delay_in_secs: None,
-                    evaluation_took_in_secs: None,
-                    query_took: None,
-                    success_response: None,
-                    is_partial: None,
-                })
-                .await;
+                    ..Default::default()
+                });
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
         }
@@ -294,24 +296,56 @@ async fn handle_alert_triggers(
     // Set the is_realtime field according to the alert
     new_trigger.is_realtime = alert.is_real_time;
 
+    // [ENTERPRISE] Initialize RCA batch tracking for this scheduler run
+    // #[cfg(feature = "enterprise")]
+    // let rca_enabled =
+    //     o2_enterprise::enterprise::ai::rca::integration::is_rca_enabled_for_org(&new_trigger.
+    // org); #[cfg(not(feature = "enterprise"))]
+    let _rca_enabled = false;
+
+    // Helper closure to mark alert completion and process batch if needed
+    // #[cfg(feature = "enterprise")]
+    // let mark_rca_completion = || async {
+    //     if rca_enabled {
+    //         let is_batch_complete =
+    //             o2_enterprise::enterprise::ai::rca::mark_alert_completed(trace_id);
+    //         if is_batch_complete {
+    //             log::info!(
+    //                 "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} complete, processing
+    // incidents",                 trace_id
+    //             );
+    //             if let Err(e) =
+    // o2_enterprise::enterprise::ai::rca::integration::process_batch_and_create_incidents(
+    //                 trace_id
+    //             ).await {
+    //                 log::error!(
+    //                     "[SCHEDULER trace_id {scheduler_trace_id}] Error creating incidents from
+    // batch {}: {}",                     trace_id, e
+    //                 );
+    //             }
+    //         }
+    //     }
+    // };
+
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
+            let mut alert = alert;
             log::info!(
-                "skipping alert {} id {} in org {} because free trial expiry",
+                "pausing alert {} id {} in org {} because free trial expiry",
                 alert.name,
                 trigger.module_key,
                 trigger.org
             );
+            alert.enabled = false;
             // Update the trigger job to the next expected trigger time to check again
-            let next_run_at = alert.trigger_condition.get_next_trigger_time(
-                true,
-                alert.tz_offset,
-                false,
-                None,
-            )?;
-            new_trigger.next_run_at = next_run_at;
-            db::scheduler::update_trigger(new_trigger).await?;
+            if let Err(e) = set_without_updating_trigger(&trigger.org, alert).await {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause alert due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    &trigger.module_key
+                );
+            }
             return Ok(());
         }
     }
@@ -327,7 +361,7 @@ async fn handle_alert_triggers(
             &trigger.module_key
         );
         // wakeup the trigger
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -335,7 +369,7 @@ async fn handle_alert_triggers(
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -347,6 +381,7 @@ async fn handle_alert_triggers(
             period_end_time: None,
             tolerance: 0,
             last_satisfied_at: None,
+            backfill_job: None,
         }
     };
 
@@ -367,7 +402,7 @@ async fn handle_alert_triggers(
         // Keep the last_satisfied_at field
         trigger_data.reset();
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -393,6 +428,7 @@ async fn handle_alert_triggers(
             delay,
             alert.trigger_condition.align_time,
             now,
+            alert.trigger_condition.timezone.as_deref(),
         );
         final_end_time = skipped_timestamps_end_timestamp.1;
         let skipped_timestamps = skipped_timestamps_end_timestamp.0;
@@ -426,17 +462,12 @@ async fn handle_alert_triggers(
                 end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
                 delay_in_secs: Some(Duration::microseconds(delay).num_seconds()),
-                error: None,
-                success_response: None,
-                is_partial: None,
-                evaluation_took_in_secs: None,
                 source_node: Some(source_node.clone()),
-                query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(time_in_queue),
                 skipped_alerts_count: Some(skipped_alerts_count as i64),
-            })
-            .await;
+                ..Default::default()
+            });
         }
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] alert {} skipped due to delay: {}",
@@ -479,7 +510,7 @@ async fn handle_alert_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     let evaluation_took = Instant::now();
@@ -488,7 +519,7 @@ async fn handle_alert_triggers(
         .evaluate(
             None,
             (Some(start_time), final_end_time),
-            Some(query_trace_id),
+            Some(query_trace_id.clone()),
         )
         .await;
     let evaluation_took = evaluation_took.elapsed().as_secs_f64();
@@ -531,7 +562,7 @@ async fn handle_alert_triggers(
             trigger_data.reset();
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             trigger_data_stream.next_run_at = new_trigger.next_run_at;
-            db::scheduler::update_trigger(new_trigger).await?;
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
             // update its status and retries
             db::scheduler::update_status(
@@ -541,10 +572,17 @@ async fn handle_alert_triggers(
                 db::scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
                 None,
+                true,
+                &query_trace_id,
             )
             .await?;
         }
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
+
+        // [ENTERPRISE] Mark completion even on failure
+        // #[cfg(feature = "enterprise")]
+        // mark_rca_completion().await;
+
         return Err(err);
     }
 
@@ -594,6 +632,255 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data {
+        // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let grouping_enabled = alert
+            .deduplication
+            .as_ref()
+            .and_then(|d| d.grouping.as_ref())
+            .map(|g| g.enabled)
+            .unwrap_or(false);
+
+        #[cfg(not(feature = "enterprise"))]
+        let grouping_enabled = false;
+
+        if grouping_enabled {
+            #[cfg(feature = "enterprise")]
+            {
+                let grouping_config = alert
+                    .deduplication
+                    .as_ref()
+                    .and_then(|d| d.grouping.as_ref())
+                    .unwrap();
+
+                // Calculate fingerprint for grouping
+                let fingerprint = if let Some(dedup_config) = alert.deduplication.as_ref() {
+                    let org_config =
+                        match crate::service::alerts::org_config::get_deduplication_config(
+                            &new_trigger.org,
+                        )
+                        .await
+                        {
+                            Ok(Some(config)) => Some(config),
+                            _ => None,
+                        };
+
+                    if let Some(first_row) = data.first() {
+                        crate::service::alerts::deduplication::calculate_fingerprint(
+                            &alert,
+                            first_row,
+                            dedup_config,
+                            org_config.as_ref(),
+                        )
+                    } else {
+                        alert.get_unique_key()
+                    }
+                } else {
+                    alert.get_unique_key()
+                };
+
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {}, rows: {}",
+                    &new_trigger.org,
+                    &alert.name,
+                    fingerprint,
+                    data.len()
+                );
+
+                // Add to batch
+                let batch_ready = crate::service::alerts::grouping::add_to_batch(
+                    fingerprint.clone(),
+                    new_trigger.org.clone(),
+                    alert.clone(),
+                    data.clone(),
+                    grouping_config.group_wait_seconds,
+                    grouping_config.max_group_size,
+                );
+
+                if batch_ready {
+                    log::info!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} reached max size, sending immediately",
+                        fingerprint
+                    );
+                    if let Some(batch) =
+                        crate::service::alerts::grouping::get_ready_batch(&fingerprint)
+                        && let Err(e) =
+                            crate::job::alert_grouping::send_grouped_notification_sync(batch).await
+                    {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
+                            e
+                        );
+                    }
+                } else {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
+                        fingerprint
+                    );
+                }
+
+                // Mark as grouped for history tracking
+                trigger_data_stream.dedup_enabled = Some(true);
+                trigger_data_stream.grouped = Some(true);
+                trigger_data_stream.group_size = Some(if batch_ready {
+                    grouping_config.max_group_size as i32
+                } else {
+                    1
+                });
+
+                // Alert added to batch, don't send individual notification
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(trigger_results.end_time)
+                } else {
+                    None
+                };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+        }
+
+        // Apply deduplication if enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let data = if let Some(db) = ORM_CLIENT.get() {
+            match crate::service::alerts::deduplication::apply_deduplication(
+                db,
+                &alert,
+                data.clone(),
+            )
+            .await
+            {
+                Ok(deduplicated_data) => {
+                    if deduplicated_data.is_empty() {
+                        log::debug!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+
+                        // Mark as suppressed for history tracking
+                        trigger_data_stream.dedup_enabled = Some(true);
+                        trigger_data_stream.dedup_suppressed = Some(true);
+
+                        // All results were deduplicated, skip notification
+                        // Still update the trigger timing
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        publish_triggers_usage(trigger_data_stream);
+                        return Ok(());
+                    }
+                    deduplicated_data
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {}",
+                        &new_trigger.org,
+                        &new_trigger.module_key,
+                        e
+                    );
+                    // On error, continue with original data to avoid missing alerts
+                    data
+                }
+            }
+        } else {
+            log::warn!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Could not connect to ORM for deduplication, continuing without it"
+            );
+            data
+        };
+
+        // [ENTERPRISE] Collect alert events for batched incident creation
+        // #[cfg(feature = "enterprise")]
+        // if rca_enabled && !data.is_empty() {
+        //     // Collect each deduplicated result row as an alert event
+        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
+        //     for row in &data {
+        //         if let Err(e) =
+        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
+        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
+        //             row,
+        //             triggered_at,
+        //         ) {
+        //             log::error!(
+        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
+        // for RCA: {}",                 e
+        //             );
+        //             // Don't fail alert evaluation if RCA collection fails
+        //         }
+        //     }
+        //     log::debug!(
+        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
+        // batch {}",         data.len(),
+        //         trace_id
+        //     );
+        // }
+
+        // [ENTERPRISE] Correlate alert to incident for unified incident management
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .enabled
+            && let Some(first_row) = data.first()
+        {
+            // Extract service name from result labels (used for topology enrichment)
+            let service_name = first_row
+                .get("service.name")
+                .or_else(|| first_row.get("service_name"))
+                .and_then(json::Value::as_str);
+
+            // Extract trace_id for trace-based correlation
+            let trace_id = first_row
+                .get("trace_id")
+                .or_else(|| first_row.get("traceId"))
+                .or_else(|| first_row.get("TraceId"))
+                .and_then(json::Value::as_str);
+
+            match crate::service::alerts::incidents::correlate_alert_to_incident(
+                &alert,
+                first_row,
+                triggered_at,
+                service_name,
+                trace_id,
+            )
+            .await
+            {
+                Ok(Some((incident_id, discovered_service_name))) => {
+                    log::info!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {} (service: {})",
+                        &new_trigger.org,
+                        &alert.name,
+                        incident_id,
+                        discovered_service_name
+                    );
+
+                    // Note: Topology enrichment now happens automatically in
+                    // find_or_create_incident when dimensions change or
+                    // topology is missing. The enrichment is triggered
+                    // during incident creation or when new dimensions are discovered.
+                    // No need to spawn enrichment here anymore.
+                }
+                Ok(None) => {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] No incident correlation for alert {}/{}",
+                        &new_trigger.org,
+                        &alert.name
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error correlating alert to incident: {e}"
+                    );
+                    // Don't fail alert processing if incident correlation fails
+                }
+            }
+        }
+
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
@@ -613,12 +900,20 @@ async fn handle_alert_triggers(
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
+
+        // Mark dedup status for history (if dedup was enabled, alert passed through)
+        if alert.deduplication.as_ref().is_some_and(|d| d.enabled) {
+            trigger_data_stream.dedup_enabled = Some(true);
+            trigger_data_stream.dedup_suppressed = Some(false);
+        }
+
+        // No grouping - send individual notification
         match alert
             .send_notification(
                 &data,
                 trigger_results.end_time,
                 Some(start_time),
-                final_end_time,
+                triggered_at,
             )
             .await
         {
@@ -649,7 +944,7 @@ async fn handle_alert_triggers(
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 // Notification is already sent to some destinations,
                 // hence in case of partial errors, no need to retry
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             }
             Err(e) => {
                 log::error!(
@@ -677,7 +972,7 @@ async fn handle_alert_triggers(
                     trigger_data.period_end_time = None;
                     new_trigger.data = json::to_string(&trigger_data).unwrap();
                     trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                    db::scheduler::update_trigger(new_trigger).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 } else {
                     let trigger_data = json::to_string(&trigger_data).unwrap();
                     // Otherwise update its status and data only
@@ -688,6 +983,8 @@ async fn handle_alert_triggers(
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
                         Some(&trigger_data),
+                        true,
+                        &query_trace_id,
                     )
                     .await?;
                     trigger_data_stream.next_run_at = now;
@@ -711,7 +1008,7 @@ async fn handle_alert_triggers(
             None
         };
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
@@ -722,7 +1019,91 @@ async fn handle_alert_triggers(
         &trigger_data_stream.key
     );
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
+
+    // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
+    // #[cfg(feature = "enterprise")]
+    // mark_rca_completion().await;
+
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_query_recommendations_triggers(
+    _trace_id: &str,
+    _trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn handle_query_recommendations_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use std::{
+        sync::Arc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use config::meta::triggers::TriggerStatus;
+
+    let cfg = get_config();
+    let query_recommendation_analysis_interval = cfg.limit.query_recommendation_analysis_interval;
+    let next_run_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Basic relative time")
+        .as_micros() as i64
+        + query_recommendation_analysis_interval * 1_000_000;
+
+    log::info!("[QUERY_RECOMMENDATIONS] Generating Query Recommendations. trace_id={trace_id}");
+
+    let query_recommendation_service = QueryRecommendationService {
+        ctx: Arc::new(QueryOptimizerContext),
+        query_recommendation_analysis_interval: cfg.limit.query_recommendation_analysis_interval,
+        query_recommendation_duration: cfg.limit.query_recommendation_duration,
+        query_recommendation_top_k: cfg.limit.query_recommendation_top_k,
+    };
+
+    let result = query_recommendation_service
+        .run()
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "[QUERY_RECOMMENDATIONS] Recommendation service stopped with an error: Error={:?}",
+                e
+            );
+        })
+        .inspect(|_| {
+            log::info!("[QUERY_RECOMMENDATIONS] Recommendation job completed successfully. trace_id={trace_id}");
+        });
+
+    // Always queue the next run, regardless of success or failure
+    let new_trigger = db::scheduler::Trigger {
+        status: TriggerStatus::Waiting,
+        retries: 3,
+        next_run_at,
+        ..trigger
+    };
+
+    db::scheduler::update_trigger(new_trigger, false, trace_id)
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "[QUERY_RECOMMENDATIONS] Failed to update QueryRecommendations trigger. e={:?}",
+                e
+            )
+        })?;
+
+    // If there was an error during generation, log it but don't prevent the next run from being
+    // queued
+    if let Err(e) = result {
+        log::error!(
+            "[QUERY_RECOMMENDATIONS] Query Recommendations Job operation encountered an error: e={:?}",
+            e
+        );
+        // Return Ok since the next run has been successfully queued
+    }
 
     Ok(())
 }
@@ -732,7 +1113,8 @@ async fn handle_report_triggers(
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::generate_trace_id());
+    let query_trace_id = ider::generate_trace_id();
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
@@ -767,7 +1149,7 @@ async fn handle_report_triggers(
                 // next run at is after 5mins
                 let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                 new_trigger.next_run_at = next_run_at;
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 // Mark the trigger as failed
                 db::scheduler::update_status(
@@ -777,6 +1159,8 @@ async fn handle_report_triggers(
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
+                    true,
+                    &query_trace_id,
                 )
                 .await?;
             }
@@ -801,9 +1185,8 @@ async fn handle_report_triggers(
                 query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-                skipped_alerts_count: None,
-            })
-            .await;
+                ..Default::default()
+            });
             return Err(anyhow::anyhow!(
                 "Error getting report: {report_id}, error: {e}"
             ));
@@ -815,12 +1198,21 @@ async fn handle_report_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "skipping report {}  in org {} because free trial expiry",
+                "pausing report {}  in org {} because free trial expiry",
                 report_name,
                 trigger.org
             );
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
+            report.enabled = false;
+            if let Err(e) =
+                crate::service::dashboards::reports::enable(&report.org_id, &report.name, false)
+                    .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause report due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    report_name
+                );
+            }
             return Ok(());
         }
     }
@@ -831,7 +1223,7 @@ async fn handle_report_triggers(
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     let mut run_once = false;
@@ -894,6 +1286,11 @@ async fn handle_report_triggers(
             new_trigger.next_run_at,
             report.tz_offset,
             Some(frequency_seconds),
+            if report.timezone.is_empty() {
+                None
+            } else {
+                Some(&report.timezone)
+            },
         );
     }
 
@@ -922,7 +1319,7 @@ async fn handle_report_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     if trigger.retries >= max_retries {
@@ -933,7 +1330,7 @@ async fn handle_report_triggers(
             org_id = &new_trigger.org,
             report_name = report_name
         );
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     match report.send_subscribers().await {
@@ -945,7 +1342,7 @@ async fn handle_report_triggers(
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
             }
-            db::scheduler::update_trigger(new_trigger).await?;
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
@@ -962,7 +1359,7 @@ async fn handle_report_triggers(
                     "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
                 );
                 trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 if run_once {
                     report.enabled = true;
@@ -975,6 +1372,8 @@ async fn handle_report_triggers(
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
+                    true,
+                    &query_trace_id,
                 )
                 .await?;
             }
@@ -987,7 +1386,7 @@ async fn handle_report_triggers(
         "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
         &trigger_data_stream.key
     );
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
 
     Ok(())
 }
@@ -1009,22 +1408,16 @@ async fn handle_derived_stream_triggers(
     let (_, max_retries) = get_scheduler_max_retries();
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
-    let columns = trigger.module_key.split('/').collect::<Vec<_>>();
-    if columns.len() < 4 {
-        log::warn!(
-            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
-            trigger.module_key
-        );
-        return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
-            trigger.module_key
-        ));
-    }
-    let stream_type: StreamType = columns[0].into();
-    let org_id = columns[1];
-    let pipeline_name = columns[2];
-    // Handles the case where the pipeline name contains a `/`
-    let pipeline_id = columns[columns.len() - 1];
+    let (org_id, stream_type, pipeline_name, pipeline_id) =
+        match get_pipeline_info_from_module_key(&trigger.module_key) {
+            Ok(info) => info,
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] error getting pipeline module key {e}"
+                );
+                return Err(anyhow::anyhow!("[SCHEDULER trace_id {trace_id}] {e}"));
+            }
+        };
 
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
@@ -1037,11 +1430,103 @@ async fn handle_derived_stream_triggers(
     } else {
         ScheduledTriggerData::from_json_string(&trigger.data).unwrap()
     };
-    let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
-        let err_msg = format!(
-            "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+    // Try to get pipeline from cache first, fallback to database if not found
+    let pipeline = if let Some(cached_pipeline) =
+        db::pipeline::get_scheduled_pipeline_from_cache(&pipeline_id).await
+    {
+        log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} found in cache"
         );
-        // Check after 5 mins if the pipeline is created
+        cached_pipeline
+    } else {
+        // Cache miss, try to fetch from database and cache it
+        log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} not in cache, fetching from database"
+        );
+        match db::pipeline::get_by_id(&pipeline_id).await {
+            Ok(pipeline) => {
+                // Cache the pipeline for future use
+                db::pipeline::cache_scheduled_pipeline(&pipeline).await;
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} fetched from database and cached"
+                );
+                pipeline
+            }
+            Err(_) => {
+                let err_msg = format!(
+                    "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+                );
+                // Check after 5 mins if the pipeline is created
+                new_trigger.next_run_at += Duration::try_minutes(5)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+                let trigger_data_stream = TriggerData {
+                    _timestamp: now_micros(),
+                    org: new_trigger.org.clone(),
+                    module: TriggerDataType::DerivedStream,
+                    key: new_trigger.module_key.clone(),
+                    next_run_at: new_trigger.next_run_at,
+                    is_realtime: new_trigger.is_realtime,
+                    is_silenced: new_trigger.is_silenced,
+                    status: TriggerDataStatus::Failed,
+                    start_time: 0,
+                    end_time: 0,
+                    retries: new_trigger.retries,
+                    error: Some(err_msg.clone()),
+                    success_response: None,
+                    is_partial: None,
+                    delay_in_secs: None,
+                    evaluation_took_in_secs: None,
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    query_took: None,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    time_in_queue_ms: Some(time_in_queue),
+                    ..Default::default()
+                };
+
+                log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
+                new_trigger_data.reset();
+                new_trigger.data = new_trigger_data.to_json_string();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Err(anyhow::anyhow!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] {}",
+                    err_msg
+                ));
+            }
+        }
+    };
+
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            log::info!(
+                "[Scheduler trace_id {scheduler_trace_id}] pausing pipeline {} id {} in org {} because free trial expiry",
+                pipeline.name,
+                pipeline_id,
+                trigger.org
+            );
+
+            if let Err(e) =
+                crate::service::pipeline::enable_pipeline(&pipeline.org, &pipeline.id, false, false)
+                    .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause pipeline due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    pipeline.name
+                );
+            }
+            return Ok(());
+        }
+    }
+
+    if !pipeline.enabled {
+        // Pipeline not enabled, check again in 5 mins
+        let msg = format!(
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+        );
         new_trigger.next_run_at += Duration::try_minutes(5)
             .unwrap()
             .num_microseconds()
@@ -1058,7 +1543,7 @@ async fn handle_derived_stream_triggers(
             start_time: 0,
             end_time: 0,
             retries: new_trigger.retries,
-            error: Some(err_msg.clone()),
+            error: Some(msg.clone()),
             success_response: None,
             is_partial: None,
             delay_in_secs: None,
@@ -1067,31 +1552,14 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
+            ..Default::default()
         };
-
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
+        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
-        return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] {}",
-            err_msg
-        ));
-    };
-
-    #[cfg(feature = "cloud")]
-    {
-        if !is_org_in_free_trial_period(&trigger.org).await? {
-            log::info!(
-                "skipping pipeline {} id {} in org {} because free trial expiry",
-                pipeline.name,
-                pipeline_id,
-                trigger.org
-            );
-            return Ok(());
-        }
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        publish_triggers_usage(trigger_data_stream);
+        return Ok(());
     }
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
@@ -1123,13 +1591,13 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
+            ..Default::default()
         };
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        publish_triggers_usage(trigger_data_stream);
         return Err(anyhow::anyhow!(
             "[SCHEDULER trace_id {scheduler_trace_id}] {}",
             err_msg
@@ -1156,6 +1624,24 @@ async fn handle_derived_stream_triggers(
         .unwrap()
         .num_microseconds()
         .unwrap();
+    let aligned_supposed_to_be_run_at = if !is_cron_frequency {
+        TriggerCondition::align_time(
+            supposed_to_be_run_at,
+            derived_stream.tz_offset,
+            Some(derived_stream.trigger_condition.period * 60),
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
+        )
+    } else {
+        // For cron frequency, we don't need to align the end time as it is already aligned (the
+        // cron crate takes care of it)
+        TriggerCondition::align_time(
+            supposed_to_be_run_at,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
+    };
 
     let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
         (derived_stream.start_at, supposed_to_be_run_at)
@@ -1170,7 +1656,8 @@ async fn handle_derived_stream_triggers(
         // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
         // period from 5:05pm to 5:15pm.
         log::debug!(
-            "supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            new_trigger.module_key,
             chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
                 .unwrap()
                 .time(),
@@ -1202,7 +1689,7 @@ async fn handle_derived_stream_triggers(
         (None, supposed_to_be_run_at)
     };
     // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
-    let aligned_curr_time = if !is_cron_frequency {
+    let aligned_end_time = if !is_cron_frequency {
         // For non-cron frequency, we need to align the current time so that the end_time is
         // divisible by the period For example, if the current time is 5:19pm, period is 5
         // mins, and delay is 4mins (supposed to be run at 5:15pm), we need to ingest data
@@ -1214,87 +1701,19 @@ async fn handle_derived_stream_triggers(
             end,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(end, derived_stream.tz_offset, None)
+        TriggerCondition::align_time(
+            end,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
     };
-    // conditionally modify supposed_to_be_run_at
-    if start.is_none_or(|t0| t0 < aligned_curr_time) {
-        end = aligned_curr_time;
-    }
-
-    if !pipeline.enabled {
-        // Pipeline not enabled, check again in 5 mins
-        let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
-        );
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let trigger_data_stream = TriggerData {
-            _timestamp: now_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Skipped,
-            start_time: 0,
-            end_time: 0,
-            retries: new_trigger.retries,
-            error: Some(msg.clone()),
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
-        };
-        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
-        // new_trigger_data.reset();
-        // new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
-        return Ok(());
-    }
-
-    // In case the scheduler background job (watch_timeout) updates the trigger retries
-    // (not through this handler), we need to skip to the next run at but with the same
-    // trigger start time. If we don't handle here, in that case, the `clean_complete`
-    // background job will clear this job as it has reached max retries.
-    if trigger.retries >= max_retries {
-        log::info!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream trigger: {}/{} has reached maximum possible retries. Skipping to next run",
-            new_trigger.org,
-            new_trigger.module_key
-        );
-        // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream
-            .trigger_condition
-            .get_next_trigger_time_non_aligned(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(trigger.next_run_at),
-            )?;
-        // Start over next time
-        new_trigger.retries = 0;
-        db::scheduler::update_trigger(new_trigger).await?;
-        return Ok(());
-    }
-
-    log::debug!(
-        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream: querying for time range: start_time {}, end_time {}.",
-        start.unwrap_or_default(),
-        end,
-    );
 
     let mut trigger_data_stream = TriggerData {
         _timestamp: now_micros(),
@@ -1321,8 +1740,78 @@ async fn handle_derived_stream_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
+
+    // conditionally modify supposed_to_be_run_at
+    if start.is_none_or(|t0| t0 < aligned_end_time) {
+        end = aligned_end_time;
+    } else {
+        // either t0 = aligned_end_time or t0 > aligned_end_time
+        // in both cases, we need to skip to next run because, we should always use
+        // aligned_curr_time as the end time
+        // Invalid timerange, most probably due to non-zero delay
+        // Don't do any further processing, just skip to next run
+        let start_time = start.unwrap();
+        log::warn!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, Invalid timerange. Skipping to next run. start: {}, end: {}",
+            new_trigger.module_key,
+            start_time,
+            end,
+        );
+        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+            false,
+            derived_stream.tz_offset,
+            false,
+            Some(trigger.next_run_at),
+        )?;
+        trigger_data_stream.status = TriggerDataStatus::Skipped;
+        trigger_data_stream.end_time = aligned_end_time;
+        trigger_data_stream.next_run_at = new_trigger.next_run_at;
+        trigger_data_stream.start_time = start_time;
+        trigger_data_stream.error = Some(format!(
+            "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
+        ));
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        publish_triggers_usage(trigger_data_stream);
+        return Ok(());
+    }
+
+    // In case the scheduler background job (watch_timeout) updates the trigger retries
+    // (not through this handler), we need to skip to the next run at but with the same
+    // trigger start time. If we don't handle here, in that case, the `clean_complete`
+    // background job will clear this job as it has reached max retries.
+    if trigger.retries >= max_retries {
+        log::info!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream trigger: {}/{} has reached maximum possible retries. Skipping to next run",
+            new_trigger.org,
+            new_trigger.module_key
+        );
+        // Go to the next nun at, but use the same trigger start time
+        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+            false,
+            derived_stream.tz_offset,
+            false,
+            Some(trigger.next_run_at),
+        )?;
+        // Start over next time
+        new_trigger.retries = 0;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        return Ok(());
+    }
+
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream: {} querying for time range: start_time {}, end_time {}.",
+        new_trigger.module_key,
+        start.unwrap_or_default(),
+        end,
+    );
+
+    // end can change due to delay feature, so we need to update the start and end time
+    if start.is_none() {
+        trigger_data_stream.start_time = end - period_num_microseconds;
+    }
+    trigger_data_stream.end_time = end;
 
     // evaluate trigger and configure trigger next run time
     match derived_stream
@@ -1399,7 +1888,7 @@ async fn handle_derived_stream_triggers(
                         log::error!("{err_msg}");
                         ingestion_error_msg = Some(err_msg);
                     }
-                    Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
+                    Ok(exec_pl) => match exec_pl.process_batch(&org_id, local_val, None).await {
                         Err(e) => {
                             let err_msg = format!(
                                 "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({org_id}/{pipeline_name}) failed to process DerivedStream query results. Caused by: {e}"
@@ -1419,7 +1908,7 @@ async fn handle_derived_stream_triggers(
                                     let (_, results): (Vec<_>, Vec<_>) =
                                         stream_pl_results.into_iter().unzip();
                                     json_data_by_stream
-                                        .entry(stream_params)
+                                        .entry(stream_params.clone())
                                         .or_default()
                                         .extend(results);
                                 }
@@ -1540,6 +2029,7 @@ async fn handle_derived_stream_triggers(
             period_end_time: Some(start_time),
             tolerance: 0,
             last_satisfied_at: None,
+            backfill_job: None,
         })
         .unwrap();
     }
@@ -1551,7 +2041,7 @@ async fn handle_derived_stream_triggers(
     if !(trigger_data_stream.status == TriggerDataStatus::Failed
         && new_trigger.retries < max_retries)
     {
-        let need_to_catch_up = end < supposed_to_be_run_at;
+        let need_to_catch_up = end < aligned_supposed_to_be_run_at;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
         if trigger_data_stream.status != TriggerDataStatus::Failed {
@@ -1581,7 +2071,7 @@ async fn handle_derived_stream_triggers(
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
 
     // If it reaches max retries, go to the next nun at, but use the same trigger start time
     if new_trigger.retries >= max_retries {
@@ -1609,7 +2099,7 @@ async fn handle_derived_stream_triggers(
         new_trigger.retries = 0; // start over
     }
 
-    if let Err(e) = db::scheduler::update_trigger(new_trigger).await {
+    if let Err(e) = db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await {
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             &pipeline.org,
@@ -1619,4 +2109,1431 @@ async fn handle_derived_stream_triggers(
     }
 
     Ok(())
+}
+
+pub fn get_pipeline_info_from_module_key(
+    module_key: &str,
+) -> Result<(String, StreamType, String, String), anyhow::Error> {
+    let columns = module_key.split('/').collect::<Vec<_>>();
+    if columns.len() < 4 {
+        return Err(anyhow::anyhow!(
+            "Invalid module_key format: {}.",
+            module_key
+        ));
+    }
+    let stream_type: StreamType = columns[0].into();
+    let org_id = columns[1];
+    let pipeline_name = columns[2];
+    // Handles the case where the pipeline name contains a `/`
+    let pipeline_id = columns[columns.len() - 1];
+    Ok((
+        org_id.to_string(),
+        stream_type,
+        pipeline_name.to_string(),
+        pipeline_id.to_string(),
+    ))
+}
+
+async fn handle_backfill_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::meta::{
+        pipeline::components::PipelineSource,
+        triggers::{DeletionStatus, ScheduledTriggerData},
+    };
+
+    let (_, max_retries) = get_scheduler_max_retries();
+    let job_id = trigger.module_key.clone();
+    let query_trace_id = ider::generate_trace_id();
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] Processing backfill trigger: {}",
+        &job_id
+    );
+
+    let now = Utc::now().timestamp_micros();
+    let trigger_start_time = trigger.start_time.unwrap_or(now);
+    let _source_node = LOCAL_NODE.name.clone();
+
+    // 1. Fetch static config from backfill_jobs table
+    let config = match infra::table::backfill_jobs::get(&trigger.org, &job_id).await {
+        Ok(config) => config,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to fetch backfill job config: {e}",
+                &job_id
+            );
+            // Delete the trigger if config is not found
+            let _ = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::Backfill,
+                &job_id,
+            )
+            .await;
+            return Err(anyhow::anyhow!(
+                "Failed to fetch backfill job config: {}",
+                e
+            ));
+        }
+    };
+
+    // 1a. Check if the job is enabled
+    if !config.enabled {
+        log::debug!(
+            "[SCHEDULER trace_id {trace_id}] [job_id: {}] Backfill job is disabled, marking as completed",
+            &job_id
+        );
+        // Mark trigger as Completed when disabled
+        let _ = db::scheduler::update_trigger(
+            db::scheduler::Trigger {
+                status: db::scheduler::TriggerStatus::Completed,
+                ..trigger
+            },
+            true,
+            trace_id,
+        )
+        .await;
+        return Ok(());
+    }
+
+    // 2. Parse backfill job dynamic state from trigger.data
+    let trigger_data = match ScheduledTriggerData::from_json_string(&trigger.data) {
+        Ok(data) => data,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to parse backfill trigger data: {e}",
+                &job_id
+            );
+            return Err(anyhow::anyhow!("Failed to parse trigger data: {}", e));
+        }
+    };
+
+    let mut backfill_job = match trigger_data.backfill_job {
+        Some(job) => job,
+        None => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Missing backfill job data in trigger",
+                &job_id
+            );
+            return Err(anyhow::anyhow!("Missing backfill job data"));
+        }
+    };
+
+    // 3. Fetch the source pipeline configuration
+    let pipeline = match crate::service::db::pipeline::get_by_id(&config.pipeline_id).await {
+        Ok(pipeline) => pipeline,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to fetch pipeline {}: {e}",
+                &job_id,
+                config.pipeline_id
+            );
+            if trigger.retries + 1 >= max_retries {
+                // Delete the trigger after max retries
+                let _ = db::scheduler::delete(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Backfill,
+                    &job_id,
+                )
+                .await;
+            } else {
+                let _ = db::scheduler::update_status(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Backfill,
+                    &job_id,
+                    db::scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                    None,
+                    true,
+                    trace_id,
+                )
+                .await;
+            }
+            return Err(anyhow::anyhow!("Failed to fetch pipeline: {}", e));
+        }
+    };
+
+    // 4. Extract DerivedStream configuration
+    let derived_stream = match &pipeline.source {
+        PipelineSource::Scheduled(ds) => ds,
+        _ => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Pipeline {} is not scheduled",
+                &job_id,
+                config.pipeline_id
+            );
+            // Delete the trigger as this is a configuration error
+            let _ = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::Backfill,
+                &job_id,
+            )
+            .await;
+            return Err(anyhow::anyhow!("Pipeline is not scheduled"));
+        }
+    };
+
+    // Get destination streams from pipeline nodes
+    let destination_streams = match get_destination_stream_from_pipeline(&pipeline) {
+        Ok(streams) => streams,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to get destination streams: {e}",
+                &job_id
+            );
+            let _ = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::Backfill,
+                &job_id,
+            )
+            .await;
+            return Err(e);
+        }
+    };
+
+    // 5. Handle deletion phase if required
+    if config.delete_before_backfill {
+        match &backfill_job.deletion_status {
+            DeletionStatus::NotRequired => {
+                // Not required, proceed to backfill
+            }
+            DeletionStatus::Pending => {
+                // Initiate deletion for all destination streams
+                log::info!(
+                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Starting deletion for {} destination stream(s), time range {}-{}",
+                    &job_id,
+                    destination_streams.len(),
+                    config.start_time,
+                    config.end_time
+                );
+
+                // Initiate deletion for all streams
+                let mut deletion_job_ids = Vec::new();
+                let mut failed = false;
+                let mut error_msg = String::new();
+
+                for (idx, stream) in destination_streams.iter().enumerate() {
+                    log::debug!(
+                        "[BACKFILL trace_id {trace_id}] [job_id: {}] Initiating deletion for stream {}/{} ({}/{})",
+                        &job_id,
+                        stream.stream_type,
+                        stream.stream_name,
+                        idx + 1,
+                        destination_streams.len()
+                    );
+
+                    match initiate_stream_deletion(
+                        &trigger.org,
+                        stream,
+                        config.start_time,
+                        config.end_time,
+                    )
+                    .await
+                    {
+                        Ok(deletion_job_id) => {
+                            deletion_job_ids.push(deletion_job_id.clone());
+                            log::debug!(
+                                "[BACKFILL trace_id {trace_id}] [job_id: {}] Deletion job {} created for stream {}/{}",
+                                &job_id,
+                                deletion_job_id,
+                                stream.stream_type,
+                                stream.stream_name
+                            );
+                        }
+                        Err(e) => {
+                            error_msg = format!(
+                                "Failed to initiate deletion for stream {}/{}: {}",
+                                stream.stream_type, stream.stream_name, e
+                            );
+                            log::error!(
+                                "[BACKFILL trace_id {trace_id}] [job_id: {}] {}",
+                                &job_id,
+                                error_msg
+                            );
+                            failed = true;
+                            break;
+                        }
+                    }
+                }
+
+                if failed {
+                    backfill_job.error = Some(error_msg.clone());
+                    let updated_trigger_data = ScheduledTriggerData {
+                        backfill_job: Some(backfill_job),
+                        ..trigger_data
+                    };
+                    db::scheduler::update_trigger(
+                        db::scheduler::Trigger {
+                            status: db::scheduler::TriggerStatus::Completed,
+                            data: updated_trigger_data.to_json_string(),
+                            ..trigger
+                        },
+                        true,
+                        trace_id,
+                    )
+                    .await?;
+                    return Err(anyhow::anyhow!("{}", error_msg));
+                }
+
+                // All deletions initiated successfully
+                backfill_job.deletion_status = DeletionStatus::InProgress;
+                backfill_job.deletion_job_ids = deletion_job_ids.clone();
+                backfill_job.error = None; // Clear any previous errors
+
+                let updated_trigger_data = ScheduledTriggerData {
+                    backfill_job: Some(backfill_job.clone()),
+                    ..trigger_data
+                };
+
+                // Use delay_between_chunks_secs for checking deletion status
+                let delay = config.delay_between_chunks_secs.unwrap_or(30);
+                let next_run_at = now + (delay * 1_000_000);
+
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        data: updated_trigger_data.to_json_string(),
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+
+                log::info!(
+                    "[BACKFILL trace_id {trace_id}] [job_id: {}] {} deletion job(s) initiated, will check status in {}s",
+                    &job_id,
+                    deletion_job_ids.len(),
+                    delay
+                );
+                return Ok(());
+            }
+            DeletionStatus::InProgress => {
+                // Check if all deletion jobs are complete
+                if !backfill_job.deletion_job_ids.is_empty() {
+                    let mut all_completed = true;
+                    let mut completed_count = 0;
+
+                    for deletion_job_id in &backfill_job.deletion_job_ids {
+                        match check_deletion_status(deletion_job_id).await {
+                            Ok(status) if status == "completed" => {
+                                completed_count += 1;
+                            }
+                            Ok(status) => {
+                                log::debug!(
+                                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Deletion job {} status: {}",
+                                    &job_id,
+                                    deletion_job_id,
+                                    status
+                                );
+                                all_completed = false;
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to check deletion job {} status: {}",
+                                    &job_id,
+                                    deletion_job_id,
+                                    e
+                                );
+                                all_completed = false;
+                            }
+                        }
+                    }
+
+                    if all_completed {
+                        log::info!(
+                            "[BACKFILL trace_id {trace_id}] [job_id: {}] All {} deletion job(s) completed, starting backfill",
+                            &job_id,
+                            backfill_job.deletion_job_ids.len()
+                        );
+                        backfill_job.deletion_status = DeletionStatus::Completed;
+                        backfill_job.error = None; // Clear any previous errors
+                    // Continue to backfill phase below
+                    } else {
+                        // Still in progress, reschedule to check again
+                        // Use delay_between_chunks_secs for checking deletion status
+                        let delay = config.delay_between_chunks_secs.unwrap_or(30);
+                        let next_run_at = now + (delay * 1_000_000);
+
+                        db::scheduler::update_trigger(
+                            db::scheduler::Trigger {
+                                next_run_at,
+                                status: db::scheduler::TriggerStatus::Waiting,
+                                ..trigger
+                            },
+                            true,
+                            trace_id,
+                        )
+                        .await?;
+
+                        log::debug!(
+                            "[BACKFILL trace_id {trace_id}] [job_id: {}] Deletion in progress ({}/{} completed), checking again in {}s",
+                            &job_id,
+                            completed_count,
+                            backfill_job.deletion_job_ids.len(),
+                            delay
+                        );
+                        return Ok(());
+                    }
+                }
+            }
+            DeletionStatus::Completed => {
+                // Deletion already complete, proceed to backfill
+            }
+        }
+    }
+
+    // 6. Calculate current chunk to process
+    let chunk_period = config
+        .chunk_period_minutes
+        .unwrap_or(derived_stream.trigger_condition.period);
+    let chunk_end = std::cmp::min(
+        backfill_job.current_position + (chunk_period * 60 * 1_000_000),
+        config.end_time,
+    );
+
+    // Store the exact query time range that will be used
+    let query_start_time = backfill_job.current_position;
+    let query_end_time = chunk_end;
+
+    log::debug!(
+        "[BACKFILL trace_id {trace_id}] [job_id: {}] Processing chunk: {}-{}",
+        &job_id,
+        query_start_time,
+        query_end_time
+    );
+
+    // 7. Execute the pipeline for this chunk
+    let results = match derived_stream
+        .evaluate(
+            (Some(query_start_time), query_end_time),
+            &job_id,
+            Some(trace_id.to_string()),
+        )
+        .await
+    {
+        Ok(results) => results,
+        Err(e) => {
+            log::error!(
+                "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to evaluate pipeline: {e}",
+                &job_id
+            );
+
+            let error_msg = e.to_string();
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            // Clone org before moving trigger
+            let org = trigger.org.clone();
+
+            let next_run_at;
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries.",
+                    &job_id,
+                    config.pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = config.delay_between_chunks_secs.unwrap_or(0);
+                next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            } else {
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
+                next_run_at = now; // Will retry immediately
+
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            }
+
+            // Publish trigger usage for failed evaluation
+            let trigger_data_stream = TriggerData {
+                _timestamp: now,
+                org,
+                module: TriggerDataType::Backfill,
+                key: job_id.clone(),
+                next_run_at,
+                is_realtime: false,
+                is_silenced: false,
+                status: TriggerDataStatus::Failed,
+                start_time: query_start_time,
+                end_time: query_end_time,
+                retries: new_retries,
+                error: Some(format!("Failed to evaluate pipeline: {}", error_msg)),
+                success_response: None,
+                evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                time_in_queue_ms: Some(
+                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                ),
+                ..Default::default()
+            };
+            publish_triggers_usage(trigger_data_stream);
+
+            return Err(anyhow::anyhow!(
+                "Failed to evaluate pipeline: {}",
+                error_msg
+            ));
+        }
+    };
+
+    // 8. Process results through pipeline
+    let executable_pipeline = match ExecutablePipeline::new(&pipeline).await {
+        Ok(ep) => ep,
+        Err(e) => {
+            log::error!(
+                "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to create executable pipeline: {e}",
+                &job_id
+            );
+
+            let error_msg = e.to_string();
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            // Clone org before moving trigger
+            let org = trigger.org.clone();
+
+            let next_run_at;
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on pipeline creation.",
+                    &job_id,
+                    config.pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = config.delay_between_chunks_secs.unwrap_or(0);
+                next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            } else {
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
+                next_run_at = now; // Will retry immediately
+
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            }
+
+            // Publish trigger usage for failed pipeline creation
+            let trigger_data_stream = TriggerData {
+                _timestamp: now,
+                org,
+                module: TriggerDataType::Backfill,
+                key: job_id.clone(),
+                next_run_at,
+                is_realtime: false,
+                is_silenced: false,
+                status: TriggerDataStatus::Failed,
+                start_time: query_start_time,
+                end_time: query_end_time,
+                retries: new_retries,
+                error: Some(format!(
+                    "Failed to create executable pipeline: {}",
+                    error_msg
+                )),
+                success_response: None,
+                evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                time_in_queue_ms: Some(
+                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                ),
+                ..Default::default()
+            };
+            publish_triggers_usage(trigger_data_stream);
+
+            return Err(anyhow::anyhow!(
+                "Failed to create executable pipeline: {}",
+                error_msg
+            ));
+        }
+    };
+
+    // Track whether data was found and ingested successfully
+    let has_data = results.data.as_ref().is_some_and(|d| !d.is_empty());
+    let mut ingestion_error: Option<String> = None;
+
+    if let Some(data) = results.data {
+        let records: Vec<json::Value> = data.into_iter().map(json::Value::Object).collect();
+        match executable_pipeline
+            .process_batch(&trigger.org, records, None)
+            .await
+        {
+            Err(e) => {
+                log::error!(
+                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to process batch: {e}",
+                    &job_id
+                );
+
+                let error_msg = e.to_string();
+                // Store the ingestion error
+                ingestion_error = Some(error_msg.clone());
+
+                // Increment retries
+                let new_retries = trigger.retries + 1;
+
+                // Clone org before moving trigger
+                let org = trigger.org.clone();
+
+                let next_run_at;
+                if new_retries >= max_retries {
+                    // Max retries reached, report error and reset retries for next scheduled run
+                    log::warn!(
+                        "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
+                        &job_id,
+                        config.pipeline_id
+                    );
+
+                    // Calculate next run time with delay
+                    let delay = config.delay_between_chunks_secs.unwrap_or(0);
+                    next_run_at = now + (delay * 1_000_000);
+
+                    // Update trigger with reset retries and scheduled next run
+                    db::scheduler::update_trigger(
+                        db::scheduler::Trigger {
+                            retries: 0, // Reset retries for next attempt
+                            next_run_at,
+                            status: db::scheduler::TriggerStatus::Waiting,
+                            ..trigger
+                        },
+                        true,
+                        trace_id,
+                    )
+                    .await?;
+                } else {
+                    // Increment retries but don't update next_run_at - let scheduler pick it up
+                    // immediately
+                    next_run_at = now; // Will retry immediately
+
+                    db::scheduler::update_trigger(
+                        db::scheduler::Trigger {
+                            retries: new_retries,
+                            status: db::scheduler::TriggerStatus::Waiting,
+                            ..trigger
+                        },
+                        true,
+                        trace_id,
+                    )
+                    .await?;
+                }
+
+                // Publish trigger usage for failed batch processing
+                let trigger_data_stream = TriggerData {
+                    _timestamp: now,
+                    org,
+                    module: TriggerDataType::Backfill,
+                    key: job_id.clone(),
+                    next_run_at,
+                    is_realtime: false,
+                    is_silenced: false,
+                    status: TriggerDataStatus::Failed,
+                    start_time: query_start_time,
+                    end_time: query_end_time,
+                    retries: new_retries,
+                    error: Some(format!("Failed to process batch: {}", error_msg)),
+                    success_response: None,
+                    evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    time_in_queue_ms: Some(
+                        Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                    ),
+                    ..Default::default()
+                };
+                publish_triggers_usage(trigger_data_stream);
+
+                return Err(anyhow::anyhow!("Failed to process batch: {}", error_msg));
+            }
+            Ok(pl_results) => {
+                // Collect results by stream for ingestion
+                use std::collections::HashMap;
+                let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =
+                    HashMap::new();
+
+                for (stream_params, stream_pl_results) in pl_results {
+                    if matches!(
+                        stream_params.stream_type,
+                        StreamType::Logs
+                            | StreamType::EnrichmentTables
+                            | StreamType::Metrics
+                            | StreamType::Traces
+                    ) {
+                        let (_, results): (Vec<_>, Vec<_>) = stream_pl_results.into_iter().unzip();
+                        json_data_by_stream
+                            .entry(stream_params.clone())
+                            .or_default()
+                            .extend(results);
+                    }
+                }
+
+                // Ingest results into destination streams
+                for (dest_stream, records) in json_data_by_stream {
+                    let mut request_metadata = pipeline
+                        .get_metadata_by_stream_params(&dest_stream)
+                        .map(|meta| {
+                            let mut meta = meta;
+                            meta.insert("is_backfill".to_string(), "true".to_string());
+                            cluster_rpc::IngestRequestMetadata { data: meta }
+                        });
+                    if request_metadata.is_none() {
+                        let mut metadata = HashMap::new();
+                        metadata.insert("is_backfill".to_string(), "true".to_string());
+                        request_metadata =
+                            Some(cluster_rpc::IngestRequestMetadata { data: metadata });
+                    }
+
+                    let (org_id, stream_name, stream_type): (String, String, String) = (
+                        dest_stream.org_id.into(),
+                        dest_stream.stream_name.into(),
+                        dest_stream.stream_type.to_string(),
+                    );
+                    let records_len = records.len();
+
+                    let req = cluster_rpc::IngestionRequest {
+                        org_id: org_id.clone(),
+                        stream_name: stream_name.clone(),
+                        stream_type: stream_type.clone(),
+                        data: Some(cluster_rpc::IngestionData::from(records)),
+                        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                        metadata: request_metadata,
+                    };
+
+                    match ingestion_service::ingest(req).await {
+                        Ok(resp) if resp.status_code == 200 => {
+                            log::info!(
+                                "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill data ingested to destination {org_id}/{stream_name}/{stream_type}, records: {records_len}",
+                                &job_id
+                            );
+                        }
+                        error => {
+                            let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                            log::error!(
+                                "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to ingest backfill data to destination {org_id}/{stream_name}/{stream_type}: {err}",
+                                &job_id
+                            );
+                            ingestion_error = Some(format!(
+                                "Failed to ingest to {org_id}/{stream_name}/{stream_type}: {err}"
+                            ));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Check if there was an ingestion error and handle retries
+    if let Some(error_msg) = &ingestion_error {
+        // Increment retries
+        let new_retries = trigger.retries + 1;
+
+        // Clone org before moving trigger
+        let org = trigger.org.clone();
+
+        let next_run_at;
+        if new_retries >= max_retries {
+            // Max retries reached, report error and reset retries for next scheduled run
+            log::warn!(
+                "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on ingestion.",
+                &job_id,
+                config.pipeline_id
+            );
+
+            // Calculate next run time with delay
+            let delay = config.delay_between_chunks_secs.unwrap_or(0);
+            next_run_at = now + (delay * 1_000_000);
+
+            // Update trigger with reset retries and scheduled next run
+            db::scheduler::update_trigger(
+                db::scheduler::Trigger {
+                    retries: 0, // Reset retries for next attempt
+                    next_run_at,
+                    status: db::scheduler::TriggerStatus::Waiting,
+                    ..trigger
+                },
+                true,
+                trace_id,
+            )
+            .await?;
+        } else {
+            // Increment retries but don't update next_run_at - let scheduler pick it up
+            // immediately
+            next_run_at = now; // Will retry immediately
+
+            db::scheduler::update_trigger(
+                db::scheduler::Trigger {
+                    retries: new_retries,
+                    next_run_at,
+                    status: db::scheduler::TriggerStatus::Waiting,
+                    ..trigger
+                },
+                true,
+                trace_id,
+            )
+            .await?;
+        }
+
+        // Publish trigger usage for failed ingestion
+        let trigger_data_stream = TriggerData {
+            _timestamp: now,
+            org,
+            module: TriggerDataType::Backfill,
+            key: job_id.clone(),
+            next_run_at,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerDataStatus::Failed,
+            start_time: query_start_time,
+            end_time: query_end_time,
+            retries: new_retries,
+            error: Some(format!("Failed to ingest data: {}", error_msg)),
+            success_response: None,
+            evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+            source_node: Some(LOCAL_NODE.name.clone()),
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(
+                Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+            ),
+            ..Default::default()
+        };
+        publish_triggers_usage(trigger_data_stream);
+
+        return Err(anyhow::anyhow!("Failed to ingest data: {}", error_msg));
+    }
+
+    // 9. Update progress or complete
+    if chunk_end >= config.end_time {
+        // Backfill complete - set current_position to end_time and mark trigger as completed
+        backfill_job.current_position = config.end_time;
+        backfill_job.error = None; // Clear any previous errors on successful completion
+
+        let updated_trigger_data = ScheduledTriggerData {
+            backfill_job: Some(backfill_job.clone()),
+            ..trigger_data
+        };
+
+        log::info!(
+            "[BACKFILL trace_id {scheduler_trace_id}] [job_id: {}] Backfill job completed for pipeline {}",
+            &job_id,
+            config.pipeline_id
+        );
+
+        // Clone org before moving trigger
+        let org = trigger.org.clone();
+
+        // Update trigger to completed status
+        db::scheduler::update_trigger(
+            db::scheduler::Trigger {
+                status: db::scheduler::TriggerStatus::Completed,
+                data: serde_json::to_string(&updated_trigger_data)?,
+                ..trigger
+            },
+            true,
+            trace_id,
+        )
+        .await?;
+
+        // Disable the job since it's completed
+        let _ = db::backfill::update_enabled(&org, &job_id, false).await;
+
+        // Determine trigger status based on data availability and ingestion success
+        let trigger_status = if ingestion_error.is_some() {
+            TriggerDataStatus::Failed
+        } else if has_data {
+            TriggerDataStatus::Completed
+        } else {
+            TriggerDataStatus::ConditionNotSatisfied
+        };
+
+        // Publish trigger usage for completion (last chunk)
+        let trigger_data_stream = TriggerData {
+            _timestamp: now,
+            org: org.clone(),
+            module: TriggerDataType::Backfill,
+            key: job_id.clone(),
+            next_run_at: 0, // No next run since completed
+            is_realtime: false,
+            is_silenced: false,
+            status: trigger_status,
+            start_time: query_start_time,
+            end_time: query_end_time,
+            retries: 0,
+            error: ingestion_error.clone(),
+            success_response: if ingestion_error.is_none() {
+                Some(format!(
+                    "Backfill job completed successfully for pipeline {}",
+                    config.pipeline_id
+                ))
+            } else {
+                None
+            },
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+            source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(
+                Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+            ),
+            ..Default::default()
+        };
+        publish_triggers_usage(trigger_data_stream);
+    } else {
+        // Update progress and schedule next chunk
+        backfill_job.current_position = chunk_end;
+        backfill_job.error = None; // Clear any previous errors on successful chunk processing
+
+        let delay = config.delay_between_chunks_secs.unwrap_or(0);
+        let next_run_at = now + (delay * 1_000_000);
+
+        let updated_trigger_data = ScheduledTriggerData {
+            backfill_job: Some(backfill_job.clone()),
+            ..trigger_data
+        };
+
+        // Clone org before moving trigger
+        let org = trigger.org.clone();
+
+        db::scheduler::update_trigger(
+            db::scheduler::Trigger {
+                next_run_at,
+                status: db::scheduler::TriggerStatus::Waiting,
+                data: updated_trigger_data.to_json_string(),
+                retries: 0, // Reset retries on successful chunk
+                ..trigger
+            },
+            true,
+            trace_id,
+        )
+        .await?;
+
+        let progress = ((chunk_end - config.start_time) as f64
+            / (config.end_time - config.start_time) as f64
+            * 100.0) as u8;
+        log::debug!(
+            "[BACKFILL trace_id {trace_id}] [job_id: {}] Progress: {}%, next chunk in {}s",
+            &job_id,
+            progress,
+            delay
+        );
+
+        // Determine trigger status based on data availability and ingestion success
+        let trigger_status = if ingestion_error.is_some() {
+            TriggerDataStatus::Failed
+        } else if has_data {
+            TriggerDataStatus::Completed
+        } else {
+            TriggerDataStatus::ConditionNotSatisfied
+        };
+
+        // Publish trigger usage for this chunk
+        let trigger_data_stream = TriggerData {
+            _timestamp: now,
+            org: org.clone(),
+            module: TriggerDataType::Backfill,
+            key: job_id.clone(),
+            next_run_at,
+            is_realtime: false,
+            is_silenced: false,
+            status: trigger_status,
+            start_time: query_start_time,
+            end_time: query_end_time,
+            retries: 0,
+            error: ingestion_error.clone(),
+            success_response: if ingestion_error.is_none() {
+                Some(format!(
+                    "Processed chunk successfully: {progress}% complete"
+                ))
+            } else {
+                None
+            },
+            evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+            source_node: Some(LOCAL_NODE.name.clone()),
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(
+                Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+            ),
+            ..Default::default()
+        };
+        publish_triggers_usage(trigger_data_stream);
+    }
+
+    Ok(())
+}
+
+/// Helper function to get destination streams from pipeline
+fn get_destination_stream_from_pipeline(
+    pipeline: &config::meta::pipeline::Pipeline,
+) -> Result<Vec<StreamParams>, anyhow::Error> {
+    let mut destination_streams = Vec::new();
+
+    for node in &pipeline.nodes {
+        if let NodeData::Stream(stream_params) = &node.data {
+            // Destination stream node (not the query source node)
+            let node_id = node.get_node_id();
+            if !matches!(node_id.as_str(), "source" | "query") {
+                destination_streams.push(stream_params.clone());
+            }
+        }
+    }
+
+    if destination_streams.is_empty() {
+        Err(anyhow::anyhow!("No destination streams found in pipeline"))
+    } else {
+        Ok(destination_streams)
+    }
+}
+
+/// Helper function to initiate stream deletion
+async fn initiate_stream_deletion(
+    org_id: &str,
+    stream: &StreamParams,
+    start_time: i64,
+    end_time: i64,
+) -> Result<String, anyhow::Error> {
+    use chrono::TimeZone;
+    use config::meta::stream::StreamType;
+
+    // Convert microseconds to formatted time range strings
+    let time_range_start = {
+        let ts = Utc
+            .timestamp_micros(start_time)
+            .single()
+            .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
+        if stream.stream_type == StreamType::Logs {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
+    let time_range_end = {
+        let ts = Utc
+            .timestamp_micros(end_time)
+            .single()
+            .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
+        if stream.stream_type == StreamType::Logs {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
+
+    // Create deletion job using existing retention service
+    let (key, _created) = crate::service::db::compact::retention::delete_stream(
+        org_id,
+        stream.stream_type,
+        &stream.stream_name,
+        Some((time_range_start.as_str(), time_range_end.as_str())),
+    )
+    .await?;
+
+    // Create a job in the compact manual jobs table
+    let job = infra::table::compactor_manual_jobs::CompactorManualJob {
+        id: config::ider::uuid(),
+        key: key.clone(),
+        status: infra::table::compactor_manual_jobs::Status::Pending,
+        created_at: Utc::now().timestamp_micros(),
+        ended_at: 0,
+    };
+
+    let job_id = crate::service::db::compact::compactor_manual_jobs::add_job(job).await?;
+    Ok(job_id)
+}
+
+/// Helper function to check deletion job status
+/// We need to only check this local region status. This is because the ingestion will happen only
+/// in this region, so we can start backfilling as soon as the deletion in this region is complete.
+async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
+    let job = crate::service::db::compact::compactor_manual_jobs::get_job(job_id).await?;
+    let status_str = match job.status {
+        infra::table::compactor_manual_jobs::Status::Pending => "pending",
+        infra::table::compactor_manual_jobs::Status::Running => "running",
+        infra::table::compactor_manual_jobs::Status::Completed => "completed",
+    };
+    Ok(status_str.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::*;
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_valid_input() {
+        // Test with valid module key format
+        let module_key = "logs/org123/pipeline_name/pipeline_id_456";
+        let result = get_pipeline_info_from_module_key(module_key);
+
+        assert!(result.is_ok());
+        let (org_id, stream_type, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "org123");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(pipeline_name, "pipeline_name");
+        assert_eq!(pipeline_id, "pipeline_id_456");
+    }
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_different_stream_types() {
+        // Test different stream types
+        let test_cases = vec![
+            ("logs/org1/pipeline1/id1", StreamType::Logs),
+            ("metrics/org2/pipeline2/id2", StreamType::Metrics),
+            ("traces/org3/pipeline3/id3", StreamType::Traces),
+            (
+                "enrichment_tables/org4/pipeline4/id4",
+                StreamType::EnrichmentTables,
+            ),
+        ];
+
+        for (module_key, expected_stream_type) in test_cases {
+            let result = get_pipeline_info_from_module_key(module_key);
+            assert!(result.is_ok());
+            let (_, stream_type, ..) = result.unwrap();
+            assert_eq!(stream_type, expected_stream_type);
+        }
+    }
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_invalid_inputs() {
+        // Test with insufficient parts
+        let invalid_cases = vec![
+            "logs/org123",          // Only 2 parts
+            "logs/org123/pipeline", // Only 3 parts
+            "logs",                 // Only 1 part
+            "",                     // Empty string
+            "single_part",          // Single part
+        ];
+
+        for invalid_module_key in invalid_cases {
+            let result = get_pipeline_info_from_module_key(invalid_module_key);
+            assert!(result.is_err());
+            let error_msg = result.unwrap_err().to_string();
+            assert!(error_msg.contains("Invalid module_key format"));
+            assert!(error_msg.contains(invalid_module_key));
+        }
+    }
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_edge_cases() {
+        // Test with empty parts
+        let module_key = "logs//pipeline_name/pipeline_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+
+        assert!(result.is_ok());
+        let (org_id, _, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "");
+        assert_eq!(pipeline_name, "pipeline_name");
+        assert_eq!(pipeline_id, "pipeline_id");
+
+        // Test with very long names
+        let long_name = "a".repeat(1000);
+        let module_key = format!("logs/org123/{long_name}/pipeline_id");
+        let result = get_pipeline_info_from_module_key(&module_key);
+
+        assert!(result.is_ok());
+        let (_, _, pipeline_name, _) = result.unwrap();
+        assert_eq!(pipeline_name, long_name);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_cron() {
+        // Test with cron expression
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC in microseconds
+        let cron = "0 */5 * * * *"; // Every 5 minutes
+        let tz_offset = 0; // UTC
+        let frequency = 300; // 5 minutes in seconds
+        let delay = 600000000; // 10 minutes in microseconds
+        let align_time = false;
+        let now = 1640995800000000; // 2022-01-01 00:10:00 UTC
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        // Should have skipped timestamps for 5:00, 5:05, 5:10
+        assert!(!skipped_timestamps.is_empty());
+        assert!(skipped_timestamps.len() >= 2);
+
+        // Final timestamp should be the current time when align_time is false
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_frequency() {
+        // Test with frequency-based scheduling (no cron)
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
+        let cron = ""; // Empty cron means frequency-based
+        let tz_offset = 0; // UTC
+        let frequency = 300; // 5 minutes in seconds
+        let delay = 600000000; // 10 minutes in microseconds
+        let align_time = false;
+        let now = 1640995800000000; // 2022-01-01 00:10:00 UTC
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        // Should have skipped timestamps for 5:00, 5:05, 5:10
+        assert!(!skipped_timestamps.is_empty());
+        assert!(skipped_timestamps.len() >= 2);
+
+        // Final timestamp should be the current time when align_time is false
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_align_time() {
+        // Test with align_time = true
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 300; // 5 minutes
+        let delay = 300000000; // 5 minutes in microseconds
+        let align_time = true;
+        let now = 1640995500000000; // 2022-01-01 00:05:00 UTC
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        // When align_time is true and there are skipped timestamps,
+        // final_timestamp should be the supposed_to_run_at or adjusted value
+        if !skipped_timestamps.is_empty() {
+            // Should be aligned to the frequency
+            assert!(final_timestamp >= supposed_to_run_at);
+        }
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_timezone() {
+        // Test with timezone offset (UTC+5:30 for India)
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
+        let cron = "0 */5 * * * *"; // Every 5 minutes
+        let tz_offset = 330; // UTC+5:30 in minutes
+        let frequency = 300;
+        let delay = 600000000;
+        let align_time = false;
+        let now = 1640995800000000;
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        // Should still work with timezone offset
+        assert!(skipped_timestamps.len() >= 2);
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_no_delay() {
+        // Test with no delay (delay = 0)
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 300;
+        let delay = 0; // No delay
+        let align_time = false;
+        let now = 1640995200000000; // Same as supposed_to_run_at
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        // Should have no skipped timestamps when delay is 0
+        assert!(skipped_timestamps.is_empty());
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_large_delay() {
+        // Test with large delay
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 60; // 1 minute
+        let delay = 3600000000; // 1 hour in microseconds
+        let align_time = false;
+        let now = 1640998800000000; // 1 hour later
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        // Should have many skipped timestamps (60 minutes worth)
+        assert!(skipped_timestamps.len() >= 50);
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_invalid_cron() {
+        // Test with invalid cron expression - should panic
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "invalid cron";
+        let tz_offset = 0;
+        let frequency = 300;
+        let delay = 600000000;
+        let align_time = false;
+        let now = 1640995800000000;
+
+        // This should panic due to invalid cron expression
+        let result = std::panic::catch_unwind(|| {
+            get_skipped_timestamps(
+                supposed_to_run_at,
+                cron,
+                tz_offset,
+                frequency,
+                delay,
+                align_time,
+                now,
+                None,
+            )
+        });
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_edge_case_empty_skipped_timestamps() {
+        // Test case where skipped_timestamps is empty and align_time is true
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 300;
+        let delay = 0; // No delay, so no skipped timestamps
+        let align_time = true;
+        let now = 1640995200000000;
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        assert!(skipped_timestamps.is_empty());
+        assert_eq!(final_timestamp, supposed_to_run_at);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_pop_last_timestamp() {
+        // Test case where the last timestamp is greater than supposed_to_run_at
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 60; // 1 minute
+        let delay = 120000000; // 2 minutes
+        let align_time = true;
+        let now = 1640995320000000; // 2 minutes later
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+            None,
+        );
+
+        // Should have some skipped timestamps
+        assert!(!skipped_timestamps.is_empty());
+
+        // The final timestamp should be adjusted based on the logic
+        assert!(final_timestamp >= supposed_to_run_at);
+    }
 }

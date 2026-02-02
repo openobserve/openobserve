@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use config::datafusion::request::Request;
 use datafusion::{
     common::{
         Result,
@@ -28,7 +29,6 @@ use infra::errors::Error;
 
 use crate::service::search::{
     cluster::flight::{SearchContextBuilder, register_table},
-    request::Request,
     sql::Sql,
 };
 

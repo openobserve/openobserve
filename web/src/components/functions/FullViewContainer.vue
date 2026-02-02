@@ -1,30 +1,30 @@
 <template>
   <div
-    class="tw-py-[2px]"
-    :class="store.state.theme === 'dark' ? 'tw-bg-gray-500' : 'tw-bg-gray-200 '"
+    class="tw:py-[2px]"
+    :class="store.state.theme === 'dark' ? 'tw:bg-gray-500' : 'tw:bg-gray-200 '"
   >
-    <div class="tw-flex tw-justify-between">
-      <div class="tw-flex tw-items-center">
+    <div class="tw:flex tw:justify-between">
+      <div class="tw:flex tw:items-center">
         <q-icon
           v-if="showExpandIcon"
           name="keyboard_arrow_up"
           @click.stop="expanded = !expanded"
-          class="tw-mr-1 tw-cursor-pointer tw-transition-all"
+          class="tw:mr-1 tw:cursor-pointer tw:transition-all"
           :class="[
             store.state.theme === 'dark'
-              ? 'tw-text-gray-100'
-              : 'tw-text-gray-500',
-            expanded ? 'tw-transform tw-rotate-180' : '',
+              ? 'tw:text-gray-100'
+              : 'tw:text-gray-500',
+            expanded ? 'tw:transform tw:rotate-180' : '',
           ]"
           size="20px"
         />
         <div
           @click="showExpandIcon ? expanded = !expanded : null"
-          class="tw-text-[14px] tw-font-bold"
+          class="tw:text-[14px] tw:font-bold"
           :class="[
             store.state.theme === 'dark'
-              ? 'tw-text-gray-100'
-              : 'tw-text-gray-500',
+              ? 'tw:text-gray-100'
+              : 'tw:text-gray-500',
             labelClass,
           ]"
         >

@@ -109,15 +109,18 @@ const useSqlSuggestions = () => {
     {
       label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
       kind: "Text",
-      insertText: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
+      insertText: (_keyword: string) =>
+        `match_all_raw_ignore_case('${_keyword}')`,
     },
     {
-      label: (_keyword: string) => `re_match(fieldname: string, regular_expression: string)`,
+      label: (_keyword: string) =>
+        `re_match(fieldname: string, regular_expression: string)`,
       kind: "Text",
       insertText: (_keyword: string) => `re_match(fieldname, '')`,
     },
     {
-      label: (_keyword: string) => `re_not_match(fieldname: string, regular_expression: string)`,
+      label: (_keyword: string) =>
+        `re_not_match(fieldname: string, regular_expression: string)`,
       kind: "Text",
       insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
     },
@@ -136,7 +139,8 @@ const useSqlSuggestions = () => {
     {
       label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
       kind: "Text",
-      insertText: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
+      insertText: (_keyword: string) =>
+        `fuzzy_match(fieldname, '${_keyword}', 1)`,
     },
     {
       label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
@@ -164,30 +168,44 @@ const useSqlSuggestions = () => {
       insertText: (_keyword: string) => `cast_to_arr('${_keyword}')`,
     },
     {
-      label: (_keyword: string,start:number= 1 ,end:number= 10) => `arrindex('${_keyword}', ${start}, ${end})`,
+      label: (_keyword: string, start: number = 1, end: number = 10) =>
+        `arrindex('${_keyword}', ${start}, ${end})`,
       kind: "Text",
-      insertText: (_keyword: string,start:number= 1 ,end:number= 10) => `arrindex('${_keyword}', ${start}, ${end})`,
+      insertText: (_keyword: string, start: number = 1, end: number = 10) =>
+        `arrindex('${_keyword}', ${start}, ${end})`,
     },
     {
-      label: (_keyword: string,delimiter:string= 'delimiter') => `arrjoin('${_keyword}', '${delimiter}')`,
+      label: (_keyword: string, delimiter: string = "delimiter") =>
+        `arrjoin('${_keyword}', '${delimiter}')`,
       kind: "Text",
-      insertText: (_keyword: string,delimiter:string= 'delimiter') => `arrjoin('${_keyword}', '${delimiter}')`,
+      insertText: (_keyword: string, delimiter: string = "delimiter") =>
+        `arrjoin('${_keyword}', '${delimiter}')`,
     },
-  
+
     {
-      label: (_keyword: string,_keyword2:string,delimiter:string= 'delimiter') => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
+      label: (
+        _keyword: string,
+        _keyword2: string,
+        delimiter: string = "delimiter",
+      ) => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
       kind: "Text",
-      insertText: (_keyword: string,_keyword2:string,delimiter:string= 'delimiter') => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
+      insertText: (
+        _keyword: string,
+        _keyword2: string,
+        delimiter: string = "delimiter",
+      ) => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
     },
     {
-      label: (_keyword: string,path:string= 'path') => `spath('${_keyword}', '${path}')`,
+      label: (_keyword: string, path: string = "path") =>
+        `spath('${_keyword}', '${path}')`,
       kind: "Text",
-      insertText: (_keyword: string,path:string= 'path') => `spath('${_keyword}', '${path}')`,
+      insertText: (_keyword: string, path: string = "path") =>
+        `spath('${_keyword}', '${path}')`,
     },
     {
-      label: (array: string= 'array') => `to_array_string('${array}')`,
+      label: (array: string = "array") => `to_array_string('${array}')`,
       kind: "Text",
-      insertText: (array: string= 'array') => `to_array_string('${array}')`,
+      insertText: (array: string = "array") => `to_array_string('${array}')`,
     },
     {
       label: () => `unnest`,
@@ -200,7 +218,7 @@ const useSqlSuggestions = () => {
       insertText: () => `array_extract`,
     },
 
-    //from here aggregation functions are added 
+    //from here aggregation functions are added
     {
       label: (_keyword: string) => `sum('${_keyword}')`,
       kind: "Text",
@@ -228,21 +246,34 @@ const useSqlSuggestions = () => {
     },
     //histogram function
     {
-      label: (_keyword: string,duration:string= 'duration') => `histogram('${_keyword}', '${duration}')`,
+      label: (_keyword: string, duration: string = "duration") =>
+        `histogram('${_keyword}', '${duration}')`,
       kind: "Text",
-      insertText: (_keyword: string,duration:string= 'duration') => `histogram('${_keyword}', '${duration}')`,
+      insertText: (_keyword: string, duration: string = "duration") =>
+        `histogram('${_keyword}', '${duration}')`,
     },
     {
-      label: (_keyword: string,number_of_frequent_values:number = 10) => `approx_topk('${_keyword}', ${number_of_frequent_values})`,
+      label: (_keyword: string, number_of_frequent_values: number = 10) =>
+        `approx_topk('${_keyword}', ${number_of_frequent_values})`,
       kind: "Text",
-      insertText: (_keyword: string,number_of_frequent_values:number = 10) => `approx_topk('${_keyword}', ${number_of_frequent_values})`,
+      insertText: (_keyword: string, number_of_frequent_values: number = 10) =>
+        `approx_topk('${_keyword}', ${number_of_frequent_values})`,
     },
     {
-      label: (_keyword: string,_keyword2:string,number_of_frequent_values:number = 10) => `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
+      label: (
+        _keyword: string,
+        _keyword2: string,
+        number_of_frequent_values: number = 10,
+      ) =>
+        `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
       kind: "Text",
-      insertText: (_keyword: string,_keyword2:string,number_of_frequent_values:number = 10) => `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
+      insertText: (
+        _keyword: string,
+        _keyword2: string,
+        number_of_frequent_values: number = 10,
+      ) =>
+        `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
     },
-    
   ];
   const autoCompleteData = ref({
     fieldValues: {} as any, // { kubernetes_host: new Set([value1, value2]) }
@@ -296,7 +327,7 @@ const useSqlSuggestions = () => {
     const cursorIndex = autoCompleteData.value.position.cursorIndex;
     const sqlWhereClause = analyzeSqlWhereClause(
       autoCompleteData.value.query,
-      cursorIndex
+      cursorIndex,
     );
     if (
       sqlWhereClause.meta.label &&
@@ -304,7 +335,7 @@ const useSqlSuggestions = () => {
     ) {
       const values = Array.from(
         autoCompleteData.value.fieldValues[sqlWhereClause.meta.label] ||
-          new Set()
+          new Set(),
       ).map((item) => {
         return {
           label: item,
@@ -322,6 +353,7 @@ const useSqlSuggestions = () => {
   };
 
   const updateAutoComplete = () => {
+    autoCompleteKeywords.value = [];
     autoCompleteKeywords.value.push(...functionKeywords.value);
     for (const item of fieldKeywords) {
       autoCompleteKeywords.value.push(item);

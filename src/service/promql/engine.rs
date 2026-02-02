@@ -13,14 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, HashLabelValue, NAME_LABEL, VALUE_LABEL},
-    utils::json,
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL, value::*},
+    utils::{
+        hash::{Sum64, gxhash},
+        json,
+    },
 };
 use datafusion::{
     arrow::{
@@ -28,48 +31,66 @@ use datafusion::{
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
-    functions_aggregate::min_max::max,
+    physical_plan::{
+        Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
+    },
     prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use promql_parser::{
-    label::MatchOp,
+    label::{MatchOp, Matchers},
     parser::{
         AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
         LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
         VectorMatchCardinality, VectorSelector, token,
     },
 };
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
     PromqlContext,
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
+    aggregations, binaries, functions, micros, rewrite::remove_filter_all,
 };
 
+type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Sample>>, HashSet<i64>)>>;
+type TokioExemplarsResult =
+    tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Arc<Exemplar>>>, HashSet<i64>)>>;
+
 pub struct Engine {
-    ctx: Arc<PromqlContext>,
-    /// The time boundaries for the evaluation.
-    time: i64,
-    /// Filters to include certain columns
-    col_filters: Option<HashSet<String>>,
-    result_type: Option<String>,
     trace_id: String,
+    /// PromQL evaluation context
+    ctx: Arc<PromqlContext>,
+    /// Evaluation context for promql queries
+    eval_ctx: EvalContext,
+    /// Only select columns with certain labels
+    label_selector: HashSet<String>,
+    /// The result type of the query
+    result_type: Option<String>,
 }
 
 impl Engine {
-    pub fn new(trace_id: &str, ctx: Arc<PromqlContext>, time: i64) -> Self {
+    pub fn new(trace_id: &str, ctx: Arc<PromqlContext>, eval_ctx: EvalContext) -> Self {
         Self {
             ctx,
-            time,
-            col_filters: Some(HashSet::new()),
+            eval_ctx,
+            label_selector: HashSet::new(),
             result_type: None,
             trace_id: trace_id.to_string(),
         }
+    }
+
+    /// Create a new engine with evaluation context for range queries
+    /// This is now an alias for `new()` since eval_ctx is always required
+    pub fn new_with_context(
+        trace_id: &str,
+        ctx: Arc<PromqlContext>,
+        eval_ctx: EvalContext,
+    ) -> Self {
+        Self::new(trace_id, ctx, eval_ctx)
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
@@ -115,7 +136,7 @@ impl Engine {
                     match card {
                         VectorMatchCardinality::ManyToOne(_)
                         | VectorMatchCardinality::OneToMany(_) => {
-                            self.col_filters = None;
+                            self.label_selector.clear();
                         }
                         _ => {}
                     }
@@ -154,12 +175,12 @@ impl Engine {
         if let Some(label_modifier) = modifier {
             match op.id() {
                 // topk and bottomk query all columns when with modifiers
-                token::T_TOPK | token::T_BOTTOMK => self.col_filters = None,
+                token::T_TOPK | token::T_BOTTOMK => self.label_selector.clear(),
                 _ => {
-                    if let (Some(col_filters), LabelModifier::Include(labels)) =
-                        (&mut self.col_filters, label_modifier)
+                    if let (label_selector, LabelModifier::Include(labels)) =
+                        (&mut self.label_selector, label_modifier)
                     {
-                        col_filters.extend(labels.labels.iter().cloned());
+                        label_selector.extend(labels.labels.iter().cloned());
                     }
                 }
             }
@@ -179,29 +200,26 @@ impl Engine {
             PromExpr::Unary(UnaryExpr { expr }) => {
                 let val = self.exec_expr(expr).await?;
                 match val {
-                    Value::Vector(v) => {
-                        let out = v
+                    Value::Matrix(m) => {
+                        let out = m
                             .into_iter()
-                            .map(|mut instant| InstantValue {
-                                labels: std::mem::take(&mut instant.labels),
-                                sample: Sample {
-                                    timestamp: instant.sample.timestamp,
-                                    value: -instant.sample.value,
-                                },
+                            .map(|mut range| RangeValue {
+                                labels: std::mem::take(&mut range.labels).without_metric_name(),
+                                samples: range
+                                    .samples
+                                    .into_iter()
+                                    .map(|s| Sample {
+                                        timestamp: s.timestamp,
+                                        value: -s.value,
+                                    })
+                                    .collect(),
+                                exemplars: range.exemplars,
+                                time_window: range.time_window,
                             })
                             .collect();
-                        Value::Vector(out)
+                        Value::Matrix(out)
                     }
-                    Value::Float(f) => {
-                        let v = InstantValue {
-                            labels: Labels::default(),
-                            sample: Sample {
-                                timestamp: self.time,
-                                value: -f,
-                            },
-                        };
-                        Value::Vector(vec![v])
-                    }
+                    Value::Float(f) => Value::Float(-f),
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Unary: {expr:?}"
@@ -217,10 +235,12 @@ impl Engine {
                 let op = expr.op.is_comparison_operator();
 
                 // This is a very special case, as we treat the float also a
-                // `Value::Vector(vec![element])` therefore, better convert it
+                // `Value::Matrix(vec![element])` therefore, better convert it
                 // back to its representation.
                 let rhs = match rhs {
-                    Value::Vector(v) if v.len() == 1 => Value::Float(v[0].sample.value),
+                    Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
+                        Value::Float(m[0].samples[0].value)
+                    }
                     _ => rhs,
                 };
                 match (lhs, rhs) {
@@ -234,61 +254,40 @@ impl Engine {
                         )?;
                         Value::Float(value)
                     }
-                    (Value::Vector(left), Value::Vector(right)) => {
+                    (Value::Matrix(left), Value::Matrix(right)) => {
                         binaries::vector_bin_op(expr, left, right)?
                     }
-                    (Value::Vector(left), Value::Float(right)) => {
+                    (Value::Matrix(left), Value::Float(right)) => {
                         binaries::vector_scalar_bin_op(expr, left, right, false).await?
                     }
-                    (Value::Float(left), Value::Vector(right)) => {
+                    (Value::Float(left), Value::Matrix(right)) => {
                         binaries::vector_scalar_bin_op(expr, right, left, true).await?
                     }
                     (Value::None, Value::None) => Value::None,
                     _ => {
                         log::debug!(
-                            "[trace_id: {}] [PromExpr::Binary] either lhs or rhs vector is found to be empty",
+                            "[trace_id: {}] [PromExpr::Binary] either lhs or rhs matrix is found to be empty",
                             self.trace_id
                         );
-                        Value::Vector(vec![])
+                        Value::Matrix(vec![])
                     }
                 }
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
                 let val = self.exec_expr(&expr.expr).await?;
-                let time_window = Some(TimeWindow::new(self.time, expr.range));
+                let range = expr.range;
                 let matrix = match val {
-                    Value::Vector(v) => v
-                        .iter()
-                        .map(|v| RangeValue {
-                            labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
-                            exemplars: None,
-                            time_window: time_window.clone(),
-                        })
-                        .collect(),
-                    Value::Instant(v) => {
-                        vec![RangeValue {
-                            labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
-                            exemplars: None,
-                            time_window,
-                        }]
+                    Value::Matrix(vs) => {
+                        // For matrix type, update the time_window range
+                        vs.into_iter()
+                            .map(|mut rv| {
+                                // Update time_window with new range
+                                rv.time_window = Some(TimeWindow::new(range));
+                                rv
+                            })
+                            .collect()
                     }
-                    Value::Range(v) => vec![v],
-                    Value::Matrix(vs) => vs,
-                    Value::Sample(s) => vec![RangeValue {
-                        labels: Labels::default(),
-                        samples: vec![s],
-                        exemplars: None,
-                        time_window,
-                    }],
-                    Value::Float(val) => vec![RangeValue {
-                        labels: Labels::default(),
-                        samples: vec![Sample::new(self.time, val)],
-                        exemplars: None,
-                        time_window,
-                    }],
                     v => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported subquery, the return value should have been a matrix but got {:?}",
@@ -301,16 +300,30 @@ impl Engine {
             }
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
-            PromExpr::VectorSelector(v) => {
-                let data = self.eval_vector_selector(v).await?;
+            PromExpr::VectorSelector(vs) => {
+                let mut vs = vs.clone();
+                remove_filter_all(&mut vs);
+                if !vs.matchers.or_matchers.is_empty() {
+                    return Err(DataFusionError::Plan(
+                        "VectorSelector: or_matchers is not supported".into(),
+                    ));
+                }
+                let data = self.eval_vector_selector(&vs).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
-                    Value::Vector(data)
+                    Value::Matrix(data)
                 }
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
-                let data = self.eval_matrix_selector(vs, *range).await?;
+                let mut vs = vs.clone();
+                remove_filter_all(&mut vs);
+                if !vs.matchers.or_matchers.is_empty() {
+                    return Err(DataFusionError::Plan(
+                        "MatrixSelector: or_matchers is not supported".into(),
+                    ));
+                }
+                let data = self.eval_matrix_selector(&vs, *range).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
@@ -330,91 +343,95 @@ impl Engine {
     /// timestamp.
     ///
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
-    async fn eval_vector_selector(
-        &mut self,
-        selector: &VectorSelector,
-    ) -> Result<Vec<InstantValue>> {
+    async fn eval_vector_selector(&mut self, selector: &VectorSelector) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
         }
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
-
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "VectorSelector: metric name is required".into(),
+                    ));
+                }
+            };
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.to_string();
+        let data = self.selector_load_data_owned(&selector, None).await?;
 
-        let cache_exists = {
-            self.ctx
-                .data_cache
-                .read()
-                .await
-                .contains_key(data_cache_key)
-        };
-        if !cache_exists {
-            self.selector_load_data(&selector, None).await?;
-        }
-        let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(data_cache_key) {
-            Some(v) => match v.get_ref_matrix_values() {
-                Some(v) => v,
-                None => return Ok(vec![]),
-            },
+        let metrics_cache = match data.get_range_values() {
+            Some(v) => v,
             None => return Ok(vec![]),
         };
 
-        // Evaluation timestamp.
-        let eval_ts = self.time;
-        let start = eval_ts - self.ctx.lookback_delta;
-
-        let mut offset_modifier: i64 = 0;
+        let mut offset_modifier = 0;
         if let Some(offset) = selector.offset {
             match offset {
-                Offset::Pos(off) => {
-                    offset_modifier = micros(off);
+                Offset::Pos(offset) => {
+                    offset_modifier = micros(offset);
                 }
-                Offset::Neg(off) => {
-                    offset_modifier = -micros(off);
+                Offset::Neg(offset) => {
+                    offset_modifier = -micros(offset);
                 }
+            }
+        };
+
+        // Get all evaluation timestamps from the context
+        let eval_timestamps = self.eval_ctx.timestamps();
+
+        // For each metric, select appropriate samples at each evaluation timestamp
+        // TODO: make it parallel
+        let mut result = Vec::with_capacity(metrics_cache.len());
+        for metric in metrics_cache {
+            let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
+
+            for &eval_ts in &eval_timestamps {
+                // Calculate lookback window for this evaluation timestamp
+                let start = eval_ts - self.ctx.lookback_delta;
+
+                // Find the sample for this evaluation timestamp
+                // Binary search for the last sample before or at eval_ts (considering offset)
+                let end_index = metric
+                    .samples
+                    .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
+
+                let match_sample = if end_index > 0 {
+                    metric.samples.get(end_index - 1).and_then(|sample| {
+                        let adjusted_ts = sample.timestamp + offset_modifier;
+                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                            Some(sample)
+                        } else {
+                            None
+                        }
+                    })
+                } else {
+                    None
+                };
+
+                // Add the matched sample (already validated to be within range)
+                if let Some(sample) = match_sample {
+                    // Use eval_ts as the timestamp for the selected sample
+                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                    selected_samples.push(Sample::new(eval_ts, sample.value));
+                }
+            }
+
+            // Only include metrics that have at least one sample
+            if !selected_samples.is_empty() {
+                result.push(RangeValue {
+                    labels: metric.labels,
+                    samples: selected_samples,
+                    exemplars: metric.exemplars,
+                    time_window: metric.time_window,
+                });
             }
         }
 
-        let mut values = vec![];
-        for metric in metrics_cache {
-            let end_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let match_sample = if end_index > 0 {
-                metric.samples.get(end_index - 1)
-            } else if !metric.samples.is_empty() {
-                metric.samples.first()
-            } else {
-                None
-            };
-            if let Some(sample) = match_sample
-                && sample.timestamp + offset_modifier <= eval_ts
-                && sample.timestamp + offset_modifier > start
-            {
-                let last_value = sample.value;
-                values.push(
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    InstantValue {
-                        labels: metric.labels.clone(),
-                        sample: Sample::new(eval_ts, last_value),
-                    },
-                );
-            }
-        }
-        Ok(values)
+        Ok(result)
     }
 
     /// Range vector selector --- select a whole time range at each evaluation
@@ -446,30 +463,32 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.to_string();
-        let cache_exists = {
-            self.ctx
-                .data_cache
-                .read()
-                .await
-                .contains_key(data_cache_key)
-        };
-        if !cache_exists {
-            self.selector_load_data(&selector, Some(range)).await?;
-        }
-        let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(data_cache_key) {
-            Some(v) => match v.get_ref_matrix_values() {
-                Some(v) => v,
-                None => return Ok(vec![]),
-            },
+        let data = self
+            .selector_load_data_owned(&selector, Some(range))
+            .await?;
+
+        let values = match data.get_range_values() {
+            Some(v) => v,
             None => return Ok(vec![]),
         };
 
-        // Evaluation timestamp --- end of the time window.
-        let eval_ts = self.time;
-        // Start of the time window.
-        let start = eval_ts - micros(range); // e.g. [5m]
+        let start = std::time::Instant::now();
+        let values = values
+            .into_par_iter()
+            .map(|rv| RangeValue {
+                labels: rv.labels,
+                samples: rv.samples,
+                exemplars: rv.exemplars,
+                time_window: Some(TimeWindow::new(range)),
+            })
+            .collect::<Vec<_>>();
+
+        log::info!(
+            "[trace_id: {}] [PromQL Timing] eval_matrix_selector() processing took: {:?}",
+            self.trace_id,
+            start.elapsed()
+        );
+
         let mut offset_modifier = 0;
         if let Some(offset) = selector.offset {
             match offset {
@@ -482,78 +501,62 @@ impl Engine {
             }
         };
 
-        let mut values = Vec::with_capacity(metrics_cache.len());
-        for metric in metrics_cache {
-            // use binary search to find the start and end index
-            let start_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier < start);
-            let end_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let samples = metric.samples[start_index..end_index]
-                .iter()
-                .map(|v| Sample {
-                    timestamp: v.timestamp + offset_modifier,
-                    value: v.value,
+        // TODO: optimize this part
+        if offset_modifier != 0 {
+            let adjusted_values = values
+                .into_iter()
+                .map(|rv| {
+                    let adjusted_samples = rv
+                        .samples
+                        .into_iter()
+                        .map(|s| Sample {
+                            timestamp: s.timestamp + offset_modifier,
+                            value: s.value,
+                        })
+                        .collect();
+                    RangeValue {
+                        labels: rv.labels,
+                        samples: adjusted_samples,
+                        exemplars: rv.exemplars,
+                        time_window: rv.time_window,
+                    }
                 })
-                .collect::<Vec<_>>();
-            let exemplars = if self.ctx.query_exemplars {
-                metric.exemplars.clone()
-            } else {
-                None
-            };
-            values.push(RangeValue {
-                labels: metric.labels.clone(),
-                samples,
-                exemplars,
-                time_window: Some(TimeWindow::new(eval_ts, range)),
-            });
+                .collect();
+            return Ok(adjusted_values);
         }
 
         Ok(values)
     }
 
-    #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
-    async fn selector_load_data(
+    #[tracing::instrument(name = "promql:engine:load_data_owned", skip_all)]
+    async fn selector_load_data_owned(
         &mut self,
         selector: &VectorSelector,
         range: Option<Duration>,
-    ) -> Result<()> {
-        let data_cache_key = selector.to_string();
-        let mut data_loaded = self.ctx.data_loading.lock().await;
-        if data_loaded.contains(&data_cache_key) {
-            return Ok(()); // data is already loading
-        }
-
+    ) -> Result<Value> {
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id: {}] [PromQL] Failed to load data for stream: {data_cache_key}, error: {e:?}",
+                    "[trace_id: {}] [PromQL] Failed to load data for stream, error: {e:?}",
                     self.trace_id
                 );
-                data_loaded.insert(data_cache_key);
                 return Err(e);
             }
         };
 
         // no data, return immediately
         if metrics.is_empty() {
-            self.ctx
-                .data_cache
-                .write()
-                .await
-                .insert(data_cache_key.clone(), Value::None);
-            data_loaded.insert(data_cache_key);
-            return Ok(());
+            return Ok(Value::None);
         }
 
-        // cache data
+        let start = std::time::Instant::now();
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
         metric_values.par_iter_mut().for_each(|metric| {
-            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            if self.ctx.query_exemplars && metric.exemplars.is_some() {
+            metric
+                .samples
+                .sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            if self.ctx.query_ctx.query_exemplars && metric.exemplars.is_some() {
                 metric
                     .exemplars
                     .as_mut()
@@ -566,13 +569,12 @@ impl Engine {
         } else {
             Value::Matrix(metric_values)
         };
-        self.ctx
-            .data_cache
-            .write()
-            .await
-            .insert(data_cache_key.clone(), values);
-        data_loaded.insert(data_cache_key);
-        Ok(())
+        log::info!(
+            "[trace_id: {}] sort samples by timestamps took: {:?}",
+            self.trace_id,
+            start.elapsed()
+        );
+        Ok(values)
     }
 
     #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
@@ -580,7 +582,7 @@ impl Engine {
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
-    ) -> Result<HashMap<HashLabelValue, RangeValue>> {
+    ) -> Result<HashMap<u64, RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
@@ -602,11 +604,8 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[trace_id: {}] loading data for stream: {}, range: [{},{}), filter: {:?}",
+            "[trace_id: {}] loading data for stream: {table_name}, range: [{start},{end}), filter: {:?}",
             self.trace_id,
-            table_name,
-            start,
-            end,
             selector.to_string(),
         );
 
@@ -622,48 +621,105 @@ impl Engine {
                 }
             })
             .collect::<Vec<(_, _)>>();
+
+        // check for super cluster
+        #[cfg(feature = "enterprise")]
+        let (super_tx, mut super_rx) = tokio::sync::mpsc::channel::<
+            Result<(HashMap<u64, RangeValue>, config::meta::search::ScanStats)>,
+        >(1);
+        #[cfg(feature = "enterprise")]
+        if self.ctx.query_ctx.is_super_cluster {
+            let trace_id = self.ctx.query_ctx.trace_id.clone();
+            let query_ctx = self.ctx.query_ctx.clone();
+            let step = self.eval_ctx.step;
+            let selector = selector.clone();
+            let label_selector = self.label_selector.clone();
+            tokio::task::spawn(async move {
+                let ret = o2_enterprise::enterprise::metrics::super_cluster::selector_load_data(
+                    query_ctx,
+                    selector,
+                    range,
+                    &label_selector,
+                    start,
+                    end,
+                    step,
+                )
+                .await;
+                if let Err(e) = super_tx.send(ret).await {
+                    log::error!(
+                        "[trace_id: {trace_id}] [PromQL] Failed to send super cluster result to channel, error: {e:?}",
+                    );
+                }
+                drop(super_tx);
+            });
+        } else {
+            drop(super_tx);
+        }
+
         let ctxs = self
             .ctx
             .table_provider
             .create_context(
-                &self.ctx.org_id,
+                &self.ctx.query_ctx.org_id,
                 table_name,
                 (start, end),
                 selector.matchers.clone(),
-                self.col_filters.clone(),
+                self.label_selector.clone(),
                 &mut filters,
             )
             .await?;
 
-        let mut tasks = Vec::new();
-        for (ctx, schema, scan_stats) in ctxs {
-            let selector = selector.clone();
-            let col_filters = &self.col_filters;
-            let query_exemplars = self.ctx.query_exemplars;
-            let trace_id = self.trace_id.to_string();
-            let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion(
-                    &trace_id,
-                    ctx,
-                    schema,
-                    selector,
-                    start,
-                    end,
-                    col_filters,
-                    query_exemplars,
-                )
-                .await
-            });
+        // check if we need to load data from local cluster
+        #[cfg(feature = "enterprise")]
+        let ctxs = if self.ctx.query_ctx.is_super_cluster
+            && !o2_enterprise::enterprise::super_cluster::search::has_local_cluster(
+                self.ctx.query_ctx.regions.clone(),
+                self.ctx.query_ctx.clusters.clone(),
+            )
+            .await
+        {
+            vec![]
+        } else {
+            ctxs
+        };
+
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
+        let mut tasks = Vec::with_capacity(ctxs.len());
+        for (ctx, schema, scan_stats, keep_filters) in ctxs {
+            let query_ctx = self.ctx.query_ctx.clone();
+            let mut selector = selector.clone();
+            if !keep_filters {
+                selector.matchers = Matchers::empty();
+            };
+            let label_selector = label_selector.clone();
+            let task = tokio::time::timeout(
+                Duration::from_secs(self.ctx.query_ctx.timeout),
+                async move {
+                    selector_load_data_from_datafusion(
+                        query_ctx,
+                        ctx,
+                        schema,
+                        selector,
+                        label_selector,
+                        start,
+                        end,
+                    )
+                    .await
+                },
+            );
             tasks.push(task);
             // update stats
             let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
             ctx_scan_stats.add(&scan_stats);
         }
+
         let task_results = try_join_all(tasks)
             .await
             .map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
 
-        let mut metrics: HashMap<HashLabelValue, RangeValue> = HashMap::default();
+        let mut metrics: HashMap<u64, RangeValue> = HashMap::default();
         let task_results_len = task_results.len();
         for task_result in task_results {
             if task_results_len == 1 {
@@ -678,6 +734,39 @@ impl Engine {
                     metrics.insert(key, value);
                 }
             }
+        }
+
+        // check for super cluster
+        #[cfg(feature = "enterprise")]
+        if self.ctx.query_ctx.is_super_cluster {
+            let (metric, stats) = match super_rx.recv().await {
+                Some(Ok(ret)) => ret,
+                Some(Err(e)) => {
+                    log::error!(
+                        "[trace_id: {}] [PromQL] Super cluster result channel error: {e:?}",
+                        self.trace_id
+                    );
+                    return Err(e);
+                }
+                None => {
+                    log::error!(
+                        "[trace_id: {}] [PromQL] Super cluster result channel is closed",
+                        self.trace_id
+                    );
+                    return Err(DataFusionError::Plan(
+                        "super cluster result channel is closed".to_string(),
+                    ));
+                }
+            };
+            for (key, value) in metric {
+                if let Some(metric) = metrics.get_mut(&key) {
+                    metric.extend(value);
+                } else {
+                    metrics.insert(key, value);
+                }
+            }
+            let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
+            ctx_scan_stats.add(&stats);
         }
 
         log::info!(
@@ -697,36 +786,70 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
-        let sample_time = self.time;
         let input = self.exec_expr(expr).await?;
 
+        let eval_ctx = self.eval_ctx.clone();
+
         Ok(match op.id() {
-            token::T_SUM => aggregations::sum(sample_time, modifier, input)?,
-            token::T_AVG => aggregations::avg(sample_time, modifier, input)?,
-            token::T_COUNT => aggregations::count(sample_time, modifier, input)?,
-            token::T_MIN => aggregations::min(sample_time, modifier, input)?,
-            token::T_MAX => aggregations::max(sample_time, modifier, input)?,
-            token::T_GROUP => aggregations::group(sample_time, modifier, input)?,
-            token::T_STDDEV => aggregations::stddev(sample_time, modifier, input)?,
-            token::T_STDVAR => aggregations::stdvar(sample_time, modifier, input)?,
+            token::T_SUM => aggregations::sum(modifier, input, &eval_ctx)?,
+            token::T_AVG => aggregations::avg(modifier, input, &eval_ctx)?,
+            token::T_COUNT => aggregations::count(modifier, input, &eval_ctx)?,
+            token::T_MIN => aggregations::min(modifier, input, &eval_ctx)?,
+            token::T_MAX => aggregations::max(modifier, input, &eval_ctx)?,
+            token::T_GROUP => aggregations::group(modifier, input, &eval_ctx)?,
+            token::T_STDDEV => aggregations::stddev(modifier, input, &eval_ctx)?,
+            token::T_STDVAR => aggregations::stdvar(modifier, input, &eval_ctx)?,
             token::T_TOPK => {
-                aggregations::topk(self, param.clone().unwrap(), modifier, input).await?
+                let param_expr = param.clone().unwrap();
+                let k_value = self.exec_expr(&param_expr).await?;
+                let k = match k_value {
+                    Value::Float(f) => f as usize,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[topk] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::topk(k, modifier, input, &eval_ctx)?
             }
             token::T_BOTTOMK => {
-                aggregations::bottomk(self, param.clone().unwrap(), modifier, input).await?
+                let param_expr = param.clone().unwrap();
+                let k_value = self.exec_expr(&param_expr).await?;
+                let k = match k_value {
+                    Value::Float(f) => f as usize,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[bottomk] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::bottomk(k, modifier, input, &eval_ctx)?
             }
             token::T_COUNT_VALUES => {
-                aggregations::count_values(
-                    self,
-                    sample_time,
-                    param.clone().unwrap(),
-                    modifier,
-                    input,
-                )
-                .await?
+                let param_expr = param.clone().unwrap();
+                let label_name = self.exec_expr(&param_expr).await?;
+                let label_name_str = match label_name {
+                    Value::String(s) => s,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[count_values] param must be a string".to_string(),
+                        ));
+                    }
+                };
+                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)?
             }
             token::T_QUANTILE => {
-                aggregations::quantile(self, sample_time, param.clone().unwrap(), input).await?
+                let param_expr = param.clone().unwrap();
+                let qtile_value = self.exec_expr(&param_expr).await?;
+                let qtile = match qtile_value {
+                    Value::Float(f) => f,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[quantile] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::quantile(qtile, input, &eval_ctx)?
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -817,13 +940,20 @@ impl Engine {
         let input = match functions_without_args.contains(func.name) {
             true => match args.len() {
                 0 => {
-                    // Found no arg to pass to, lets use a `vector(time())` as the arg.
+                    // Found no arg to pass to, lets use a `matrix(time())` as the arg.
                     // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
-                    let default_now_vector = vec![InstantValue {
+                    let timestamps = self.eval_ctx.timestamps();
+                    let samples: Vec<Sample> = timestamps
+                        .iter()
+                        .map(|&ts| Sample::new(ts, ts as f64))
+                        .collect();
+                    let default_now_matrix = vec![RangeValue {
                         labels: Labels::default(),
-                        sample: Sample::new(self.time, self.time as f64),
+                        samples,
+                        exemplars: None,
+                        time_window: None,
                     }];
-                    Value::Vector(default_now_vector)
+                    Value::Matrix(default_now_matrix)
                 }
                 1 => self.call_expr_first_arg(args).await?,
 
@@ -843,11 +973,11 @@ impl Engine {
 
         Ok(match func_name {
             Func::Abs => functions::abs(input)?,
-            Func::Absent => functions::absent(input, self.time)?,
-            Func::AbsentOverTime => functions::absent_over_time(input)?,
-            Func::AvgOverTime => functions::avg_over_time(input)?,
+            Func::Absent => functions::absent(input, &self.eval_ctx)?,
+            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
+            Func::AvgOverTime => functions::avg_over_time(input, &self.eval_ctx)?,
             Func::Ceil => functions::ceil(input)?,
-            Func::Changes => functions::changes(input)?,
+            Func::Changes => functions::changes(input, &self.eval_ctx)?,
             Func::Clamp => {
                 let err =
                     "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
@@ -860,7 +990,7 @@ impl Engine {
                 let (min_f, max_f) = match (min, max) {
                     (Value::Float(min), Value::Float(max)) => {
                         if min > max {
-                            return Ok(Value::Vector(vec![]));
+                            return Ok(Value::Matrix(vec![]));
                         }
                         (min, max)
                     }
@@ -898,13 +1028,13 @@ impl Engine {
                 };
                 functions::clamp(input, min_f, f64::MAX)?
             }
-            Func::CountOverTime => functions::count_over_time(input)?,
+            Func::CountOverTime => functions::count_over_time(input, &self.eval_ctx)?,
             Func::DayOfMonth => functions::day_of_month(input)?,
             Func::DayOfWeek => functions::day_of_week(input)?,
             Func::DayOfYear => functions::day_of_year(input)?,
             Func::DaysInMonth => functions::days_in_month(input)?,
-            Func::Delta => functions::delta(input)?,
-            Func::Deriv => functions::deriv(input)?,
+            Func::Delta => functions::delta(input, &self.eval_ctx)?,
+            Func::Deriv => functions::deriv(input, &self.eval_ctx)?,
             Func::Exp => functions::exp(input)?,
             Func::Floor => functions::floor(input)?,
             Func::HistogramCount => {
@@ -937,8 +1067,9 @@ impl Engine {
                         }
                     }
                 };
-                let sample_time = self.time;
-                functions::histogram_quantile(sample_time, phi, input)?
+
+                // Use range version if we have an eval context
+                functions::histogram_quantile(phi, input, &self.eval_ctx)?
             }
             Func::HistogramSum => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -957,12 +1088,12 @@ impl Engine {
                 let scaling_factor = self.parse_f64_else_err(&sf, err)?;
                 let trend_factor = self.parse_f64_else_err(&tf, err)?;
 
-                functions::holt_winters(input, scaling_factor, trend_factor)?
+                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
             }
             Func::Hour => functions::hour(input)?,
-            Func::Idelta => functions::idelta(input)?,
-            Func::Increase => functions::increase(input)?,
-            Func::Irate => functions::irate(input)?,
+            Func::Idelta => functions::idelta(input, &self.eval_ctx)?,
+            Func::Increase => functions::increase(input, &self.eval_ctx)?,
+            Func::Irate => functions::irate(input, &self.eval_ctx)?,
             Func::LabelJoin => {
                 let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
                 self.ensure_ge_three_args(args, err)?;
@@ -1011,12 +1142,12 @@ impl Engine {
 
                 functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
             }
-            Func::LastOverTime => functions::last_over_time(input)?,
+            Func::LastOverTime => functions::last_over_time(input, &self.eval_ctx)?,
             Func::Ln => functions::ln(input)?,
             Func::Log10 => functions::log10(input)?,
             Func::Log2 => functions::log2(input)?,
-            Func::MaxOverTime => functions::max_over_time(input)?,
-            Func::MinOverTime => functions::min_over_time(input)?,
+            Func::MaxOverTime => functions::max_over_time(input, &self.eval_ctx)?,
+            Func::MinOverTime => functions::min_over_time(input, &self.eval_ctx)?,
             Func::Minute => functions::minute(input)?,
             Func::Month => functions::month(input)?,
             Func::PredictLinear => {
@@ -1030,7 +1161,7 @@ impl Engine {
                         "Invalid prediction_steps, f64 expected".into(),
                     ),
                 )?;
-                functions::predict_linear(input, prediction_steps)?
+                functions::predict_linear(input, prediction_steps, &self.eval_ctx)?
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
@@ -1045,19 +1176,12 @@ impl Engine {
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
-                functions::quantile_over_time(self.time, phi_quantile, input)?
+                functions::quantile_over_time(phi_quantile, input, &self.eval_ctx)?
             }
-            Func::Rate => functions::rate(input)?,
-            Func::Resets => functions::resets(input)?,
+            Func::Rate => functions::rate(input, &self.eval_ctx)?,
+            Func::Resets => functions::resets(input, &self.eval_ctx)?,
             Func::Round => functions::round(input)?,
-            Func::Scalar => match input {
-                Value::Float(_) => input,
-                _ => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "Invalid scalar value: {input:?}"
-                    )));
-                }
-            },
+            Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
             Func::Sgn => functions::sgn(input)?,
             Func::Sort => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -1070,48 +1194,28 @@ impl Engine {
                 )));
             }
             Func::Sqrt => functions::sqrt(input)?,
-            Func::StddevOverTime => functions::stddev_over_time(input)?,
-            Func::StdvarOverTime => functions::stdvar_over_time(input)?,
-            Func::SumOverTime => functions::sum_over_time(input)?,
-            Func::Time => Value::Float((self.time / 1_000_000) as f64),
-            Func::Timestamp => match input {
-                Value::Vector(instant_value) => {
-                    let out: Vec<InstantValue> = instant_value
-                        .into_iter()
-                        .map(|mut instant| InstantValue {
-                            labels: std::mem::take(&mut instant.labels),
-                            sample: Sample {
-                                timestamp: instant.sample.timestamp,
-                                value: (instant.sample.timestamp / 1000 / 1000) as f64,
-                            },
-                        })
-                        .collect();
-                    Value::Vector(out)
-                }
-                _ => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "Unexpected input to timestamp function: {input:?}"
-                    )));
-                }
-            },
-            Func::Vector => functions::vector(input, self.time)?,
+            Func::StddevOverTime => functions::stddev_over_time(input, &self.eval_ctx)?,
+            Func::StdvarOverTime => functions::stdvar_over_time(input, &self.eval_ctx)?,
+            Func::SumOverTime => functions::sum_over_time(input, &self.eval_ctx)?,
+            // TODO: check this implementation
+            Func::Time => Value::Float((self.eval_ctx.start / 1_000_000) as f64),
+            Func::Timestamp => functions::timestamp(input)?,
+            Func::Vector => functions::vector(input, &self.eval_ctx)?,
             Func::Year => functions::year(input)?,
         })
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn selector_load_data_from_datafusion(
-    trace_id: &str,
+    query_ctx: Arc<QueryContext>,
     ctx: SessionContext,
     schema: Arc<Schema>,
     selector: VectorSelector,
+    label_selector: HashSet<String>,
     start: i64,
     end: i64,
-    label_selector: &Option<HashSet<String>>,
-    query_exemplars: bool,
-) -> Result<HashMap<HashLabelValue, RangeValue>> {
-    let cfg = config::get_config();
+) -> Result<HashMap<u64, RangeValue>> {
+    let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
@@ -1126,125 +1230,93 @@ async fn selector_load_data_from_datafusion(
 
     df_group = apply_matchers(df_group, &schema, &selector.matchers)?;
 
-    match apply_label_selector(df_group, &schema, label_selector) {
+    match apply_label_selector(df_group, &schema, &label_selector) {
         Some(dataframe) => df_group = dataframe,
         None => return Ok(HashMap::default()),
     }
 
     // check if exemplars field is exists
-    if query_exemplars {
-        let schema: Schema = df_group.schema().into();
+
+    if query_ctx.query_exemplars {
+        let schema = df_group.schema().as_arrow();
         if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
             return Ok(HashMap::default());
         }
     }
 
-    let label_cols = df_group
+    // get label columns
+    let mut label_cols = df_group
         .schema()
         .fields()
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == TIMESTAMP_COL_NAME
-                || name == VALUE_LABEL
-                || name == EXEMPLARS_LABEL
-                || name == NAME_LABEL
-            {
+            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
                 None
             } else {
-                Some(col(name))
+                Some(name)
             }
         })
         .collect::<Vec<_>>();
-
-    let max_series = if cfg.limit.metrics_max_series_per_query > 0 {
-        cfg.limit.metrics_max_series_per_query
-    } else {
-        DEFAULT_MAX_SERIES_PER_QUERY
-    };
+    // sort labels to have a consistent order
+    label_cols.sort();
+    let label_cols = label_cols.into_iter().map(col).collect::<Vec<_>>();
 
     // get hash & timestamp
-    let start_time = std::time::Instant::now();
-    let sub_batch = df_group
-        .clone()
-        .aggregate(
-            vec![col(HASH_LABEL)],
-            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
-        )?
-        .sort(vec![col(HASH_LABEL).sort(true, true)])?
-        .limit(0, Some(max_series))?
-        .collect()
-        .await?;
-
+    let start1 = std::time::Instant::now();
     let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
-    let (mut timestamp_values, hash_value_set): (Vec<_>, HashSet<HashLabelValue>) =
-        if hash_field_type == &DataType::UInt64 {
-            sub_batch
-                .iter()
-                .flat_map(|batch| {
-                    let ts = batch
-                        .column_by_name(TIMESTAMP_COL_NAME)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<Int64Array>()
-                        .unwrap();
-                    let hash = batch
-                        .column_by_name(HASH_LABEL)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<UInt64Array>()
-                        .unwrap();
-                    ts.iter()
-                        .zip(hash.iter())
-                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or(0).into()))
-                })
-                .unzip()
-        } else {
-            sub_batch
-                .iter()
-                .flat_map(|batch| {
-                    let ts = batch
-                        .column_by_name(TIMESTAMP_COL_NAME)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<Int64Array>()
-                        .unwrap();
-                    let hash = batch
-                        .column_by_name(HASH_LABEL)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<StringArray>()
-                        .unwrap();
-                    ts.iter()
-                        .zip(hash.iter())
-                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or("").into()))
-                })
-                .unzip()
-        };
-    timestamp_values.sort();
-    timestamp_values.dedup();
-    let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
+    let (mut metrics, timestamp_set) = if query_ctx.query_exemplars {
+        load_exemplars_from_datafusion(&query_ctx.trace_id, hash_field_type, df_group.clone())
+            .await?
+    } else {
+        load_samples_from_datafusion(&query_ctx.trace_id, hash_field_type, df_group.clone()).await?
+    };
 
     log::info!(
-        "[trace_id: {trace_id}] load hashing took: {:?}",
-        start_time.elapsed()
+        "[trace_id: {}] load hashing and sample took: {:?}, metrics count: {}, timestamp count: {}",
+        query_ctx.trace_id,
+        start1.elapsed(),
+        metrics.len(),
+        timestamp_set.len()
     );
 
     // get series
-    let series = df_group
-        .clone()
-        .filter(col(TIMESTAMP_COL_NAME).in_list(timestamp_values, false))?
-        .select(label_cols)?
-        .collect()
-        .await?;
+    let start2 = std::time::Instant::now();
+    let series =
+        if config::get_config().limit.metrics_inlist_filter_enabled || timestamp_set.is_empty() {
+            df_group
+                .clone()
+                .filter(col(TIMESTAMP_COL_NAME).in_list(
+                    timestamp_set.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
+                    false,
+                ))?
+                .select(label_cols)?
+                .collect()
+                .await?
+        } else {
+            let min = timestamp_set.iter().min().unwrap();
+            let max = timestamp_set.iter().max().unwrap();
+            df_group
+                .clone()
+                .filter(col(TIMESTAMP_COL_NAME).between(lit(*min), lit(*max)))?
+                .select(label_cols)?
+                .collect()
+                .await?
+        };
 
-    let mut metrics: HashMap<HashLabelValue, RangeValue> =
-        HashMap::with_capacity(hash_value_set.len());
+    log::info!(
+        "[trace_id: {}] load all labels took: {:?}",
+        query_ctx.trace_id,
+        start2.elapsed()
+    );
+
+    let mut labels = Vec::new();
+    let mut hash_label_set: HashSet<u64> = HashSet::with_capacity(metrics.len());
     for batch in series {
         let columns = batch.columns();
         let schema = batch.schema();
         let fields = schema.fields();
-        let mut cols = fields
+        let cols = fields
             .iter()
             .zip(columns)
             .filter_map(|(field, col)| {
@@ -1257,8 +1329,6 @@ async fn selector_load_data_from_datafusion(
                 }
             })
             .collect::<Vec<(_, _)>>();
-        cols.sort_by(|a, b| a.0.cmp(b.0));
-        let mut labels = Vec::with_capacity(columns.len());
         if hash_field_type == &DataType::UInt64 {
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
@@ -1267,14 +1337,17 @@ async fn selector_load_data_from_datafusion(
                 .downcast_ref::<UInt64Array>()
                 .unwrap();
             for i in 0..batch.num_rows() {
-                let hash = hash_values.value(i).into();
-                if !hash_value_set.contains(&hash) {
-                    continue;
-                }
-                if metrics.contains_key(&hash) {
+                let hash = hash_values.value(i);
+                if hash_label_set.contains(&hash) {
                     continue;
                 }
                 labels.clear(); // reset and reuse the same vector
+                if query_ctx.query_data {
+                    labels.push(Arc::new(Label {
+                        name: HASH_LABEL.to_string(),
+                        value: hash.to_string(),
+                    }));
+                }
                 for (name, value) in cols.iter() {
                     if value.is_null(i) {
                         continue;
@@ -1284,7 +1357,10 @@ async fn selector_load_data_from_datafusion(
                         value: value.value(i).to_string(),
                     }));
                 }
-                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
+                hash_label_set.insert(hash);
+                if let Some(range_val) = metrics.get_mut(&hash) {
+                    range_val.labels = labels.clone();
+                }
             }
         } else {
             let hash_values = batch
@@ -1294,14 +1370,17 @@ async fn selector_load_data_from_datafusion(
                 .downcast_ref::<StringArray>()
                 .unwrap();
             for i in 0..batch.num_rows() {
-                let hash = hash_values.value(i).into();
-                if !hash_value_set.contains(&hash) {
-                    continue;
-                }
-                if metrics.contains_key(&hash) {
+                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
+                if hash_label_set.contains(&hash) {
                     continue;
                 }
                 labels.clear(); // reset and reuse the same vector
+                if query_ctx.query_data {
+                    labels.push(Arc::new(Label {
+                        name: HASH_LABEL.to_string(),
+                        value: hash.to_string(),
+                    }));
+                }
                 for (name, value) in cols.iter() {
                     if value.is_null(i) {
                         continue;
@@ -1311,26 +1390,18 @@ async fn selector_load_data_from_datafusion(
                         value: value.value(i).to_string(),
                     }));
                 }
-                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
+                hash_label_set.insert(hash);
+                if let Some(range_val) = metrics.get_mut(&hash) {
+                    range_val.labels = labels.clone();
+                }
             }
         }
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load series took: {:?}",
-        start_time.elapsed()
-    );
-
-    // get values
-    if query_exemplars {
-        load_exemplars_from_datafusion(trace_id, hash_field_type, &mut metrics, df_group).await?;
-    } else {
-        load_samples_from_datafusion(trace_id, hash_field_type, &mut metrics, df_group).await?;
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] load data took: {:?}",
-        start_time.elapsed()
+        "[trace_id: {}] load data from datafusion took: {:?}",
+        query_ctx.trace_id,
+        start_time.elapsed(),
     );
 
     Ok(metrics)
@@ -1339,234 +1410,247 @@ async fn selector_load_data_from_datafusion(
 async fn load_samples_from_datafusion(
     trace_id: &str,
     hash_field_type: &DataType,
-    metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
-) -> Result<()> {
-    let start_time = std::time::Instant::now();
-    let streams = df
+) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
+    let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
+    let plan = df
         .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
-        .execute_stream_partitioned()
+        .create_physical_plan()
         .await?;
+    let schema = plan.schema();
+    let plan = Arc::new(RepartitionExec::try_new(
+        plan,
+        Partitioning::Hash(
+            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
+            target_partitions,
+        ),
+    )?);
 
-    log::info!(
-        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
-        start_time.elapsed()
-    );
+    if config::get_config().common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
+        );
+    }
 
+    let streams = execute_stream_partitioned(plan, ctx)?;
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series = metrics.clone();
-        let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
-            tokio::task::spawn(async move {
-                loop {
-                    match stream.try_next().await {
-                        Ok(Some(batch)) => {
-                            let time_values = batch
-                                .column_by_name(TIMESTAMP_COL_NAME)
+        let mut series: HashMap<u64, Vec<Sample>> = HashMap::new();
+        let task: TokioResult = tokio::task::spawn(async move {
+            loop {
+                match stream.try_next().await {
+                    Ok(Some(batch)) => {
+                        let time_values = batch
+                            .column_by_name(TIMESTAMP_COL_NAME)
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<Int64Array>()
+                            .unwrap();
+                        let value_values = batch
+                            .column_by_name(VALUE_LABEL)
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<Float64Array>()
+                            .unwrap();
+
+                        if hash_field_type == DataType::UInt64 {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
                                 .unwrap()
                                 .as_any()
-                                .downcast_ref::<Int64Array>()
+                                .downcast_ref::<UInt64Array>()
                                 .unwrap();
-                            let value_values = batch
-                                .column_by_name(VALUE_LABEL)
+                            for i in 0..batch.num_rows() {
+                                let timestamp = time_values.value(i);
+                                let hash: u64 = hash_values.value(i);
+                                let entry = series.entry(hash).or_default();
+                                entry.push(Sample::new(timestamp, value_values.value(i)));
+                            }
+                        } else {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
                                 .unwrap()
                                 .as_any()
-                                .downcast_ref::<Float64Array>()
+                                .downcast_ref::<StringArray>()
                                 .unwrap();
-                            if hash_field_type == DataType::UInt64 {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<UInt64Array>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
-                                    if let Some(range_val) = series.get_mut(&hash) {
-                                        range_val.samples.push(Sample::new(
-                                            time_values.value(i),
-                                            value_values.value(i),
-                                        ));
-                                    }
-                                }
-                            } else {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<StringArray>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
-                                    if let Some(range_val) = series.get_mut(&hash) {
-                                        range_val.samples.push(Sample::new(
-                                            time_values.value(i),
-                                            value_values.value(i),
-                                        ));
-                                    }
-                                }
+                            for i in 0..batch.num_rows() {
+                                let timestamp = time_values.value(i);
+                                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
+                                let entry = series.entry(hash).or_default();
+                                entry.push(Sample::new(timestamp, value_values.value(i)));
                             }
                         }
-                        Ok(None) => break,
-                        Err(e) => {
-                            log::error!("load samples from datafusion execute stream Error: {e}");
-                            return Err(e);
-                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        log::error!("load samples from datafusion execute stream Error: {e}");
+                        return Err(e);
                     }
                 }
-                Ok(series)
-            });
+            }
+            let mut unique_timestamps: HashSet<i64> = HashSet::new();
+            for (_, samples) in &series {
+                if let Some(min_timestamp) = samples.iter().map(|s| s.timestamp).max() {
+                    unique_timestamps.insert(min_timestamp);
+                }
+            }
+            Ok((series, unique_timestamps))
+        });
         tasks.push(task);
     }
 
     // collect results
+    let mut all_unique_timestamps: HashSet<i64> = HashSet::new();
+    let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
-        let m = task
+        let (m, timestamps) = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, value) in m {
-            if let Some(range_val) = metrics.get_mut(&hash) {
-                range_val.samples.extend(value.samples);
-            }
+        all_unique_timestamps.extend(timestamps);
+        for (hash, samples) in m {
+            metrics.insert(
+                hash,
+                RangeValue {
+                    labels: vec![],
+                    samples,
+                    exemplars: None,
+                    time_window: None,
+                },
+            );
         }
     }
 
-    log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
-        start_time.elapsed()
-    );
-
-    Ok(())
+    Ok((metrics, all_unique_timestamps))
 }
 
 async fn load_exemplars_from_datafusion(
     trace_id: &str,
     hash_field_type: &DataType,
-    metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
-) -> Result<()> {
-    let start_time = std::time::Instant::now();
-    let streams = df
+) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
+    let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
+    let plan = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
-        .execute_stream_partitioned()
+        .create_physical_plan()
         .await?;
+    let schema = plan.schema();
+    let plan = Arc::new(RepartitionExec::try_new(
+        plan,
+        Partitioning::Hash(
+            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
+            target_partitions,
+        ),
+    )?);
 
-    log::info!(
-        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
-        start_time.elapsed()
-    );
+    if config::get_config().common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
+        );
+    }
 
+    let streams = execute_stream_partitioned(plan, ctx)?;
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series = metrics.clone();
-        let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
-            tokio::task::spawn(async move {
-                loop {
-                    match stream.try_next().await {
-                        Ok(Some(batch)) => {
-                            let exemplars_values = batch
-                                .column_by_name(EXEMPLARS_LABEL)
+        let mut series: HashMap<u64, Vec<Arc<Exemplar>>> = HashMap::new();
+        let task: TokioExemplarsResult = tokio::task::spawn(async move {
+            loop {
+                match stream.try_next().await {
+                    Ok(Some(batch)) => {
+                        let exemplars_values = batch
+                            .column_by_name(EXEMPLARS_LABEL)
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap();
+                        if hash_field_type == DataType::UInt64 {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<UInt64Array>()
+                                .unwrap();
+                            for i in 0..batch.num_rows() {
+                                let hash: u64 = hash_values.value(i);
+                                let exemplar = exemplars_values.value(i);
+                                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar)
+                                {
+                                    let entry = series.entry(hash).or_default();
+                                    for exemplar in exemplars {
+                                        if let Some(exemplar) = exemplar.as_object() {
+                                            entry.push(Arc::new(Exemplar::from(exemplar)));
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
                                 .unwrap()
                                 .as_any()
                                 .downcast_ref::<StringArray>()
                                 .unwrap();
-                            if hash_field_type == DataType::UInt64 {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<UInt64Array>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
-                                    let exemplar = exemplars_values.value(i);
-                                    if let Some(range_val) = series.get_mut(&hash)
-                                        && let Ok(exemplars) =
-                                            json::from_str::<Vec<json::Value>>(exemplar)
-                                    {
-                                        for exemplar in exemplars {
-                                            if let Some(exemplar) = exemplar.as_object() {
-                                                if range_val.exemplars.is_none() {
-                                                    range_val.exemplars = Some(vec![]);
-                                                }
-                                                range_val
-                                                    .exemplars
-                                                    .as_mut()
-                                                    .unwrap()
-                                                    .push(Arc::new(Exemplar::from(exemplar)));
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<StringArray>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
-                                    let exemplar = exemplars_values.value(i);
-                                    if let Some(range_val) = series.get_mut(&hash)
-                                        && let Ok(exemplars) =
-                                            json::from_str::<Vec<json::Value>>(exemplar)
-                                    {
-                                        for exemplar in exemplars {
-                                            if let Some(exemplar) = exemplar.as_object() {
-                                                if range_val.exemplars.is_none() {
-                                                    range_val.exemplars = Some(vec![]);
-                                                }
-                                                range_val
-                                                    .exemplars
-                                                    .as_mut()
-                                                    .unwrap()
-                                                    .push(Arc::new(Exemplar::from(exemplar)));
-                                            }
+                            for i in 0..batch.num_rows() {
+                                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
+                                let exemplar = exemplars_values.value(i);
+                                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar)
+                                {
+                                    let entry = series.entry(hash).or_default();
+                                    for exemplar in exemplars {
+                                        if let Some(exemplar) = exemplar.as_object() {
+                                            entry.push(Arc::new(Exemplar::from(exemplar)));
                                         }
                                     }
                                 }
                             }
                         }
-                        Ok(None) => break,
-                        Err(e) => {
-                            log::error!("load exemplars from datafusion execute stream Error: {e}");
-                            return Err(e);
-                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        log::error!("load exemplars from datafusion execute stream Error: {e}");
+                        return Err(e);
                     }
                 }
-                Ok(series)
-            });
+            }
+            let mut unique_timestamps: HashSet<i64> = HashSet::new();
+            for (_, samples) in &series {
+                if let Some(min_timestamp) = samples.iter().map(|s| s.timestamp).max() {
+                    unique_timestamps.insert(min_timestamp);
+                }
+            }
+            Ok((series, unique_timestamps))
+        });
         tasks.push(task);
     }
 
     // collect results
+    let mut all_unique_timestamps: HashSet<i64> = HashSet::new();
+    let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
-        let m = task
+        let (m, timestamps) = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, value) in m {
-            let Some(exemplars) = value.exemplars else {
-                continue;
-            };
-            if let Some(range_val) = metrics.get_mut(&hash) {
-                if range_val.exemplars.is_none() {
-                    range_val.exemplars = Some(vec![]);
-                }
-                range_val.exemplars.as_mut().unwrap().extend(exemplars);
-            }
+        all_unique_timestamps.extend(timestamps);
+        for (hash, exemplars) in m {
+            metrics.insert(
+                hash,
+                RangeValue {
+                    labels: vec![],
+                    samples: vec![],
+                    exemplars: Some(exemplars),
+                    time_window: None,
+                },
+            );
         }
     }
 
-    log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
-        start_time.elapsed()
-    );
-
-    Ok(())
+    Ok((metrics, all_unique_timestamps))
 }
 #[cfg(test)]
 mod tests {
@@ -1608,34 +1692,35 @@ mod tests {
     #[test]
     fn test_engine_new() {
         // Test basic engine creation with a simple mock
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
-        assert_eq!(engine.time, 1640995200000000i64);
-        assert_eq!(engine.trace_id, "test_trace");
-        assert!(engine.col_filters.is_some());
+        assert_eq!(engine.trace_id, trace_id.to_string());
+        assert!(engine.label_selector.is_empty());
         assert!(engine.result_type.is_none());
     }
 
     #[test]
     fn test_extract_columns_from_prom_expr_number_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
 
@@ -1645,15 +1730,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_string_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let expr = PromExpr::StringLiteral(StringLiteral {
             val: "test".to_string(),
@@ -1665,15 +1751,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_paren() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
         let expr = PromExpr::Paren(ParenExpr {
@@ -1686,15 +1773,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_unary() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
         let expr = PromExpr::Unary(UnaryExpr {
@@ -1707,15 +1795,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_binary() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1733,15 +1822,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_binary_with_modifier() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1766,15 +1856,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_binary_with_many_to_one() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1797,21 +1888,22 @@ mod tests {
 
         let result = engine.extract_columns_from_prom_expr(&expr);
         assert!(result.is_ok());
-        // Should clear col_filters for ManyToOne
-        assert!(engine.col_filters.is_none());
+        // Should clear label_selector for ManyToOne
+        assert!(engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_prom_expr_aggregate() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1828,15 +1920,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_aggregate_with_param() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1854,15 +1947,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_subquery() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1880,15 +1974,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_call() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs { args: vec![] };
@@ -1906,15 +2001,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_call_with_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let arg = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1935,15 +2031,16 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_extension() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         // Create a mock extension expression
@@ -1963,33 +2060,35 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_modifier_none() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         engine.extract_columns_from_modifier(&None, &create_test_token());
-        // Should not change col_filters
-        assert!(engine.col_filters.is_some());
+        // Should not change label_selector
+        assert!(engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_modifier_topk() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
@@ -1997,21 +2096,22 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should clear col_filters for topk
-        assert!(engine.col_filters.is_some());
+        // Should clear label_selector for topk
+        assert!(!engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_modifier_bottomk() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
@@ -2019,21 +2119,22 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should clear col_filters for bottomk
-        assert!(engine.col_filters.is_some());
+        // Should clear label_selector for bottomk
+        assert!(!engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_modifier_include() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
@@ -2041,24 +2142,24 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should add labels to col_filters
-        assert!(engine.col_filters.is_some());
-        let filters = engine.col_filters.as_ref().unwrap();
-        assert!(filters.contains("env"));
-        assert!(filters.contains("service"));
+        // Should add labels to label_selector
+        assert!(!engine.label_selector.is_empty());
+        assert!(engine.label_selector.contains("env"));
+        assert!(engine.label_selector.contains("service"));
     }
 
     #[test]
     fn test_extract_columns_from_modifier_exclude() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Exclude(promql_parser::label::Labels {
@@ -2066,21 +2167,22 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should not change col_filters for exclude
-        assert!(engine.col_filters.is_some());
+        // Should not change label_selector for exclude
+        assert!(engine.label_selector.is_empty());
     }
 
     #[tokio::test]
     async fn test_exec_expr_number_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2096,15 +2198,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_string_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::StringLiteral(StringLiteral {
@@ -2122,15 +2225,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_paren() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2150,15 +2254,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_unary_float() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2169,25 +2274,25 @@ mod tests {
         let result = engine.exec_expr(&expr).await;
         assert!(result.is_ok());
 
-        if let Ok(Value::Vector(v)) = result {
-            assert_eq!(v.len(), 1);
-            assert_eq!(v[0].sample.value, -42.0);
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, -42.0);
         } else {
-            panic!("Expected Value::Vector");
+            panic!("Expected Value::Float");
         }
     }
 
     #[tokio::test]
     async fn test_exec_expr_unary_vector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let sample = Sample::new(1640995200000000i64, 42.0);
@@ -2211,15 +2316,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_binary_float_float() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2243,15 +2349,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_binary_none_none() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::Extension(Extension {
@@ -2274,15 +2381,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_subquery() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2295,28 +2403,28 @@ mod tests {
         });
 
         let result = engine.exec_expr(&subquery_expr).await;
-        assert!(result.is_ok());
-
-        if let Ok(Value::Matrix(matrix)) = result {
-            assert_eq!(matrix.len(), 1);
-            assert_eq!(matrix[0].samples.len(), 1);
-            assert_eq!(matrix[0].samples[0].value, 42.0);
-        } else {
-            panic!("Expected Value::Matrix");
-        }
+        // Subquery with float input should fail because subquery expects matrix input
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported subquery")
+        );
     }
 
     #[tokio::test]
     async fn test_exec_expr_subquery_with_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2330,20 +2438,28 @@ mod tests {
         });
 
         let result = engine.exec_expr(&subquery_expr).await;
-        assert!(result.is_ok());
+        // Subquery with float input should fail because subquery expects matrix input
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported subquery")
+        );
     }
 
     #[tokio::test]
     async fn test_exec_expr_subquery_vector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let sample = Sample::new(1640995200000000i64, 42.0);
@@ -2370,15 +2486,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_subquery_float() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let float_expr = PromExpr::Extension(Extension {
@@ -2400,15 +2517,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_aggregate() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2427,15 +2545,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_call() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs { args: vec![] };
@@ -2455,15 +2574,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_extension() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let extension_expr = PromExpr::Extension(Extension {
@@ -2482,15 +2602,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_vector_selector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2519,15 +2640,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_matrix_selector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2561,15 +2683,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2583,15 +2706,16 @@ mod tests {
 
     #[test]
     fn test_ensure_two_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2614,15 +2738,16 @@ mod tests {
 
     #[test]
     fn test_ensure_three_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2646,15 +2771,16 @@ mod tests {
 
     #[test]
     fn test_ensure_ge_three_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2679,15 +2805,16 @@ mod tests {
 
     #[test]
     fn test_ensure_five_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2713,15 +2840,16 @@ mod tests {
 
     #[test]
     fn test_parse_f64_else_err() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let value = Value::Float(42.0);
@@ -2736,15 +2864,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_first_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2764,15 +2893,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_second_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2793,15 +2923,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_third_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2823,15 +2954,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_fourth_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2854,15 +2986,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_fifth_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2889,6 +3022,33 @@ mod tests {
         token::TokenType::new(token::T_ADD)
     }
 
+    // Helper function to create test QueryContext
+    fn create_test_query_ctx(trace_id: &str, org_id: &str, timeout: u64) -> Arc<QueryContext> {
+        Arc::new(QueryContext {
+            trace_id: trace_id.to_string(),
+            org_id: org_id.to_string(),
+            query_exemplars: false,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            timeout,
+            search_event_type: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: false,
+        })
+    }
+
+    // Helper function to create test EvalContext
+    fn create_test_eval_ctx() -> EvalContext {
+        EvalContext::new(
+            1640995200000000i64,
+            1640995200000000i64,
+            0,
+            "test_trace".to_string(),
+        )
+    }
+
     // Simple mock provider that implements the required trait
     struct SimpleMockProvider;
 
@@ -2900,13 +3060,14 @@ mod tests {
             _stream_name: &str,
             _time_range: (i64, i64),
             _machers: promql_parser::label::Matchers,
-            _label_selector: Option<std::collections::HashSet<String>>,
+            _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
         ) -> datafusion::error::Result<
             Vec<(
                 datafusion::prelude::SessionContext,
                 std::sync::Arc<datafusion::arrow::datatypes::Schema>,
                 config::meta::search::ScanStats,
+                bool,
             )>,
         > {
             Ok(vec![])
@@ -2915,15 +3076,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_vector_selector_basic() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2950,15 +3112,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_vector_selector_with_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2985,15 +3148,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_vector_selector_with_negative_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -3020,15 +3184,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_matrix_selector_basic() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -3057,15 +3222,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_matrix_selector_with_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                30,
+                vec![],
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {

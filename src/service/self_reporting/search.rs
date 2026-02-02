@@ -43,6 +43,8 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            sampling_config: None,
+            sampling_ratio: None,
             streaming_output: false,
             streaming_id: None,
             histogram_interval: 0,
@@ -54,6 +56,7 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
 

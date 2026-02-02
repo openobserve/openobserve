@@ -44,6 +44,9 @@ const template = {
       )}`
     );
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/alerts/templates/bulk`, { data });
+  },
 };
 
 export default template;

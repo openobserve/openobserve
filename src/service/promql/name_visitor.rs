@@ -39,7 +39,10 @@ impl Default for MetricNameVisitor {
 }
 
 fn get_name_from_expr(vector_selector: &VectorSelector) -> String {
-    vector_selector.name.as_ref().unwrap().to_string()
+    match vector_selector.name.as_ref() {
+        Some(name) => name.clone(),
+        None => "".to_string(),
+    }
 }
 
 impl ExprVisitor for MetricNameVisitor {

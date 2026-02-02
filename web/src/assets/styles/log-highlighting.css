@@ -1,0 +1,181 @@
+/* Log Highlighting CSS Classes */
+/* Base highlighting classes */
+.log-highlight {
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-word;
+  display: inline;
+
+}
+
+/* Syntax highlighting classes */
+.log-key {
+  color: #B71C1C;
+
+}
+.log-string {
+  color: #047857;
+
+}
+.log-number {
+  color: #2563eb;
+
+}
+.log-boolean {
+  color: #6d28d9;
+
+}
+.log-null {
+  color: #6b7280;
+
+}
+.log-separator {
+  color: #9ca3af;
+
+}
+.log-object-brace {
+  color: #9ca3af;
+
+}
+
+/* Semantic type classes - colors from keyValueParser.ts */
+.log-ip {
+  color: #D97706; /* Bold amber for IP addresses */
+
+}
+.log-url {
+  color: #1D4ED8; /* Strong blue for URLs */
+
+}
+.log-email {
+  color: #9333EA; /* Vivid purple for emails */
+
+}
+.log-timestamp {
+  color: #2563EB; /* Blue for timestamps */
+
+}
+.log-http-method {
+  color: #388e3c; /* Green for HTTP methods (not in keyValueParser) */
+
+}
+.log-status-code {
+  color: #f57c00; /* Orange for status codes (not in keyValueParser) */
+
+}
+.log-path {
+  color: #4338CA; /* Deep indigo for file paths */
+
+}
+.log-uuid {
+  color: #047857; /* Dark teal for UUIDs */
+
+}
+.log-file-size {
+  color: #2563eb; /* Blue for file sizes (not in keyValueParser) */
+
+}
+.log-object-value {
+  color: #4b5563; /* Neutral gray for objects */
+
+}
+.log-array-value {
+  color: #0E7490; /* Calm teal for arrays */
+
+}
+
+/* Dark theme variants - colors from keyValueParser.ts */
+.dark .log-key {
+  color: #f67a7aff; /* Lighter red for dark mode */
+
+}
+.dark .log-string {
+  color: #6EE7B7; /* Soft mint green */
+
+}
+.dark .log-number {
+  color: #60A5FA; /* Light blue for numbers */
+
+}
+.dark .log-boolean {
+  color: #A5B4FC; /* Lavender */
+
+}
+.dark .log-null {
+  color: #9CA3AF; /* Medium gray */
+
+}
+.dark .log-ip {
+  color: #FCD34D; /* Soft gold */
+
+}
+.dark .log-url {
+  color: #93C5FD; /* Light blue */
+
+}
+.dark .log-email {
+  color: #C4B5FD; /* Soft purple */
+
+}
+.dark .log-timestamp {
+  color: #60A5FA; /* Light blue */
+
+}
+.dark .log-http-method {
+  color: #66bb6a; /* Green for HTTP methods (not in keyValueParser) */
+
+}
+.dark .log-status-code {
+  color: #ffb74d; /* Orange for status codes (not in keyValueParser) */
+
+}
+.dark .log-path {
+  color: #BAE6FD; /* Ice blue */
+
+}
+.dark .log-uuid {
+  color: #6EE7B7; /* Mint green (consistent with string) */
+
+}
+.dark .log-object-value {
+  color: #D1D5DB; /* Light gray */
+
+}
+.dark .log-array-value {
+  color: #67E8F9; /* Soft cyan */
+
+}
+
+/* Highlighting class */
+.log-highlighted {
+  background-color: rgb(255, 213, 0);
+  color: black;
+
+}
+
+/* Combined utility classes */
+.log-quote::before,
+.log-quote::after {
+  content: '"';
+
+}
+
+/* Default fallback class */
+.log-default {
+  color: inherit;
+
+}
+
+/* Whitespace class */
+.log-whitespace {
+  color: transparent;
+
+}
+
+/* Special classes for performance optimization */
+.log-simple-text {
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-word;
+
+}

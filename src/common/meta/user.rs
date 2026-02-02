@@ -59,7 +59,8 @@ impl UserRequest {
             password,
             salt,
             organizations: vec![UserOrg {
-                name: org,
+                name: org.clone(),
+                org_name: org,
                 token,
                 rum_token: Some(rum_token),
                 role: self.role.base_role.clone(),
@@ -127,9 +128,27 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum UserUpdateMode {
+    OtherUpdate,
+    SelfUpdate,
+    CliUpdate,
+}
+
+impl UserUpdateMode {
+    pub fn is_self_update(&self) -> bool {
+        self == &UserUpdateMode::SelfUpdate
+    }
+
+    pub fn is_cli_update(&self) -> bool {
+        self == &UserUpdateMode::CliUpdate
+    }
+}
+
 pub fn get_default_user_org() -> UserOrg {
     UserOrg {
         name: "".to_string(),
+        org_name: "".to_string(),
         token: "".to_string(),
         rum_token: None,
         role: get_default_user_role(),
@@ -208,7 +227,9 @@ impl From<&OrgInviteStatus> for InviteStatus {
 #[cfg(feature = "cloud")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserInvite {
+    pub org_name: String,
     pub org_id: String,
+    pub inviter_id: String,
     pub token: String,
     pub role: String,
     pub status: InviteStatus,
@@ -245,6 +266,12 @@ pub struct TokenValidationResponse {
 }
 pub struct TokenValidationResponseBuilder {
     pub response: TokenValidationResponse,
+}
+
+impl Default for TokenValidationResponseBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Builder for creating a `TokenValidationResponse` from a `DBUser`.
@@ -385,7 +412,7 @@ impl From<&UserRoleRequest> for UserOrgRole {
         let mut custom_role = role.custom.clone();
         let mut is_role_name_standard = false;
         for user_role in get_roles() {
-            if user_role.to_string().eq(&role.role) {
+            if user_role.to_string().eq_ignore_ascii_case(&role.role) {
                 standard_role = user_role;
                 is_role_name_standard = true;
                 break;
@@ -429,6 +456,13 @@ pub struct AuthTokensExt {
     pub refresh_token: String,
     pub request_time: i64,
     pub expires_in: i64,
+}
+
+impl AuthTokensExt {
+    /// Checks if the token is still valid or not
+    pub fn has_expired(&self) -> bool {
+        chrono::Utc::now().timestamp() - self.request_time > self.expires_in
+    }
 }
 
 #[cfg(test)]
@@ -551,10 +585,7 @@ mod tests {
         assert_eq!(user_request.last_name, "Doe");
         assert_eq!(user_request.password, "password123");
         assert_eq!(user_request.role.base_role, UserRole::Admin);
-        assert_eq!(
-            user_request.role.custom_role.unwrap().first().unwrap(),
-            "Admin"
-        );
+        assert!(user_request.role.custom_role.is_none());
         assert!(!user_request.is_external);
         assert!(user_request.token.is_none());
     }
@@ -955,38 +986,71 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_in_user() {
-        let sign_in = SignInUser {
-            name: "test@example.com".to_string(),
-            password: "password123".to_string(),
+    fn test_user_role_request_case_insensitive_root() {
+        // Test "Root" (capitalized) - this was the original bug
+        let request = UserRoleRequest {
+            role: "Root".to_string(),
+            custom: Some(vec![]),
         };
+        let org_role = UserOrgRole::from(&request);
+        assert_eq!(org_role.base_role, UserRole::Root);
+        assert_eq!(org_role.custom_role, Some(vec![]));
 
-        assert_eq!(sign_in.name, "test@example.com");
-        assert_eq!(sign_in.password, "password123");
+        // Test "root" (lowercase)
+        let request = UserRoleRequest {
+            role: "root".to_string(),
+            custom: None,
+        };
+        let org_role = UserOrgRole::from(&request);
+        assert_eq!(org_role.base_role, UserRole::Root);
+        assert!(org_role.custom_role.is_none());
+
+        // Test "ROOT" (uppercase)
+        let request = UserRoleRequest {
+            role: "ROOT".to_string(),
+            custom: None,
+        };
+        let org_role = UserOrgRole::from(&request);
+        assert_eq!(org_role.base_role, UserRole::Root);
+        assert!(org_role.custom_role.is_none());
     }
 
     #[test]
-    fn test_sign_in_response() {
-        let response = SignInResponse {
-            status: true,
-            message: "Login successful".to_string(),
+    fn test_user_role_request_case_insensitive_admin() {
+        // Test "Admin" (capitalized)
+        let request = UserRoleRequest {
+            role: "Admin".to_string(),
+            custom: None,
         };
+        let org_role = UserOrgRole::from(&request);
+        assert_eq!(org_role.base_role, UserRole::Admin);
 
-        assert!(response.status);
-        assert_eq!(response.message, "Login successful");
+        // Test "ADMIN" (uppercase)
+        let request = UserRoleRequest {
+            role: "ADMIN".to_string(),
+            custom: None,
+        };
+        let org_role = UserOrgRole::from(&request);
+        assert_eq!(org_role.base_role, UserRole::Admin);
     }
 
     #[test]
-    fn test_role_org() {
-        let role_org = RoleOrg {
-            role: UserRole::Admin,
-            org: "test_org".to_string(),
-            custom_role: Some("custom_perm".to_string()),
+    fn test_user_role_request_case_insensitive_service_account() {
+        // Test "Service_Account" (mixed case)
+        let request = UserRoleRequest {
+            role: "Service_Account".to_string(),
+            custom: None,
         };
+        let org_role = UserOrgRole::from(&request);
+        assert_eq!(org_role.base_role, UserRole::ServiceAccount);
 
-        assert_eq!(role_org.role, UserRole::Admin);
-        assert_eq!(role_org.org, "test_org");
-        assert_eq!(role_org.custom_role, Some("custom_perm".to_string()));
+        // Test "SERVICE_ACCOUNT" (uppercase)
+        let request = UserRoleRequest {
+            role: "SERVICE_ACCOUNT".to_string(),
+            custom: None,
+        };
+        let org_role = UserOrgRole::from(&request);
+        assert_eq!(org_role.base_role, UserRole::ServiceAccount);
     }
 
     #[cfg(feature = "cloud")]
@@ -1010,40 +1074,5 @@ mod tests {
             InviteStatus::from(&OrgInviteStatus::Expired),
             InviteStatus::Expired
         );
-    }
-
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn test_user_invite() {
-        let invite = UserInvite {
-            org_id: "org123".to_string(),
-            token: "invite_token".to_string(),
-            role: "Admin".to_string(),
-            status: InviteStatus::Pending,
-            expires_at: 1234567890,
-        };
-
-        assert_eq!(invite.org_id, "org123");
-        assert_eq!(invite.token, "invite_token");
-        assert_eq!(invite.role, "Admin");
-        assert_eq!(invite.status, InviteStatus::Pending);
-        assert_eq!(invite.expires_at, 1234567890);
-    }
-
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn test_user_invite_list() {
-        let invite_list = UserInviteList {
-            data: vec![UserInvite {
-                org_id: "org123".to_string(),
-                token: "invite_token".to_string(),
-                role: "Admin".to_string(),
-                status: InviteStatus::Pending,
-                expires_at: 1234567890,
-            }],
-        };
-
-        assert_eq!(invite_list.data.len(), 1);
-        assert_eq!(invite_list.data[0].org_id, "org123");
     }
 }

@@ -16,7 +16,6 @@
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 #[cfg(feature = "marketplace")]
 use infra::errors::Error;
-use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
 #[cfg(feature = "enterprise")]
@@ -24,37 +23,41 @@ use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
 use crate::{
-    common::{
-        infra::config::SYSLOG_ENABLED,
-        meta::{
-            organization::DEFAULT_ORG,
-            user::{UserOrgRole, UserRequest},
-        },
+    common::meta::{
+        organization::DEFAULT_ORG,
+        user::{UserOrgRole, UserRequest},
     },
     service::{db, self_reporting, users},
 };
 
+#[cfg(feature = "enterprise")]
+pub mod alert_grouping;
 mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
+pub mod config_watcher;
 mod file_downloader;
 mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
+#[cfg(feature = "enterprise")]
+mod incidents;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
 pub(crate) mod pipeline;
+mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
+#[cfg(feature = "enterprise")]
+mod service_graph;
+mod session_cleanup;
 mod stats;
-pub(crate) mod syslog_server;
 
 pub use file_downloader::{download_from_node, queue_download};
-pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "marketplace")]
@@ -62,10 +65,8 @@ async fn get_metering_lock() -> Result<(), Error> {
     if !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }
-    use infra::dist_lock;
+    use infra::{cluster::get_node_by_uuid, dist_lock};
     use o2_enterprise::enterprise::metering::METERING_NATS_LOCK_KEY;
-
-    use crate::common::infra::cluster::get_node_by_uuid;
 
     let db = infra::db::get_db().await;
     let node = db
@@ -109,6 +110,28 @@ async fn get_metering_lock() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn enforce_usage_stream_retention() {
+    use config::{
+        META_ORG_ID,
+        meta::{self_reporting::usage::USAGE_STREAM, stream::StreamType},
+    };
+    if let Some(mut s) =
+        infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
+        && s.data_retention < 32
+    {
+        s.data_retention = 32;
+        crate::service::stream::save_stream_settings(
+            META_ORG_ID,
+            USAGE_STREAM,
+            StreamType::Logs,
+            s,
+        )
+        .await
+        .unwrap(); //unwrap is intentional, we should panic if this fails
+    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -161,6 +184,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(mmdb_downloader::run());
     }
 
+    // Initialize URL job processor for enrichment tables on ingesters
+    // This ensures the stale job recovery task starts even if this ingester
+    // never receives a URL enrichment event. Critical for distributed deployments.
+    if LOCAL_NODE.is_ingester() {
+        crate::service::enrichment_table::init_url_processor();
+    }
+
     db::user::cache().await.expect("user cache failed");
     db::organization::cache()
         .await
@@ -175,6 +205,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::organization::watch());
+
+    #[cfg(feature = "cloud")]
+    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
 
     // check version
     db::metas::version::set()
@@ -208,6 +241,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(promql_self_consume::run());
+
+    #[cfg(feature = "enterprise")]
+    {
+        tokio::task::spawn(async move {
+            loop {
+                enforce_usage_stream_retention().await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(10 * 60)).await;
+            }
+        });
+    }
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -235,25 +279,31 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(async move { db::schema::watch().await });
-    tokio::task::spawn(async move { db::functions::watch().await });
-    tokio::task::spawn(async move { db::compact::retention::watch().await });
-    tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
-    tokio::task::spawn(async move { db::alerts::templates::watch().await });
-    tokio::task::spawn(async move { db::alerts::destinations::watch().await });
-    tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
-    tokio::task::spawn(async move { db::alerts::alert::watch().await });
-    tokio::task::spawn(async move { db::organization::org_settings_watch().await });
+    tokio::task::spawn(db::schema::watch());
+    tokio::task::spawn(db::functions::watch());
+    tokio::task::spawn(db::compact::retention::watch());
+    tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
+    tokio::task::spawn(db::system_settings::watch());
+    tokio::task::spawn(db::alerts::templates::watch());
+    tokio::task::spawn(db::alerts::destinations::watch());
+    tokio::task::spawn(db::alerts::realtime_triggers::watch());
+    tokio::task::spawn(db::alerts::alert::watch());
+    tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(
-        async move { o2_enterprise::enterprise::domain_management::db::watch().await },
-    );
+    tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { db::ai_prompts::watch().await });
+    tokio::task::spawn(db::ai_prompts::watch());
+    // Service streams watch only needed on queriers - they serve the UI APIs
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_querier() {
+        tokio::task::spawn(async move {
+            o2_enterprise::enterprise::service_streams::cache::watch().await
+        });
+    }
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(async move { db::pipeline::watch().await });
+        tokio::task::spawn(db::pipeline::watch());
     }
 
     #[cfg(feature = "enterprise")]
@@ -278,6 +328,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("prom cluster leader cache failed");
 
+    // cache system settings (FQN priority, etc.)
+    db::system_settings::cache()
+        .await
+        .expect("system settings cache failed");
+
     // cache alerts
     db::alerts::templates::cache()
         .await
@@ -291,12 +346,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
-    #[allow(deprecated)]
-    db::syslog::cache().await.expect("syslog cache failed");
-    #[allow(deprecated)]
-    db::syslog::cache_syslog_settings()
-        .await
-        .expect("syslog settings cache failed");
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
@@ -305,10 +354,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::ai_prompts::cache()
         .await
         .expect("ai prompts cache failed");
-
-    infra_file_list::create_table_index().await?;
-    if !LOCAL_NODE.is_alert_manager() {
-        infra_file_list::LOCAL_CACHE.create_table_index().await?;
+    // Service streams cache only needed on queriers - they serve the UI APIs
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_querier() {
+        o2_enterprise::enterprise::service_streams::cache::init_cache()
+            .await
+            .expect("service discovery cache failed");
     }
 
     #[cfg(feature = "enterprise")]
@@ -326,24 +377,44 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
+    config_watcher::run();
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
         tokio::task::spawn(async move {
-            o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt()
+            o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
                 .await
                 .expect("load system prompt failed");
         });
     }
-    tokio::task::spawn(async move { files::run().await });
-    tokio::task::spawn(async move { stats::run().await });
-    tokio::task::spawn(async move { compactor::run().await });
-    tokio::task::spawn(async move { flatten_compactor::run().await });
-    tokio::task::spawn(async move { metrics::run().await });
-    let _ = promql::run();
-    tokio::task::spawn(async move { alert_manager::run().await });
-    tokio::task::spawn(async move { file_downloader::run().await });
+    tokio::task::spawn(files::run());
+    tokio::task::spawn(stats::run());
+    tokio::task::spawn(compactor::run());
+    tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { pipeline::run().await });
+    tokio::task::spawn(service_graph::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(incidents::run());
+    tokio::task::spawn(metrics::run());
+    let _ = promql::run();
+    tokio::task::spawn(alert_manager::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(alert_grouping::process_expired_batches());
+    tokio::task::spawn(file_downloader::run());
+    // Note: Service discovery extraction runs automatically during parquet file processing
+    // See src/job/files/parquet.rs:queue_services_from_parquet for implementation
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "service_streams_batch_processor",
+        get_enterprise_config().service_streams.batch_flush_interval_seconds,
+        {
+            o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
+        },
+        pause_if: !get_enterprise_config().service_streams.enabled
+    );
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(pipeline::run());
+    pipeline_error_cleanup::run();
+    session_cleanup::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
@@ -357,10 +428,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     {
-        tokio::task::spawn(async move { cipher::run().await });
-        tokio::task::spawn(async move { db::keys::watch().await });
-        tokio::task::spawn(async move { db::re_pattern::watch_patterns().await });
-        tokio::task::spawn(async move { db::re_pattern::watch_pattern_associations().await });
+        tokio::task::spawn(cipher::run());
+        tokio::task::spawn(db::keys::watch());
+        tokio::task::spawn(db::re_pattern::watch_patterns());
+        tokio::task::spawn(db::re_pattern::watch_pattern_associations());
         // we do this call here so the pattern manager gets init-ed at the very start instead at
         // first use helpful for stream settings case, where if not already init-ed, it
         // returns empty array for associations because it is a sync fn and cannot init
@@ -379,10 +450,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(any(feature = "cloud", feature = "marketplace"))]
     {
-        use crate::{
-            common::infra::cluster::get_cached_nodes, service::self_reporting::search::get_usage,
-        };
+        use infra::cluster::get_cached_nodes;
 
+        use crate::service::self_reporting::{ingest_data_retention_usages, search::get_usage};
+
+        #[cfg(feature = "marketplace")]
         tokio::spawn(async move {
             // try checking the lock every 15 minutes, so we can be fairly sure that
             // when we report metering, there is an alive node holding the lock
@@ -411,7 +483,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 interval.tick().await;
             }
         });
-        o2_enterprise::enterprise::metering::init(get_usage)
+        o2_enterprise::enterprise::metering::init(get_usage, ingest_data_retention_usages)
             .await
             .expect("cloud usage metering job init failed");
 
@@ -425,28 +497,30 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
 
-    // Syslog server start
-    #[allow(deprecated)]
-    tokio::task::spawn(db::syslog::watch());
-    #[allow(deprecated)]
-    tokio::task::spawn(db::syslog::watch_syslog_settings());
-
-    let start_syslog = *SYSLOG_ENABLED.read();
-    if start_syslog {
-        syslog_server::run(start_syslog, true)
-            .await
-            .expect("syslog server run failed");
-    }
-
     Ok(())
 }
 
 /// Additional jobs that init processes should be deferred until the gRPC service
 /// starts in the main thread
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::license::start_license_check(
+            crate::service::self_reporting::search::get_usage,
+            LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
+        )
+        .await;
+        tokio::task::spawn(db::license::watch());
+    }
+
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }
+
+    // Clean up old JSON format enrichment tables before caching (one-time check at startup)
+    config::utils::enrichment_local_cache::cleanup_old_json_format()
+        .await
+        .expect("Failed to clean up old JSON format enrichment tables");
 
     db::schema::cache_enrichment_tables()
         .await

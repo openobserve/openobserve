@@ -40,6 +40,8 @@ pub struct DBUser {
 pub struct UserOrg {
     pub name: String,
     #[serde(default)]
+    pub org_name: String,
+    #[serde(default)]
     pub token: String,
     #[serde(default)]
     pub rum_token: Option<String>,
@@ -120,6 +122,15 @@ impl UserRole {
             UserRole::User => "User".to_string(),
             UserRole::ServiceAccount => "Service Account".to_string(),
         }
+    }
+
+    /// Check if a string is a valid standard role name
+    /// Returns true if the string matches one of the UserRole enum variants
+    pub fn is_valid_role(role: &str) -> bool {
+        matches!(
+            role,
+            "admin" | "root" | "viewer" | "editor" | "user" | "service_account"
+        )
     }
 }
 

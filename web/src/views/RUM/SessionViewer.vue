@@ -15,46 +15,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 full-height">
-    <div class="col-12 q-px-sm q-pt-md row items-end">
-      <div class="col-9 row">
+  <div class="row qp-2 tw:h-full tw:px-[0.625rem] tw:pt-[0.25rem]">
+    <div class="col-12 row items-end tw:pb-[0.625rem]">
+      <div class="col-12 row card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
+          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
           title="Go Back"
           @click="router.back()"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <q-icon name="arrow_back_ios_new" size="0.875rem" />
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="language" size="14px" class="q-pr-xs" />
+          <q-icon name="language" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.ip }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="calendar_month" size="14px" class="q-pr-xs" />
+          <q-icon name="calendar_month" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.date }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="person" size="14px" class="q-pr-xs" />
+          <q-icon name="person" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="location_on" size="14px" class="q-pr-xs" />
+          <q-icon name="location_on" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="settings" size="14x" class="q-pr-xs" />
+          <q-icon name="settings" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
+        <div
+          v-if="frustrationCount > 0"
+          class="text-caption ellipsis row items-center"
+          :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
+          data-test="session-viewer-frustration-summary"
+        >
+          <q-icon
+            name="sentiment_very_dissatisfied"
+            size="0.875rem"
+            class="q-pr-xs"
+            style="color: #fb923c"
+            data-test="frustration-summary-icon"
+          />
+          <span
+            class="tw:font-semibold"
+            style="color: #fb923c"
+            data-test="frustration-summary-text"
+            >{{ frustrationCount }} Frustration{{
+              frustrationCount > 1 ? "s" : ""
+            }}</span
+          >
+        </div>
       </div>
-      <q-separator class="full-width q-mt-sm" />
     </div>
-    <div class="col-12 row" style="height: calc(100vh - 104px)">
+    <div
+      class="col-12 row card-container tw:overflow-hidden tw:mb-[0.325rem] tw:h-[calc(100%-58px)]!"
+    >
       <div class="col-9 full-height">
         <VideoPlayer
           ref="videoPlayerRef"
@@ -101,6 +118,8 @@ const defaultEvent = {
   loading_time: "",
   loading_type: "",
   user: {},
+  frustration_type: null,
+  frustration_types: [],
 };
 
 const sessionId = ref("1");
@@ -129,6 +148,13 @@ const sessionDetails = ref({
   city: "",
   country: "",
   id: "",
+});
+
+const frustrationCount = computed(() => {
+  return segmentEvents.value.filter(
+    (event: any) =>
+      event.frustration_types && event.frustration_types.length > 0,
+  ).length;
 });
 
 onBeforeMount(async () => {
@@ -400,10 +426,29 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
-  // if (event.event.custom.error) {
-  //   _event.name = event.event.custom.error.message;
-  // }
+  _event.name =
+    event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+
+  // Add frustration information if present
+  if (event?.action_frustration_type) {
+    _event.frustration_type = event.action_frustration_type;
+    try {
+      const frustrationTypes = JSON.parse(event.action_frustration_type);
+      if (Array.isArray(frustrationTypes)) {
+        _event.frustration_types = frustrationTypes;
+      } else {
+        _event.frustration_types = [frustrationTypes];
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to parse frustration type as JSON:",
+        event.action_frustration_type,
+        error,
+      );
+      _event.frustration_types = [event.action_frustration_type];
+    }
+  }
+
   return _event;
 };
 
@@ -429,7 +474,7 @@ const formatEvent = (event: any) => {
 
     return eventTypes[event.type](event);
   } catch (err) {
-    console.log(err);
+    console.error("Error while formatting event :", event.type, err);
     return null;
   }
 };

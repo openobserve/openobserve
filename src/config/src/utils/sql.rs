@@ -152,6 +152,7 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
             operand,
             conditions,
             else_result,
+            ..
         } => {
             // Check if any part of the CASE expression is an aggregate function
             conditions.iter().any(|c| {
@@ -586,7 +587,7 @@ fn has_cte(query: &Query) -> bool {
 }
 
 fn has_limit(query: &Query) -> bool {
-    query.limit.is_some()
+    query.limit_clause.is_some()
 }
 
 #[cfg(test)]

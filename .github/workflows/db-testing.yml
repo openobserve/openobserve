@@ -1,0 +1,198 @@
+name: Database Validation Tests
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080/
+  ZO_INTERNAL_GRPC_TOKEN: fake_token_for_testing
+  ZO_MEM_PERSIST_INTERVAL: 1
+  ZO_MAX_FILE_RETENTION_TIME: 1
+  ZO_FILE_PUSH_INTERVAL: 1
+
+jobs:
+  db_validation_tests:
+    name: db_validation_tests
+    runs-on: ubicloud-standard-8
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:17.5-alpine3.22
+        env:
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-11-11
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          prefix-key: db-testing
+
+      - name: Install Protoc
+        run: |
+          bash ./.github/protoc.sh
+      
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Create db-testing directory structure
+        run: |
+          mkdir -p tests/db-testing/tests
+          if [ ! -f tests/db-testing/pyproject.toml ]; then
+            cat > tests/db-testing/pyproject.toml << 'EOF'
+          [project]
+          name = "db-testing"
+          version = "0.1.0"
+          description = "Database validation tests for OpenObserve"
+          dependencies = [
+              "pytest>=7.4.0",
+              "requests>=2.31.0",
+              "psycopg2-binary>=2.9.9",
+              "python-dotenv>=1.0.0",
+          ]
+          requires-python = ">= 3.11"
+
+          [build-system]
+          requires = ["hatchling"]
+          build-backend = "hatchling.build"
+
+          [tool.hatch.build.targets.wheel]
+          packages = ["tests"]
+
+          [tool.rye]
+          managed = true
+          dev-dependencies = []
+
+          [tool.pytest.ini_options]
+          testpaths = ["tests"]
+          python_files = ["test_*.py"]
+          python_classes = ["Test*"]
+          python_functions = ["test_*"]
+          EOF
+          fi
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: false
+          working-directory: "tests/db-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/db-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/db-testing/
+
+      - name: Start OpenObserve with Postgres
+        run: |
+          export ZO_META_STORE=postgres
+          export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
+          export ZO_TEXT_DATA_TYPE=text
+          export ZO_MEM_PERSIST_INTERVAL=1
+          export ZO_MAX_FILE_RETENTION_TIME=1
+          export ZO_FILE_PUSH_INTERVAL=1
+          target/debug/openobserve > o2_postgres.log 2>&1 &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          echo "OpenObserve PID: $SERVER_PID"
+
+      - name: Wait for OpenObserve to start
+        run: |
+          echo "Waiting for OpenObserve to be ready..."
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -s -f http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "OpenObserve is ready!"
+              break
+            fi
+            attempt=$((attempt + 1))
+            echo "Attempt $attempt/$max_attempts - waiting..."
+            sleep 2
+          done
+          if [ $attempt -eq $max_attempts ]; then
+            echo "OpenObserve failed to start"
+            exit 1
+          fi
+
+      - name: Run DB validation tests
+        run: |
+          # Export database connection info for tests
+          export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
+
+          # Run pytest with verbose output
+          rye run pytest -v --tb=short
+        working-directory: tests/db-testing/
+
+      - name: Stop OpenObserve
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+          fi
+
+      - name: Upload OpenObserve logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-logs
+          path: o2_postgres.log
+          retention-days: 5
+
+  db_tests_summary:
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: [db_validation_tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.db_validation_tests.result }}" == "success" ] || [ "${{ needs.db_validation_tests.result }}" == "skipped" ]; then
+            echo "DB validation tests passed or skipped"
+            exit 0
+          else
+            echo "DB validation tests failed"
+            exit 1
+          fi

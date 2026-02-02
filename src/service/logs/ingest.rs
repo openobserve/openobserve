@@ -19,7 +19,7 @@ use std::{
 };
 
 use actix_web::http;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
@@ -30,11 +30,14 @@ use config::{
     utils::{
         flatten,
         json::{self, estimate_json_bytes},
-        time::parse_timestamp_micro_from_value,
+        time::{now_micros, parse_timestamp_micro_from_value},
     },
 };
 use flate2::read::GzDecoder;
-use infra::errors::{Error, Result};
+use infra::{
+    errors::{Error, Result},
+    schema::get_flatten_level,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
@@ -48,9 +51,9 @@ use serde_json::json;
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::ingestion::{
-        AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
-        IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
-        StreamStatus,
+        AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
+        IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
+        IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
     },
     service::{
         format_stream_name, get_formatted_stream_name,
@@ -64,8 +67,8 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     in_stream_name: &str,
-    in_req: IngestionRequest<'_>,
-    user_email: &str,
+    in_req: IngestionRequest,
+    user: IngestUser,
     extend_json: Option<&HashMap<String, serde_json::Value>>,
     is_derived: bool,
 ) -> Result<IngestionResponse> {
@@ -76,39 +79,36 @@ pub async fn ingest(
     let log_ingestion_errors = ingestion_log_enabled().await;
     #[cfg(feature = "enterprise")]
     let pattern_manager = get_pattern_manager().await?;
+    let stream_type = StreamType::Logs;
 
     // check stream
     let stream_name = if cfg.common.skip_formatting_stream_name {
-        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, StreamType::Logs))
-            .await?
+        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, stream_type)).await?
     } else {
-        format_stream_name(in_stream_name)
+        format_stream_name(in_stream_name.to_string())
     };
 
     // check system resource
-    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
+    check_ingestion_allowed(org_id, stream_type, Some(&stream_name)).await?;
 
-    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-        .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
-        .timestamp_micros();
+    let now = now_micros();
+    let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
+    let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
-    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+    let index_all_max_value_length = cfg.limit.index_all_max_value_length;
+
     let mut derived_streams = HashSet::new();
-
     if is_derived {
         derived_streams.insert(stream_name.to_string());
     }
 
     // Start retrieve associated pipeline and construct pipeline components
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &stream_name,
-        &StreamType::Logs,
-    )
-    .await;
-    let mut pipeline_inputs = Vec::new();
-    let mut original_options = Vec::new();
+    let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
+    let mut stream_params = vec![stream_param];
+    let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
+    let mut original_options = Vec::with_capacity(stream_params.len());
     // End pipeline params construction
 
     if let Some(exec_pl) = &executable_pipeline {
@@ -132,17 +132,19 @@ pub async fn ingest(
         executable_pipeline.is_some() && streams_need_original_map.values().any(|val| *val);
     // End get user defined schema
 
+    let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
+
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (endpoint, usage_type, data) = match in_req {
         IngestionRequest::JSON(req) => {
-            json_req = json::from_slice(req).unwrap_or({
-                let val: json::Value = json::from_slice(req)?;
+            json_req = json::from_slice(&req).unwrap_or({
+                let val: json::Value = json::from_slice(&req)?;
                 vec![val]
             });
             (
                 "/api/org/ingest/logs/_json",
                 UsageType::Json,
-                IngestionData::JSON(&json_req),
+                IngestionData::JSON(json_req),
             )
         }
         IngestionRequest::Multi(req) => (
@@ -150,12 +152,17 @@ pub async fn ingest(
             UsageType::Multi,
             IngestionData::Multi(req),
         ),
-        IngestionRequest::Hec(logs) => (
+        IngestionRequest::JsonValues(IngestionValueType::Bulk, logs) => (
+            "/api/org/ingest/logs/_bulk",
+            UsageType::Bulk,
+            IngestionData::JSON(logs),
+        ),
+        IngestionRequest::JsonValues(IngestionValueType::Hec, logs) => (
             "/api/org/ingest/logs/_hec",
             UsageType::Hec,
             IngestionData::JSON(logs),
         ),
-        IngestionRequest::Loki(logs) => (
+        IngestionRequest::JsonValues(IngestionValueType::Loki, logs) => (
             "/api/org/ingest/logs/_loki",
             UsageType::Loki,
             IngestionData::JSON(logs),
@@ -178,20 +185,20 @@ pub async fn ingest(
         IngestionRequest::Usage(req) => {
             // no need to report usage for usage data
             need_usage_report = false;
-            json_req = json::from_slice(req).unwrap_or({
-                let val: json::Value = json::from_slice(req)?;
+            json_req = json::from_slice(&req).unwrap_or({
+                let val: json::Value = json::from_slice(&req)?;
                 vec![val]
             });
             (
                 "/api/org/ingest/logs/_usage",
                 UsageType::Json,
-                IngestionData::JSON(&json_req),
+                IngestionData::JSON(json_req),
             )
         }
     };
 
     let mut stream_status = StreamStatus::new(&stream_name);
-    let mut json_data_by_stream = HashMap::new();
+    let mut json_data_by_stream: HashMap<String, (Vec<(i64, _)>, Option<usize>)> = HashMap::new();
     let mut size_by_stream = HashMap::new();
     for ret in data.iter() {
         let mut item = match ret {
@@ -228,16 +235,18 @@ pub async fn ingest(
             None // `item` won't be flattened, no need to store original
         };
 
+        // we report stream size before pushing data to pipeline
+        // this is to capture the actual size of stream at the time of ingestion
+        let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
+        *size += estimate_json_bytes(&item);
+
         if executable_pipeline.is_some() {
             // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
-            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-            *_size += estimate_json_bytes(&item);
-
-            // JSON Flattening
-            let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
+            // JSON Flattening - use per-stream flatten level
+            let mut res = flatten::flatten_with_level(item, flatten_level)?;
 
             // handle timestamp
             let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
@@ -265,7 +274,7 @@ pub async fn ingest(
             };
 
             if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                local_val = crate::service::logs::refactor_map(local_val, fields);
+                local_val = crate::service::ingestion::refactor_map(local_val, fields);
             }
 
             // add `_original` and '_record_id` if required by StreamSettings
@@ -293,17 +302,20 @@ pub async fn ingest(
             {
                 let mut values = Vec::with_capacity(local_val.len());
                 for (k, value) in local_val.iter() {
-                    if [
+                    if ![
                         TIMESTAMP_COL_NAME,
                         ID_COL_NAME,
                         ORIGINAL_DATA_COL_NAME,
                         ALL_VALUES_COL_NAME,
                     ]
                     .contains(&k.as_str())
+                        && (index_all_max_value_length == 0
+                            || value
+                                .as_str()
+                                .is_none_or(|s| s.len() <= index_all_max_value_length))
                     {
-                        continue;
+                        values.push(value.to_string());
                     }
-                    values.push(value.to_string());
                 }
                 local_val.insert(
                     ALL_VALUES_COL_NAME.to_string(),
@@ -311,11 +323,18 @@ pub async fn ingest(
                 );
             }
 
-            let (ts_data, fn_num) = json_data_by_stream
-                .entry(stream_name.clone())
-                .or_insert_with(|| (Vec::new(), None));
-            ts_data.push((timestamp, local_val));
-            *fn_num = need_usage_report.then_some(0); // no pl -> no func
+            match json_data_by_stream.get_mut(&stream_name) {
+                Some((ts_data, fn_num)) => {
+                    ts_data.push((timestamp, local_val));
+                    *fn_num = need_usage_report.then_some(0);
+                }
+                None => {
+                    json_data_by_stream.insert(
+                        stream_name.clone(),
+                        (vec![(timestamp, local_val)], need_usage_report.then_some(0)),
+                    );
+                }
+            };
         }
         tokio::task::coop::consume_budget().await;
     }
@@ -396,7 +415,7 @@ pub async fn ingest(
 
                         if let Some(Some(fields)) = user_defined_schema_map.get(&destination_stream)
                         {
-                            local_val = crate::service::logs::refactor_map(local_val, fields);
+                            local_val = crate::service::ingestion::refactor_map(local_val, fields);
                         }
 
                         // usize::MAX used as a flag when pipeline is applied with ResultArray vrl
@@ -430,17 +449,20 @@ pub async fn ingest(
                         {
                             let mut values = Vec::with_capacity(local_val.len());
                             for (k, value) in local_val.iter() {
-                                if [
+                                if ![
                                     TIMESTAMP_COL_NAME,
                                     ID_COL_NAME,
                                     ORIGINAL_DATA_COL_NAME,
                                     ALL_VALUES_COL_NAME,
                                 ]
                                 .contains(&k.as_str())
+                                    && (index_all_max_value_length == 0
+                                        || value
+                                            .as_str()
+                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
                                 {
-                                    continue;
+                                    values.push(value.to_string());
                                 }
-                                values.push(value.to_string());
                             }
                             local_val.insert(
                                 ALL_VALUES_COL_NAME.to_string(),
@@ -454,10 +476,14 @@ pub async fn ingest(
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
 
-                        let _size = size_by_stream
-                            .entry(destination_stream.clone())
-                            .or_insert(0);
-                        *_size += original_size;
+                        // Since we report the size for the original stream before the pipeline
+                        // execution we need to skip reporting the actual size on disk.
+                        if destination_stream.ne(&stream_name) {
+                            let size = size_by_stream
+                                .entry(destination_stream.clone())
+                                .or_insert(0);
+                            *size += original_size;
+                        }
 
                         tokio::task::coop::consume_budget().await;
                     }
@@ -501,11 +527,19 @@ pub async fn ingest(
     }
 
     let (metric_rpt_status_code, response_body) = {
-        let mut status = IngestionStatus::Record(stream_status.status);
+        let mut status = if usage_type == UsageType::Bulk {
+            IngestionStatus::Bulk(BulkResponse {
+                took: 0,
+                errors: false,
+                items: vec![],
+            })
+        } else {
+            IngestionStatus::Record(stream_status.status.clone())
+        };
         let write_result = super::write_logs_by_stream(
             thread_id,
             org_id,
-            user_email,
+            &user.to_email(),
             (started_at, &start),
             usage_type,
             &mut status,
@@ -514,9 +548,13 @@ pub async fn ingest(
             derived_streams,
         )
         .await;
-        stream_status.status = match status {
-            IngestionStatus::Record(status) => status,
-            IngestionStatus::Bulk(_) => unreachable!(),
+        match status {
+            IngestionStatus::Record(status) => {
+                stream_status.status = status;
+            }
+            IngestionStatus::Bulk(items) => {
+                stream_status.items = items.items;
+            }
         };
         match write_result {
             Ok(()) => ("200", stream_status),
@@ -564,12 +602,18 @@ pub fn handle_timestamp(
     let local_val = value
         .as_object_mut()
         .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
-    let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
-        Some(v) => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-        },
-        None => Utc::now().timestamp_micros(),
+    let (timestamp, has_valid_timestamp) = match local_val.get(TIMESTAMP_COL_NAME) {
+        Some(v) => {
+            if !v.is_null() {
+                match parse_timestamp_micro_from_value(v) {
+                    Ok(t) => t,
+                    Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+                }
+            } else {
+                (Utc::now().timestamp_micros(), false)
+            }
+        }
+        None => (Utc::now().timestamp_micros(), false),
     };
     // check ingestion time
     if timestamp < min_ts {
@@ -578,19 +622,21 @@ pub fn handle_timestamp(
     if timestamp > max_ts {
         return Err(get_future_discard_error());
     }
-    local_val.insert(
-        TIMESTAMP_COL_NAME.to_string(),
-        json::Value::Number(timestamp.into()),
-    );
+    if !has_valid_timestamp {
+        local_val.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+    }
     Ok(timestamp)
 }
 
-impl Iterator for IngestionDataIter<'_> {
+impl Iterator for IngestionDataIter {
     type Item = Result<json::Value, IngestionError>;
 
     fn next(&mut self) -> Option<Result<json::Value, IngestionError>> {
         match self {
-            IngestionDataIter::JSONIter(iter) => iter.next().cloned().map(Ok),
+            IngestionDataIter::JSONIter(iter) => iter.next().map(Ok),
             IngestionDataIter::MultiIter(iter) => loop {
                 match iter.next() {
                     Some(Ok(line)) if line.trim().is_empty() => {
@@ -623,12 +669,13 @@ impl Iterator for IngestionDataIter<'_> {
     }
 }
 
-impl<'a> IngestionData<'a> {
-    pub fn iter(&'a self) -> IngestionDataIter<'a> {
+impl IngestionData {
+    pub fn iter(self) -> IngestionDataIter {
         match self {
-            IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.iter()),
+            IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.into_iter()),
             IngestionData::Multi(data) => {
-                IngestionDataIter::MultiIter(std::io::BufReader::new(*data).lines())
+                let cursor = Cursor::new(data);
+                IngestionDataIter::MultiIter(std::io::BufReader::new(cursor).lines())
             }
             IngestionData::GCP(request) => {
                 let data = &request.message.data;
@@ -650,7 +697,7 @@ impl<'a> IngestionData<'a> {
                 }
             }
             IngestionData::KinesisFH(request) => {
-                let mut events = Vec::new();
+                let mut events = Vec::with_capacity(request.records.len());
                 let request_id = &request.request_id;
                 let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
 

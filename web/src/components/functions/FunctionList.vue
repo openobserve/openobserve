@@ -17,137 +17,170 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <q-page>
     <div v-if="!showAddJSTransformDialog">
-      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4" 
-      :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
-      >
-        <div class="q-table__title">
-            {{ t("function.header") }}
+      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+        <div class="card-container tw:mb-[0.625rem]">
+          <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
+            <div class="q-table__title tw:font-[600]">
+                {{ t("function.header") }}
+              </div>
+              <div class="q-ml-auto" data-test="functions-list-search-input">
+                <q-input
+                  v-model="filterQuery"
+                  borderless
+                  dense
+                  class="q-ml-auto no-border o2-search-input"
+                  :placeholder="t('function.search')"
+                >
+                  <template #prepend>
+                    <q-icon class="o2-search-input-icon" name="search" />
+                  </template>
+                </q-input>
+              </div>
+              <q-btn
+                  class="q-ml-sm o2-primary-button tw:h-[36px]"
+                flat
+                no-caps
+                :label="t(`function.add`)"
+                data-test="function-list-add-function-btn"
+                @click="showAddUpdateFn({})"
+              />
           </div>
-          <div class="q-ml-auto" data-test="functions-list-search-input">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              filled
-              dense
-              class="q-ml-auto no-border"
-              :placeholder="t('function.search')"
+        </div>
+        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+          <div class="card-container tw:h-[calc(100vh-127px)]">
+            <q-table
+              ref="qTable"
+              :rows="visibleRows"
+              :columns="columns"
+              row-key="name"
+              :pagination="pagination"
+              :filter="filterQuery"
+              selection="multiple"
+              v-model:selected="selectedFunctions"
+              style="width: 100%"
+              :style="hasVisibleRows
+                  ? 'width: 100%; height: calc(100vh - 130px)'
+                  : 'width: 100%'"
+              class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
+              <template #no-data>
+                <NoData />
               </template>
-            </q-input>
+              <template v-slot:body-cell-actions="props">
+                <q-td :props="props">
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    icon="edit"
+                    round
+                    flat
+                    :title="t('function.updateTitle')"
+                    @click="showAddUpdateFn(props)"
+                  >
+                </q-btn>
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    :icon="outlinedDelete"
+                    round
+                    flat
+                    :title="t('function.delete')"
+                    @click="showDeleteDialogFn(props)"
+                  >
+                </q-btn>
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    :icon="outlinedAccountTree"
+                    round
+                    flat
+                    :title="'Associated Pipelines'"
+                    @click="getAssociatedPipelines(props)"
+                  >
+                </q-btn>
+                </q-td>
+              </template>
+
+              <template v-slot:body-cell-function="props">
+                <q-td :props="props">
+                  <q-tooltip>
+                    <pre>{{ props.row.function }}</pre>
+                  </q-tooltip>
+                  <pre style="white-space: break-spaces">{{
+                    props.row.function
+                  }}</pre>
+                </q-td>
+              </template>
+
+              <template v-slot:body-selection="scope">
+                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+              </template>
+
+              <template #bottom="scope">
+                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+                        {{ resultTotal }} {{ t('function.header') }}
+                      </div>
+                  <q-btn
+                    v-if="selectedFunctions.length > 0"
+                    data-test="function-list-delete-functions-btn"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    no-caps
+                    dense
+                    @click="openBulkDeleteDialog"
+                  >
+                    <q-icon name="delete" size="16px" />
+                    <span class="tw:ml-2">Delete</span>
+                  </q-btn>
+                  <QTablePagination
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
+                </div>
+
+              </template>
+
+              <template v-slot:header="props">
+                  <q-tr :props="props">
+                    <!-- Adding this block to render the select-all checkbox -->
+                    <q-th v-if="columns.length > 0" auto-width>
+                      <q-checkbox
+                        v-model="props.selected"
+                        size="sm"
+                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                        class="o2-table-checkbox"
+                      />
+                    </q-th>
+
+                    <!-- Rendering the rest of the columns -->
+                    <q-th
+                      v-for="col in props.cols"
+                      :key="col.name"
+                      :props="props"
+                      :class="col.classes"
+                      :style="col.style"
+                    >
+                      {{ col.label }}
+                    </q-th>
+                  </q-tr>
+                </template>
+            </q-table>
           </div>
-          <q-btn
-            class="q-ml-md text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t(`function.add`)"
-            @click="showAddUpdateFn({})"
-          />
+        </div>
       </div>
-      <q-table
-        ref="qTable"
-        :rows="jsTransforms"
-        :columns="columns"
-        row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        style="width: 100%"
-        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
-        class="o2-quasar-table"
-      >
-        <template #no-data>
-          <NoData />
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('function.updateTitle')"
-              @click="showAddUpdateFn(props)"
-            ></q-btn>
-            <q-btn
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('function.delete')"
-              @click="showDeleteDialogFn(props)"
-            ></q-btn>
-            <q-btn
-              :icon="outlinedAccountTree"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="'Associated Pipelines'"
-              @click="getAssociatedPipelines(props)"
-            ></q-btn>
-          </q-td>
-        </template>
-
-        <template v-slot:body-cell-function="props">
-          <q-td :props="props">
-            <q-tooltip>
-              <pre>{{ props.row.function }}</pre>
-            </q-tooltip>
-            <pre style="white-space: break-spaces">{{
-              props.row.function
-            }}</pre>
-          </q-td>
-        </template>
-        <template #top="scope">
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('function.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-
-        <template #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the of the columns -->
-               <!-- here we can add the classes class so that the head will be sticky -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-      </q-table>
     </div>
     <div v-else>
       <AddFunction
@@ -166,10 +199,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+
+    <ConfirmDialog
+      title="Delete Functions"
+      :message="`Are you sure you want to delete ${selectedFunctions.length} function(s)?`"
+      @update:ok="bulkDeleteFunctions"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
+
     <q-dialog v-model="confirmForceDelete" persistent>
       <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
         <q-card-section
-          class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center"
+          class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center"
         >
           <div>
             Pipelines Associated with
@@ -236,6 +278,7 @@ import {
   outlinedAccountTree,
 } from "@quasar/extras/material-icons-outlined";
 import useLogs from "@/composables/useLogs";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "functionList",
@@ -264,9 +307,13 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
+    const confirmBulkDelete = ref<boolean>(false);
+    const selectedFunctions = ref<any[]>([]);
     const { searchObj } = useLogs();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
+    const filterQuery = ref("");
+    const { track } = useReo();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -374,12 +421,11 @@ export default defineComponent({
       value: number | String;
     }
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
       { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
     ];
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
@@ -420,6 +466,10 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+        track("Button Click", {
+          button: "Add Function",
+          page: "Functions"
+        });
       } else {
         isUpdated.value = true;
         action = "Update Function";
@@ -430,6 +480,10 @@ export default defineComponent({
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
           },
+        });
+        track("Button Click", {
+          button: "Update Function",
+          page: "Functions"
         });
       }
       addTransform();
@@ -565,6 +619,121 @@ export default defineComponent({
       emit("sendToAiChat", value);
     };
 
+    const filterData = (rows: any, terms: any) => {
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return jsTransforms.value || []
+      return filterData(jsTransforms.value || [], filterQuery.value)
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
+
+    
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteFunctions = async () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Deleting functions...",
+        timeout: 0,
+      });
+
+      try {
+        if (selectedFunctions.value.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: "No functions selected for deletion",
+            timeout: 2000,
+          });
+          dismiss();
+          return;
+        }
+
+        // Extract function names for the API call (BE supports names)
+        const payload = {
+          ids: selectedFunctions.value.map((f: any) => f.name),
+        };
+
+        const response = await jsTransformService.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          payload
+        );
+
+        dismiss();
+
+        // Handle response based on successful/unsuccessful arrays
+        if (response.data) {
+          const { successful = [], unsuccessful = [] } = response.data;
+          const successCount = successful.length;
+          const failCount = unsuccessful.length;
+
+          if (failCount > 0 && successCount > 0) {
+            // Partial success
+            $q.notify({
+              type: "warning",
+              message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
+              timeout: 5000,
+            });
+          } else if (failCount > 0) {
+            // All failed
+            $q.notify({
+              type: "negative",
+              message: `Failed to delete ${failCount} function(s)`,
+              timeout: 3000,
+            });
+          } else {
+            // All successful
+            $q.notify({
+              type: "positive",
+              message: `${successCount} function(s) deleted successfully`,
+              timeout: 2000,
+            });
+          }
+        } else {
+          // Fallback success message
+          $q.notify({
+            type: "positive",
+            message: `${selectedFunctions.value.length} function(s) deleted successfully`,
+            timeout: 2000,
+          });
+        }
+
+        selectedFunctions.value = [];
+        // Refresh functions list
+        getJSTransforms();
+      } catch (error: any) {
+        dismiss();
+        console.error("Error deleting functions:", error);
+
+        // Show error message from response if available
+        const errorMessage = error.response?.data?.message || error?.message || "Error deleting functions. Please try again.";
+        if (error.response?.status != 403 || error?.status != 403) {
+          $q.notify({
+            type: "negative",
+            message: errorMessage,
+            timeout: 3000,
+          });
+        }
+      }
+
+      confirmBulkDelete.value = false;
+    };
+
     return {
       t,
       qTable,
@@ -601,20 +770,17 @@ export default defineComponent({
       onPipelineSelect,
       transformedPipelineList,
       getAssociatedPipelines,
-      filterQuery: ref(""),
-      filterData(rows: any, terms: any) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
       getImageURL,
       verifyOrganizationStatus,
-      sendToAiChat
+      sendToAiChat,
+      visibleRows,
+      hasVisibleRows,
+      openBulkDeleteDialog,
+      bulkDeleteFunctions,
+      confirmBulkDelete,
+      selectedFunctions,
     };
   },
   computed: {

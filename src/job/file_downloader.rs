@@ -24,7 +24,7 @@ use config::{
 };
 use futures_util::StreamExt;
 use hashbrown::{HashMap, HashSet};
-use infra::cache::file_data;
+use infra::{cache::file_data, cluster};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{SimpleFileList, event_client::EventClient};
 use tokio::sync::{
@@ -32,8 +32,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue};
-
-use crate::common::infra::cluster;
 
 /// (trace_id, file_id, account, file, size, cache_type)
 type FileInfo = (String, i64, String, String, usize, file_data::CacheType);
@@ -128,7 +126,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             );
                             // update metrics
                             metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-                                .with_label_values(&[])
+                                .with_label_values::<&str>(&[])
                                 .dec();
                             continue;
                         }
@@ -161,7 +159,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                         // update metrics
                         metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-                            .with_label_values(&[])
+                            .with_label_values::<&str>(&[])
                             .dec();
                     }
                 }
@@ -218,7 +216,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     );
                                     // update metrics
                                     metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                                        .with_label_values(&[])
+                                        .with_label_values::<&str>(&[])
                                         .dec();
                                     return;
                                 }
@@ -247,7 +245,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                                 // update metrics
                                 metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                                    .with_label_values(&[])
+                                    .with_label_values::<&str>(&[])
                                     .dec();
                             }
                             None => {
@@ -375,7 +373,7 @@ pub async fn download_from_node(
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid token"))?;
 
-    let channel = crate::service::grpc::get_cached_channel(addr).await?;
+    let channel = infra::client::grpc::get_cached_channel(addr).await?;
     let client = EventClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
         req.metadata_mut().insert("authorization", token.clone());
         Ok(req)
@@ -505,7 +503,7 @@ pub async fn queue_download(
 
         // update metrics
         metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .inc();
     } else {
         FILE_DOWNLOAD_CHANNEL
@@ -522,7 +520,7 @@ pub async fn queue_download(
 
         // update metrics
         metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .inc();
     }
     Ok(())

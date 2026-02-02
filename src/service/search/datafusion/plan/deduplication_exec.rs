@@ -21,7 +21,7 @@ use std::{
 
 use arrow::array::{
     BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
-    TimestampMicrosecondArray, UInt64Array,
+    StringViewArray, TimestampMicrosecondArray, UInt64Array,
 };
 use arrow_schema::{DataType, SortOptions, TimeUnit};
 use config::TIMESTAMP_COL_NAME;
@@ -47,7 +47,7 @@ use itertools::Itertools;
 pub struct DeduplicationExec {
     input: Arc<dyn ExecutionPlan>,
     deduplication_columns: Vec<Column>,
-    max_rows: usize,
+    max_rows: usize, // current unused
     cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
@@ -86,8 +86,12 @@ impl DisplayAs for DeduplicationExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "DeduplicationExec: columns: {:?}",
+            "DeduplicationExec: columns: [{}]",
             self.deduplication_columns
+                .iter()
+                .map(|c| format!("{c}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         )
     }
 }
@@ -121,6 +125,10 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
+    fn supports_limit_pushdown(&self) -> bool {
+        true
+    }
+
     fn execute(
         &self,
         partition: usize,
@@ -143,8 +151,8 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn statistics(&self) -> Result<Statistics> {
-        self.input.partition_statistics(None)
+    fn partition_statistics(&self, partition: Option<usize>) -> Result<Statistics> {
+        self.input.partition_statistics(partition)
     }
 
     // if don't have this, the optimizer will not merge the SortExec
@@ -261,6 +269,7 @@ impl RecordBatchStream for DeduplicationStream {
         Arc::clone(&self.stream.schema())
     }
 }
+
 #[derive(Debug, Clone)]
 struct DeduplicationArrays {
     pub arrays: Vec<Array>,
@@ -278,6 +287,7 @@ impl DeduplicationArrays {
 #[derive(Debug, Clone)]
 enum Array {
     String(StringArray),
+    StringView(StringViewArray),
     LargeString(LargeStringArray),
     Int64(Int64Array),
     UInt64(UInt64Array),
@@ -290,6 +300,7 @@ impl Array {
     pub fn get_value(&self, i: usize) -> Value {
         match &self {
             Array::String(array) => Value::String(array.value(i).to_string()),
+            Array::StringView(array) => Value::String(array.value(i).to_string()),
             Array::LargeString(array) => Value::String(array.value(i).to_string()),
             Array::Int64(array) => Value::Int64(array.value(i)),
             Array::UInt64(array) => Value::UInt64(array.value(i)),
@@ -322,6 +333,13 @@ fn generate_deduplication_arrays(
                     array
                         .as_any()
                         .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                DataType::Utf8View => Array::StringView(
+                    array
+                        .as_any()
+                        .downcast_ref::<StringViewArray>()
                         .unwrap()
                         .clone(),
                 ),

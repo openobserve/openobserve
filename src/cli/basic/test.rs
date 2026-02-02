@@ -34,8 +34,8 @@ pub async fn file_list(
 
     let file_list = crate::service::file_list::query_for_merge(
         org,
-        stream_name,
         stream_type.into(),
+        stream_name,
         hour,
         hour,
     )

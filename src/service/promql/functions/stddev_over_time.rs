@@ -13,22 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    common::std_deviation,
-    value::{RangeValue, Value},
-};
+use crate::service::promql::{common::std_deviation, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stddev_over_time
-pub(crate) fn stddev_over_time(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "stddev_over_time", exec, false)
+pub(crate) fn stddev_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    super::eval_range(data, StddevOverTimeFunc::new(), eval_ctx)
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    if data.samples.is_empty() {
-        return None;
+pub struct StddevOverTimeFunc;
+
+impl StddevOverTimeFunc {
+    pub fn new() -> Self {
+        StddevOverTimeFunc {}
     }
-    let samples: Vec<f64> = data.samples.iter().map(|s| s.value).collect();
-    std_deviation(&samples)
+}
+
+impl RangeFunc for StddevOverTimeFunc {
+    fn name(&self) -> &'static str {
+        "stddev_over_time"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        if samples.is_empty() {
+            return None;
+        }
+        let sample_values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+        std_deviation(&sample_values)
+    }
 }

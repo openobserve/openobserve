@@ -245,9 +245,9 @@ describe("useStreams Composable", () => {
 
     it("should reject with 'Stream Not Found' for non-existent stream", async () => {
       mockStore.state.streams.logs = { list: [] };
-      
+
       await expect(streamsInstance.getStream("non-existent", "logs", false))
-        .rejects.toBe("Stream Not Found");
+        .rejects.toThrow("Stream 'non-existent' not found for type 'logs'");
     });
 
     it("should handle getMultiStreams with valid streams", async () => {
@@ -310,12 +310,12 @@ describe("useStreams Composable", () => {
       // Test with specific stream type
       mockStore.state.streams.logs = { list: [{ name: "test" }] };
       expect(streamsInstance.isStreamFetched("logs")).toBe(true);
-      
+
       mockStore.state.streams.metrics = null;
       expect(streamsInstance.isStreamFetched("metrics")).toBe(false);
-      
+
       // Test with 'all'
-      mockStore.state.streams.areStreamsFetched = true;
+      mockStore.state.streams.areAllStreamsFetched = true;
       expect(streamsInstance.isStreamFetched("all")).toBe(true);
     });
 
@@ -551,18 +551,20 @@ describe("useStreams Composable", () => {
 
     it("should handle resetStreamType error gracefully", () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
-      // Mock Object.hasOwn to throw error
-      const originalHasOwn = Object.hasOwn;
-      Object.hasOwn = vi.fn().mockImplementation(() => { throw new Error("Test error"); });
-      
+
+      // Mock store dispatch to throw error
+      mockStore.dispatch = vi.fn().mockImplementation(() => {
+        throw new Error("Test error");
+      });
+
       streamsInstance.resetStreamType("logs");
-      
+
       expect(consoleSpy).toHaveBeenCalledWith("Error while clearing local cache for stream type.", expect.any(Error));
-      
+
       // Restore
-      Object.hasOwn = originalHasOwn;
       consoleSpy.mockRestore();
+      // Restore dispatch for subsequent tests
+      mockStore.dispatch = vi.fn();
     });
   });
 
@@ -659,9 +661,9 @@ describe("useStreams Composable", () => {
       mockStore.state.streams.streamsIndexMapping.logs["test"] = 0;
       
       vi.mocked(StreamService.schema).mockRejectedValueOnce(new Error("Schema error"));
-      
+
       await expect(streamsInstance.getStream("test", "logs", true))
-        .rejects.toBe("Error while fetching schema");
+        .rejects.toThrow("Error while fetching schema: Schema error");
     });
 
     it("should handle getPaginatedStreams service error", async () => {

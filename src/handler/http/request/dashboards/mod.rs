@@ -13,15 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put,
+    web::{self, Query},
+};
+use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::dashboards::{
-        CreateDashboardRequestBody, CreateDashboardResponseBody, GetDashboardResponseBody,
-        ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
-        MoveDashboardsRequestBody, UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+    handler::http::{
+        extractors::Headers,
+        models::dashboards::{
+            DashboardRequestBody,
+            DashboardResponseBody,
+            ListDashboardsQuery,
+            ListDashboardsResponseBody,
+            MoveDashboardRequestBody,
+            MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+        },
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::dashboards::{self, DashboardError},
 };
@@ -69,20 +82,21 @@ impl From<DashboardError> for HttpResponse {
 }
 
 /// CreateDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "CreateDashboard",
+    summary = "Create new dashboard",
+    description = "Creates a new dashboard with specified title, description, and visualization panels. The dashboard will be saved in the specified folder",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard will be created. Used for RBAC checks in enterprise version. Defaults to 'default' if not specified"),
     ),
     request_body(
-        content = CreateDashboardRequestBody,
+        content = inline(DashboardRequestBody),
         description = "Dashboard details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -90,24 +104,26 @@ impl From<DashboardError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Dashboard created", body = CreateDashboardResponseBody),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::CREATED, description = "Dashboard created", body = inline(DashboardResponseBody)),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a new dashboard"}))
+    )
 )]
 #[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
     path: web::Path<String>,
-    req_body: web::Json<CreateDashboardRequestBody>,
+    req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req.query_string());
-    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
-    {
-        Ok(dashboard) => dashboard,
-        Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
-    };
+
+    let mut dashboard: Dashboard = req_body.0.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
@@ -115,51 +131,51 @@ pub async fn create_dashboard(
         Ok(saved) => saved,
         Err(err) => return err.into(),
     };
-    let resp_body: CreateDashboardResponseBody = saved.into();
+    let resp_body: DashboardResponseBody = saved.into();
     MetaHttpResponse::json(resp_body)
 }
 
 /// UpdateDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "UpdateDashboard",
+    summary = "Update existing dashboard",
+    description = "Updates an existing dashboard with new content, panels, or settings. Supports concurrent edit conflict detection using hash values",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = String, Query, description = "Folder ID where the dashboard is located"),
+        ("hash" = Option<String>, Query, description = "Hash value for conflict detection. Required when updating an existing dashboard to prevent concurrent edit conflicts"),
     ),
-    request_body(
-        content = UpdateDashboardRequestBody,
-        description = "Dashboard details",
-    ),
+    request_body(content = inline(DashboardRequestBody), description = "Dashboard details"),
     responses(
-        (status = StatusCode::OK, description = "Dashboard updated", body = UpdateDashboardResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = HttpResponse),
+        (status = StatusCode::OK, description = "Dashboard updated", body = inline(DashboardResponseBody)),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::CONFLICT, description = "Conflict: Failed to save due to concurrent changes", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update an existing dashboard"}))
+    )
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
 async fn update_dashboard(
     path: web::Path<(String, String)>,
-    req_body: web::Json<UpdateDashboardRequestBody>,
+    req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
-    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
-    {
-        Ok(dashboard) => dashboard,
-        Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
-    };
+    let mut dashboard: Dashboard = req_body.0.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
@@ -169,17 +185,17 @@ async fn update_dashboard(
         Ok(saved) => saved,
         Err(err) => return err.into(),
     };
-    let resp_body: UpdateDashboardResponseBody = saved.into();
+    let resp_body: DashboardResponseBody = saved.into();
     MetaHttpResponse::json(resp_body)
 }
 
 /// ListDashboards
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ListDashboards",
+    summary = "List organization dashboards",
+    description = "Retrieves a list of dashboards within the organization, with optional filtering by folder and pagination support",
     security(
         ("Authorization" = [])
     ),
@@ -188,15 +204,20 @@ async fn update_dashboard(
         ListDashboardsQuery
     ),
     responses(
-        (status = StatusCode::OK, body = ListDashboardsResponseBody),
+        (status = StatusCode::OK, body = inline(ListDashboardsResponseBody)),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all dashboards in organization"}))
+    )
 )]
 #[get("/{org_id}/dashboards")]
-async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let Ok(query) = web::Query::<ListDashboardsQuery>::from_query(req.query_string()) else {
-        return MetaHttpResponse::bad_request("Error parsing query parameters");
-    };
-    let params = query.into_inner().into(&org_id.into_inner());
+async fn list_dashboards(
+    org_id: web::Path<String>,
+    web::Query(query): web::Query<ListDashboardsQuery>,
+    req: HttpRequest,
+) -> impl Responder {
+    let params = query.into(&org_id.into_inner());
     let Some(user_id) = get_user_id(req) else {
         return MetaHttpResponse::unauthorized("User ID not found in request headers");
     };
@@ -209,23 +230,29 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
 }
 
 /// GetDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "GetDashboard",
+    summary = "Get dashboard details",
+    description = "Retrieves complete details of a specific dashboard including its panels, queries, and visualization configurations",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
     ),
     responses(
-        (status = StatusCode::OK, body = GetDashboardResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get dashboard details by ID"}))
+    )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
 async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
@@ -234,28 +261,34 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
     };
-    let resp_body: GetDashboardResponseBody = dashboard.into();
+    let resp_body: DashboardResponseBody = dashboard.into();
     MetaHttpResponse::json(resp_body)
 }
 
 /// ExportDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ExportDashboard",
+    summary = "Export dashboard",
+    description = "Exports a dashboard configuration in a portable format that can be imported into other organizations or instances",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
     ),
     responses(
-        (status = StatusCode::OK, body = GetDashboardResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON"}))
+    )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/export")]
 pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Responder {
@@ -264,29 +297,35 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
     };
-    let resp_body: GetDashboardResponseBody = dashboard.into();
+    let resp_body: DashboardResponseBody = dashboard.into();
     MetaHttpResponse::json(resp_body)
 }
 
 /// DeleteDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "DeleteDashboard",
+    summary = "Delete dashboard",
+    description = "Permanently deletes a dashboard and all its associated panels and configurations. This action cannot be undone",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = Object),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID"}))
+    )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
 async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
@@ -300,13 +339,92 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     }
 }
 
+/// DeleteDashboardBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "DeleteDashboardBulk",
+    summary = "Delete multiple dashboard",
+    description = "Permanently deletes multiple dashboard and all their associated panels and configurations. This action cannot be undone",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboards are located. Required for RBAC permission checks in enterprise version"),
+    ),
+    request_body(
+        content = BulkDeleteRequest,
+        description = "Dashboard ids",
+        example = json!({"ids": vec!["1","2","3"]}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/dashboards/bulk")]
+async fn delete_dashboard_bulk(
+    path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+    let _folder_id = crate::common::utils::http::get_folder(&query);
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(
+            id,
+            &org_id,
+            &_user_id,
+            "dashboards",
+            "DELETE",
+            Some(&_folder_id),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in req.ids {
+        match dashboards::delete_dashboard(&org_id, &id).await {
+            Ok(()) => successful.push(id),
+            Err(e) => {
+                log::error!("error deleting dashboard {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string())
+            }
+        }
+    }
+
+    MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
+}
+
 /// MoveDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboard",
+    summary = "Move dashboard to folder",
+    description = "Moves a dashboard from one folder to another within the organization. The dashboard content remains unchanged",
     security(
         ("Authorization" = [])
     ),
@@ -315,7 +433,7 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
      request_body(
-        content = MoveDashboardRequestBody,
+        content = inline(MoveDashboardRequestBody),
         description = "MoveDashboard details",
         example = json!({
             "from": "Source folder id",
@@ -323,15 +441,19 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Dashboard Moved", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::OK, description = "Dashboard Moved", body = Object),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Move dashboard to another folder"}))
+    )
 )]
 #[put("/{org_id}/folders/dashboards/{dashboard_id}")]
 async fn move_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<MoveDashboardRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     // For this endpoint, openfga check is already done in the middleware
@@ -353,30 +475,34 @@ async fn move_dashboard(
 }
 
 /// MoveDashboards
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboards",
+    summary = "Move multiple dashboards",
+    description = "Moves multiple dashboards to a specified destination folder in a single batch operation. Useful for organizing dashboards efficiently",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = MoveDashboardsRequestBody, description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
+    request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Move multiple dashboards to folder"}))
     )
 )]
 #[patch("/{org_id}/dashboards/move")]
 async fn move_dashboards(
     path: web::Path<String>,
     req_body: web::Json<MoveDashboardsRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     // For this endpoint, openfga check is needed here, as we don't do openfga check in the
@@ -427,14 +553,7 @@ fn set_dashboard_owner_if_empty(
     dashboard: &mut config::meta::dashboards::Dashboard,
     user_email: &str,
 ) {
-    match dashboard.owner() {
-        Some(owner) => {
-            if owner.is_empty() {
-                dashboard.set_owner(user_email.to_string());
-            }
-        }
-        None => {
-            dashboard.set_owner(user_email.to_string());
-        }
+    if dashboard.owner().filter(|v| !v.is_empty()).is_none() {
+        dashboard.set_owner(user_email.to_string());
     }
 }

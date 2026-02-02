@@ -18,29 +18,33 @@ use std::sync::Arc;
 use datafusion::{
     common::{Result, internal_err},
     error::DataFusionError,
-    execution::FunctionRegistry,
+    execution::TaskContext,
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
-    aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
-};
 use prost::Message;
 use proto::cluster_rpc;
+#[cfg(feature = "enterprise")]
+use {
+    crate::service::search::datafusion::distributed_plan::enrichment_exec::EnrichmentExec,
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::{
+        agg_topk_exec::AggregateTopkExec, streaming_aggs_exec::exec::StreamingAggsExec,
+        tmp_exec::TmpExec,
+    },
+};
 
 use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
-pub struct PhysicalPlanNodePhysicalExtensionCodec;
+pub struct PhysicalPlanNodePhysicalExtensionCodec {}
 
 impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
     fn try_decode(
         &self,
         buf: &[u8],
         inputs: &[Arc<dyn ExecutionPlan>],
-        registry: &dyn FunctionRegistry,
+        ctx: &TaskContext,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let proto = cluster_rpc::PhysicalPlanNode::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -49,15 +53,23 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         })?;
         match proto.plan {
             Some(cluster_rpc::physical_plan_node::Plan::EmptyExec(node)) => {
-                super::empty_exec::try_decode(node, inputs, registry)
+                super::empty_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(node)) => {
-                super::aggregate_topk_exec::try_decode(node, inputs, registry)
+                super::aggregate_topk_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
-                super::streaming_aggs_exec::try_decode(node, inputs, registry)
+                super::streaming_aggs_exec::try_decode(node, inputs, ctx)
+            }
+            #[cfg(feature = "enterprise")]
+            Some(cluster_rpc::physical_plan_node::Plan::TmpExec(node)) => {
+                super::tmp_exec::try_decode(node, inputs, ctx)
+            }
+            #[cfg(feature = "enterprise")]
+            Some(cluster_rpc::physical_plan_node::Plan::EnrichmentExec(node)) => {
+                super::enrichment_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(not(feature = "enterprise"))]
             Some(_) => {
@@ -77,6 +89,10 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
             super::streaming_aggs_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<TmpExec>().is_some() {
+            super::tmp_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<EnrichmentExec>().is_some() {
+            super::enrichment_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }
@@ -117,7 +133,8 @@ mod tests {
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<NewEmptyExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
 

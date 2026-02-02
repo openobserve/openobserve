@@ -5,7 +5,8 @@
       v-model="condition.logicalOperator"
       dense
       options-dense
-      filled
+      borderless
+      hide-bottom-space
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
@@ -29,22 +30,10 @@
           @show="(e: any) => loadFilterItem(condition.column)"
         >
           <div style="display: flex">
-            <q-select
+            <StreamFieldSelect
+              class="tw:w-full"
+              :streams="getAllSelectedStreams()"
               v-model="condition.column"
-              :options="filteredSchemaOptions"
-              label="Filters on Field"
-              input-debounce="0"
-              behavior="menu"
-              dense
-              filled
-              style="width: 100%"
-              use-input
-              borderless
-              hide-selected
-              fill-input
-              emit-value
-              @filter="filterStreamFn"
-              @update:model-value="handleFieldChange"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
             />
             <q-btn
@@ -85,12 +74,14 @@
                     <div class="flex column" style="height: 220px">
                       <q-select
                         dense
-                        filled
+                        borderless
+                        hide-bottom-space
                         v-model="condition.operator"
                         :options="operators"
                         :label="t('common.operator')"
                         style="width: 100%"
                         data-test="dashboard-add-condition-operator"
+                        class="o2-custom-select-dashboard"
                       />
                       <CommonAutoComplete
                         v-if="
@@ -108,7 +99,7 @@
                   <q-tab-panel dense name="list" class="q-pa-none">
                     <q-select
                       dense
-                      filled
+                      borderless
                       v-model="condition.values"
                       :options="sortedFilteredListOptions"
                       :label="t('common.selectFilter')"
@@ -122,6 +113,7 @@
                       use-input
                       @filter="filterListFn"
                       data-test="dashboard-add-condition-list-tab"
+                      class="o2-custom-select-dashboard"
                     >
                       <template v-slot:selected>
                         {{
@@ -177,17 +169,22 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, toRef, watch } from "vue";
+import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
+import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
 export default defineComponent({
   name: "AddCondition",
   components: {
     CommonAutoComplete,
     SanitizedHtmlRenderer,
+    StreamFieldSelect,
   },
   props: [
     "condition",
@@ -199,6 +196,13 @@ export default defineComponent({
     "conditionIndex",
   ],
   setup(props, { emit }) {
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
     const { t } = useI18n();
     const searchTerm = ref("");
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
@@ -206,9 +210,13 @@ export default defineComponent({
 
     const filteredListOptions = computed(() => {
       const options = props.dashboardPanelData.meta.filterValue
-        .find((it: any) => it.column == props.condition.column)
-        ?.value.filter((option: any) =>
-          option.toLowerCase().includes(searchTerm.value.toLowerCase()),
+        .find(
+          (it: any) =>
+            it.column == props?.condition?.column?.field &&
+            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.streamAlias),
+        )
+        ?.value?.filter((option: any) =>
+          option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
         );
 
       // Sort options alphabetically
@@ -247,47 +255,13 @@ export default defineComponent({
     const filterOptions = ["AND", "OR"];
 
     const computedLabel = (condition: any) => {
-      if (condition.operator === "match_all") {
-        return condition.operator + "(" + condition.value + ")";
-      } else if (condition.operator === "str_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "str_match_ignore_case") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_not_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else {
-        return props.condition.column;
-      }
+      const builtCondition = buildCondition(condition, dashboardPanelData);
+
+      return builtCondition === ""
+        ? condition.column.field
+        : builtCondition?.length > MAX_FIELD_LABEL_CHARS
+          ? builtCondition.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
+          : builtCondition;
     };
 
     const emitLogicalOperatorChange = (newOperator: string) => {
@@ -299,7 +273,7 @@ export default defineComponent({
     };
 
     const removeColumnName = () => {
-      props.condition.column = "";
+      props.condition.column = {};
     };
 
     watch(
@@ -308,6 +282,13 @@ export default defineComponent({
         if (newColumn !== oldColumn) {
           props.condition.values = [];
         }
+      },
+    );
+
+    watch(
+      () => props.condition.column,
+      () => {
+        props.loadFilterItem(props.condition.column);
       },
     );
 
@@ -323,6 +304,7 @@ export default defineComponent({
       removeColumnName,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,
+      getAllSelectedStreams,
     };
   },
 });
@@ -345,24 +327,34 @@ export default defineComponent({
 }
 
 .condition-logical-operator {
-  width: 55px;
+  width: 60px;
 }
 
 :deep(.condition-logical-operator .q-field__control) {
-  min-height: 23px !important;
-  height: 23px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   padding: 0px 0px 0px 5px !important;
+  vertical-align: middle !important;
+  margin-top: 4px; /* Nudge up slightly to align with buttons */
 }
 
 :deep(.condition-logical-operator .q-field__native) {
-  min-height: 23px !important;
-  height: 23px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   padding: 0px 0px 0px 0px !important;
 }
 
 :deep(.condition-logical-operator .q-field__append) {
-  min-height: 23px !important;
-  height: 23px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   padding: 0px 0px 0px 0px !important;
+}
+
+:deep(.q-panel) {
+  overflow: visible !important;
+}
+
+:deep(.o2-custom-select-dashboard .q-field__bottom) {
+  padding-top: 8px !important;
 }
 </style>

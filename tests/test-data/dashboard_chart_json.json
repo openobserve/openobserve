@@ -1,0 +1,980 @@
+[
+    {
+        "kubernetes.container_name": "prometheus",
+        "kubernetes.labels": {
+            "app": "prometheus",
+            "version": "2.39.1",
+            "region": "asia-south1",
+            "team": "monitoring-core"
+        },
+        "kubernetes.annotations": [
+            "scrape=true",
+            "team=monitoring",
+            "retention=30d",
+            "alerting=true",
+            "autoscale=enabled"
+        ],
+        "alerts_fired": [
+            {
+                "name": "HighCPU",
+                "severity": "warning",
+                "trigger_count": 1850
+            },
+            {
+                "name": "DiskFull",
+                "severity": "critical",
+                "trigger_count": 743
+            },
+            {
+                "name": "HighMemory",
+                "severity": "warning",
+                "trigger_count": 421
+            },
+            {
+                "name": "NodeDown",
+                "severity": "critical",
+                "trigger_count": 98
+            },
+            {
+                "name": "OOMKilled",
+                "severity": "critical",
+                "trigger_count": 122
+            }
+        ],
+        "kubernetes.container_image": "quay.io/prometheus/prometheus:v2.39.1",
+        "count": 999999999
+    },
+    {
+        "kubernetes.container_name": "grafana",
+        "kubernetes.labels": {
+            "app": "grafana",
+            "tier": "ui",
+            "cluster": "grafana-ha"
+        },
+        "kubernetes.annotations": [
+            "persist=true",
+            "theme=dark",
+            "alerts=enabled",
+            "usersync=true",
+            "plugins=enabled"
+        ],
+        "dashboards": [
+            {
+                "id": 12,
+                "title": "Overview",
+                "widgets": 42
+            },
+            {
+                "id": 8,
+                "title": "System Metrics",
+                "widgets": 58
+            },
+            {
+                "id": 22,
+                "title": "API Performance",
+                "widgets": 33
+            },
+            {
+                "id": 30,
+                "title": "User Analytics",
+                "widgets": 29
+            },
+            {
+                "id": 4,
+                "title": "Kubernetes Health",
+                "widgets": 61
+            }
+        ],
+        "kubernetes.container_image": "grafana/grafana:9.2.0",
+        "count": 500000
+    },
+    {
+        "kubernetes.container_name": "alertmanager",
+        "kubernetes.labels": {
+            "app": "alertmanager",
+            "cluster": "main",
+            "region": "us-central"
+        },
+        "kubernetes.annotations": null,
+        "routes": [
+            {
+                "receiver": "team-a",
+                "match": "warning",
+                "deliveries": 12000
+            },
+            {
+                "receiver": "team-b",
+                "match": "critical",
+                "deliveries": 8500
+            },
+            {
+                "receiver": "team-c",
+                "match": "info",
+                "deliveries": 2300
+            },
+            {
+                "receiver": "team-d",
+                "match": "error",
+                "deliveries": 5400
+            },
+            {
+                "receiver": "team-e",
+                "match": "fatal",
+                "deliveries": 1200
+            }
+        ],
+        "kubernetes.container_image": "quay.io/prometheus/alertmanager:v0.25.0"
+    },
+    {
+        "kubernetes.container_name": "nginx",
+        "kubernetes.labels": {
+            "app": "nginx",
+            "env": "prod",
+            "role": "frontend"
+        },
+        "kubernetes.annotations": [
+            "team=frontend"
+        ],
+        "access_logs": [
+            {
+                "path": "/home",
+                "status": 200,
+                "response_time_ms": 123
+            },
+            {
+                "path": "/login",
+                "status": 403,
+                "response_time_ms": 352
+            },
+            {
+                "path": "/api",
+                "status": 500,
+                "response_time_ms": 640
+            },
+            {
+                "path": "/settings",
+                "status": 200,
+                "response_time_ms": 145
+            },
+            {
+                "path": "/dashboard",
+                "status": 302,
+                "response_time_ms": 98
+            }
+        ],
+        "kubernetes.container_image": "nginx:1.23"
+    },
+    {
+        "kubernetes.container_name": "redis",
+        "kubernetes.labels": {
+            "app": "redis",
+            "role": "cache",
+            "cluster": "redis-main"
+        },
+        "kubernetes.annotations": [],
+        "cache_keys": [
+            {
+                "pattern": "session:*",
+                "count": 1500000
+            },
+            {
+                "pattern": "profile:*",
+                "count": 800000
+            },
+            {
+                "pattern": "cart:*",
+                "count": 450000
+            },
+            {
+                "pattern": "inventory:*",
+                "count": 210000
+            },
+            {
+                "pattern": "geo:*",
+                "count": 120000
+            }
+        ],
+        "kubernetes.container_image": "redis:7"
+    },
+    {
+        "kubernetes.container_name": "mysql",
+        "kubernetes.labels": {
+            "app": "mysql",
+            "tier": "database"
+        },
+        "kubernetes.annotations": [
+            "backup=daily"
+        ],
+        "replicas": [
+            {
+                "node": "db-1",
+                "lag": "0s"
+            },
+            {
+                "node": "db-2",
+                "lag": "2s"
+            },
+            {
+                "node": "db-3",
+                "lag": "5s"
+            },
+            {
+                "node": "db-4",
+                "lag": "0s"
+            },
+            {
+                "node": "db-5",
+                "lag": "1s"
+            }
+        ],
+        "kubernetes.container_image": "mysql:8.0"
+    },
+    {
+        "kubernetes.container_name": "fluent-bit",
+        "kubernetes.labels": {
+            "app": "fluent-bit",
+            "type": "logging"
+        },
+        "kubernetes.annotations": [
+            "ship-s3=true",
+            "ship-es=true"
+        ],
+        "log_streams": [
+            {
+                "name": "stdout",
+                "rate": "500msg/s"
+            },
+            {
+                "name": "stderr",
+                "rate": "120msg/s"
+            },
+            {
+                "name": "debug",
+                "rate": "80msg/s"
+            },
+            {
+                "name": "audit",
+                "rate": "40msg/s"
+            },
+            {
+                "name": "network",
+                "rate": "50msg/s"
+            }
+        ],
+        "kubernetes.container_image": "fluent/fluent-bit:2.2"
+    },
+    {
+        "kubernetes.container_name": "node-exporter",
+        "kubernetes.labels": {
+            "app": "node-exporter"
+        },
+        "kubernetes.annotations": null,
+        "metrics_collected": [
+            {
+                "metric": "cpu_usage",
+                "enabled": true
+            },
+            {
+                "metric": "memory_usage",
+                "enabled": true
+            },
+            {
+                "metric": "disk_usage",
+                "enabled": false
+            },
+            {
+                "metric": "load_avg",
+                "enabled": true
+            },
+            {
+                "metric": "network_io",
+                "enabled": true
+            }
+        ],
+        "kubernetes.container_image": "quay.io/prometheus/node-exporter:v1.5"
+    },
+    {
+        "kubernetes.container_name": "kube-state-metrics",
+        "kubernetes.labels": {
+            "app": "kube-state-metrics"
+        },
+        "kubernetes.annotations": [
+            "scrape=true"
+        ],
+        "resources_tracked": [
+            {
+                "type": "pods",
+                "count": 2000
+            },
+            {
+                "type": "deployments",
+                "count": 150
+            },
+            {
+                "type": "statefulsets",
+                "count": 45
+            },
+            {
+                "type": "daemonsets",
+                "count": 29
+            },
+            {
+                "type": "jobs",
+                "count": 120
+            }
+        ],
+        "kubernetes.container_image": "k8s.gcr.io/kube-state-metrics:v2.8"
+    },
+    {
+        "kubernetes.container_name": "apiserver",
+        "kubernetes.labels": {
+            "app": "kubernetes",
+            "component": "apiserver"
+        },
+        "audit_logs": [
+            {
+                "event": "UserLogin",
+                "count": 25000
+            },
+            {
+                "event": "CreatePod",
+                "count": 6000
+            },
+            {
+                "event": "DeletePod",
+                "count": 3100
+            },
+            {
+                "event": "ScaleDeployment",
+                "count": 950
+            },
+            {
+                "event": "UpdateConfigMap",
+                "count": 1200
+            }
+        ],
+        "kubernetes.annotations": [
+            "audit=enabled"
+        ],
+        "kubernetes.container_image": "k8s.gcr.io/kube-apiserver:v1.26"
+    },
+    {
+        "kubernetes.container_name": "coredns",
+        "kubernetes.labels": {
+            "app": "coredns"
+        },
+        "dns_records": [
+            {
+                "domain": "service.local",
+                "queries": 1500000
+            },
+            {
+                "domain": "cluster.local",
+                "queries": 3400000
+            },
+            {
+                "domain": "db.local",
+                "queries": 980000
+            },
+            {
+                "domain": "api.local",
+                "queries": 1870000
+            },
+            {
+                "domain": "auth.local",
+                "queries": 450000
+            }
+        ],
+        "kubernetes.annotations": [],
+        "kubernetes.container_image": "coredns/coredns:1.10"
+    },
+    {
+        "kubernetes.container_name": "etcd",
+        "kubernetes.labels": {
+            "app": "etcd",
+            "role": "primary"
+        },
+        "cluster_peers": [
+            {
+                "name": "etcd-1",
+                "state": "healthy"
+            },
+            {
+                "name": "etcd-2",
+                "state": "healthy"
+            },
+            {
+                "name": "etcd-3",
+                "state": "degraded"
+            },
+            {
+                "name": "etcd-4",
+                "state": "healthy"
+            },
+            {
+                "name": "etcd-5",
+                "state": "degraded"
+            }
+        ],
+        "kubernetes.annotations": [
+            "storage=ssd"
+        ],
+        "kubernetes.container_image": "k8s.gcr.io/etcd:3.5"
+    },
+    {
+        "kubernetes.container_name": "vault",
+        "kubernetes.labels": {
+            "app": "vault",
+            "env": "dev"
+        },
+        "secrets_engines": [
+            {
+                "engine": "kv",
+                "enabled": true
+            },
+            {
+                "engine": "transit",
+                "enabled": false
+            },
+            {
+                "engine": "pki",
+                "enabled": true
+            },
+            {
+                "engine": "aws",
+                "enabled": true
+            },
+            {
+                "engine": "gcp",
+                "enabled": false
+            }
+        ],
+        "kubernetes.annotations": null,
+        "kubernetes.container_image": "hashicorp/vault:1.12"
+    },
+    {
+        "kubernetes.container_name": "rabbitmq",
+        "kubernetes.labels": {
+            "app": "rabbitmq"
+        },
+        "queues": [
+            {
+                "name": "emails",
+                "messages": 40000
+            },
+            {
+                "name": "events",
+                "messages": 900000
+            },
+            {
+                "name": "jobs",
+                "messages": 320000
+            },
+            {
+                "name": "notifications",
+                "messages": 550000
+            },
+            {
+                "name": "system-events",
+                "messages": 78000
+            }
+        ],
+        "kubernetes.annotations": [
+            "mirroring=true"
+        ],
+        "kubernetes.container_image": "rabbitmq:3.11"
+    },
+    {
+        "kubernetes.container_name": "elasticsearch",
+        "kubernetes.labels": {
+            "app": "elasticsearch"
+        },
+        "indices": [
+            {
+                "name": "logs-2023",
+                "docs": 120000000
+            },
+            {
+                "name": "metrics-2023",
+                "docs": 45000000
+            },
+            {
+                "name": "apm-2023",
+                "docs": 75000000
+            },
+            {
+                "name": "audit-2023",
+                "docs": 9000000
+            },
+            {
+                "name": "security-2023",
+                "docs": 22000000
+            }
+        ],
+        "kubernetes.annotations": null,
+        "kubernetes.container_image": "elasticsearch:8.5"
+    },
+    {
+        "kubernetes.container_name": "kibana",
+        "kubernetes.labels": {
+            "app": "kibana"
+        },
+        "users_active": [
+            {
+                "user": "admin",
+                "role": "superuser"
+            },
+            {
+                "user": "viewer",
+                "role": "read-only"
+            },
+            {
+                "user": "editor",
+                "role": "edit"
+            },
+            {
+                "user": "analyst",
+                "role": "read"
+            },
+            {
+                "user": "auditor",
+                "role": "read-only"
+            }
+        ],
+        "kubernetes.annotations": [
+            "theme=dark"
+        ],
+        "kubernetes.container_image": "kibana:8.5"
+    },
+    {
+        "kubernetes.container_name": "tempo",
+        "kubernetes.labels": {
+            "app": "tempo"
+        },
+        "trace_batches": [
+            {
+                "batch": "A1",
+                "count": 1400000
+            },
+            {
+                "batch": "B7",
+                "count": 2000000
+            },
+            {
+                "batch": "C3",
+                "count": 980000
+            },
+            {
+                "batch": "D9",
+                "count": 1540000
+            },
+            {
+                "batch": "E2",
+                "count": 760000
+            }
+        ],
+        "kubernetes.annotations": [],
+        "kubernetes.container_image": "grafana/tempo:2.0"
+    },
+    {
+        "kubernetes.container_name": "loki",
+        "kubernetes.labels": {
+            "app": "loki"
+        },
+        "log_streams": [
+            {
+                "name": "app-logs",
+                "entries": 50000000
+            },
+            {
+                "name": "system-logs",
+                "entries": 120000000
+            },
+            {
+                "name": "debug-logs",
+                "entries": 40000000
+            },
+            {
+                "name": "audit-logs",
+                "entries": 52000000
+            },
+            {
+                "name": "trace-logs",
+                "entries": 31000000
+            }
+        ],
+        "kubernetes.annotations": null,
+        "kubernetes.container_image": "grafana/loki:2.7"
+    },
+    {
+        "kubernetes.container_name": "minio",
+        "kubernetes.labels": {
+            "app": "minio",
+            "role": "storage"
+        },
+        "buckets": [
+            {
+                "bucket": "configs",
+                "size_mb": 9876543
+            },
+            {
+                "bucket": "backups",
+                "size_mb": 45678921
+            },
+            {
+                "bucket": "audit-logs",
+                "size_mb": 18500000
+            },
+            {
+                "bucket": "archive-2022",
+                "size_mb": 78200000
+            },
+            {
+                "bucket": "session-data",
+                "size_mb": 1580000
+            }
+        ],
+        "kubernetes.annotations": [
+            "backup=weekly"
+        ],
+        "kubernetes.container_image": "minio/minio:2023"
+    },
+    {
+        "kubernetes.container_name": "consul",
+        "kubernetes.labels": {
+            "app": "consul"
+        },
+        "services_registered": [
+            {
+                "service": "api",
+                "instances": 30
+            },
+            {
+                "service": "web",
+                "instances": 22
+            },
+            {
+                "service": "auth",
+                "instances": 15
+            },
+            {
+                "service": "billing",
+                "instances": 18
+            },
+            {
+                "service": "warehouse",
+                "instances": 9
+            }
+        ],
+        "kubernetes.annotations": [],
+        "kubernetes.container_image": "consul:1.15"
+    },
+    {
+        "labels": "{ \"service\": \"api\", \"instances\": 300 }"
+    },
+    {
+        "kubernetes.container_name": "prometheus",
+        "kubernetes.labels": {
+            "app": "prometheus",
+            "version": "2.39.1"
+        },
+        "kubernetes.annotations": [
+            true,
+            false,
+            true
+        ],
+        "alerts_fired": [
+            {
+                "name": "HighCPU",
+                "severity": 1
+            },
+            {
+                "name": "DiskFull",
+                "severity": 2
+            }
+        ],
+        "cpu_load_samples": [
+            82.5,
+            91.2,
+            88.1,
+            77.4,
+            69.0
+        ],
+        "kubernetes.container_image": "quay.io/prometheus/prometheus:v2.39.1",
+        "count": 150000
+    },
+    {
+        "kubernetes.container_name": "grafana",
+        "kubernetes.labels": {
+            "app": "grafana",
+            "tier": "ui"
+        },
+        "kubernetes.annotations": [
+            false,
+            true,
+            false
+        ],
+        "dashboards": [
+            {
+                "id": 12,
+                "title": "Overview"
+            },
+            {
+                "id": 8,
+                "title": "System Metrics"
+            },
+            {
+                "id": 27,
+                "title": "Cluster Health"
+            }
+        ],
+        "load_times_ms": [
+            120,
+            95,
+            140,
+            150,
+            110
+        ],
+        "kubernetes.container_image": "grafana/grafana:9.2.0",
+        "count": 5
+    },
+    {
+        "kubernetes.container_name": "nginx",
+        "kubernetes.labels": {
+            "app": "nginx",
+            "env": "prod"
+        },
+        "kubernetes.annotations": [
+            1,
+            0,
+            1,
+            1
+        ],
+        "access_logs": [
+            {
+                "path": "/home",
+                "status": 200
+            },
+            {
+                "path": "/login",
+                "status": 403
+            }
+        ],
+        "latency_histogram_ms": [
+            10,
+            20,
+            35,
+            55,
+            85
+        ],
+        "kubernetes.container_image": "nginx:1.23"
+    },
+    {
+        "kubernetes.container_name": "redis",
+        "kubernetes.labels": {
+            "app": "redis",
+            "role": "cache"
+        },
+        "kubernetes.annotations": [],
+        "cache_keys": [
+            {
+                "pattern": "session:*",
+                "count": 150
+            },
+            {
+                "pattern": "profile:*",
+                "count": 80
+            },
+            {
+                "pattern": "cart:*",
+                "count": 60
+            }
+        ],
+        "memory_slots": [
+            1024,
+            2048,
+            4096,
+            8192
+        ],
+        "kubernetes.container_image": "redis:7"
+    },
+    {
+        "kubernetes.container_name": "mysql",
+        "kubernetes.labels": {
+            "app": "mysql",
+            "tier": "database"
+        },
+        "kubernetes.annotations": [
+            1,
+            1,
+            0
+        ],
+        "replicas": [
+            {
+                "node": "db-1",
+                "lag": 0
+            },
+            {
+                "node": "db-2",
+                "lag": 2
+            },
+            {
+                "node": "db-3",
+                "lag": 1
+            }
+        ],
+        "connection_pool_sizes": [
+            100,
+            150,
+            200,
+            180,
+            175
+        ],
+        "kubernetes.container_image": "mysql:8.0"
+    },
+    {
+        "kubernetes.container_name": "fluent-bit",
+        "kubernetes.labels": {
+            "app": "fluent-bit",
+            "type": "logging"
+        },
+        "kubernetes.annotations": [
+            true,
+            true,
+            false
+        ],
+        "log_streams": [
+            {
+                "name": "stdout",
+                "rate": 500
+            },
+            {
+                "name": "stderr",
+                "rate": 120
+            }
+        ],
+        "streams_active": [
+            1,
+            1,
+            0,
+            1
+        ],
+        "kubernetes.container_image": "fluent/fluent-bit:2.2"
+    },
+    {
+        "kubernetes.container_name": "node-exporter",
+        "kubernetes.labels": {
+            "app": "node-exporter"
+        },
+        "kubernetes.annotations": null,
+        "metrics_collected": [
+            {
+                "metric": "cpu_usage",
+                "enabled": true
+            },
+            {
+                "metric": "memory_usage",
+                "enabled": true
+            },
+            {
+                "metric": "disk_usage",
+                "enabled": false
+            }
+        ],
+        "enabled_metrics_flags": [
+            1,
+            1,
+            0,
+            1,
+            1
+        ],
+        "kubernetes.container_image": "quay.io/prometheus/node-exporter:v1.5"
+    },
+    {
+        "kubernetes.container_name": "tempo",
+        "kubernetes.labels": {
+            "app": "tempo"
+        },
+        "trace_batches": [
+            {
+                "batch": "A1",
+                "count": 1400
+            },
+            {
+                "batch": "B7",
+                "count": 2000
+            },
+            {
+                "batch": "C3",
+                "count": 900
+            }
+        ],
+        "batch_sizes": [
+            1400,
+            2000,
+            900,
+            1800,
+            2300
+        ],
+        "kubernetes.annotations": [],
+        "kubernetes.container_image": "grafana/tempo:2.0"
+    },
+    {
+        "kubernetes.container_name": "loki",
+        "kubernetes.labels": {
+            "app": "loki"
+        },
+        "log_streams": [
+            {
+                "name": "app-logs",
+                "entries": 50000
+            },
+            {
+                "name": "system-logs",
+                "entries": 120000
+            }
+        ],
+        "log_counts_hourly": [
+            1200,
+            1400,
+            1500,
+            1700,
+            2000
+        ],
+        "kubernetes.annotations": null,
+        "kubernetes.container_image": "grafana/loki:2.7"
+    },
+    {
+        "kubernetes.container_name": "minio",
+        "kubernetes.labels": {
+            "app": "minio",
+            "role": "storage"
+        },
+        "buckets": [
+            {
+                "bucket": "configs",
+                "size_mb": 300
+            },
+            {
+                "bucket": "backups",
+                "size_mb": 2100
+            },
+            {
+                "bucket": "logs",
+                "size_mb": 12000
+            }
+        ],
+        "bucket_sizes": [
+            300,
+            2100,
+            12000,
+            8750,
+            6432
+        ],
+        "kubernetes.annotations": [
+            0,
+            1
+        ],
+        "kubernetes.container_image": "minio/minio:2023"
+    }
+]

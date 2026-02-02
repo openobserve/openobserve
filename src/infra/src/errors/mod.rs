@@ -27,8 +27,6 @@ pub enum Error {
     IoError(#[from] std::io::Error),
     #[error("DbError# {0}")]
     DbError(#[from] DbError),
-    #[error("EtcdError# {0}")]
-    EtcdError(#[from] etcd_client::Error),
     #[error("FromStrError# {0}")]
     FromStrError(#[from] FromStrError),
     #[error("FromI16Error# {0}")]
@@ -36,7 +34,11 @@ pub enum Error {
     #[error("SerdeJsonError# {0}")]
     SerdeJsonError(#[from] json::Error),
     #[error("ArrowError# {0}")]
-    ArrowError(#[from] datafusion::arrow::error::ArrowError),
+    ArrowError(#[from] arrow::error::ArrowError),
+    #[error("ParquetError# {0}")]
+    ParquetError(#[from] parquet::errors::ParquetError),
+    #[error("ObjectStoreError# {0}")]
+    ObjectStoreError(#[from] object_store::Error),
     #[error("WatchError# watcher is exists {0}")]
     WatcherExists(String),
     #[error("StringUTF8Error# {0}")]
@@ -89,6 +91,8 @@ pub enum Error {
     WalFileError(String),
     #[error("Error# {0}")]
     OtherError(#[from] anyhow::Error),
+    #[error("Expired Trial Period")]
+    TrialPeriodExpired,
 }
 
 unsafe impl Send for Error {}

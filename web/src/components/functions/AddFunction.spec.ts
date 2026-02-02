@@ -309,7 +309,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       expect(vm.suffixCode).toBe('');
     });
 
-    it('should handle Lua function type (transType 1)', async () => {
+    it('should handle JavaScript function type (transType 1)', async () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
@@ -329,16 +329,17 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       const vm = wrapper.vm as any;
-      
-      // Branch: transType == "1" (line 321-324)
+
+      // Branch: transType == "1" (JavaScript - no prefix/suffix)
       vm.formData.transType = '1';
       vm.updateEditorContent();
-      
-      expect(vm.prefixCode).toBe('function(row)');
-      expect(vm.suffixCode).toContain('end');
+
+      // JavaScript functions don't get prefix/suffix - written as-is
+      expect(vm.prefixCode).toBe('');
+      expect(vm.suffixCode).toBe('');
     });
 
-    it('should clear params for Lua functions during submission', async () => {
+    it('should clear params for JavaScript functions during submission', async () => {
       const wrapper = mount(AddFunction, {
         props: {
           ...defaultProps,
@@ -363,11 +364,11 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       const vm = wrapper.vm as any;
-      
-      // Branch: transType == 1 (line 359-361)
+
+      // Branch: transType == 1 (JavaScript)
       vm.formData = {
-        name: 'testLuaFunction',
-        function: 'test lua code',
+        name: 'testJavaScriptFunction',
+        function: 'function transform(row) { return row; }',
         params: 'row,data',
         transType: 1,
       };
@@ -657,72 +658,7 @@ describe('AddFunction.vue Branch Coverage', () => {
     });
   });
 
-  describe('Theme and AI Chat Conditional Styling Branch Coverage', () => {
-    it('should apply dark theme styles', async () => {
-      const darkStore = createStore({
-        state: {
-          ...mockStore.state,
-          theme: 'dark', // Branch condition: === 'dark'
-        },
-        actions: mockStore.actions,
-      });
-
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n, mockRouter],
-          provide: {
-            store: darkStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
-
-      // Branch: store.state.theme === 'dark' (line 86-89, 105)
-      const errorContainer = wrapper.find('.q-px-sm.q-pb-sm');
-      if (errorContainer.exists()) {
-        expect(errorContainer.classes()).toContain('bg-grey-10');
-      }
-
-      const testContainer = wrapper.find('.q-px-md.q-pt-sm.q-pb-md');
-      if (testContainer.exists()) {
-        expect(testContainer.classes()).toContain('tw-bg-gray-700');
-      }
-    });
-
-    it('should apply light theme styles', async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n, mockRouter],
-          provide: {
-            store: mockStore, // theme: 'light'
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
-
-      // Branch: store.state.theme !== 'dark' (line 87-88, 105)
-      const testContainer = wrapper.find('.q-px-md.q-pt-sm.q-pb-md');
-      if (testContainer.exists()) {
-        expect(testContainer.classes()).toContain('tw-bg-zinc-100');
-      }
-    });
-
+  describe('AI Chat Integration', () => {
     it('should show AI chat when enabled and not in add function component', async () => {
       const aiEnabledStore = createStore({
         state: {
@@ -758,7 +694,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: store.state.isAiChatEnabled && !isAddFunctionComponent (line 41, 119)
-      const mainContainer = wrapper.find('.tw-flex.tw-overflow-auto');
+      const mainContainer = wrapper.find('.tw\\:flex.tw\\:overflow-auto');
       if (mainContainer.exists()) {
         expect(mainContainer.attributes('style')).toContain('75%');
       }
@@ -794,7 +730,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: !store.state.isAiChatEnabled || isAddFunctionComponent (line 41, 119)
-      const mainContainer = wrapper.find('.tw-flex.tw-overflow-auto');
+      const mainContainer = wrapper.find('.tw\\:flex.tw\\:overflow-auto');
       if (mainContainer.exists()) {
         expect(mainContainer.attributes('style')).toContain('100%');
       }

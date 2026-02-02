@@ -19,29 +19,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="relative-position">
     <div
-      class="q-mx-sm performance-error-dashboard"
-      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+      class="performance-error-dashboard"
+      :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
-      <div class="q-px-sm performance-dashboard">
+      <div class="performance-dashboard">
         <RenderDashboardCharts
           ref="errorRenderDashboardChartsRef"
           :viewOnly="true"
           :dashboardData="currentDashboardData.data"
           :currentTimeObj="dateTime"
           searchType="RUM"
+          @variablesManagerReady="onVariablesManagerReady"
+          @updated:data-zoom="onDataZoom"
         />
       </div>
     </div>
     <div
       v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
-      style="height: calc(100vh - 250px); top: 0"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
         <q-spinner-hourglass
           color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
+          size="2.5rem"
+          class="tw:mx-auto tw:block"
         />
         <div class="text-center full-width">Loading Dashboard</div>
       </div>
@@ -58,6 +59,7 @@ import {
   onActivated,
   onMounted,
   nextTick,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -82,7 +84,8 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  setup(props) {
+  emits: ["variablesManagerReady"],
+  setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
     const currentDashboardData = reactive({
@@ -91,7 +94,7 @@ export default defineComponent({
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);
     const errorsByView = ref([]);
-    const variablesData = ref(null);
+    const variablesData = ref({ isVariablesLoading: true, values: [] });
     const errorRenderDashboardChartsRef = ref(null);
 
     const refDateTime: any = ref(null);
@@ -113,19 +116,20 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      errorRenderDashboardChartsRef.value.layoutUpdate();
+      if (errorRenderDashboardChartsRef.value) {
+        errorRenderDashboardChartsRef.value.layoutUpdate();
 
-      // Dashboards gets overlapped as we have used keep alive
-      // Its an internal bug of vue-grid-layout
-      // So adding settimeout of 1 sec to fix the issue
-      errorRenderDashboardChartsRef.value.layoutUpdate();
+        // Dashboards gets overlapped as we have used keep alive
+        // Its an internal bug of vue-grid-layout
+        // So adding settimeout of 1 sec to fix the issue
+        errorRenderDashboardChartsRef.value.layoutUpdate();
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
-    // variables data
-    const variablesDataUpdated = (data: any) => {
-      if (JSON.stringify(variablesData.value) === JSON.stringify(data)) return;
-      variablesData.value = data;
+    // Variables manager event handler - pass through to parent
+    const onVariablesManagerReady = (manager: any) => {
+      emit("variablesManagerReady", manager);
     };
 
     const columns = [
@@ -156,13 +160,21 @@ export default defineComponent({
           currentDashboardData.data?.variables?.list.length
         )
       ) {
-        variablesData.value.isVariablesLoading = false;
-        variablesData.value.values = [];
+        if (variablesData.value) {
+          variablesData.value.isVariablesLoading = false;
+          variablesData.value.values = [];
+        }
       }
     };
 
     const addSettingsData = () => {
       showDashboardSettingsDialog.value = true;
+    };
+
+    // Handle data zoom from chart interactions
+    const onDataZoom = (event: any) => {
+      // Update the dateTime prop to trigger parent to update time range
+      emit("update:dateTime", event);
     };
 
     return {
@@ -173,7 +185,7 @@ export default defineComponent({
       refreshInterval,
       viewOnly,
       variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
@@ -181,6 +193,8 @@ export default defineComponent({
       errorsByView,
       errorRenderDashboardChartsRef,
       isLoading,
+      updateLayout,
+      onDataZoom,
     };
   },
 });
