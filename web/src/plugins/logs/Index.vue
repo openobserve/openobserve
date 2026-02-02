@@ -2172,10 +2172,9 @@ export default defineComponent({
 
     const onBuildQueryGenerated = (query: string) => {
       // Sync generated query to logs composables so user can see it in the editor
-      if (query) {
-        searchObj.data.query = query;
-        searchObj.data.editorValue = query; // Also update editor display
-      }
+      // Always update, including empty string when all fields are removed
+      searchObj.data.query = query;
+      searchObj.data.editorValue = query;
     };
 
     const onCustomQueryModeChanged = (isCustomMode: boolean) => {

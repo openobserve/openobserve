@@ -1113,12 +1113,13 @@ watch(
   async () => {
     // Only auto-generate SQL if in builder mode (customQuery = false)
     if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery) {
-      await makeAutoSQLQuery();
+      const result = await makeAutoSQLQuery();
 
-      // Emit the generated query for pages that need to sync it (e.g., BuildQueryPage -> SearchBar)
-      const generatedQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query;
-      if (generatedQuery) {
-        emit("queryGenerated", generatedQuery);
+      // Only emit if makeAutoSQLQuery actually ran and generated a query
+      // Don't emit when it returns early (undefined) due to missing stream fields
+      // This prevents clearing the query on page load before stream fields are loaded
+      if (result !== undefined) {
+        emit("queryGenerated", result);
       }
     }
   },

@@ -115,7 +115,7 @@ const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 
 // Get dashboard panel data for build page
-const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields } =
+const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields, makeAutoSQLQuery } =
   useDashboardPanelData("build");
 
 // Provide page key for child components
@@ -270,7 +270,6 @@ onMounted(() => {
 
 /**
  * Run the query in PanelEditor
- * PanelEditor handles SQL generation via its watcher and emits queryGenerated
  */
 const runQuery = async (withoutCache?: boolean) => {
   // Ensure stream fields are loaded before running query in builder mode
@@ -278,9 +277,14 @@ const runQuery = async (withoutCache?: boolean) => {
     if (!dashboardPanelData.meta.streamFields?.groupedFields?.length) {
       await updateGroupedFields();
     }
+    // Generate SQL query after stream fields are loaded
+    // The watcher won't fire because only streamFields changed, not the watched fields
+    const generatedQuery = await makeAutoSQLQuery();
+    if (generatedQuery !== undefined) {
+      emit("queryGenerated", generatedQuery);
+    }
   }
 
-  // PanelEditor will generate SQL and emit queryGenerated
   panelEditorRef.value?.runQuery(withoutCache);
 };
 
