@@ -74,7 +74,7 @@ const collapseSidebar = () => {
   splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
 };
 
-const tabs = ref([
+const allTabs = [
   {
     dataTest: "iam-users-tab",
     name: "users",
