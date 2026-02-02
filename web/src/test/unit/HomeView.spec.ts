@@ -99,10 +99,13 @@ const i18n = createI18n({
 describe("HomeView.vue", () => {
   let wrapper: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
+    // Reset aws-exports mock to default value
+    vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
+
     // Setup organization service mock
     orgService.get_organization_summary.mockResolvedValue({
       data: {
@@ -121,7 +124,7 @@ describe("HomeView.vue", () => {
         total_functions: 0
       }
     });
-    
+
     // Setup default store state
     store.state.selectedOrganization = {
       label: "Test Organization",
@@ -130,7 +133,7 @@ describe("HomeView.vue", () => {
       user_email: "test@example.com",
       subscription_type: "premium"
     };
-    
+
     store.state.theme = "dark";
     store.state.isAiChatEnabled = false;
   });
