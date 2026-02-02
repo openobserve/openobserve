@@ -2355,7 +2355,8 @@
     "collapseFields": "Comprimi campi",
     "openFields": "Campi aperti",
     "timeRangeUpdated": "L'intervallo di tempo selezionato non includeva questa traccia. L'intervallo di tempo è stato aggiornato in modo che corrisponda al timestamp della traccia.",
-    "fetchingMoreTraces": "Recuperando altre tracce..."
+    "fetchingMoreTraces": "Recuperando altre tracce...",
+    "showErrorOnly": "Mostra solo errori"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -2628,7 +2629,9 @@
     "analyzeTooltip": "Analizza i modelli di frequenza di tracciamento tra le dimensioni",
     "analyzeTooltipLogs": "Analizza la distribuzione delle dimensioni per l'intervallo di tempo corrente",
     "rateLabel": "Tariffa:",
-    "timeRangeLabel": "Intervallo di tempo:"
+    "timeRangeLabel": "Intervallo di tempo:",
+    "analyzeTooltipTraces": "Analizza le dimensioni delle tracce per individuare velocità, latenza e modelli di errore",
+    "insightsButtonLabel": "Approfondimenti"
   },
   "errorInsights": {
     "title": "Approfondimenti",

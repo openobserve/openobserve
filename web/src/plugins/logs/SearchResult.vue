@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             color="primary"
             icon="analytics"
-            :label="t('latencyInsights.analyzeButtonLabel')"
+            :label="t('volumeInsights.insightsButtonLabel')"
             class="q-ml-md"
             size="sm"
             @click="openVolumeAnalysisDashboard"

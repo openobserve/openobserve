@@ -36,6 +36,8 @@ style="min-height: auto">
           @searchdata="searchData"
           @onChangeTimezone="refreshTimezone"
           @update:activeTab="activeTab = $event"
+          @error-only-toggled="onErrorOnlyToggled"
+          @filters-reset="onFiltersReset"
         />
       </div>
 
@@ -167,6 +169,7 @@ color="primary" size="md" />
                     @update:datetime="setHistogramDate"
                     @update:scroll="getMoreData"
                     @shareLink="copyTracesUrl"
+                    @metrics:filters-updated="onMetricsFiltersUpdated"
                   />
                 </div>
               </div>
@@ -658,36 +661,10 @@ async function getQueryData() {
       });
     }
 
+    // Filters are already in editorValue (set by metrics dashboard brush selections)
+    // No need to add them again here
     let filter = searchObj.data.editorValue.trim();
-
-    // Add RED metrics filters to the query
-    const metricsFilters: string[] = [];
-    searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
-      if (rangeFilter.panelTitle === "Duration") {
-        if (rangeFilter.start !== null && rangeFilter.end !== null) {
-          metricsFilters.push(
-            `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
-          );
-        } else {
-          metricsFilters.push(
-            `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
-          );
-        }
-      }
-      // Note: Rate and Error filters are not applicable to individual trace queries
-      // They are aggregation metrics, not span-level filters
-    });
-
-    // Add Error Only filter
-    if (searchObj.meta.showErrorOnly) {
-      metricsFilters.push("span_status = 'ERROR'");
-    }
-
-    // Combine editor filter with metrics filters
-    const allFilters = [filter, ...metricsFilters].filter(
-      (f) => f.trim().length > 0,
-    );
-    const combinedFilter = allFilters.join(" AND ");
+    const combinedFilter = filter;
 
     if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
 
@@ -1224,6 +1201,76 @@ const setHistogramDate = async (date: any) => {
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
 };
 
+// Handler for metrics dashboard brush selection filters
+// Simply replace the query editor content with metrics filters
+// User can manually add their own filters before clicking "Run Query"
+const onMetricsFiltersUpdated = (filters: string[]) => {
+  // Add Error Only filter if toggle is enabled
+  const allFilters = [...filters];
+  if (searchObj.meta.showErrorOnly) {
+    allFilters.push("span_status = 'ERROR'");
+  }
+
+  // Join filters with AND
+  const newFilters = allFilters.join(" AND ");
+
+  searchObj.data.editorValue = newFilters;
+
+  // Update the query editor UI via ref
+  if (searchBarRef.value?.setEditorValue) {
+    searchBarRef.value.setEditorValue(newFilters);
+  }
+};
+
+// Handler for Error Only toggle
+// Triggers re-emission of filters from metrics dashboard
+const onErrorOnlyToggled = (value: boolean) => {
+  // The toggle value is already updated in searchObj.meta.showErrorOnly
+  // Now we need to re-trigger filter emission from metrics dashboard
+  // We'll do this by manually calling the filter update logic
+
+  // Build filters from current brush selections
+  const filters: string[] = [];
+
+  searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
+    if (rangeFilter.panelTitle === "Duration") {
+      if (rangeFilter.start !== null && rangeFilter.end !== null) {
+        filters.push(
+          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+        );
+      } else if (rangeFilter.start !== null) {
+        filters.push(`duration >= ${rangeFilter.start}`);
+      } else if (rangeFilter.end !== null) {
+        filters.push(`duration <= ${rangeFilter.end}`);
+      }
+    } else if (rangeFilter.panelTitle === "Errors") {
+      filters.push("span_status = 'ERROR'");
+    }
+  });
+
+  // Add Error Only filter if toggle is enabled
+  if (value && !filters.includes("span_status = 'ERROR'")) {
+    filters.push("span_status = 'ERROR'");
+  }
+
+  // Update Query Editor
+  const newFilters = filters.join(" AND ");
+  searchObj.data.editorValue = newFilters;
+
+  if (searchBarRef.value?.setEditorValue) {
+    searchBarRef.value.setEditorValue(newFilters);
+  }
+};
+
+// Handler for Reset Filters button
+// Clears all filters including brush selections
+const onFiltersReset = () => {
+  // Brush selections already cleared in SearchBar.vue
+  // metricsRangeFilters.clear() was called
+  // No additional action needed here
+  console.log("Filters reset - brush selections cleared");
+};
+
 const isStreamSelected = computed(() => {
   return searchObj.data.stream.selectedStream.value.trim().length > 0;
 });
@@ -1237,6 +1284,10 @@ const searchData = () => {
   ) {
     return;
   }
+
+  // Clear brush selections when running query
+  // The filters are now part of the query, so brush selections should be cleared
+  searchObj.meta.metricsRangeFilters.clear();
 
   runQueryFn();
 

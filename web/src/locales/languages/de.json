@@ -2357,7 +2357,8 @@
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
     "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
-    "fetchingMoreTraces": "Weitere Spuren werden abgerufen..."
+    "fetchingMoreTraces": "Weitere Spuren werden abgerufen...",
+    "showErrorOnly": "Nur Fehler anzeigen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -2630,7 +2631,9 @@
     "analyzeTooltip": "Analysieren Sie Trace-Muster über Dimensionen hinweg",
     "analyzeTooltipLogs": "Analysieren Sie die Dimensionsverteilung für den aktuellen Zeitraum",
     "rateLabel": "Rate:",
-    "timeRangeLabel": "Zeitbereich:"
+    "timeRangeLabel": "Zeitbereich:",
+    "analyzeTooltipTraces": "Analysieren Sie die Trace-Dimensionen auf Rate, Latenz und Fehlermuster",
+    "insightsButtonLabel": "Einblicke"
   },
   "errorInsights": {
     "title": "Einblicke",

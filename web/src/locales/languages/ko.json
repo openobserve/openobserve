@@ -2357,7 +2357,8 @@
     "collapseFields": "필드 축소",
     "openFields": "오픈 필드",
     "timeRangeUpdated": "선택한 시간 범위에는 이 추적이 포함되지 않았습니다.트레이스의 타임스탬프와 일치하도록 시간 범위가 업데이트되었습니다.",
-    "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중..."
+    "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중...",
+    "showErrorOnly": "오류만 보기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -2630,7 +2631,9 @@
     "analyzeTooltip": "차원 전반의 트레이스 레이트 패턴 분석",
     "analyzeTooltipLogs": "현재 시간 범위의 차원 분포 분석",
     "rateLabel": "요금:",
-    "timeRangeLabel": "시간 범위:"
+    "timeRangeLabel": "시간 범위:",
+    "analyzeTooltipTraces": "속도, 지연 및 오류 패턴에 대한 트레이스 차원 분석",
+    "insightsButtonLabel": "인사이트"
   },
   "errorInsights": {
     "title": "인사이트",
