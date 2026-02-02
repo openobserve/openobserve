@@ -2654,7 +2654,6 @@ export default defineComponent({
       handleOpenAddVariable,
       handleCloseAddVariable,
       handleSaveVariable,
-      handleSaveVariable,
       currentTabId,
       currentPanelId,
       isPartialData,
