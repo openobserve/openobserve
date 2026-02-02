@@ -205,10 +205,6 @@ tantivy-fst.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
 tokio-util = "0.7.13"
-# pprof = { version = "0.15.0", features = [
-#     "flamegraph",
-#     "prost-codec",
-# ], optional = true }
 tokio-stream.workspace = true
 mime = "0.3.17"
 pin-project-lite.workspace = true
