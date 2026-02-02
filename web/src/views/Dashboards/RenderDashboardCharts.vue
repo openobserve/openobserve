@@ -86,7 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabId="selectedTabId"
             :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
             :variablesManager="variablesManager"
-            :selectedTimeDate="currentTimeObj['__global']"
+            :selectedTimeDate="
+              currentTimeObj?.[panels[0].id] ||
+              currentTimeObj['__global'] ||
+              {}
+            "
             :initialVariableValues="initialVariableValues"
             data-test="panel-variables-selector"
           />
@@ -229,7 +233,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tabId="selectedTabId"
                         :variablesConfig="{ list: getPanelVariables(item.id) }"
                         :variablesManager="variablesManager"
-                        :selectedTimeDate="currentTimeObj['__global']"
+                        :selectedTimeDate="
+                          currentTimeObj?.[item.id] ||
+                          currentTimeObj['__global'] ||
+                          {}
+                        "
                         :initialVariableValues="initialVariableValues"
                         :style="{ marginBottom: '8px' }"
                         data-test="panel-variables-selector"
