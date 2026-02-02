@@ -80,9 +80,7 @@ export const usePanelDataLoader = (
   shouldRefreshWithoutCache?: any,
 ) => {
   const log = (...args: any[]) => {
-    // Enable for debugging (set to true temporarily when debugging)
-    const DEBUG_LOGS = false;
-    if (DEBUG_LOGS) {
+    if (false) {
       console.log(panelSchema?.value?.title + ": ", ...args);
     }
   };
@@ -158,11 +156,13 @@ export const usePanelDataLoader = (
     },
     metadata: {
       queries: [] as any,
-      seriesLimiting: undefined as {
-        totalMetricsReceived: number;
-        metricsStored: number;
-        maxSeries: number;
-      } | undefined,
+      seriesLimiting: undefined as
+        | {
+            totalMetricsReceived: number;
+            metricsStored: number;
+            maxSeries: number;
+          }
+        | undefined,
     } as {
       queries: any;
       seriesLimiting?: {
@@ -999,7 +999,8 @@ export const usePanelDataLoader = (
               }
 
               // Get series limit from config
-              const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+              const maxSeries =
+                store.state?.zoConfig?.max_dashboard_series ?? 100;
 
               // Create chunk processor for efficient metric merging
               const chunkProcessor = createPromQLChunkProcessor({
@@ -1019,7 +1020,7 @@ export const usePanelDataLoader = (
                   // Process chunk using extracted processor module
                   queryResults[queryIndex] = chunkProcessor.processChunk(
                     queryResults[queryIndex],
-                    newData
+                    newData,
                   );
 
                   // Update state with accumulated results
@@ -1946,24 +1947,7 @@ export const usePanelDataLoader = (
   };
 
   const hasAtLeastOneQuery = () =>
-    panelSchema.value.queries?.some((q: any) => {
-      // For custom query mode, check if query string exists
-      if (q?.customQuery) {
-        return !!q?.query;
-      }
-      // For builder mode (customQuery: false), check if fields are configured
-      const fields = q?.fields;
-      if (fields) {
-        const hasXFields = fields.x?.length > 0;
-        const hasYFields = fields.y?.length > 0;
-        const hasStream = !!fields.stream;
-        // Need at least stream and some axis fields
-        return hasStream && (hasXFields || hasYFields);
-      }
-      // Fallback to checking query string
-      return !!q?.query;
-    });
-
+    panelSchema.value.queries?.some((q: any) => q?.query);
   // [START] variables management
 
   // check when the variables data changes
