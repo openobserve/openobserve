@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">Graph Legend</div>
 
           <div style="margin-bottom: 6px;">
-            <span style="color: #ef4444;">●</span> Red = Root Cause
+            <span style="color: #ef4444;">●</span> Red = Potential Root Cause
           </div>
           <div style="margin-bottom: 6px;">
             <span style="color: #f97316;">●</span> Orange = High Frequency
