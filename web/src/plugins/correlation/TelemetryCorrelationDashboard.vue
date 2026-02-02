@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="trace.trace_id"
                   :item="trace"
                   :index="index"
-                  @click="openTraceInNewWindow(trace.trace_id)"
+                  @click="openTraceInNewWindow(trace)"
                   data-test="correlation-trace-block"
                 />
               </div>
@@ -2122,7 +2122,7 @@ const openTraceInNewWindow = (trace) => {
     name: "traceDetails",
     query: {
       stream: traceStream,
-      trace_id: trace.trace_id,
+      trace_id: targetTraceId,
       from: trace.trace_start_time - 10000000,
       to: trace.trace_end_time + 10000000,
       org_identifier: org,
