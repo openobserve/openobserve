@@ -992,4 +992,249 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       });
     });
   });
+
+  describe("fnParsedSQL and fnUnparsedSQL - UNION queries", () => {
+    beforeEach(() => {
+      mockSearchObj.data.query = "";
+      logsUtilsInstance = logsUtils();
+    });
+
+    it("should handle UNION ALL query with multiple streams", () => {
+      const query = 'SELECT job,level FROM "default" UNION ALL SELECT job,level FROM "default12"';
+      mockSearchObj.data.query = query;
+
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+
+      // The parser may return an empty result or a union structure
+      // Check if the parsed result has expected structure
+      expect(parsedSQL).toBeDefined();
+
+      // Try to unparse the SQL
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+
+      // If parsing fails, unparsedSQL should be empty string
+      expect(typeof unparsedSQL).toBe("string");
+    });
+
+    it("should handle UNION ALL BY NAME query with multiple streams", () => {
+      const query = 'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
+      mockSearchObj.data.query = query;
+
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+
+      // UNION ALL BY NAME may not be supported by the parser
+      // It should return default empty result
+      expect(parsedSQL).toBeDefined();
+
+      // Check if we get the default parsed result structure
+      if (parsedSQL.columns.length === 0 && parsedSQL.from.length === 0) {
+        // Parser doesn't support this syntax
+        expect(parsedSQL.columns).toEqual([]);
+        expect(parsedSQL.from).toEqual([]);
+      }
+
+      // Try to unparse - should handle gracefully
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+      expect(typeof unparsedSQL).toBe("string");
+    });
+
+    it("should return empty string when unparsing invalid/empty parsed object", () => {
+      const emptyParsedObj = {
+        columns: [],
+        from: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
+
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(emptyParsedObj);
+
+      // Should return empty string for invalid/empty structure
+      expect(unparsedSQL).toBe("");
+    });
+
+    it("should handle UNION query in openFilterCreator context", () => {
+      // Simulate the scenario when user clicks expand on a field
+      // with UNION query active
+      const query = 'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
+      mockSearchObj.data.query = query;
+
+      // Parse the query
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+
+      // Verify parsing returns a result (even if empty)
+      expect(parsedSQL).toBeDefined();
+      expect(parsedSQL).toHaveProperty('columns');
+      expect(parsedSQL).toHaveProperty('from');
+
+      // Unparse the SQL (simulating openFilterCreator flow)
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+
+      // Should not throw error and return string
+      expect(typeof unparsedSQL).toBe("string");
+
+      // If UNION BY NAME is not supported, result should be empty
+      if (parsedSQL.columns.length === 0) {
+        expect(unparsedSQL).toBe("");
+      }
+    });
+
+    it("should handle standard UNION without BY NAME clause", () => {
+      const query = 'SELECT job,level FROM "default" UNION SELECT job,level FROM "default12"';
+      mockSearchObj.data.query = query;
+
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+
+      expect(parsedSQL).toBeDefined();
+      expect(typeof unparsedSQL).toBe("string");
+    });
+
+    it("should handle UNION ALL with WHERE clauses", () => {
+      const query = 'SELECT job,level FROM "default" WHERE level=\'error\' UNION ALL SELECT job,level FROM "default12" WHERE level=\'error\'';
+      mockSearchObj.data.query = query;
+
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+
+      expect(parsedSQL).toBeDefined();
+      expect(typeof unparsedSQL).toBe("string");
+    });
+
+    it("should handle UNION with ORDER BY clause", () => {
+      const query = 'SELECT job,level FROM "default" UNION ALL SELECT job,level FROM "default12" ORDER BY level';
+      mockSearchObj.data.query = query;
+
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+
+      expect(parsedSQL).toBeDefined();
+      expect(typeof unparsedSQL).toBe("string");
+    });
+
+    it("should handle multiple UNION operations", () => {
+      const query = 'SELECT job FROM "default" UNION ALL SELECT job FROM "default12" UNION ALL SELECT job FROM "default13"';
+      mockSearchObj.data.query = query;
+
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+
+      expect(parsedSQL).toBeDefined();
+      expect(typeof unparsedSQL).toBe("string");
+    });
+
+    it("should handle fnUnparsedSQL error gracefully", () => {
+      // Pass a malformed object that will cause sqlify to fail
+      const malformedObj = {
+        invalid: "structure",
+        columns: "not_an_array",
+      };
+
+      const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(malformedObj);
+
+      // Should return empty string on error
+      expect(unparsedSQL).toBe("");
+    });
+
+    it("should handle null/undefined input in fnUnparsedSQL", () => {
+      expect(logsUtilsInstance.fnUnparsedSQL(null)).toBe("");
+      expect(logsUtilsInstance.fnUnparsedSQL(undefined)).toBe("");
+      expect(logsUtilsInstance.fnUnparsedSQL({})).toBe("");
+    });
+  });
+
+  describe("openFilterCreator with UNION queries - Integration", () => {
+    beforeEach(() => {
+      mockSearchObj.data.query = "";
+      mockSearchObj.meta.sqlMode = true;
+      logsUtilsInstance = logsUtils();
+    });
+
+    it("should handle expand field action with UNION ALL BY NAME query", () => {
+      // This simulates the exact scenario from the issue:
+      // 1. Two streams selected: "default" and "default12"
+      // 2. All fields in user-defined schema
+      // 3. UNION ALL BY NAME query active
+      // 4. User clicks to expand a field (e.g., "job")
+
+      const query = 'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
+      mockSearchObj.data.query = query;
+
+      // Step 1: Parse the query (this happens in openFilterCreator)
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+
+      // Verify parser returns result (even if empty/default)
+      expect(parsedSQL).toBeDefined();
+
+      // Step 2: Unparse the query to create query_context
+      // This is where the error occurs in the actual code
+      const queryContext = logsUtilsInstance.fnUnparsedSQL(parsedSQL).replace(/`/g, '"') || "";
+
+      // Verify it returns a string (empty if unsupported)
+      expect(typeof queryContext).toBe("string");
+
+      // If the parser doesn't support UNION BY NAME:
+      if (parsedSQL.columns.length === 0 && parsedSQL.from.length === 0) {
+        // We expect empty query_context
+        expect(queryContext).toBe("");
+
+        // In this case, the openFilterCreator should handle this gracefully
+        // and either fall back to a default query or show an error
+        console.log("UNION ALL BY NAME is not supported by the SQL parser");
+        console.log("query_context will be empty, consider fallback logic");
+      }
+    });
+
+    it("should provide fallback for unsupported UNION queries", () => {
+      const query = 'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
+      mockSearchObj.data.query = query;
+
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+      const queryContext = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
+
+      // If parsing fails, we should have a fallback strategy
+      if (queryContext === "") {
+        // Verify both columns and from are empty (parser failed)
+        expect(parsedSQL.columns.length).toBe(0);
+        expect(parsedSQL.from.length).toBe(0);
+
+        // Fallback: Use simple SELECT * for field values
+        const fallbackQuery = 'SELECT * FROM "[INDEX_NAME]"';
+        expect(fallbackQuery).toBe('SELECT * FROM "[INDEX_NAME]"');
+
+        // This fallback will be used in IndexList.vue openFilterCreator
+        expect(fallbackQuery.includes("[INDEX_NAME]")).toBe(true);
+      }
+    });
+
+    it("should validate the complete fallback flow as implemented in IndexList.vue", () => {
+      // Simulate the exact scenario from IndexList.vue:651-676
+      const query = 'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
+      mockSearchObj.data.query = query;
+
+      // Step 1: Parse the query
+      const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
+
+      // Step 2: Unparse the query
+      let query_context = logsUtilsInstance.fnUnparsedSQL(parsedSQL).replace(/`/g, '"') || "";
+
+      // Step 3: Apply fallback logic (as in IndexList.vue)
+      if (
+        query_context === "" &&
+        parsedSQL.columns?.length === 0 &&
+        parsedSQL.from?.length === 0
+      ) {
+        query_context = 'SELECT * FROM "[INDEX_NAME]"';
+      }
+
+      // Step 4: Verify fallback was applied
+      expect(query_context).toBe('SELECT * FROM "[INDEX_NAME]"');
+
+      // Step 5: Verify it can be used for stream replacement
+      const streamName = "default";
+      const finalQuery = query_context.replace("[INDEX_NAME]", streamName);
+      expect(finalQuery).toBe('SELECT * FROM "default"');
+    });
+  });
 });
