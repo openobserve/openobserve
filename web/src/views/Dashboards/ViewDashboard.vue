@@ -902,6 +902,12 @@ export default defineComponent({
         end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
+      // ALWAYS update __global to ensure panels without panel-level time can refresh
+      currentTimeObjPerPanel.value = {
+        ...currentTimeObjPerPanel.value,
+        __global: globalTime,
+      };
+
       // Check if panel has its own time configuration
       // Update only this panel's time in the object
       if (hasPanelTime(targetPanel, panelId, route.query)) {
@@ -953,7 +959,7 @@ export default defineComponent({
     };
 
     // when the date changes from the picker, update the current time object for the dashboard
-    watch(selectedDate, () => {
+    watch(selectedDate, async () => {
       if (selectedDate.value && dateTimePicker.value) {
         const date = dateTimePicker.value?.getConsumableDateTime();
 
@@ -969,6 +975,13 @@ export default defineComponent({
         computeAllPanelTimes();
 
         setTimeString();
+
+        // Ensure all updates are settled before updating URL
+        await nextTick();
+
+        // Update URL to reflect the new global date time
+        // This ensures URL stays in sync when user changes the date picker
+        updateUrlWithCurrentState();
       }
     });
 
@@ -999,16 +1012,31 @@ export default defineComponent({
         return {};
       }
 
-      if (data.relativeTimePeriod) {
+      // Primary check: use valueType if available
+      if (data.valueType === 'relative' && data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
         };
-      } else {
+      } else if (data.valueType === 'absolute' && data.startTime && data.endTime) {
         return {
           from: data.startTime,
           to: data.endTime,
         };
       }
+
+      // Fallback for backward compatibility (when valueType is missing)
+      if (data.relativeTimePeriod) {
+        return {
+          period: data.relativeTimePeriod,
+        };
+      } else if (data.startTime && data.endTime) {
+        return {
+          from: data.startTime,
+          to: data.endTime,
+        };
+      }
+
+      return {};
     };
 
     // [END] date picker related variables
@@ -1198,6 +1226,9 @@ export default defineComponent({
         }
       });
 
+      // Get global time params - ensure we always have time params
+      const timeParams = getQueryParamsForDuration(selectedDate.value);
+
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1205,7 +1236,7 @@ export default defineComponent({
           folder: route.query.folder,
           tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
+          ...timeParams, // Global time params (period or from/to)
           ...variableParams, // Use variables from manager or route
           ...panelTimeParams, // CRITICAL: Preserve panel time params (Issue 2 fix)
           print: store.state.printMode,
@@ -1214,18 +1245,17 @@ export default defineComponent({
       });
     };
 
-    // whenever the refreshInterval is changed, update the query params
-    // Note: We're removing the variablesManager.committedVariablesData watch
-    // because URL updates should only happen when user clicks refresh (handled in refreshData)
-    // This watch is just for time/tab/refresh interval changes
+    // whenever the refreshInterval or selectedTabId is changed, update the query params
+    // Note: selectedDate changes are handled in the selectedDate watch above
     watch(
       [
         refreshInterval,
-        selectedDate,
         selectedTabId,
       ],
-      () => {
+      async () => {
         generateNewDashboardRunId();
+        // Wait for next tick to ensure all reactive updates have settled
+        await nextTick();
         updateUrlWithCurrentState();
       },
       { deep: true },
