@@ -290,6 +290,11 @@ import {
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { getConsumableRelativeTime } from "@/utils/date";
+import {
+  getPanelTimeFromURL,
+  convertPanelTimeRangeToPicker,
+  convertTimeObjToPickerFormat,
+} from "@/utils/dashboard/panelTimeUtils";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -990,34 +995,6 @@ export default defineComponent({
       }
     };
 
-    // Get panel time from URL parameters (same logic as ViewDashboard)
-    const getPanelTimeFromURL = (panelId: string) => {
-      const relativeParam = route.query[`pt-${panelId}`];
-      const fromParam = route.query[`pt-${panelId}-from`];
-      const toParam = route.query[`pt-${panelId}-to`];
-
-      if (relativeParam) {
-        // Relative time from URL
-        const result = getConsumableRelativeTime(relativeParam as string);
-        if (result) {
-          return {
-            start_time: new Date(result.startTime),
-            end_time: new Date(result.endTime),
-          };
-        }
-      }
-
-      if (fromParam && toParam) {
-        // Absolute time from URL
-        return {
-          start_time: new Date(parseInt(fromParam as string)),
-          end_time: new Date(parseInt(toParam as string)),
-        };
-      }
-
-      return null;
-    };
-
     const updateDateTime = (value: object) => {
       if (selectedDate.value && dateTimePickerRef?.value) {
         // CRITICAL FIX (Issue 4): Check if panel has its own time configured
@@ -1029,32 +1006,43 @@ export default defineComponent({
 
         // Priority 1: URL params (only in edit mode)
         if (panelId) {
-          const urlPanelTime = getPanelTimeFromURL(panelId);
+          const urlPanelTime = getPanelTimeFromURL(panelId, route.query);
           if (urlPanelTime) {
-            effectiveTime = urlPanelTime;
-          }
-        }
-
-        // Priority 2: Panel's configured time range
-        if (!effectiveTime) {
-          const panelTimeRange = dashboardPanelData.data.config?.panel_time_range;
-
-          if (panelTimeRange) {
-            // Panel has its own time range configured
-            if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
-              // Convert relative time to absolute time
-              const result = getConsumableRelativeTime(panelTimeRange.relativeTimePeriod);
+            if (urlPanelTime.valueType === 'relative' && urlPanelTime.relativeTimePeriod) {
+              const result = getConsumableRelativeTime(urlPanelTime.relativeTimePeriod);
               if (result) {
                 effectiveTime = {
                   start_time: new Date(result.startTime),
                   end_time: new Date(result.endTime),
                 };
               }
-            } else if (panelTimeRange.type === 'absolute') {
-              // Use absolute time directly
+            } else if (urlPanelTime.valueType === 'absolute') {
               effectiveTime = {
-                start_time: new Date(panelTimeRange.startTime),
-                end_time: new Date(panelTimeRange.endTime),
+                start_time: new Date(urlPanelTime.startTime),
+                end_time: new Date(urlPanelTime.endTime),
+              };
+            }
+          }
+        }
+
+        // Priority 2: Panel's configured time range
+        if (!effectiveTime) {
+          const panelTimeRange = dashboardPanelData.data.config?.panel_time_range;
+          const pickerValue = convertPanelTimeRangeToPicker(panelTimeRange);
+
+          if (pickerValue) {
+            if (pickerValue.valueType === 'relative' && pickerValue.relativeTimePeriod) {
+              const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
+              if (result) {
+                effectiveTime = {
+                  start_time: new Date(result.startTime),
+                  end_time: new Date(result.endTime),
+                };
+              }
+            } else if (pickerValue.valueType === 'absolute') {
+              effectiveTime = {
+                start_time: new Date(pickerValue.startTime),
+                end_time: new Date(pickerValue.endTime),
               };
             }
           }

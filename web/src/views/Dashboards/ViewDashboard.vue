@@ -363,6 +363,10 @@ import {
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
+import {
+  getPanelTimeFromURL,
+  convertPanelTimeRangeToPicker,
+} from "@/utils/dashboard/panelTimeUtils";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
@@ -828,75 +832,49 @@ export default defineComponent({
 
     // ===== Panel Time Configuration (NEW FEATURE) =====
 
+    // Helper: Convert picker format to time object
+    const convertPickerToTimeObj = (pickerValue: any) => {
+      if (!pickerValue) return null;
+
+      if (pickerValue.valueType === 'relative' && pickerValue.relativeTimePeriod) {
+        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
+        if (result) {
+          return {
+            start_time: new Date(result.startTime),
+            end_time: new Date(result.endTime),
+          };
+        }
+      } else if (pickerValue.valueType === 'absolute') {
+        return {
+          start_time: new Date(pickerValue.startTime),
+          end_time: new Date(pickerValue.endTime),
+        };
+      }
+
+      return null;
+    };
+
     // Compute effective time for a specific panel
     const computePanelTime = (panel: any, globalTime: any) => {
       if (!panel) return globalTime;
 
       // Check if panel has its own time range configured
       if (panel.config?.panel_time_range) {
-        const panelTimeRange = panel.config.panel_time_range;
-
         // Priority 1: Check URL params for this panel (highest priority)
-        const urlPanelTime = getPanelTimeFromURL(panel.id);
+        const urlPanelTime = getPanelTimeFromURL(panel.id, route.query);
         if (urlPanelTime) {
-          return urlPanelTime;
+          return convertPickerToTimeObj(urlPanelTime);
         }
 
         // Priority 2: Use panel's configured time range
-        const computedTime = convertPanelTimeRangeToTimeObj(panelTimeRange);
-        return computedTime;
+        const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
+        if (pickerValue) {
+          return convertPickerToTimeObj(pickerValue);
+        }
       }
 
       // Panel doesn't have panel_time_range → use global time
       return globalTime;
-    };
-
-    // Parse panel time from URL parameters
-    const getPanelTimeFromURL = (panelId: string) => {
-      const relativeParam = route.query[`pt-${panelId}`];
-      const fromParam = route.query[`pt-${panelId}-from`];
-      const toParam = route.query[`pt-${panelId}-to`];
-
-      if (relativeParam) {
-        // Relative time from URL
-        return convertRelativeTimeToTimeObj(relativeParam as string);
-      }
-
-      if (fromParam && toParam) {
-        // Absolute time from URL
-        return {
-          start_time: new Date(parseInt(fromParam as string)),
-          end_time: new Date(parseInt(toParam as string)),
-        };
-      }
-
-      return null;
-    };
-
-    // Convert panel_time_range config to time object
-    const convertPanelTimeRangeToTimeObj = (panelTimeRange: any) => {
-      if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
-        return convertRelativeTimeToTimeObj(panelTimeRange.relativeTimePeriod);
-      } else if (panelTimeRange.type === 'absolute') {
-        return {
-          start_time: new Date(panelTimeRange.startTime),
-          end_time: new Date(panelTimeRange.endTime),
-        };
-      }
-      return null;
-    };
-
-    // Convert relative time string (e.g., "15m", "1h") to time object
-    // Uses the shared utility function for consistency with DateTime.vue
-    const convertRelativeTimeToTimeObj = (relativeTime: string) => {
-      const result = getConsumableRelativeTime(relativeTime);
-
-      if (!result) return null;
-
-      return {
-        start_time: new Date(result.startTime),
-        end_time: new Date(result.endTime),
-      };
     };
 
     // Compute time for a single specific panel (for panel-level refresh)
