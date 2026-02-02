@@ -384,6 +384,7 @@ import {
   createDashboardsContextProvider,
   contextRegistry,
 } from "@/composables/contextProviders";
+import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -924,12 +925,8 @@ export default defineComponent({
       };
 
       // Check if panel has its own time configuration
-      const hasPanelTime = targetPanel.config?.panel_time_range ||
-                           route.query[`pt-${panelId}`] ||
-                           route.query[`pt-${panelId}-from`];
-
       // Update only this panel's time in the object
-      if (hasPanelTime) {
+      if (hasPanelTime(targetPanel, panelId, route.query)) {
         const effectiveTime = computePanelTime(targetPanel, globalTime);
         if (effectiveTime) {
           currentTimeObjPerPanel.value[panelId] = effectiveTime;
@@ -962,11 +959,7 @@ export default defineComponent({
         tab.panels?.forEach((panel: any) => {
           if (panel.id) {
             // Check if panel has its own time configuration
-            const hasPanelTime = panel.config?.panel_time_range ||
-                                 route.query[`pt-${panel.id}`] ||
-                                 route.query[`pt-${panel.id}-from`];
-
-            if (hasPanelTime) {
+            if (hasPanelTime(panel, panel.id, route.query)) {
               // Panel has its own time → compute and store it
               const effectiveTime = computePanelTime(panel, globalTime);
               if (effectiveTime) {
