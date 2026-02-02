@@ -465,22 +465,24 @@ async fn map_group_to_custom_role(
             UserRole::from_str(&dex_cfg.default_role).unwrap()
         };
 
-        // Extract unique orgs from custom roles BEFORE moving custom_roles (format: "org/role")
+        // Extract orgs and their roles from custom roles (format: "org/role")
         // Check if custom claim parsing was used by looking for roles with custom orgs
         // If custom claim parsing is disabled, custom_roles come from LDAP groups and should use
         // default org
         let use_custom_orgs = openfga_cfg.custom_claim_parsing_enabled;
 
-        let custom_orgs: std::collections::HashMap<String, String> = if use_custom_orgs {
-            custom_roles
-                .iter()
-                .filter_map(|r| {
-                    let mut parts = r.split('/');
-                    let org = parts.next()?;
-                    let role = parts.next()?;
-                    Some((org.to_string(), role.to_string()))
-                })
-                .collect()
+        // Use HashMap<String, Vec<String>> to support multiple roles per org
+        let custom_orgs: std::collections::HashMap<String, Vec<String>> = if use_custom_orgs {
+            let mut map: std::collections::HashMap<String, Vec<String>> =
+                std::collections::HashMap::new();
+            for r in &custom_roles {
+                if let Some((org, role)) = r.split_once('/') {
+                    map.entry(org.to_string())
+                        .or_default()
+                        .push(role.to_string());
+                }
+            }
+            map
         } else {
             // LDAP groups: use default org with all roles
             std::collections::HashMap::new()
@@ -537,19 +539,17 @@ async fn map_group_to_custom_role(
             // Group custom roles by organization
             if use_custom_orgs && !custom_orgs.is_empty() {
                 // Custom claim parsing: roles are assigned to their respective orgs
-                let mut roles_by_org: std::collections::HashMap<String, Vec<String>> =
-                    std::collections::HashMap::new();
-                for (org_name, role_name) in &custom_orgs {
-                    roles_by_org
-                        .entry(org_name.clone())
-                        .or_default()
-                        .push(format!("{org_name}/{role_name}"));
-                }
+                // custom_orgs already has roles grouped by org: { org_name => [role1, role2, ...] }
+                for (org_name, role_names) in &custom_orgs {
+                    // Format roles as "org_name/role_name" for the tuple function
+                    let org_roles: Vec<String> = role_names
+                        .iter()
+                        .map(|role_name| format!("{org_name}/{role_name}"))
+                        .collect();
 
-                for (org_name, org_roles) in roles_by_org {
                     check_and_get_crole_tuple_for_new_user(
                         user_email,
-                        &org_name,
+                        org_name,
                         org_roles,
                         &mut tuples,
                     )
@@ -630,16 +630,20 @@ async fn map_group_to_custom_role(
         }
         log::info!("group_to_custom_role: User exists in the database");
 
-        // Extract unique orgs from custom roles (format: "org/role")
-        let custom_orgs: std::collections::HashMap<String, String> = custom_roles
-            .iter()
-            .filter_map(|r| {
-                let mut parts = r.split('/');
-                let org = parts.next()?;
-                let role = parts.next()?;
-                Some((org.to_string(), role.to_string()))
-            })
-            .collect();
+        // Extract orgs and their roles from custom roles (format: "org/role")
+        // Use HashMap<String, Vec<String>> to support multiple roles per org
+        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
+            let mut map: std::collections::HashMap<String, Vec<String>> =
+                std::collections::HashMap::new();
+            for r in &custom_roles {
+                if let Some((org, role)) = r.split_once('/') {
+                    map.entry(org.to_string())
+                        .or_default()
+                        .push(role.to_string());
+                }
+            }
+            map
+        };
 
         // Create any new organizations
         for org_name in custom_orgs.keys() {
