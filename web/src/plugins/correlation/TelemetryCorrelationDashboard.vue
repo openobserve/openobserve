@@ -405,102 +405,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Traces Table -->
+            <!-- Traces List with TraceBlock -->
             <div
               class="tw:p-3 tw:overflow-auto"
               style="max-height: calc(100% - 4rem)"
             >
-              <q-table
-                :rows="tracesForDimensions"
-                :columns="traceListColumns"
-                row-key="trace_id"
-                flat
-                dense
-                :rows-per-page-options="[0]"
-                class="trace-list-table"
-              >
-                <template v-slot:body-cell-trace_id="slotProps">
-                  <q-td :props="slotProps">
-                    <span
-                      class="tw:font-mono tw:text-xs tw:text-primary tw:cursor-pointer hover:tw:underline"
-                      @click="openTraceInNewWindow(slotProps.row.trace_id)"
-                      :title="t('correlation.openTraceInNewWindow')"
-                    >
-                      {{ slotProps.row.trace_id?.substring(0, 16) }}...
-                      <q-icon
-                        name="open_in_new"
-                        size="0.75rem"
-                        class="tw:ml-1"
-                      />
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-service_name="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">
-                      {{
-                        Array.isArray(props.row.service_name)
-                          ? props.row.service_name
-                              .map((s: any) => s.service_name)
-                              .join(", ")
-                          : props.row.service_name
-                      }}
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-operation_name="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">
-                      {{
-                        Array.isArray(props.row.operation_name)
-                          ? props.row.operation_name[0]
-                          : props.row.operation_name
-                      }}
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-duration="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatDuration(props.row.duration || 0)
-                    }}</span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-spans="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">
-                      {{
-                        Array.isArray(props.row.spans)
-                          ? props.row.spans[0]
-                          : props.row.spans
-                      }}
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-errors="props">
-                  <q-td :props="props">
-                    <q-badge
-                      :color="
-                        (Array.isArray(props.row.spans)
-                          ? props.row.spans[1]
-                          : 0) > 0
-                          ? 'negative'
-                          : 'grey'
-                      "
-                      :label="
-                        Array.isArray(props.row.spans) ? props.row.spans[1] : 0
-                      "
-                    />
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-start_time="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatTimestamp(props.row.start_time)
-                    }}</span>
-                  </q-td>
-                </template>
-              </q-table>
+              <div class="tw:space-y-2">
+                <TraceBlock
+                  v-for="(trace, index) in tracesForDimensions"
+                  :key="trace.trace_id"
+                  :item="trace"
+                  :index="index"
+                  @click="openTraceInNewWindow(trace.trace_id)"
+                  data-test="correlation-trace-block"
+                />
+              </div>
             </div>
           </div>
 
@@ -824,98 +743,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Traces Table -->
+          <!-- Traces List with TraceBlock -->
           <div
             class="tw:p-3 tw:overflow-auto"
-            style="max-height: calc(100vh - 332px)"
+            style="max-height: calc(100vh - 11rem)"
           >
-            <q-table
-              :rows="tracesForDimensions"
-              :columns="traceListColumns"
-              row-key="trace_id"
-              flat
-              dense
-              :rows-per-page-options="[0]"
-              class="trace-list-table"
-            >
-              <template v-slot:body-cell-trace_id="slotProps">
-                <q-td :props="slotProps">
-                  <span
-                    class="tw:font-mono tw:text-xs tw:text-primary tw:cursor-pointer hover:tw:underline"
-                    @click="openTraceInNewWindow(slotProps.row.trace_id)"
-                    :title="t('correlation.openTraceInNewWindow')"
-                  >
-                    {{ slotProps.row.trace_id?.substring(0, 16) }}...
-                    <q-icon name="open_in_new" size="0.75rem" class="tw:ml-1" />
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-service_name="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">
-                    {{
-                      Array.isArray(props.row.service_name)
-                        ? props.row.service_name
-                            .map((s: any) => s.service_name)
-                            .join(", ")
-                        : props.row.service_name
-                    }}
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-operation_name="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">
-                    {{
-                      Array.isArray(props.row.operation_name)
-                        ? props.row.operation_name[0]
-                        : props.row.operation_name
-                    }}
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-duration="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatDuration(props.row.duration || 0)
-                  }}</span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-spans="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">
-                    {{
-                      Array.isArray(props.row.spans)
-                        ? props.row.spans[0]
-                        : props.row.spans
-                    }}
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-errors="props">
-                <q-td :props="props">
-                  <q-badge
-                    :color="
-                      (Array.isArray(props.row.spans)
-                        ? props.row.spans[1]
-                        : 0) > 0
-                        ? 'negative'
-                        : 'grey'
-                    "
-                    :label="
-                      Array.isArray(props.row.spans) ? props.row.spans[1] : 0
-                    "
-                  />
-                </q-td>
-              </template>
-              <template v-slot:body-cell-start_time="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatTimestamp(props.row.start_time)
-                  }}</span>
-                </q-td>
-              </template>
-            </q-table>
+            <div class="tw:space-y-2">
+              <TraceBlock
+                v-for="(trace, index) in tracesForDimensions"
+                :key="trace.trace_id"
+                :item="trace"
+                :index="index"
+                @click="openTraceInNewWindow(trace)"
+                data-test="correlation-trace-block"
+              />
+            </div>
           </div>
         </div>
 
@@ -1035,6 +877,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
+import useTraces from "@/composables/useTraces";
 import {
   useMetricsCorrelationDashboard,
   type MetricsCorrelationConfig,
@@ -1048,6 +891,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import TraceBlock from "@/plugins/traces/TraceBlock.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1091,6 +935,7 @@ const { t } = useI18n();
 const { generateDashboard, generateLogsDashboard } =
   useMetricsCorrelationDashboard();
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
+const { formatTracesMetaData } = useTraces();
 
 // Check if embedded tabs mode
 const isEmbeddedTabs = computed(() => props.mode === "embedded-tabs");
@@ -1184,68 +1029,6 @@ const spanTableColumns = [
     sortable: true,
   },
 ];
-
-// Table columns for trace list (dimension-based correlation)
-const traceListColumns = [
-  {
-    name: "trace_id",
-    label: "Trace ID",
-    field: "trace_id",
-    align: "left" as const,
-  },
-  {
-    name: "service_name",
-    label: "Service",
-    field: "service_name",
-    align: "left" as const,
-  },
-  {
-    name: "operation_name",
-    label: "Operation",
-    field: "operation_name",
-    align: "left" as const,
-  },
-  {
-    name: "duration",
-    label: "Duration",
-    field: "duration",
-    align: "left" as const,
-    sortable: true,
-  },
-  { name: "spans", label: "Spans", field: "spans", align: "left" as const },
-  { name: "errors", label: "Errors", field: "errors", align: "left" as const },
-  {
-    name: "start_time",
-    label: "Time",
-    field: "start_time",
-    align: "left" as const,
-    sortable: true,
-  },
-];
-
-// Service colors for span visualization
-const serviceColors: Record<string, string> = {};
-const colorPalette = [
-  "#b7885e",
-  "#1ab8be",
-  "#ffcb99",
-  "#f89570",
-  "#839ae2",
-  "#ff6b6b",
-  "#4ecdc4",
-  "#45b7d1",
-  "#96ceb4",
-  "#ffeaa7",
-];
-let colorIndex = 0;
-
-const getServiceColor = (serviceName: string): string => {
-  if (!serviceColors[serviceName]) {
-    serviceColors[serviceName] = colorPalette[colorIndex % colorPalette.length];
-    colorIndex++;
-  }
-  return serviceColors[serviceName];
-};
 
 // Use external tab control in embedded mode, otherwise manage internally
 const activeTab = computed({
@@ -2293,40 +2076,17 @@ const fetchTracesByDimensions = async () => {
     stream_name: streamName,
   });
 
-  return response.data?.hits || [];
-};
-
-/**
- * Format duration in a human-readable way
- */
-const formatDuration = (durationNs: number): string => {
-  if (durationNs < 1000) {
-    return `${durationNs}ns`;
-  } else if (durationNs < 1000000) {
-    return `${(durationNs / 1000).toFixed(2)}µs`;
-  } else if (durationNs < 1000000000) {
-    return `${(durationNs / 1000000).toFixed(2)}ms`;
-  } else {
-    return `${(durationNs / 1000000000).toFixed(2)}s`;
-  }
-};
-
-/**
- * Format timestamp for display
- */
-const formatTimestamp = (timestampMicros: number): string => {
-  const date = new Date(timestampMicros / 1000);
-  return date.toLocaleString();
+  // Format traces with service colors and proper structure for TraceBlock
+  return formatTracesMetaData(response.data?.hits || []);
 };
 
 /**
  * Open traces screen in new window with trace_id filter
  * @param traceIdOrEvent - trace_id string to use, or event object (when called from @click without args)
  */
-const openTraceInNewWindow = (traceIdOrEvent?: string | Event) => {
+const openTraceInNewWindow = (trace) => {
   // Handle case where event object is passed instead of trace_id (e.g., from @click without args)
-  const traceId =
-    typeof traceIdOrEvent === "string" ? traceIdOrEvent : undefined;
+  const traceId = typeof trace === "string" ? trace : trace.trace_id;
   const targetTraceId = traceId || extractedTraceId.value;
   if (!targetTraceId) return;
 
@@ -2335,14 +2095,13 @@ const openTraceInNewWindow = (traceIdOrEvent?: string | Event) => {
 
   // Build the URL with sql_mode and just trace_id filter
   const route = router.resolve({
-    name: "traces",
+    name: "traceDetails",
     query: {
-      org_identifier: org,
       stream: traceStream,
-      sql_mode: "true",
-      query: b64EncodeUnicode(`trace_id='${targetTraceId}'`),
-      from: props.timeRange.startTime.toString(),
-      to: props.timeRange.endTime.toString(),
+      trace_id: trace.trace_id,
+      from: trace.trace_start_time - 10000000,
+      to: trace.trace_end_time + 10000000,
+      org_identifier: org,
     },
   });
 
