@@ -2746,7 +2746,9 @@
         "startBeforeEnd": "A hora de início deve ser antes da hora de término",
         "endAfterStart": "A hora de término deve ser após a hora de início"
       }
-    }
+    },
+    "viewInTraces": "Exibir em traços",
+    "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
