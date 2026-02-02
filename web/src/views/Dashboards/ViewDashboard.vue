@@ -902,29 +902,40 @@ export default defineComponent({
         end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
-      // ALWAYS update __global to ensure panels without panel-level time can refresh
-      currentTimeObjPerPanel.value = {
-        ...currentTimeObjPerPanel.value,
-        __global: globalTime,
-      };
-
       // Check if panel has its own time configuration
-      // Update only this panel's time in the object
       if (hasPanelTime(targetPanel, panelId, route.query)) {
+        // Panel has panel-level time - only update this specific panel's time
+        // DO NOT update __global to avoid triggering refreshes in other panels
         const effectiveTime = computePanelTime(targetPanel, globalTime);
         if (effectiveTime) {
-          currentTimeObjPerPanel.value[panelId] = effectiveTime;
+          currentTimeObjPerPanel.value = {
+            ...currentTimeObjPerPanel.value,
+            [panelId]: effectiveTime,
+          };
         }
       } else {
-        // Panel uses global time - remove any panel-specific override
-        if (currentTimeObjPerPanel.value[panelId]) {
-          delete currentTimeObjPerPanel.value[panelId];
-        }
+        // Panel depends on global time
+        // Create a panel-specific time entry (even though it normally uses __global)
+        // This allows refreshing ONLY this panel without affecting other global-dependent panels
+        currentTimeObjPerPanel.value = {
+          ...currentTimeObjPerPanel.value,
+          [panelId]: globalTime,
+        };
       }
     };
 
+    // Helper: Check if two time objects are equal
+    const areTimesEqual = (time1: any, time2: any) => {
+      if (!time1 || !time2) return false;
+      return (
+        time1.start_time?.getTime() === time2.start_time?.getTime() &&
+        time1.end_time?.getTime() === time2.end_time?.getTime()
+      );
+    };
+
     // Compute times for all panels in all tabs
-    const computeAllPanelTimes = () => {
+    // @param forceRefresh - If true, always create new time objects to force all panels to refresh
+    const computeAllPanelTimes = (forceRefresh = false) => {
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
         return;
       }
@@ -934,33 +945,56 @@ export default defineComponent({
         end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
-      const panelTimes: Record<string, any> = {
-        __global: globalTime,
+      // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
+      // This prevents unnecessary refreshes of panels that depend on global time
+      const existingGlobalTime = currentTimeObjPerPanel.value.__global;
+      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+
+      // Build the new panel times object
+      const newPanelTimes: Record<string, any> = {
+        __global: shouldUpdateGlobal ? globalTime : existingGlobalTime,
       };
 
-      // Compute time for each panel in each tab
+      // For panels with panel-level time, compute and compare with existing
       currentDashboardData.data.tabs.forEach((tab: any) => {
         tab.panels?.forEach((panel: any) => {
           if (panel.id) {
             // Check if panel has its own time configuration
             if (hasPanelTime(panel, panel.id, route.query)) {
-              // Panel has its own time → compute and store it
+              // Panel has its own time → compute it
               const effectiveTime = computePanelTime(panel, globalTime);
               if (effectiveTime) {
-                panelTimes[panel.id] = effectiveTime;
+                if (forceRefresh) {
+                  // Force refresh: always use new time object to trigger reactivity
+                  newPanelTimes[panel.id] = effectiveTime;
+                } else {
+                  // Smart update: only update if the time has actually changed
+                  const existingTime = currentTimeObjPerPanel.value[panel.id];
+                  if (!areTimesEqual(existingTime, effectiveTime)) {
+                    newPanelTimes[panel.id] = effectiveTime;
+                  } else {
+                    // Preserve the existing time object reference to avoid triggering reactivity
+                    newPanelTimes[panel.id] = existingTime;
+                  }
+                }
               }
             }
-            // If panel doesn't have its own time, it will use __global (don't store)
+            // If panel doesn't have panel-level time, it will use __global (don't add to object)
           }
         });
       });
 
-      currentTimeObjPerPanel.value = panelTimes;
+      // Update the reactive object
+      currentTimeObjPerPanel.value = newPanelTimes;
     };
 
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, async () => {
       if (selectedDate.value && dateTimePicker.value) {
+        // CRITICAL: Clear panelIdToBeRefreshed to ensure all panels refresh
+        // When global date time changes, all panels should update
+        panelIdToBeRefreshed.value = null;
+
         const date = dateTimePicker.value?.getConsumableDateTime();
 
         currentTimeObj.value = {
@@ -971,8 +1005,9 @@ export default defineComponent({
         // DON'T reset currentTimeObjPerPanel here - let computeAllPanelTimes() handle it
         // This prevents losing panel-specific times during the update
 
-        // Compute panel-specific times (this will set currentTimeObjPerPanel correctly)
-        computeAllPanelTimes();
+        // Compute panel-specific times with forceRefresh=true
+        // This ensures all panels refresh when global date time changes
+        computeAllPanelTimes(true);
 
         setTimeString();
 
@@ -988,9 +1023,27 @@ export default defineComponent({
     // Watch for URL query changes to handle panel time updates
     watch(
       () => route.query,
-      () => {
-        // Re-compute panel times when URL changes (e.g., panel time params updated)
-        computeAllPanelTimes();
+      (newQuery, oldQuery) => {
+        // CRITICAL FIX: Only recompute if relevant params changed
+        // Skip if only panel time params (pt-*) changed - those are handled separately
+        // Check if global time params (period, from, to) or other params changed
+        const globalTimeParamsChanged =
+          newQuery.period !== oldQuery.period ||
+          newQuery.from !== oldQuery.from ||
+          newQuery.to !== oldQuery.to;
+
+        // Check if only panel time params changed
+        const onlyPanelParamsChanged = Object.keys(newQuery).some(key =>
+          key.startsWith('pt-') && newQuery[key] !== oldQuery?.[key]
+        ) && !globalTimeParamsChanged;
+
+        // If only panel params changed, don't recompute (panel refresh handles it)
+        // If global time or other params changed, recompute all panel times
+        if (!onlyPanelParamsChanged) {
+          // Re-compute panel times when URL changes (e.g., panel time params updated)
+          // Use forceRefresh=false to preserve existing time references where possible
+          computeAllPanelTimes();
+        }
       },
       { deep: true }
     );
@@ -1090,7 +1143,8 @@ export default defineComponent({
         await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
 
         // Recompute all panel times after syncing
-        computeAllPanelTimes();
+        // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
+        computeAllPanelTimes(true);
 
         // Commit all live variable changes to committed state
         // At this point, route.query has the updated panel time params
