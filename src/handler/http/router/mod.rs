@@ -765,7 +765,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/re_patterns/bulk", delete(re_pattern::delete_bulk))
 
             // Domain management
-            .route("/{org_id}/domain_management", get(domain_management::get_domain_management_config).post(domain_management::set_domain_management_config))
+            .route("/{org_id}/domain_management", get(domain_management::get_domain_management_config).put(domain_management::set_domain_management_config))
 
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))
