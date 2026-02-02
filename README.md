@@ -420,4 +420,3 @@ Generate the SBOM:
 cd web
 cyclonedx-npm > sbom.json
 ```
-
