@@ -29,8 +29,8 @@ use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::{
-    check_persist_done, get_immutables_cache_stats, get_memtable_id_from_file_name,
-    get_processing_tables_cache_stats, read_from_immutable,
+    check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
+    read_from_immutable,
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
