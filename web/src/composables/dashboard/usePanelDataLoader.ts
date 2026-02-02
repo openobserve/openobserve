@@ -48,6 +48,7 @@ import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import logsUtils from "@/composables/useLogs/logsUtils";
 import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -1601,8 +1602,17 @@ export const usePanelDataLoader = (
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [selectedTimeObj?.value, forceLoad?.value],
-    async () => {
+    async (newVal, oldVal) => {
       log("PanelSchema/Time Wather: called");
+
+      // CRITICAL FIX: Check if this specific panel should refresh
+      // If panelIdToBeRefreshed is set and doesn't match this panel, skip loading
+      // This prevents all panels from refreshing when only one panel's time changes
+      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.value.id) {
+        log("PanelSchema/Time Wather: skipping - different panel is being refreshed");
+        return;
+      }
+
       loadData(); // Loading the data
     },
   );

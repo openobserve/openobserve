@@ -831,31 +831,22 @@ export default defineComponent({
     const computePanelTime = (panel: any, globalTime: any) => {
       if (!panel) return globalTime;
 
-      console.log('[ViewDashboard] Computing time for panel:', panel.id, {
-        hasPanelTimeRange: !!panel.config?.panel_time_range,
-        panelTimeRange: panel.config?.panel_time_range,
-      });
-
-      // NEW FEATURE: Check if panel has its own time range configured
-      // Simple check: if panel_time_range exists, use it; otherwise use global
+      // Check if panel has its own time range configured
       if (panel.config?.panel_time_range) {
         const panelTimeRange = panel.config.panel_time_range;
 
         // Priority 1: Check URL params for this panel (highest priority)
         const urlPanelTime = getPanelTimeFromURL(panel.id);
         if (urlPanelTime) {
-          console.log('[ViewDashboard] Using URL time for panel:', panel.id, urlPanelTime);
           return urlPanelTime;
         }
 
         // Priority 2: Use panel's configured time range
         const computedTime = convertPanelTimeRangeToTimeObj(panelTimeRange);
-        console.log('[ViewDashboard] Using config time for panel:', panel.id, computedTime);
         return computedTime;
       }
 
-      // EXISTING BEHAVIOR: Panel doesn't have panel_time_range → use global time
-      console.log('[ViewDashboard] Using global time for panel:', panel.id);
+      // Panel doesn't have panel_time_range → use global time
       return globalTime;
     };
 
@@ -883,19 +874,13 @@ export default defineComponent({
 
     // Convert panel_time_range config to time object
     const convertPanelTimeRangeToTimeObj = (panelTimeRange: any) => {
-      console.log('[ViewDashboard] Converting panel_time_range:', panelTimeRange);
-
       if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
-        const timeObj = convertRelativeTimeToTimeObj(panelTimeRange.relativeTimePeriod);
-        console.log('[ViewDashboard] Converted relative time:', panelTimeRange.relativeTimePeriod, '→', timeObj);
-        return timeObj;
+        return convertRelativeTimeToTimeObj(panelTimeRange.relativeTimePeriod);
       } else if (panelTimeRange.type === 'absolute') {
-        const timeObj = {
+        return {
           start_time: new Date(panelTimeRange.startTime),
           end_time: new Date(panelTimeRange.endTime),
         };
-        console.log('[ViewDashboard] Using absolute time:', timeObj);
-        return timeObj;
       }
       return null;
     };
@@ -913,10 +898,23 @@ export default defineComponent({
       };
     };
 
-    // Compute times for all panels in all tabs
-    const computeAllPanelTimes = () => {
+    // Compute time for a single specific panel (for panel-level refresh)
+    const computeSinglePanelTime = (panelId: string) => {
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
-        console.log('[ViewDashboard] Cannot compute panel times - missing data');
+        return;
+      }
+
+      // Find the panel across all tabs
+      let targetPanel: any = null;
+      for (const tab of currentDashboardData.data.tabs) {
+        const found = tab.panels?.find((p: any) => p.id === panelId);
+        if (found) {
+          targetPanel = found;
+          break;
+        }
+      }
+
+      if (!targetPanel) {
         return;
       }
 
@@ -925,7 +923,35 @@ export default defineComponent({
         end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
-      console.log('[ViewDashboard] Computing panel times with global time:', globalTime);
+      // Check if panel has its own time configuration
+      const hasPanelTime = targetPanel.config?.panel_time_range ||
+                           route.query[`panel-time-${panelId}`] ||
+                           route.query[`panel-time-${panelId}-from`];
+
+      // Update only this panel's time in the object
+      if (hasPanelTime) {
+        const effectiveTime = computePanelTime(targetPanel, globalTime);
+        if (effectiveTime) {
+          currentTimeObjPerPanel.value[panelId] = effectiveTime;
+        }
+      } else {
+        // Panel uses global time - remove any panel-specific override
+        if (currentTimeObjPerPanel.value[panelId]) {
+          delete currentTimeObjPerPanel.value[panelId];
+        }
+      }
+    };
+
+    // Compute times for all panels in all tabs
+    const computeAllPanelTimes = () => {
+      if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
+        return;
+      }
+
+      const globalTime = {
+        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
+        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
+      };
 
       const panelTimes: Record<string, any> = {
         __global: globalTime,
@@ -952,7 +978,6 @@ export default defineComponent({
         });
       });
 
-      console.log('[ViewDashboard] Computed panel times:', panelTimes);
       currentTimeObjPerPanel.value = panelTimes;
     };
 
@@ -1040,8 +1065,12 @@ export default defineComponent({
       });
     };
 
-    const refreshData = () => {
+    const refreshData = async () => {
       if (!arePanelsLoading.value) {
+        // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
+        // This allows all panels to refresh, not just the one previously refreshed
+        panelIdToBeRefreshed.value = null;
+
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
 
@@ -1056,12 +1085,19 @@ export default defineComponent({
           });
         });
 
-        // CRITICAL: Commit all live variable changes to committed state
-        // This is the key mechanism that prevents premature API calls
-        // Call commitAllVariables via the RenderDashboardCharts ref
+        // Sync all panel-level datetime pickers FIRST before committing variables
+        // This must happen before commitAllVariables() to avoid race condition where
+        // variable commit triggers URL update that preserves OLD panel time params
+        await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
+
+        // Recompute all panel times after syncing
+        computeAllPanelTimes();
+
+        // Commit all live variable changes to committed state
+        // At this point, route.query has the updated panel time params
         renderDashboardChartsRef.value?.commitAllVariables();
 
-        // Refresh the dashboard
+        // Refresh the dashboard (syncs global datetime picker)
         dateTimePicker.value.refresh();
       }
     };
@@ -1410,9 +1446,8 @@ export default defineComponent({
         [panelId]: shouldRefreshWithoutCache || false,
       };
 
-      // CRITICAL: Recompute panel times to ensure fresh values (especially for relative time like "Last 1h")
-      // This ensures that when user clicks refresh, we compute time based on current moment
-      computeAllPanelTimes();
+      // Recompute time for this specific panel only
+      computeSinglePanelTime(panelId);
 
       setTimeString();
     };
