@@ -927,6 +927,340 @@ describe("HomeView.vue", () => {
     });
   });
 
+  describe("Index Size Tile - Cloud Conditional Rendering", () => {
+    it("should render index size tile when isCloud is 'false'", async () => {
+      // Mock with isCloud = 'false'
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
+
+      // Mock response with data
+      orgService.get_organization_summary.mockResolvedValue({
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 50,
+            total_records: 1000,
+            total_index_size: 25
+          },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isCloud).toBe("false");
+      expect(wrapper.vm.config.isCloud).toBe("false");
+
+      // Check that index size tile is in the DOM
+      const indexTileText = wrapper.text();
+      expect(indexTileText).toContain("Index Size");
+    });
+
+    it("should not render index size tile when isCloud is 'true'", async () => {
+      // Mock with isCloud = 'true'
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
+
+      // Mock response with data including index size
+      orgService.get_organization_summary.mockResolvedValue({
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 75,
+            total_records: 1000,
+            total_index_size: 30
+          },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      });
+
+      // Create a fresh wrapper instance with cloud config
+      const cloudWrapper = mount(HomeView, {
+        global: {
+          plugins: [
+            [
+              Quasar,
+              {
+                plugins: [Notify]
+              }
+            ],
+            i18n,
+            store
+          ],
+          mocks: {
+            $router: mockRouter,
+            $route: mockRoute
+          },
+          stubs: {
+            'router-link': {
+              template: '<a><slot /></a>',
+              props: ['to']
+            },
+            'q-page': {
+              template: '<div class="q-page"><slot /></div>'
+            },
+            'q-btn': {
+              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            },
+            'q-separator': {
+              template: '<hr class="q-separator" />'
+            },
+            'TrialPeriod': {
+              name: "TrialPeriod",
+              template: '<div class="trial-period">Trial Period</div>'
+            }
+          }
+        }
+      });
+
+      await flushPromises();
+
+      expect(cloudWrapper.vm.config.isCloud).toBe("true");
+
+      // Check that index size tile is not rendered in the DOM
+      const indexTileText = cloudWrapper.text();
+      expect(indexTileText).not.toContain("Index Size");
+
+      cloudWrapper.unmount();
+    });
+
+    it("should display index size value when tile is rendered in self-hosted mode", async () => {
+      // Mock with isCloud = 'false'
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
+
+      const indexSize = 30;
+
+      // Set up the mock BEFORE creating the wrapper so it's used on mount
+      orgService.get_organization_summary.mockResolvedValue({
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 50,
+            total_records: 1000,
+            total_index_size: indexSize
+          },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      expect(wrapper.vm.summary.index_size_raw).toBe(indexSize);
+      expect(wrapper.vm.formattedAnimatedIndexSize).toBeDefined();
+    });
+
+    it("should only render index size tile when isCloud is exactly 'false'", async () => {
+      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null, "true"];
+
+      for (const testValue of testValues) {
+        // Mock with different isCloud values
+        vi.mocked(await import("../../aws-exports")).default.isCloud = testValue;
+
+        orgService.get_organization_summary.mockResolvedValue({
+          data: {
+            streams: {
+              num_streams: 5,
+              total_storage_size: 100,
+              total_compressed_size: 50,
+              total_records: 1000,
+              total_index_size: 25
+            },
+            alerts: {
+              num_realtime: 1,
+              num_scheduled: 1,
+              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            },
+            pipelines: {
+              num_realtime: 1,
+              num_scheduled: 1,
+              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            },
+            total_dashboards: 1,
+            total_functions: 1
+          }
+        });
+
+        const testWrapper = createWrapper();
+        await flushPromises();
+
+        expect(testWrapper.vm.config.isCloud).toBe(testValue);
+
+        // Index size tile should only be rendered when value is exactly 'false'
+        const indexTileText = testWrapper.text();
+        if (testValue === "false") {
+          expect(indexTileText).toContain("Index Size");
+        } else {
+          expect(indexTileText).not.toContain("Index Size");
+        }
+
+        testWrapper.unmount();
+      }
+    });
+
+    it("should handle index size data properly when tile is conditionally rendered", async () => {
+      // Test self-hosted mode (isCloud = false) - index tile should be visible
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
+
+      const mockData = {
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 75,
+            total_records: 1000,
+            total_index_size: 35
+          },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      };
+
+      // Set up the mock BEFORE creating the wrapper so it's used on mount
+      orgService.get_organization_summary.mockResolvedValue(mockData);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Data should be loaded and tile should be visible in self-hosted mode
+      expect(wrapper.vm.summary.index_size_raw).toBe(35);
+      expect(wrapper.vm.summary.index_size).toBeDefined();
+
+      // Tile should be visible in self-hosted mode (isCloud = false)
+      const indexTileText = wrapper.text();
+      expect(indexTileText).toContain("Index Size");
+    });
+
+    it("should not display index size data in cloud mode even if API returns it", async () => {
+      // Mock with isCloud = 'true'
+      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
+
+      const mockData = {
+        data: {
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 75,
+            total_records: 1000,
+            total_index_size: 40
+          },
+          alerts: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          pipelines: {
+            num_realtime: 1,
+            num_scheduled: 1,
+            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          },
+          total_dashboards: 1,
+          total_functions: 1
+        }
+      };
+
+      // Set up the mock BEFORE creating the wrapper so it's used on mount
+      orgService.get_organization_summary.mockResolvedValue(mockData);
+
+      const cloudWrapper = mount(HomeView, {
+        global: {
+          plugins: [
+            [
+              Quasar,
+              {
+                plugins: [Notify]
+              }
+            ],
+            i18n,
+            store
+          ],
+          mocks: {
+            $router: mockRouter,
+            $route: mockRoute
+          },
+          stubs: {
+            'router-link': {
+              template: '<a><slot /></a>',
+              props: ['to']
+            },
+            'q-page': {
+              template: '<div class="q-page"><slot /></div>'
+            },
+            'q-btn': {
+              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            },
+            'q-separator': {
+              template: '<hr class="q-separator" />'
+            },
+            'TrialPeriod': {
+              name: "TrialPeriod",
+              template: '<div class="trial-period">Trial Period</div>'
+            }
+          }
+        }
+      });
+
+      await flushPromises();
+      await nextTick();
+
+      // Data might be in summary, but tile should not be visible in cloud mode
+      expect(cloudWrapper.vm.config.isCloud).toBe("true");
+
+      // Tile should not be visible in cloud mode
+      const indexTileText = cloudWrapper.text();
+      expect(indexTileText).not.toContain("Index Size");
+
+      cloudWrapper.unmount();
+    });
+  });
+
   describe("Navigation and Routing", () => {
     it("should have router available", () => {
       wrapper = createWrapper();
