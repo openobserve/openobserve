@@ -61,6 +61,9 @@ impl O2Attributes {
 
     /// Result returned from the tool call
     pub const TOOL_CALL_RESULT: &'static str = "_o2_llm_tool_call_result";
+
+    /// Completion start time in microseconds
+    pub const COMPLETION_START_TIME: &'static str = "_o2_llm_completion_start_time";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -223,6 +226,10 @@ impl LangfuseAttributes {
 
     // Source metadata attribute
     pub const METADATA_SOURCE: &'static str = "langfuse.observation.metadata.source";
+
+    // Completion start time (ISO 8601 format)
+    // Note: Uses underscore format since dots are converted to underscores during ingestion
+    pub const COMPLETION_START_TIME: &'static str = "langfuse.observation.completion_start_time";
 }
 
 /// Other Framework Attributes

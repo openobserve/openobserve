@@ -20,10 +20,10 @@
 
 use std::collections::HashMap;
 
-use config::utils::{json, str::EMPTY_STRING};
+use config::utils::{json, str::EMPTY_STRING, time::parse_timestamp_micro_from_value};
 
 use super::{
-    attributes::O2Attributes,
+    attributes::{LangfuseAttributes, O2Attributes},
     extractors::{
         InputOutputExtractor, MetadataExtractor, ModelExtractor, ParametersExtractor,
         PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor, ToolExtractor,
@@ -123,6 +123,11 @@ impl OtelIngestionProcessor {
 
         // Extract prompt information
         let prompt_name = self.prompt_extractor.extract_name(span_attributes);
+
+        // Extract completion start time (TTFT - Time To First Token)
+        let completion_start_time = span_attributes
+            .get(LangfuseAttributes::COMPLETION_START_TIME)
+            .and_then(|v| parse_timestamp_micro_from_value(v).ok().map(|(ts, _)| ts));
 
         // Extract tool information
         let tool_name = self.tool_extractor.extract_tool_name(span_attributes);
@@ -248,6 +253,13 @@ impl OtelIngestionProcessor {
 
         if let Some(pname) = prompt_name {
             span_attributes.insert(O2Attributes::PROMPT_NAME.to_string(), json::json!(pname));
+        }
+
+        if let Some(ct) = completion_start_time {
+            span_attributes.insert(
+                O2Attributes::COMPLETION_START_TIME.to_string(),
+                json::json!(ct),
+            );
         }
 
         if let Some(tname) = tool_name {

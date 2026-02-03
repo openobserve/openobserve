@@ -73,6 +73,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
+        v-if="getTTFT"
+        class="q-px-sm ellipsis non-selectable"
+        :title="getTTFT"
+        style="border-right: 1px solid #cccccc; font-size: 14px"
+        data-test="trace-details-sidebar-header-toolbar-ttft"
+      >
+        <span class="text-grey-7">TTFT: </span>
+        <span>{{ getTTFT }}</span>
+      </div>
+
+      <div
         class="q-px-sm ellipsis non-selectable"
         :title="getStartTime"
         style="font-size: 14px"
@@ -1011,6 +1022,19 @@ export default defineComponent({
       formatTimeWithSuffix(props.span.duration),
     );
 
+    const getTTFT = computed(() => {
+      // Only calculate for LLM spans with completion_start_time
+      if (!props.span._o2_llm_completion_start_time || !props.span.start_time) {
+        return null;
+      }
+      // completion_start_time is in microseconds
+      // start_time is in nanoseconds, convert to microseconds
+      const completionStartTime = props.span._o2_llm_completion_start_time;
+      const spanStartTimeUs = props.span.start_time / 1000;
+      const ttftUs = completionStartTime - spanStartTimeUs;
+      return formatTimeWithSuffix(ttftUs);
+    });
+
     onBeforeMount(() => {
       spanDetails.value = getFormattedSpanDetails();
     });
@@ -1573,6 +1597,7 @@ export default defineComponent({
       getExceptionEvents,
       exceptionEventColumns,
       getDuration,
+      getTTFT,
       viewSpanLogs,
       getStartTime,
       copySpanId,
