@@ -65,6 +65,47 @@ use crate::{
 /// Session ID header for AI chat correlation
 pub const X_O2_ASSISTANT_SESSION_ID: &str = "x-o2-assistant-session-id";
 
+/// Extract headers from the request that match the configured passthrough patterns.
+/// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
+fn extract_passthrough_headers(
+    headers: &axum::http::HeaderMap,
+    passthrough_config: &str,
+) -> std::collections::HashMap<String, String> {
+    let mut result = std::collections::HashMap::new();
+
+    // Parse the passthrough config into patterns
+    let patterns: Vec<&str> = passthrough_config
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    for (header_name, header_value) in headers.iter() {
+        let header_name_lower = header_name.as_str().to_lowercase();
+
+        for pattern in &patterns {
+            let pattern_lower = pattern.to_lowercase();
+            let matches = if pattern_lower.ends_with('*') {
+                // Prefix match (e.g., "x-forwarded-*" matches "x-forwarded-for")
+                let prefix = &pattern_lower[..pattern_lower.len() - 1];
+                header_name_lower.starts_with(prefix)
+            } else {
+                // Exact match
+                header_name_lower == pattern_lower
+            };
+
+            if matches {
+                if let Ok(value) = header_value.to_str() {
+                    result.insert(header_name_lower.clone(), value.to_string());
+                }
+                break;
+            }
+        }
+    }
+
+    result
+}
+
 /// CreateChat
 #[utoipa::path(
     context_path = "/api",
@@ -173,6 +214,12 @@ pub async fn chat(
             }
         };
 
+        // Extract headers to pass through to the agent
+        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
+        // For now, use empty string (no passthrough) until config is updated
+        let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
+        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+
         // Transform PromptRequest -> QueryRequest
         // Extract the last user message as the query
         let last_user_message = prompt_body
@@ -223,7 +270,15 @@ pub async fn chat(
             user_token,
         };
 
-        // Query agent
+        // Query agent with headers
+        // TODO: Once RcaAgentClient.query_with_headers() method is available, pass headers
+        // For now, passthrough_headers are collected but not passed to maintain compatibility
+        let _headers_to_forward = if passthrough_headers.is_empty() {
+            None
+        } else {
+            Some(passthrough_headers)
+        };
+
         match client.query(agent_type, query_req).await {
             Ok(response) => {
                 // QueryResponse has a `response: String` field
@@ -366,6 +421,21 @@ pub async fn chat_stream(
     if let Some(user_agent) = in_req.headers().get("user-agent") {
         if let Ok(val) = user_agent.to_str() {
             forward_headers.insert("user-agent".to_string(), val.to_string());
+        }
+    }
+
+    // Extract and merge passthrough headers from config
+    #[cfg(feature = "enterprise")]
+    {
+        let _config = get_o2_config();
+        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
+        // For now, use empty string (no passthrough) until config is updated
+        let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
+        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+        // Merge passthrough headers, but don't override already-set headers (like session_id,
+        // traceparent)
+        for (key, value) in passthrough_headers {
+            forward_headers.entry(key).or_insert(value);
         }
     }
 
@@ -569,5 +639,113 @@ pub async fn chat_stream(
         drop(forward_headers);
         drop(in_req);
         MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_passthrough_headers_exact_match() {
+        // Create a test request with headers
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "Mozilla/5.0".parse().unwrap());
+        headers.insert("x-custom-header", "custom-value".parse().unwrap());
+        headers.insert("authorization", "Bearer secret".parse().unwrap());
+
+        let config = "user-agent,x-custom-header";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get("user-agent"), Some(&"Mozilla/5.0".to_string()));
+        assert_eq!(
+            result.get("x-custom-header"),
+            Some(&"custom-value".to_string())
+        );
+        // Authorization should not be included
+        assert!(result.get("authorization").is_none());
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_wildcard_match() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("x-forwarded-for", "192.168.1.1".parse().unwrap());
+        headers.insert("x-forwarded-proto", "https".parse().unwrap());
+        headers.insert("x-forwarded-host", "example.com".parse().unwrap());
+        headers.insert("x-other-header", "other".parse().unwrap());
+
+        let config = "x-forwarded-*";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(
+            result.get("x-forwarded-for"),
+            Some(&"192.168.1.1".to_string())
+        );
+        assert_eq!(result.get("x-forwarded-proto"), Some(&"https".to_string()));
+        assert_eq!(
+            result.get("x-forwarded-host"),
+            Some(&"example.com".to_string())
+        );
+        // X-Other-Header should not match
+        assert!(result.get("x-other-header").is_none());
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_mixed_patterns() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "curl/7.68.0".parse().unwrap());
+        headers.insert("x-forwarded-for", "10.0.0.1".parse().unwrap());
+        headers.insert("x-forwarded-proto", "http".parse().unwrap());
+        headers.insert("x-request-id", "abc-123".parse().unwrap());
+
+        let config = "x-forwarded-*,user-agent,x-request-id";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 4);
+        assert!(result.contains_key("user-agent"));
+        assert!(result.contains_key("x-forwarded-for"));
+        assert!(result.contains_key("x-forwarded-proto"));
+        assert!(result.contains_key("x-request-id"));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_empty_config() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "test".parse().unwrap());
+
+        let config = "";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_case_insensitive() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("USER-AGENT", "test-agent".parse().unwrap());
+        headers.insert("X-FORWARDED-FOR", "1.2.3.4".parse().unwrap());
+
+        let config = "User-Agent,x-forwarded-for";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get("user-agent"), Some(&"test-agent".to_string()));
+        assert_eq!(result.get("x-forwarded-for"), Some(&"1.2.3.4".to_string()));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_whitespace_handling() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "test".parse().unwrap());
+        headers.insert("x-custom", "value".parse().unwrap());
+
+        let config = " user-agent , x-custom , ";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert!(result.contains_key("user-agent"));
+        assert!(result.contains_key("x-custom"));
     }
 }
