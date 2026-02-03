@@ -13,14 +13,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! AI Chat handlers that redirect to o2-sre-agent.
+//!
+//! These endpoints accept the legacy PromptRequest format for backward compatibility
+//! but internally forward all requests to the o2-sre-agent service, which handles
+//! the actual AI processing with MCP tool integration.
+
 use actix_http::StatusCode;
-use actix_web::{
-    HttpRequest, HttpResponse, Responder, post,
-    web::{self, Json},
-};
-use o2_enterprise::enterprise::{ai::agent, common::config::get_config as get_o2_config};
+use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::Deserialize;
 use tracing::Span;
+
+/// Agent type for general chat/copilot requests (SQL help, observability questions, etc.)
+#[cfg(feature = "enterprise")]
+const DEFAULT_AGENT_TYPE: &str = "o2-ai";
+
+/// Agent type for incident-specific queries (triggered when incident_id is in context)
+#[cfg(feature = "enterprise")]
+const INCIDENT_AGENT_TYPE: &str = "sre";
+
+/// Determine agent type based on context.
+/// - If context contains incident_id, use SRE agent for incident investigation
+/// - Otherwise use default copilot agent
+#[cfg(feature = "enterprise")]
+fn get_agent_type(context: &serde_json::Value) -> &'static str {
+    if context
+        .as_object()
+        .map(|obj| obj.contains_key("incident_id"))
+        .unwrap_or(false)
+    {
+        INCIDENT_AGENT_TYPE
+    } else {
+        DEFAULT_AGENT_TYPE
+    }
+}
+
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::ai::agent::meta::Role;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -31,13 +62,17 @@ use crate::{
     },
 };
 
+/// Session ID header for AI chat correlation
+pub const X_O2_ASSISTANT_SESSION_ID: &str = "x-o2-assistant-session-id";
+
 /// CreateChat
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
     operation_id = "Chat",
     summary = "Generate AI chat response",
-    description = "Generates an AI-powered response to user queries and requests",
+    description = "Generates an AI-powered response to user queries and requests. \
+                   This endpoint redirects to the o2-sre-agent service for processing.",
     security(
         ("Authorization" = [])
     ),
@@ -69,42 +104,143 @@ use crate::{
 pub async fn chat(
     Headers(auth_data): Headers<TraceInfo>,
     org_id: web::Path<String>,
-    Json(body): Json<PromptRequest>,
+    body: web::Json<PromptRequest>,
+    in_req: HttpRequest,
 ) -> impl Responder {
-    let trace_id = auth_data.get_trace_id();
-    let user_id = &auth_data.user_id;
-    let org_id_str = org_id.as_str();
-    let config = get_o2_config();
+    let prompt_body = body.into_inner();
 
-    // Create root span for AI tracing if enabled
-    let _span = if config.ai.traces_enabled {
-        tracing::info_span!(
-            "http.request",
-            http.method = "POST",
-            http.route = "/api/{org_id}/ai/chat",
-            http.target = format!("/api/{}/ai/chat", org_id_str),
-            otel.kind = "server",
-        )
-        .entered()
-    } else {
-        Span::none().entered()
-    };
+    #[cfg(feature = "enterprise")]
+    {
+        use config::get_config;
+        use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, RcaAgentClient};
 
-    if config.ai.enabled {
-        let response = agent::service::chat(
-            agent::meta::AiServerRequest::new(body.messages, body.model, body.context),
-            trace_id.clone(),
-        )
-        .await;
-        match response {
-            Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
+        let trace_id = auth_data.get_trace_id();
+        let user_id = &auth_data.user_id;
+        let org_id_str = org_id.as_str();
+        let config = get_o2_config();
+
+        // Create root span for AI tracing if enabled
+        let _span = if config.ai.tracing_enabled {
+            tracing::info_span!(
+                "http.request",
+                http.method = "POST",
+                http.route = "/api/{org_id}/ai/chat",
+                http.target = format!("/api/{}/ai/chat", org_id_str),
+                otel.kind = "server",
+            )
+            .entered()
+        } else {
+            Span::none().entered()
+        };
+
+        // Check if AI/agent is enabled
+        if !config.ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        if !config.incidents.rca_enabled || config.incidents.rca_agent_url.is_empty() {
+            return MetaHttpResponse::bad_request("Agent service not configured");
+        }
+
+        // Extract user token from cookie/header for per-user MCP auth
+        let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            // Session format: "Session::{session_id}::{actual_token}"
+            // Extract actual token (already has Bearer/Basic prefix)
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Create agent client
+        let zo_config = get_config();
+        let client = match RcaAgentClient::new(
+            &config.incidents.rca_agent_url,
+            &zo_config.auth.root_user_email,
+            &zo_config.auth.root_user_password,
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!(
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Failed to create agent client: {e}"
+                );
+                return MetaHttpResponse::internal_error(format!(
+                    "Failed to create agent client: {e}"
+                ));
+            }
+        };
+
+        // Transform PromptRequest -> QueryRequest
+        // Extract the last user message as the query
+        let last_user_message = prompt_body
+            .messages
+            .iter()
+            .rfind(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        // Build history from all messages except the last user message
+        let history: Vec<serde_json::Value> = prompt_body
+            .messages
+            .iter()
+            .take(prompt_body.messages.len().saturating_sub(1))
+            .map(|m| {
+                serde_json::json!({
+                    "role": format!("{:?}", m.role).to_lowercase(),
+                    "content": m.content
+                })
+            })
+            .collect();
+
+        // Merge org_id into context
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "org_id".to_string(),
+                serde_json::Value::String(org_id.to_string()),
+            );
+        }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        let agent_type = get_agent_type(&context);
+
+        let query_req = QueryRequest {
+            query: last_user_message,
+            context,
+            model: if prompt_body.model.is_empty() {
+                None
+            } else {
+                Some(prompt_body.model)
+            },
+            history: if history.is_empty() {
+                None
+            } else {
+                Some(history)
+            },
+            user_token,
+        };
+
+        // Query agent
+        match client.query(agent_type, query_req).await {
+            Ok(response) => {
+                // QueryResponse has a `response: String` field
+                let prompt_response = PromptResponse {
+                    role: Role::Assistant,
+                    content: response.response,
+                };
+                HttpResponse::Ok().json(prompt_response)
+            }
             Err(e) => {
                 let error_msg = e.to_string();
                 log::error!(
-                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] Error in AI chat: {error_msg}"
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Agent query failed: {error_msg}"
                 );
 
-                // Check if this is a rate limit error (429) - pass through to client
+                // Check if this is a rate limit error (429)
                 if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
                     return HttpResponse::TooManyRequests().json(serde_json::json!({
                         "error": error_msg,
@@ -112,37 +248,46 @@ pub async fn chat(
                     }));
                 }
 
-                // All other errors (4XX except 429, and 5XX) are internal server errors
-                // as they indicate misconfiguration or provider issues
                 MetaHttpResponse::internal_error(error_msg)
             }
         }
-    } else {
-        MetaHttpResponse::bad_request("AI is not enabled")
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(auth_data);
+        drop(in_req);
+        drop(prompt_body);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
     }
 }
 
 #[derive(Debug, Deserialize)]
-struct TraceInfo {
-    user_id: String,
+pub struct TraceInfo {
+    pub user_id: String,
     #[serde(default)]
-    traceparent: String,
+    pub traceparent: Option<String>,
+    #[serde(default)]
+    pub authorization: Option<String>,
 }
 
 impl TraceInfo {
     /// Extract trace_id from traceparent header if present, otherwise generate UUID v7
-    fn get_trace_id(&self) -> String {
-        if !self.traceparent.is_empty() {
-            // Parse traceparent format: 00-{trace_id}-{span_id}-{flags}
-            let parts: Vec<&str> = self.traceparent.split('-').collect();
-            if parts.len() >= 3 {
-                let trace_id = parts[1].to_string();
-                // Validate trace_id (32 hex chars, not all zeros)
-                if trace_id.len() == 32
-                    && trace_id.chars().all(|c| c.is_ascii_hexdigit())
-                    && trace_id.chars().any(|c| c != '0')
-                {
-                    return trace_id;
+    pub fn get_trace_id(&self) -> String {
+        if let Some(ref traceparent) = self.traceparent {
+            if !traceparent.is_empty() {
+                // Parse traceparent format: 00-{trace_id}-{span_id}-{flags}
+                let parts: Vec<&str> = traceparent.split('-').collect();
+                if parts.len() >= 3 {
+                    let trace_id = parts[1].to_string();
+                    // Validate trace_id (32 hex chars, not all zeros)
+                    if trace_id.len() == 32
+                        && trace_id.chars().all(|c| c.is_ascii_hexdigit())
+                        && trace_id.chars().any(|c| c != '0')
+                    {
+                        return trace_id;
+                    }
                 }
             }
         }
@@ -157,7 +302,8 @@ impl TraceInfo {
     tag = "Ai",
     operation_id = "ChatStream",
     summary = "Generate streaming AI chat response",
-    description = "Generates an AI response with real-time streaming for improved user experience",
+    description = "Generates an AI response with real-time streaming for improved user experience. \
+                   This endpoint redirects to the o2-sre-agent service for processing.",
     security(
         ("Authorization" = [])
     ),
@@ -193,102 +339,235 @@ pub async fn chat_stream(
     in_req: HttpRequest,
 ) -> impl Responder {
     let trace_id = auth_data.get_trace_id();
-    let user_id = auth_data.user_id;
+    let user_id = auth_data.user_id.clone();
     let org_id = org_id.into_inner();
+    let prompt_body = body.into_inner();
 
-    let config = get_o2_config();
+    // Collect headers to forward
+    let mut forward_headers = std::collections::HashMap::new();
 
-    // Create root span for AI tracing if enabled
-    let _span = if config.ai.traces_enabled {
-        tracing::info_span!(
-            "http.request",
-            http.method = "POST",
-            http.route = "/api/{org_id}/ai/chat_stream",
-            http.target = format!("/api/{}/ai/chat_stream", org_id),
-            otel.kind = "server",
-        )
-        .entered()
-    } else {
-        Span::none().entered()
-    };
-
-    let mut code = StatusCode::OK.as_u16();
-    let req_body = body.into_inner();
-    let body_bytes = serde_json::to_string(&req_body).unwrap();
-
-    if !config.ai.enabled {
-        let error_message = Some("AI is not enabled".to_string());
-        code = StatusCode::BAD_REQUEST.as_u16();
-        report_to_audit(
-            user_id,
-            org_id,
-            trace_id.clone(),
-            code,
-            error_message,
-            &in_req,
-            body_bytes,
-        )
-        .await;
-
-        return MetaHttpResponse::bad_request("AI is not enabled");
-    }
-    let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
-
-    let stream = match agent::service::chat_stream(
-        agent::meta::AiServerRequest::new(req_body.messages, req_body.model, req_body.context),
-        auth_str,
-        trace_id.clone(),
-    )
-    .await
-    {
-        Ok(stream) => stream,
-        Err(e) => {
-            let error_msg = e.to_string();
-            log::error!(
-                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id}] Error in AI chat_stream: {error_msg}"
-            );
-
-            // Check if this is a rate limit error (429) - pass through to client
-            if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
-                code = StatusCode::TOO_MANY_REQUESTS.as_u16();
-                let error_message = Some(error_msg.clone());
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    code,
-                    error_message,
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-
-                return HttpResponse::TooManyRequests().json(serde_json::json!({
-                    "error": error_msg,
-                    "code": 429
-                }));
+    // Extract and validate session ID
+    if let Some(session_id) = in_req.headers().get(X_O2_ASSISTANT_SESSION_ID) {
+        if let Ok(val) = session_id.to_str() {
+            if val.len() == 36 && val.chars().filter(|&c| c == '-').count() == 4 {
+                forward_headers.insert(X_O2_ASSISTANT_SESSION_ID.to_string(), val.to_string());
+            } else {
+                log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
             }
+        }
+    }
 
-            // All other errors (4XX except 429, and 5XX) are internal server errors
-            let error_message = Some(error_msg.clone());
-            code = StatusCode::INTERNAL_SERVER_ERROR.as_u16();
+    if let Some(ref traceparent) = auth_data.traceparent {
+        if !traceparent.is_empty() {
+            forward_headers.insert("traceparent".to_string(), traceparent.clone());
+        }
+    }
+
+    if let Some(user_agent) = in_req.headers().get("user-agent") {
+        if let Ok(val) = user_agent.to_str() {
+            forward_headers.insert("user-agent".to_string(), val.to_string());
+        }
+    }
+
+    // Log correlation context for debugging
+    log::info!(
+        "[trace_id:{}] AI chat request: user_id={}, session_id={}",
+        trace_id,
+        user_id,
+        forward_headers
+            .get(X_O2_ASSISTANT_SESSION_ID)
+            .unwrap_or(&"none".to_string())
+    );
+
+    #[cfg(feature = "enterprise")]
+    {
+        use async_stream::stream;
+        use futures::StreamExt;
+        use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, get_agent_client};
+
+        let config = get_o2_config();
+        let org_id_str = org_id.clone();
+
+        // Create root span for AI tracing if enabled
+        let _span = if config.ai.tracing_enabled {
+            tracing::info_span!(
+                "http.request",
+                http.method = "POST",
+                http.route = "/api/{org_id}/ai/chat_stream",
+                http.target = format!("/api/{}/ai/chat_stream", org_id_str),
+                otel.kind = "server",
+            )
+            .entered()
+        } else {
+            Span::none().entered()
+        };
+
+        let mut code = StatusCode::OK.as_u16();
+        let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
+
+        // Check if AI/agent is enabled
+        if !config.ai.enabled {
+            let error_message = Some("AI is not enabled".to_string());
+            code = StatusCode::BAD_REQUEST.as_u16();
             report_to_audit(
-                user_id,
-                org_id,
-                trace_id,
+                user_id.clone(),
+                org_id_str.clone(),
+                trace_id.clone(),
                 code,
                 error_message,
                 &in_req,
-                body_bytes,
+                body_bytes_str,
             )
             .await;
-
-            return MetaHttpResponse::internal_error(error_msg);
+            return MetaHttpResponse::bad_request("AI is not enabled");
         }
-    };
 
-    report_to_audit(user_id, org_id, trace_id, code, None, &in_req, body_bytes).await;
-    HttpResponse::Ok()
-        .content_type(mime::TEXT_EVENT_STREAM)
-        .streaming(stream)
+        // Get global agent client
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                let error_message = Some("Agent service not configured".to_string());
+                code = StatusCode::BAD_REQUEST.as_u16();
+                report_to_audit(
+                    user_id.clone(),
+                    org_id_str.clone(),
+                    trace_id.clone(),
+                    code,
+                    error_message,
+                    &in_req,
+                    body_bytes_str,
+                )
+                .await;
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
+        };
+
+        // Extract user token from cookie/header for per-user MCP auth
+        let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Transform PromptRequest -> QueryRequest
+        let last_user_message = prompt_body
+            .messages
+            .iter()
+            .rfind(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        let history: Vec<serde_json::Value> = prompt_body
+            .messages
+            .iter()
+            .take(prompt_body.messages.len().saturating_sub(1))
+            .map(|m| {
+                serde_json::json!({
+                    "role": format!("{:?}", m.role).to_lowercase(),
+                    "content": m.content
+                })
+            })
+            .collect();
+
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "org_id".to_string(),
+                serde_json::Value::String(org_id_str.clone()),
+            );
+        }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        let agent_type = get_agent_type(&context);
+
+        let query_req = QueryRequest {
+            query: last_user_message,
+            context,
+            model: if prompt_body.model.is_empty() {
+                None
+            } else {
+                Some(prompt_body.model)
+            },
+            history: if history.is_empty() {
+                None
+            } else {
+                Some(history)
+            },
+            user_token,
+        };
+
+        // Report successful start to audit
+        report_to_audit(
+            user_id.clone(),
+            org_id_str.clone(),
+            trace_id.clone(),
+            code,
+            None,
+            &in_req,
+            body_bytes_str,
+        )
+        .await;
+
+        // Create streaming response
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
+
+        let s = stream! {
+            // Call the agent service with forwarded headers
+            let response = match client.query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref()).await {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                         Agent query failed: {e}"
+                    );
+                    let error_event = serde_json::json!({
+                        "type": "error",
+                        "error": format!("Agent query failed: {}", e)
+                    });
+                    yield Ok::<web::Bytes, std::io::Error>(web::Bytes::from(format!("data: {}\n\n", error_event)));
+                    return;
+                }
+            };
+
+            // Forward the streaming response from agent
+            let mut agent_stream = response.bytes_stream();
+
+            while let Some(chunk_result) = agent_stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        yield Ok(web::Bytes::from(bytes.to_vec()));
+                    }
+                    Err(e) => {
+                        yield Err(std::io::Error::other(e));
+                        break;
+                    }
+                }
+            }
+        };
+
+        HttpResponse::Ok()
+            .content_type(mime::TEXT_EVENT_STREAM)
+            .insert_header(("Cache-Control", "no-cache"))
+            .insert_header(("X-Accel-Buffering", "no"))
+            .streaming(Box::pin(s))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(auth_data);
+        drop(trace_id);
+        drop(user_id);
+        drop(prompt_body);
+        drop(forward_headers);
+        drop(in_req);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
 }
