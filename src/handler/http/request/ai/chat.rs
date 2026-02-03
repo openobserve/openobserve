@@ -120,7 +120,7 @@ pub async fn chat(
         let config = get_o2_config();
 
         // Create root span for AI tracing if enabled
-        let _span = if config.ai.tracing_enabled {
+        let _span = if config.ai.traces_enabled {
             tracing::info_span!(
                 "http.request",
                 http.method = "POST",
@@ -389,7 +389,7 @@ pub async fn chat_stream(
         let org_id_str = org_id.clone();
 
         // Create root span for AI tracing if enabled
-        let _span = if config.ai.tracing_enabled {
+        let _span = if config.ai.traces_enabled {
             tracing::info_span!(
                 "http.request",
                 http.method = "POST",
