@@ -167,16 +167,18 @@ export default defineComponent({
             message: "Please subscribe to one of the plan.",
             timeout: 5000,
           });
+
+          // Redirect to plans page only when there's no valid subscription
+          this.$router.push({
+            name: "plans",
+            query: {
+              org_identifier: this.store.state.selectedOrganization.identifier,
+            },
+          });
         }
+
         this.loading = false;
         this.proLoading = false;
-        console.log("Plans.vue , Push to plans");
-        this.$router.push({
-          name: "plans",
-          query: {
-            org_identifier: this.store.state.selectedOrganization.identifier,
-          },
-        });
       } catch (e: any) {
         this.loading = false;
         this.proLoading = false;
