@@ -464,7 +464,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // For now, use empty string (no passthrough) until config is updated
         let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
         let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
-        // Merge passthrough headers, but don't override already-set headers (like session_id, traceparent)
+        // Merge passthrough headers, but don't override already-set headers (like session_id,
+        // traceparent)
         for (key, value) in passthrough_headers {
             forward_headers.entry(key).or_insert(value);
         }
