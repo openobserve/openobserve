@@ -859,7 +859,6 @@ describe("EventDetailDrawerContent", () => {
     it.skip("should display formatted timestamp in component", () => {
       const text = wrapper.text();
 
-      console.log("text ----------------", text);
       expect(text).toContain("2024");
     });
 

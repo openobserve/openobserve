@@ -442,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="tw:flex tw:items-center">
                   <q-icon name="access_time" size="0.75rem" class="tw:mr-1" />
-                  {{ formatDuration(resource.resource_duration / 1000) }}
+                  {{ formatDuration(resource.resource_duration / 1000000) }}
                 </div>
                 <div class="tw:flex tw:items-center">
                   <q-icon
