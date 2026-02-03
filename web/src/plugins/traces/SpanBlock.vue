@@ -80,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-caption flex items-center"
           data-test="span-block-duration"
         >
-          <!-- Duration -->
           <div>
             {{ formatTimeWithSuffix(span.durationUs) }}
           </div>
