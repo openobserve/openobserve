@@ -579,6 +579,7 @@ mod tests {
             org_id: "orgId".to_owned(),
             folder_id: Some("folderId".to_owned()),
             title_pat: Some("tItLePat".to_owned()),
+            dashboard_id_pat: None,
             page_size_and_idx: Some((100, 2)),
         };
         list_models(&db, params).await?;
@@ -609,6 +610,7 @@ mod tests {
             org_id: "orgId".to_owned(),
             folder_id: Some("folderId".to_owned()),
             title_pat: Some("tItLePat".to_owned()),
+            dashboard_id_pat: None,
             page_size_and_idx: Some((100, 2)),
         };
         list_models(&db, params).await?;
@@ -639,6 +641,7 @@ mod tests {
             org_id: "orgId".to_owned(),
             folder_id: Some("folderId".to_owned()),
             title_pat: Some("tItLePat".to_owned()),
+            dashboard_id_pat: None,
             page_size_and_idx: Some((100, 2)),
         };
         list_models(&db, params).await?;
