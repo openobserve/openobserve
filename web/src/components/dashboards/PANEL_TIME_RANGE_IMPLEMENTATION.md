@@ -42,7 +42,7 @@ This document outlines the implementation for **panel-level time range/date-time
 
 3. ✅ **URL Parameter Sync**
    - Panel-level time synced to URL (like panel variables with `var-*`)
-   - Format: `panel-time-<panelId>=<value>` or similar
+   - Format: `pt-period.<panelId>=<value>` or similar
    - Enables sharing dashboards with specific panel time ranges
 
 4. ✅ **Priority System**
@@ -255,17 +255,17 @@ Current URL params:
 ?var-hostname=server1         // Panel variable
 
 New params for panel time:
-?panel-time-<panelId>=15m                           // Panel relative time
-?panel-time-<panelId>-from=<ts>&panel-time-<panelId>-to=<ts>  // Panel absolute time
+?pt-period.<panelId>=15m                           // Panel relative time
+?pt-period.<panelId>-from=<ts>&pt-period.<panelId>-to=<ts>  // Panel absolute time
 
 Example:
 /dashboards/view?
   org_identifier=default&
   dashboard=sys-metrics&
   period=15m&                           // Global: Last 15 min
-  panel-time-panel123=1h&               // Panel 123: Last 1 hour
-  panel-time-panel456-from=1704067200000&
-  panel-time-panel456-to=1704153600000  // Panel 456: Absolute dates
+  pt-period.panel123=1h&               // Panel 123: Last 1 hour
+  pt-period.panel456-from=1704067200000&
+  pt-period.panel456-to=1704153600000  // Panel 456: Absolute dates
 ```
 
 **Priority:**
@@ -927,9 +927,9 @@ const initializePanelTimes = () => {
 
 // Get panel time from URL params
 const getPanelTimeFromURL = (panelId: string) => {
-  const relativeParam = route.query[`panel-time-${panelId}`];
-  const fromParam = route.query[`panel-time-${panelId}-from`];
-  const toParam = route.query[`panel-time-${panelId}-to`];
+  const relativeParam = route.query[`pt-period.${panelId}`];
+  const fromParam = route.query[`pt-period.${panelId}-from`];
+  const toParam = route.query[`pt-period.${panelId}-to`];
 
   if (relativeParam) {
     return {
@@ -1029,16 +1029,16 @@ const updateURLWithPanelTime = (panelId: string, timeValue: any) => {
   const query = { ...route.query };
 
   // Remove old panel time params
-  delete query[`panel-time-${panelId}`];
-  delete query[`panel-time-${panelId}-from`];
-  delete query[`panel-time-${panelId}-to`];
+  delete query[`pt-period.${panelId}`];
+  delete query[`pt-period.${panelId}-from`];
+  delete query[`pt-period.${panelId}-to`];
 
   // Add new params based on type
   if (timeValue.type === 'relative' || timeValue.valueType === 'relative') {
-    query[`panel-time-${panelId}`] = timeValue.relativeTimePeriod;
+    query[`pt-period.${panelId}`] = timeValue.relativeTimePeriod;
   } else if (timeValue.type === 'absolute' || timeValue.valueType === 'absolute') {
-    query[`panel-time-${panelId}-from`] = timeValue.startTime.toString();
-    query[`panel-time-${panelId}-to`] = timeValue.endTime.toString();
+    query[`pt-period.${panelId}-from`] = timeValue.startTime.toString();
+    query[`pt-period.${panelId}-to`] = timeValue.endTime.toString();
   }
 
   // Update URL without reloading
@@ -1215,9 +1215,9 @@ const parsePanelTimeParams = () => {
   const panelTimes: Record<string, any> = {};
 
   Object.keys(route.query).forEach((key) => {
-    // Match panel-time-<panelId> pattern
-    const relativeMatch = key.match(/^panel-time-(.+)$/);
-    if (relativeMatch && !key.includes('-from') && !key.includes('-to')) {
+    // Match pt-period.<panelId> pattern
+    const relativeMatch = key.match(/^pt-period\.(.+)$/);
+    if (relativeMatch) {
       const panelId = relativeMatch[1];
       panelTimes[panelId] = {
         type: 'relative',
@@ -1225,11 +1225,11 @@ const parsePanelTimeParams = () => {
       };
     }
 
-    // Match panel-time-<panelId>-from pattern
-    const absoluteFromMatch = key.match(/^panel-time-(.+)-from$/);
+    // Match pt-from.<panelId> pattern
+    const absoluteFromMatch = key.match(/^pt-from\.(.+)$/);
     if (absoluteFromMatch) {
       const panelId = absoluteFromMatch[1];
-      const toKey = `panel-time-${panelId}-to`;
+      const toKey = `pt-to.${panelId}`;
       if (route.query[toKey]) {
         panelTimes[panelId] = {
           type: 'absolute',
@@ -1501,7 +1501,7 @@ When a panel is opened in **View Panel** mode or **Full Screen** mode, the panel
   org_identifier=default&
   dashboard=sys-metrics&
   panel=panel123&
-  panel-time-panel123=1h
+  pt-period.panel123=1h
 ```
 
 **Implementation:**
@@ -1572,7 +1572,7 @@ const panelData = ref(null);
 // Initialize panel time from URL
 const initializePanelTime = () => {
   // Check URL for panel time params
-  const panelTimeParam = route.query[`panel-time-${panelId.value}`];
+  const panelTimeParam = route.query[`pt-period.${panelId.value}`];
   // ... similar logic to PanelContainer.vue
 };
 
@@ -1628,16 +1628,16 @@ const updateURLWithPanelTime = (panelId: string, timeValue: any) => {
   const query = { ...route.query };
 
   // Remove old panel time params
-  delete query[`panel-time-${panelId}`];
-  delete query[`panel-time-${panelId}-from`];
-  delete query[`panel-time-${panelId}-to`];
+  delete query[`pt-period.${panelId}`];
+  delete query[`pt-period.${panelId}-from`];
+  delete query[`pt-period.${panelId}-to`];
 
   // Add new params based on type
   if (timeValue.type === 'relative' || timeValue.valueType === 'relative') {
-    query[`panel-time-${panelId}`] = timeValue.relativeTimePeriod;
+    query[`pt-period.${panelId}`] = timeValue.relativeTimePeriod;
   } else if (timeValue.type === 'absolute' || timeValue.valueType === 'absolute') {
-    query[`panel-time-${panelId}-from`] = timeValue.startTime.toString();
-    query[`panel-time-${panelId}-to`] = timeValue.endTime.toString();
+    query[`pt-period.${panelId}-from`] = timeValue.startTime.toString();
+    query[`pt-period.${panelId}-to`] = timeValue.endTime.toString();
   }
 
   // Update URL without reloading
@@ -1705,7 +1705,7 @@ const exitFullScreen = () => {
 
 | Scenario | Panel Time Behavior | URL Behavior |
 |----------|-------------------|--------------|
-| **View Panel Modal** | Time picker visible if panel has panel-level time enabled | URL updates with `panel-time-<id>` param |
+| **View Panel Modal** | Time picker visible if panel has panel-level time enabled | URL updates with `pt-period.<id>` param |
 | **Full Screen** | Time picker in header bar | URL includes panel ID and time params |
 | **Exit View Panel** | Panel time preserved in dashboard | URL retains panel time param |
 | **Exit Full Screen** | Return to dashboard with panel time | URL removes `panel` param, keeps time param |
@@ -1813,7 +1813,7 @@ const exitFullScreen = () => {
 5. User clicks **Apply** button on date time picker
 6. onPanelTimeApply() triggered
 7. **API call fires immediately** to refresh panel with new time (7 days)
-8. **URL updated immediately** with panel-time-<panelId>=7d
+8. **URL updated immediately** with pt-period.<panelId>=7d
 9. Panel data loads and displays with new 7-day time range
 10. No yellow indicator needed - Apply triggers immediate action
 ```
@@ -1822,7 +1822,7 @@ const exitFullScreen = () => {
 
 ```
 1. User configures panel times
-2. URL contains: ?period=15m&panel-time-panel1=1h&panel-time-panel2=7d
+2. URL contains: ?period=15m&pt-period.panel1=1h&pt-period.panel2=7d
 3. User copies URL and shares
 4. Recipient opens URL
 5. Dashboard loads with:
@@ -1937,7 +1937,7 @@ const exitFullScreen = () => {
 
 ### 2. URL Parameter Overrides Saved Panel Config
 
-**Scenario:** Panel saved with "Last 1h" in config. User opens URL with `?panel-time-panelA=7d`.
+**Scenario:** Panel saved with "Last 1h" in config. User opens URL with `?pt-period.panelA=7d`.
 
 **Behavior:**
 - Panel shows "Last 7 days" (URL has highest priority)
@@ -1981,7 +1981,7 @@ const exitFullScreen = () => {
 **Scenario:** Dashboard has duplicate panel IDs (shouldn't happen, but safety check).
 
 **Behavior:**
-- URL param `panel-time-<panelId>` affects all panels with that ID
+- URL param `pt-period.<panelId>` affects all panels with that ID
 - First panel's time used for URL generation
 
 **Solution:** Add panel ID uniqueness validation when saving dashboard (separate issue).
@@ -2069,7 +2069,7 @@ These existing tests already cover the time conversion logic that will be reused
 - [ ] **Verify panel data refreshes with new time**
 
 **URL Parameters:**
-- [ ] Load dashboard with `panel-time-<id>=1h` → verify panel uses 1h
+- [ ] Load dashboard with `pt-period.<id>=1h` → verify panel uses 1h
 - [ ] Load dashboard with absolute panel time params → verify works
 - [ ] Change panel time → verify URL updates immediately
 - [ ] Copy URL → open in new tab → verify panel times preserved
@@ -2364,7 +2364,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Panel data loads with "Last 1h" on initial load
 
 **E2E-020: Load Dashboard with Panel Time URL Parameter**
-- Open URL: `?period=15m&panel-time-panel123=7d`
+- Open URL: `?period=15m&pt-period.panel123=7d`
 - Verify global time shows "Last 15m"
 - Verify Panel 123 shows "Last 7d" in its picker
 - Verify Panel 123 data shows 7 days of data
@@ -2372,19 +2372,19 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 **E2E-021: URL with Multiple Panel Times**
 - Open URL with:
   - `?period=15m`
-  - `&panel-time-panel1=1h`
-  - `&panel-time-panel2=7d`
-  - `&panel-time-panel3=30d`
+  - `&pt-period.panel1=1h`
+  - `&pt-period.panel2=7d`
+  - `&pt-period.panel3=30d`
 - Verify each panel shows correct time in picker
 - Verify each panel shows correct data
 
 **E2E-022: URL Panel Time Overrides Config**
 - Dashboard has Panel A saved with "Last 1h" in config
-- Open URL with `panel-time-panelA=7d`
+- Open URL with `pt-period.panelA=7d`
 - Verify Panel A picker shows "Last 7d" (URL takes priority)
 - Verify Panel A data shows 7 days
 - Change picker to "Last 1h"
-- Verify URL updates to `panel-time-panelA=1h`
+- Verify URL updates to `pt-period.panelA=1h`
 
 **E2E-023: Share URL with Panel Times**
 - Configure Panel A with "Last 1h"
@@ -2397,21 +2397,21 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 
 **E2E-024: Browser Back/Forward with Panel Time URL Changes**
 - Load dashboard
-- Change Panel A time to "Last 1h" (URL: `...panel-time-panelA=1h`)
-- Change Panel A time to "Last 7d" (URL: `...panel-time-panelA=7d`)
+- Change Panel A time to "Last 1h" (URL: `...pt-period.panelA=1h`)
+- Change Panel A time to "Last 7d" (URL: `...pt-period.panelA=7d`)
 - Click browser back button
-- Verify URL changes to `...panel-time-panelA=1h`
+- Verify URL changes to `...pt-period.panelA=1h`
 - Verify Panel A picker shows "Last 1h"
 - Verify Panel A data updates
 - Click browser forward button
-- Verify URL changes to `...panel-time-panelA=7d`
+- Verify URL changes to `...pt-period.panelA=7d`
 - Verify Panel A picker shows "Last 7d"
 
 **E2E-025: Absolute Panel Time in URL**
 - Configure Panel A with absolute time (Jan 1-15, 2024)
 - Verify URL contains:
-  - `panel-time-panelA-from=<timestamp>`
-  - `panel-time-panelA-to=<timestamp>`
+  - `pt-period.panelA-from=<timestamp>`
+  - `pt-period.panelA-to=<timestamp>`
 - Copy URL and open in new tab
 - Verify Panel A shows correct absolute date range
 
@@ -2423,18 +2423,18 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 
 **E2E-027: Long URL with Many Panel Times**
 - Configure 20 panels with different times
-- Verify URL contains all `panel-time-*` parameters
+- Verify URL contains all `pt-*` parameters
 - Copy URL (check length)
 - Open URL in new tab
 - Verify all 20 panels load with correct times
 
 **E2E-028: Clear Panel Time URL Parameter**
-- Load dashboard with `panel-time-panelA=1h` in URL
+- Load dashboard with `pt-period.panelA=1h` in URL
 - Disable panel time for Panel A
-- Verify `panel-time-panelA=1h` removed from URL
+- Verify `pt-period.panelA=1h` removed from URL
 - Enable panel time again with "Use global"
 - Verify Panel A now tracks global time
-- No `panel-time-panelA` parameter in URL
+- No `pt-period.panelA` parameter in URL
 
 ---
 
@@ -2442,7 +2442,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 
 **E2E-029: URL Priority Over Config**
 - Dashboard Panel A config: `panel_time_range: { relativeTimePeriod: "1h" }`
-- Open URL with `panel-time-panelA=7d`
+- Open URL with `pt-period.panelA=7d`
 - Verify Panel A shows "Last 7d" (URL priority)
 - Not "Last 1h" from config
 
@@ -2463,18 +2463,18 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Setup:
   - Global time: "Last 15m"
   - Panel A config: "Last 1h" (individual)
-  - URL param: `panel-time-panelA=7d`
+  - URL param: `pt-period.panelA=7d`
 - Verify Panel A shows "Last 7d" (URL highest priority)
 
 **E2E-033: Panel "Use Global" Mode Priority**
 - Panel A: `allow_panel_time: true`, `panel_time_mode: "global"`
-- URL has: `panel-time-panelA=7d`
+- URL has: `pt-period.panelA=7d`
 - Panel A picker visible
 - Verify Panel A tracks global time (mode takes priority over URL)
 - Panel A ignores URL parameter
 
 **E2E-034: Priority After URL Parameter Removed**
-- Load with URL: `panel-time-panelA=7d`
+- Load with URL: `pt-period.panelA=7d`
 - Panel A shows "Last 7d"
 - Remove URL parameter (change panel time via picker)
 - Now Panel A uses config or global
@@ -2540,7 +2540,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 
 **E2E-040: Full Screen URL Sharing**
 - Open Panel A in full screen with time "Last 7d"
-- URL should be: `/fullscreen?panel=panelA&panel-time-panelA=7d`
+- URL should be: `/fullscreen?panel=panelA&pt-period.panelA=7d`
 - Copy URL and open in new tab
 - Verify panel opens in full screen
 - Verify panel shows "Last 7d"
@@ -2570,7 +2570,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Panel A has individual time with URL param
 - Delete Panel A from dashboard
 - Verify panel removed from dashboard
-- Verify `panel-time-panelA` removed from URL
+- Verify `pt-period.panelA` removed from URL
 - Save dashboard
 - Verify panel config removed from backend
 
@@ -2904,16 +2904,16 @@ interface PanelConfig {
 
 ```
 Format:
-?panel-time-<panelId>=<relativePeriod>                      // Relative time
-?panel-time-<panelId>-from=<timestamp>&panel-time-<panelId>-to=<timestamp>  // Absolute time
+?pt-period.<panelId>=<relativePeriod>                      // Relative time
+?pt-period.<panelId>-from=<timestamp>&pt-period.<panelId>-to=<timestamp>  // Absolute time
 
 Examples:
-?panel-time-panel123=1h                                     // Panel 123: Last 1 hour
-?panel-time-panel456=7d                                     // Panel 456: Last 7 days
-?panel-time-panel789-from=1704067200000&panel-time-panel789-to=1704153600000  // Panel 789: Specific dates
+?pt-period.panel123=1h                                     // Panel 123: Last 1 hour
+?pt-period.panel456=7d                                     // Panel 456: Last 7 days
+?pt-period.panel789-from=1704067200000&pt-period.panel789-to=1704153600000  // Panel 789: Specific dates
 
 Combined with global time:
-?period=15m&panel-time-panel123=1h                          // Global: 15m, Panel 123: 1h
+?period=15m&pt-period.panel123=1h                          // Global: 15m, Panel 123: 1h
 ```
 
 ---
