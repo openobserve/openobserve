@@ -488,6 +488,10 @@ const currentTimeObj = computed(() => {
 const toggleDimension = (dimensionValue: string) => {
   const index = selectedDimensions.value.indexOf(dimensionValue);
   if (index > -1) {
+    // Prevent removing the last dimension - at least one must remain
+    if (selectedDimensions.value.length <= 1) {
+      return;
+    }
     // Remove dimension - create new array to trigger reactivity
     selectedDimensions.value = selectedDimensions.value.filter(d => d !== dimensionValue);
   } else {
