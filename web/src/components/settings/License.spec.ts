@@ -78,7 +78,7 @@ describe('License.vue', () => {
       limits: {
         Ingestion: {
           typ: 'PerDayCount',
-          value: 100,
+          value: 50,
         },
       },
     },
