@@ -87,7 +87,7 @@ export default class DashboardPanelTime {
    */
   async setPanelTimeRelative(timeRange) {
     // Click the panel time picker in AddPanel (edit mode)
-    const pickerBtn = this.page.locator('[data-test="addpanel-date-time-picker"]');
+    const pickerBtn = this.page.locator('[data-test="dashboard-config-panel-time-picker"]');
     await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await pickerBtn.click();
 
@@ -97,7 +97,7 @@ export default class DashboardPanelTime {
     await timeOptionLocator.click();
 
     // Click apply
-    await this.page.locator('[data-test="date-time-apply-btn"]').click();
+    await this.page.locator('[data-test="dashboard-apply"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 
@@ -112,15 +112,6 @@ export default class DashboardPanelTime {
     // Switch to absolute tab
     await this.page.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
-  }
-
-  /**
-   * Verify date time picker label in AddPanel
-   * @param {string} expectedLabel - "Panel Time Range" or "Time Range"
-   */
-  async verifyDateTimePickerLabel(expectedLabel) {
-    const labelLocator = this.page.locator('[data-test="panel-config-time-picker-label"]');
-    await expect(labelLocator).toContainText(expectedLabel);
   }
 
   /**
@@ -194,39 +185,6 @@ export default class DashboardPanelTime {
   async waitForPanelTimeDisplay(panelId, expectedText) {
     const pickerBtn = this.page.locator(`[data-test="panel-time-picker-${panelId}-btn"]`);
     await expect(pickerBtn).toContainText(expectedText, { timeout: 10000 });
-  }
-
-  /**
-   * Verify URL contains panel time parameter
-   * @param {string} panelId - Panel ID
-   * @param {string} expectedValue - Expected time value (e.g., "1h", "7d")
-   */
-  async verifyPanelTimeInURL(panelId, expectedValue) {
-    const url = this.page.url();
-    const expectedParam = `pt-period.${panelId}=${expectedValue}`;
-    expect(url).toContain(expectedParam);
-  }
-
-  /**
-   * Verify URL does NOT contain panel time parameter
-   * @param {string} panelId - Panel ID
-   */
-  async verifyPanelTimeNotInURL(panelId) {
-    const url = this.page.url();
-    const paramPrefix = `pt-period.${panelId}`;
-    const paramFrom = `pt-from.${panelId}`;
-    expect(url).not.toContain(paramPrefix);
-    expect(url).not.toContain(paramFrom);
-  }
-
-  /**
-   * Verify panel time parameter with from/to (absolute time)
-   * @param {string} panelId - Panel ID
-   */
-  async verifyPanelTimeAbsoluteInURL(panelId) {
-    const url = this.page.url();
-    expect(url).toContain(`pt-from.${panelId}=`);
-    expect(url).toContain(`pt-to.${panelId}=`);
   }
 
   /**
@@ -341,14 +299,6 @@ export default class DashboardPanelTime {
     const exitBtn = this.page.locator('[data-test="panel-fullscreen-exit"]');
     await exitBtn.click();
     await this.page.locator('[data-test="panel-fullscreen"]').waitFor({ state: "hidden", timeout: 5000 });
-  }
-
-  /**
-   * Verify panel time picker is visible in full screen
-   */
-  async verifyPanelTimePickerInFullScreen() {
-    const picker = this.page.locator('[data-test="panel-fullscreen-time-picker"]');
-    await expect(picker).toBeVisible();
   }
 
   /**
