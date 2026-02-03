@@ -390,7 +390,7 @@ export async function verifyPanelTimeConfig(page, expectedConfig) {
   testLogger.info('Verifying panel time config', expectedConfig);
 
   // Check if toggle is in correct state
-  const toggleLocator = page.locator('[data-test="panel-time-enable-toggle"]');
+  const toggleLocator = page.locator('[data-test="dashboard-config-allow-panel-time"]');
   const isChecked = await toggleLocator.getAttribute('aria-checked');
 
   if (allowPanelTime) {
@@ -398,17 +398,17 @@ export async function verifyPanelTimeConfig(page, expectedConfig) {
 
     // Verify mode
     if (panelTimeMode === 'global') {
-      const globalRadio = page.locator('[data-test="panel-time-mode-global"]');
+      const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]');
       const globalChecked = await globalRadio.getAttribute('aria-checked');
       expect(globalChecked).toBe('true');
     } else {
-      const individualRadio = page.locator('[data-test="panel-time-mode-individual"]');
+      const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="individual"]');
       const individualChecked = await individualRadio.getAttribute('aria-checked');
       expect(individualChecked).toBe('true');
 
       // Verify time range is displayed in picker
       if (panelTimeRange) {
-        const pickerBtn = page.locator('[data-test="panel-config-time-picker-btn"]');
+        const pickerBtn = page.locator('[data-test="addpanel-date-time-picker"]');
         const pickerText = await pickerBtn.textContent();
         testLogger.debug('Panel time picker shows', { pickerText });
         // Note: Exact text verification depends on how the time is displayed
