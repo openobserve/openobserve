@@ -195,8 +195,7 @@ impl PuffinFooterBytesReader {
             serde_json::from_reader(decoder)
                 .map_err(|e| anyhow!("Error decompress footer payload {}", e))
         } else {
-            serde_json::from_slice(bytes)
-                .map_err(|e| anyhow!("Error serializing footer {}", e))
+            serde_json::from_slice(bytes).map_err(|e| anyhow!("Error serializing footer {}", e))
         }
     }
 
