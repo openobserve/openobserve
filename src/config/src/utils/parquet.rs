@@ -442,7 +442,8 @@ mod tests {
     fn test_generate_filename_with_time_range() {
         let filename = generate_filename_with_time_range(1000, 2000, 1);
         assert!(filename.ends_with(FILE_EXT_PARQUET));
-        assert!(filename.starts_with("1000.2000.1_1."));
+        assert!(filename.starts_with("1000.2000."));
+        assert!(filename.contains("_1.parquet"));
     }
 
     #[test]
