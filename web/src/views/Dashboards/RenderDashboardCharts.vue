@@ -1423,17 +1423,17 @@ export default defineComponent({
     const updateURLWithPanelTime = async (panelId: string, timeValue: any) => {
       const query = { ...route.query };
 
-      // Remove old panel time params
-      delete query[`pt-${panelId}`];
-      delete query[`pt-${panelId}-from`];
-      delete query[`pt-${panelId}-to`];
+      // Remove existing panel time params
+      delete query[`pt-period.${panelId}`];
+      delete query[`pt-from.${panelId}`];
+      delete query[`pt-to.${panelId}`];
 
       // Add new params based on type
       if (timeValue.relativeTimePeriod || timeValue.type === 'relative' || timeValue.valueType === 'relative') {
-        query[`pt-${panelId}`] = timeValue.relativeTimePeriod;
+        query[`pt-period.${panelId}`] = timeValue.relativeTimePeriod;
       } else if (timeValue.type === 'absolute' || timeValue.valueType === 'absolute' || (timeValue.startTime && timeValue.endTime)) {
-        query[`pt-${panelId}-from`] = timeValue.startTime.toString();
-        query[`pt-${panelId}-to`] = timeValue.endTime.toString();
+        query[`pt-from.${panelId}`] = timeValue.startTime.toString();
+        query[`pt-to.${panelId}`] = timeValue.endTime.toString();
       }
 
       await router.replace({ query });
