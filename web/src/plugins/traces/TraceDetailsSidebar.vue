@@ -240,16 +240,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="q-mb-md">
           <div class="section-label text-bold q-mb-xs flex items-center justify-between">
             <div>Input</div>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="content_copy"
-              @click="copyContent(span._o2_llm_input, 'input')"
-              title="Copy input"
-            >
-              <q-tooltip>Copy Input</q-tooltip>
-            </q-btn>
+            <div class="flex items-center gap-xs">
+              <q-btn-toggle
+                v-model="inputViewMode"
+                dense
+                no-caps
+                size="sm"
+                toggle-color="primary"
+                :options="[
+                  { label: 'Formatted', value: 'formatted' },
+                  { label: 'JSON', value: 'json' }
+                ]"
+              />
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="content_copy"
+                @click="copyContent(span._o2_llm_input, 'input')"
+                title="Copy input"
+              >
+                <q-tooltip>Copy Input</q-tooltip>
+              </q-btn>
+            </div>
           </div>
           <div class="llm-content-box" :class="{ 'expanded': inputExpanded }">
             <LLMContentRenderer
@@ -257,6 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :observation-type="span._o2_llm_observation_type"
               :span="span"
               content-type="input"
+              :view-mode="inputViewMode"
             />
           </div>
           <div
@@ -272,16 +286,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="section-label text-bold q-mb-xs flex items-center justify-between">
             <div>Output</div>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="content_copy"
-              @click="copyContent(span._o2_llm_output, 'output')"
-              title="Copy output"
-            >
-              <q-tooltip>Copy Output</q-tooltip>
-            </q-btn>
+            <div class="flex items-center gap-xs">
+              <q-btn-toggle
+                v-model="outputViewMode"
+                dense
+                no-caps
+                size="sm"
+                toggle-color="primary"
+                :options="[
+                  { label: 'Formatted', value: 'formatted' },
+                  { label: 'JSON', value: 'json' }
+                ]"
+              />
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="content_copy"
+                @click="copyContent(span._o2_llm_output, 'output')"
+                title="Copy output"
+              >
+                <q-tooltip>Copy Output</q-tooltip>
+              </q-btn>
+            </div>
           </div>
           <div class="llm-content-box" :class="{ 'expanded': outputExpanded }">
             <LLMContentRenderer
@@ -289,6 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :observation-type="span._o2_llm_observation_type"
               :span="span"
               content-type="output"
+              :view-mode="outputViewMode"
             />
           </div>
           <div
@@ -787,6 +815,10 @@ export default defineComponent({
     // LLM content expand/collapse state
     const inputExpanded = ref(false);
     const outputExpanded = ref(false);
+
+    // LLM view mode state: 'formatted' (default) or 'json'
+    const inputViewMode = ref<'formatted' | 'json'>('formatted');
+    const outputViewMode = ref<'formatted' | 'json'>('formatted');
     const closeSidebar = () => {
       emit("close");
     };
@@ -1567,6 +1599,8 @@ export default defineComponent({
       getObservationTypeColor,
       inputExpanded,
       outputExpanded,
+      inputViewMode,
+      outputViewMode,
       getInputCharCount,
       getOutputCharCount,
     };
@@ -1630,6 +1664,8 @@ export default defineComponent({
 .attr-text {
   font-size: 12px;
   font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .table-header {
   // text-transform: capitalize;

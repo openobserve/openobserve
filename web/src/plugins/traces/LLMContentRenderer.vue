@@ -31,16 +31,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="content-wrapper">
       <!-- Truncated view -->
       <div v-if="!isExpanded && contentStats.shouldTruncate">
-        <div v-if="isMessagesArray" class="messages-view">
-          <MessageBubble
-            v-for="(msg, idx) in previewMessages"
-            :key="idx"
-            :message="msg"
-          />
+        <!-- Formatted mode -->
+        <div v-if="props.viewMode === 'formatted'">
+          <div v-if="shouldRenderAsMessages" class="messages-view">
+            <MessageItem
+              v-for="(msg, idx) in previewMessages"
+              :key="idx"
+              :message="msg"
+            />
+          </div>
+          <div v-else-if="isPlainText" class="text-content">
+            <pre class="plain-text-content">{{ contentStats.previewText }}</pre>
+          </div>
+          <div v-else class="json-content">
+            <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
+          </div>
         </div>
-        <div v-else-if="isPlainText" class="text-content">
-          <pre class="plain-text-content">{{ contentStats.previewText }}</pre>
-        </div>
+
+        <!-- JSON mode -->
         <div v-else class="json-content">
           <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
         </div>
@@ -60,16 +68,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Full content view -->
       <div v-else>
-        <div v-if="isMessagesArray" class="messages-view">
-          <MessageBubble
-            v-for="(msg, idx) in parsedMessages"
-            :key="idx"
-            :message="msg"
-          />
+        <!-- Formatted mode -->
+        <div v-if="props.viewMode === 'formatted'">
+          <div v-if="shouldRenderAsMessages" class="messages-view">
+            <MessageItem
+              v-for="(msg, idx) in parsedMessages"
+              :key="idx"
+              :message="msg"
+            />
+          </div>
+          <div v-else-if="isPlainText" class="text-content">
+            <pre class="plain-text-content">{{ fullText }}</pre>
+          </div>
+          <div v-else class="json-content">
+            <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
+          </div>
         </div>
-        <div v-else-if="isPlainText" class="text-content">
-          <pre class="plain-text-content">{{ fullText }}</pre>
-        </div>
+
+        <!-- JSON mode -->
         <div v-else class="json-content">
           <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
         </div>
@@ -113,6 +129,10 @@ const props = defineProps({
   span: {
     type: Object,
     default: null,
+  },
+  viewMode: {
+    type: String as () => 'formatted' | 'json',
+    default: 'formatted',
   },
 });
 
@@ -167,6 +187,37 @@ const isMessagesArray = computed(() => {
   );
 });
 
+// Detect single message object (for output)
+const isSingleMessage = computed(() => {
+  return (
+    parsedContent.value &&
+    typeof parsedContent.value === 'object' &&
+    !Array.isArray(parsedContent.value) &&
+    'role' in parsedContent.value
+  );
+});
+
+// Detect content parts array (OpenAI/Anthropic output format: [{type: 'text', text: '...'}])
+// This handles cases where the output is just an array of content parts without a role wrapper
+const isContentPartsArray = computed(() => {
+  return (
+    Array.isArray(parsedContent.value) &&
+    parsedContent.value.length > 0 &&
+    parsedContent.value.every(
+      (item: any) =>
+        item &&
+        typeof item === 'object' &&
+        'type' in item &&
+        (item.type === 'text' || item.type === 'image_url' || item.type === 'image')
+    )
+  );
+});
+
+// Check if content should be rendered as messages (any format)
+const shouldRenderAsMessages = computed(() => {
+  return isMessagesArray.value || isSingleMessage.value || isContentPartsArray.value;
+});
+
 const isPlainText = computed(() => {
   // If parsedContent is different from original content, it means we successfully parsed JSON
   if (typeof props.content === 'string') {
@@ -180,13 +231,61 @@ const isPlainText = computed(() => {
   return false;
 });
 
+// Helper function to format content (handles string, array of parts, or object)
+const formatContent = (content: any): string => {
+  // Handle array content (OpenAI multimodal format: [{type: 'text', text: '...'}, {type: 'image_url', image_url: {...}}])
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const part of content) {
+      if (part.type === 'text' && part.text) {
+        parts.push(part.text);
+      } else if (part.type === 'image_url' && part.image_url?.url) {
+        parts.push(`[Image: ${part.image_url.url}]`);
+      } else if (part.type === 'image' && part.source) {
+        // Handle Anthropic-style image content
+        parts.push(`[Image: ${part.source.type || 'base64'}]`);
+      } else {
+        // Fallback for unknown part types
+        parts.push(JSON.stringify(part));
+      }
+    }
+    return parts.join('\n\n');
+  } else if (typeof content === 'string') {
+    return content;
+  } else if (content) {
+    return JSON.stringify(content, null, 2);
+  }
+  return '';
+};
+
 // Extract messages
 const parsedMessages = computed(() => {
-  if (!isMessagesArray.value) return [];
-  return (parsedContent.value as any[]).map((msg: any) => ({
-    role: msg.role || 'unknown',
-    content: msg.content || JSON.stringify(msg),
-  }));
+  // Handle array of messages (input format)
+  if (isMessagesArray.value) {
+    return (parsedContent.value as any[]).map((msg: any) => ({
+      role: msg.role || 'unknown',
+      content: formatContent(msg.content),
+    }));
+  }
+
+  // Handle single message object (output format: {role: 'assistant', content: '...'})
+  if (isSingleMessage.value) {
+    const msg = parsedContent.value as any;
+    return [{
+      role: msg.role || 'assistant',
+      content: formatContent(msg.content),
+    }];
+  }
+
+  // Handle direct content parts array (output format: [{type: 'text', text: '...'}])
+  if (isContentPartsArray.value) {
+    return [{
+      role: 'assistant',
+      content: formatContent(parsedContent.value),
+    }];
+  }
+
+  return [];
 });
 
 // Get text content for truncation
@@ -204,7 +303,7 @@ const fullText = computed(() => {
 const contentStats = computed(() => {
   let text = '';
 
-  if (isMessagesArray.value) {
+  if (shouldRenderAsMessages.value) {
     // For messages, concatenate all message contents
     text = parsedMessages.value
       .map((m: any) => `${m.role}: ${m.content}`)
@@ -231,7 +330,7 @@ const contentStats = computed(() => {
 
 // Preview messages (first 15 lines worth)
 const previewMessages = computed(() => {
-  if (!isMessagesArray.value) return [];
+  if (!shouldRenderAsMessages.value) return [];
 
   let lineCount = 0;
   const preview: any[] = [];
@@ -259,12 +358,20 @@ const previewMessages = computed(() => {
 </script>
 
 <script lang="ts">
-// Message Bubble Component
+// Message Item Component - Renders message with markdown
 import { defineComponent, h } from 'vue';
 import VueJsonPretty from 'vue-json-pretty';
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 
-const MessageBubble = defineComponent({
-  name: 'MessageBubble',
+// Convert content to markdown format
+const toMarkdown = (content: string): string => {
+  // Replace [Image: URL] markers with markdown image syntax
+  return content.replace(/\[Image: (https?:\/\/[^\]]+)\]/g, '![Image]($1)');
+};
+
+const MessageItem = defineComponent({
+  name: 'MessageItem',
   props: {
     message: {
       type: Object,
@@ -282,47 +389,96 @@ const MessageBubble = defineComponent({
       return colors[role] || 'rgba(158, 158, 158, 0.1)';
     };
 
-    const parseContent = (content: string) => {
-      try {
-        return { isJson: true, data: JSON.parse(content) };
-      } catch {
-        return { isJson: false, data: content };
-      }
+    const roleLabel = (role: string) => {
+      const labels: Record<string, string> = {
+        user: 'User',
+        assistant: 'Assistant',
+        system: 'System',
+        tool: 'Tool',
+      };
+      return labels[role] || role;
     };
 
     return () => {
-      const parsed = parseContent(props.message.content);
+      const content = props.message.content;
+
+      // Try to parse as JSON for structured display
+      let isJson = false;
+      let jsonData = null;
+      try {
+        jsonData = JSON.parse(content);
+        isJson = true;
+      } catch {
+        isJson = false;
+      }
+
+      // If it's JSON, render with VueJsonPretty
+      if (isJson) {
+        return h(
+          'div',
+          {
+            class: 'message-item q-mb-sm',
+            style: {
+              border: '1px solid var(--o2-border-color)',
+              borderRadius: '8px',
+              overflow: 'hidden',
+            },
+          },
+          [
+            h('div', {
+              class: 'message-role text-caption text-bold q-pa-sm',
+              style: {
+                backgroundColor: roleColor(props.message.role),
+                borderBottom: '1px solid var(--o2-border-color)',
+                textTransform: 'capitalize',
+              },
+            }, roleLabel(props.message.role)),
+            h('div', {
+              class: 'message-content-json q-pa-sm',
+              style: {
+                backgroundColor: 'var(--o2-code-bg)',
+              },
+            }, [
+              h(VueJsonPretty, {
+                data: jsonData,
+                deep: 3,
+                showLength: true,
+              }),
+            ]),
+          ]
+        );
+      }
+
+      // Convert content to markdown and render
+      const markdownContent = toMarkdown(content);
+      const htmlContent = DOMPurify.sanitize(marked.parse(markdownContent) as string);
 
       return h(
         'div',
         {
-          class: 'message-bubble q-mb-sm q-pa-sm',
+          class: 'message-item q-mb-sm',
           style: {
-            backgroundColor: roleColor(props.message.role),
             border: '1px solid var(--o2-border-color)',
             borderRadius: '8px',
+            overflow: 'hidden',
           },
         },
         [
-          h('div', { class: 'message-role text-caption text-bold q-mb-xs' }, props.message.role),
-          parsed.isJson
-            ? h(VueJsonPretty, {
-                data: parsed.data,
-                deep: 3,
-                showLength: true,
-                class: 'message-content-json',
-              })
-            : h('pre', {
-                class: 'message-content',
-                style: {
-                  margin: 0,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  fontSize: '13px',
-                  lineHeight: '1.5',
-                },
-                textContent: parsed.data,
-              }),
+          h('div', {
+            class: 'message-role text-caption text-bold q-pa-sm',
+            style: {
+              backgroundColor: roleColor(props.message.role),
+              borderBottom: '1px solid var(--o2-border-color)',
+              textTransform: 'capitalize',
+            },
+          }, roleLabel(props.message.role)),
+          h('div', {
+            class: 'message-content markdown-body q-pa-sm',
+            style: {
+              backgroundColor: 'var(--o2-code-bg)',
+            },
+            innerHTML: htmlContent,
+          }),
         ]
       );
     };
@@ -331,7 +487,7 @@ const MessageBubble = defineComponent({
 
 export default {
   components: {
-    MessageBubble,
+    MessageItem,
     VueJsonPretty,
   },
 };
@@ -352,10 +508,89 @@ export default {
 }
 
 .messages-view {
-  .message-bubble {
+  .message-item {
     .message-content {
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1.6;
+
+      :deep(p) {
+        margin: 0 0 8px 0;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+
+      :deep(img) {
+        max-width: 50%;
+        max-height: 400px;
+        object-fit: contain;
+        display: block;
+        margin: 8px 0;
+        border-radius: 4px;
+      }
+
+      :deep(pre) {
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 8px;
+        border-radius: 4px;
+        overflow-x: auto;
+        margin: 8px 0;
+      }
+
+      :deep(code) {
+        font-family: monospace;
+        font-size: 12px;
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 2px 4px;
+        border-radius: 3px;
+      }
+
+      :deep(pre code) {
+        background-color: transparent;
+        padding: 0;
+      }
+
+      :deep(ul), :deep(ol) {
+        margin: 8px 0;
+        padding-left: 24px;
+      }
+
+      :deep(li) {
+        margin: 4px 0;
+      }
+
+      :deep(a) {
+        color: var(--q-primary);
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+
+      :deep(blockquote) {
+        border-left: 3px solid var(--o2-border-color);
+        margin: 8px 0;
+        padding-left: 12px;
+        color: var(--o2-text-secondary);
+      }
+
+      :deep(table) {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 8px 0;
+
+        th, td {
+          border: 1px solid var(--o2-border-color);
+          padding: 6px 8px;
+          text-align: left;
+        }
+
+        th {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+      }
     }
 
     .message-content-json {

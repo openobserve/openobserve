@@ -80,17 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-caption flex items-center"
           data-test="span-block-duration"
         >
-          <!-- LLM Metrics (usage, cost) before duration -->
-          <div v-if="isLLMSpan && llmMetrics" class="flex items-center q-mr-xs">
-            <span class="q-mr-xs">
-              <q-icon name="functions" size="10px" class="q-mr-xs" />
-              {{ formatTokens(llmMetrics.usage.total) }}
-            </span>
-            <span class="q-mr-xs">
-              <q-icon name="attach_money" size="10px" class="q-mr-xs" />
-              {{ formatCost(llmMetrics.cost.total) }}
-            </span>
-          </div>
           <!-- Duration -->
           <div>
             {{ formatTimeWithSuffix(span.durationUs) }}
@@ -118,11 +107,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
-import {
-  isLLMTrace,
-  formatTokens,
-  formatCost,
-} from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -296,19 +280,6 @@ export default defineComponent({
       emit("hover");
     };
 
-    // LLM span detection and metrics
-    const isLLMSpan = computed(() => {
-      return isLLMTrace(props.span);
-    });
-
-    const llmMetrics = computed(() => {
-      if (!isLLMSpan.value) return null;
-      return {
-        usage: props.span.llm_usage,
-        cost: props.span.llm_cost,
-      };
-    });
-
     return {
       t,
       formatTimeWithSuffix,
@@ -326,11 +297,6 @@ export default defineComponent({
       onSpanHover,
       durationStyle,
       searchObj,
-      // LLM
-      isLLMSpan,
-      llmMetrics,
-      formatTokens,
-      formatCost,
     };
   },
 });
