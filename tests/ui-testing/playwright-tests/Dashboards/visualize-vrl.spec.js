@@ -553,10 +553,6 @@ test.describe("VRL visualization support testcases", () => {
     await expect(tablePanel).toBeVisible({ timeout: 5000 });
   });
 
-  // =============================================
-  // Additional P1 Test Cases for VRL Visualization
-  // =============================================
-
   test("[P1] Should enable dynamic columns configuration when VRL function is applied", async ({
     page,
   }) => {
