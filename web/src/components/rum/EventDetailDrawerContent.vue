@@ -270,6 +270,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
+          <!-- Action Details -->
+          <EventDetailsSection
+            v-if="event.type === 'action'"
+            title="Action Details"
+            :fields="actionFields"
+            data-test="action-details"
+            class="tw:mb-3"
+          />
+
           <!-- Related Events for Actions -->
           <div v-if="event.type === 'action'" class="tw:mb-3">
             <template v-if="isLoadingRelatedResources">

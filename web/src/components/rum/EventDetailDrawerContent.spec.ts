@@ -263,6 +263,49 @@ describe("EventDetailDrawerContent", () => {
   });
 
   // ==========================================================================
+  // TAB FUNCTIONALITY
+  // ==========================================================================
+
+  describe("Tab functionality", () => {
+    it("should display all tabs", () => {
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      const networkTab = findByTestId(wrapper, "event-detail-network-tab");
+      const attributesTab = findByTestId(wrapper, "event-detail-attributes-tab");
+
+      expect(overviewTab.exists()).toBe(true);
+      expect(networkTab.exists()).toBe(true);
+      expect(attributesTab.exists()).toBe(true);
+    });
+
+    it("should switch to Overview tab when clicked", async () => {
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      await overviewTab.trigger("click");
+      await flushPromises();
+
+      const overviewTabPanel = findByTestId(wrapper, "overview-tab");
+      expect(overviewTabPanel.exists()).toBe(true);
+    });
+
+    it("should switch to Network tab when clicked", async () => {
+      const networkTab = findByTestId(wrapper, "event-detail-network-tab");
+      await networkTab.trigger("click");
+      await flushPromises();
+
+      // Should show network tab content
+      expect(wrapper.text()).toContain("Related Events");
+    });
+
+    it("should switch to Attributes tab when clicked", async () => {
+      const attributesTab = findByTestId(wrapper, "event-detail-attributes-tab");
+      await attributesTab.trigger("click");
+      await flushPromises();
+
+      const attributesTabPanel = findByTestId(wrapper, "attributes-tab");
+      expect(attributesTabPanel.exists()).toBe(true);
+    });
+  });
+
+  // ==========================================================================
   // SESSION METADATA DISPLAY
   // ==========================================================================
 
@@ -308,21 +351,41 @@ describe("EventDetailDrawerContent", () => {
   // ==========================================================================
 
   describe("Action event details", () => {
-    it("should display Action Details section for action events", () => {
+    it("should display Action Details section for action events", async () => {
+      // Click on Overview tab to see action details
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      await overviewTab.trigger("click");
+      await flushPromises();
+
       expect(wrapper.text()).toContain("Action Details");
     });
 
-    it("should display action type", () => {
+    it("should display action type", async () => {
+      // Click on Overview tab
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      await overviewTab.trigger("click");
+      await flushPromises();
+
       expect(wrapper.text()).toContain("Action Type:");
       expect(wrapper.text()).toContain("click");
     });
 
-    it("should display action target", () => {
+    it("should display action target", async () => {
+      // Click on Overview tab
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      await overviewTab.trigger("click");
+      await flushPromises();
+
       expect(wrapper.text()).toContain("Target:");
       expect(wrapper.text()).toContain("Submit Button");
     });
 
-    it("should display action ID when available", () => {
+    it("should display action ID when available", async () => {
+      // Click on Overview tab
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      await overviewTab.trigger("click");
+      await flushPromises();
+
       expect(wrapper.text()).toContain("Action ID:");
       expect(wrapper.text()).toContain("action-123");
     });
@@ -331,6 +394,11 @@ describe("EventDetailDrawerContent", () => {
       await wrapper.setProps({
         rawEvent: createMockRawEvent({ action_id: undefined }),
       });
+      await flushPromises();
+
+      // Click on Overview tab
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      await overviewTab.trigger("click");
       await flushPromises();
 
       const text = wrapper.text();
@@ -551,6 +619,11 @@ describe("EventDetailDrawerContent", () => {
     it("should display trace correlation card for resource with trace_id", async () => {
       await waitForRelatedResources(wrapper);
 
+      // Click on Network tab first
+      const networkTab = findByTestId(wrapper, "event-detail-network-tab");
+      await networkTab.trigger("click");
+      await flushPromises();
+
       // Click on first resource which has trace_id
       const resourceItems = wrapper.findAll(
         '[data-test="related-resource-item"]',
@@ -566,6 +639,11 @@ describe("EventDetailDrawerContent", () => {
 
     it("should pass correct props to TraceCorrelationCard", async () => {
       await waitForRelatedResources(wrapper);
+
+      // Click on Network tab first
+      const networkTab = findByTestId(wrapper, "event-detail-network-tab");
+      await networkTab.trigger("click");
+      await flushPromises();
 
       // Select resource with trace
       const resourceItems = wrapper.findAll(
@@ -586,6 +664,11 @@ describe("EventDetailDrawerContent", () => {
 
     it("should auto-select first resource with trace_id and display trace card", async () => {
       await waitForRelatedResources(wrapper);
+
+      // Click on Network tab first
+      const networkTab = findByTestId(wrapper, "event-detail-network-tab");
+      await networkTab.trigger("click");
+      await flushPromises();
 
       // The component auto-selects the first resource with trace_id
       const traceCard = findByTestId(wrapper, "trace-correlation-card");
@@ -675,38 +758,73 @@ describe("EventDetailDrawerContent", () => {
   });
 
   // ==========================================================================
-  // RAW EVENT DATA
+  // RAW EVENT DATA / ATTRIBUTES TAB
   // ==========================================================================
 
-  describe("Raw event data", () => {
-    it("should display raw event data in expansion panel", () => {
-      const expansionItem = findByTestId(wrapper, "raw-event-expansion");
-      expect(expansionItem.exists()).toBe(true);
+  describe("Raw event data / Attributes tab", () => {
+    it("should display Attributes tab", () => {
+      const attributesTab = findByTestId(wrapper, "event-detail-attributes-tab");
+      expect(attributesTab.exists()).toBe(true);
     });
 
-    it("should display formatted JSON in raw event section", async () => {
-      // Expand the panel first
-      const expansionItem = findByTestId(wrapper, "raw-event-expansion");
-      await expansionItem.trigger("click");
+    it("should display copy to clipboard button in Attributes tab", async () => {
+      // Click on Attributes tab
+      const attributesTab = findByTestId(wrapper, "event-detail-attributes-tab");
+      await attributesTab.trigger("click");
       await flushPromises();
 
-      const preElement = findByTestId(wrapper, "raw-event-json");
-      expect(preElement.exists()).toBe(true);
-      expect(preElement.text()).toContain('"action_type": "click"');
+      const copyBtn = findByTestId(wrapper, "attributes-copy-btn");
+      expect(copyBtn.exists()).toBe(true);
     });
 
-    it("should display complete raw event data", async () => {
-      const expansionItem = findByTestId(wrapper, "raw-event-expansion");
-      await expansionItem.trigger("click");
+    it("should display formatted JSON in Attributes tab", async () => {
+      // Click on Attributes tab
+      const attributesTab = findByTestId(wrapper, "event-detail-attributes-tab");
+      await attributesTab.trigger("click");
       await flushPromises();
 
-      const preElement = findByTestId(wrapper, "raw-event-json");
-      const jsonText = preElement.text();
+      const jsonElement = findByTestId(wrapper, "raw-event-json");
+      expect(jsonElement.exists()).toBe(true);
+      expect(jsonElement.text()).toContain("action_type");
+    });
 
-      expect(jsonText).toContain('"action_type"');
-      expect(jsonText).toContain('"action_target_name"');
-      expect(jsonText).toContain('"action_id"');
-      expect(jsonText).toContain('"session_id"');
+    it("should display complete raw event data in Attributes tab", async () => {
+      // Click on Attributes tab
+      const attributesTab = findByTestId(wrapper, "event-detail-attributes-tab");
+      await attributesTab.trigger("click");
+      await flushPromises();
+
+      const jsonElement = findByTestId(wrapper, "raw-event-json");
+      const jsonText = jsonElement.text();
+
+      expect(jsonText).toContain("action_type");
+      expect(jsonText).toContain("action_target_name");
+      expect(jsonText).toContain("action_id");
+      expect(jsonText).toContain("session_id");
+    });
+
+    it("should copy attributes to clipboard when clicking copy button", async () => {
+      const copyToClipboardSpy = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", {
+        clipboard: {
+          writeText: copyToClipboardSpy,
+        },
+      });
+
+      // Click on Attributes tab
+      const attributesTab = findByTestId(wrapper, "event-detail-attributes-tab");
+      await attributesTab.trigger("click");
+      await flushPromises();
+
+      const copyBtn = findByTestId(wrapper, "attributes-copy-btn");
+      await copyBtn.trigger("click");
+      await flushPromises();
+
+      expect(copyToClipboardSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"action_type"')
+      );
+
+      vi.unstubAllGlobals();
     });
   });
 
@@ -773,12 +891,22 @@ describe("EventDetailDrawerContent", () => {
     it("should format duration in milliseconds for values < 1000", async () => {
       await waitForRelatedResources(wrapper);
 
+      // Click on Network tab to see related resources
+      const networkTab = findByTestId(wrapper, "event-detail-network-tab");
+      await networkTab.trigger("click");
+      await flushPromises();
+
       // Resource has duration of 150ms
       const text = wrapper.text();
       expect(text).toContain("150ms");
     });
 
     it("should format ID values correctly", async () => {
+      // Click on Overview tab to see action ID
+      const overviewTab = findByTestId(wrapper, "event-detail-overview-tab");
+      await overviewTab.trigger("click");
+      await flushPromises();
+
       const text = wrapper.text();
       expect(text).toContain("action-123");
     });
