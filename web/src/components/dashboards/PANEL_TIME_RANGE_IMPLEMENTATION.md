@@ -720,6 +720,13 @@ export default defineComponent({
 
 Modify the existing date time picker to work for panel-level time:
 
+**✅ IMPLEMENTED:** When editing a panel that has panel-level time configured, the date time picker now automatically shows the panel's time instead of the global time. This provides a seamless experience where users can see and modify the panel-specific time directly.
+
+**Priority for Date Time Picker Display in Edit Mode:**
+1. **URL Panel Time Parameters** (pt-{panelId}) - Highest priority
+2. **Panel Config Time** (panel_time_range) - If no URL params
+3. **Global Time** - Fallback if panel has no specific time
+
 ```vue
 <template>
   <!-- Existing layout ... -->
@@ -770,6 +777,31 @@ watch(dateTimeValue, (newValue) => {
     };
   }
 }, { deep: true });
+
+// ✅ NEW: In loadDashboard(), after setting selectedDate from global time,
+// check if we're in edit mode and if the panel has panel-level time.
+// If yes, override selectedDate with the panel's time to show it in the picker.
+if (editMode.value && route.query.panelId) {
+  const panelId = route.query.panelId as string;
+  let panelTimeValue = null;
+
+  // Priority 1: Check URL params for panel-level time (pt-{panelId})
+  const urlPanelTime = getPanelTimeFromURL(panelId, route.query);
+  if (urlPanelTime) {
+    panelTimeValue = urlPanelTime;
+  }
+  // Priority 2: Check panel config for panel_time_range
+  else if (dashboardPanelData.data.config?.panel_time_range) {
+    panelTimeValue = convertPanelTimeRangeToPicker(
+      dashboardPanelData.data.config.panel_time_range
+    );
+  }
+
+  // If panel has its own time, update the selectedDate to show it in the picker
+  if (panelTimeValue) {
+    selectedDate.value = panelTimeValue;
+  }
+}
 </script>
 ```
 
