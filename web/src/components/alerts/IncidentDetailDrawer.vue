@@ -1389,6 +1389,10 @@ export default defineComponent({
 
     // Computed property to extract unique alerts and their fire counts from triggers
     const uniqueAlertsMap = computed(() => {
+      if (!triggers.value || triggers.value.length === 0) {
+        return new Map<string, number>();
+      }
+
       const alertMap = new Map<string, number>();
 
       triggers.value.forEach(trigger => {
