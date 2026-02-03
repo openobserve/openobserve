@@ -2,7 +2,7 @@
 
 ## Overview
 
-This test suite contains **10 Priority 1 (P1) test cases** for VRL (Vector Remap Language) visualization support. VRL functions are currently **only supported for table charts**.
+This test suite contains **20 Priority 1 (P1) test cases** for VRL (Vector Remap Language) visualization support. VRL functions are currently **only supported for table charts**.
 
 ## Test File
 
@@ -75,21 +75,17 @@ Based on the UI screenshots and design:
 ---
 
 ### 6. ✅ Complex VRL Function Handling
-**Test**: `[P1] Should handle complex VRL function with conditional logic`
+**Test**: `[P1] Should handle complex VRL function with multiple field creation`
 
 **VRL Example**:
 ```vrl
-.status_code = to_int!(.kubernetes_namespace_name) ?? 200
-.is_error = .status_code >= 400
-.log_level = if .is_error {
-  "ERROR"
-} else {
-  "INFO"
-}
+.vrl_status = "processed"
+.vrl_count = 100
+.vrl_flag = true
 ```
 
 **What it tests**:
-- Complex VRL with conditionals executes correctly
+- Complex VRL with multiple fields executes correctly
 - Multiple VRL-generated fields appear
 - No dashboard errors
 - Table has multiple columns
@@ -146,6 +142,129 @@ Based on the UI screenshots and design:
 
 ---
 
+### 11. ✅ Dynamic Columns Configuration
+**Test**: `[P1] Should enable dynamic columns configuration when VRL function is applied`
+
+**What it tests**:
+- Table chart automatically enables dynamic columns for VRL
+- VRL-generated columns appear in the table
+- Column headers are visible
+- VRL column data is displayed correctly
+
+---
+
+### 12. ✅ VRL Toggle Disable/Re-enable
+**Test**: `[P1] Should disable VRL toggle and allow chart type switching`
+
+**What it tests**:
+- VRL toggle can be disabled after being enabled
+- VRL function editor can be cleared
+- Query can be run without VRL after disabling
+- Behavior changes when VRL is disabled
+
+---
+
+### 13. ✅ H-Bar Chart Restriction
+**Test**: `[P1] Should show error for h-bar chart when VRL function is present`
+
+**What it tests**:
+- H-bar chart switch shows error when VRL is present
+- Error message appears correctly
+- Table chart remains selected after attempted switch
+- VRL restriction applies to all chart types including h-bar
+
+---
+
+### 14. ✅ Query Refresh Persistence
+**Test**: `[P1] Should persist VRL function after running query multiple times`
+
+**What it tests**:
+- VRL function persists after running query in visualization tab
+- Chart renders correctly after multiple query executions
+- Table chart remains selected
+- VRL column values remain visible
+
+---
+
+### 15. ✅ VRL Data Types Display
+**Test**: `[P1] Should display VRL-generated fields as table columns with correct data types`
+
+**VRL Example**:
+```vrl
+.vrl_string = "test"
+.vrl_number = 42
+.vrl_boolean = true
+```
+
+**What it tests**:
+- String values are displayed correctly
+- Number values are displayed correctly
+- Boolean values are displayed correctly
+- Multiple data type columns appear in table
+
+---
+
+### 16. ✅ Time Range Change Persistence
+**Test**: `[P1] Should maintain VRL toggle state after changing time range`
+
+**What it tests**:
+- VRL toggle remains enabled after changing time range
+- VRL editor remains visible
+- VRL function is preserved
+- Table chart is still selected in visualization
+
+---
+
+### 17. ✅ VRL with Aggregation Query
+**Test**: `[P1] Should handle VRL with aggregation query and force table chart`
+
+**SQL Example**:
+```sql
+SELECT kubernetes_namespace_name as "x_axis_1", count(*) as "y_axis_1"
+FROM "e2e_automate" GROUP BY x_axis_1 LIMIT 10
+```
+
+**What it tests**:
+- Aggregation queries with VRL force table chart (not bar/line)
+- Data rows are displayed in table
+- Bar chart switch shows VRL error
+- VRL restriction applies to aggregation results
+
+---
+
+### 18. ✅ No VRL Error Without VRL
+**Test**: `[P1] Should not show VRL error notification when VRL is not present`
+
+**What it tests**:
+- Without VRL, chart type switching works normally
+- VRL-specific error message does NOT appear
+- Other chart types can be selected
+- Validates error message is specific to VRL
+
+---
+
+### 19. ✅ VRL Editor Format and Display
+**Test**: `[P1] Should display VRL function editor with correct placeholder and format`
+
+**What it tests**:
+- VRL editor is visible when toggle is enabled
+- Editor input area is ready for input
+- VRL content can be entered correctly
+- Editor displays correctly
+
+---
+
+### 20. ✅ Edit Dashboard Panel with VRL
+**Test**: `[P1] Should preserve VRL configuration when editing existing dashboard panel`
+
+**What it tests**:
+- Dashboard panel with VRL can be edited
+- VRL column is preserved in edit mode
+- Table chart type remains selected
+- VRL configuration survives edit/save cycle
+
+---
+
 ## VRL Function Examples
 
 ### Simple VRL (from screenshot)
@@ -159,15 +278,18 @@ Based on the UI screenshots and design:
 .status = "success"
 ```
 
-### Complex VRL with Conditionals
+### Complex VRL with Multiple Fields
 ```vrl
-.status_code = to_int!(.kubernetes_namespace_name) ?? 200
-.is_error = .status_code >= 400
-.log_level = if .is_error {
-  "ERROR"
-} else {
-  "INFO"
-}
+.vrl_status = "processed"
+.vrl_count = 100
+.vrl_flag = true
+```
+
+### Multi-Type VRL (String, Number, Boolean)
+```vrl
+.vrl_string = "test"
+.vrl_number = 42
+.vrl_boolean = true
 ```
 
 ## SQL Query Examples
@@ -224,18 +346,21 @@ npx playwright test visualize-vrl.spec.js --debug
 
 ## Test Execution Time
 
-**Estimated Time**: ~4-5 minutes for all 10 tests
+**Estimated Time**: ~8-10 minutes for all 20 tests
 
 ## Test Coverage
 
 | Category | Coverage |
 |----------|----------|
-| VRL Editor UI | ✅ Toggle display, Editor visibility |
-| VRL Function Execution | ✅ Simple VRL, Complex VRL, Multiple fields |
-| Chart Type Restrictions | ✅ Error for line/bar/area/scatter, Table allowed |
-| Dashboard Integration | ✅ Save panel, Load panel |
-| Data Persistence | ✅ Tab switching, Configuration preservation |
+| VRL Editor UI | ✅ Toggle display, Editor visibility, Editor format |
+| VRL Function Execution | ✅ Simple VRL, Complex VRL, Multiple fields, Data types |
+| Chart Type Restrictions | ✅ Error for line/bar/area/scatter/h-bar, Table allowed |
+| Dashboard Integration | ✅ Save panel, Load panel, Edit panel |
+| Data Persistence | ✅ Tab switching, Time range change, Query refresh |
 | Query Types | ✅ SELECT *, Aggregation, Histogram |
+| Toggle State | ✅ Enable, Disable, Re-enable, Persistence |
+| Dynamic Columns | ✅ Auto-enabled for VRL, Column display |
+| Negative Testing | ✅ No VRL error when VRL not present |
 
 ## Error Messages Tested
 
@@ -330,7 +455,8 @@ Based on the provided screenshots, the tests cover:
 
 ---
 
-**Test Suite Version**: 1.0
+**Test Suite Version**: 2.0
 **Created**: 2026-01-30
-**Test Count**: 10 P1 test cases
-**Estimated Execution Time**: 4-5 minutes
+**Updated**: 2026-01-31
+**Test Count**: 20 P1 test cases
+**Estimated Execution Time**: 8-10 minutes
