@@ -1,6 +1,6 @@
 <template>
   <q-card flat class="tw:h-full">
-    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container">
+    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container service-graph-container">
       <!-- Top row with search and control buttons -->
       <div class="row items-center q-col-gutter-sm q-mb-md">
         <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
@@ -16,7 +16,7 @@
                 : [{ label: 'All Streams', value: 'all' }]
             "
             dense
-            outlined
+            borderless
             emit-value
             map-options
             class="tw:w-[180px] tw:flex-shrink-0"
@@ -37,7 +37,7 @@
             v-model="searchFilter"
             borderless
             dense
-            class="no-border tw:h-[36px] tw:flex-grow"
+            class="no-border tw:h-[36px]"
             placeholder="Search services..."
             debounce="300"
             @update:model-value="applyFilters"
@@ -79,25 +79,23 @@
             <q-tooltip>Refresh Service Graph</q-tooltip>
           </q-btn>
 
-          <!-- 3. Graph/Tree view toggle buttons -->
-          <q-btn-toggle
-            v-model="visualizationType"
-            toggle-color="primary"
-            :options="[
-              { label: 'Graph View', value: 'graph', icon: 'hub' },
-              { label: 'Tree View', value: 'tree', icon: 'account_tree' },
-            ]"
-            dense
-            no-caps
-            @update:model-value="setVisualizationType"
-          />
+          <!-- 3. Graph/Tree view toggle -->
+          <div class="app-tabs-container tw:h-[36px]">
+            <app-tabs
+              data-test="service-graph-view-tabs"
+              class="tabs-selection-container"
+              :tabs="visualizationTabs"
+              v-model:active-tab="visualizationType"
+              @update:active-tab="setVisualizationType"
+            />
+          </div>
 
           <!-- 4. Layout dropdown -->
           <q-select
             v-model="layoutType"
             :options="layoutOptions"
             dense
-            filled
+            borderless
             class="tw:w-[160px]"
             emit-value
             map-options
@@ -313,13 +311,41 @@
                 />
               </div>
             </div>
-            <div v-else class="tw:h-full">
+            <div v-else class="tw:h-full graph-with-panel-container">
               <ChartRenderer
                 ref="chartRendererRef"
                 data-test="service-graph-chart"
                 :data="chartData"
                 :key="chartKey"
                 class="tw:h-full"
+                @click="handleNodeClick"
+              />
+
+              <!-- Service Graph Side Panel -->
+              <ServiceGraphSidePanel
+                v-if="selectedNode"
+                :selected-node="selectedNode"
+                :graph-data="graphData"
+                :time-range="timeRange"
+                :visible="showSidePanel"
+                :stream-filter="streamFilter"
+                @close="handleCloseSidePanel"
+                @view-logs="handleViewLogs"
+                @view-traces="handleViewTraces"
+                @navigate-to-dashboard="handleNavigateToDashboard"
+              />
+
+              <!-- Service Graph Edge Panel -->
+              <ServiceGraphEdgePanel
+                v-if="selectedEdge"
+                :selected-edge="selectedEdge"
+                :graph-data="graphData"
+                :time-range="timeRange"
+                :visible="showEdgePanel"
+                :stream-filter="streamFilter"
+                @close="handleCloseEdgePanel"
+                @view-logs="handleEdgeViewLogs"
+                @view-traces="handleEdgeViewTraces"
               />
             </div>
           </div>
@@ -368,12 +394,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import DateTime from "@/components/DateTime.vue";
+import ServiceGraphSidePanel from "./ServiceGraphSidePanel.vue";
+import ServiceGraphEdgePanel from "./ServiceGraphEdgePanel.vue";
 import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
@@ -386,15 +416,27 @@ export default defineComponent({
     AppTabs,
     ChartRenderer,
     DateTime,
+    ServiceGraphSidePanel,
+    ServiceGraphEdgePanel,
   },
   setup() {
     const store = useStore();
+    const $q = useQuasar();
+    const router = useRouter();
     const { getStreams } = useStreams();
 
     const loading = ref(false);
     const error = ref<string | null>(null);
     const showSettings = ref(false);
     const lastUpdated = ref("");
+
+    // Side panel state
+    const selectedNode = ref<any>(null);
+    const showSidePanel = ref(false);
+
+    // Edge panel state
+    const selectedEdge = ref<any>(null);
+    const showEdgePanel = ref(false);
 
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem(
@@ -403,6 +445,12 @@ export default defineComponent({
     const visualizationType = ref<"tree" | "graph">(
       (storedVisualizationType as "tree" | "graph") || "graph",
     );
+
+    // Visualization tabs configuration
+    const visualizationTabs = [
+      { label: "Graph View", value: "graph" },
+      { label: "Tree View", value: "tree" },
+    ];
 
     // Initialize layout type based on visualization type
     const storedLayoutType = localStorage.getItem("serviceGraph_layoutType");
@@ -511,6 +559,8 @@ export default defineComponent({
               filteredGraphData.value,
               layoutType.value,
               graphNodePositions.value,
+              $q.dark.isActive, // Pass dark mode state
+              undefined, // Don't pass selected node - we'll use dispatchAction instead
             );
 
       // Cache the options with the current key for graph view
@@ -524,8 +574,46 @@ export default defineComponent({
       return {
         ...newOptions,
         notMerge: visualizationType.value === "graph" ? false : true, // Merge for graph, replace for tree
+        lazyUpdate: true, // Prevent viewport reset when only styles change
+        silent: true, // Disable animations during update to prevent position jumps
       };
     });
+
+    // Use ECharts select action to persistently highlight selected node
+    watch(
+      () => selectedNode.value?.id,
+      async (newId, oldId) => {
+        await nextTick();
+
+        if (!chartRendererRef.value?.chart) {
+          console.warn('[ServiceGraph] Chart ref not available for selection');
+          return;
+        }
+
+        const chart = chartRendererRef.value.chart;
+
+        // Unselect the old node (if any)
+        if (oldId) {
+          chart.dispatchAction({
+            type: 'unselect',
+            seriesIndex: 0,
+            name: oldId,
+          });
+        }
+
+        // Select the new node (if any)
+        if (newId) {
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: newId,
+          });
+        }
+
+        console.log('[ServiceGraph] Node selection updated via dispatchAction:', { newId, oldId });
+      },
+      { flush: 'post' }
+    );
 
     const loadServiceGraph = async () => {
       loading.value = true;
@@ -868,6 +956,166 @@ export default defineComponent({
       }
     };
 
+    // Settings handler
+    const resetSettings = () => {
+      // Reset to default settings if needed
+      showSettings.value = false;
+    };
+
+    // Side Panel Handlers
+    const handleNodeClick = (params: any) => {
+      console.log('[ServiceGraph] Click event:', params);
+
+      // Check if it's an edge click (for graph visualization)
+      if (params.dataType === 'edge' && params.data) {
+        console.log('[ServiceGraph] Opening edge panel for edge:', params.data);
+        // Close node panel when opening edge panel
+        showSidePanel.value = false;
+        selectedNode.value = null;
+
+        // Find the full edge data from graphData
+        const edgeData = graphData.value.edges.find(
+          (e: any) => e.from === params.data.source && e.to === params.data.target
+        );
+        if (edgeData) {
+          selectedEdge.value = edgeData;
+          showEdgePanel.value = true;
+        } else {
+          console.warn('[ServiceGraph] Could not find edge data for:', params.data.source, '->', params.data.target);
+        }
+      }
+      // Check if it's a node click (for graph visualization)
+      else if (params.dataType === 'node' && params.data) {
+        console.log('[ServiceGraph] Opening side panel for node:', params.data);
+        // Close edge panel when opening node panel
+        showEdgePanel.value = false;
+        selectedEdge.value = null;
+
+        selectedNode.value = params.data;
+        showSidePanel.value = true;
+      }
+      // For tree visualization, check if it's a tree node
+      else if (params.componentType === 'series' && params.data && params.data.name) {
+        console.log('[ServiceGraph] Opening side panel for tree node:', params.data);
+        // Close edge panel when opening node panel
+        showEdgePanel.value = false;
+        selectedEdge.value = null;
+
+        // Find the actual node data from graphData
+        const nodeData = graphData.value.nodes.find(
+          (n: any) => n.label === params.data.name || n.id === params.data.name
+        );
+        if (nodeData) {
+          selectedNode.value = nodeData;
+          showSidePanel.value = true;
+        } else {
+          console.warn('[ServiceGraph] Could not find node data for:', params.data.name);
+        }
+      } else {
+        console.log('[ServiceGraph] Click not on a node or edge, ignoring');
+      }
+    };
+
+    const handleCloseSidePanel = () => {
+      showSidePanel.value = false;
+      // Don't clear selectedNode immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedNode.value = null;
+      }, 300);
+    };
+
+    const handleViewLogs = () => {
+      if (!selectedNode.value) return;
+
+      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
+      router.push({
+        name: 'logs',
+        query: {
+          stream: streamFilter.value,
+          sql: `SELECT * FROM "${streamFilter.value}" WHERE service_name = '${serviceName}' ORDER BY _timestamp DESC`,
+          start_time: timeRange.value.startTime,
+          end_time: timeRange.value.endTime,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    const handleViewTraces = () => {
+      if (!selectedNode.value) return;
+
+      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
+      router.push({
+        name: 'traces',
+        query: {
+          stream: streamFilter.value,
+          sql: `SELECT * FROM "${streamFilter.value}" WHERE service_name = '${serviceName}' ORDER BY start_time DESC`,
+          start_time: timeRange.value.startTime,
+          end_time: timeRange.value.endTime,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    const handleNavigateToDashboard = () => {
+      if (!selectedNode.value) return;
+
+      // Navigate to dashboards page
+      // In the future, this could navigate to a service-specific dashboard
+      const dashboardId = `service-${selectedNode.value.id}`;
+      router.push({
+        name: 'dashboards',
+        params: { dashboardId }
+      }).catch(() => {
+        // If dashboard doesn't exist, navigate to dashboards list
+        router.push({ name: 'dashboards' });
+      });
+    };
+
+    // Edge Panel Handlers
+    const handleCloseEdgePanel = () => {
+      showEdgePanel.value = false;
+      // Don't clear selectedEdge immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedEdge.value = null;
+      }, 300);
+    };
+
+    const handleEdgeViewLogs = () => {
+      if (!selectedEdge.value) return;
+
+      // Navigate to logs filtered by both source and target services
+      const sourceService = selectedEdge.value.from;
+      const targetService = selectedEdge.value.to;
+      router.push({
+        name: 'logs',
+        query: {
+          stream: streamFilter.value,
+          sql: `SELECT * FROM "${streamFilter.value}" WHERE (service_name = '${sourceService}' OR service_name = '${targetService}') ORDER BY _timestamp DESC`,
+          start_time: timeRange.value.startTime,
+          end_time: timeRange.value.endTime,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    const handleEdgeViewTraces = () => {
+      if (!selectedEdge.value) return;
+
+      // Navigate to traces filtered by edge (parent service -> child service)
+      const sourceService = selectedEdge.value.from;
+      const targetService = selectedEdge.value.to;
+      router.push({
+        name: 'traces',
+        query: {
+          stream: streamFilter.value,
+          sql: `SELECT * FROM "${streamFilter.value}" WHERE parent.service.name = '${sourceService}' AND service.name = '${targetService}' ORDER BY start_time DESC`,
+          start_time: timeRange.value.startTime,
+          end_time: timeRange.value.endTime,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     onMounted(async () => {
       await loadTraceStreams();
       loadServiceGraph();
@@ -887,6 +1135,7 @@ export default defineComponent({
       connectionTypeFilter,
       connectionTypeTabs,
       visualizationType,
+      visualizationTabs,
       layoutType,
       layoutOptions,
       chartData,
@@ -901,6 +1150,21 @@ export default defineComponent({
       setLayout,
       setVisualizationType,
       updateTimeRange,
+      resetSettings,
+      // Side panel
+      selectedNode,
+      showSidePanel,
+      handleNodeClick,
+      handleCloseSidePanel,
+      handleViewLogs,
+      handleViewTraces,
+      handleNavigateToDashboard,
+      // Edge panel
+      selectedEdge,
+      showEdgePanel,
+      handleCloseEdgePanel,
+      handleEdgeViewLogs,
+      handleEdgeViewTraces,
     };
   },
 });
@@ -926,6 +1190,21 @@ export default defineComponent({
   width: 100%;
   border-radius: 4px;
   overflow: hidden;
+}
+
+.service-graph-container {
+  position: relative;
+  overflow: hidden;
+  background: #0f1419 !important; // Dark background from HTML mockup (--bg-primary)
+}
+
+.body--light .service-graph-container {
+  background: #ffffff !important; // White background for light mode
+}
+
+.graph-with-panel-container {
+  position: relative;
+  overflow: visible;
 }
 
 code {
