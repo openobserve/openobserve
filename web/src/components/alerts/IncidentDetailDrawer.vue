@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Bottom: Large Number -->
               <div :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'" class="tw:text-3xl tw:font-semibold tw:leading-none">
-                {{ incidentDetails?.alerts?.length || 0 }}
+                {{ uniqueAlertsCount }}
               </div>
             </div>
 
@@ -817,7 +817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
                           >
-                            Fired {{ getTriggerCountForAlert(alert.id) }} time(s)
+                            Fired {{ alert.count }} time(s)
                           </span>
                         </div>
                       </div>
@@ -1387,14 +1387,47 @@ export default defineComponent({
       return triggers.value.filter(t => t.alert_id === alertId).length;
     };
 
-    // Computed: Alerts sorted by trigger count (descending)
-    const sortedAlertsByTriggerCount = computed(() => {
-      if (!alerts.value || alerts.value.length === 0) return [];
-      return [...alerts.value].sort((a, b) => {
-        const countA = getTriggerCountForAlert(a.id);
-        const countB = getTriggerCountForAlert(b.id);
-        return countB - countA; // Descending order
+    // Computed property to extract unique alerts and their fire counts from triggers
+    const uniqueAlertsMap = computed(() => {
+      const alertMap = new Map<string, number>();
+
+      triggers.value.forEach(trigger => {
+        const alertName = trigger.alert_name || 'Unknown';
+        alertMap.set(alertName, (alertMap.get(alertName) || 0) + 1);
       });
+
+      return alertMap;
+    });
+
+    // Computed property for unique alerts count
+    const uniqueAlertsCount = computed(() => {
+      return uniqueAlertsMap.value.size;
+    });
+
+    // Computed: Alerts sorted by trigger count (descending) - derived from triggers
+    const sortedAlertsByTriggerCount = computed(() => {
+      if (!triggers.value || triggers.value.length === 0) return [];
+
+      // Group triggers by alert_id to get unique alerts with their counts
+      const alertsMap = new Map<string, { id: string; name: string; count: number }>();
+
+      triggers.value.forEach(trigger => {
+        const alertId = trigger.alert_id;
+        const alertName = trigger.alert_name || 'Unknown';
+
+        if (alertsMap.has(alertId)) {
+          alertsMap.get(alertId)!.count++;
+        } else {
+          alertsMap.set(alertId, {
+            id: alertId,
+            name: alertName,
+            count: 1
+          });
+        }
+      });
+
+      // Convert map to array and sort by count (descending)
+      return Array.from(alertsMap.values()).sort((a, b) => b.count - a.count);
     });
 
     // Peak Alert Rate - find the highest concentration of alerts
@@ -2703,6 +2736,8 @@ export default defineComponent({
       affectedServicesCount,
       alertFrequency,
       getTriggerCountForAlert,
+      uniqueAlertsMap,
+      uniqueAlertsCount,
       sortedAlertsByTriggerCount,
       peakAlertRate,
       peakActivity,
