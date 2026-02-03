@@ -128,7 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-dialog v-model="showGetStarted" maximized full-height>
+    <q-dialog v-model="showGetStarted" maximized
+full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
     <PredefinedThemes />
@@ -322,8 +323,7 @@ export default defineComponent({
 
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
-    const { isOpen: isPredefinedThemesOpen, toggleThemes } =
-      usePredefinedThemes();
+    const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
@@ -394,69 +394,70 @@ export default defineComponent({
     let user = store.state.userInfo;
 
     var linksList = ref([
-      {
-        title: t("menu.home"),
-        icon: outlinedHome,
-        link: "/",
-        exact: true,
-        name: "home",
-      },
-      {
-        title: t("menu.search"),
-        icon: outlinedSearch,
-        link: "/logs",
-        name: "logs",
-      },
-      {
-        title: t("menu.metrics"),
-        icon: outlinedBarChart,
-        link: "/metrics",
-        name: "metrics",
-      },
-      {
-        title: t("menu.traces"),
-        icon: outlinedAccountTree,
-        link: "/traces",
-        name: "traces",
-      },
-      {
-        title: t("menu.rum"),
-        icon: outlinedDevices,
-        link: "/rum",
-        name: "rum",
-      },
-      {
-        title: t("menu.dashboard"),
-        icon: outlinedDashboard,
-        link: "/dashboards",
-        name: "dashboards",
-      },
-      {
-        title: t("menu.index"),
-        icon: outlinedWindow,
-        link: "/streams",
-        name: "streams",
-      },
-      {
-        title: t("menu.alerts"),
-        icon: outlinedReportProblem,
-        link: "/alerts",
-        name: "alertList",
-      },
-      {
-        title: t("menu.ingestion"),
-        icon: outlinedFilterAlt,
-        link: "/ingestion",
-        name: "ingestion",
-      },
-      {
-        title: t("menu.iam"),
-        icon: outlinedManageAccounts,
-        link: "/iam",
-        display: store.state?.currentuser?.role == "admin" ? true : false,
-        name: "iam",
-      },
-    ]);
+        {
+          title: t("menu.home"),
+          icon: outlinedHome,
+          link: "/",
+          exact: true,
+          name: "home",
+        },
+        {
+          title: t("menu.search"),
+          icon: outlinedSearch,
+          link: "/logs",
+          name: "logs",
+        },
+        {
+          title: t("menu.metrics"),
+          icon: outlinedBarChart,
+          link: "/metrics",
+          name: "metrics",
+        },
+        {
+          title: t("menu.traces"),
+          icon: outlinedAccountTree,
+          link: "/traces",
+          name: "traces",
+        },
+        {
+          title: t("menu.rum"),
+          icon: outlinedDevices,
+          link: "/rum",
+          name: "rum",
+        },
+        {
+          title: t("menu.dashboard"),
+          icon: outlinedDashboard,
+          link: "/dashboards",
+          name: "dashboards",
+        },
+        {
+          title: t("menu.index"),
+          icon: outlinedWindow,
+          link: "/streams",
+          name: "streams",
+        },
+        {
+          title: t("menu.alerts"),
+          icon: outlinedReportProblem,
+          link: "/alerts",
+          name: "alertList",
+        },
+        {
+          title: t("menu.ingestion"),
+          icon: outlinedFilterAlt,
+          link: "/ingestion",
+          name: "ingestion",
+        },
+        {
+          title: t("menu.iam"),
+          icon: outlinedManageAccounts,
+          link: "/iam",
+          display: store.state?.currentuser?.role == "admin" ? true : false,
+          name: "iam",
+        },
+      ]);
+
 
     const langList = [
       {
@@ -881,7 +882,6 @@ export default defineComponent({
         }
 
         if (router.currentRoute.value.query.action == "subscribe") {
-          console.log("MainLayout 869 , Push to plans");
           router.push({
             name: "plans",
             query: {
@@ -929,36 +929,23 @@ export default defineComponent({
         //set settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
-          scrape_interval:
-            orgSettings?.data?.data?.scrape_interval ??
-            defaultSettings.scrape_interval,
+          scrape_interval: orgSettings?.data?.data?.scrape_interval ?? defaultSettings.scrape_interval,
           span_id_field_name:
-            orgSettings?.data?.data?.span_id_field_name ??
-            defaultSettings.span_id_field_name,
+            orgSettings?.data?.data?.span_id_field_name ?? defaultSettings.span_id_field_name,
           trace_id_field_name:
-            orgSettings?.data?.data?.trace_id_field_name ??
-            defaultSettings.trace_id_field_name,
+            orgSettings?.data?.data?.trace_id_field_name ?? defaultSettings.trace_id_field_name,
           toggle_ingestion_logs:
-            orgSettings?.data?.data?.toggle_ingestion_logs ??
-            defaultSettings.toggle_ingestion_logs,
+            orgSettings?.data?.data?.toggle_ingestion_logs ?? defaultSettings.toggle_ingestion_logs,
           enable_websocket_search:
-            orgSettings?.data?.data?.enable_websocket_search ??
-            defaultSettings.enable_websocket_search,
+            orgSettings?.data?.data?.enable_websocket_search ?? defaultSettings.enable_websocket_search,
           enable_streaming_search:
-            orgSettings?.data?.data?.enable_streaming_search ??
-            defaultSettings.enable_streaming_search,
+            orgSettings?.data?.data?.enable_streaming_search ?? defaultSettings.enable_streaming_search,
           streaming_aggregation_enabled:
-            orgSettings?.data?.data?.streaming_aggregation_enabled ??
-            defaultSettings.streaming_aggregation_enabled,
-          free_trial_expiry:
-            orgSettings?.data?.data?.free_trial_expiry ??
-            defaultSettings.free_trial_expiry,
-          light_mode_theme_color:
-            orgSettings?.data?.data?.light_mode_theme_color,
+            orgSettings?.data?.data?.streaming_aggregation_enabled ?? defaultSettings.streaming_aggregation_enabled,
+          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? defaultSettings.free_trial_expiry,
+          light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
           dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
-          claim_parser_function:
-            orgSettings?.data?.data?.claim_parser_function ??
-            defaultSettings.claim_parser_function,
+          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? defaultSettings.claim_parser_function,
         });
 
         if (
@@ -972,7 +959,6 @@ export default defineComponent({
             trialDueDays <= 0 &&
             trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
           ) {
-            console.log("MainLayout 960 , Push to plans");
             router.push({
               name: "plans",
               query: {
@@ -984,9 +970,7 @@ export default defineComponent({
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
         if (error?.response?.status === 403) {
-          console.warn(
-            "Organization settings access denied (403). Using default settings.",
-          );
+          console.warn("Organization settings access denied (403). Using default settings.");
           // Set default settings when access is denied
           store.dispatch("setOrganizationSettings", defaultSettings);
         } else {
@@ -1376,7 +1360,7 @@ export default defineComponent({
         width: 1.3rem;
       }
 
-      .q-item__label {
+      .q-item__label{
         padding-bottom: 4px;
       }
 
@@ -1396,6 +1380,7 @@ export default defineComponent({
           body.body--dark & {
             color: #ffffff !important;
           }
+
         }
         color: var(--o2-menu-color);
 
@@ -1416,6 +1401,8 @@ export default defineComponent({
             color: #ffffff !important;
           }
         }
+
+        
       }
 
       &__label {

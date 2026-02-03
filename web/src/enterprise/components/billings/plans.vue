@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-px-lg q-pt-md" style="min-height: inherit; overflow: auto">
+  <q-page class="q-px-lg q-pt-md" style="min-height: inherit; overflow: auto;">
     <div class="row justify-between items-center">
       <div>
-        <span class="o2-page-title">{{ t("billing.title") }}</span
-        ><br />
+        <span class="o2-page-title">{{ t("billing.title") }}</span><br />
         <span class="o2-page-subtitle">{{ t("billing.subtitle") }}</span>
       </div>
     </div>
@@ -113,7 +112,7 @@ export default defineComponent({
       }
     },
     async onUnsubscribe() {
-      this.onChangePaymentDetail(this.currentPlanDetail.customer_id);
+      this.onChangePaymentDetail(this.currentPlanDetail.customer_id)
     },
     onChangePaymentDetail(customer_id: string) {
       BillingService.get_session_url(
@@ -135,11 +134,9 @@ export default defineComponent({
           });
         });
     },
-    async loadSubscription(fromPro = false) {
-      try {
-        const res = await BillingService.list_subscription(
-          this.store.state.selectedOrganization.identifier,
-        );
+   async loadSubscription(fromPro = false) {
+    try{
+      const res = await BillingService.list_subscription(this.store.state.selectedOrganization.identifier);
         this.currentPlanDetail = res.data;
         this.billingProvider = res.data.provider || "";
 
@@ -157,10 +154,7 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else if (
-          this.billingProvider === "" ||
-          this.billingProvider === "stripe"
-        ) {
+        } else if (this.billingProvider === "" || this.billingProvider === "stripe") {
           // Only show subscribe prompt for Stripe orgs without subscription
           this.$q.notify({
             type: "warning",
@@ -170,23 +164,22 @@ export default defineComponent({
         }
         this.loading = false;
         this.proLoading = false;
-        console.log("Plans.vue , Push to plans");
         this.$router.push({
           name: "plans",
           query: {
             org_identifier: this.store.state.selectedOrganization.identifier,
           },
         });
-      } catch (e: any) {
-        this.loading = false;
-        this.proLoading = false;
+    } catch (e: any) {
+      this.loading = false;
+      this.proLoading = false;
 
-        this.$q.notify({
-          type: "negative",
-          message: e.message,
-          timeout: 5000,
-        });
-      }
+      this.$q.notify({
+        type: "negative",
+        message: e.message,
+        timeout: 5000,
+      });
+    }
     },
   },
   setup() {
