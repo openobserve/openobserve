@@ -933,9 +933,9 @@ describe("IncidentDetailDrawer.vue", () => {
       const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
 
       expect(uniqueAlertsMap.size).toBe(3);
-      expect(uniqueAlertsMap.get("High CPU")).toBe(2);
-      expect(uniqueAlertsMap.get("Memory Alert")).toBe(2);
-      expect(uniqueAlertsMap.get("Disk Alert")).toBe(1);
+      expect(uniqueAlertsMap.get("alert-1")).toBe(2);
+      expect(uniqueAlertsMap.get("alert-2")).toBe(2);
+      expect(uniqueAlertsMap.get("alert-3")).toBe(1);
     });
 
     it("should compute unique alerts count correctly", async () => {
@@ -975,7 +975,7 @@ describe("IncidentDetailDrawer.vue", () => {
         {
           incident_id: "incident-1",
           alert_id: "alert-1",
-          alert_name: "" as any, // Empty string should become "Unknown"
+          alert_name: "" as any, // Empty string, but we use alert_id for uniqueness
           alert_fired_at: 1700000000000000,
           correlation_reason: "service_discovery",
           created_at: 1700000000000000,
@@ -993,16 +993,44 @@ describe("IncidentDetailDrawer.vue", () => {
 
       const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
 
-      // Empty string is falsy, so it becomes "Unknown"
+      // Should have 2 unique alerts by alert_id regardless of alert_name
       expect(uniqueAlertsMap.size).toBe(2);
-      // Check that Unknown key exists and has value
-      const unknownCount = uniqueAlertsMap.get("Unknown");
-      const validAlertCount = uniqueAlertsMap.get("Valid Alert");
+      // Check by alert_id instead of alert_name
+      const alert1Count = uniqueAlertsMap.get("alert-1");
+      const alert2Count = uniqueAlertsMap.get("alert-2");
 
-      expect(unknownCount).toBeDefined();
-      expect(unknownCount).toBe(1);
-      expect(validAlertCount).toBeDefined();
-      expect(validAlertCount).toBe(1);
+      expect(alert1Count).toBeDefined();
+      expect(alert1Count).toBe(1);
+      expect(alert2Count).toBeDefined();
+      expect(alert2Count).toBe(1);
+    });
+
+    it("should count alerts with same name but different IDs as separate alerts", async () => {
+      // This test verifies the fix: uniqueness should be by alert_id, not alert_name
+      const triggers = [
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }),  // Same name, different ID
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
+
+      // Should have 3 unique alerts by alert_id (alert-1, alert-2, alert-3)
+      // even though all have the same name "High CPU"
+      expect(uniqueAlertsMap.size).toBe(3);
+      expect(wrapper.vm.uniqueAlertsCount).toBe(3);
+      expect(uniqueAlertsMap.get("alert-1")).toBe(2);
+      expect(uniqueAlertsMap.get("alert-2")).toBe(1);
+      expect(uniqueAlertsMap.get("alert-3")).toBe(1);
     });
   });
 

@@ -1392,8 +1392,8 @@ export default defineComponent({
       const alertMap = new Map<string, number>();
 
       triggers.value.forEach(trigger => {
-        const alertName = trigger.alert_name || 'Unknown';
-        alertMap.set(alertName, (alertMap.get(alertName) || 0) + 1);
+        const alertId = trigger.alert_id;
+        alertMap.set(alertId, (alertMap.get(alertId) || 0) + 1);
       });
 
       return alertMap;
