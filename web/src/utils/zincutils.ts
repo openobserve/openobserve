@@ -390,6 +390,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
         store.state.organizationData?.organizationSettings?.free_trial_expiry,
       );
       if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) == -1) {
+        console.log("utils, Push to plans");
         next({
           name: "plans",
           query: {
