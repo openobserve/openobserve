@@ -48,6 +48,7 @@ export default defineComponent({
     const store = useStore();
 
     const routerPush = () => {
+      console.log("pending subscriptions, Redirect to plans");
       router.push({
         name: "plans",
         query: { org_identifier: store.state.selectedOrganization.identifier },
