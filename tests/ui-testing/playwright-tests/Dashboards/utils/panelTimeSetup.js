@@ -99,12 +99,16 @@ export async function addPanelWithPanelTime(page, pm, config) {
   // Set panel name
   await page.locator('[data-test="dashboard-panel-name"]').fill(panelName);
 
-  // Select stream type and stream
-  await page.locator('[data-test="dashboard-panel-stream-type"]').click();
-  await page.locator(`[data-test="dashboard-panel-stream-type-${streamType}"]`).click();
+  // Wait for UI to settle after filling panel name
+  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-  await page.locator('[data-test="dashboard-panel-stream"]').click();
-  await page.locator(`[data-test="dashboard-panel-stream-${stream}"]`).click();
+  // Select stream type and stream using PageManager methods
+  await pm.chartTypeSelector.selectStreamType(streamType);
+  await pm.chartTypeSelector.selectStream(stream);
+
+  // Add fields to Y and breakdown axes for proper chart configuration
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 
   // Configure panel time if enabled
   if (allowPanelTime) {
@@ -121,26 +125,13 @@ export async function addPanelWithPanelTime(page, pm, config) {
     }
   }
 
-  // Save panel
-  await page.locator('[data-test="dashboard-panel-save"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  // Save panel and get panel ID using common function
+  // Use -1 to get the last panel (the one we just added)
+  const panelId = await savePanelAndGetId(page, { panelIndex: -1 });
 
-  // Wait for panel to appear in dashboard
-  await page.locator('[data-test^="dashboard-panel-"]').first().waitFor({
-    state: "visible",
-    timeout: 15000
-  });
+  testLogger.info('Panel added successfully', { panelId, panelName });
 
-  // Get the panel ID from the created panel
-  const panelElements = await page.locator('[data-test^="dashboard-panel-"]').all();
-  if (panelElements.length > 0) {
-    const dataTest = await panelElements[0].getAttribute('data-test');
-    const panelId = dataTest.replace('dashboard-panel-', '');
-    testLogger.info('Panel created with ID', { panelId });
-    return panelId;
-  }
-
-  throw new Error('Failed to get panel ID after creation');
+  return panelId;
 }
 
 /**
@@ -215,23 +206,18 @@ export async function openDashboard(page, dashboardName) {
 /**
  * Edit a panel in dashboard
  * @param {Object} page - Playwright page object
- * @param {string} panelId - Panel ID
+ * @param {string} panelName - Panel name
  */
-export async function editPanel(page, panelId) {
-  testLogger.info('Editing panel', { panelId });
+export async function editPanel(page, panelName) {
+  testLogger.info('Editing panel', { panelName });
 
   // Click panel edit button
-  const editBtn = page.locator(`[data-test="panel-${panelId}-edit-btn"]`);
-  await editBtn.waitFor({ state: "visible", timeout: 10000 });
-  await editBtn.click();
+  await page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`).click();
+    await page.locator('[data-test="dashboard-edit-panel"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('[data-test="dashboard-edit-panel"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').waitFor({ state: "visible", timeout: 10000 });
 
-  // Wait for AddPanel view
-  await page.locator('[data-test="dashboard-panel-name"]').waitFor({
-    state: "visible",
-    timeout: 10000
-  });
-
-  testLogger.info('Panel edit mode opened', { panelId });
+  testLogger.info('Panel edit mode opened', { panelName });
 }
 
 /**
@@ -251,6 +237,61 @@ export async function savePanel(page) {
   });
 
   testLogger.info('Panel saved successfully');
+}
+
+/**
+ * Save panel and capture panel ID from API response
+ * @param {Object} page - Playwright page object
+ * @param {Object} options - Options object
+ * @param {number} options.panelIndex - Panel index to extract (0-based). Use -1 for last panel. Default: -1
+ * @returns {Promise<string>} - Panel ID
+ */
+export async function savePanelAndGetId(page, options = {}) {
+  const { panelIndex = -1 } = options;
+
+  testLogger.info('Saving panel and capturing ID from API response', { panelIndex });
+
+  // Setup API response listener before saving
+  const saveResponsePromise = page.waitForResponse(
+    response => response.url().includes('/api/') &&
+                response.url().includes('/dashboards/') &&
+                response.request().method() === 'PUT',
+    { timeout: 30000 }
+  );
+
+  // Click save button
+  await page.locator('[data-test="dashboard-panel-save"]').click();
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+  // Get panel ID from API response
+  let panelId;
+  try {
+    const saveResponse = await saveResponsePromise;
+    const responseBody = await saveResponse.json();
+
+    // Extract panel ID from response structure: response.v8.tabs[0].panels[index].id
+    if (responseBody.v8 &&
+        responseBody.v8.tabs &&
+        responseBody.v8.tabs.length > 0 &&
+        responseBody.v8.tabs[0].panels &&
+        responseBody.v8.tabs[0].panels.length > 0) {
+      const panels = responseBody.v8.tabs[0].panels;
+      // Use specified index, or last panel if index is -1
+      const targetIndex = panelIndex >= 0 ? panelIndex : panels.length - 1;
+      panelId = panels[targetIndex].id;
+      testLogger.info('Panel ID from API response', { panelId, panelIndex: targetIndex });
+    } else {
+      throw new Error('Invalid API response structure');
+    }
+  } catch (error) {
+    // Fallback to DOM extraction if API response fails
+    testLogger.warn('Failed to get panel ID from API, falling back to DOM', { error: error.message });
+    const fallbackIndex = panelIndex >= 0 ? panelIndex : 0;
+    panelId = await getPanelId(page, fallbackIndex);
+    testLogger.info('Panel ID from DOM (fallback)', { panelId });
+  }
+
+  return panelId;
 }
 
 /**
@@ -431,6 +472,7 @@ export default {
   openDashboard,
   editPanel,
   savePanel,
+  savePanelAndGetId,
   getPanelId,
   navigateToDashboardWithParams,
   getDashboardIdFromURL,
