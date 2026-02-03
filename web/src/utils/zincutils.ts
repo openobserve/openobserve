@@ -367,7 +367,9 @@ export const getPath = () => {
   const pos = window.location.pathname.indexOf("/web/");
   const path =
     window.location.origin == "http://localhost:8081"
-      ? pos > -1 ? "/web/" : "/"
+      ? pos > -1
+        ? "/web/"
+        : "/"
       : pos > -1
         ? window.location.pathname.slice(0, pos + 5)
         : "";
@@ -1273,8 +1275,10 @@ export const getDuration = (createdAt: number) => {
   };
 };
 
-
-export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string[] => {
+export const mergeAndRemoveDuplicates = (
+  arr1: string[],
+  arr2: string[],
+): string[] => {
   // Merge both arrays, then remove duplicates using Set
   return [...new Set([...arr1, ...arr2])];
 };
@@ -1289,7 +1293,7 @@ export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string
  */
 export const processQueryMetadataErrors = (
   metadata: any,
-  timezone: string = "UTC"
+  timezone: string = "UTC",
 ): string => {
   if (!metadata || metadata.length === 0) {
     return "";
@@ -1300,7 +1304,11 @@ export const processQueryMetadataErrors = (
   // Handle multi-query format (array of arrays)
   if (Array.isArray(metadata[0])) {
     metadata[0].forEach((query: any) => {
-      if (query?.function_error && query?.new_start_time && query?.new_end_time) {
+      if (
+        query?.function_error &&
+        query?.new_start_time &&
+        query?.new_end_time
+      ) {
         const combinedMessage = getFunctionErrorMessage(
           query.function_error,
           query.new_start_time,
@@ -1341,7 +1349,7 @@ export const processQueryMetadataErrors = (
  */
 export const calculateRelativeTimePeriod = (
   startTime: number,
-  endTime: number
+  endTime: number,
 ): string => {
   const diffInMicroseconds = endTime - startTime;
   const diffInSeconds = Math.floor(diffInMicroseconds / 1000000);
@@ -1349,11 +1357,11 @@ export const calculateRelativeTimePeriod = (
   // Define time units in seconds
   const units = [
     { label: "M", value: 2592000 }, // ~30 days
-    { label: "w", value: 604800 },  // 7 days
-    { label: "d", value: 86400 },   // 1 day
-    { label: "h", value: 3600 },    // 1 hour
-    { label: "m", value: 60 },      // 1 minute
-    { label: "s", value: 1 },       // 1 second
+    { label: "w", value: 604800 }, // 7 days
+    { label: "d", value: 86400 }, // 1 day
+    { label: "h", value: 3600 }, // 1 hour
+    { label: "m", value: 60 }, // 1 minute
+    { label: "s", value: 1 }, // 1 second
   ];
 
   // Find the best matching unit
@@ -1376,7 +1384,7 @@ export const calculateRelativeTimePeriod = (
  */
 export const calculateAbsoluteDateTime = (
   startTime: number,
-  endTime: number
+  endTime: number,
 ): {
   selectedDate: { from: string; to: string };
   selectedTime: { startTime: string; endTime: string };
@@ -1422,7 +1430,7 @@ export const calculateAbsoluteDateTime = (
 export const buildDateTimeObject = (
   startTime: number,
   endTime: number,
-  type: "relative" | "absolute"
+  type: "relative" | "absolute",
 ): any => {
   const baseObj: any = {
     startTime,
@@ -1432,7 +1440,10 @@ export const buildDateTimeObject = (
 
   if (type === "relative") {
     // For relative type, calculate relativeTimePeriod
-    baseObj.relativeTimePeriod = calculateRelativeTimePeriod(startTime, endTime);
+    baseObj.relativeTimePeriod = calculateRelativeTimePeriod(
+      startTime,
+      endTime,
+    );
   } else if (type === "absolute") {
     // For absolute type, calculate selectedDate and selectedTime
     const absoluteDateTime = calculateAbsoluteDateTime(startTime, endTime);
