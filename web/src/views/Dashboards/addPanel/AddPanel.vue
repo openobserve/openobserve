@@ -917,9 +917,9 @@ export default defineComponent({
         if (!newPanelTime) {
           // Panel time removed - clear panel time params from URL
           const query = { ...route.query };
-          delete query[`pt-${panelId}`];
-          delete query[`pt-${panelId}-from`];
-          delete query[`pt-${panelId}-to`];
+          delete query[`pt-period.${panelId}`];
+          delete query[`pt-from.${panelId}`];
+          delete query[`pt-to.${panelId}`];
           router.replace({ query });
           return;
         }
@@ -928,17 +928,17 @@ export default defineComponent({
         const query = { ...route.query };
 
         if (newPanelTime.type === 'relative' && newPanelTime.relativeTimePeriod) {
-          // Relative time: pt-{panelId}={relativeTimePeriod}
-          query[`pt-${panelId}`] = newPanelTime.relativeTimePeriod;
+          // Relative time: pt-period.{panelId}={relativeTimePeriod}
+          query[`pt-period.${panelId}`] = newPanelTime.relativeTimePeriod;
           // Remove absolute time params if they exist
-          delete query[`pt-${panelId}-from`];
-          delete query[`pt-${panelId}-to`];
+          delete query[`pt-from.${panelId}`];
+          delete query[`pt-to.${panelId}`];
         } else if (newPanelTime.type === 'absolute' && newPanelTime.startTime && newPanelTime.endTime) {
-          // Absolute time: pt-{panelId}-from={startTime}&pt-{panelId}-to={endTime}
-          query[`pt-${panelId}-from`] = newPanelTime.startTime.toString();
-          query[`pt-${panelId}-to`] = newPanelTime.endTime.toString();
+          // Absolute time: pt-from.{panelId}={startTime}&pt-to.{panelId}={endTime}
+          query[`pt-from.${panelId}`] = newPanelTime.startTime.toString();
+          query[`pt-to.${panelId}`] = newPanelTime.endTime.toString();
           // Remove relative time param if it exists
-          delete query[`pt-${panelId}`];
+          delete query[`pt-period.${panelId}`];
         }
 
         router.replace({ query });

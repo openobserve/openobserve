@@ -38,7 +38,7 @@ export interface PanelTimeRange {
 
 /**
  * Extract panel time from URL query parameters
- * Checks for both relative time (pt-{id}) and absolute time (pt-{id}-from, pt-{id}-to)
+ * Checks for both relative time (pt-period.{id}) and absolute time (pt-from.{id}, pt-to.{id})
  */
 export const getPanelTimeFromURL = (
   panelId: string,
@@ -46,9 +46,9 @@ export const getPanelTimeFromURL = (
 ): PanelTimePickerValue | null => {
   if (!query) return null;
 
-  const relativeParam = query[`pt-${panelId}`];
-  const fromParam = query[`pt-${panelId}-from`];
-  const toParam = query[`pt-${panelId}-to`];
+  const relativeParam = query[`pt-period.${panelId}`];
+  const fromParam = query[`pt-from.${panelId}`];
+  const toParam = query[`pt-to.${panelId}`];
 
   if (relativeParam) {
     return {
@@ -160,8 +160,8 @@ export const hasPanelTime = (
 ): boolean => {
   return !!(
     panel?.config?.panel_time_range ||
-    query?.[`pt-${panelId}`] ||
-    query?.[`pt-${panelId}-from`]
+    query?.[`pt-period.${panelId}`] ||
+    query?.[`pt-from.${panelId}`]
   );
 };
 
