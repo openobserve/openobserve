@@ -329,6 +329,79 @@ const useTraces = () => {
     return shareURL;
   });
 
+  // Color palette for service visualization
+  const colorPalette = [
+    "#b7885e",
+    "#1ab8be",
+    "#ffcb99",
+    "#f89570",
+    "#839ae2",
+  ];
+
+  /**
+   * Generate a new color in HSL format
+   * Used when the color palette is exhausted
+   */
+  const generateNewColor = (currentColorCount: number): string => {
+    const hue = currentColorCount * (360 / 50);
+    const lightness = 50 + (currentColorCount % 2) * 15;
+    return `hsl(${hue}, 100%, ${lightness}%)`;
+  };
+
+  /**
+   * Format raw trace hits from API into structured trace metadata
+   * Assigns service colors and formats timestamps
+   * @param traces - Raw trace hits from the API
+   * @returns Formatted trace metadata array
+   */
+  const formatTracesMetaData = (traces: any[]): any[] => {
+    if (!traces.length) return [];
+
+    // Track color palette locally if not using shared colors
+    const localColors = [...colorPalette];
+    let colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+
+    return traces.map((trace) => {
+      const _trace = {
+        trace_id: trace.trace_id,
+        trace_start_time: Math.round(trace.start_time / 1000),
+        trace_end_time: Math.round(trace.end_time / 1000),
+        service_name: trace.first_event?.service_name || "",
+        operation_name: trace.first_event?.operation_name || "",
+        spans: trace.spans?.[0] || 0,
+        errors: trace.spans?.[1] || 0,
+        duration: trace.duration || 0,
+        services: {} as Record<string, number>,
+        zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
+      };
+
+      // Assign colors to services
+      if (trace.service_name && Array.isArray(trace.service_name)) {
+        trace.service_name.forEach((service: any) => {
+          const serviceName =
+            typeof service === "string" ? service : service.service_name;
+
+          if (!searchObj.meta.serviceColors[serviceName]) {
+            // Generate new color if palette is exhausted
+            if (colorIndex >= localColors.length) {
+              localColors.push(generateNewColor(localColors.length));
+            }
+
+            searchObj.meta.serviceColors[serviceName] = localColors[colorIndex];
+            colorIndex++;
+          }
+
+          // Track service span count
+          const serviceCount =
+            typeof service === "string" ? 1 : service.count || 1;
+          _trace.services[serviceName] = serviceCount;
+        });
+      }
+
+      return _trace;
+    });
+  };
+
   return {
     searchObj,
     resetSearchObj,
@@ -338,6 +411,7 @@ const useTraces = () => {
     buildQueryDetails,
     navigateToLogs,
     tracesShareURL,
+    formatTracesMetaData,
   };
 };
 

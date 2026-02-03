@@ -231,16 +231,19 @@ const activeTab = ref("search");
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
-const { searchObj, resetSearchObj, getUrlQueryParams, copyTracesUrl } =
-  useTraces();
+const {
+  searchObj,
+  resetSearchObj,
+  getUrlQueryParams,
+  copyTracesUrl,
+  formatTracesMetaData,
+} = useTraces();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
-const serviceColorIndex = ref(0);
-const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
@@ -701,7 +704,7 @@ async function getQueryData() {
           }
         }
 
-        const formattedHits = getTracesMetaData(res.data.hits);
+        const formattedHits = formatTracesMetaData(res.data.hits);
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
           searchObj.data.queryResults.hits.push(...formattedHits);
@@ -780,44 +783,6 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
   });
 };
 
-const getTracesMetaData = (traces) => {
-  if (!traces.length) return [];
-
-  return traces.map((trace) => {
-    const _trace = {
-      trace_id: trace.trace_id,
-      trace_start_time: Math.round(trace.start_time / 1000),
-      trace_end_time: Math.round(trace.end_time / 1000),
-      service_name: trace.first_event.service_name,
-      operation_name: trace.first_event.operation_name,
-      spans: trace.spans[0],
-      errors: trace.spans[1],
-      duration: trace.duration,
-      services: {},
-      zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-    };
-    trace.service_name.forEach((service) => {
-      if (!searchObj.meta.serviceColors[service.service_name]) {
-        if (serviceColorIndex.value >= colors.value.length) generateNewColor();
-
-        searchObj.meta.serviceColors[service.service_name] =
-          colors.value[serviceColorIndex.value];
-
-        serviceColorIndex.value++;
-      }
-      _trace.services[service.service_name] = service.count;
-    });
-    return _trace;
-  });
-};
-
-function generateNewColor() {
-  // Generate a color in HSL format
-  const hue = colors.value.length * (360 / 50);
-  const lightness = 50 + (colors.value.length % 2) * 15;
-  colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
-  return colors;
-}
 
 async function extractFields() {
   try {

@@ -2704,6 +2704,8 @@
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No correlated traces found",
     "noTracesDescription": "No traces found for service {service} in the selected time range",
+    "viewInTraces": "View in Traces",
+    "viewInTracesTooltip": "Open traces page with RED metrics dashboard and all correlated traces",
     "filters": "Filters",
     "semanticFieldGroupsTitle": "Field Mappings",
     "semanticFieldGroupsCaption": "Define field name mappings for correlation and deduplication (e.g., host, hostname, node → 'host' group)",
