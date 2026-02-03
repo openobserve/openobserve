@@ -15,6 +15,10 @@
 
 //! Extractor modules for processing OTEL span attributes
 
+use std::collections::HashMap;
+
+use config::utils::json;
+
 pub mod input_output;
 pub mod metadata;
 pub mod model;
@@ -37,3 +41,26 @@ pub use provider::ProviderExtractor;
 pub use service::ServiceNameExtractor;
 pub use tool::ToolExtractor;
 pub use usage::UsageExtractor;
+
+#[inline]
+fn parse_json_value(data: &json::Value) -> Option<HashMap<String, json::Value>> {
+    let val = if let Some(s) = data.as_str() {
+        // If it's a string, parse it as JSON
+        json::from_str::<HashMap<String, json::Value>>(s)
+    } else {
+        // If it's already an object, deserialize it directly
+        json::from_value::<HashMap<String, json::Value>>(data.clone())
+    };
+    val.ok()
+}
+
+#[inline]
+fn set_val_if_not_zero<T: PartialOrd + Clone + Default>(
+    data: &mut HashMap<String, T>,
+    key: String,
+    value: T,
+) {
+    if value > T::default() {
+        data.insert(key, value);
+    }
+}

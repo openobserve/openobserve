@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 
-use config::utils::json;
+use config::utils::{json, str::EMPTY_STRING};
 
 use super::{
     attributes::O2Attributes,
@@ -140,6 +140,31 @@ impl OtelIngestionProcessor {
 
         // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
         if input.is_some() || output.is_some() {
+            // recalculate input and output tokens if not present
+            if let Some(v) = &input
+                && !usage.contains_key("input")
+            {
+                let prompt = v.to_string();
+                let model_name = model_name.as_ref().unwrap_or(&EMPTY_STRING);
+                let prompt_tokens = pricing::calculate_token_count(model_name, &prompt);
+                usage.insert("input".to_string(), prompt_tokens);
+            }
+            if let Some(v) = &output
+                && !usage.contains_key("output")
+            {
+                let output = v.to_string();
+                let model_name = model_name.as_ref().unwrap_or(&EMPTY_STRING);
+                let output_tokens = pricing::calculate_token_count(model_name, &output);
+                usage.insert("output".to_string(), output_tokens);
+            }
+
+            // Ensure usage has a input,output,total
+            if !usage.contains_key("input") {
+                usage.insert("input".to_string(), 0);
+            }
+            if !usage.contains_key("output") {
+                usage.insert("output".to_string(), 0);
+            }
             if !usage.contains_key("total") {
                 let input = usage.get("input").cloned().unwrap_or_default();
                 let output = usage.get("output").cloned().unwrap_or_default();

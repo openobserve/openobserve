@@ -23,6 +23,16 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use tiktoken_rs::{get_bpe_from_model, o200k_base};
+
+pub fn calculate_token_count(model_name: &str, prompt: &str) -> i64 {
+    let encoding = match get_bpe_from_model(model_name) {
+        Ok(m) => m,
+        Err(_) => o200k_base().unwrap(),
+    };
+    let tokens = encoding.encode_with_special_tokens(prompt);
+    tokens.len() as i64
+}
 
 /// Calculate cost from token usage
 ///

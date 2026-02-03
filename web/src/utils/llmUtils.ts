@@ -70,9 +70,12 @@ export function isLLMTrace(data: any): boolean {
   if (hasValue(data._o2_llm_input)) return true;
   if (hasValue(data._o2_llm_output)) return true;
 
+  // Check usage fields
+  if (hasValue(data._o2_llm_usage_details_input)) return true;
+  if (hasValue(data._o2_llm_usage_details_output)) return true;
+  if (hasValue(data._o2_llm_usage_details_total)) return true;
+
   // Check legacy fields
-  if (hasValue(data.llm_input)) return true;
-  if (hasValue(data.llm_output)) return true;
   if (hasValue(data.llm_usage) && (hasValue(data.llm_usage['input']) || hasValue(data.llm_usage['output']) || hasValue(data.llm_usage['total']))) return true;
 
   return false;
@@ -166,10 +169,53 @@ export function formatTokens(count: number): string {
 }
 
 /**
+ * Extract text content from a message's content field
+ * Handles both string content and multimodal array content
+ * Example multimodal: [{type: "text", text: "..."}, {type: "image_url", ...}]
+ */
+function extractMessageContent(content: any): string {
+  // If content is a string, return it directly
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  // If content is an array (multimodal message), extract text parts
+  if (Array.isArray(content)) {
+    // Find first text content
+    const textPart = content.find((part: any) =>
+      part && typeof part === 'object' && part.type === 'text' && part.text
+    );
+    if (textPart) {
+      return textPart.text;
+    }
+
+    // Fallback: look for any string in the array
+    const firstString = content.find((item: any) => typeof item === 'string');
+    if (firstString) {
+      return firstString;
+    }
+
+    // If no text found, stringify the first element
+    if (content.length > 0) {
+      return JSON.stringify(content[0]);
+    }
+  }
+
+  // If content is an object, stringify it
+  if (typeof content === 'object') {
+    return JSON.stringify(content);
+  }
+
+  return '';
+}
+
+/**
  * Truncate LLM input/output content for preview
  * Handles various input formats:
  * - JSON strings: {"inputs": {"input": "text"}, ...}
  * - Message arrays: [{role: "user", content: "text"}, ...]
+ * - Multimodal messages: [{role: "user", content: [{type: "text", text: "..."}, ...]}]
+ * - Nested messages: {tools: [...], messages: [...]}
  * - Simple arrays: [{}] or ["text"]
  * - Plain strings
  */
@@ -218,12 +264,12 @@ export function truncateLLMContent(
       // Look for user messages
       const userMsg = parsed.find((m: any) => m && m.role === 'user' && m.content);
       if (userMsg) {
-        text = userMsg.content;
+        text = extractMessageContent(userMsg.content);
       } else {
         // Look for any message with content
         const anyMsg = parsed.find((m: any) => m && m.content);
         if (anyMsg) {
-          text = anyMsg.content;
+          text = extractMessageContent(anyMsg.content);
         } else {
           // Look for first string in array
           const firstString = parsed.find((item: any) => typeof item === 'string');
@@ -238,7 +284,20 @@ export function truncateLLMContent(
 
     // Handle single message object: {role: "user", content: "text"}
     else if (parsed.role && parsed.content) {
-      text = parsed.content;
+      text = extractMessageContent(parsed.content);
+    }
+
+    // Handle object with nested messages array: {tools: [...], messages: [...]}
+    else if (parsed.messages && Array.isArray(parsed.messages)) {
+      const userMsg = parsed.messages.find((m: any) => m && m.role === 'user' && m.content);
+      if (userMsg) {
+        text = extractMessageContent(userMsg.content);
+      } else {
+        const anyMsg = parsed.messages.find((m: any) => m && m.content);
+        if (anyMsg) {
+          text = extractMessageContent(anyMsg.content);
+        }
+      }
     }
 
     // Handle other object formats
@@ -256,6 +315,11 @@ export function truncateLLMContent(
   // Fallback: if still no text, return N/A
   if (!text) {
     return 'N/A';
+  }
+
+  // Ensure text is a string (safety check)
+  if (typeof text !== 'string') {
+    text = JSON.stringify(text);
   }
 
   // Remove extra whitespace
@@ -293,45 +357,14 @@ export function getObservationTypeColor(type: string): string {
  * Returns null if not an LLM span/trace
  *
  * Handles two formats:
- * 1. Trace list items: llm_usage_tokens, llm_usage_costs, llm_input
- * 2. Individual spans: _o2_llm_* fields with split usage/cost fields:
- *    - _o2_llm_usage_details_input, _o2_llm_usage_details_output, _o2_llm_usage_details_total
- *    - _o2_llm_cost_details_input, _o2_llm_cost_details_output, _o2_llm_cost_details_total
+ * 1. Trace list items: 
+ *   _o2_llm_usage_details_input, _o2_llm_usage_details_output, _o2_llm_usage_details_total, 
+ *   _o2_llm_cost_details_input, _o2_llm_cost_details_output, _o2_llm_cost_details_total, 
+ *   _o2_llm_input
  */
 export function extractLLMData(span: any): LLMData | null {
   if (!isLLMTrace(span)) {
     return null;
-  }
-
-  // Check if this is a trace list item (simplified format)
-  if (span.llm_usage_tokens !== undefined || span.llm_usage_costs !== undefined || span.llm_input !== undefined) {
-    // Simplified format for trace list
-    const totalTokens = span.llm_usage_tokens || 0;
-    const totalCost = span.llm_usage_costs || 0;
-    const input = span.llm_input;
-
-    return {
-      provider: 'unknown',
-      observationType: 'SPAN',
-      modelName: 'unknown',
-      input: input,
-      output: null,
-      modelParameters: {},
-      usage: {
-        input: 0,
-        output: 0,
-        total: totalTokens,
-      },
-      cost: {
-        input: 0,
-        output: 0,
-        total: totalCost,
-      },
-      userId: null,
-      sessionId: null,
-      promptName: null,
-      inputPreview: truncateLLMContent(input, 100),
-    };
   }
 
   // Detailed format for individual spans with split fields

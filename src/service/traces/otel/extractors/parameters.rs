@@ -19,9 +19,12 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use crate::service::traces::otel::attributes::{
-    FrameworkAttributes, GenAiAttributes, LangfuseAttributes, OpenInferenceAttributes,
-    VercelAiSdkAttributes,
+use crate::service::traces::otel::{
+    attributes::{
+        FrameworkAttributes, GenAiAttributes, LangfuseAttributes, OpenInferenceAttributes,
+        VercelAiSdkAttributes,
+    },
+    extractors::parse_json_value,
 };
 
 pub struct ParametersExtractor;
@@ -66,7 +69,7 @@ impl ParametersExtractor {
 
         // OpenInference
         if let Some(val) = attributes.get(OpenInferenceAttributes::LLM_INVOCATION_PARAMETERS)
-            && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
+            && let Some(parsed) = parse_json_value(val)
         {
             for (k, v) in parsed {
                 params.insert(k, self.sanitize_param_value(&v));
@@ -76,7 +79,7 @@ impl ParametersExtractor {
 
         // Langfuse model parameters (support both dot and underscore formats)
         if let Some(val) = attributes.get(LangfuseAttributes::MODEL_PARAMETERS)
-            && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
+            && let Some(parsed) = parse_json_value(val)
         {
             for (k, v) in parsed {
                 params.insert(k, self.sanitize_param_value(&v));
@@ -86,7 +89,7 @@ impl ParametersExtractor {
 
         // Pydantic-AI model_config
         if let Some(val) = attributes.get(FrameworkAttributes::MODEL_CONFIG)
-            && let Ok(parsed) = serde_json::from_value::<HashMap<String, json::Value>>(val.clone())
+            && let Some(parsed) = parse_json_value(val)
         {
             for (k, v) in parsed {
                 params.insert(k, self.sanitize_param_value(&v));
