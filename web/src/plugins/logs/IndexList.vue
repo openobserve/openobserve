@@ -653,6 +653,18 @@ export default defineComponent({
           //hack add time stamp column to parsedSQL if not already added
           query_context = fnUnparsedSQL(parsedSQL).replace(/`/g, '"') || "";
 
+          // Check if parser failed to parse the query (e.g., UNION ALL BY NAME)
+          // If both columns and from arrays are empty, the parser couldn't handle the syntax
+          if (
+            query_context === "" &&
+            parsedSQL.columns?.length === 0 &&
+            parsedSQL.from?.length === 0
+          ) {
+            // Fallback: Use simple SELECT * query for field values
+            // This will be replaced with actual stream name later
+            query_context = 'SELECT * FROM "[INDEX_NAME]"';
+          }
+
           if (searchObj.data.stream.selectedStream.length > 1) {
             queries = extractValueQuery();
           }

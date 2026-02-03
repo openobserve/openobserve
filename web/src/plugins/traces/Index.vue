@@ -231,16 +231,19 @@ const activeTab = ref("search");
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
-const { searchObj, resetSearchObj, getUrlQueryParams, copyTracesUrl } =
-  useTraces();
+const {
+  searchObj,
+  resetSearchObj,
+  getUrlQueryParams,
+  copyTracesUrl,
+  formatTracesMetaData,
+} = useTraces();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
-const serviceColorIndex = ref(0);
-const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
@@ -701,7 +704,7 @@ async function getQueryData() {
           }
         }
 
-        const formattedHits = getTracesMetaData(res.data.hits);
+        const formattedHits = formatTracesMetaData(res.data.hits);
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
           searchObj.data.queryResults.hits.push(...formattedHits);
@@ -780,6 +783,14 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
   });
 };
 
+function generateNewColor() {
+  // Generate a color in HSL format
+  const hue = colors.value.length * (360 / 50);
+  const lightness = 50 + (colors.value.length % 2) * 15;
+  colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
+  return colors;
+}
+
 const getTracesMetaData = (traces) => {
   if (!traces.length) return [];
 
@@ -813,14 +824,6 @@ const getTracesMetaData = (traces) => {
     return _trace;
   });
 };
-
-function generateNewColor() {
-  // Generate a color in HSL format
-  const hue = colors.value.length * (360 / 50);
-  const lightness = 50 + (colors.value.length % 2) * 15;
-  colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
-  return colors;
-}
 
 async function extractFields() {
   try {

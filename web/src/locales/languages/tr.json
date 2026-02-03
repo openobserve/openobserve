@@ -2746,7 +2746,9 @@
         "startBeforeEnd": "Başlangıç saati bitiş saatinden önce olmalıdır",
         "endAfterStart": "Bitiş saati başlangıç saatinden sonra olmalıdır"
       }
-    }
+    },
+    "viewInTraces": "İzlerde Görüntüle",
+    "viewInTracesTooltip": "RED metrikler panosu ve tüm ilişkili izlerle izleme sayfasını açın"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
