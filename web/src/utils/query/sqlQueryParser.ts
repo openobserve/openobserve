@@ -116,8 +116,8 @@ const COMPLEX_PATTERNS = {
   // Window functions
   windowFunctions: /\b(OVER\s*\(|PARTITION\s+BY|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE)\b/i,
 
-  // Complex nested functions (more than 2 levels)
-  nestedFunctions: /\w+\s*\(\s*\w+\s*\(\s*\w+\s*\(/i,
+  // Nested functions (e.g., ceil(count(field))) - function inside function
+  nestedFunctions: /\w+\s*\(\s*\w+\s*\(/i,
 
   // LATERAL JOIN
   lateralJoin: /\bLATERAL\b/i,
