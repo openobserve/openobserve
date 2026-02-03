@@ -1903,6 +1903,61 @@ describe("sqlUtils", () => {
         }
       ]);
     });
+
+    it("should handle CASE/WHEN expressions as raw fields with parser", () => {
+      // Mock parser that can reconstruct the CASE expression
+      const mockParser = {
+        sqlify: (_ast: any) => {
+          // Simplified mock - return a SQL string containing the CASE expression
+          return "SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp";
+        }
+      };
+
+      const parsedAst = {
+        columns: [
+          {
+            expr: {
+              type: "case",
+              // The actual AST structure for CASE is complex, but extractFields
+              // only checks the type and passes the expr to the parser
+              args: []
+            },
+            as: "status_category"
+          }
+        ]
+      };
+
+      const result = extractFields(parsedAst, timeField, mockParser);
+      expect(result).toEqual([
+        {
+          column: "",
+          alias: "status_category",
+          aggregationFunction: null,
+          streamAlias: null,
+          type: "raw",
+          rawQuery: "CASE WHEN \"level\" = 'ERROR' THEN 'Bad' ELSE 'Good' END"
+        }
+      ]);
+    });
+
+    it("should not set type raw for CASE/WHEN when parser is not provided", () => {
+      const parsedAst = {
+        columns: [
+          {
+            expr: {
+              type: "case",
+              args: []
+            },
+            as: "status_category"
+          }
+        ]
+      };
+
+      // When parser is not provided, CASE expressions don't get processed as raw
+      const result = extractFields(parsedAst, timeField);
+      expect(result[0].type).toBeUndefined();
+      expect(result[0].rawQuery).toBeUndefined();
+    });
   });
 
   describe("parseCondition", () => {
@@ -2454,11 +2509,47 @@ describe("sqlUtils", () => {
       });
       
       const result = await getFieldsFromQuery("SELECT timestamp, COUNT(id) FROM events WHERE type = 'login' AND timestamp > '2023-01-01'");
-      
+
       expect(result.fields).toHaveLength(2);
       expect(result.fields[0].aggregationFunction).toBe(null);
       expect(result.fields[1].aggregationFunction).toBe("count");
       expect(result.streamName).toBe("events");
+    });
+
+    it("should handle CASE/WHEN expressions as raw fields", async () => {
+      // Mock sqlify to return a proper CASE expression SQL
+      mockSqlify.mockReturnValue("SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp");
+
+      mockAstify.mockReturnValue({
+        from: [{ table: "logs" }],
+        columns: [
+          {
+            expr: {
+              type: "case",
+              // Simplified CASE structure for testing
+              args: {
+                when: [
+                  {
+                    cond: { type: "binary_expr", operator: "=", left: { type: "column_ref", column: "level" }, right: { type: "string", value: "ERROR" } },
+                    result: { type: "string", value: "Bad" }
+                  }
+                ],
+                else: { type: "string", value: "Good" }
+              }
+            },
+            as: "status_category"
+          }
+        ],
+        where: null
+      });
+
+      const result = await getFieldsFromQuery("SELECT CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as status_category FROM logs");
+
+      expect(result.fields).toHaveLength(1);
+      expect(result.fields[0].type).toBe("raw");
+      expect(result.fields[0].rawQuery).toBeDefined();
+      expect(result.fields[0].alias).toBe("status_category");
+      expect(result.streamName).toBe("logs");
     });
   });
 

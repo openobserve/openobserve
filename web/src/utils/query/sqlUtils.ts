@@ -293,8 +293,41 @@ export const isGivenFieldInOrderBy = async (
   }
 };
 
+/**
+ * Reconstruct a CASE expression from AST node to SQL string
+ * @param caseExpr The CASE expression AST node
+ * @param parser The SQL parser instance (must be initialized)
+ * @returns SQL string representation of the CASE expression
+ */
+function reconstructCaseExpression(caseExpr: any, sqlParser: any): string {
+  try {
+    // Use the parser to sqlify just the case expression
+    // We wrap it in a minimal SELECT to get the expression
+    const tempAst = {
+      type: "select",
+      columns: [{ expr: caseExpr, as: null }],
+      from: [{ table: "temp", as: null }],
+    };
+    const sql = sqlParser.sqlify(tempAst);
+    // Extract just the CASE expression from "SELECT CASE ... FROM temp"
+    // Use [\s\S] instead of . with s flag for cross-line matching
+    const match = sql.match(/SELECT\s+(CASE[\s\S]+?END)\s+FROM/i);
+    if (match && match[1]) {
+      return match[1].replace(/`/g, '"');
+    }
+    // Fallback: return the whole expression part
+    const selectMatch = sql.match(/SELECT\s+([\s\S]+?)\s+FROM/i);
+    if (selectMatch && selectMatch[1]) {
+      return selectMatch[1].replace(/`/g, '"');
+    }
+    return "";
+  } catch (e) {
+    return "";
+  }
+}
+
 // Function to extract field names, aliases, aggregation functions, and stream aliases
-export function extractFields(parsedAst: any, timeField: string) {
+export function extractFields(parsedAst: any, timeField: string, sqlParser?: any) {
   let fields = parsedAst.columns.map((column: any) => {
     const field: any = {
       column: "",
@@ -320,6 +353,13 @@ export function extractFields(parsedAst: any, timeField: string) {
         column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
       // Extract table/streamAlias from function argument
       field.streamAlias = column?.expr?.args?.value?.[0]?.table || null;
+    } else if (column.expr.type === "case" && sqlParser) {
+      // CASE/WHEN expression - treat as raw field
+      const rawQuery = reconstructCaseExpression(column.expr, sqlParser);
+      field.type = "raw";
+      field.rawQuery = rawQuery;
+      field.column = ""; // No column for raw expressions
+      field.aggregationFunction = null;
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
@@ -742,12 +782,13 @@ export const getFieldsFromQuery = async (
     const ast: any = parser.astify(query);
 
     const streamName = extractTableName(ast) ?? null;
-    let fields = extractFields(ast, timeField);
+    // Pass parser to extractFields for CASE/WHEN reconstruction
+    let fields = extractFields(ast, timeField, parser);
     let filters: any = extractFilters(ast);
     const joins = extractJoins(ast);
 
-    // remove wrong fields and filters
-    fields = fields.filter((field: any) => field.column);
+    // remove wrong fields and filters (but keep raw fields)
+    fields = fields.filter((field: any) => field.column || field.type === "raw");
 
     // if type is condition
     if (filters?.filterType === "condition") {

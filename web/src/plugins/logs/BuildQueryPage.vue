@@ -93,12 +93,15 @@ interface Props {
     valueType?: "relative" | "absolute";
     relativeTimePeriod?: string;
   };
+  /** Whether this is the first toggle to build tab (for shared link support) */
+  isFirstToggle?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   searchQuery: "",
   selectedStream: "",
   selectedDateTime: undefined,
+  isFirstToggle: true,
 });
 
 // Emits
@@ -107,6 +110,8 @@ const emit = defineEmits<{
   (e: "queryGenerated", query: string): void;
   /** Emitted when customQuery mode changes (true = custom mode, false = builder mode) */
   (e: "customQueryModeChanged", isCustomMode: boolean): void;
+  /** Emitted when initialization is complete */
+  (e: "initialized"): void;
 }>();
 
 // ============================================================================
@@ -125,67 +130,33 @@ const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields, makeAu
 provide("dashboardPanelDataPageKey", "build");
 
 // ============================================================================
-// URL Restore Helper
+// URL Config Restore Helper
 // ============================================================================
 
 /**
- * Restore build configuration from URL if present
- * @returns true if restored from URL, false otherwise
+ * Restore chart type and config from URL params (similar to visualization's preservedConfig)
+ * NOTE: This only restores config/chart type, NOT fields or query.
+ * Fields are always parsed from props.searchQuery on every tab switch.
  */
-const restoreFromUrl = async (): Promise<boolean> => {
+const restoreConfigFromUrl = (): { type?: string; config?: any } => {
   const buildData = router.currentRoute.value?.query?.build_data as string | undefined;
   if (!buildData) {
-    return false;
+    return {};
   }
 
   try {
     const decoded = decodeBuildConfig(buildData);
-    if (!decoded || !decoded.fields) {
-      return false;
+    if (!decoded) {
+      return {};
     }
 
-    // Restore chart type and config
-    if (decoded.type) {
-      dashboardPanelData.data.type = decoded.type;
-    }
-    if (decoded.config) {
-      dashboardPanelData.data.config = { ...dashboardPanelData.data.config, ...decoded.config };
-    }
-
-    // Restore fields
-    const fields = decoded.fields;
-    if (fields.stream) {
-      dashboardPanelData.data.queries[0].fields.stream = fields.stream;
-      dashboardPanelData.data.queries[0].fields.stream_type = fields.stream_type || "logs";
-    }
-    if (fields.x) {
-      dashboardPanelData.data.queries[0].fields.x = fields.x;
-    }
-    if (fields.y) {
-      dashboardPanelData.data.queries[0].fields.y = fields.y;
-    }
-    if (fields.breakdown) {
-      dashboardPanelData.data.queries[0].fields.breakdown = fields.breakdown;
-    }
-    if (fields.filter) {
-      dashboardPanelData.data.queries[0].fields.filter = fields.filter;
-    }
-
-    // Restore query mode
-    dashboardPanelData.data.queries[0].customQuery = decoded.customQuery || false;
-    if (decoded.query) {
-      dashboardPanelData.data.queries[0].query = decoded.query;
-    }
-
-    // Load stream fields if we have a stream
-    if (fields.stream) {
-      await updateGroupedFields();
-    }
-
-    return true;
+    return {
+      type: decoded.type,
+      config: decoded.config,
+    };
   } catch (error) {
     console.error("Failed to restore build config from URL:", error);
-    return false;
+    return {};
   }
 };
 
@@ -202,12 +173,22 @@ const initializeFromQuery = async () => {
     dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
   }
 
-  // First, try to restore from URL (for share links)
-  const restoredFromUrl = await restoreFromUrl();
-  if (restoredFromUrl) {
-    // Successfully restored from URL - run query and return
-    await runQuery();
-    return;
+  // Restore config/chart type from URL params (similar to visualization's preservedConfig)
+  // NOTE: This only restores config, NOT fields. Fields are always parsed from props.searchQuery.
+  // Chart type is only restored on FIRST toggle (for shared links). On subsequent tab switches,
+  // chart type is always auto-selected based on the query.
+  const urlConfig = restoreConfigFromUrl();
+  let shouldAutoSelectChartType = true;
+
+  // Always restore config from URL (for settings like table_dynamic_columns, etc.)
+  if (urlConfig.config) {
+    dashboardPanelData.data.config = { ...dashboardPanelData.data.config, ...urlConfig.config };
+  }
+  // Only restore chart type from URL on FIRST toggle (shared link scenario)
+  // On subsequent toggles, always re-parse and auto-select chart type
+  if (urlConfig.type && props.isFirstToggle) {
+    dashboardPanelData.data.type = urlConfig.type;
+    shouldAutoSelectChartType = false;
   }
 
   // If no query, use builder mode with selected stream
@@ -227,8 +208,10 @@ const initializeFromQuery = async () => {
     }
     dashboardPanelData.data.queries[0].query = props.searchQuery;
     dashboardPanelData.data.queries[0].customQuery = true;
-    // Use table chart with dynamic columns for custom mode
-    dashboardPanelData.data.type = "table";
+    // Use table chart with dynamic columns for custom mode (unless chart type from URL)
+    if (shouldAutoSelectChartType) {
+      dashboardPanelData.data.type = "table";
+    }
     dashboardPanelData.data.config.table_dynamic_columns = true;
   } else {
     try {
@@ -243,8 +226,10 @@ const initializeFromQuery = async () => {
         }
         dashboardPanelData.data.queries[0].query = props.searchQuery;
         dashboardPanelData.data.queries[0].customQuery = true;
-        // Use table chart with dynamic columns for custom mode
-        dashboardPanelData.data.type = "table";
+        // Use table chart with dynamic columns for custom mode (unless chart type from URL)
+        if (shouldAutoSelectChartType) {
+          dashboardPanelData.data.type = "table";
+        }
         dashboardPanelData.data.config.table_dynamic_columns = true;
       } else {
         // Successfully parsed - apply to builder (auto mode)
@@ -268,13 +253,15 @@ const initializeFromQuery = async () => {
           dashboardPanelData.data.queries[0].joins = panelFields.joins;
         }
 
-        // Auto-select chart type based on fields:
+        // Auto-select chart type based on fields (unless chart type from URL):
         // - If useTableChart flag is set (more than 2 GROUP BY fields) → use "table" chart
         // - If only Y-axis fields (no X-axis, no breakdown) → use "metric" chart
-        if (panelFields.useTableChart) {
-          dashboardPanelData.data.type = "table";
-        } else if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {
-          dashboardPanelData.data.type = "metric";
+        if (shouldAutoSelectChartType) {
+          if (panelFields.useTableChart) {
+            dashboardPanelData.data.type = "table";
+          } else if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {
+            dashboardPanelData.data.type = "metric";
+          }
         }
 
         // Load stream fields after setting the stream from parsed query
@@ -291,11 +278,17 @@ const initializeFromQuery = async () => {
       }
       dashboardPanelData.data.queries[0].query = props.searchQuery;
       dashboardPanelData.data.queries[0].customQuery = true;
-      // Use table chart with dynamic columns for custom mode
-      dashboardPanelData.data.type = "table";
+      // Use table chart with dynamic columns for custom mode (unless chart type from URL on first toggle)
+      if (shouldAutoSelectChartType) {
+        dashboardPanelData.data.type = "table";
+      }
       dashboardPanelData.data.config.table_dynamic_columns = true;
     }
   }
+
+  // Notify parent that initialization is complete
+  // This marks the end of first toggle, so subsequent tab switches will auto-select chart type
+  emit("initialized");
 
   // Run the query after initialization
   await runQuery();

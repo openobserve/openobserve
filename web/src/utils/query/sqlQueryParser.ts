@@ -34,6 +34,10 @@ export interface ParsedField {
   aggregationFunction: string | null;
   /** Stream alias for JOIN queries (e.g., "stream_0") */
   streamAlias?: string | null;
+  /** Field type: "build" for normal fields, "raw" for complex expressions like CASE/WHEN */
+  type?: "build" | "raw";
+  /** Raw SQL expression for type: "raw" fields (e.g., CASE WHEN ... END) */
+  rawQuery?: string;
 }
 
 export interface ParsedFilter {
@@ -88,28 +92,29 @@ export interface ParsedQuery {
 
 /**
  * Patterns that indicate a query cannot be parsed into builder mode
+ *
+ * NOTE: The following are SUPPORTED in auto mode and should NOT be in this list:
+ * - CASE/WHEN statements: Supported via field type "raw" with rawQuery property
+ * - Multiple JOINs: Supported (a JOIN b JOIN c, etc.)
+ * - HAVING clause: Supported via havingConditions on y-axis fields
  */
 const COMPLEX_PATTERNS = {
-  // Subqueries
+  // Subqueries and derived tables (e.g., JOIN (SELECT ...) AS alias)
+  // This catches nested SELECTs which we cannot represent in panel schema
   subquery: /\(\s*SELECT\s+/i,
+
+  // Parenthesized/nested JOINs (e.g., a JOIN (b JOIN c ON ...) ON ...)
+  // Our flat joins array structure cannot represent nested JOIN groupings
+  parenthesizedJoin: /\bJOIN\s*\(/i,
 
   // Common Table Expressions (CTEs)
   cte: /\bWITH\s+\w+\s+AS\s*\(/i,
-
-  // CASE/WHEN statements
-  caseWhen: /\bCASE\s+WHEN\b/i,
 
   // UNION/INTERSECT/EXCEPT
   setOperations: /\b(UNION|INTERSECT|EXCEPT)\b/i,
 
   // Window functions
   windowFunctions: /\b(OVER\s*\(|PARTITION\s+BY|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE)\b/i,
-
-  // Multiple JOINs (3 or more)
-  multipleJoins: /\bJOIN\b.*\bJOIN\b.*\bJOIN\b/is,
-
-  // HAVING clause (complex aggregation logic)
-  havingClause: /\bHAVING\b/i,
 
   // Complex nested functions (more than 2 levels)
   nestedFunctions: /\w+\s*\(\s*\w+\s*\(\s*\w+\s*\(/i,
@@ -160,13 +165,11 @@ export function isQueryParseable(query: string): {
  */
 function getPatternDescription(patternName: string): string {
   const descriptions: Record<string, string> = {
-    subquery: "Contains subqueries",
+    subquery: "Contains subqueries or derived tables",
+    parenthesizedJoin: "Contains parenthesized/nested JOINs",
     cte: "Contains WITH clause (CTE)",
-    caseWhen: "Contains CASE/WHEN statements",
     setOperations: "Contains UNION/INTERSECT/EXCEPT",
     windowFunctions: "Contains window functions",
-    multipleJoins: "Contains multiple JOINs",
-    havingClause: "Contains HAVING clause",
     nestedFunctions: "Contains deeply nested functions",
     lateralJoin: "Contains LATERAL JOIN",
     distinctOn: "Contains DISTINCT ON",
@@ -351,6 +354,21 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   useTableChart: boolean;
 } {
   const mapFieldToPanel = (field: ParsedField, index: number, axis: string) => {
+    // Check if this is a raw field (e.g., CASE/WHEN expression)
+    if (field.type === "raw" && field.rawQuery) {
+      return {
+        label: field.alias || `${axis}_axis_${index + 1}`,
+        alias: field.alias || `${axis}_axis_${index + 1}`,
+        column: "",
+        color: null,
+        type: "raw",
+        rawQuery: field.rawQuery,
+        sortBy: null,
+        isDerived: false,
+        havingConditions: [],
+      };
+    }
+
     // Field structure must match dashboard builder format with functionName and args
     const baseField: any = {
       label: field.column,

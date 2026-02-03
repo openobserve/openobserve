@@ -57,7 +57,21 @@ describe("sqlQueryParser", () => {
       it("should return not parseable for subqueries", () => {
         const result = isQueryParseable("SELECT * FROM (SELECT * FROM logs)");
         expect(result.isParseable).toBe(false);
-        expect(result.reason).toBe("Contains subqueries");
+        expect(result.reason).toBe("Contains subqueries or derived tables");
+      });
+
+      it("should return not parseable for derived tables in JOINs", () => {
+        // Derived table / subquery in JOIN - not supported
+        const result = isQueryParseable("SELECT * FROM users INNER JOIN (SELECT user_id, SUM(amount) FROM orders GROUP BY user_id) AS order_summary ON users.id = order_summary.user_id");
+        expect(result.isParseable).toBe(false);
+        expect(result.reason).toBe("Contains subqueries or derived tables");
+      });
+
+      it("should return not parseable for parenthesized/nested JOINs", () => {
+        // Nested JOIN grouping like a JOIN (b JOIN c) - not supported
+        const result = isQueryParseable("SELECT * FROM a JOIN (b JOIN c ON b.id = c.b_id) ON a.id = b.a_id");
+        expect(result.isParseable).toBe(false);
+        expect(result.reason).toBe("Contains parenthesized/nested JOINs");
       });
 
       it("should return not parseable for CTEs", () => {
@@ -65,7 +79,7 @@ describe("sqlQueryParser", () => {
         const result = isQueryParseable("WITH temp AS (SELECT * FROM logs) SELECT * FROM temp");
         expect(result.isParseable).toBe(false);
         // The subquery pattern matches first since (SELECT is detected
-        expect(result.reason).toBe("Contains subqueries");
+        expect(result.reason).toBe("Contains subqueries or derived tables");
       });
 
       it("should return not parseable for CTE pattern", () => {
@@ -74,12 +88,6 @@ describe("sqlQueryParser", () => {
         expect(result.isParseable).toBe(false);
         // Pattern matches "WITH temp AS ("
         expect(result.reason).toBe("Contains WITH clause (CTE)");
-      });
-
-      it("should return not parseable for CASE/WHEN", () => {
-        const result = isQueryParseable("SELECT CASE WHEN level = 'ERROR' THEN 1 ELSE 0 END FROM logs");
-        expect(result.isParseable).toBe(false);
-        expect(result.reason).toBe("Contains CASE/WHEN statements");
       });
 
       it("should return not parseable for UNION", () => {
@@ -100,18 +108,6 @@ describe("sqlQueryParser", () => {
         expect(result.reason).toBe("Contains window functions");
       });
 
-      it("should return not parseable for multiple JOINs", () => {
-        const result = isQueryParseable("SELECT * FROM logs JOIN users ON a JOIN sessions ON b JOIN events ON c");
-        expect(result.isParseable).toBe(false);
-        expect(result.reason).toBe("Contains multiple JOINs");
-      });
-
-      it("should return not parseable for HAVING clause", () => {
-        const result = isQueryParseable("SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10");
-        expect(result.isParseable).toBe(false);
-        expect(result.reason).toBe("Contains HAVING clause");
-      });
-
       it("should return not parseable for DISTINCT ON", () => {
         const result = isQueryParseable("SELECT DISTINCT ON (user_id) * FROM logs");
         expect(result.isParseable).toBe(false);
@@ -128,6 +124,26 @@ describe("sqlQueryParser", () => {
         const result = isQueryParseable("SELECT data->>'name' FROM logs");
         expect(result.isParseable).toBe(false);
         expect(result.reason).toBe("Contains JSON operations");
+      });
+    });
+
+    describe("should return parseable for supported features", () => {
+      it("should return parseable for CASE/WHEN statements", () => {
+        // CASE/WHEN is supported via field type "raw" with rawQuery
+        const result = isQueryParseable("SELECT CASE WHEN level = 'ERROR' THEN 1 ELSE 0 END FROM logs");
+        expect(result.isParseable).toBe(true);
+      });
+
+      it("should return parseable for multiple JOINs", () => {
+        // Multiple JOINs are supported in panel schema
+        const result = isQueryParseable("SELECT * FROM logs JOIN users ON logs.user_id = users.id JOIN sessions ON users.id = sessions.user_id");
+        expect(result.isParseable).toBe(true);
+      });
+
+      it("should return parseable for HAVING clause", () => {
+        // HAVING is supported via havingConditions on y-axis fields
+        const result = isQueryParseable("SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10");
+        expect(result.isParseable).toBe(true);
       });
     });
 
@@ -176,8 +192,9 @@ describe("sqlQueryParser", () => {
       expect(shouldUseCustomMode("WITH temp AS (SELECT * FROM logs) SELECT * FROM temp")).toBe(true);
     });
 
-    it("should return true for query with HAVING", () => {
-      expect(shouldUseCustomMode("SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10")).toBe(true);
+    it("should return false for query with HAVING (supported)", () => {
+      // HAVING is supported via havingConditions on y-axis fields
+      expect(shouldUseCustomMode("SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10")).toBe(false);
     });
 
     it("should return true for query with UNION", () => {
@@ -194,7 +211,7 @@ describe("sqlQueryParser", () => {
     it("should return customQuery: true for complex query", async () => {
       const result = await parseSQL("SELECT * FROM (SELECT * FROM logs)", "logs");
       expect(result.customQuery).toBe(true);
-      expect(result.parseError).toBe("Contains subqueries");
+      expect(result.parseError).toBe("Contains subqueries or derived tables");
     });
 
     it("should preserve raw query", async () => {
@@ -424,6 +441,69 @@ describe("sqlQueryParser", () => {
 
       // useTableChart flag should be false
       expect(result.useTableChart).toBe(false);
+    });
+
+    it("should handle raw fields (CASE/WHEN expressions) in breakdown", () => {
+      // Simulates: SELECT histogram(_timestamp), count(_timestamp), CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as status FROM logs
+      const parsed = {
+        stream: "logs",
+        streamType: "logs",
+        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
+        yFields: [{ column: "_timestamp", alias: "y_axis_1", aggregationFunction: "count" }],
+        breakdownFields: [
+          {
+            column: "",
+            alias: "breakdown_1",
+            aggregationFunction: null,
+            type: "raw" as const,
+            rawQuery: "CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END",
+          },
+        ],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        joins: [],
+        customQuery: false,
+        rawQuery: "SELECT histogram(_timestamp), count(_timestamp), CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as breakdown_1 FROM logs",
+      };
+
+      const result = parsedQueryToPanelFields(parsed);
+
+      // Raw field should be converted to panel format with type: "raw" and rawQuery
+      expect(result.breakdown.length).toBe(1);
+      expect(result.breakdown[0].type).toBe("raw");
+      expect(result.breakdown[0].rawQuery).toBe("CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END");
+      expect(result.breakdown[0].alias).toBe("breakdown_1");
+      expect(result.breakdown[0].column).toBe("");
+    });
+
+    it("should handle raw fields (CASE/WHEN expressions) in y-axis", () => {
+      // CASE/WHEN can also be used as y-axis field
+      const parsed = {
+        stream: "logs",
+        streamType: "logs",
+        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
+        yFields: [
+          {
+            column: "",
+            alias: "y_axis_1",
+            aggregationFunction: null,
+            type: "raw" as const,
+            rawQuery: "CASE WHEN status = 'success' THEN 1 ELSE 0 END",
+          },
+        ],
+        breakdownFields: [],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        joins: [],
+        customQuery: false,
+        rawQuery: "SELECT histogram(_timestamp), CASE WHEN status = 'success' THEN 1 ELSE 0 END as y_axis_1 FROM logs",
+      };
+
+      const result = parsedQueryToPanelFields(parsed);
+
+      // Raw field should be converted to panel format with type: "raw" and rawQuery
+      expect(result.y.length).toBe(1);
+      expect(result.y[0].type).toBe("raw");
+      expect(result.y[0].rawQuery).toBe("CASE WHEN status = 'success' THEN 1 ELSE 0 END");
+      expect(result.y[0].alias).toBe("y_axis_1");
     });
   });
 });

@@ -328,10 +328,12 @@ size="md" />
               :searchQuery="searchObj.data.query"
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
               :selectedDateTime="selectedDateTime"
+              :isFirstToggle="isFirstBuildToggle"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
               @customQueryModeChanged="onCustomQueryModeChanged"
+              @initialized="onBuildInitialized"
             />
           </div>
         </template>
@@ -711,6 +713,10 @@ export default defineComponent({
       convertSchemaToFields,
       setFieldsBasedOnChartTypeValidation,
     } = useDashboardPanelData("logs");
+
+    // Get build page's dashboardPanelData for watching chart type/config changes
+    const { dashboardPanelData: buildDashboardPanelData } = useDashboardPanelData("build");
+
     const visualizeErrorData: any = reactive({
       errors: [],
     });
@@ -1590,6 +1596,10 @@ export default defineComponent({
     // Flag to track if this is the first time switching to visualization mode
     const isFirstVisualizationToggle = ref(true);
 
+    // Flag to track if this is the first time switching to build mode
+    // Used to restore chart type from URL only on first toggle (for shared links)
+    const isFirstBuildToggle = ref(true);
+
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
@@ -1978,6 +1988,17 @@ export default defineComponent({
       },
     );
 
+    // Watch for build page chart type changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.type,
+      () => {
+        // Sync build data to URL parameters when chart type changes
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+    );
+
     watch(
       () => splitterModel.value,
       () => {
@@ -2004,6 +2025,33 @@ export default defineComponent({
     watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
       deep: true,
     });
+
+    // Watch for build page config changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.config,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+      { deep: true },
+    );
+
+    // Sync searchObj.data.query to build page's dashboardPanelData when in custom query mode
+    // This ensures edited queries are reflected in the panel schema immediately
+    watch(
+      () => searchObj.data.query,
+      (newQuery) => {
+        if (
+          searchObj.meta.logsVisualizeToggle === "build" &&
+          buildDashboardPanelData.data.queries[0]?.customQuery === true
+        ) {
+          buildDashboardPanelData.data.queries[
+            buildDashboardPanelData.layout.currentQueryIndex
+          ].query = newQuery;
+        }
+      },
+    );
 
     watch(
       () => [
@@ -2189,6 +2237,14 @@ export default defineComponent({
       // Disable query editor in build mode when customQuery is false (builder mode)
       // In builder mode, query is auto-generated from fields - user shouldn't edit directly
       searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
+    };
+
+    const onBuildInitialized = () => {
+      // Mark that we've processed the first build toggle
+      // After this, chart type will always be auto-selected on tab switch
+      if (isFirstBuildToggle.value) {
+        isFirstBuildToggle.value = false;
+      }
     };
 
     // Selected date time for BuildQueryPage
@@ -2722,7 +2778,9 @@ export default defineComponent({
       onBuildCancel,
       onBuildQueryGenerated,
       onCustomQueryModeChanged,
+      onBuildInitialized,
       selectedDateTime,
+      isFirstBuildToggle,
     };
   },
   computed: {
