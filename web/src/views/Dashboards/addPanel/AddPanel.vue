@@ -774,6 +774,30 @@ export default defineComponent({
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
+
+      // In edit mode, check if panel has panel-level time configured
+      // If it does, use that instead of global time for the date picker
+      if (editMode.value && route.query.panelId) {
+        const panelId = route.query.panelId as string;
+        let panelTimeValue = null;
+
+        // Priority 1: Check URL params for panel-level time (pt-{panelId})
+        const urlPanelTime = getPanelTimeFromURL(panelId, route.query);
+        if (urlPanelTime) {
+          panelTimeValue = urlPanelTime;
+        }
+        // Priority 2: Check panel config for panel_time_range
+        else if (dashboardPanelData.data.config?.panel_time_range) {
+          panelTimeValue = convertPanelTimeRangeToPicker(
+            dashboardPanelData.data.config.panel_time_range
+          );
+        }
+
+        // If panel has its own time, update the selectedDate to show it in the picker
+        if (panelTimeValue) {
+          selectedDate.value = panelTimeValue;
+        }
+      }
     };
 
     const isInitialDashboardPanelData = () => {
