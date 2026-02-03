@@ -1799,7 +1799,7 @@ export default defineComponent({
         return {
           chartType: "custom_chart",
           title: {
-            text: t("incidents.noAlertActivityData"),
+            text: t("alerts.incidents.noAlertActivityData"),
             left: "center",
             top: "center",
             textStyle: {

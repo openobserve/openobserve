@@ -2138,7 +2138,8 @@
       "reopenIncidentTooltip": "Reopen this resolved incident",
       "editIncidentTitleTooltip": "Edit incident title",
       "firedTimes": "Fired {count} time(s)",
-      "incidentAnalysis": "Incident Analysis"
+      "incidentAnalysis": "Incident Analysis",
+      "noAlertActivityData": "No alert activity data"
     }
   },
   "alert_templates": {
