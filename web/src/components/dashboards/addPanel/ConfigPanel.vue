@@ -116,12 +116,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Show mode selection when enabled -->
       <div v-if="allowPanelTime" class="q-mt-sm q-ml-lg">
-        <q-option-group
-          v-model="panelTimeMode"
-          :options="panelTimeModeOptions"
-          color="primary"
-          @update:model-value="onPanelTimeModeChange"
-        />
+        <!-- Using individual q-radio components for better data-test support -->
+        <div class="q-gutter-sm">
+          <q-radio
+            v-model="panelTimeMode"
+            val="global"
+            :label="t('dashboard.useGlobalTime')"
+            color="primary"
+            data-test="dashboard-config-panel-time-mode-global"
+            @update:model-value="onPanelTimeModeChange"
+          />
+          <q-radio
+            v-model="panelTimeMode"
+            val="individual"
+            :label="t('dashboard.useIndividualTime')"
+            color="primary"
+            data-test="dashboard-config-panel-time-mode-individual"
+            @update:model-value="onPanelTimeModeChange"
+          />
+        </div>
 
         <div class="text-caption text-grey-7 q-mt-xs">
           <q-icon name="info" size="14px" />
@@ -2599,17 +2612,6 @@ export default defineComponent({
       dashboardPanelData.data.config?.panel_time_mode || 'global'
     );
 
-    // Mode options
-    const panelTimeModeOptions = computed(() => [
-      {
-        label: t('dashboard.useGlobalTime'),
-        value: 'global',
-      },
-      {
-        label: t('dashboard.useIndividualTime'),
-        value: 'individual',
-      },
-    ]);
 
     // Toggle panel time on/off
     const onTogglePanelTime = (enabled: boolean) => {
@@ -2743,7 +2745,6 @@ export default defineComponent({
       // Panel time configuration
       allowPanelTime,
       panelTimeMode,
-      panelTimeModeOptions,
       onTogglePanelTime,
       onPanelTimeModeChange,
       panelTimeValue,
