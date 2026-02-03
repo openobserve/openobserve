@@ -1398,10 +1398,10 @@ export default defineComponent({
         const filtered = [];
         terms = terms.toLowerCase();
         for (let i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            (rows[i]["identifier"] && rows[i]["identifier"].toLowerCase().includes(terms))
-          ) {
+          const name = String(rows[i]["name"] ?? "").toLowerCase();
+          const identifier = String(rows[i]["identifier"] ?? "").toLowerCase();
+
+          if (name.includes(terms) || identifier.includes(terms)) {
             filtered.push(rows[i]);
           }
         }

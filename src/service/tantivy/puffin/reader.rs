@@ -193,10 +193,10 @@ impl PuffinFooterBytesReader {
         if self.flags.contains(PuffinFooterFlags::COMPRESSED) {
             let decoder = zstd::Decoder::new(bytes)?;
             serde_json::from_reader(decoder)
-                .map_err(|e| anyhow!("Error decompress footer payload {}", e.to_string()))
+                .map_err(|e| anyhow!("Error decompress footer payload {}", e))
         } else {
             serde_json::from_slice(bytes)
-                .map_err(|e| anyhow!("Error serializing footer {}", e.to_string()))
+                .map_err(|e| anyhow!("Error serializing footer {}", e))
         }
     }
 

@@ -194,33 +194,30 @@ impl ListDashboardsQuery {
     pub fn into(self, org_id: &str) -> config::meta::dashboards::ListDashboardsParams {
         let mut query = config::meta::dashboards::ListDashboardsParams::new(org_id);
 
-        // Apply folder filter if provided
-        if let Some(f) = &self.folder {
-            query = query.with_folder_id(f);
+        // Determine which filters are actually provided (non-empty)
+        let has_folder = self.folder.as_ref().is_some_and(|f| !f.is_empty());
+        let has_title = self.title.as_ref().is_some_and(|t| !t.is_empty());
+        let has_dashboard_id = self.dashboard_id.as_ref().is_some_and(|id| !id.is_empty());
+
+        // Apply folder filter only if provided and non-empty
+        if has_folder {
+            query = query.with_folder_id(self.folder.as_ref().unwrap());
         }
 
-        // Apply title filter if provided
-        if let Some(t) = &self.title {
-            if !t.is_empty() {
-                query = query.where_title_contains(t);
-            }
+        // Apply title filter if provided and non-empty
+        if has_title {
+            query = query.where_title_contains(self.title.as_ref().unwrap());
         }
 
-        // Apply dashboard_id filter if provided
-        if let Some(id) = &self.dashboard_id {
-            if !id.is_empty() {
-                query = query.where_dashboard_id_contains(id);
-            }
+        // Apply dashboard_id filter if provided and non-empty
+        if has_dashboard_id {
+            query = query.where_dashboard_id_contains(self.dashboard_id.as_ref().unwrap());
         }
 
         // If no filter parameters are provided (or all are empty strings),
         // default to the default folder for backwards-compatibility.
         // When searching by title or dashboard_id, we want to search across all folders,
         // so we don't apply the default folder in that case.
-        let has_folder = self.folder.as_ref().is_some_and(|f| !f.is_empty());
-        let has_title = self.title.as_ref().is_some_and(|t| !t.is_empty());
-        let has_dashboard_id = self.dashboard_id.as_ref().is_some_and(|id| !id.is_empty());
-
         if !has_folder && !has_title && !has_dashboard_id {
             query = query.with_folder_id(config::meta::folder::DEFAULT_FOLDER);
         }
@@ -231,8 +228,7 @@ impl ListDashboardsQuery {
         // When neither parameter is set we simply want to return all
         // dashboards that match the selected folder so we ignore the page_size
         // parameter.
-        if (self.title.is_some_and(|t| !t.is_empty())
-            || self.dashboard_id.is_some_and(|id| !id.is_empty()))
+        if (has_title || has_dashboard_id)
             && let Some(page_size) = self.page_size
         {
             query = query.paginate(page_size, 0)
