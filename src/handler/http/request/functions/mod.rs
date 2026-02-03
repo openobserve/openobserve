@@ -227,11 +227,11 @@ pub async fn list_pipeline_dependencies(
     context_path = "/api",
     tag = "Functions",
     operation_id = "testFunction",
-    summary = "Test function execution",
-    description = "Tests a VRL transformation function against sample events to validate the function logic and preview \
-                   the expected output before deployment to production pipelines. Allows developers to verify data \
-                   transformations, debug VRL code issues, and ensure correct field mappings without affecting live \
-                   data processing workflows.",
+    summary = "Validate VRL function syntax",
+    description = "Validates VRL (Vector Remap Language) transformation function syntax by testing it against sample events. \
+                   Returns validation results with any syntax errors or successful transformation output. \
+                   Use this to verify VRL code is correct before creating or updating a function. \
+                   Accepts function code, sample events to test against, and optional trans_type (0 for VRL, 1 for JS).",
     security(
         ("Authorization"= [])
     ),
@@ -242,6 +242,9 @@ pub async fn list_pipeline_dependencies(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"category": "functions"})),
     )
 )]
 #[post("/{org_id}/functions/test")]
