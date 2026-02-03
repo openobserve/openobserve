@@ -139,7 +139,14 @@ test.describe("VRL visualization support testcases", () => {
 
     // Open visualization tab
     await pm.logsVisualise.openVisualiseTab();
+
+    // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
+    // The VRL field list is extracted from query results, not just from editor content
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
+
+    // Wait for VRL fields to be processed and registered
+    await page.waitForTimeout(2000);
 
     // Try to switch to line chart
     await page.locator('[data-test="selected-chart-line-item"]').click();
@@ -169,7 +176,13 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
 
     await pm.logsVisualise.openVisualiseTab();
+
+    // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
+
+    // Wait for VRL fields to be processed
+    await page.waitForTimeout(2000);
 
     // Test multiple chart types - all should show error
     const chartTypes = ["line", "bar", "area", "scatter"];
@@ -293,7 +306,8 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     // Use SELECT * so VRL-generated fields appear in result
-    await pm.logsVisualise.fillLogsQueryEditor(histogramQuery);
+    // Note: Aggregation queries won't show VRL fields as separate columns
+    await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
     await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add complex function that creates multiple fields
@@ -302,9 +316,11 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
 
     await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    await page.waitForTimeout(5000);
+    // Wait for VRL fields to be processed
+    await page.waitForTimeout(2000);
 
     // Verify table is displayed
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
@@ -315,10 +331,11 @@ test.describe("VRL visualization support testcases", () => {
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
 
-    // Verify table has multiple columns (original + VRL-generated fields: vrl_status, vrl_count, vrl_flag)
+    // Verify table has multiple columns (original fields + VRL-generated fields: vrl_status, vrl_count, vrl_flag)
     const headers = page.locator('[data-test="dashboard-panel-table"] thead th');
     const headerCount = await headers.count();
-    expect(headerCount).toBeGreaterThan(2);
+    // SELECT * returns many columns, plus 3 VRL fields
+    expect(headerCount).toBeGreaterThan(3);
 
     // Verify at least one VRL-generated field is visible in the table
     const vrlStatusColumn = page.locator('[data-test="dashboard-panel-table"]').getByText('vrl_status');
@@ -347,22 +364,56 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
     await pm.logsVisualise.logsApplyQueryButton();
 
+    // Verify VRL toggle is enabled before switching
+    const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+    let isChecked = await vrlToggle.getAttribute("aria-checked");
+    expect(isChecked).toBe("true");
+
     // Switch to visualization
     await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
+
+    // Wait for table to fully render
+    await page.waitForTimeout(2000);
+
+    // Verify table is displayed with data (proves VRL query executed)
+    const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
+    await expect(tablePanel).toBeVisible({ timeout: 10000 });
+
+    // Verify table has data rows (VRL function executed successfully)
+    const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
+    const rowCount = await tableRows.count();
+    expect(rowCount).toBeGreaterThan(0);
 
     // Switch back to logs
     await pm.logsVisualise.backToLogs();
     await page.waitForTimeout(1000);
 
+    // ASSERT: Verify VRL toggle is still enabled after switching back to logs
+    isChecked = await vrlToggle.getAttribute("aria-checked");
+    expect(isChecked).toBe("true");
+
+    // ASSERT: Verify VRL editor is still visible
+    const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+    await expect(vrlEditor.first()).toBeVisible();
+
     // Switch to visualization again
     await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Verify chart still renders (VRL should be preserved)
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Verify table chart is still selected
-    await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
+    // Wait for table to fully render
+    await page.waitForTimeout(2000);
+
+    // ASSERT: Verify table is still displayed after tab switches
+    await expect(tablePanel).toBeVisible({ timeout: 10000 });
+
+    // ASSERT: Verify table still has data rows (proves VRL preserved and executed)
+    const rowCountAfterSwitch = await tableRows.count();
+    expect(rowCountAfterSwitch).toBeGreaterThan(0);
 
     // Verify no errors
     const errorResult = await pm.logsVisualise.checkDashboardErrors(
@@ -451,23 +502,42 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
 
     await pm.logsVisualise.openVisualiseTab();
+
+    // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Table chart should be selected
-    await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
+    // Wait for VRL fields to be processed
+    await page.waitForTimeout(2000);
 
-    // Click table chart again - should remain selected without error
+    // Verify table panel is displayed (proves table chart is active)
+    const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
+    await expect(tablePanel).toBeVisible({ timeout: 10000 });
+
+    // Click table chart - should NOT show VRL error (table is allowed)
     await page.locator('[data-test="selected-chart-table-item"]').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
-    // Table should still be selected
-    await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
-
-    // No error should appear
-    const errorNotification = page.getByText(
+    // Verify NO VRL error notification appears for table chart selection
+    const vrlErrorNotification = page.getByText(
       "VRL functions are present. Only table chart is supported when using VRL functions."
     );
-    const isVisible = await errorNotification.isVisible().catch(() => false);
-    expect(isVisible).toBe(false);
+    let isVrlErrorVisible = await vrlErrorNotification.isVisible().catch(() => false);
+    expect(isVrlErrorVisible).toBe(false);
+
+    // Verify table panel is still displayed after clicking table chart
+    await expect(tablePanel).toBeVisible({ timeout: 5000 });
+
+    // Now verify that OTHER chart types DO show VRL error
+    // Try to switch to line chart - should show VRL error
+    await page.locator('[data-test="selected-chart-line-item"]').click();
+    await page.waitForTimeout(500);
+
+    // Verify VRL error notification DOES appear for line chart
+    isVrlErrorVisible = await vrlErrorNotification.isVisible().catch(() => false);
+    expect(isVrlErrorVisible).toBe(true);
+
+    // Verify table panel is STILL displayed (not switched to line chart)
+    await expect(tablePanel).toBeVisible({ timeout: 5000 });
   });
 });
