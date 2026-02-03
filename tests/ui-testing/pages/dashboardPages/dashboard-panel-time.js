@@ -13,7 +13,7 @@ export default class DashboardPanelTime {
    * Enable panel level time in AddPanel config
    */
   async enablePanelTime() {
-    const toggleLocator = this.page.locator('[data-test="panel-time-enable-toggle"]');
+    const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
     await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
 
     // Check if already enabled
@@ -28,7 +28,7 @@ export default class DashboardPanelTime {
    * Disable panel level time in AddPanel config
    */
   async disablePanelTime() {
-    const toggleLocator = this.page.locator('[data-test="panel-time-enable-toggle"]');
+    const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
     await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
 
     // Check if already disabled
@@ -43,7 +43,7 @@ export default class DashboardPanelTime {
    * Check if panel time toggle is enabled
    */
   async isPanelTimeEnabled() {
-    const toggleLocator = this.page.locator('[data-test="panel-time-enable-toggle"]');
+    const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
     const isChecked = await toggleLocator.getAttribute('aria-checked');
     return isChecked === 'true';
   }
@@ -52,7 +52,7 @@ export default class DashboardPanelTime {
    * Select "Use Global Time" mode
    */
   async selectGlobalTimeMode() {
-    const radioLocator = this.page.locator('[data-test="panel-time-mode-global"]');
+    const radioLocator = this.page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]');
     await radioLocator.waitFor({ state: "visible", timeout: 10000 });
     await radioLocator.click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
@@ -62,7 +62,7 @@ export default class DashboardPanelTime {
    * Select "Use Individual Time" mode
    */
   async selectIndividualTimeMode() {
-    const radioLocator = this.page.locator('[data-test="panel-time-mode-individual"]');
+    const radioLocator = this.page.locator('[data-test="dashboard-config-panel-time-mode"][value="individual"]');
     await radioLocator.waitFor({ state: "visible", timeout: 10000 });
     await radioLocator.click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
@@ -73,7 +73,7 @@ export default class DashboardPanelTime {
    * @returns {Promise<string>} "global" or "individual"
    */
   async getPanelTimeMode() {
-    const globalChecked = await this.page.locator('[data-test="panel-time-mode-global"]').getAttribute('aria-checked');
+    const globalChecked = await this.page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]').getAttribute('aria-checked');
     return globalChecked === 'true' ? 'global' : 'individual';
   }
 
@@ -82,8 +82,8 @@ export default class DashboardPanelTime {
    * @param {string} timeRange - e.g., "15-m", "1-h", "7-d"
    */
   async setPanelTimeRelative(timeRange) {
-    // Click the panel time picker in AddPanel
-    const pickerBtn = this.page.locator('[data-test="panel-config-time-picker-btn"]');
+    // Click the panel time picker in AddPanel (edit mode)
+    const pickerBtn = this.page.locator('[data-test="addpanel-date-time-picker"]');
     await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await pickerBtn.click();
 
@@ -199,7 +199,7 @@ export default class DashboardPanelTime {
    */
   async verifyPanelTimeInURL(panelId, expectedValue) {
     const url = this.page.url();
-    const expectedParam = `panel-time-${panelId}=${expectedValue}`;
+    const expectedParam = `pt-period.${panelId}=${expectedValue}`;
     expect(url).toContain(expectedParam);
   }
 
@@ -209,8 +209,10 @@ export default class DashboardPanelTime {
    */
   async verifyPanelTimeNotInURL(panelId) {
     const url = this.page.url();
-    const paramPrefix = `panel-time-${panelId}`;
+    const paramPrefix = `pt-period.${panelId}`;
+    const paramFrom = `pt-from.${panelId}`;
     expect(url).not.toContain(paramPrefix);
+    expect(url).not.toContain(paramFrom);
   }
 
   /**
@@ -219,8 +221,8 @@ export default class DashboardPanelTime {
    */
   async verifyPanelTimeAbsoluteInURL(panelId) {
     const url = this.page.url();
-    expect(url).toContain(`panel-time-${panelId}-from=`);
-    expect(url).toContain(`panel-time-${panelId}-to=`);
+    expect(url).toContain(`pt-from.${panelId}=`);
+    expect(url).toContain(`pt-to.${panelId}=`);
   }
 
   /**
@@ -246,7 +248,7 @@ export default class DashboardPanelTime {
    * Click the global date time picker
    */
   async clickGlobalTimePicker() {
-    const globalPicker = this.page.locator('[data-test="date-time-btn"]');
+    const globalPicker = this.page.locator('[data-test="dashboard-global-date-time-picker"]');
     await globalPicker.waitFor({ state: "visible", timeout: 10000 });
     await globalPicker.click();
   }
