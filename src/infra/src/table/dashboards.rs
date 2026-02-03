@@ -23,7 +23,7 @@ use config::meta::{
     folder::{Folder, FolderType},
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait,
     IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
     TryIntoModel, prelude::Expr, sea_query::Func,
 };
@@ -406,15 +406,50 @@ async fn list_models(
         query
     };
 
-    // Apply the optional title substring filter.
+    // Apply the optional title and/or dashboard_id substring filters.
+    // If both are provided, use OR logic (match either title OR dashboard_id).
+    // If only one is provided, use that single filter.
     let title_pat = params
         .title_pat
         .and_then(|p| if p.is_empty() { None } else { Some(p) });
-    let query = if let Some(title_pat) = title_pat {
-        let pattern = format!("%{}%", title_pat.to_lowercase());
-        query.filter(Expr::expr(Func::lower(Expr::col(dashboards::Column::Title))).like(pattern))
-    } else {
-        query
+    let dashboard_id_pat = params
+        .dashboard_id_pat
+        .and_then(|p| if p.is_empty() { None } else { Some(p) });
+
+    let query = match (title_pat, dashboard_id_pat) {
+        (Some(title_pat), Some(dashboard_id_pat)) => {
+            // Both filters provided: use OR logic
+            let title_pattern = format!("%{}%", title_pat.to_lowercase());
+            let id_pattern = format!("%{}%", dashboard_id_pat.to_lowercase());
+            query.filter(
+                Condition::any()
+                    .add(
+                        Expr::expr(Func::lower(Expr::col(dashboards::Column::Title)))
+                            .like(title_pattern),
+                    )
+                    .add(
+                        Expr::expr(Func::lower(Expr::col(dashboards::Column::DashboardId)))
+                            .like(id_pattern),
+                    ),
+            )
+        }
+        (Some(title_pat), None) => {
+            // Only title filter provided
+            let pattern = format!("%{}%", title_pat.to_lowercase());
+            query
+                .filter(Expr::expr(Func::lower(Expr::col(dashboards::Column::Title))).like(pattern))
+        }
+        (None, Some(dashboard_id_pat)) => {
+            // Only dashboard_id filter provided
+            let pattern = format!("%{}%", dashboard_id_pat.to_lowercase());
+            query.filter(
+                Expr::expr(Func::lower(Expr::col(dashboards::Column::DashboardId))).like(pattern),
+            )
+        }
+        (None, None) => {
+            // No filters provided
+            query
+        }
     };
 
     // Apply ordering.

@@ -1164,7 +1164,10 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           "",
           query,
+          query,
         );
+        // Check if this response is stale (user has typed something new since the request was made)
+        // Since we send the same query to both title and dashboardId, we only need to check one
         if (response.config.params.title != searchQuery.value) {
           return [];
         }
@@ -1391,7 +1394,10 @@ export default defineComponent({
         const filtered = [];
         terms = terms.toLowerCase();
         for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+          if (
+            rows[i]["name"].toLowerCase().includes(terms) ||
+            (rows[i]["identifier"] && rows[i]["identifier"].toLowerCase().includes(terms))
+          ) {
             filtered.push(rows[i]);
           }
         }

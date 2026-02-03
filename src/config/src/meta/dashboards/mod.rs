@@ -139,6 +139,10 @@ pub struct ListDashboardsParams {
     /// dashboards.
     pub title_pat: Option<String>,
 
+    /// The optional case-insensitive dashboard ID substring with which to filter
+    /// dashboards.
+    pub dashboard_id_pat: Option<String>,
+
     /// The optional page size and page index of results to retrieve.
     pub page_size_and_idx: Option<(u64, u64)>,
 }
@@ -151,6 +155,7 @@ impl ListDashboardsParams {
             org_id: org_id.to_string(),
             folder_id: None,
             title_pat: None,
+            dashboard_id_pat: None,
             page_size_and_idx: None,
         }
     }
@@ -167,6 +172,15 @@ impl ListDashboardsParams {
     /// contains the case-insitive title pattern.
     pub fn where_title_contains(mut self, title_pat: &str) -> Self {
         self.title_pat = Some(title_pat.to_string());
+        self
+    }
+
+    /// Filter dashboards by the case-insensitive dashboard ID pattern.
+    ///
+    /// Listed dashboards will only include dashboards with a dashboard ID that
+    /// contains the case-insensitive dashboard ID pattern.
+    pub fn where_dashboard_id_contains(mut self, dashboard_id_pat: &str) -> Self {
+        self.dashboard_id_pat = Some(dashboard_id_pat.to_string());
         self
     }
 

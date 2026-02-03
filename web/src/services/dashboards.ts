@@ -24,7 +24,8 @@ const dashboards = {
     name: string,
     organization: string,
     folderId: string,
-    title: string
+    title: string,
+    dashboardId: string = ""
   ) => {
     const params: any = {
       page_num,
@@ -39,6 +40,10 @@ const dashboards = {
     // Only add title if it is provided
     if (title) {
       params.title = title;
+    }
+    // Only add dashboardId if it is provided
+    if (dashboardId) {
+      params.dashboardId = dashboardId;
     }
     return http().get(`/api/${organization}/dashboards`, { params });
   },
