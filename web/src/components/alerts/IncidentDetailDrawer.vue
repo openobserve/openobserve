@@ -1057,18 +1057,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Success State - TelemetryCorrelationDashboard -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
-            <TelemetryCorrelationDashboard
-              mode="embedded-tabs"
-              :externalActiveTab="'logs'"
-              :serviceName="correlationData.serviceName"
-              :matchedDimensions="correlationData.matchedDimensions"
-              :additionalDimensions="correlationData.additionalDimensions"
-              :logStreams="correlationData.logStreams"
-              :metricStreams="correlationData.metricStreams"
-              :traceStreams="correlationData.traceStreams"
-              :timeRange="telemetryTimeRange"
+          <!-- Success State - CorrelatedLogsTable (following TraceDetailsSidebar pattern) -->
+          <div v-else-if="hasCorrelatedData && correlationPropsForLogsTable" class="tw-flex-1 tw-overflow-hidden">
+            <CorrelatedLogsTable
+              :service-name="correlationPropsForLogsTable.serviceName"
+              :matched-dimensions="correlationPropsForLogsTable.matchedDimensions"
+              :additional-dimensions="correlationPropsForLogsTable.additionalDimensions"
+              :log-streams="correlationPropsForLogsTable.logStreams"
+              :source-stream="correlationPropsForLogsTable.sourceStream"
+              :source-type="correlationPropsForLogsTable.sourceType"
+              :available-dimensions="correlationPropsForLogsTable.availableDimensions"
+              :fts-fields="correlationPropsForLogsTable.ftsFields"
+              :time-range="correlationPropsForLogsTable.timeRange"
+              :hide-view-related-button="correlationPropsForLogsTable.hideViewRelatedButton"
+              :hide-search-term-actions="correlationPropsForLogsTable.hideSearchTermActions"
+              :hide-dimension-filters="correlationPropsForLogsTable.hideDimensionFilters"
             />
           </div>
         </div>
@@ -1236,6 +1239,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
@@ -1247,6 +1251,7 @@ export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
@@ -1741,6 +1746,45 @@ export default defineComponent({
         correlationData.value.metricStreams.length > 0 ||
         correlationData.value.traceStreams.length > 0
       );
+    });
+
+    // Computed property for CorrelatedLogsTable props (following TraceDetailsSidebar pattern)
+    const correlationPropsForLogsTable = computed(() => {
+      if (!correlationData.value || !incidentDetails.value) return null;
+
+      // Extract available dimensions from incident stable_dimensions
+      const availableDimensions: Record<string, string> = {};
+      if (incidentDetails.value.stable_dimensions) {
+        Object.entries(incidentDetails.value.stable_dimensions).forEach(([key, value]) => {
+          if (typeof value === "string" && value) {
+            availableDimensions[key] = value;
+          }
+        });
+      }
+
+      // Derive source stream from stable dimensions (same logic as getCorrelatedStreams)
+      const dimensions = incidentDetails.value.stable_dimensions;
+      const sourceStream =
+        dimensions?.service ||
+        dimensions?.serviceName ||
+        dimensions?.["service.name"] ||
+        dimensions?.["service_name"] ||
+        "incidents";
+
+      return {
+        serviceName: correlationData.value.serviceName,
+        matchedDimensions: correlationData.value.matchedDimensions,
+        additionalDimensions: correlationData.value.additionalDimensions || {},
+        logStreams: correlationData.value.logStreams,
+        sourceStream: sourceStream,
+        sourceType: "logs",
+        availableDimensions: availableDimensions,
+        ftsFields: [],
+        timeRange: telemetryTimeRange.value,
+        hideViewRelatedButton: true,
+        hideSearchTermActions: false,
+        hideDimensionFilters: false,
+      };
     });
 
     // Computed property for formatted RCA content
@@ -2699,6 +2743,7 @@ export default defineComponent({
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
+      correlationPropsForLogsTable,
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
