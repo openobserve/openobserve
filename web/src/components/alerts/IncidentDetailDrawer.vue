@@ -1011,7 +1011,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Logs Tab Content -->
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Refresh Button (shown when logs data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.logStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+          <div v-if="correlationProps && !correlationLoading && correlationProps?.logStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
             <span class="tw-text-xs tw-text-gray-500">Showing correlated logs from incident timeframe</span>
             <q-btn
               flat
@@ -1019,7 +1019,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               icon="refresh"
               color="primary"
-              @click="refreshCorrelation"
+              @click="() => { correlationProps = null; loadCorrelation(); }"
               :disable="correlationLoading"
             >
               <q-tooltip>Refresh correlated data</q-tooltip>
@@ -1027,13 +1027,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading && !correlationProps" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated logs...</div>
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || (!correlationLoading && !correlationProps)" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
               :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
               :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
@@ -1050,25 +1050,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               outline
               size="md"
-              @click="refreshCorrelation"
+              @click="() => { correlationProps = null; correlationError = null; loadCorrelation(); }"
               icon="refresh"
               label="Retry"
               class="q-mt-md"
             />
           </div>
 
-          <!-- Success State - TelemetryCorrelationDashboard -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
-            <TelemetryCorrelationDashboard
-              mode="embedded-tabs"
-              :externalActiveTab="'logs'"
-              :serviceName="correlationData.serviceName"
-              :matchedDimensions="correlationData.matchedDimensions"
-              :additionalDimensions="correlationData.additionalDimensions"
-              :logStreams="correlationData.logStreams"
-              :metricStreams="correlationData.metricStreams"
-              :traceStreams="correlationData.traceStreams"
-              :timeRange="telemetryTimeRange"
+          <!-- Success State - CorrelatedLogsTable -->
+          <div v-else-if="correlationProps" class="tw-flex-1 tw-overflow-hidden q-pa-none">
+            <CorrelatedLogsTable
+              :service-name="correlationProps.serviceName"
+              :matched-dimensions="correlationProps.matchedDimensions"
+              :additional-dimensions="correlationProps.additionalDimensions"
+              :log-streams="correlationProps.logStreams"
+              :source-stream="correlationProps.sourceStream"
+              :source-type="correlationProps.sourceType"
+              :available-dimensions="correlationProps.availableDimensions"
+              :fts-fields="correlationProps.ftsFields"
+              :time-range="correlationProps.timeRange"
+              :hide-view-related-button="true"
+              :hide-search-term-actions="false"
+              :hide-dimension-filters="true"
             />
           </div>
         </div>
@@ -1236,6 +1239,10 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import config from "@/aws-exports";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
@@ -1247,6 +1254,7 @@ export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
@@ -1343,6 +1351,8 @@ export default defineComponent({
     const correlationData = ref<IncidentCorrelatedStreams | null>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
+    const correlationProps = ref<any>(null); // For logs tab correlation
+    const { findRelatedTelemetry } = useServiceCorrelation();
 
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
@@ -1674,6 +1684,123 @@ export default defineComponent({
       }
     };
 
+    // Load correlation for logs tab (following TraceDetailsSidebar pattern)
+    const loadCorrelation = async () => {
+      // Skip if already loaded or loading
+      if (correlationProps.value || correlationLoading.value) {
+        return;
+      }
+
+      // Gate correlation feature behind enterprise check
+      if (config.isEnterprise !== "true") {
+        console.log(
+          "[IncidentDetailDrawer] Correlation feature requires enterprise license"
+        );
+        correlationError.value = "Correlation feature requires enterprise license";
+        return;
+      }
+
+      if (!incidentDetails.value) {
+        console.warn(
+          "[IncidentDetailDrawer] Cannot load correlation: missing incident details"
+        );
+        correlationError.value = "Missing incident details";
+        return;
+      }
+
+      correlationLoading.value = true;
+      correlationError.value = null;
+
+      try {
+        // Get first alert to determine source stream
+        const firstAlert = alerts.value?.[0];
+        if (!firstAlert) {
+          console.warn("[IncidentDetailDrawer] No alerts found in incident");
+          correlationError.value = "No alerts found in incident";
+          return;
+        }
+
+        const streamType = firstAlert.stream_type || "logs";
+        const streamName = firstAlert.stream_name || "default";
+
+        console.log("[IncidentDetailDrawer] Loading correlation for logs tab:", {
+          streamName,
+          streamType,
+          stableDimensions: incidentDetails.value.stable_dimensions,
+        });
+
+        // Build telemetry context from incident
+        const context: TelemetryContext = {
+          timestamp: incidentDetails.value.created_at,
+          fields: { ...incidentDetails.value.stable_dimensions },
+          streamName: streamName,
+        };
+
+        console.log("[IncidentDetailDrawer] Correlation context:", context);
+
+        // Find related telemetry
+        const result = await findRelatedTelemetry(
+          context,
+          streamType,
+          5, // 5 minute time window
+          streamName
+        );
+
+        if (result && result.correlationData) {
+          const correlationData = result.correlationData;
+
+          // Calculate time range (incident timeframe with buffer)
+          const incidentStart = incidentDetails.value.created_at;
+          const incidentEnd = incidentDetails.value.resolved_at || Date.now() * 1000;
+          const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
+
+          // Build availableDimensions from incident stable dimensions
+          // This is critical for log queries to use the correct field names
+          const availableDimensions: Record<string, string> = {};
+          for (const [key, value] of Object.entries(incidentDetails.value.stable_dimensions)) {
+            if (typeof value === "string" && value) {
+              availableDimensions[key] = value;
+            }
+          }
+
+          console.log(
+            "[IncidentDetailDrawer] Available dimensions for log queries:",
+            availableDimensions
+          );
+
+          correlationProps.value = {
+            serviceName: correlationData.service_name,
+            matchedDimensions: correlationData.matched_dimensions,
+            additionalDimensions: correlationData.additional_dimensions || {},
+            logStreams: correlationData.related_streams.logs,
+            sourceStream: streamName,
+            sourceType: streamType,
+            // Use stable dimensions as availableDimensions for log query filters
+            availableDimensions: availableDimensions,
+            ftsFields: [],
+            timeRange: {
+              startTime: incidentStart - bufferUs,
+              endTime: incidentEnd + bufferUs,
+            },
+          };
+
+          console.log(
+            "[IncidentDetailDrawer] Correlation successful:",
+            correlationProps.value
+          );
+        } else {
+          correlationError.value =
+            "No related services found for this incident";
+        }
+      } catch (err: any) {
+        console.error("[IncidentDetailDrawer] Correlation failed:", err);
+        correlationError.value =
+          err.message || "Failed to load correlation data";
+      } finally {
+        correlationLoading.value = false;
+      }
+    };
+
     // Refresh correlation data
     const refreshCorrelation = () => {
       fetchCorrelatedStreams(true);
@@ -1681,13 +1808,18 @@ export default defineComponent({
 
     // Lazy load correlation when user clicks telemetry tab for the first time
     watch(activeTab, (newTab) => {
-      if (
-        (newTab === "logs" || newTab === "metrics" || newTab === "traces") &&
-        !correlationData.value &&
-        !correlationLoading.value &&
-        !correlationError.value
-      ) {
-        fetchCorrelatedStreams();
+      if (newTab === "logs") {
+        // Use new loadCorrelation for logs tab (CorrelatedLogsTable pattern)
+        loadCorrelation();
+      } else if (newTab === "metrics" || newTab === "traces") {
+        // Keep existing fetchCorrelatedStreams for metrics/traces tabs
+        if (
+          !correlationData.value &&
+          !correlationLoading.value &&
+          !correlationError.value
+        ) {
+          fetchCorrelatedStreams();
+        }
       }
     });
 
@@ -2696,6 +2828,7 @@ export default defineComponent({
       correlationData,
       correlationLoading,
       correlationError,
+      correlationProps,
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
@@ -2710,6 +2843,7 @@ export default defineComponent({
       correlationTooltip,
       alertActivityChartData,
       refreshCorrelation,
+      loadCorrelation,
       close,
       acknowledgeIncident,
       resolveIncident,
