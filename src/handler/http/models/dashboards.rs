@@ -213,9 +213,15 @@ impl ListDashboardsQuery {
             }
         }
 
-        // If no filter parameters are provided, default to the default folder
-        // for backwards-compatibility
-        if self.folder.is_none() && self.title.is_none() && self.dashboard_id.is_none() {
+        // If no filter parameters are provided (or all are empty strings),
+        // default to the default folder for backwards-compatibility.
+        // When searching by title or dashboard_id, we want to search across all folders,
+        // so we don't apply the default folder in that case.
+        let has_folder = self.folder.as_ref().is_some_and(|f| !f.is_empty());
+        let has_title = self.title.as_ref().is_some_and(|t| !t.is_empty());
+        let has_dashboard_id = self.dashboard_id.as_ref().is_some_and(|id| !id.is_empty());
+
+        if !has_folder && !has_title && !has_dashboard_id {
             query = query.with_folder_id(config::meta::folder::DEFAULT_FOLDER);
         }
 

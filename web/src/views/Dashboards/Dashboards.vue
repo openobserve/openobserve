@@ -1167,8 +1167,12 @@ export default defineComponent({
           query,
         );
         // Check if this response is stale (user has typed something new since the request was made)
-        // Since we send the same query to both title and dashboardId, we only need to check one
-        if (response.config.params.title != searchQuery.value) {
+        // We send the same query to both title and dashboardId, so check both to be safe
+        const titleMatches = response.config.params.title === searchQuery.value;
+        const dashboardIdMatches = response.config.params.dashboardId === searchQuery.value;
+
+        // If neither matches the current search query, this is a stale response
+        if (!titleMatches && !dashboardIdMatches) {
           return [];
         }
 
