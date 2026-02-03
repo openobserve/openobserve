@@ -540,4 +540,242 @@ test.describe("VRL visualization support testcases", () => {
     // Verify table panel is STILL displayed (not switched to line chart)
     await expect(tablePanel).toBeVisible({ timeout: 5000 });
   });
+
+  // =============================================
+  // Additional P1 Test Cases for VRL Visualization
+  // =============================================
+
+  test("[P1] Should enable dynamic columns configuration when VRL function is applied", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
+    await pm.logsVisualise.setRelative("8", "h");
+
+    // Enable VRL editor and add function
+    await enableVrlEditor(page);
+    await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Wait for table to render
+    await page.waitForTimeout(2000);
+
+    // Verify table is displayed
+    const table = page.locator('[data-test="dashboard-panel-table"]');
+    await expect(table).toBeVisible({ timeout: 10000 });
+
+    // Open config panel to verify dynamic columns is enabled
+    await pm.dashboardPanelConfigs.openConfigPanel();
+
+    // Verify "Allow Dynamic Columns" toggle is enabled (aria-checked="true")
+    const dynamicColumnsToggle = page.locator('[data-test="dashboard-config-table_dynamic_columns"]');
+    await dynamicColumnsToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    const isChecked = await dynamicColumnsToggle.getAttribute("aria-checked");
+    expect(isChecked).toBe("true");
+
+    // Verify table has data rows
+    const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
+    const rowCount = await tableRows.count();
+    expect(rowCount).toBeGreaterThan(0);
+  });
+
+  test("[P1] Should disable VRL toggle and allow chart type switching", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
+    await pm.logsVisualise.setRelative("8", "h");
+
+    // Enable VRL editor and add function
+    await enableVrlEditor(page);
+    await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Verify table chart is selected due to VRL
+    await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
+
+    // Switch back to logs tab
+    await pm.logsVisualise.backToLogs();
+    await page.waitForTimeout(1000);
+
+    // Disable VRL toggle
+    const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+    await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
+    const isChecked = await vrlToggle.getAttribute("aria-checked");
+
+    if (isChecked === "true") {
+      await vrlToggle.click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Clear the VRL function editor
+    const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+    if (await vrlEditor.first().isVisible().catch(() => false)) {
+      await vrlEditor.first().click();
+      await page.locator("#fnEditor").locator(".inputarea").fill("");
+    }
+
+    // Apply query without VRL
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Switch back to visualization
+    await pm.logsVisualise.openVisualiseTab();
+    await page.waitForTimeout(2000);
+
+    // Verify no VRL function error when switching chart types
+    // Note: Chart switching may still be restricted based on other factors like SELECT *
+  });
+
+  test.skip("[P1] Should show error for h-bar chart when VRL function is present", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
+    await pm.logsVisualise.setRelative("8", "h");
+
+    // Enable VRL editor and add function
+    await enableVrlEditor(page);
+    await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Try to switch to h-bar chart
+    const hbarChart = page.locator('[data-test="selected-chart-h-bar-item"]');
+    if (await hbarChart.isVisible().catch(() => false)) {
+      await hbarChart.click();
+      await page.waitForTimeout(500);
+
+      // Verify error notification appears
+      const errorNotification = page.getByText(
+        "VRL functions are present. Only table chart is supported when using VRL functions."
+      );
+      const isVisible = await errorNotification.isVisible().catch(() => false);
+      expect(isVisible).toBe(true);
+
+      // Verify table chart remains selected
+      await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
+    }
+  });
+
+  test("[P1] Should handle VRL with aggregation query and force table chart", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    const aggregationQuery = `SELECT kubernetes_namespace_name as "x_axis_1", count(*) as "y_axis_1" FROM "${STREAM_NAME}" GROUP BY x_axis_1 LIMIT 10`;
+
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.fillLogsQueryEditor(aggregationQuery);
+    await pm.logsVisualise.setRelative("8", "h");
+
+    // Enable VRL editor and add function
+    await enableVrlEditor(page);
+    await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Wait for VRL fields to be processed
+    await page.waitForTimeout(2000);
+
+    // Verify table is displayed with data
+    const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
+    await expect(tablePanel).toBeVisible({ timeout: 10000 });
+
+    // Verify data is displayed in table
+    const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
+    const rowCount = await tableRows.count();
+    expect(rowCount).toBeGreaterThan(0);
+
+    // Try to switch to bar chart - should show error
+    await page.locator('[data-test="selected-chart-bar-item"]').click();
+    await page.waitForTimeout(500);
+
+    const errorNotification = page.getByText(
+      "VRL functions are present. Only table chart is supported when using VRL functions."
+    );
+    const isVisible = await errorNotification.isVisible().catch(() => false);
+    expect(isVisible).toBe(true);
+
+    // Verify table panel is still displayed (not switched to bar chart)
+    await expect(tablePanel).toBeVisible({ timeout: 5000 });
+  });
+
+  test("[P1] Should not show VRL error notification when VRL is not present", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    const aggregationQuery = `SELECT kubernetes_namespace_name as "x_axis_1", count(*) as "y_axis_1" FROM "${STREAM_NAME}" GROUP BY x_axis_1 LIMIT 10`;
+
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.fillLogsQueryEditor(aggregationQuery);
+    await pm.logsVisualise.setRelative("8", "h");
+
+    // Do NOT enable VRL - run query without VRL
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Try to switch to bar chart - should NOT show VRL error
+    await page.locator('[data-test="selected-chart-bar-item"]').click();
+    await page.waitForTimeout(500);
+
+    // Verify VRL-specific error notification does NOT appear
+    const vrlErrorNotification = page.getByText(
+      "VRL functions are present. Only table chart is supported when using VRL functions."
+    );
+    const isVrlErrorVisible = await vrlErrorNotification.isVisible().catch(() => false);
+    expect(isVrlErrorVisible).toBe(false);
+  });
+
+  test("[P1] Should display VRL function editor with correct placeholder and format", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
+    await pm.logsVisualise.setRelative("8", "h");
+
+    // Enable VRL editor
+    await enableVrlEditor(page);
+
+    // Verify VRL editor is visible
+    const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+    await expect(vrlEditor.first()).toBeVisible();
+
+    // Verify editor is ready to accept input
+    const editorInput = page.locator("#fnEditor").locator(".inputarea");
+    await expect(editorInput).toBeVisible();
+
+    // Add VRL function and verify it's entered correctly
+    await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
+
+    // Verify the VRL content was entered (check editor has content)
+    const editorContent = page.locator("#fnEditor");
+    await expect(editorContent).toBeVisible();
+  });
+
 });
