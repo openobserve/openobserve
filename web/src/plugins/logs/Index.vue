@@ -1024,7 +1024,6 @@ export default defineComponent({
       try {
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
-          console.log("Setup logs tab");
           searchObj.organizationIdentifier =
             store.state.selectedOrganization.identifier;
 
@@ -1048,9 +1047,7 @@ export default defineComponent({
           }
 
           if (isLogsTab()) {
-            console.log("IS loading ------", searchObj.loading);
             searchObj.loading = true;
-            console.log("IS loading ------", searchObj.loading);
             loadLogsData();
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
