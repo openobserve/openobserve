@@ -352,59 +352,8 @@ describe("PromQLTableChart", () => {
     });
   });
 
-  describe("Pagination Options", () => {
-    it("should include default pagination values", () => {
-      wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true },
-      });
-
-      const options = wrapper.vm.paginationOptions;
-      expect(options).toContain(10);
-      expect(options).toContain(20);
-      expect(options).toContain(50);
-      expect(options).toContain(100);
-    });
-
-    it("should include custom rows_per_page value", () => {
-      wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true, rows_per_page: 25 },
-      });
-
-      const options = wrapper.vm.paginationOptions;
-      expect(options).toContain(25);
-    });
-
-    it("should include 0 (All) at the end", () => {
-      wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true },
-      });
-
-      const options = wrapper.vm.paginationOptions;
-      expect(options[options.length - 1]).toBe(0);
-    });
-
-    it("should sort options numerically", () => {
-      wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true, rows_per_page: 15 },
-      });
-
-      const options = wrapper.vm.paginationOptions;
-      const numericOptions = options.slice(0, -1); // Exclude 0
-      for (let i = 1; i < numericOptions.length; i++) {
-        expect(numericOptions[i]).toBeGreaterThan(numericOptions[i - 1]);
-      }
-    });
-
-    it("should not duplicate existing default values", () => {
-      wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true, rows_per_page: 50 },
-      });
-
-      const options = wrapper.vm.paginationOptions;
-      const fiftyCount = options.filter((opt: number) => opt === 50).length;
-      expect(fiftyCount).toBe(1);
-    });
-  });
+  // Note: paginationOptions is computed inside TableRenderer and exposed via slot scope.
+  // Tests for paginationOptions are in TableRenderer.spec.ts
 
   describe("Pagination Props to TableRenderer", () => {
     it("should pass show_pagination to TableRenderer", () => {
