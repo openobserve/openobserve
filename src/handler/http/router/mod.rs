@@ -811,15 +811,15 @@ pub fn service_routes() -> Router {
                 post(organization::org::accept_org_invite),
             )
             .route(
-                "/{org_id}/billings/checkout",
-                post(cloud::billings::create_checkout_session),
+                "/{org_id}/billings/hosted_subscription_url",
+                get(cloud::billings::create_checkout_session),
             )
             .route(
                 "/{org_id}/billings/session",
                 post(cloud::billings::process_session_detail),
             )
             .route(
-                "/{org_id}/billings/subscriptions",
+                "/{org_id}/billings/list_subscription",
                 get(cloud::billings::list_subscription),
             )
             .route(
