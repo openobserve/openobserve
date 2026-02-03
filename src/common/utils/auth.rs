@@ -613,6 +613,14 @@ where
                             OFGA_MODELS.get("alert_folders").unwrap().key,
                             path_columns[1] // org_id
                         )
+                    } else if method.eq("POST") && path_columns[3].eq("generate_sql") {
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(path_columns[2])
+                                .map_or(path_columns[2], |model| model.key),
+                            path_columns[1]
+                        )
                     } else {
                         format!(
                             "{}:{}",

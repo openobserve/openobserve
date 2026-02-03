@@ -502,7 +502,7 @@ export default class LogsVisualise {
 
   //wait for query inspector to be visible
   async waitForQueryInspector(page) {
-    const queryInspector = page.getByText("Query Inspectorclose");
-    await expect(queryInspector).toBeVisible({ timeout: 10000 });
+    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-close-btn"]');
+    await queryInspectorCloseBtn.waitFor({ state: "visible", timeout: 10000 });
   }
 }
