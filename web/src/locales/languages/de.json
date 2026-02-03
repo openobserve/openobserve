@@ -2746,7 +2746,9 @@
         "startBeforeEnd": "Die Startzeit muss vor der Endzeit liegen",
         "endAfterStart": "Die Endzeit muss nach der Startzeit liegen"
       }
-    }
+    },
+    "viewInTraces": "In Traces ansehen",
+    "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",
