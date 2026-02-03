@@ -88,6 +88,7 @@
             ]"
             dense
             no-caps
+            class="view-toggle-buttons"
             @update:model-value="setVisualizationType"
           />
 
@@ -144,58 +145,9 @@
                 <div class="text-h6 q-mt-md text-grey-7">
                   No Service Graph Data
                 </div>
-                <div
-                  class="text-h6 text-grey-7 q-mt-lg q-mb-md"
-                  style="font-size: 1.1rem"
-                >
-                  Possible causes:
+                <div class="text-body2 text-grey-6 q-mt-sm">
+                  Try querying a longer duration
                 </div>
-                <div
-                  class="text-body1 text-grey-6"
-                  style="max-width: 800px; font-size: 0.95rem"
-                >
-                  <div
-                    class="q-pa-md q-mb-md"
-                    style="
-                      background: rgba(var(--q-primary-rgb), 0.05);
-                      border-radius: 6px;
-                    "
-                  >
-                    <div
-                      class="text-weight-medium q-mb-sm"
-                      style="font-size: 1rem"
-                    >
-                      Queried time range has no traces, try selecting a longer duration.
-                    </div>
-                  </div>
-
-                  <div
-                    class="q-pa-md q-mb-md"
-                    style="
-                      background: rgba(var(--q-primary-rgb), 0.05);
-                      border-radius: 6px;
-                    "
-                  >
-                    <div
-                      class="text-weight-medium q-mb-sm"
-                      style="font-size: 1rem"
-                    >
-                      Maybe your traces have only internal spans (<code>span_kind = 1</code>)?
-                    </div>
-                    <div class="q-mt-sm">
-                      Make sure <code>O2_SERVICE_GRAPH_EXCLUDE_INTERNAL_SPANS=true</code>
-                    </div>
-                    <div>to process internal spans for service edges.</div>
-                  </div>
-                </div>
-                <q-btn
-                  outline
-                  color="primary"
-                  label="Refresh"
-                  icon="refresh"
-                  @click="loadServiceGraph"
-                  class="q-mt-lg"
-                />
               </div>
             </div>
             <div v-else class="tw:h-full">
@@ -803,5 +755,25 @@ code {
   font-size: 0.9em;
   font-weight: 600;
   color: #333;
+}
+
+.view-toggle-buttons {
+  :deep(.q-btn) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  :deep(.q-btn-item) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  :deep(.q-btn__content) {
+    gap: 0.5rem;
+  }
+
+  :deep(.q-separator) {
+    margin: 0.25rem 0;
+  }
 }
 </style>
