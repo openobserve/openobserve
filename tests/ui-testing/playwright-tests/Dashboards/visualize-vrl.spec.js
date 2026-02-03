@@ -111,14 +111,26 @@ test.describe("VRL visualization support testcases", () => {
     // Open visualization tab
     await pm.logsVisualise.openVisualiseTab();
 
+    // IMPORTANT: Run query in visualization tab to populate table data
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+
     // Verify chart renders
     await pm.logsVisualise.verifyChartRenders(page);
+
+    // Wait for table to fully render with data
+    await page.waitForTimeout(2000);
+
+    // Verify table panel is visible
+    const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
+    await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
     // Verify table chart is selected
     await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
 
-    // Verify table has data
+    // Verify table has data - use expect with retry for more robust assertion
     const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
+    // Use toHaveCount with minimum value - this has built-in retrying
+    await expect(tableRows).not.toHaveCount(0, { timeout: 15000 });
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
   });
