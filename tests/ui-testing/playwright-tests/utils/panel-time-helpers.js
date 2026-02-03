@@ -219,96 +219,6 @@ export async function waitForPanelLoadStart(page, panelId, timeout = 5000) {
 }
 
 /**
- * Create a dashboard with panel time configuration for testing
- * @param {Object} pm - PageManager instance
- * @param {Object} config - Configuration object
- * @param {string} config.dashboardName - Dashboard name
- * @param {string} config.panelName - Panel name
- * @param {boolean} config.allowPanelTime - Enable panel time
- * @param {string} config.panelTimeMode - "global" or "individual"
- * @param {string} config.panelTimeRange - Time range (e.g., "1-h")
- */
-export async function createDashboardWithPanelTime(pm, config) {
-  const {
-    dashboardName,
-    panelName = 'Test Panel',
-    allowPanelTime = true,
-    panelTimeMode = 'individual',
-    panelTimeRange = '1-h'
-  } = config;
-
-  const page = pm.page;
-
-  // Create dashboard
-  await pm.dashboardList.menuItem("dashboards-item");
-  await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
-  await pm.dashboardCreate.waitForDashboardUIStable();
-  await pm.dashboardCreate.createDashboard(dashboardName);
-
-  // Wait for add panel button
-  await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible", timeout: 10000 });
-  await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-
-  // Wait for AddPanel view
-  await page.locator('[data-test="dashboard-panel-name"]').waitFor({ state: "visible", timeout: 10000 });
-
-  // Configure panel basics
-  await page.locator('[data-test="dashboard-panel-name"]').fill(panelName);
-
-  // Enable panel time if requested
-  if (allowPanelTime) {
-    await pm.dashboardPanelTime.enablePanelTime();
-
-    if (panelTimeMode === 'individual') {
-      await pm.dashboardPanelTime.selectIndividualTimeMode();
-      await pm.dashboardPanelTime.setPanelTimeRelative(panelTimeRange);
-    } else {
-      await pm.dashboardPanelTime.selectGlobalTimeMode();
-    }
-  }
-
-  // Add a basic query (required for panel to be valid)
-  await page.locator('[data-test="dashboard-panel-query-editor"]').click();
-  await page.locator('[data-test="dashboard-panel-query-editor"]').fill('SELECT * FROM logs');
-
-  // Save panel
-  await page.locator('[data-test="dashboard-panel-save"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-  return dashboardName;
-}
-
-/**
- * Get the panel ID from a panel element
- * @param {import('@playwright/test').Page} page - Playwright page object
- * @param {number} panelIndex - Panel index (0-based)
- * @returns {Promise<string>} - Panel ID
- */
-export async function getPanelId(page, panelIndex = 0) {
-  const panels = page.locator('[data-test^="dashboard-panel-"]');
-  const panelCount = await panels.count();
-
-  if (panelCount === 0) {
-    throw new Error('No panels found on dashboard');
-  }
-
-  if (panelIndex >= panelCount) {
-    throw new Error(`Panel index ${panelIndex} out of range. Only ${panelCount} panels found.`);
-  }
-
-  const panel = panels.nth(panelIndex);
-  const dataTest = await panel.getAttribute('data-test');
-
-  // Extract panel ID from data-test attribute (format: "dashboard-panel-{id}")
-  const match = dataTest.match(/dashboard-panel-(.+)/);
-  if (match) {
-    return match[1];
-  }
-
-  throw new Error('Could not extract panel ID from panel element');
-}
-
-/**
  * Parse time range display text to standard format
  * @param {string} displayText - Display text from time picker (e.g., "Last 1 hour", "Last 7 days")
  * @returns {string} - Standard format (e.g., "1h", "7d")
@@ -332,19 +242,6 @@ export function parseTimeDisplayText(displayText) {
   }
 
   return text;
-}
-
-/**
- * Verify URL has NOT updated (no changes to URL)
- * This captures the URL before an action and verifies it hasn't changed
- * @param {import('@playwright/test').Page} page - Playwright page object
- * @param {string} originalURL - The original URL to compare against
- */
-export function verifyURLUnchanged(page, originalURL) {
-  const currentURL = page.url();
-  if (currentURL !== originalURL) {
-    throw new Error(`URL changed unexpectedly. Expected: ${originalURL}, Got: ${currentURL}`);
-  }
 }
 
 /**
