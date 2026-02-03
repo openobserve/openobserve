@@ -103,15 +103,74 @@ export default class DashboardPanelTime {
 
   /**
    * Set panel time in AddPanel edit mode (absolute time)
-   * Note: This is simplified - full absolute time selection would need date picker interaction
+    * @param {number} startDay - Start day number (1-31)
+    * @param {number} endDay - End day number (1-31)
    */
-  async setPanelTimeAbsolute() {
-    const pickerBtn = this.page.locator('[data-test="panel-config-time-picker-btn"]');
+  async setPanelTimeAbsolute(startDay, endDay) {
+
+    // Click the panel time picker in AddPanel config (edit mode)
+    const pickerBtn = this.page.locator('[data-test="dashboard-config-panel-time-picker"]');
+    await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await pickerBtn.click();
 
     // Switch to absolute tab
     await this.page.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+
+    // Click the left chevron button (if needed)
+    await this.page
+      .locator("button")
+      .filter({ hasText: "chevron_left" })
+      .first()
+      .click();
+
+    // Select the start and end days dynamically
+    await this.page
+      .getByRole("button", { name: String(startDay) })
+      .last()
+      .click();
+    await this.page
+      .getByRole("button", { name: String(endDay) })
+      .last()
+      .click();
+  }
+
+  /**
+   * Set panel time in AddPanel edit mode using calendar picker (absolute time)
+   * This method uses the calendar UI to select dates by clicking on day numbers
+   
+   */
+  async setPanelTimeAbsoluteByCalendar(startDay, endDay) {
+    
+
+    // Click the panel time picker in AddPanel config (edit mode)
+    const pickerBtn = this.page.locator('[data-test="dashboard-config-panel-time-picker"]');
+    await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
+    await pickerBtn.click();
+
+    // Switch to absolute tab
+    await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+    await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+
+    // Click the left chevron button (if needed)
+    await this.page
+      .locator("button")
+      .filter({ hasText: "chevron_left" })
+      .first()
+      .click();
+
+    // Select the start and end days dynamically
+    await this.page
+      .getByRole("button", { name: String(startDay) })
+      .last()
+      .click();
+    await this.page
+      .getByRole("button", { name: String(endDay) })
+      .last()
+      .click();
+      // Click apply button
+      await this.page.locator('[data-test="dashboard-apply"]').click();
+      await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 
   /**
