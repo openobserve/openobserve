@@ -108,6 +108,9 @@ export async function addPanelWithPanelTime(page, pm, config) {
 
   // Configure panel time if enabled
   if (allowPanelTime) {
+    // Open config panel sidebar
+    await pm.dashboardPanelConfigs.openConfigPanel();
+
     await pm.dashboardPanelTime.enablePanelTime();
 
     if (panelTimeMode === 'individual') {
@@ -398,11 +401,11 @@ export async function verifyPanelTimeConfig(page, expectedConfig) {
 
     // Verify mode
     if (panelTimeMode === 'global') {
-      const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]');
+      const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode-global"]');
       const globalChecked = await globalRadio.getAttribute('aria-checked');
       expect(globalChecked).toBe('true');
     } else {
-      const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="individual"]');
+      const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode-individual"]');
       const individualChecked = await individualRadio.getAttribute('aria-checked');
       expect(individualChecked).toBe('true');
 

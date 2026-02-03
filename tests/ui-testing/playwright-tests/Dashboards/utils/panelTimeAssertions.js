@@ -216,11 +216,11 @@ export async function assertPanelTimeMode(page, expectedMode) {
   testLogger.info('Asserting panel time mode', { expectedMode });
 
   if (expectedMode === 'global') {
-    const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]');
+    const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode-global"]');
     const isChecked = await globalRadio.getAttribute('aria-checked');
     expect(isChecked).toBe('true');
   } else {
-    const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="individual"]');
+    const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode-individual"]');
     const isChecked = await individualRadio.getAttribute('aria-checked');
     expect(isChecked).toBe('true');
   }

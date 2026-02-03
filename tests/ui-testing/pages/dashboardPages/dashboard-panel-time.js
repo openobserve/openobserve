@@ -11,6 +11,8 @@ export default class DashboardPanelTime {
 
   /**
    * Enable panel level time in AddPanel config
+   * Note: Config panel sidebar must be open before calling this method
+   * Use pm.dashboardPanelConfigs.openConfigPanel() first
    */
   async enablePanelTime() {
     const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
@@ -26,6 +28,8 @@ export default class DashboardPanelTime {
 
   /**
    * Disable panel level time in AddPanel config
+   * Note: Config panel sidebar must be open before calling this method
+   * Use pm.dashboardPanelConfigs.openConfigPanel() first
    */
   async disablePanelTime() {
     const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
@@ -52,7 +56,7 @@ export default class DashboardPanelTime {
    * Select "Use Global Time" mode
    */
   async selectGlobalTimeMode() {
-    const radioLocator = this.page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]');
+    const radioLocator = this.page.locator('[data-test="dashboard-config-panel-time-mode-global"]');
     await radioLocator.waitFor({ state: "visible", timeout: 10000 });
     await radioLocator.click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
@@ -62,7 +66,7 @@ export default class DashboardPanelTime {
    * Select "Use Individual Time" mode
    */
   async selectIndividualTimeMode() {
-    const radioLocator = this.page.locator('[data-test="dashboard-config-panel-time-mode"][value="individual"]');
+    const radioLocator = this.page.locator('[data-test="dashboard-config-panel-time-mode-individual"]');
     await radioLocator.waitFor({ state: "visible", timeout: 10000 });
     await radioLocator.click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
@@ -73,7 +77,7 @@ export default class DashboardPanelTime {
    * @returns {Promise<string>} "global" or "individual"
    */
   async getPanelTimeMode() {
-    const globalChecked = await this.page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]').getAttribute('aria-checked');
+    const globalChecked = await this.page.locator('[data-test="dashboard-config-panel-time-mode-global"]').getAttribute('aria-checked');
     return globalChecked === 'true' ? 'global' : 'individual';
   }
 
