@@ -729,6 +729,7 @@ pub async fn enrich_with_topology(
         let current_node_first_fired = topology.nodes[current_node_index].first_fired_at;
 
         // Find the most recent previous node from same service
+        // Use node index as tiebreaker when timestamps are equal (handles simultaneous alerts)
         let most_recent_previous = topology
             .nodes
             .iter()
@@ -736,9 +737,11 @@ pub async fn enrich_with_topology(
             .filter(|(idx, node)| {
                 *idx != current_node_index
                     && node.service_name == service_name
-                    && node.first_fired_at < current_node_first_fired
+                    && (node.first_fired_at < current_node_first_fired
+                        || (node.first_fired_at == current_node_first_fired
+                            && *idx < current_node_index))
             })
-            .max_by_key(|(_, node)| node.first_fired_at);
+            .max_by_key(|(idx, node)| (node.first_fired_at, *idx));
 
         if let Some((prev_idx, _)) = most_recent_previous {
             // Check if edge already exists
@@ -814,7 +817,11 @@ pub async fn enrich_with_topology(
                     let to_node = &topology.nodes[to_idx];
 
                     // Only add if from happened before to (chronological)
-                    if from_node.first_fired_at < to_node.first_fired_at {
+                    // Use node index as tiebreaker when timestamps are equal (handles simultaneous
+                    // alerts)
+                    if from_node.first_fired_at < to_node.first_fired_at
+                        || (from_node.first_fired_at == to_node.first_fired_at && from_idx < to_idx)
+                    {
                         // Check if edge already exists
                         let edge_exists = topology.edges.iter().any(|e| {
                             e.from_node_index == from_idx
@@ -843,17 +850,22 @@ pub async fn enrich_with_topology(
                 let from_node = &topology.nodes[from_idx];
 
                 // Find most recent node in to_service that fired after from_node
+                // Use node index as tiebreaker when timestamps are equal (handles simultaneous
+                // alerts)
                 let most_recent_to = to_indices
                     .iter()
                     .filter_map(|&to_idx| {
                         let to_node = &topology.nodes[to_idx];
-                        if to_node.first_fired_at > from_node.first_fired_at {
+                        if to_node.first_fired_at > from_node.first_fired_at
+                            || (to_node.first_fired_at == from_node.first_fired_at
+                                && to_idx > from_idx)
+                        {
                             Some((to_idx, to_node.first_fired_at))
                         } else {
                             None
                         }
                     })
-                    .min_by_key(|(_, fired_at)| *fired_at); // Closest in time (earliest after from_node)
+                    .min_by_key(|(to_idx, fired_at)| (*fired_at, *to_idx)); // Closest in time, then by index
 
                 if let Some((to_idx, _)) = most_recent_to {
                     // Check if edge already exists
