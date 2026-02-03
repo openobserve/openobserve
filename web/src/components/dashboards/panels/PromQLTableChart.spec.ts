@@ -352,9 +352,6 @@ describe("PromQLTableChart", () => {
     });
   });
 
-  // Note: paginationOptions is computed inside TableRenderer and exposed via slot scope.
-  // Tests for paginationOptions are in TableRenderer.spec.ts
-
   describe("Pagination Props to TableRenderer", () => {
     it("should pass show_pagination to TableRenderer", () => {
       wrapper = createWrapper({
