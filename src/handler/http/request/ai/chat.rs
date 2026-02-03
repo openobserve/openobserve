@@ -723,7 +723,7 @@ mod tests {
             Some(&"custom-value".to_string())
         );
         // Authorization should not be included
-        assert!(result.get("authorization").is_none());
+        assert!(!result.contains_key("authorization"));
     }
 
     #[test]
@@ -748,7 +748,7 @@ mod tests {
             Some(&"example.com".to_string())
         );
         // X-Other-Header should not match
-        assert!(result.get("x-other-header").is_none());
+        assert!(!result.contains_key("x-other-header"));
     }
 
     #[test]
