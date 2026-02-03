@@ -59,7 +59,7 @@ export async function assertPanelTimeInURL(page, panelId, expectedValue) {
   testLogger.info('Asserting panel time in URL', { panelId, expectedValue });
 
   const url = page.url();
-  const expectedParam = `panel-time-${panelId}=${expectedValue}`;
+  const expectedParam = `pt-period.${panelId}=${expectedValue}`;
 
   expect(url).toContain(expectedParam);
 
@@ -75,9 +75,11 @@ export async function assertPanelTimeNotInURL(page, panelId) {
   testLogger.info('Asserting panel time NOT in URL', { panelId });
 
   const url = page.url();
-  const paramPrefix = `panel-time-${panelId}`;
+  const paramPeriod = `pt-period.${panelId}`;
+  const paramFrom = `pt-from.${panelId}`;
 
-  expect(url).not.toContain(paramPrefix);
+  expect(url).not.toContain(paramPeriod);
+  expect(url).not.toContain(paramFrom);
 
   testLogger.info('Panel time parameter not found in URL', { panelId });
 }
@@ -92,8 +94,8 @@ export async function assertPanelTimeAbsoluteInURL(page, panelId) {
 
   const url = page.url();
 
-  expect(url).toContain(`panel-time-${panelId}-from=`);
-  expect(url).toContain(`panel-time-${panelId}-to=`);
+  expect(url).toContain(`pt-from.${panelId}=`);
+  expect(url).toContain(`pt-to.${panelId}=`);
 
   testLogger.info('Absolute panel time parameters found in URL', { panelId });
 }
@@ -197,7 +199,7 @@ export async function assertPanelLoadComplete(page, panelId) {
 export async function assertPanelTimeToggleState(page, expectedEnabled) {
   testLogger.info('Asserting panel time toggle state', { expectedEnabled });
 
-  const toggle = page.locator('[data-test="panel-time-enable-toggle"]');
+  const toggle = page.locator('[data-test="dashboard-config-allow-panel-time"]');
   const isChecked = await toggle.getAttribute('aria-checked');
 
   expect(isChecked).toBe(expectedEnabled ? 'true' : 'false');
@@ -214,11 +216,11 @@ export async function assertPanelTimeMode(page, expectedMode) {
   testLogger.info('Asserting panel time mode', { expectedMode });
 
   if (expectedMode === 'global') {
-    const globalRadio = page.locator('[data-test="panel-time-mode-global"]');
+    const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="global"]');
     const isChecked = await globalRadio.getAttribute('aria-checked');
     expect(isChecked).toBe('true');
   } else {
-    const individualRadio = page.locator('[data-test="panel-time-mode-individual"]');
+    const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode"][value="individual"]');
     const isChecked = await individualRadio.getAttribute('aria-checked');
     expect(isChecked).toBe('true');
   }

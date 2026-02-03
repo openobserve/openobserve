@@ -106,14 +106,14 @@ export function assertPanelDataAPITriggered(result, expectations = {}) {
  */
 export async function waitForPanelTimeInURL(page, panelId, expectedValue, timeout = 5000) {
   const startTime = Date.now();
-  const expectedParam = `panel-time-${panelId}=${expectedValue}`;
+  const expectedParam = `pt-period.${panelId}=${expectedValue}`;
 
   while (Date.now() - startTime < timeout) {
     const url = page.url();
     if (url.includes(expectedParam)) {
       return true;
     }
-    await page.waitForTimeout(100);
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   throw new Error(`URL did not contain ${expectedParam} within ${timeout}ms. Current URL: ${page.url()}`);
@@ -127,17 +127,18 @@ export async function waitForPanelTimeInURL(page, panelId, expectedValue, timeou
  */
 export async function waitForPanelTimeRemovedFromURL(page, panelId, timeout = 5000) {
   const startTime = Date.now();
-  const paramPrefix = `panel-time-${panelId}`;
+  const paramPeriod = `pt-period.${panelId}`;
+  const paramFrom = `pt-from.${panelId}`;
 
   while (Date.now() - startTime < timeout) {
     const url = page.url();
-    if (!url.includes(paramPrefix)) {
+    if (!url.includes(paramPeriod) && !url.includes(paramFrom)) {
       return true;
     }
-    await page.waitForTimeout(100);
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  throw new Error(`URL still contains ${paramPrefix} after ${timeout}ms. Current URL: ${page.url()}`);
+  throw new Error(`URL still contains panel time params after ${timeout}ms. Current URL: ${page.url()}`);
 }
 
 /**
@@ -148,9 +149,9 @@ export async function waitForPanelTimeRemovedFromURL(page, panelId, timeout = 50
  */
 export function getPanelTimeFromURL(page, panelId) {
   const url = new URL(page.url());
-  const relativeParam = url.searchParams.get(`panel-time-${panelId}`);
-  const fromParam = url.searchParams.get(`panel-time-${panelId}-from`);
-  const toParam = url.searchParams.get(`panel-time-${panelId}-to`);
+  const relativeParam = url.searchParams.get(`pt-period.${panelId}`);
+  const fromParam = url.searchParams.get(`pt-from.${panelId}`);
+  const toParam = url.searchParams.get(`pt-to.${panelId}`);
 
   if (relativeParam) {
     return {
