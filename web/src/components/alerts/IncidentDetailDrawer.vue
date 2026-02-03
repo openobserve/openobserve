@@ -705,13 +705,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent) -->
+              <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: incidentDetails?.topology_context?.nodes?.length
+                  height: (incidentDetails?.topology_context?.nodes?.length && triggers.length > 0)
                     ? 'calc(35% - 5.6px)'
-                    : 'calc(65% - 8px)',
+                    : 'calc(65% - 2px)',
                   minHeight: 0,
                   flexShrink: 0
                 }"
