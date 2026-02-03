@@ -760,8 +760,7 @@ export default defineComponent({
       try {
         if (searchObj) {
           // Turn off all loaders before saving view
-          let savedSearchObj = toRaw(searchObj);
-          savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
+          let savedSearchObj = JSON.parse(JSON.stringify(searchObj));
           savedSearchObj.loading = false;
           savedSearchObj.loadingHistogram = false;
           savedSearchObj.loadingCounter = false;
