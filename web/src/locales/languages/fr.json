@@ -2746,7 +2746,9 @@
         "startBeforeEnd": "L'heure de début doit être antérieure à l'heure de fin",
         "endAfterStart": "L'heure de fin doit être postérieure à l'heure de début"
       }
-    }
+    },
+    "viewInTraces": "Afficher dans Traces",
+    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

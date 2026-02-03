@@ -2746,7 +2746,9 @@
         "startBeforeEnd": "De starttijd moet vóór de eindtijd liggen",
         "endAfterStart": "De eindtijd moet na de starttijd liggen"
       }
-    }
+    },
+    "viewInTraces": "Bekijk in Traces",
+    "viewInTracesTooltip": "Open de pagina met sporen met het RED-metriekendashboard en alle gerelateerde sporen"
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

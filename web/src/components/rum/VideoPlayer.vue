@@ -75,12 +75,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="progressTime absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
-            width: event.frustration_types && event.frustration_types.length > 0 ? '3px' : '2px',
+            width:
+              event.frustration_types && event.frustration_types.length > 0
+                ? '3px'
+                : '2px',
             left:
               (event.relativeTime / playerState.totalTime) * playerState.width +
               'px',
             bottom: '-0.3125rem',
-            height: event.frustration_types && event.frustration_types.length > 0 ? '1.125rem' : '0.9375rem',
+            height:
+              event.frustration_types && event.frustration_types.length > 0
+                ? '1.125rem'
+                : '0.9375rem',
           }"
           :title="getEventTooltip(event)"
         />
@@ -279,8 +285,6 @@ const setupSession = async () => {
   props.segments.forEach((segment: any) => {
     segment.records.forEach((record: any) => {
       let segCopy = cloneDeep(record);
-      const supportedTypes = [2, 3, 4, 8];
-      if (!supportedTypes.includes(segCopy.type)) return;
       if (segCopy.type === 8) {
         const seg = {
           ...segCopy,
@@ -416,6 +420,10 @@ const setupSession = async () => {
   // });
 
   if (!player.value) return;
+  updatePlayerState();
+};
+
+const updatePlayerState = () => {
   const playerMeta = player.value?.getMetaData();
   playerState.value.startTime = playerMeta.startTime;
   playerState.value.endTime = playerMeta.endTime;
@@ -427,29 +435,31 @@ const setupSession = async () => {
   const playbackBarWidth = playbackBarRef.value?.clientWidth || 0;
   // calculate width of progress bar
   playerState.value.width = playbackBarWidth;
-
   player.value.triggerResize();
 };
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return 'bg-frustration-marker';
+    return "bg-frustration-marker";
   }
-  if (event.type === 'error') {
-    return 'bg-red-5';
+  if (event.type === "error") {
+    return "bg-red-5";
   }
-  return 'bg-secondary';
+  return "bg-secondary";
 };
 
 const getEventTooltip = (event: any) => {
-  const eventName = event.name.length > 100
-    ? event.name.slice(0, 100) + '...'
-    : event.name;
+  const eventName =
+    event.name.length > 100 ? event.name.slice(0, 100) + "..." : event.name;
 
   if (event.frustration_types && event.frustration_types.length > 0) {
-    const frustrationLabels = event.frustration_types.map((type: string) => {
-      return type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
-    }).join(', ');
+    const frustrationLabels = event.frustration_types
+      .map((type: string) => {
+        return type
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (l: string) => l.toUpperCase());
+      })
+      .join(", ");
     return `⚠️ FRUSTRATION: ${frustrationLabels}\n${eventName}`;
   }
 
@@ -580,6 +590,7 @@ defineExpose({
   setSpeed,
   toggleSkipInactive,
   playerState,
+  updatePlayerState,
 });
 </script>
 

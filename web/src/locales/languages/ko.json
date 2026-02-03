@@ -2746,7 +2746,9 @@
         "startBeforeEnd": "시작 시간은 종료 시간 이전이어야 합니다.",
         "endAfterStart": "종료 시간은 시작 시간 이후여야 합니다."
       }
-    }
+    },
+    "viewInTraces": "트레이스에서 보기",
+    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기"
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

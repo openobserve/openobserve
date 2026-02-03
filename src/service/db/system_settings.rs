@@ -442,6 +442,25 @@ pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::Sem
     }
 }
 
+/// Get the updated_at timestamp for semantic_field_groups setting
+///
+/// Returns the timestamp (in microseconds since epoch) when the semantic field groups
+/// configuration was last updated. This is used for time-based FQN selection to prefer
+/// services that were processed after the most recent configuration change.
+///
+/// Returns 0 if no org-level setting exists (uses defaults).
+pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    // Get the settings record (not just the value)
+    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await {
+        setting.updated_at
+    } else {
+        // No org-level setting found - using defaults (return 0 = epoch)
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

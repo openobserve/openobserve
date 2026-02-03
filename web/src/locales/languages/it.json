@@ -2744,7 +2744,9 @@
         "startBeforeEnd": "L'ora di inizio deve essere precedente all'ora di fine",
         "endAfterStart": "L'ora di fine deve essere successiva all'ora di inizio"
       }
-    }
+    },
+    "viewInTraces": "Visualizza in Tracce",
+    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

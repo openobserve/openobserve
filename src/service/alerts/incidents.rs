@@ -223,6 +223,10 @@ async fn query_service_discovery_key(
         let semantic_groups =
             crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
 
+        // Get the updated_at timestamp for semantic_field_groups setting
+        let semantic_groups_updated_at =
+            crate::service::db::system_settings::get_semantic_field_groups_updated_at(org_id).await;
+
         // Use the existing ServiceStorage::correlate API for proper dimension matching
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
             org_id,
@@ -231,6 +235,7 @@ async fn query_service_discovery_key(
             labels,
             &fqn_priority,
             &semantic_groups,
+            semantic_groups_updated_at,
         )
         .await
         {
@@ -723,32 +728,37 @@ pub async fn enrich_with_topology(
     if is_new_node {
         let current_node_first_fired = topology.nodes[current_node_index].first_fired_at;
 
-        for (idx, node) in topology.nodes.iter().enumerate() {
-            if idx == current_node_index {
-                continue; // Skip self
-            }
+        // Find the most recent previous node from same service
+        let most_recent_previous = topology
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(idx, node)| {
+                *idx != current_node_index
+                    && node.service_name == service_name
+                    && node.first_fired_at < current_node_first_fired
+            })
+            .max_by_key(|(_, node)| node.first_fired_at);
 
-            // Only connect nodes from same service
-            if node.service_name == service_name && node.first_fired_at < current_node_first_fired {
-                // Check if edge already exists
-                let edge_exists = topology.edges.iter().any(|e| {
-                    e.from_node_index == idx
-                        && e.to_node_index == current_node_index
-                        && matches!(e.edge_type, EdgeType::Temporal)
+        if let Some((prev_idx, _)) = most_recent_previous {
+            // Check if edge already exists
+            let edge_exists = topology.edges.iter().any(|e| {
+                e.from_node_index == prev_idx
+                    && e.to_node_index == current_node_index
+                    && matches!(e.edge_type, EdgeType::Temporal)
+            });
+
+            if !edge_exists {
+                topology.edges.push(AlertEdge {
+                    from_node_index: prev_idx,
+                    to_node_index: current_node_index,
+                    edge_type: EdgeType::Temporal,
                 });
-
-                if !edge_exists {
-                    topology.edges.push(AlertEdge {
-                        from_node_index: idx,
-                        to_node_index: current_node_index,
-                        edge_type: EdgeType::Temporal,
-                    });
-                    log::debug!(
-                        "[incidents] Added temporal edge: {} -> {} (same service)",
-                        idx,
-                        current_node_index
-                    );
-                }
+                log::debug!(
+                    "[incidents] Added temporal edge: {} -> {} (most recent from same service)",
+                    prev_idx,
+                    current_node_index
+                );
             }
         }
     }
@@ -796,42 +806,71 @@ pub async fn enrich_with_topology(
             .iter()
             .any(|e| &e.from == from_service && &e.to == to_service);
 
-        // Add edge from each node in from_service to each node in to_service
-        // that occurred chronologically after
-        for &from_idx in from_indices {
-            for &to_idx in to_indices {
+        if has_sg_edge {
+            // Service dependency: connect ALL nodes (full causality)
+            for &from_idx in from_indices {
+                for &to_idx in to_indices {
+                    let from_node = &topology.nodes[from_idx];
+                    let to_node = &topology.nodes[to_idx];
+
+                    // Only add if from happened before to (chronological)
+                    if from_node.first_fired_at < to_node.first_fired_at {
+                        // Check if edge already exists
+                        let edge_exists = topology.edges.iter().any(|e| {
+                            e.from_node_index == from_idx
+                                && e.to_node_index == to_idx
+                                && matches!(e.edge_type, EdgeType::ServiceDependency)
+                        });
+
+                        if !edge_exists {
+                            topology.edges.push(AlertEdge {
+                                from_node_index: from_idx,
+                                to_node_index: to_idx,
+                                edge_type: EdgeType::ServiceDependency,
+                            });
+                            log::debug!(
+                                "[incidents] Added ServiceDependency edge: {from_idx} ({from_service}) -> {to_idx} ({to_service})"
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            // Temporal only: connect to most recent node in target service
+            // For each node in from_service, find the most recent
+            // chronologically-after node in to_service
+            for &from_idx in from_indices {
                 let from_node = &topology.nodes[from_idx];
-                let to_node = &topology.nodes[to_idx];
 
-                // Only add if from happened before to (chronological)
-                if from_node.first_fired_at < to_node.first_fired_at {
-                    // Determine edge type: ServiceDependency if SG edge exists, otherwise
-                    // Temporal
-                    let edge_type = if has_sg_edge {
-                        EdgeType::ServiceDependency
-                    } else {
-                        EdgeType::Temporal
-                    };
+                // Find most recent node in to_service that fired after from_node
+                let most_recent_to = to_indices
+                    .iter()
+                    .filter_map(|&to_idx| {
+                        let to_node = &topology.nodes[to_idx];
+                        if to_node.first_fired_at > from_node.first_fired_at {
+                            Some((to_idx, to_node.first_fired_at))
+                        } else {
+                            None
+                        }
+                    })
+                    .min_by_key(|(_, fired_at)| *fired_at); // Closest in time (earliest after from_node)
 
+                if let Some((to_idx, _)) = most_recent_to {
                     // Check if edge already exists
                     let edge_exists = topology.edges.iter().any(|e| {
                         e.from_node_index == from_idx
                             && e.to_node_index == to_idx
-                            && matches!(
-                                (&e.edge_type, &edge_type),
-                                (EdgeType::ServiceDependency, EdgeType::ServiceDependency)
-                                    | (EdgeType::Temporal, EdgeType::Temporal)
-                            )
+                            && matches!(e.edge_type, EdgeType::Temporal)
                     });
 
                     if !edge_exists {
                         topology.edges.push(AlertEdge {
                             from_node_index: from_idx,
                             to_node_index: to_idx,
-                            edge_type,
+                            edge_type: EdgeType::Temporal,
                         });
                         log::debug!(
-                            "[incidents] Added {edge_type:?} edge: {from_idx} ({from_service}) -> {to_idx} ({to_service})"
+                            "[incidents] Added Temporal edge: {from_idx} ({from_service}) -> {to_idx} ({to_service}, most recent)"
                         );
                     }
                 }

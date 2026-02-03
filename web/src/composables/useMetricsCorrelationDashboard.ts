@@ -279,57 +279,28 @@ ORDER BY x_axis_1`;
     streams: StreamInfo[],
     config: MetricsCorrelationConfig
   ) => {
-    // When coming from logs page, use the source stream (the one user was viewing)
-    // Otherwise, use the first correlated log stream from API
+    // Determine stream and filters based on available data
     let streamName: string;
     let filters: Record<string, string>;
 
     if (config.sourceType === "logs" && config.sourceStream) {
-      // Use the original logs stream user was viewing
+      // When viewing from logs page, prefer source stream
       streamName = config.sourceStream;
-      // Use only the matched dimensions from availableDimensions
-      // Extract only the fields that correspond to matched dimension keys
-      filters = {};
 
-      if (config.availableDimensions && config.matchedDimensions) {
-        // Build a reverse mapping: value -> field name from availableDimensions
-        const valueToFieldMap = new Map<string, string>();
-        for (const [fieldName, fieldValue] of Object.entries(config.availableDimensions)) {
-          if (typeof fieldValue === 'string') {
-            valueToFieldMap.set(String(fieldValue), fieldName);
-          }
-        }
-
-        // For each matched dimension, find the actual field name
-        for (const [semanticKey, value] of Object.entries(config.matchedDimensions)) {
-          if (value === "_o2_all_") {
-            // For _o2_all_, we need to find the field name by matching against the semantic key
-            // Try exact match first with underscores
-            const normalizedKey = semanticKey.replace(/-/g, '_');
-            if (config.availableDimensions[normalizedKey] !== undefined) {
-              filters[normalizedKey] = "_o2_all_";
-            } else {
-              // Try to find by partial match
-              for (const fieldName of Object.keys(config.availableDimensions)) {
-                if (fieldName.toLowerCase() === normalizedKey.toLowerCase()) {
-                  filters[fieldName] = "_o2_all_";
-                  break;
-                }
-              }
-            }
-          } else {
-            // For actual values, use the reverse mapping
-            const fieldName = valueToFieldMap.get(value);
-            if (fieldName) {
-              filters[fieldName] = value;
-            }
-          }
-        }
+      // Try to find matching stream in API response
+      const matchingStream = streams?.find(s => s.stream_name === config.sourceStream);
+      if (matchingStream) {
+        // Use filters from API response (best case - backend computed correct field names)
+        filters = matchingStream.filters;
+      } else if (streams && streams.length > 0) {
+        // Source stream not in response, use first available stream's filters
+        filters = streams[0].filters;
       } else {
-        filters = config.matchedDimensions;
+        // No streams from API, fallback to matched dimensions
+        filters = config.matchedDimensions || {};
       }
     } else if (streams && streams.length > 0) {
-      // Use correlated log streams from API response
+      // Use first correlated log stream from API response
       const primaryStream = streams[0];
       streamName = primaryStream.stream_name;
       filters = primaryStream.filters;

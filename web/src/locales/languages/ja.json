@@ -2746,7 +2746,9 @@
         "startBeforeEnd": "開始時刻は終了時刻より前でなければなりません",
         "endAfterStart": "終了時刻は開始時刻より後である必要があります"
       }
-    }
+    },
+    "viewInTraces": "トレースで表示",
+    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
