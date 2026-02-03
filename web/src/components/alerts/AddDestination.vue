@@ -610,7 +610,8 @@ const {
   updateDestination,
   generatePreview,
   isTestInProgress,
-  lastTestResult
+  lastTestResult,
+  detectPrebuiltType
 } = usePrebuiltDestinations();
 
 // Prebuilt destinations state
