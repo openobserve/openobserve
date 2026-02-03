@@ -783,50 +783,6 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
   });
 };
 
-function generateNewColor() {
-  // Generate a color in HSL format
-  const hue = colors.value.length * (360 / 50);
-  const lightness = 50 + (colors.value.length % 2) * 15;
-  colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
-  return colors;
-}
-
-const getTracesMetaData = (traces) => {
-  if (!traces.length) return [];
-
-  return traces.map((trace) => {
-    const _trace = {
-      trace_id: trace.trace_id,
-      trace_start_time: Math.round(trace.start_time / 1000),
-      trace_end_time: Math.round(trace.end_time / 1000),
-      service_name: trace.first_event.service_name,
-      operation_name: trace.first_event.operation_name,
-      spans: trace.spans[0],
-      errors: trace.spans[1],
-      duration: trace.duration,
-      _o2_llm_usage_details_input: trace._o2_llm_usage_details_input,
-      _o2_llm_usage_details_output: trace._o2_llm_usage_details_output,
-      _o2_llm_usage_details_total: trace._o2_llm_usage_details_total,
-      _o2_llm_cost_details_total: trace._o2_llm_cost_details_total,
-      _o2_llm_input: trace._o2_llm_input || {},
-      services: {},
-      zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-    };
-    trace.service_name.forEach((service) => {
-      if (!searchObj.meta.serviceColors[service.service_name]) {
-        if (serviceColorIndex.value >= colors.value.length) generateNewColor();
-
-        searchObj.meta.serviceColors[service.service_name] =
-          colors.value[serviceColorIndex.value];
-
-        serviceColorIndex.value++;
-      }
-      _trace.services[service.service_name] = service.count;
-    });
-    return _trace;
-  });
-};
-
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
