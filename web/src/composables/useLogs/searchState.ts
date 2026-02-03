@@ -159,6 +159,12 @@ export const searchState = () => {
       searchObj.config = JSON.parse(JSON.stringify(state.config));
       searchObj.communicationMethod = state.communicationMethod;
 
+      searchObj.loading = false;
+      searchObj.loadingHistogram = false;
+      searchObj.loadingCounter = false;
+      searchObj.loadingStream = false;
+      searchObj.loadingSavedView = false;
+
       await nextTick();
 
       // Initialize meta with reset refresh interval
