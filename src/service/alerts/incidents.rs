@@ -411,6 +411,23 @@ async fn find_or_create_incident(
             }
         });
 
+        // Retry RCA if it's empty (failed in the past due to infra issues or errors)
+        #[cfg(feature = "enterprise")]
+        {
+            let org_id_rca = org_id.to_string();
+            let incident_id_rca = existing.id.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) =
+                    trigger_rca_for_incident(org_id_rca.clone(), incident_id_rca.clone()).await
+                {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Retry attempt failed for existing incident {incident_id_rca}: {e}"
+                    );
+                }
+            });
+        }
+
         return Ok(existing.id);
     }
 
