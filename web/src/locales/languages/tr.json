@@ -2623,7 +2623,8 @@
     "analyzeButtonLabel": "Analiz",
     "refreshTooltip": "Güncellenmiş yüzdelik ile analizi yenileyin",
     "customSQLFieldsDisabled": "Alan seçimi özel SQL sorguları için kullanılamaz. Boyutlar, sorgu sonuçlarınızdan çıkarılır.",
-    "timeRangeSelected": "Seçilen Zaman Aralığı"
+    "timeRangeSelected": "Seçilen Zaman Aralığı",
+    "dimensionsSelected": "Seçilen boyutlar"
   },
   "volumeInsights": {
     "title": "İçgörüler",

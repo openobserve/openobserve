@@ -2623,7 +2623,8 @@
     "analyzeButtonLabel": "Analyseren",
     "refreshTooltip": "Analyse vernieuwen met bijgewerkt percentiel",
     "customSQLFieldsDisabled": "Veldselectie is niet beschikbaar voor aangepaste SQL-query's. Dimensies worden geëxtraheerd uit de resultaten van uw zoekopdracht.",
-    "timeRangeSelected": "Tijdbereik geselecteerd"
+    "timeRangeSelected": "Tijdbereik geselecteerd",
+    "dimensionsSelected": "Geselecteerde afmetingen"
   },
   "volumeInsights": {
     "title": "Inzichten",

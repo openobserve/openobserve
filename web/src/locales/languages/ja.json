@@ -2623,7 +2623,8 @@
     "analyzeButtonLabel": "分析",
     "refreshTooltip": "パーセンタイルを更新して分析を更新",
     "customSQLFieldsDisabled": "フィールド選択はカスタム SQL クエリでは使用できません。ディメンションはクエリ結果から抽出されます。",
-    "timeRangeSelected": "選択した時間範囲"
+    "timeRangeSelected": "選択した時間範囲",
+    "dimensionsSelected": "ディメンションが選択されました"
   },
   "volumeInsights": {
     "title": "インサイト",
