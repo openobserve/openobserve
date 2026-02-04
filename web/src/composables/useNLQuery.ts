@@ -16,7 +16,6 @@
 import { ref } from "vue";
 import useAiChat from "@/composables/useAiChat";
 import useSuggestions from "@/composables/useSuggestions";
-import { parsePromQlQuery } from "@/utils/query/promQLUtils";
 
 /**
  * Composable for Natural Language to SQL Query transformation
@@ -63,118 +62,44 @@ export function useNLQuery() {
   };
 
   /**
-   * Detects if the given text is natural language (not SQL/PromQL/VRL/JS)
+   * Detects if the given text is natural language (not SQL)
    *
    * @param text - The text to analyze
-   * @param language - Current editor language (sql, promql, vrl, javascript)
-   * @returns true if text is natural language, false if it's valid query syntax
+   * @returns true if text is natural language, false if it's SQL or empty
    *
    * Detection logic:
    * - Returns false for empty/whitespace text
-   * - Returns false if matches language-specific syntax patterns
+   * - Returns false if starts with SQL keywords (SELECT, FROM, WHERE, etc.)
+   * - Returns false if starts with SQL comment (--)
+   * - Returns false if contains quick mode functions (extracted from useSuggestions)
+   * - Returns false if contains field comparison operators
    * - Returns true otherwise (natural language)
+   *
+   * Note on SQL keywords:
+   * - This list represents common SQL statement keywords used for initial detection
+   * - The codebase uses node-sql-parser (logsUtils.ts) for full SQL parsing when needed
+   * - There's no centralized SQL keyword utility to reuse - this is the standard pattern
+   * - The keyword list here is intentionally minimal and focused on detection needs
    */
-  const detectNaturalLanguage = (text: string, language: string = 'sql'): boolean => {
+  const detectNaturalLanguage = (text: string): boolean => {
     const trimmed = text.trim();
 
     // Empty text is not natural language
     if (!trimmed) return false;
 
-    const lang = language.toLowerCase();
-
-    // PromQL detection
-    if (lang === 'promql') {
-      // Strategy 1: Try parsing as PromQL using the parser
-      // If the parser can extract a metric name or labels, it's valid PromQL
-      try {
-        const parsed = parsePromQlQuery(trimmed);
-        if (parsed.metricName || parsed.label.hasLabels) {
-          // Successfully parsed as PromQL with metric name or labels
-          return false;
-        }
-      } catch (e) {
-        // Parser failed, continue with pattern matching
-      }
-
-      // Strategy 2: Pattern-based detection for queries parser might not fully handle
-
-      // Check for PromQL aggregation operators at start
-      const promqlAggregations = /^(sum|min|max|avg|group|stddev|stdvar|count|count_values|bottomk|topk|quantile)\s*\(/i;
-      if (promqlAggregations.test(trimmed)) {
-        return false;
-      }
-
-      // Check for PromQL metric selectors with curly braces: metric_name{label="value"}
-      const metricSelector = /[a-zA-Z_:][a-zA-Z0-9_:]*\s*\{[^}]*\}/;
-      if (metricSelector.test(trimmed)) {
-        return false;
-      }
-
-      // Check for PromQL range selectors: [5m], [1h], etc.
-      const rangeSelector = /\[[0-9]+[smhdwy]\]/;
-      if (rangeSelector.test(trimmed)) {
-        return false;
-      }
-
-      // Check for PromQL functions
-      const promqlFunctions = /\b(rate|increase|delta|idelta|irate|avg_over_time|min_over_time|max_over_time|sum_over_time|count_over_time|quantile_over_time|stddev_over_time|stdvar_over_time|histogram_quantile|label_join|label_replace|abs|ceil|floor|round|sqrt|exp|ln|log2|log10|clamp|clamp_max|clamp_min|sort|sort_desc|time|timestamp|vector|scalar|changes|deriv|predict_linear|holt_winters|resets)\s*\(/i;
-      if (promqlFunctions.test(trimmed)) {
-        return false;
-      }
-
-      // Check for PromQL aggregation modifiers (by, without)
-      const aggregationModifiers = /\b(by|without)\s*\(/i;
-      if (aggregationModifiers.test(trimmed)) {
-        return false;
-      }
-
-      // Check for simple metric names (without selectors) - common PromQL pattern
-      // Examples: cpu_usage, http_requests_total
-      const simpleMetric = /^[a-zA-Z_:][a-zA-Z0-9_:]*$/;
-      if (simpleMetric.test(trimmed)) {
-        return false;
-      }
-
-      // Check for parentheses wrapping expressions (common in PromQL)
-      // Examples: (metric_name), (avg(metric))
-      const wrappedExpression = /^\(.+\)$/;
-      if (wrappedExpression.test(trimmed)) {
-        // Check if content inside looks like PromQL
-        const innerContent = trimmed.slice(1, -1).trim();
-        // Recursively check inner content
-        if (innerContent) {
-          const isInnerNL = detectNaturalLanguage(innerContent, lang);
-          if (!isInnerNL) {
-            return false; // Inner content is PromQL, so outer is also PromQL
-          }
-        }
-      }
-    }
-
-    // VRL detection
-    if (lang === 'vrl') {
-      const vrlPatterns = /(\.|=\s|,\s*\{|\}|->|\.parse_|\.to_)/;
-      if (vrlPatterns.test(trimmed)) {
-        return false;
-      }
-    }
-
-    // JavaScript detection
-    if (lang === 'javascript' || lang === 'js') {
-      const jsPatterns = /^(function|const|let|var|class|if|for|while|return|=>|\{|\})/i;
-      if (jsPatterns.test(trimmed)) {
-        return false;
-      }
-    }
-
-    // SQL detection (applies to all languages as fallback)
+    // SQL keywords that indicate SQL query (not natural language)
+    // Note: Searched codebase for reusable SQL keyword utilities but none exist.
+    // This minimal set is sufficient for natural language detection.
     const sqlKeywords = [
       'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE',
       'CREATE', 'ALTER', 'DROP', 'JOIN', 'INNER', 'LEFT', 'RIGHT',
       'OUTER', 'UNION', 'GROUP', 'ORDER', 'HAVING', 'LIMIT'
     ];
 
+    // Get first word (case-insensitive)
     const firstWord = trimmed.split(/\s+/)[0].toUpperCase();
+
+    // If starts with SQL keyword, it's SQL (not NL)
     if (sqlKeywords.includes(firstWord)) {
       return false;
     }
@@ -185,31 +110,34 @@ export function useNLQuery() {
     }
 
     // Quick mode detection: Check for quick mode query patterns
+    // Reuse function names from autocomplete suggestions to avoid duplication
     const quickModeFunctions = getQuickModeFunctionNames();
 
     const lowerText = trimmed.toLowerCase();
     for (const func of quickModeFunctions) {
       if (lowerText.includes(`${func}(`)) {
-        return false;
+        return false; // This is a quick mode function query
       }
     }
 
     // Check for field comparison operators (=, !=, >, <, >=, <=, <>)
+    // These indicate quick mode field comparisons like: status_code = 500
     const comparisonOperators = /[a-zA-Z_][a-zA-Z0-9_]*\s*(=|!=|>|<|>=|<=|<>)\s*.+/;
     if (comparisonOperators.test(trimmed)) {
-      return false;
+      return false; // This is a quick mode field comparison
     }
 
     // Check for boolean operators (and, or, not) which are common in quick mode
+    // Examples: "status_code = 500 and endpoint = 'abc'"
     const hasBooleanOps = /\b(and|or|not)\b/i.test(trimmed);
     if (hasBooleanOps && comparisonOperators.test(trimmed)) {
-      return false;
+      return false; // This is a quick mode compound expression
     }
 
     // Check for SQL operators like LIKE, IN, BETWEEN (case-insensitive)
     const sqlOperators = /\b(like|in|not in|between|is null|is not null)\b/i;
     if (sqlOperators.test(trimmed)) {
-      return false;
+      return false; // This is a SQL operator pattern
     }
 
     // Otherwise, it's natural language
@@ -228,38 +156,20 @@ export function useNLQuery() {
    * - Filters out explanatory text before/after SQL
    */
   const extractSQLFromResponse = (response: string): string | null => {
-    // Strategy 1: Extract from markdown code blocks (SQL, PromQL, VRL, JavaScript)
-    // Try language-specific code blocks first
-    const codeBlockPatterns = [
-      /```sql\s+([\s\S]+?)```/i,
-      /```promql\s+([\s\S]+?)```/i,
-      /```vrl\s+([\s\S]+?)```/i,
-      /```javascript\s+([\s\S]+?)```/i,
-      /```js\s+([\s\S]+?)```/i,
-    ];
-
-    for (const pattern of codeBlockPatterns) {
-      const match = response.match(pattern);
-      if (match && match[1]) {
-        const extracted = match[1].trim();
-        console.log('[NL2Q] Extracted query from code block:', extracted);
-        return extracted;
-      }
+    // Strategy 1: Extract from markdown SQL code block
+    const sqlCodeBlockMatch = response.match(/```sql\s+([\s\S]+?)```/i);
+    if (sqlCodeBlockMatch && sqlCodeBlockMatch[1]) {
+      return sqlCodeBlockMatch[1].trim();
     }
 
-    // Strategy 2: Extract from generic code block (no language specified)
-    // This handles cases like ```\navg(metric_name)\n```
-    const genericCodeBlockMatch = response.match(/```\s*\n?([\s\S]+?)\n?```/);
+    // Strategy 2: Extract from generic code block
+    const genericCodeBlockMatch = response.match(/```\s+(SELECT[\s\S]+?)```/i);
     if (genericCodeBlockMatch && genericCodeBlockMatch[1]) {
-      const extracted = genericCodeBlockMatch[1].trim();
-      console.log('[NL2Q] Extracted query from generic code block:', extracted);
-      return extracted;
+      return genericCodeBlockMatch[1].trim();
     }
 
     // Strategy 3: Find SQL statement by keywords (SELECT, WITH, etc.)
-    // NOTE: This strategy is SQL-specific and won't work for PromQL/VRL/JavaScript
-    // It's a fallback for cases where the AI doesn't use code blocks
-    // For non-SQL languages, we rely on Strategies 1 & 2 (code blocks)
+    // Look for lines starting with SQL keywords
     const sqlKeywords = ['SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'CREATE'];
     const lines = response.split('\n');
 
@@ -319,7 +229,7 @@ export function useNLQuery() {
    * // Returns: "SELECT * FROM logs WHERE level = 'error' AND _timestamp > now() - INTERVAL '1 hour'"
    * ```
    */
-  const generateSQL = async (prompt: string, orgId: string, abortSignal?: AbortSignal, sessionId?: string): Promise<string | null> => {
+  const generateSQL = async (prompt: string, orgId: string): Promise<string | null> => {
     if (!prompt.trim()) {
       console.warn('[NL2Q] Empty prompt provided');
       return null;
@@ -370,23 +280,18 @@ export function useNLQuery() {
         messages,
         '', // Use default model from server config
         orgId,
-        abortSignal, // Abort signal for request cancellation
+        undefined, // No abort signal
         context, // Explicit context with agent_type
-        sessionId // Session ID for tracking across requests
+        undefined // No session ID needed for single query generation
       );
 
-      if (!response || (response as any).cancelled) {
-        console.log('[NL2Q] Request was cancelled');
-        return null;
-      }
-
-      if (!(response as Response).ok) {
-        console.error('[NL2Q] AI assistant returned error:', (response as Response).status);
+      if (!response || !response.ok) {
+        console.error('[NL2Q] AI assistant returned error:', response?.status);
         return null;
       }
 
       // Read streaming response
-      const reader = (response as Response).body?.getReader();
+      const reader = response.body?.getReader();
       if (!reader) {
         console.error('[NL2Q] No reader available from response');
         return null;
@@ -395,11 +300,6 @@ export function useNLQuery() {
       const decoder = new TextDecoder();
       let generatedQuery = '';
       let chunkCount = 0;
-      const toolCalls: Array<{tool: string, message: string, success?: boolean}> = [];
-      const toolResults: Array<{tool: string, success: boolean, message: string}> = [];
-      let hasError = false;
-      let errorMessage = '';
-      let lastMessageContent = ''; // Track latest message events for dashboard URLs
 
       console.log('[NL2Q] Starting to read streaming response...');
 
@@ -421,73 +321,11 @@ export function useNLQuery() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.substring(6));
-
-              // Handle different event types
-              if (data.type === 'status') {
-                // Status event (processing, etc.)
-                console.log('[NL2Q] Status:', data.message);
-                streamingResponse.value = data.message || 'Processing...';
-              } else if (data.type === 'message') {
-                // Message event (AI planning/explanation text)
-                console.log('[NL2Q] Message:', data.content?.substring(0, 100));
-                lastMessageContent = data.content || '';
-                streamingResponse.value = data.content?.substring(0, 100) || 'Processing...';
-              } else if (data.type === 'tool_call') {
-                // Track tool execution (dashboard/alert creation)
-                console.log('[NL2Q] Tool call:', data.tool, '-', data.message);
-                toolCalls.push({
-                  tool: data.tool || 'unknown',
-                  message: data.message || '',
-                  success: undefined // Will be updated by tool_result
-                });
-                streamingResponse.value = data.message || `Executing ${data.tool}...`;
-              } else if (data.type === 'tool_result') {
-                // Tool execution result
-                console.log('[NL2Q] Tool result:', data.tool, '- Success:', data.success);
-                toolResults.push({
-                  tool: data.tool || 'unknown',
-                  success: data.success || false,
-                  message: data.message || ''
-                });
-
-                // Update corresponding tool call with success status
-                const lastToolCall = toolCalls[toolCalls.length - 1];
-                if (lastToolCall) {
-                  lastToolCall.success = data.success;
-                }
-
-                if (!data.success) {
-                  streamingResponse.value = `Tool failed: ${data.message}`;
-                }
-              } else if (data.type === 'error') {
-                // Error event
-                console.error('[NL2Q] Error event:', data.error || data.message);
-                hasError = true;
-                errorMessage = data.error || data.message || 'Unknown error';
-                streamingResponse.value = errorMessage;
-              } else if (data.type === 'complete') {
-                // Completion event - may contain full response in history
-                console.log('[NL2Q] Completion event received');
-
-                // Extract final response from history if available
-                if (data.history && Array.isArray(data.history)) {
-                  const lastMessage = data.history[data.history.length - 1];
-                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content) {
-                    // If we haven't accumulated content yet, use the history
-                    if (!generatedQuery.trim()) {
-                      generatedQuery = lastMessage.content;
-                      console.log('[NL2Q] Using content from completion history');
-                    }
-                    // Also update lastMessageContent for URL extraction
-                    lastMessageContent = lastMessage.content;
-                  }
-                }
-              } else if (data.type === 'title') {
-                // Title event (ignore for now)
-                console.log('[NL2Q] Title event:', data.title);
-              } else if (data.content) {
-                // Content event (regular text)
+              if (data.content) {
                 generatedQuery += data.content;
+
+                // Update streaming response - REPLACE with latest content only
+                // This shows only the new chunk, not accumulated text
                 streamingResponse.value = data.content;
               }
             } catch (e) {
@@ -500,85 +338,16 @@ export function useNLQuery() {
       const rawResponse = generatedQuery.trim();
       console.log('[NL2Q] Full AI response received:', {
         length: rawResponse.length,
-        preview: rawResponse.substring(0, 200),
-        toolCalls: toolCalls.length,
-        hasError
+        preview: rawResponse.substring(0, 200)
       });
 
-      // Check for error first
-      if (hasError) {
-        console.error('[NL2Q] Response contains error:', errorMessage);
+      if (!rawResponse) {
+        console.warn('[NL2Q] AI assistant returned empty query');
         return null;
       }
 
-      if (!rawResponse && toolCalls.length === 0) {
-        console.warn('[NL2Q] AI assistant returned empty response');
-        return null;
-      }
-
-      // PRIORITY 1: Try to extract SQL from AI response first
-      console.log('[NL2Q] Attempting to extract SQL from response...');
-      const extractedSQL = extractSQLFromResponse(rawResponse);
-
-      // If SQL was successfully extracted, return it (this is the primary goal)
-      if (extractedSQL) {
-        console.log('[NL2Q] Successfully generated SQL query:', extractedSQL);
-        return extractedSQL;
-      }
-
-      // PRIORITY 2: Check if this is a non-SQL action (dashboard/alert creation)
-      if (toolCalls.length > 0) {
-        console.log('[NL2Q] Tool calls detected but no SQL found:', toolCalls);
-
-        // Use lastMessageContent if available (has formatted response with URLs)
-        const responseToReturn = lastMessageContent || rawResponse;
-
-        // Check for successful dashboard creation (case-insensitive)
-        const dashboardTool = toolCalls.find(tc => {
-          const toolLower = tc.tool.toLowerCase();
-          return (
-            (toolLower === 'createdashboard' ||
-             toolLower === 'create_dashboard' ||
-             toolLower.includes('dashboard')) &&
-            tc.success !== false // Only if not explicitly failed
-          );
-        });
-
-        if (dashboardTool) {
-          console.log('[NL2Q] Dashboard created successfully');
-          return '✓ DASHBOARD_CREATED: ' + responseToReturn;
-        }
-
-        // Check for successful alert creation (case-insensitive)
-        const alertTool = toolCalls.find(tc => {
-          const toolLower = tc.tool.toLowerCase();
-          return (
-            (toolLower === 'createalert' ||
-             toolLower === 'create_alert' ||
-             toolLower.includes('alert')) &&
-            tc.success !== false
-          );
-        });
-
-        if (alertTool) {
-          console.log('[NL2Q] Alert created successfully');
-          return '✓ ALERT_CREATED: ' + responseToReturn;
-        }
-
-        // Check if any tool succeeded
-        const hasSuccessfulTool = toolCalls.some(tc => tc.success === true);
-
-        if (hasSuccessfulTool) {
-          console.log('[NL2Q] Tool execution completed successfully');
-          return '✓ ACTION_COMPLETED: ' + responseToReturn;
-        }
-
-        // All tools failed
-        console.warn('[NL2Q] All tool executions failed');
-        return null;
-      }
-
-      // Only if SQL extraction failed, check if AI is asking questions
+      // Check if AI is asking questions instead of generating a query
+      // Common patterns when AI doesn't have enough context
       const questionPatterns = [
         /what is your organization/i,
         /I need to check/i,
@@ -593,12 +362,21 @@ export function useNLQuery() {
 
       if (isQuestion) {
         console.error('[NL2Q] AI returned questions instead of query. Context may be incomplete:', rawResponse);
+        // Return null to trigger error message to user
         return null;
       }
 
-      // No SQL, no tool calls, no questions - ambiguous response
-      console.warn('[NL2Q] Could not determine response type. Full response:', rawResponse);
-      return null;
+      // Extract SQL from AI response (may contain explanatory text and markdown)
+      console.log('[NL2Q] Attempting to extract SQL from response...');
+      const extractedSQL = extractSQLFromResponse(rawResponse);
+
+      if (!extractedSQL) {
+        console.warn('[NL2Q] Could not extract SQL from AI response. Full response:', rawResponse);
+        return null;
+      }
+
+      console.log('[NL2Q] Successfully generated SQL query:', extractedSQL);
+      return extractedSQL;
 
     } catch (error) {
       console.error('[NL2Q] Error generating SQL:', error);
@@ -609,45 +387,33 @@ export function useNLQuery() {
   };
 
   /**
-   * Transforms editor content by converting natural language to language-specific comments
-   * and appending the generated query
+   * Transforms editor content by converting natural language to SQL comments
+   * and appending the generated SQL query
    *
    * @param originalNL - Original natural language text from editor
-   * @param generatedQuery - Generated query from AI
-   * @param language - Query language (sql, promql, vrl, javascript)
-   * @returns Transformed text with NL as comments and query below
+   * @param generatedSQL - Generated SQL query from AI
+   * @returns Transformed text with NL as comments and SQL below
    *
    * Example:
    * ```typescript
    * const transformed = transformToSQL(
    *   'show errors from last hour',
-   *   'SELECT * FROM logs WHERE level = \'error\'',
-   *   'sql'
+   *   'SELECT * FROM logs WHERE level = \'error\''
    * );
    * // Returns:
    * // -- show errors from last hour
    * // SELECT * FROM logs WHERE level = 'error'
    * ```
    */
-  const transformToSQL = (originalNL: string, generatedQuery: string, language: string = 'sql'): string => {
-    // Determine comment prefix based on language
-    let commentPrefix = '--'; // Default: SQL
-    const lang = language.toLowerCase();
-
-    if (lang === 'promql') {
-      commentPrefix = '#'; // PromQL uses # for comments
-    } else if (lang === 'vrl' || lang === 'javascript' || lang === 'js') {
-      commentPrefix = '//'; // VRL and JavaScript use // for comments
-    }
-
-    // Convert each line of natural language to language-specific comment
+  const transformToSQL = (originalNL: string, generatedSQL: string): string => {
+    // Convert each line of natural language to SQL comment
     const commentedNL = originalNL
       .split('\n')
-      .map(line => `${commentPrefix} ${line}`)
+      .map(line => `-- ${line}`)
       .join('\n');
 
-    // Return commented NL + blank line + generated query
-    return `${commentedNL}\n${generatedQuery}`;
+    // Return commented NL + blank line + generated SQL
+    return `${commentedNL}\n${generatedSQL}`;
   };
 
   return {
