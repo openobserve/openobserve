@@ -819,6 +819,7 @@ export default defineComponent({
                   // Handle error events - display error message to user
                   if (data && data.type === 'error') {
                     // Complete any active tool call first
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
                         type: 'tool_call',
@@ -826,7 +827,6 @@ export default defineComponent({
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
@@ -846,8 +846,8 @@ export default defineComponent({
                       errorMessage += `\n\n${data.suggestion}`;
                     }
 
-                    // Get or create assistant message for error
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    // Get or create assistant message for error (reuse lastMessage)
+                    lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (!lastMessage || lastMessage.role !== 'assistant') {
                       chatMessages.value.push({
                         role: 'assistant',
@@ -1037,6 +1037,7 @@ export default defineComponent({
                 // Handle error events - display error message to user
                 if (data && data.type === 'error') {
                   // Complete any active tool call first
+                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
@@ -1044,7 +1045,6 @@ export default defineComponent({
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
@@ -1064,8 +1064,8 @@ export default defineComponent({
                     errorMessage += `\n\n${data.suggestion}`;
                   }
 
-                  // Get or create assistant message for error
-                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  // Get or create assistant message for error (reuse lastMessage)
+                  lastMessage = chatMessages.value[chatMessages.value.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
                     chatMessages.value.push({
                       role: 'assistant',
