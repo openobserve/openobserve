@@ -732,11 +732,11 @@ mod tests {
         let extractor = InputOutputExtractor;
         let mut attrs = HashMap::new();
         attrs.insert(
-            "langfuse_observation_input".to_string(),
+            "langfuse.observation.input".to_string(),
             json::json!(r#"{"file_path": "/path/to/file.md"}"#),
         );
         attrs.insert(
-            "langfuse_observation_output".to_string(),
+            "langfuse.observation.output".to_string(),
             json::json!("File content here"),
         );
 
@@ -756,9 +756,9 @@ mod tests {
     fn test_is_input_output_attribute_langfuse() {
         let extractor = InputOutputExtractor;
 
-        assert!(extractor.is_input_output_attribute("langfuse_observation_input"));
-        assert!(extractor.is_input_output_attribute("langfuse_observation_output"));
-        assert!(!extractor.is_input_output_attribute("langfuse_observation_metadata_tool_name"));
-        assert!(!extractor.is_input_output_attribute("langfuse_observation_type"));
+        assert!(extractor.is_input_output_attribute("langfuse.observation.input"));
+        assert!(extractor.is_input_output_attribute("langfuse.observation.output"));
+        assert!(!extractor.is_input_output_attribute("langfuse.observation.metadata.tool.name"));
+        assert!(!extractor.is_input_output_attribute("langfuse.observation.type"));
     }
 }
