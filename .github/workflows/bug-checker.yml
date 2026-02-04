@@ -148,7 +148,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          direct_prompt: |
+          timeout_minutes: 30
+
+          prompt: |
             You are a Bug Verification Agent. Your job is to analyze bug reports and check if the fix already exists in the codebase.
 
             ## Bugs to Analyze
@@ -196,5 +198,5 @@ jobs:
 
             DRY_RUN: ${{ inputs.dry_run || 'false' }}
 
-          allowed_tools: "Read,Glob,Grep,Bash"
-          timeout_minutes: 30
+          claude_args: |
+            --allowedTools "Bash(gh issue comment:*),Bash(gh issue view:*),Read,Grep,Glob"
