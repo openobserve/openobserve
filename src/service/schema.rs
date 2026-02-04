@@ -46,7 +46,7 @@ use serde_json::{Map, Value};
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
     common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
-    service::db,
+    service::{db, traces::otel::attributes::O2_LLM_PREFIX},
 };
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
@@ -567,7 +567,7 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert("events".to_string());
             // Automatically include all fields with _o2_llm_ prefix from the schema
             for field in schema.fields() {
-                if field.name().starts_with("_o2_llm_") {
+                if field.name().starts_with(O2_LLM_PREFIX) {
                     fields.insert(field.name().to_string());
                 }
             }
