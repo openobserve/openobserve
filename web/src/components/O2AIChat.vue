@@ -518,6 +518,7 @@ export default defineComponent({
     const aiGeneratedTitle = ref<string | null>(null);
     const displayedTitle = ref<string>('');
     const isTypingTitle = ref(false);
+    const titleAnimationId = ref<number>(0); // Used to cancel stale animations
 
     // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
@@ -530,6 +531,11 @@ export default defineComponent({
 
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
+
+    // Typewriter animation state for LLM responses
+    const displayedStreamingContent = ref('');
+    const typewriterAnimationId = ref<number | null>(null);
+    const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
 
     // Throttle save during streaming to prevent data loss on page reload
     const lastStreamingSaveTime = ref<number>(0);
@@ -581,29 +587,118 @@ export default defineComponent({
       }
     };
 
+    // Interval ID for title animation
+    let titleIntervalId: ReturnType<typeof setInterval> | null = null;
+
     /**
      * Animate title with typewriter effect
      * Characters appear one by one from left to right
+     * Uses setInterval for reliable timing with Vue reactivity
      */
-    const animateTitle = async (title: string) => {
-      isTypingTitle.value = true;
-      displayedTitle.value = '';
-
-      for (let i = 0; i < title.length; i++) {
-        displayedTitle.value += title[i];
-        await new Promise(resolve => setTimeout(resolve, 30)); // 30ms per character
+    const animateTitle = (title: string) => {
+      // Clear any existing animation
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
       }
 
-      isTypingTitle.value = false;
+      // Increment animation ID to track this animation
+      const currentAnimationId = ++titleAnimationId.value;
+
+      isTypingTitle.value = true;
+      displayedTitle.value = '';
+      let charIndex = 0;
+
+      titleIntervalId = setInterval(() => {
+        // Check if this animation was superseded
+        if (titleAnimationId.value !== currentAnimationId) {
+          if (titleIntervalId) {
+            clearInterval(titleIntervalId);
+            titleIntervalId = null;
+          }
+          return;
+        }
+
+        if (charIndex < title.length) {
+          displayedTitle.value = title.slice(0, charIndex + 1);
+          charIndex++;
+        } else {
+          // Animation complete
+          if (titleIntervalId) {
+            clearInterval(titleIntervalId);
+            titleIntervalId = null;
+          }
+          isTypingTitle.value = false;
+        }
+      }, 30); // 30ms per character
     };
 
     /**
      * Reset title state for new chat
      */
     const resetTitleState = () => {
+      // Cancel any ongoing animation
+      titleAnimationId.value++;
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
       aiGeneratedTitle.value = null;
       displayedTitle.value = '';
       isTypingTitle.value = false;
+    };
+
+    /**
+     * Reset typewriter animation state
+     */
+    const resetTypewriterState = () => {
+      displayedStreamingContent.value = '';
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+    };
+
+    /**
+     * Animate text reveal with typewriter effect
+     * Skips animation for code blocks (reveals them instantly)
+     */
+    const animateStreamingText = () => {
+      const target = currentTextSegment.value;
+      const current = displayedStreamingContent.value;
+
+      if (current.length >= target.length) {
+        // Caught up, stop animation
+        if (typewriterAnimationId.value) {
+          cancelAnimationFrame(typewriterAnimationId.value);
+          typewriterAnimationId.value = null;
+        }
+        return;
+      }
+
+      // Check if we're at the start of a code block - if so, skip to end of code block
+      const remaining = target.slice(current.length);
+      const codeBlockStart = remaining.match(/^```[\w]*/);
+
+      if (codeBlockStart) {
+        // Find the closing ``` and reveal entire code block instantly
+        const codeBlockEnd = remaining.indexOf('```', codeBlockStart[0].length);
+        if (codeBlockEnd !== -1) {
+          const endPos = codeBlockEnd + 3;
+          displayedStreamingContent.value = target.slice(0, current.length + endPos);
+        } else {
+          // Code block not complete yet, reveal opening and wait
+          displayedStreamingContent.value = target.slice(0, current.length + codeBlockStart[0].length);
+        }
+      } else {
+        // Regular text - reveal one character
+        displayedStreamingContent.value = target.slice(0, current.length + 1);
+      }
+
+      // Schedule next frame
+      typewriterAnimationId.value = requestAnimationFrame(() => {
+        setTimeout(animateStreamingText, TYPEWRITER_SPEED);
+      });
     };
 
     // Query history functionality
@@ -726,6 +821,13 @@ export default defineComponent({
         activeToolCall.value = null;
         stopAnalyzingRotation();
 
+        // Immediately show all buffered text (like ChatGPT's "Stop generating")
+        displayedStreamingContent.value = currentTextSegment.value;
+        if (typewriterAnimationId.value) {
+          cancelAnimationFrame(typewriterAnimationId.value);
+          typewriterAnimationId.value = null;
+        }
+
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -734,15 +836,23 @@ export default defineComponent({
               // Remove empty assistant message that was added for streaming
               chatMessages.value.pop();
             } else if (currentStreamingMessage.value) {
+              // Update final text in contentBlocks to show all buffered content
+              if (lastMessage.contentBlocks) {
+                const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                if (lastBlock && lastBlock.type === 'text') {
+                  lastBlock.text = currentTextSegment.value;
+                }
+              }
               // Keep partial content but indicate it was cancelled
               lastMessage.content += '\n\n_[Response stopped by user]_';
             }
           }
         }
-        
+
         // Reset streaming state
         currentStreamingMessage.value = '';
         currentTextSegment.value = '';
+        displayedStreamingContent.value = '';
 
         // Save the current state including cancellation
         await saveToHistory();
@@ -987,14 +1097,20 @@ export default defineComponent({
                     currentStreamingMessage.value += content;
                     currentTextSegment.value += content;
 
+                    // Start typewriter animation if not already running
+                    if (!typewriterAnimationId.value) {
+                      animateStreamingText();
+                    }
+
                     // Get or create assistant message
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (!lastMessage || lastMessage.role !== 'assistant') {
                       // Create new assistant message with pending tool calls + text
+                      // Use displayedStreamingContent for animated display
                       chatMessages.value.push({
                         role: 'assistant',
                         content: currentStreamingMessage.value,
-                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: displayedStreamingContent.value }]
                       });
                       pendingToolCalls.value = []; // Clear pending
                       // Save immediately when assistant message is first created to prevent data loss on reload
@@ -1011,11 +1127,11 @@ export default defineComponent({
                       // Find the last text block and update it, or create new one
                       const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                       if (lastBlock && lastBlock.type === 'text') {
-                        // Append to existing text block (same segment)
-                        lastBlock.text = currentTextSegment.value;
+                        // Append to existing text block (same segment) - use animated content for display
+                        lastBlock.text = displayedStreamingContent.value;
                       } else {
                         // Add new text block (after tool call - new segment)
-                        lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                        lastMessage.contentBlocks.push({ type: 'text', text: displayedStreamingContent.value });
                       }
                       // Throttled save during streaming to preserve progress
                       await throttledStreamingSave();
@@ -1209,13 +1325,19 @@ export default defineComponent({
                   currentStreamingMessage.value += content;
                   currentTextSegment.value += content;
 
+                  // Start typewriter animation if not already running
+                  if (!typewriterAnimationId.value) {
+                    animateStreamingText();
+                  }
+
                   let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
                     // Create new assistant message with pending tool calls + text
+                    // Use displayedStreamingContent for animated display
                     chatMessages.value.push({
                       role: 'assistant',
                       content: currentStreamingMessage.value,
-                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: displayedStreamingContent.value }]
                     });
                     pendingToolCalls.value = []; // Clear pending
                     // Save immediately when assistant message is first created
@@ -1228,9 +1350,10 @@ export default defineComponent({
                     }
                     const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                     if (lastBlock && lastBlock.type === 'text') {
-                      lastBlock.text = currentTextSegment.value;
+                      // Use animated content for display
+                      lastBlock.text = displayedStreamingContent.value;
                     } else {
-                      lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                      lastMessage.contentBlocks.push({ type: 'text', text: displayedStreamingContent.value });
                     }
                     // Throttled save during streaming
                     await throttledStreamingSave();
@@ -1248,6 +1371,20 @@ export default defineComponent({
 
         // If we completed a message, save to history
         if (messageComplete) {
+          // Immediately show all remaining text and stop typewriter animation
+          displayedStreamingContent.value = currentTextSegment.value;
+          if (typewriterAnimationId.value) {
+            cancelAnimationFrame(typewriterAnimationId.value);
+            typewriterAnimationId.value = null;
+          }
+          // Update final text in contentBlocks
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+            if (lastBlock && lastBlock.type === 'text') {
+              lastBlock.text = currentTextSegment.value;
+            }
+          }
           await saveToHistory();
         }
       } catch (error) {
@@ -1407,6 +1544,7 @@ export default defineComponent({
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       resetTitleState(); // Clear AI-generated title for new chat
+      resetTypewriterState(); // Clear typewriter animation state for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
@@ -1494,6 +1632,7 @@ export default defineComponent({
       isLoading.value = true;
       currentStreamingMessage.value = '';
       currentTextSegment.value = '';
+      resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
       // Create new AbortController for this request - enables cancellation via Stop button
@@ -1738,6 +1877,18 @@ export default defineComponent({
         currentAbortController.value.abort();
         currentAbortController.value = null;
       }
+
+      // Clean up typewriter animation to prevent memory leaks
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+
+      // Clean up title animation interval
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
       
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
@@ -1751,7 +1902,7 @@ export default defineComponent({
         addNewChat();
       }
     })
-    //this watch is added to make sure that the chat gets updated 
+    //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
       watch(chatUpdated, (newChatUpdated: boolean) => {
         if (newChatUpdated && store.state.currentChatTimestamp) {
@@ -1762,6 +1913,19 @@ export default defineComponent({
         }
         store.dispatch('setChatUpdated', false);
       });
+
+    // Watch for typewriter animation updates to refresh the displayed text
+    watch(displayedStreamingContent, (newContent) => {
+      if (!isLoading.value) return;
+
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+        if (lastBlock && lastBlock.type === 'text') {
+          lastBlock.text = newContent;
+        }
+      }
+    });
 
     const copyToClipboard = async (text: string) => {
       try {
