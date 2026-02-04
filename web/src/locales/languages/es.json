@@ -2530,7 +2530,8 @@
     "sql_query": "Consulta SQL",
     "resuls": "Resultados",
     "wrapText": "Envolver texto",
-    "delayMessage": "Es posible que el historial de búsqueda se retrase un"
+    "delayMessage": "Es posible que el historial de búsqueda se retrase un",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Planificador de tareas de búsqueda",

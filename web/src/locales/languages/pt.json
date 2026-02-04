@@ -2532,7 +2532,8 @@
     "sql_query": "Consulta SQL",
     "resuls": "Resultados",
     "wrapText": "Quebrar texto",
-    "delayMessage": "O histórico de pesquisa pode ser atrasado em"
+    "delayMessage": "O histórico de pesquisa pode ser atrasado em",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Agendador de tarefas de pesquisa",
