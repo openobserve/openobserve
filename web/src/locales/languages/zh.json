@@ -2623,7 +2623,8 @@
     "analyzeButtonLabel": "分析",
     "refreshTooltip": "使用更新的百分位数刷新分析",
     "customSQLFieldsDisabled": "字段选择不适用于自定义 SQL 查询。维度是从您的查询结果中提取的。",
-    "timeRangeSelected": "时间范围已选择"
+    "timeRangeSelected": "时间范围已选择",
+    "dimensionsSelected": "所选尺寸"
   },
   "volumeInsights": {
     "title": "标题",

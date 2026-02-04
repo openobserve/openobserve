@@ -2623,7 +2623,8 @@
     "analyzeButtonLabel": "분석",
     "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
     "customSQLFieldsDisabled": "사용자 지정 SQL 쿼리에는 필드 선택을 사용할 수 없습니다.차원은 쿼리 결과에서 추출됩니다.",
-    "timeRangeSelected": "시간 범위 선택"
+    "timeRangeSelected": "시간 범위 선택",
+    "dimensionsSelected": "치수 선택"
   },
   "volumeInsights": {
     "title": "인사이트",
