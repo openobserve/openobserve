@@ -119,7 +119,7 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlp-mode-detected", "nlpModeDetected"],
+  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
@@ -349,10 +349,9 @@ export default defineComponent({
       // Emit event to auto-toggle NLP mode when natural language is detected
       // The parent component (SearchBar) will handle toggling the NLP mode
       if (isNL) {
-        console.log('[NL2Q-Detection] Emitting nlp-mode-detected event');
-        emit("nlp-mode-detected", true);
-        emit("nlpModeDetected", true); // Also emit camelCase version
-        console.log('[NL2Q-Detection] Event emitted successfully (both kebab and camel case)');
+        console.log('[NL2Q-Detection] Emitting nlpModeDetected event');
+        emit("nlpModeDetected", true);
+        console.log('[NL2Q-Detection] Event emitted successfully');
       } else {
         console.log('[NL2Q-Detection] Not natural language, not emitting event');
       }
@@ -406,7 +405,6 @@ export default defineComponent({
         emit("update:query", transformedText);
 
         // Turn off NLP mode after generating SQL (we're now in SQL mode)
-        emit("nlp-mode-detected", false);
         emit("nlpModeDetected", false);
         console.log('[NL2Q-UI] Emitted nlpModeDetected: false to turn off NLP mode');
 
@@ -901,6 +899,18 @@ export default defineComponent({
       monaco.editor.setModelMarkers(getModel(), "owner", []);
       monaco.editor.setModelMarkers(getModel(), "owner", markers);
     }
+
+    // Watch isGenerating and emit events to parent
+    watch(isGenerating, (newValue) => {
+      console.log('[CodeQueryEditor] isGenerating changed to:', newValue);
+      if (newValue) {
+        console.log('[CodeQueryEditor] Emitting generation-start');
+        emit('generation-start');
+      } else {
+        console.log('[CodeQueryEditor] Emitting generation-end');
+        emit('generation-end');
+      }
+    });
 
     return {
       editorRef,
