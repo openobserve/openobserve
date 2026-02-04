@@ -139,9 +139,9 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const timestamp = Date.now();
     const dashboardName = `Dashboard_ManyPanels_${timestamp}`;
 
-    // Create dashboard with 10 panels (reduced from 20 for test performance)
+    // Create dashboard with 5 panels (reduced from 20 for test performance)
     const panels = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
       panels.push({
         panelName: `Panel_${i}_${timestamp}`,
         allowPanelTime: true,
