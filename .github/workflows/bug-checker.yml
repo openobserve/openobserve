@@ -51,8 +51,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const daysThreshold = parseInt('${{ inputs.days_threshold }}' || '30');
-            const maxBugsToAnalyze = parseInt('${{ inputs.max_bugs_to_analyze }}' || '10');
+            const daysThreshold = parseInt('${{ inputs.days_threshold }}' || '7');
+            const maxBugsToAnalyze = parseInt('${{ inputs.max_bugs_to_analyze }}' || '35');
 
             console.log(`Configuration: days_threshold=${daysThreshold}, max_bugs=${maxBugsToAnalyze}`);
 
