@@ -8,6 +8,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
 const testLogger = require('../utils/test-logger.js');
+const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 // Helper function to generate unique dashboard name per test
 const generateUniqueDashboardName = () => 
@@ -685,9 +686,14 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
 });
 
 test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => {
+  // Ensure metrics are ingested once before all PromQL tests run
+  test.beforeAll(async () => {
+    await ensureMetricsIngested();
+  });
+
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
-    await ingestion(page);
+    // Note: Metrics ingestion is handled by beforeAll, logs ingestion not needed for PromQL tests
   });
 
   test("should enable pagination for PromQL table chart", async ({
