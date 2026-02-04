@@ -1066,6 +1066,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :log-streams="correlationData.logStreams"
               :source-stream="'incidents'"
               :source-type="'incidents'"
+              :available-dimensions="availableDimensions"
+              :fts-fields="ftsFields"
               :time-range="telemetryTimeRange"
               :hide-view-related-button="true"
               :hide-search-term-actions="false"
@@ -1781,6 +1783,21 @@ export default defineComponent({
         correlationData.value.metricStreams.length > 0 ||
         correlationData.value.traceStreams.length > 0
       );
+    });
+
+    // Computed properties for CorrelatedLogsTable
+    // availableDimensions contains the actual field names from the incident
+    // This is critical for log queries to use the correct field names
+    const availableDimensions = computed(() => {
+      if (!incidentDetails.value?.stable_dimensions) {
+        return {};
+      }
+      return incidentDetails.value.stable_dimensions;
+    });
+
+    const ftsFields = computed(() => {
+      // FTS fields can be empty for now, as the log streams will determine this
+      return [];
     });
 
     // Computed property for formatted RCA content
@@ -2739,6 +2756,8 @@ export default defineComponent({
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
+      availableDimensions,
+      ftsFields,
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
