@@ -15,12 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="query-editor"
-    class="logs-query-editor"
-    ref="editorRef"
-    :id="editorId"
-  />
+  <div class="code-query-editor-container">
+    <div
+      data-test="query-editor"
+      class="logs-query-editor"
+      ref="editorRef"
+      :id="editorId"
+    />
+    <!-- Streaming response preview card (shown while generating) -->
+    <Transition name="slide-up">
+      <div
+        v-if="isGenerating && streamingResponse"
+        class="streaming-preview-card"
+        data-test="nl-streaming-preview"
+      >
+        <pre class="streaming-preview-content">{{ streamingResponse }}</pre>
+      </div>
+    </Transition>
+  </div>
 </template>
 
 <script lang="ts">
@@ -52,7 +64,10 @@ import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
-import useLogs from "@/composables/useLogs";
+import searchState from "@/composables/useLogs/searchState";
+import { useNLQuery } from "@/composables/useNLQuery";
+import { useI18n } from "vue-i18n";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   props: {
@@ -97,15 +112,19 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["update-query", "run-query", "update:query", "focus", "blur"],
+  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlp-mode-detected", "nlpModeDetected"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
+    const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
-    const { searchObj } = useLogs();
+    const { searchObj } = searchState();
+    const { detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse } = useNLQuery();
 
     let provider: Ref<any | null> = ref(null);
+    const currentEditorText = ref('');
 
     // These will be initialized when Monaco loads
     let CompletionKind: any = null;
@@ -306,6 +325,92 @@ export default defineComponent({
       return props.suggestions;
     });
 
+    /**
+     * Debounced function to detect natural language and show/hide button
+     * Waits 500ms after user stops typing before checking
+     * Only shows button if: (1) text is natural language AND (2) stream is selected
+     */
+    const checkForNaturalLanguage = debounce((text: string) => {
+      currentEditorText.value = text;
+      const isNL = detectNaturalLanguage(text);
+
+      console.log('[NL2Q-Detection]', {
+        text: text.substring(0, 50),
+        isNaturalLanguage: isNL
+      });
+
+      // Emit event to auto-toggle NLP mode when natural language is detected
+      // The parent component (SearchBar) will handle toggling the NLP mode
+      if (isNL) {
+        console.log('[NL2Q-Detection] Emitting nlp-mode-detected event');
+        emit("nlp-mode-detected", true);
+        emit("nlpModeDetected", true); // Also emit camelCase version
+        console.log('[NL2Q-Detection] Event emitted successfully (both kebab and camel case)');
+      } else {
+        console.log('[NL2Q-Detection] Not natural language, not emitting event');
+      }
+    }, 500);
+
+    /**
+     * Handles Generate SQL button click
+     * Calls AI to generate SQL and transforms editor content
+     */
+    const handleGenerateSQL = async () => {
+      const currentText = currentEditorText.value;
+      if (!currentText.trim()) return;
+
+      console.log('[NL2Q-UI] Starting SQL generation for:', currentText);
+
+      try {
+        // Get organization ID from store
+        const orgId = store.state.selectedOrganization?.identifier || 'default';
+        console.log('[NL2Q-UI] Organization ID:', orgId);
+
+        // Prefix the natural language text with instruction for AI
+        const prompt = `Generate SQL query : ${currentText}`;
+
+        // Generate SQL from natural language
+        console.log('[NL2Q-UI] Calling generateSQL...');
+        const generatedSQL = await generateSQL(prompt, orgId);
+        console.log('[NL2Q-UI] generateSQL returned:', {
+          value: generatedSQL,
+          type: typeof generatedSQL,
+          isNull: generatedSQL === null,
+          isEmpty: generatedSQL === '',
+          isFalsy: !generatedSQL
+        });
+
+        if (!generatedSQL || generatedSQL.trim() === '') {
+          // Show error notification
+          console.log('[NL2Q-UI] Showing error notification - query generation failed or empty');
+          showErrorNotification(t('search.nlQueryGenerationFailed'));
+          return;
+        }
+
+        // Transform: NL becomes comment, SQL appears below
+        const transformedText = transformToSQL(currentText, generatedSQL);
+        console.log('[NL2Q-UI] Transformed text:', transformedText);
+
+        // Update editor value
+        setValue(transformedText);
+
+        // Emit update events
+        emit("update-query", transformedText);
+        emit("update:query", transformedText);
+
+        // Turn off NLP mode after generating SQL (we're now in SQL mode)
+        emit("nlp-mode-detected", false);
+        emit("nlpModeDetected", false);
+        console.log('[NL2Q-UI] Emitted nlpModeDetected: false to turn off NLP mode');
+
+        console.log('[NL2Q-UI] SQL generation completed successfully');
+
+      } catch (error) {
+        console.error('[NL2Q-UI] Exception during SQL generation:', error);
+        showErrorNotification(t('search.nlQueryGenerationFailed'));
+      }
+    };
+
     const createDependencyProposals = (range: any) => {
       if (!CompletionKind || !insertTextRules) return [];
       return keywords.value.map((keyword: any) => {
@@ -442,8 +547,8 @@ export default defineComponent({
 
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
-          emit("update-query", editorObj?.getValue()?.trim(), e);
-          emit("update:query", editorObj?.getValue()?.trim(), e);
+          emit("update-query", editorObj.getValue()?.trim(), e);
+          emit("update:query", editorObj.getValue()?.trim(), e);
         }, props.debounceTime),
       );
 
@@ -804,6 +909,10 @@ export default defineComponent({
       getValue,
       decorateRanges,
       addErrorDiagnostics,
+      isGenerating,
+      handleGenerateSQL,
+      streamingResponse,
+      t,
     };
   },
 });
@@ -814,6 +923,159 @@ export default defineComponent({
   width: 100%;
   height: 78%;
   border-radius: 5px;
+}
+
+.code-query-editor-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Generate SQL button - O2 AI Assistant gradient style (matches send-button) */
+.generate-sql-button {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  z-index: 100;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important;
+  transition: all 0.3s ease !important;
+  border: none !important;
+}
+
+.generate-sql-button:hover:not(.disabled):not([disabled]):not(:disabled) {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+  box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.4) !important;
+  transform: translateY(-0.0625rem) !important;
+}
+
+.generate-sql-button:active:not(.disabled):not([disabled]):not(:disabled) {
+  transform: translateY(0) !important;
+  box-shadow: 0 0.125rem 0.625rem 0 rgba(102, 126, 234, 0.3) !important;
+}
+
+/* Fade transition for button appearance */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Streaming preview card - O2 AI Assistant message style with purple border */
+.streaming-preview-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 56.25rem; /* 900px - matches O2 AI Assistant max-width */
+  max-width: calc(100% - 2rem);
+  max-height: 31.25rem;
+  background: var(--o2-card-bg);
+  border-radius: 0.5rem; /* 8px - matches O2 message border-radius */
+  border: 2px solid #667eea; /* O2 AI Assistant purple border */
+  padding: 0.75rem; /* 12px - matches O2 message padding */
+  z-index: 99;
+  overflow: hidden;
+}
+
+/* Light mode shadow - matches O2 AI Assistant with purple glow */
+.light-mode .streaming-preview-card {
+  box-shadow: 0 0.25rem 1rem 0 rgba(102, 126, 234, 0.2);
+}
+
+/* Dark mode shadow - matches O2 AI Assistant with purple glow */
+.dark-mode .streaming-preview-card {
+  box-shadow: 0 0.25rem 1rem 0 rgba(102, 126, 234, 0.3);
+}
+
+/* Streaming preview content - O2 AI Assistant text-block style with center alignment */
+.streaming-preview-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.6; /* Better readability for text content */
+  color: var(--o2-text-primary);
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center; /* Center-aligned text */
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 30rem;
+  max-width: 100%;
+}
+
+/* Code blocks within streaming preview */
+.streaming-preview-content :deep(pre),
+.streaming-preview-content :deep(code) {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  padding: 0.5rem;
+  margin: 0.25rem 0;
+  border-radius: 0.25rem;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Lists within streaming preview */
+.streaming-preview-content :deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.streaming-preview-content :deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.streaming-preview-content :deep(li) {
+  margin: 0.25em 0;
+}
+
+/* Paragraphs within streaming preview */
+.streaming-preview-content :deep(p) {
+  margin: 0.5em 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* Slide up transition for streaming preview - centered */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-up-enter-from {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.98);
+}
+
+@keyframes typing-cursor {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
 }
 </style>
 
