@@ -129,7 +129,7 @@
     "source": "ソース",
     "noResult": "結果なし",
     "syntaxGuide": "シンタックスガイド",
-    "recordsPerPage": "1 ページあたりのレコード数",
+    "rowsPerPage": "1 ページあたりのレコード数",
     "showing": "表示中",
     "of": "の",
     "rowDetail": "ソース詳細",
@@ -328,11 +328,7 @@
     "generating": "生成中...",
     "nlQueryGenerationFailed": "クエリを生成できませんでした。もう一度試してください。",
     "nlQueryGenerationSuccess": "クエリは正常に生成されました!",
-    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません",
-    "askAIPlaceholder": "AIに問い合わせて...",
-    "aiBarSuccessPlaceholder": "次は何をしたいですか？",
-    "askAI": "AI に聞く",
-    "askAITooltip": "AIに問い合わせを依頼する"
+    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません"
   },
   "menu": {
     "home": "ホーム",
@@ -2292,6 +2288,7 @@
       "groupsLabel": "グループ",
       "noMatchingGroups": "一致するグループがありません",
       "fqnFormulaTitle": "識別子フォーミュラ",
+      "fqnFormulaTooltip": "サービス識別子の計算方法を示します。スコープディメンション（青）は '/' で連結されます。最初の非NULLワークロードディメンション（緑）がサービス名になります。",
       "scopeDimension": "スコープディメンション",
       "workloadDimension": "ワークロードディメンション",
       "noFormulaConfigured": "識別子フォーミュラが設定されていません。上でディメンションを追加してください。",

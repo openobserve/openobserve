@@ -128,7 +128,7 @@
     "source": "_Quelle",
     "noResult": "Kein Ergebnis",
     "syntaxGuide": "Leitfaden zur Syntax",
-    "recordsPerPage": "Datensätze pro Seite",
+    "rowsPerPage": "Datensätze pro Seite",
     "showing": "Wird angezeigt",
     "of": "von",
     "rowDetail": "Angaben zur Quelle",
@@ -328,11 +328,7 @@
     "generating": "Generieren...",
     "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
     "nlQueryGenerationSuccess": "Die Abfrage wurde erfolgreich generiert!",
-    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden",
-    "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
-    "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
-    "askAI": "Frag KI",
-    "askAITooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage"
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
   },
   "menu": {
     "home": "Startseite",
@@ -2271,6 +2267,7 @@
       "groupsLabel": "Gruppen",
       "noMatchingGroups": "Keine passenden Gruppen",
       "fqnFormulaTitle": "Identitätsformel",
+      "fqnFormulaTooltip": "Zeigt, wie die Service-Identität berechnet wird. Scope-Dimensionen (blau) werden mit '/' verkettet. Die erste Nicht-Null-Workload-Dimension (grün) wird zum Servicenamen.",
       "scopeDimension": "Scope-Dimension",
       "workloadDimension": "Workload-Dimension",
       "noFormulaConfigured": "Keine Identitätsformel konfiguriert. Fügen Sie oben Dimensionen hinzu.",

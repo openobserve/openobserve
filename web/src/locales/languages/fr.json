@@ -128,7 +128,7 @@
     "source": "_source",
     "noResult": "Aucun résultat",
     "syntaxGuide": "Guide de syntaxe",
-    "recordsPerPage": "Enregistrements par page",
+    "rowsPerPage": "Enregistrements par page",
     "showing": "Montrant",
     "of": "de",
     "rowDetail": "Détails de la source",
@@ -328,11 +328,7 @@
     "generating": "Génération de...",
     "nlQueryGenerationFailed": "Impossible de générer la requête. Veuillez réessayer.",
     "nlQueryGenerationSuccess": "Requête générée avec succès !",
-    "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux",
-    "askAIPlaceholder": "Demandez à AI de l'aide pour répondre à votre requête...",
-    "aiBarSuccessPlaceholder": "Qu'aimerais-tu faire ensuite ?",
-    "askAI": "Demandez à AI",
-    "askAITooltip": "Demandez à AI de l'aide pour votre requête"
+    "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux"
   },
   "menu": {
     "home": "Accueil",
@@ -2271,6 +2267,7 @@
       "groupsLabel": "groupes",
       "noMatchingGroups": "Aucun groupe correspondant",
       "fqnFormulaTitle": "Formule d'identité",
+      "fqnFormulaTooltip": "Montre comment l'identité de service sera calculée. Les dimensions de portée (bleu) sont concaténées avec '/'. La première dimension de charge de travail non nulle (vert) devient le nom du service.",
       "scopeDimension": "Dimension de portée",
       "workloadDimension": "Dimension de charge de travail",
       "noFormulaConfigured": "Aucune formule d'identité configurée. Ajoutez des dimensions ci-dessus.",

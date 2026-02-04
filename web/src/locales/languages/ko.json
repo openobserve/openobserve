@@ -128,7 +128,7 @@
     "source": "_소스",
     "noResult": "결과 없음",
     "syntaxGuide": "구문 가이드",
-    "recordsPerPage": "페이지당 레코드",
+    "rowsPerPage": "페이지당 레코드",
     "showing": "표시",
     "of": "의",
     "rowDetail": "소스 세부 정보",
@@ -328,11 +328,7 @@
     "generating": "생성 중...",
     "nlQueryGenerationFailed": "쿼리를 생성하지 못했습니다.다시 시도해 주세요.",
     "nlQueryGenerationSuccess": "쿼리가 성공적으로 생성되었습니다!",
-    "nlpModeDisabledForVisualization": "다중 스트림으로 시각화하는 동안에는 자연어 모드를 비활성화할 수 없습니다.",
-    "askAIPlaceholder": "AI에게 문의에 도움을 요청하세요...",
-    "aiBarSuccessPlaceholder": "다음에는 무엇을 하고 싶으세요?",
-    "askAI": "AI에게 물어보세요",
-    "askAITooltip": "AI가 쿼리에 도움을 요청하세요"
+    "nlpModeDisabledForVisualization": "다중 스트림으로 시각화하는 동안에는 자연어 모드를 비활성화할 수 없습니다."
   },
   "menu": {
     "home": "홈",
@@ -2271,6 +2267,7 @@
       "groupsLabel": "그룹",
       "noMatchingGroups": "일치하는 그룹 없음",
       "fqnFormulaTitle": "식별자 공식",
+      "fqnFormulaTooltip": "서비스 식별자가 어떻게 계산되는지 보여줍니다. 범위 차원(파란색)은 '/'로 연결됩니다. 첫 번째 non-null 워크로드 차원(녹색)이 서비스 이름이 됩니다.",
       "scopeDimension": "범위 차원",
       "workloadDimension": "워크로드 차원",
       "noFormulaConfigured": "식별자 공식이 구성되지 않았습니다. 위에 차원을 추가하십시오.",

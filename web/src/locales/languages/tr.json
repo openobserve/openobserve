@@ -128,7 +128,7 @@
     "source": "_kaynak",
     "noResult": "Sonuç Yok",
     "syntaxGuide": "Sözdizimi kılavuzu",
-    "recordsPerPage": "Sayfa başına kayıtlar",
+    "rowsPerPage": "Sayfa başına kayıtlar",
     "showing": "Gösterme",
     "of": "dan",
     "rowDetail": "Kaynak Ayrıntıları",
@@ -328,11 +328,7 @@
     "generating": "Oluşturuluyor...",
     "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
     "nlQueryGenerationSuccess": "Sorgu başarıyla oluşturuldu!",
-    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz",
-    "askAIPlaceholder": "Yapay zekadan sorgunuzla ilgili yardım isteyin...",
-    "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?",
-    "askAI": "Yapay zekaya sor",
-    "askAITooltip": "Yapay zekadan sorgunuzla ilgili yardım isteyin"
+    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -2271,6 +2267,7 @@
       "groupsLabel": "gruplar",
       "noMatchingGroups": "Eşleşen grup yok",
       "fqnFormulaTitle": "Kimlik Formülü",
+      "fqnFormulaTooltip": "Servis kimliğinin nasıl hesaplanacağını gösterir. Kapsam boyutları (mavi) '/' ile birleştirilir. İlk null olmayan iş yükü boyutu (yeşil) servis adı olur.",
       "scopeDimension": "Kapsam Boyutu",
       "workloadDimension": "İş Yükü Boyutu",
       "noFormulaConfigured": "Hiçbir kimlik formülü yapılandırılmamış. Yukarıda boyutlar ekleyin.",

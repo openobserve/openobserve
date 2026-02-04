@@ -128,7 +128,7 @@
     "source": "_fonte",
     "noResult": "Nessun risultato",
     "syntaxGuide": "Guida alla sintassi",
-    "recordsPerPage": "Record per pagina",
+    "rowsPerPage": "Record per pagina",
     "showing": "Mostrando",
     "of": "di",
     "rowDetail": "Dettagli della fonte",
@@ -328,11 +328,7 @@
     "generating": "Generazione...",
     "nlQueryGenerationFailed": "Generazione della query non riuscita. Per favore riprova.",
     "nlQueryGenerationSuccess": "Query generata con successo!",
-    "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream",
-    "askAIPlaceholder": "Chiedi all'IA di aiutarti con la tua domanda...",
-    "aiBarSuccessPlaceholder": "Cosa vorresti fare dopo?",
-    "askAI": "Chiedi all'AI",
-    "askAITooltip": "Chiedi all'IA di aiutarti con la tua richiesta"
+    "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream"
   },
   "menu": {
     "home": "Home",
@@ -2269,6 +2265,7 @@
       "groupsLabel": "gruppi",
       "noMatchingGroups": "Nessun gruppo corrispondente",
       "fqnFormulaTitle": "Formula identità",
+      "fqnFormulaTooltip": "Mostra come verrà calcolata l'identità del servizio. Le dimensioni di ambito (blu) sono concatenate con '/'. La prima dimensione di workload non nulla (verde) diventa il nome del servizio.",
       "scopeDimension": "Dimensione di ambito",
       "workloadDimension": "Dimensione di workload",
       "noFormulaConfigured": "Nessuna formula di identità configurata. Aggiungi dimensioni sopra.",

@@ -128,7 +128,7 @@
     "source": "Fuente",
     "noResult": "Sin resultados",
     "syntaxGuide": "Guía de sintaxis",
-    "recordsPerPage": "Registros por página",
+    "rowsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "de",
     "rowDetail": "Detalles de la fila",
@@ -328,11 +328,7 @@
     "generating": "Generando...",
     "nlQueryGenerationFailed": "No se pudo generar la consulta. Por favor, inténtelo de nuevo.",
     "nlQueryGenerationSuccess": "¡Consulta generada correctamente!",
-    "nlpModeDisabledForVisualization": "El modo de lenguaje natural no se puede deshabilitar durante la visualización con varias transmisiones",
-    "askAIPlaceholder": "Pídele a la IA que te ayude con tu consulta...",
-    "aiBarSuccessPlaceholder": "¿Qué le gustaría hacer a continuación?",
-    "askAI": "Pregúntale a AI",
-    "askAITooltip": "Pídele a la IA que te ayude con tu consulta"
+    "nlpModeDisabledForVisualization": "El modo de lenguaje natural no se puede deshabilitar durante la visualización con varias transmisiones"
   },
   "menu": {
     "home": "Inicio",
@@ -2269,6 +2265,7 @@
       "groupsLabel": "grupos",
       "noMatchingGroups": "No hay grupos coincidentes",
       "fqnFormulaTitle": "Fórmula de identidad",
+      "fqnFormulaTooltip": "Muestra cómo se calculará la identidad del servicio. Las dimensiones de alcance (azul) se concatenan con '/'. La primera dimensión de carga de trabajo no nula (verde) se convierte en el nombre del servicio.",
       "scopeDimension": "Dimensión de alcance",
       "workloadDimension": "Dimensión de carga de trabajo",
       "noFormulaConfigured": "No hay fórmula de identidad configurada. Agregue dimensiones arriba.",

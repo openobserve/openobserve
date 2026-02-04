@@ -128,7 +128,7 @@
     "source": "_fonte",
     "noResult": "Sem resultado",
     "syntaxGuide": "Guia de sintaxe",
-    "recordsPerPage": "Registros por página",
+    "rowsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "do",
     "rowDetail": "Detalhes da fonte",
@@ -328,11 +328,7 @@
     "generating": "Gerando...",
     "nlQueryGenerationFailed": "Falha ao gerar consulta. Por favor, tente novamente.",
     "nlQueryGenerationSuccess": "Consulta gerada com sucesso!",
-    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos",
-    "askAIPlaceholder": "Peça ajuda à IA com sua consulta...",
-    "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?",
-    "askAI": "Pergunte à IA",
-    "askAITooltip": "Peça ajuda à IA com sua consulta"
+    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos"
   },
   "menu": {
     "home": "Início",
@@ -2271,6 +2267,7 @@
       "groupsLabel": "grupos",
       "noMatchingGroups": "Nenhum grupo correspondente",
       "fqnFormulaTitle": "Fórmula de identidade",
+      "fqnFormulaTooltip": "Mostra como a identidade do serviço será calculada. As dimensões de escopo (azul) são concatenadas com '/'. A primeira dimensão de carga de trabalho não nula (verde) se torna o nome do serviço.",
       "scopeDimension": "Dimensão de escopo",
       "workloadDimension": "Dimensão de carga de trabalho",
       "noFormulaConfigured": "Nenhuma fórmula de identidade configurada. Adicione dimensões acima.",
