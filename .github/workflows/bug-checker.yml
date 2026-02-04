@@ -9,7 +9,7 @@ on:
       dry_run:
         description: "Dry run mode (only report, don't comment)"
         required: false
-        default: "false"
+        default: false
         type: boolean
       days_threshold:
         description: "Only check issues older than N days"
@@ -128,7 +128,7 @@ jobs:
             **Action requested:** Please verify if this bug has been fixed and close this issue if appropriate.
 
             ---
-            _This is an automated message from the Bug Checker Agent. [Learn more](https://github.com/openobserve/openobserve/blob/main/tests/test-agents/bug-checker/README.md)_`;
+            _This is an automated message from the Bug Checker Agent._`;
 
               if (dryRun) {
                 console.log(`\n[DRY RUN] Would comment on #${issue.number}:`);
