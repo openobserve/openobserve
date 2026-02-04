@@ -28,6 +28,8 @@ use crate::{
     },
 };
 
+const MAX_INDEX: usize = 100;
+
 pub struct InputOutputExtractor;
 
 impl InputOutputExtractor {
@@ -534,6 +536,7 @@ fn build_array_from_keys(
             max_index = max_index.max(index);
         }
     }
+    max_index = std::cmp::min(max_index, MAX_INDEX);
 
     // Initialize array with empty objects
     let mut array: Vec<json::Value> = Vec::new();
@@ -620,8 +623,9 @@ fn set_nested_value(target: &mut json::Value, path: &[&str], value: json::Value)
 
         set_nested_value(nested, &path[1..], value);
     } else if let json::Value::Array(arr) = target
-        && let Ok(index) = path[0].parse::<usize>()
+        && let Ok(mut index) = path[0].parse::<usize>()
     {
+        index = std::cmp::min(index, MAX_INDEX);
         while arr.len() <= index {
             arr.push(json::json!({}));
         }
