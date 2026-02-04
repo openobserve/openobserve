@@ -1057,18 +1057,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Success State - TelemetryCorrelationDashboard -->
+          <!-- Success State - CorrelatedLogsTable -->
           <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
-            <TelemetryCorrelationDashboard
-              mode="embedded-tabs"
-              :externalActiveTab="'logs'"
-              :serviceName="correlationData.serviceName"
-              :matchedDimensions="correlationData.matchedDimensions"
-              :additionalDimensions="correlationData.additionalDimensions"
-              :logStreams="correlationData.logStreams"
-              :metricStreams="correlationData.metricStreams"
-              :traceStreams="correlationData.traceStreams"
-              :timeRange="telemetryTimeRange"
+            <CorrelatedLogsTable
+              :service-name="correlationData.serviceName"
+              :matched-dimensions="correlationData.matchedDimensions"
+              :additional-dimensions="correlationData.additionalDimensions"
+              :log-streams="correlationData.logStreams"
+              :source-stream="'incidents'"
+              :source-type="'incidents'"
+              :time-range="telemetryTimeRange"
+              :hide-view-related-button="true"
+              :hide-search-term-actions="false"
+              :hide-dimension-filters="false"
             />
           </div>
         </div>
@@ -1236,6 +1237,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
@@ -1247,6 +1249,7 @@ export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
