@@ -91,6 +91,13 @@ describe("IncidentList.vue", () => {
       subscription_type: "",
     };
 
+    // Reset incidents store state
+    store.state.incidents = {
+      incidents: {},
+      pageBeforeSearch: 1,
+      isInitialized: false
+    };
+
     // Default mock implementation
     (incidentsService.list as any).mockResolvedValue({
       data: {
@@ -909,6 +916,844 @@ describe("IncidentList.vue", () => {
         expect.any(String),
         "acknowledged"
       );
+    });
+  });
+
+  describe("State Persistence - Vuex Store Integration", () => {
+    beforeEach(() => {
+      // Reset incidents store state
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+    });
+
+    it("should save state to store when navigating to incident detail", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.pagination.page = 3;
+      wrapper.vm.pagination.rowsPerPage = 50;
+      wrapper.vm.searchQuery = "test query";
+
+      const incident = wrapper.vm.incidents[0];
+      wrapper.vm.viewIncident(incident);
+
+      const savedState = store.state.incidents.incidents;
+      expect(savedState.searchQuery).toBe("test query");
+      expect(savedState.pagination.page).toBe(3);
+      expect(savedState.pagination.rowsPerPage).toBe(50);
+      expect(savedState.organizationIdentifier).toBe("default");
+    });
+
+    it("should restore state from store on mount", async () => {
+      // Mock enough incidents
+      const mockIncidents = Array.from({ length: 500 }, (_, i) =>
+        createIncident({ id: `${i}`, title: `Incident ${i}` })
+      );
+
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: mockIncidents,
+          total: 500,
+        },
+      });
+
+      // Pre-populate store with saved state (without search query to avoid watch complications)
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          pagination: { page: 3, rowsPerPage: 50 },
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 1,
+        isInitialized: true
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Verify key restoration happened
+      expect(wrapper.vm.pagination.page).toBe(3);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+    });
+
+    it("should reset state when organization changes", async () => {
+      // Simulate previous org state
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "old org query",
+          pagination: { page: 3, rowsPerPage: 50 },
+          organizationIdentifier: "old-org"
+        },
+        pageBeforeSearch: 3,
+        isInitialized: true
+      };
+
+      // New organization
+      store.state.selectedOrganization = {
+        label: "new Organization",
+        id: 200,
+        identifier: "new-org",
+        user_email: "new@example.com",
+        subscription_type: "",
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should have reset to defaults
+      expect(wrapper.vm.searchQuery).toBe("");
+      expect(wrapper.vm.pagination.page).toBe(1);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
+    });
+
+    it("should not restore state if not initialized", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "should not restore",
+          pagination: { page: 10, rowsPerPage: 500 },
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 10,
+        isInitialized: false // Not initialized
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should use defaults, not restored values
+      expect(wrapper.vm.searchQuery).toBe("");
+      expect(wrapper.vm.pagination.page).toBe(1);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
+    });
+  });
+
+  describe("Search Query Watch - Page Management", () => {
+    beforeEach(async () => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 100 }, (_, i) =>
+            createIncident({ id: `${i}`, title: `Incident ${i}` })
+          ),
+          total: 100,
+        },
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+    });
+
+    it("should save current page and reset to page 1 when starting a search", async () => {
+      wrapper.vm.pagination.page = 3;
+      await nextTick();
+      await flushPromises();
+
+      // Start search (empty -> value)
+      wrapper.vm.searchQuery = "test";
+      await nextTick();
+      await flushPromises(); // Wait for store dispatch to complete
+
+      expect(store.state.incidents.pageBeforeSearch).toBe(3);
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should restore pageBeforeSearch when clearing search", async () => {
+      wrapper.vm.pagination.page = 5;
+      await nextTick();
+      await flushPromises();
+
+      // Start search
+      wrapper.vm.searchQuery = "test";
+      await nextTick();
+      await flushPromises(); // Wait for store dispatch to complete
+
+      expect(wrapper.vm.pagination.page).toBe(1);
+      expect(store.state.incidents.pageBeforeSearch).toBe(5);
+
+      // Clear search (value -> empty)
+      wrapper.vm.searchQuery = "";
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.pagination.page).toBe(5);
+    });
+
+    it("should reset to page 1 when changing search query", async () => {
+      wrapper.vm.pagination.page = 3;
+      await nextTick();
+
+      wrapper.vm.searchQuery = "first";
+      await nextTick();
+      expect(wrapper.vm.pagination.page).toBe(1);
+
+      wrapper.vm.pagination.page = 2;
+      await nextTick();
+
+      // Change search query (value -> different value)
+      wrapper.vm.searchQuery = "second";
+      await nextTick();
+
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should not manipulate pages during state restoration", async () => {
+      // Set up stored state with search query
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "restored search",
+          pagination: { page: 1, rowsPerPage: 20 },
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 3,
+        isInitialized: true
+      };
+
+      const setPageBeforeSearchSpy = vi.spyOn(store, 'dispatch');
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Verify searchQuery was restored
+      expect(wrapper.vm.searchQuery).toBe("restored search");
+
+      // During restoration, setPageBeforeSearch should NOT be called
+      // (because isRestoringState flag prevents watch logic)
+      const setPageBeforeSearchCalls = setPageBeforeSearchSpy.mock.calls
+        .filter((call: any) => call[0] === 'incidents/setPageBeforeSearch');
+
+      expect(setPageBeforeSearchCalls).toHaveLength(0);
+    });
+  });
+
+  describe("Edge Case: Clearing Restored Search Resets Page (PRIMARY BUG FIX)", () => {
+    beforeEach(async () => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 100 }, (_, i) =>
+            createIncident({ id: `${i}`, title: `Incident ${i}` })
+          ),
+          total: 100,
+        },
+      });
+    });
+
+    it("should preserve original page when clearing restored search query", async () => {
+      // STEP 1: User on page 3 with no search
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      wrapper.vm.pagination.page = 3;
+      await nextTick();
+
+      // STEP 2: User types search query
+      wrapper.vm.searchQuery = "test";
+      await nextTick();
+      await flushPromises(); // Wait for store dispatch to complete
+
+      expect(store.state.incidents.pageBeforeSearch).toBe(3);
+      expect(wrapper.vm.pagination.page).toBe(1);
+
+      // STEP 3: Save state (simulate navigation)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: wrapper.vm.searchQuery,
+        pagination: {
+          page: wrapper.vm.pagination.page,
+          rowsPerPage: wrapper.vm.pagination.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
+
+      // STEP 4: Restore state (simulate coming back)
+      store.state.incidents.isInitialized = true;
+      const restoredWrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      expect(restoredWrapper.vm.searchQuery).toBe("test");
+      expect(restoredWrapper.vm.pagination.page).toBe(1);
+      expect(store.state.incidents.pageBeforeSearch).toBe(3);
+
+      // STEP 5: User clears search query
+      restoredWrapper.vm.searchQuery = "";
+      await nextTick();
+
+      // CRITICAL: Should restore to page 3, NOT stay at page 1
+      expect(restoredWrapper.vm.pagination.page).toBe(3);
+    });
+  });
+
+  describe("Edge Case: Restored Page Out of Bounds", () => {
+    beforeEach(() => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+    });
+
+    it("should auto-correct page when restored page exceeds available pages", async () => {
+      // User had page 5 with 100+ records
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          pagination: { page: 5, rowsPerPage: 20 },
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 1,
+        isInitialized: true
+      };
+
+      // Now only 10 records exist (1 page max)
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 10 }, (_, i) =>
+            createIncident({ id: `${i}` })
+          ),
+          total: 10,
+        },
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should auto-correct to page 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should handle restoration when all data is deleted", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          pagination: { page: 3, rowsPerPage: 20 },
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 1,
+        isInitialized: true
+      };
+
+      // No data available
+      (incidentsService.list as any).mockResolvedValue({
+        data: { incidents: [], total: 0 },
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should reset to page 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+      expect(wrapper.vm.pagination.rowsNumber).toBe(0);
+    });
+  });
+
+  describe("Edge Case: pageBeforeSearch Out of Bounds", () => {
+    beforeEach(() => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 20 }, (_, i) =>
+            createIncident({ id: `${i}` })
+          ),
+          total: 20,
+        },
+      });
+    });
+
+    it("should auto-correct when clearing search if pageBeforeSearch is out of bounds", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // User was on page 5
+      wrapper.vm.pagination.page = 5;
+      await nextTick();
+      await flushPromises();
+
+      // Start search
+      wrapper.vm.searchQuery = "test";
+      await nextTick();
+      await flushPromises(); // Wait for store dispatch to complete
+
+      expect(store.state.incidents.pageBeforeSearch).toBe(5);
+      expect(wrapper.vm.pagination.page).toBe(1);
+
+      // Simulate data deletion - now only 20 records (1 page at 20/page)
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 20 }, (_, i) =>
+            createIncident({ id: `${i}` })
+          ),
+          total: 20,
+        },
+      });
+
+      wrapper.vm.allIncidents = Array.from({ length: 20 }, (_, i) =>
+        createIncident({ id: `${i}` })
+      );
+      wrapper.vm.pagination.rowsNumber = 20;
+
+      // Clear search - should validate and correct
+      wrapper.vm.searchQuery = "";
+      await nextTick();
+
+      // Should auto-correct to max page (1) instead of trying to go to page 5
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+  });
+
+  describe("Edge Case: Invalid Pagination Values", () => {
+    beforeEach(() => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 50 }, (_, i) =>
+            createIncident({ id: `${i}` })
+          ),
+          total: 50,
+        },
+      });
+    });
+
+    it("should handle invalid rowsPerPage (0)", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          pagination: { page: 1, rowsPerPage: 0 }, // Invalid
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 1,
+        isInitialized: true
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should reset to default (20)
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
+    });
+
+    it("should handle invalid rowsPerPage (negative)", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          pagination: { page: 1, rowsPerPage: -10 }, // Invalid
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 1,
+        isInitialized: true
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should reset to default (20)
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
+    });
+
+    it("should handle invalid currentPage (0)", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          pagination: { page: 0, rowsPerPage: 20 }, // Invalid
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 1,
+        isInitialized: true
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should reset to page 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should handle invalid currentPage (negative)", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          pagination: { page: -5, rowsPerPage: 20 }, // Invalid
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 1,
+        isInitialized: true
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Should reset to page 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+  });
+
+  describe("Edge Case: Search Results Fewer Than Expected", () => {
+    beforeEach(() => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+    });
+
+    it("should auto-correct page when search results have fewer items", async () => {
+      // Initial load with 100 incidents
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 100 }, (_, i) =>
+            createIncident({ id: `${i}`, title: `Incident ${i}` })
+          ),
+          total: 100,
+        },
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // User navigates to page 3
+      wrapper.vm.pagination.page = 3;
+      await nextTick();
+
+      // User searches - only 5 results (fits on 1 page)
+      wrapper.vm.allIncidents = Array.from({ length: 5 }, (_, i) =>
+        createIncident({ id: `${i}`, title: `Match ${i}` })
+      );
+
+      wrapper.vm.searchQuery = "Match";
+      await nextTick();
+
+      // Should auto-correct to page 1 (only 1 page of results)
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+  });
+
+  describe("Frontend Search Filtering", () => {
+    beforeEach(async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", title: "Database Error", status: "open", severity: "P1" }),
+            createIncident({ id: "2", title: "API Timeout", status: "acknowledged", severity: "P2" }),
+            createIncident({ id: "3", title: "Login Issue", status: "resolved", severity: "P3" }),
+            createIncident({ id: "4", title: "Database Connection Failed", status: "open", severity: "P1" }),
+          ],
+          total: 4,
+        },
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+    });
+
+    it("should filter incidents by title", async () => {
+      wrapper.vm.searchQuery = "Database";
+      await nextTick();
+
+      expect(wrapper.vm.pagination.rowsNumber).toBe(2);
+    });
+
+    it("should filter incidents by status", async () => {
+      wrapper.vm.searchQuery = "open";
+      await nextTick();
+
+      expect(wrapper.vm.pagination.rowsNumber).toBe(2);
+    });
+
+    it("should filter incidents by severity", async () => {
+      wrapper.vm.searchQuery = "P1";
+      await nextTick();
+
+      expect(wrapper.vm.pagination.rowsNumber).toBe(2);
+    });
+
+    it("should be case-insensitive", async () => {
+      wrapper.vm.searchQuery = "DATABASE";
+      await nextTick();
+
+      expect(wrapper.vm.pagination.rowsNumber).toBe(2);
+    });
+
+    it("should return all incidents when search is cleared", async () => {
+      wrapper.vm.searchQuery = "Database";
+      await nextTick();
+      expect(wrapper.vm.pagination.rowsNumber).toBe(2);
+
+      wrapper.vm.searchQuery = "";
+      await nextTick();
+      expect(wrapper.vm.pagination.rowsNumber).toBe(4);
+    });
+
+    it("should save search state to store on search", async () => {
+      wrapper.vm.searchQuery = "Database";
+      await nextTick();
+      await flushPromises(); // Wait for store dispatch to complete
+
+      const savedState = store.state.incidents.incidents;
+      expect(savedState.searchQuery).toBe("Database");
+    });
+  });
+
+  describe("Vuex Store Actions and Mutations", () => {
+    beforeEach(() => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+    });
+
+    it("should dispatch setPageBeforeSearch action", async () => {
+      const dispatchSpy = vi.spyOn(store, 'dispatch');
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      wrapper.vm.pagination.page = 5;
+      await nextTick();
+
+      wrapper.vm.searchQuery = "test";
+      await nextTick();
+
+      expect(dispatchSpy).toHaveBeenCalledWith('incidents/setPageBeforeSearch', 5);
+    });
+
+    it("should dispatch setIncidents action on pagination change", async () => {
+      const dispatchSpy = vi.spyOn(store, 'dispatch');
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      dispatchSpy.mockClear();
+
+      await wrapper.vm.changePagination({ label: "50", value: 50 });
+
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        'incidents/setIncidents',
+        expect.objectContaining({
+          searchQuery: expect.any(String),
+          pagination: expect.objectContaining({
+            page: expect.any(Number),
+            rowsPerPage: 50
+          }),
+          organizationIdentifier: "default"
+        })
+      );
+    });
+
+    it("should dispatch resetIncidents when organization changes", async () => {
+      const dispatchSpy = vi.spyOn(store, 'dispatch');
+
+      // Set up old org state
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "old",
+          pagination: { page: 3, rowsPerPage: 50 },
+          organizationIdentifier: "old-org"
+        },
+        pageBeforeSearch: 3,
+        isInitialized: true
+      };
+
+      store.state.selectedOrganization = {
+        label: "new Organization",
+        id: 200,
+        identifier: "new-org",
+        user_email: "new@example.com",
+        subscription_type: "",
+      };
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(dispatchSpy).toHaveBeenCalledWith('incidents/resetIncidents');
+    });
+
+    it("should dispatch setIsInitialized on first load", async () => {
+      const dispatchSpy = vi.spyOn(store, 'dispatch');
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(dispatchSpy).toHaveBeenCalledWith('incidents/setIsInitialized', true);
+    });
+  });
+
+  describe("isRestoringState Flag Behavior", () => {
+    beforeEach(() => {
+      store.state.incidents = {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      };
+    });
+
+    it("should set isRestoringState flag during restoration", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "test",
+          pagination: { page: 3, rowsPerPage: 20 },
+          organizationIdentifier: "default"
+        },
+        pageBeforeSearch: 5,
+        isInitialized: true
+      };
+
+      wrapper = createWrapper();
+
+      // During mount, isRestoringState should be true
+      // This is internal state, but we can verify side effects
+      await flushPromises();
+      await nextTick();
+
+      // After nextTick, isRestoringState should be false
+      // Verify by checking that subsequent search changes trigger normal behavior
+      wrapper.vm.searchQuery = "new query";
+      await nextTick();
+
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should clear isRestoringState flag after restoration completes", async () => {
+      // Mock enough incidents
+      const mockIncidents = Array.from({ length: 150 }, (_, i) =>
+        createIncident({ id: `${i}`, title: `test Incident ${i}` })
+      );
+
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: mockIncidents,
+          total: 150,
+        },
+      });
+
+      // Start with empty state (no restoration)
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // After component is mounted, search watch should work normally
+      wrapper.vm.pagination.page = 4;
+      await nextTick();
+      await flushPromises();
+
+      // Start a search - should save current page and reset to 1
+      wrapper.vm.searchQuery = "test";
+      await nextTick();
+      await flushPromises(); // Wait for store dispatch to complete
+
+      // Should save pageBeforeSearch and reset to page 1 (normal behavior)
+      expect(store.state.incidents.pageBeforeSearch).toBe(4);
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+  });
+
+  describe("validateAndCorrectPagination Function", () => {
+    beforeEach(async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: Array.from({ length: 50 }, (_, i) =>
+            createIncident({ id: `${i}` })
+          ),
+          total: 50,
+        },
+      });
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+    });
+
+    it("should return true when correction was needed", async () => {
+      wrapper.vm.pagination.page = 10;
+      wrapper.vm.pagination.rowsPerPage = 20;
+      wrapper.vm.pagination.rowsNumber = 50;
+
+      const wasCorrected = wrapper.vm.validateAndCorrectPagination();
+
+      expect(wasCorrected).toBe(true);
+      expect(wrapper.vm.pagination.page).toBe(3); // max page = ceil(50/20) = 3
+    });
+
+    it("should return false when no correction needed", async () => {
+      wrapper.vm.pagination.page = 2;
+      wrapper.vm.pagination.rowsPerPage = 20;
+      wrapper.vm.pagination.rowsNumber = 50;
+
+      const wasCorrected = wrapper.vm.validateAndCorrectPagination();
+
+      expect(wasCorrected).toBe(false);
+      expect(wrapper.vm.pagination.page).toBe(2);
+    });
+
+    it("should correct invalid rowsPerPage to default", async () => {
+      wrapper.vm.pagination.rowsPerPage = 0;
+      wrapper.vm.pagination.page = 1;
+
+      const wasCorrected = wrapper.vm.validateAndCorrectPagination();
+
+      expect(wasCorrected).toBe(true);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
+    });
+
+    it("should correct invalid page to 1", async () => {
+      wrapper.vm.pagination.page = -5;
+      wrapper.vm.pagination.rowsPerPage = 20;
+
+      const wasCorrected = wrapper.vm.validateAndCorrectPagination();
+
+      expect(wasCorrected).toBe(true);
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should handle zero records gracefully", async () => {
+      wrapper.vm.pagination.page = 3;
+      wrapper.vm.pagination.rowsPerPage = 20;
+      wrapper.vm.pagination.rowsNumber = 0;
+      wrapper.vm.allIncidents = [];
+
+      const wasCorrected = wrapper.vm.validateAndCorrectPagination();
+
+      expect(wasCorrected).toBe(true);
+      expect(wrapper.vm.pagination.page).toBe(1);
     });
   });
 });

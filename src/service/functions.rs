@@ -370,7 +370,6 @@ pub async fn update_function(
         }
     }
     extract_num_args(&mut func);
-
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
         return Ok(map_error_to_http_response(&(error.into()), None));
     }

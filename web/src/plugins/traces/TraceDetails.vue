@@ -431,6 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
                 class="histogram-sidebar-inner"
                 :class="isTimelineExpanded ? '' : 'full'"
+                :style="{ flex: `0 0 ${sidebarWidth}`, maxWidth: sidebarWidth }"
               >
                 <trace-details-sidebar
                   data-test="trace-details-sidebar"
@@ -517,6 +518,10 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
+import {
+  parseUsageDetails,
+  parseCostDetails,
+} from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -674,6 +679,16 @@ export default defineComponent({
     const initialWidth: Ref<number> = ref(0);
 
     const throttledResizing = ref<any>(null);
+
+    // Calculate sidebar width based on leftWidth
+    // Sidebar should take ~84% of the remaining space after left panel
+    const sidebarWidth = computed(() => {
+      if (!parentContainer.value) return '84%';
+      const containerWidth = parentContainer.value.clientWidth || 1200;
+      const remainingWidth = containerWidth - leftWidth.value;
+      const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
+      return `${sidebarWidthPx}px`;
+    });
 
     const serviceColorIndex = ref(0);
     const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
@@ -936,8 +951,8 @@ export default defineComponent({
 
       // Standalone mode - fetch from API
       if (props.mode === "standalone") {
-        await getTraceMeta();
         await loadLogStreams();
+        await getTraceMeta();
       }
     };
 
@@ -1097,6 +1112,16 @@ export default defineComponent({
       endTime: number,
     ) => {
       try {
+        // Check if _rumdata stream exists in logs
+        if (!logStreams.value.includes("_rumdata")) {
+          return [];
+        }
+
+        // Check if traceId is valid (indicating _oo_trace_id might be present)
+        if (!traceId) {
+          return [];
+        }
+
         const req = {
           query: {
             sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${traceId}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
@@ -1559,6 +1584,10 @@ export default defineComponent({
     // Convert span object to required format
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
+      // Parse usage details from split fields
+      const usage = parseUsageDetails(span);
+      const cost = parseCostDetails(span);
+      
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
@@ -1584,6 +1613,8 @@ export default defineComponent({
           color: "",
         },
         links: JSON.parse(span.links || "[]"),
+        llm_usage: usage,
+        llm_cost: cost,
       };
     };
 
@@ -1920,6 +1951,7 @@ export default defineComponent({
       getImageURL,
       store,
       leftWidth,
+      sidebarWidth,
       startResize,
       isTimelineExpanded,
       toggleTimeline,
@@ -2090,8 +2122,8 @@ html:has(.trace-details) {
 }
 
 .histogram-container .trace-content-scroll {
-  flex: 0 0 calc(16% - 2px) !important;
-  max-width: calc(16% - 2px) !important;
+  flex: 1 !important;
+  max-width: 100% !important;
 }
 
 .histogram-container-full .trace-content-scroll {

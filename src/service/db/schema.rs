@@ -102,6 +102,21 @@ pub async fn update_setting(
     Ok(())
 }
 
+pub async fn set_stream_is_llm(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    is_llm_stream: bool,
+) -> Result<(), anyhow::Error> {
+    let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let mut metadata = std::collections::HashMap::with_capacity(1);
+    settings.is_llm_stream = is_llm_stream;
+    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+    update_setting(org_id, stream_name, stream_type, metadata).await
+}
+
 pub async fn delete_fields(
     org_id: &str,
     stream_name: &str,
