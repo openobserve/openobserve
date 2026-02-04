@@ -50,6 +50,11 @@ jobs:
             const potentiallyFixed = [];
 
             for (const issue of openBugs) {
+              // Skip PRs (GitHub API returns PRs as issues too)
+              if (issue.pull_request) {
+                continue;
+              }
+
               // Skip issues newer than threshold
               const issueAge = (now - new Date(issue.created_at)) / (1000 * 60 * 60 * 24);
               if (issueAge < daysThreshold) {
@@ -59,8 +64,8 @@ jobs:
 
               console.log(`\nChecking issue #${issue.number}: ${issue.title}`);
 
-              // Search for merged PRs that reference this issue
-              const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged ${issue.number}`;
+              // Search for merged PRs that reference this issue (use quotes to prevent partial matches)
+              const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged "#${issue.number}"`;
               const searchResults = await github.rest.search.issuesAndPullRequests({
                 q: searchQuery,
                 per_page: 10
@@ -129,17 +134,18 @@ jobs:
                 console.log(`\n[DRY RUN] Would comment on #${issue.number}:`);
                 console.log(commentBody);
               } else {
-                // Check if we already commented on this issue recently
+                // Check if we already commented on this issue within last 30 days
+                const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
                 const comments = await github.rest.issues.listComments({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issue.number,
+                  since: thirtyDaysAgo,
                   per_page: 100
                 });
 
                 const recentBotComment = comments.data.find(c =>
-                  c.body.includes('Bug Checker Agent Report') &&
-                  (now - new Date(c.created_at)) / (1000 * 60 * 60 * 24) < 30
+                  c.body.includes('Bug Checker Agent Report')
                 );
 
                 if (recentBotComment) {
