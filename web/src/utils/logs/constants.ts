@@ -119,6 +119,7 @@ export const DEFAULT_LOGS_CONFIG = {
     logsVisualizeDirtyFlag: false,
     sqlMode: false,
     sqlModeManualTrigger: false,
+    nlpMode: false,
     quickMode: false,
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
