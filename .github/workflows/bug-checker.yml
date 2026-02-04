@@ -56,12 +56,12 @@ jobs:
 
             console.log(`Configuration: days_threshold=${daysThreshold}, max_bugs=${maxBugsToAnalyze}`);
 
-            // Get all open issues with 'bug' label
+            // Get all open issues with bug label (note: label includes emoji)
             const openBugs = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'bug',
+              labels: '☢️ Bug',
               per_page: 100
             });
 
