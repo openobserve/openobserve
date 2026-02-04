@@ -1061,8 +1061,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
             <CorrelatedLogsTable
               :service-name="correlationData.serviceName"
-              :matched-dimensions="correlationData.matchedDimensions"
-              :additional-dimensions="correlationData.additionalDimensions"
+              :matched-dimensions="actualMatchedDimensions"
+              :additional-dimensions="{}"
               :log-streams="correlationData.logStreams"
               :source-stream="'incidents'"
               :source-type="'incidents'"
@@ -1786,13 +1786,23 @@ export default defineComponent({
     });
 
     // Computed properties for CorrelatedLogsTable
-    // availableDimensions contains the actual field names from the incident
-    // This is critical for log queries to use the correct field names
+    // Extract actual field names from logStreams filters
+    // The filters contain the correct field name mappings (e.g., k8s_namespace_name)
+    // instead of semantic dimension names (e.g., k8s-namespace)
+    const actualMatchedDimensions = computed(() => {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
+        return correlationData.value?.matchedDimensions || {};
+      }
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
+    });
+
     const availableDimensions = computed(() => {
-      if (!incidentDetails.value?.stable_dimensions) {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
         return {};
       }
-      return incidentDetails.value.stable_dimensions;
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
     });
 
     const ftsFields = computed(() => {
@@ -2756,6 +2766,7 @@ export default defineComponent({
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
+      actualMatchedDimensions,
       availableDimensions,
       ftsFields,
       incidentContextData,
