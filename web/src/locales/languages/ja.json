@@ -2532,7 +2532,8 @@
     "sql_query": "SQL クエリー",
     "resuls": "結果",
     "wrapText": "テキストを折り返す",
-    "delayMessage": "検索履歴は次の理由で遅延する可能性があります"
+    "delayMessage": "検索履歴は次の理由で遅延する可能性があります",
+    "results": "結果"
   },
   "search_scheduler_job": {
     "title": "ジョブスケジューラを検索する",
