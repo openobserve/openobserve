@@ -810,6 +810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="ellipsis"
                   >
                     {{ localDestinations.join(", ") }}
+                    <q-tooltip>{{ localDestinations.join(", ") }}</q-tooltip>
                   </div>
                 </template>
                 <template v-slot:option="option">
@@ -893,11 +894,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="templateFieldRef"
                 v-model="localTemplate"
                 :options="filteredTemplates"
-                class="no-case q-py-none"
+                class="no-case q-py-none template-select-field"
                 borderless
                 dense
                 use-input
-                fill-input
                 clearable
                 emit-value
                 :input-debounce="400"
@@ -905,8 +905,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @filter="filterTemplates"
                 @update:model-value="emitTemplateUpdate"
                 style="width: 180px; max-width: 300px"
-                placeholder="Use destination templates"
               >
+                <template v-slot:selected>
+                  <div v-if="localTemplate" class="ellipsis">
+                    {{ localTemplate }}
+                    <q-tooltip>{{ localTemplate }}</q-tooltip>
+                  </div>
+                </template>
                 <template v-slot:no-option>
                   <q-item>
                     <q-item-section class="text-grey">No templates available</q-item-section>
@@ -1687,6 +1692,33 @@ export default defineComponent({
         flex: 0 0 20% !important;
         min-width: 0 !important;
         width: 20% !important;
+      }
+    }
+  }
+}
+
+// Fix for template select - keep selected value and input on same line
+.template-select-field {
+  :deep(.q-field__control) {
+    .q-field__native {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      flex-wrap: nowrap !important;
+      overflow: hidden !important;
+
+      > span {
+        flex: 0 0 70% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        min-width: 0 !important;
+      }
+
+      > input {
+        flex: 0 0 30% !important;
+        min-width: 0 !important;
+        width: 30% !important;
       }
     }
   }

@@ -2532,7 +2532,8 @@
     "sql_query": "SQL-Abfrage",
     "resuls": "Ergebnisse",
     "wrapText": "Text umbrechen",
-    "delayMessage": "Der Suchverlauf könnte sich verzögern um"
+    "delayMessage": "Der Suchverlauf könnte sich verzögern um",
+    "results": "Ergebnisse"
   },
   "search_scheduler_job": {
     "title": "Job Scheduler durchsuchen",

@@ -2532,7 +2532,8 @@
     "sql_query": "SQL-zoekopdracht",
     "resuls": "Resultaten",
     "wrapText": "Tekst omwikkelen",
-    "delayMessage": "De zoekgeschiedenis kan worden vertraagd door"
+    "delayMessage": "De zoekgeschiedenis kan worden vertraagd door",
+    "results": "Resultaten"
   },
   "search_scheduler_job": {
     "title": "Zoek Job Scheduler",

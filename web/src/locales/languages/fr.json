@@ -2532,7 +2532,8 @@
     "sql_query": "Requête SQL",
     "resuls": "Résultats",
     "wrapText": "Envelopper le texte",
-    "delayMessage": "L'historique des recherches peut être retardé par"
+    "delayMessage": "L'historique des recherches peut être retardé par",
+    "results": "Résultats"
   },
   "search_scheduler_job": {
     "title": "Rechercher un planificateur de tâches",

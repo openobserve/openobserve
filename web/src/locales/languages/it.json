@@ -2530,7 +2530,8 @@
     "sql_query": "Interrogazione SQL",
     "resuls": "Risultati",
     "wrapText": "Avvolgi testo",
-    "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata"
+    "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata",
+    "results": "Risultati"
   },
   "search_scheduler_job": {
     "title": "Cerca Job Scheduler",
