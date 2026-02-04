@@ -546,7 +546,7 @@
         "features_title": "Available Enterprise Features",
         "features_subtitle": "Get a free license to unlock unlimited capabilities",
         "primary_button_text": "Get Free License",
-        "license_note": "100GB/day without license • 200GB/day with license"
+        "license_note": "50GB/day without license • 200GB/day with license"
       },
       "enterprise_with_license": {
         "hero_title": "Your Enterprise Edition",

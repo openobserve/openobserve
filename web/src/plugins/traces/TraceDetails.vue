@@ -951,8 +951,8 @@ export default defineComponent({
 
       // Standalone mode - fetch from API
       if (props.mode === "standalone") {
-        await getTraceMeta();
         await loadLogStreams();
+        await getTraceMeta();
       }
     };
 
@@ -1112,6 +1112,16 @@ export default defineComponent({
       endTime: number,
     ) => {
       try {
+        // Check if _rumdata stream exists in logs
+        if (!logStreams.value.includes("_rumdata")) {
+          return [];
+        }
+
+        // Check if traceId is valid (indicating _oo_trace_id might be present)
+        if (!traceId) {
+          return [];
+        }
+
         const req = {
           query: {
             sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${traceId}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
