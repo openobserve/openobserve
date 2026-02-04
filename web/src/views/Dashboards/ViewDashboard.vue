@@ -1049,6 +1049,16 @@ export default defineComponent({
       { deep: true }
     );
 
+    // Sync selectedTabId from URL changes (handles back/forward navigation)
+    watch(
+      () => route.query.tab,
+      (newTabId) => {
+        if (newTabId && newTabId !== selectedTabId.value) {
+          selectedTabId.value = newTabId;
+        }
+      }
+    );
+
     const getPanelFromTab = (tabId: string, panelId: string) => {
       const tab = currentDashboardData.data.tabs.find(
         (tab) => tab.tabId === tabId,
@@ -1127,20 +1137,7 @@ export default defineComponent({
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
 
-        // Set shouldRefreshWithoutCache to false for all panels
-        const allPanelIds = [];
-        currentDashboardData.data.tabs?.forEach((tab: any) => {
-          tab.panels?.forEach((panel: any) => {
-            if (panel.id) {
-              allPanelIds.push(panel?.id);
-              shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
-            }
-          });
-        });
-
-        // Sync all panel-level datetime pickers FIRST before committing variables
-        // This must happen before commitAllVariables() to avoid race condition where
-        // variable commit triggers URL update that preserves OLD panel time params
+        // Sync panel-level datetime pickers FIRST (updates URL)
         await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
 
         // Recompute all panel times after syncing
@@ -1148,7 +1145,6 @@ export default defineComponent({
         computeAllPanelTimes(true);
 
         // Commit all live variable changes to committed state
-        // At this point, route.query has the updated panel time params
         renderDashboardChartsRef.value?.commitAllVariables();
 
         // Refresh the dashboard (syncs global datetime picker)
@@ -1301,7 +1297,6 @@ export default defineComponent({
       }
 
       // Preserve any panel time params from URL that might have been manually set
-      // (these override the panel config values)
       Object.keys(route.query).forEach((key) => {
         if (key.startsWith("pt-")) {
           panelTimeParams[key] = route.query[key];
@@ -1334,10 +1329,8 @@ export default defineComponent({
         refreshInterval,
         selectedTabId,
       ],
-      async () => {
+      () => {
         generateNewDashboardRunId();
-        // Wait for next tick to ensure all reactive updates have settled
-        await nextTick();
         updateUrlWithCurrentState();
       },
       { deep: true },
