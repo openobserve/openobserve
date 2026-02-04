@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,16 +19,13 @@ use config::{meta::function::Transform, utils::json};
 
 use crate::{common::infra::config::QUERY_FUNCTIONS, service::db};
 
-pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
-    match db::put(
-        &key,
-        json::to_vec(js_func).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await
-    {
+    let val = json::to_vec(func_val)?;
+    if val.is_empty() {
+        return Err(anyhow::anyhow!("Function value is empty"));
+    }
+    match db::put(&key, val.into(), db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error saving function: {e}");

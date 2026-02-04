@@ -431,6 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
                 class="histogram-sidebar-inner"
                 :class="isTimelineExpanded ? '' : 'full'"
+                :style="{ flex: `0 0 ${sidebarWidth}`, maxWidth: sidebarWidth }"
               >
                 <trace-details-sidebar
                   data-test="trace-details-sidebar"
@@ -678,6 +679,16 @@ export default defineComponent({
     const initialWidth: Ref<number> = ref(0);
 
     const throttledResizing = ref<any>(null);
+
+    // Calculate sidebar width based on leftWidth
+    // Sidebar should take ~84% of the remaining space after left panel
+    const sidebarWidth = computed(() => {
+      if (!parentContainer.value) return '84%';
+      const containerWidth = parentContainer.value.clientWidth || 1200;
+      const remainingWidth = containerWidth - leftWidth.value;
+      const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
+      return `${sidebarWidthPx}px`;
+    });
 
     const serviceColorIndex = ref(0);
     const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
@@ -1930,6 +1941,7 @@ export default defineComponent({
       getImageURL,
       store,
       leftWidth,
+      sidebarWidth,
       startResize,
       isTimelineExpanded,
       toggleTimeline,
@@ -2100,8 +2112,8 @@ html:has(.trace-details) {
 }
 
 .histogram-container .trace-content-scroll {
-  flex: 0 0 calc(16% - 2px) !important;
-  max-width: calc(16% - 2px) !important;
+  flex: 1 !important;
+  max-width: 100% !important;
 }
 
 .histogram-container-full .trace-content-scroll {

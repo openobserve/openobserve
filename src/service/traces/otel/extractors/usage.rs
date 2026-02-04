@@ -37,7 +37,6 @@ impl UsageExtractor {
         attributes: &HashMap<String, json::Value>,
         instrumentation_scope_name: &str,
     ) -> HashMap<String, i64> {
-        dbg!(&attributes);
         let mut usage = HashMap::new();
 
         // LLM Usage Total Tokens

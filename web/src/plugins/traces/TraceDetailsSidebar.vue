@@ -15,10 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
-    data-test="trace-details-sidebar-header"
-  >
+  <div>
+    <div
+      class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
+      data-test="trace-details-sidebar-header"
+    >
     <div
       :title="span.operation_name"
       :style="{ width: 'calc(100% - 24px)' }"
@@ -745,6 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-tab-panel>
   </q-tab-panels>
+  </div>
 </template>
 
 <script lang="ts">
@@ -990,7 +992,7 @@ export default defineComponent({
     const getTagRows = computed(() => {
       return Object.entries(tags.value).map(([key, value]) => ({
         field: key,
-        value: value,
+        value: typeof value === 'string' ? value : JSON.stringify(value),
       }));
     });
 
@@ -1014,7 +1016,7 @@ export default defineComponent({
     const getProcessRows = computed(() => {
       return Object.entries(processes.value).map(([key, value]) => ({
         field: key,
-        value: value,
+        value: typeof value === 'string' ? value : JSON.stringify(value),
       }));
     });
 
@@ -1639,6 +1641,7 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     width: 100%;
+    table-layout: fixed;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(0.625rem);
     border-radius: 0.5rem;
@@ -1653,6 +1656,19 @@ export default defineComponent({
     text-align: left;
     padding: 8px 12px !important;
     font-size: 13px;
+    word-break: break-word;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 600px;
+  }
+
+  td span {
+    display: inline-block;
+    width: 100%;
+    word-break: break-word;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
   }
 
   th:last-child,
