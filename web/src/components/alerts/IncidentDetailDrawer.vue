@@ -1138,6 +1138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
@@ -1203,6 +1204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
