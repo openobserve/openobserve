@@ -282,6 +282,8 @@ export default class DashboardPanelTime {
     await this.clickGlobalTimePicker();
     await this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).click();
     await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await this.page.locator('[data-test="date-time-apply-btn"]').click();
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
   /**

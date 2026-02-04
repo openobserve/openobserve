@@ -398,7 +398,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelTime.changeGlobalTime("1-h");
 
     // Step 9: Verify Panel A still shows "Last 6d" (unaffected)
-    const panelATextAfter = await page.locator(`[data-test="panel-time-picker-${panelAId}-btn"]`).textContent();
+    const panelATextAfter = await page.locator(`[data-test="panel-time-picker-${panelAId}"]`).textContent();
     expect(panelATextAfter).toContain("6");
 
     // Cleanup
@@ -485,10 +485,10 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await page.keyboard.press('Escape');
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
-    // Step 9: Change Panel A time to "Last 24h"
-    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "24-h", true);
+    // Step 9: Change Panel A time to "Last 1d"
+    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "1-d", true);
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    await assertPanelTimeInURL(page, panelAId, "24h");
+    await assertPanelTimeInURL(page, panelAId, "1d");
 
     // Step 10: Change Panel A's variable again
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
@@ -496,7 +496,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await panelVariableDropdown.click();
     const result2 = await apiMonitor2;
 
-    // Step 11: Verify variable query now uses "Last 24h" (new panel time)
+    // Step 11: Verify variable query now uses "Last 1d" (new panel time)
     expect(result2.success).toBe(true);
     expect(result2.actualCount).toBeGreaterThanOrEqual(1);
 
@@ -535,8 +535,8 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(result4.success).toBe(true);
     expect(result4.actualCount).toBeGreaterThanOrEqual(1);
 
-    // Verify Panel A still shows 24h (unaffected by global change)
-    await assertPanelTimeInURL(page, panelAId, "24h");
+    // Verify Panel A still shows 1d (unaffected by global change)
+    await assertPanelTimeInURL(page, panelAId, "1d");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
