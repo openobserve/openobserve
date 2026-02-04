@@ -152,7 +152,7 @@ pub async fn correlate_alert_to_incident(
             .await;
 
     // Use enterprise correlation engine with actual hash (or None for fallback)
-    let correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
+    let mut correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
         &labels,
         service_discovery_result
             .as_ref()
@@ -160,6 +160,18 @@ pub async fn correlate_alert_to_incident(
         trace_id,
         &org_config,
     );
+
+    // BUGFIX: If stable_dimensions is empty, use alert_id as correlation_key
+    // This prevents unrelated alerts from being grouped into the same incident
+    // (they would all hash to the same value for empty dimensions)
+    if correlation_result.stable_dimensions.is_empty() {
+        let alert_id = alert.get_unique_key();
+        log::warn!(
+            "[incidents] Alert {} has no stable dimensions - using alert_id as correlation_key to prevent incorrect grouping",
+            alert.name
+        );
+        correlation_result.correlation_key = alert_id;
+    }
 
     // Guarantee service_name extraction
     let service_name = if let Some(ref sd_result) = service_discovery_result {
@@ -183,10 +195,11 @@ pub async fn correlate_alert_to_incident(
     };
 
     log::info!(
-        "[incidents] Alert {} correlation - service: {}, correlation_key: {}",
+        "[incidents] Alert {} correlation - service: {}, correlation_key: {}, stable_dimensions: {:?}",
         alert.name,
         service_name,
-        correlation_result.correlation_key
+        correlation_result.correlation_key,
+        correlation_result.stable_dimensions
     );
 
     // Find or create incident
@@ -410,6 +423,23 @@ async fn find_or_create_incident(
                 );
             }
         });
+
+        // Retry RCA if it's empty (failed in the past due to infra issues or errors)
+        #[cfg(feature = "enterprise")]
+        {
+            let org_id_rca = org_id.to_string();
+            let incident_id_rca = existing.id.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) =
+                    trigger_rca_for_incident(org_id_rca.clone(), incident_id_rca.clone()).await
+                {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Retry attempt failed for existing incident {incident_id_rca}: {e}"
+                    );
+                }
+            });
+        }
 
         return Ok(existing.id);
     }
