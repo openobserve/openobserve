@@ -195,7 +195,7 @@ export default class DashboardPanelTime {
    * @param {string} panelId - Panel ID
    */
   async clickPanelTimePicker(panelId) {
-    const pickerBtn = this.page.locator(`[data-test="panel-time-picker-${panelId}-btn"]`);
+    const pickerBtn = this.page.locator(`[data-test="panel-time-picker-${panelId}"] [data-test="date-time-btn"]`);
     await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await pickerBtn.click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
@@ -269,7 +269,7 @@ export default class DashboardPanelTime {
    * Click the global date time picker
    */
   async clickGlobalTimePicker() {
-    const globalPicker = this.page.locator('[data-test="dashboard-global-date-time-picker"]');
+    const globalPicker = this.page.locator('[data-test="dashboard-global-date-time-picker"] [data-test="date-time-btn"]');
     await globalPicker.waitFor({ state: "visible", timeout: 10000 });
     await globalPicker.click();
   }
