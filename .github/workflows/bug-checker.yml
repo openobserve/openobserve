@@ -42,6 +42,9 @@ jobs:
       bugs_json: ${{ steps.collect.outputs.bugs_json }}
       has_bugs: ${{ steps.collect.outputs.has_bugs }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Collect open bugs
         id: collect
         run: |
