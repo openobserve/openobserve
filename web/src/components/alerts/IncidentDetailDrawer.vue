@@ -1071,7 +1071,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :time-range="telemetryTimeRange"
               :hide-view-related-button="true"
               :hide-search-term-actions="false"
-              :hide-dimension-filters="false"
+              :hide-dimension-filters="true"
             />
           </div>
         </div>
