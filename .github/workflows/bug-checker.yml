@@ -124,7 +124,7 @@ jobs:
               BUGS_WITHOUT_PRS="$BUGS_WITHOUT_PRS
               $NUMBER|$TITLE"
 
-              ((ANALYZED_COUNT++))
+              ANALYZED_COUNT=$((ANALYZED_COUNT + 1))
             fi
 
             # Rate limit protection
