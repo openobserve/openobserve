@@ -3154,8 +3154,15 @@ export default defineComponent({
         }
       } else {
         this.searchObj.meta.sqlMode = false;
-        this.searchObj.data.query = "";
-        this.searchObj.data.editorValue = "";
+
+        // IMPORTANT: Don't clear query when switching from SQL mode to NLP mode
+        // User may want to refine/fix their existing SQL query using AI
+        // Only clear when not in NLP mode (i.e., switching to Quick mode or other modes)
+        if (!this.searchObj.meta.nlpMode) {
+          this.searchObj.data.query = "";
+          this.searchObj.data.editorValue = "";
+        }
+
         if (
           this.searchObj.loading == false &&
           this.searchObj.shouldIgnoreWatcher == false &&
