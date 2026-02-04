@@ -1032,6 +1032,7 @@ class="q-pr-sm q-pt-xs" />
                   dense
                   flat
                   :title="searchObj.meta.nlpMode ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                  :disable="searchObj.meta.nlpMode && isGeneratingSQL"
                   class="q-pa-none tw:h-[30px] element-box-shadow"
                   :class="[
                     searchObj.meta.nlpMode ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
@@ -1104,7 +1105,7 @@ class="q-pr-sm q-pt-xs" />
                   :color="searchObj.meta.nlpMode ? 'primary' : undefined"
                   no-caps
                   @click="searchObj.meta.nlpMode ? handleGenerateSQLQuery() : handleRunQueryFn()"
-                  :disable="disable"
+                  :disable="disable || (searchObj.meta.nlpMode && isGeneratingSQL)"
                   >
                   <img v-if="searchObj.meta.nlpMode" :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px]" />
                   {{ searchObj.meta.nlpMode ? t("search.generateQuery") : t("search.runQuery") }}
@@ -1151,7 +1152,8 @@ class="q-pr-sm q-pt-xs" />
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
-                  searchObj.loadingHistogram == true
+                  searchObj.loadingHistogram == true ||
+                  (searchObj.meta.nlpMode && isGeneratingSQL)
                 "
                 >
                 <img v-if="searchObj.meta.nlpMode" :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px] tw:mr-[6px]" />
@@ -1238,6 +1240,8 @@ class="q-pr-sm q-pt-xs" />
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
                 @nlp-mode-detected="handleNlpModeDetected"
                 @nlpModeDetected="handleNlpModeDetected"
+                @generation-start="handleGenerationStart"
+                @generation-end="handleGenerationEnd"
               />
               <!-- Mode Toggle for Build Mode -->
               <div
@@ -1813,7 +1817,7 @@ import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
-import { computed } from "vue";
+import { computed, unref } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
@@ -2147,6 +2151,10 @@ export default defineComponent({
         searchObj.meta.showHistogram = value;
       },
     });
+
+    // Track if AI is currently generating SQL query
+    // Use a local ref that will be updated via events from CodeQueryEditor
+    const isGeneratingSQL = ref(false);
 
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
@@ -4086,6 +4094,22 @@ export default defineComponent({
     };
 
     /**
+     * Handle generation start event from CodeQueryEditor
+     */
+    const handleGenerationStart = () => {
+      console.log('[SearchBar] Generation started - disabling button');
+      isGeneratingSQL.value = true;
+    };
+
+    /**
+     * Handle generation end event from CodeQueryEditor
+     */
+    const handleGenerationEnd = () => {
+      console.log('[SearchBar] Generation ended - enabling button');
+      isGeneratingSQL.value = false;
+    };
+
+    /**
      * Handle Generate SQL Query when in NLP mode
      * Calls the handleGenerateSQL method from CodeQueryEditor
      */
@@ -4666,7 +4690,10 @@ export default defineComponent({
       createScheduledSearchIcon,
       listScheduledSearchIcon,
       handleNlpModeDetected,
+      handleGenerationStart,
+      handleGenerationEnd,
       handleGenerateSQLQuery,
+      isGeneratingSQL,
       getColumnNames,
       getSearchObj,
       toggleHistogram,
