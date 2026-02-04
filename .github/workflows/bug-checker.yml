@@ -1,7 +1,11 @@
 name: Bug Checker Agent
 
 # Checks open bugs to find those potentially fixed by merged PRs
+# TODO: Remove push trigger after testing
 on:
+  push:
+    branches: [feature/bug-checker-agent]
+    paths: ['.github/workflows/bug-checker.yml']
   schedule:
     - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
   workflow_dispatch:
