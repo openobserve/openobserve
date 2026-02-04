@@ -20,10 +20,10 @@ on:
         required: false
         default: "30"
         type: string
-      max_bugs_to_analyze:
-        description: "Max bugs to analyze with Claude"
+      max_bugs_to_check:
+        description: "Max bugs to check per run"
         required: false
-        default: "5"
+        default: "35"
         type: string
 
 permissions:
@@ -48,7 +48,7 @@ jobs:
 
           DRY_RUN="${{ inputs.dry_run }}"
           DAYS_THRESHOLD="${{ inputs.days_threshold || '30' }}"
-          MAX_BUGS="${{ inputs.max_bugs_to_analyze || '5' }}"
+          MAX_BUGS="${{ inputs.max_bugs_to_check || '35' }}"
 
           echo "Configuration: dry_run=$DRY_RUN, days_threshold=$DAYS_THRESHOLD, max_bugs=$MAX_BUGS"
 
@@ -76,13 +76,20 @@ jobs:
           # Arrays for results
           BUGS_WITH_PRS=""
           BUGS_WITHOUT_PRS=""
-          ANALYZED_COUNT=0
+          BUGS_CHECKED=0
 
           # Process each bug
           echo ""
           echo "=== Checking for linked PRs ==="
 
           for row in $(echo "$BUGS" | jq -r '.[] | @base64'); do
+            # Stop if we've checked enough bugs
+            if [[ "$BUGS_CHECKED" -ge "$MAX_BUGS" ]]; then
+              echo ""
+              echo "Reached limit of $MAX_BUGS bugs, stopping."
+              break
+            fi
+
             _jq() {
               echo "$row" | base64 --decode | jq -r "$1"
             }
@@ -96,6 +103,8 @@ jobs:
               echo "Skipping #$NUMBER - too recent"
               continue
             fi
+
+            BUGS_CHECKED=$((BUGS_CHECKED + 1))
 
             echo ""
             echo "Checking #$NUMBER: $TITLE"
@@ -123,8 +132,6 @@ jobs:
               echo "  ✗ No linked PRs"
               BUGS_WITHOUT_PRS="$BUGS_WITHOUT_PRS
               $NUMBER|$TITLE"
-
-              ANALYZED_COUNT=$((ANALYZED_COUNT + 1))
             fi
 
             # Rate limit protection
@@ -133,6 +140,7 @@ jobs:
 
           echo ""
           echo "=== Results ==="
+          echo "Bugs checked: $BUGS_CHECKED / $MAX_BUGS"
           echo "Bugs with linked PRs: $(echo "$BUGS_WITH_PRS" | grep -c '|' || echo 0)"
           echo "Bugs without linked PRs: $(echo "$BUGS_WITHOUT_PRS" | grep -c '|' || echo 0)"
 
@@ -185,15 +193,20 @@ jobs:
           echo ""
           echo "=== Summary ==="
 
-          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          BUGS_WITH_PRS_COUNT=$(echo "$BUGS_WITH_PRS" | grep -c '|' || echo 0)
+          BUGS_WITHOUT_PRS_COUNT=$(echo "$BUGS_WITHOUT_PRS" | grep -c '|' || echo 0)
+          MODE=$([[ "$DRY_RUN" == "true" ]] && echo "🧪 Dry Run" || echo "🚀 Live")
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
           ## 🔍 Bug Checker Agent Summary
 
           | Metric | Count |
           |--------|-------|
-          | Total bugs checked | $TOTAL_BUGS |
-          | Bugs with linked PRs | $(echo "$BUGS_WITH_PRS" | grep -c '|' || echo 0) |
-          | Bugs without linked PRs | $(echo "$BUGS_WITHOUT_PRS" | grep -c '|' || echo 0) |
-          | Mode | $([[ "$DRY_RUN" == "true" ]] && echo "🧪 Dry Run" || echo "🚀 Live") |
+          | Total open bugs | $TOTAL_BUGS |
+          | Bugs checked | $BUGS_CHECKED |
+          | Bugs with linked PRs | $BUGS_WITH_PRS_COUNT |
+          | Bugs without linked PRs | $BUGS_WITHOUT_PRS_COUNT |
+          | Mode | $MODE |
 
           ### Bugs Without Linked PRs (Need Manual Review)
           These bugs have no linked PRs and may need investigation:
