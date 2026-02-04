@@ -87,24 +87,17 @@ jobs:
                 per_page: 10
               });
 
-              // Filter PRs that actually reference this issue
+              // Filter PRs that actually reference this issue (use regex for exact match)
               const linkedPRs = [];
               for (const pr of searchResults.data.items) {
                 const body = (pr.body || '').toLowerCase();
                 const title = (pr.title || '').toLowerCase();
+                const text = `${title} ${body}`;
 
-                const patterns = [
-                  `fixes #${issue.number}`,
-                  `fix #${issue.number}`,
-                  `closes #${issue.number}`,
-                  `close #${issue.number}`,
-                  `resolves #${issue.number}`,
-                  `resolve #${issue.number}`,
-                  `fixed #${issue.number}`,
-                  `#${issue.number}`
-                ];
+                // Regex with word boundary to prevent #12 matching #123
+                const pattern = new RegExp(`(fixes|fix|closes|close|resolves|resolve|fixed)?\\s*#${issue.number}(?!\\d)`, 'i');
 
-                if (patterns.some(p => body.includes(p) || title.includes(p))) {
+                if (pattern.test(text)) {
                   linkedPRs.push({
                     number: pr.number,
                     title: pr.title,
