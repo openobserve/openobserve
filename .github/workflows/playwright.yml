@@ -308,7 +308,7 @@ jobs:
             run_files:
               [
                 "dashboard-panel-time-part1-config-behavior.spec.js",
-                # "dashboard-panel-time-part2-url-priority.spec.js",
+                "dashboard-panel-time-part2-url-priority.spec.js",
                 # "dashboard-panel-time-part3-advanced-edge-cases.spec.js",
               ]
     steps:
