@@ -84,8 +84,8 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
         { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" }
       ]
     });
-    await page.locator('[data-test="dashboard-refresh-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.dashboardPanelTime.clickGlobalRefresh();
+
     const panelAId = panelIds[0];
     const panelBId = panelIds[1];
 
@@ -155,8 +155,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
       panels
     });
 
-    await page.locator('[data-test="dashboard-refresh-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.dashboardPanelTime.clickGlobalRefresh();
     
     // Step 3: Verify URL contains all panel params
     for (let i = 0; i < panelIds.length; i++) {

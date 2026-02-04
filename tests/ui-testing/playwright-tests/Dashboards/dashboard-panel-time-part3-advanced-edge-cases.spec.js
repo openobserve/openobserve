@@ -25,7 +25,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await ingestion(page);
   });
 
-  test("12-should support View Panel modal time picker", async ({ page }) => {
+  test("12-should support View Panel modal time picker independently", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_ViewModal_${timestamp}`;
@@ -40,30 +40,37 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       panelTimeRange: "1-h"
     });
 
-    // Step 2: Click "View" on Panel
+    // Step 2: Verify initial URL has "1h"
+    await assertPanelTimeInURL(page, panelId, "1h");
+
+    // Step 3: Click "View" on Panel
     await pm.dashboardPanelTime.openViewPanelModal(panelId);
 
-    // Step 3: Verify modal picker visible
+    // Step 4: Verify modal picker visible
     await assertPanelTimePickerInModal(page);
 
-    // Step 6: Change time to "Last 7d" in modal
+    // Step 5: Change time to "Last 6d" in modal
     const modalPicker = page.locator('[data-test="dashboard-viewpanel-date-time-picker"]');
     await modalPicker.click();
-    await page.locator('[data-test="date-time-relative-7-d-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
 
-    // Step 8: Click Apply
+    // Step 6: Click Apply
     await page.locator('[data-test="date-time-apply-btn"]').click();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Step 10: Verify URL updates
-    await assertPanelTimeInURL(page, panelId, "7d");
+    // Step 7: Verify URL remains unchanged (View Panel time is temporary)
+    await assertPanelTimeInURL(page, panelId, "1h");
 
-    // Step 11: Close modal
+    // Step 8: Close modal
     await pm.dashboardPanelTime.closeViewPanelModal();
 
-    // Step 12: Verify Panel in dashboard shows "Last 7d"
-    const pickerText = await page.locator(`[data-test="panel-time-picker-${panelId}-btn"]`).textContent();
-    expect(pickerText).toContain("7");
+    // Step 9: Verify Panel in dashboard still shows "Last 1h" (not affected by View Panel change)
+    const pickerText = await page.locator(`[data-test="panel-time-picker-${panelId}"]`).textContent();
+    expect(pickerText).toContain("1");
+    expect(pickerText).not.toContain("7");
+
+    // Step 10: Verify URL still has "1h"
+    await assertPanelTimeInURL(page, panelId, "1h");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
@@ -84,24 +91,31 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       panelTimeRange: "1-h"
     });
 
-    // Step 2: Click "Full Screen"
+    // Step 2: Verify initial URL has "1h"
+    await assertPanelTimeInURL(page, panelId, "1h");
+
+    // Step 3: Click "Full Screen" (navigates to dashboard view)
     await pm.dashboardPanelTime.openPanelFullScreen(panelId);
 
-    // Step 3: Verify full screen mode and picker visible
-    await assertPanelTimePickerInFullScreen(page);
+    // Step 4: Verify panel time picker visible in full screen (dashboard view)
+    await assertPanelTimePickerInFullScreen(page, panelId);
 
-    // Step 6: Change time to "Last 24h"
-    await pm.dashboardPanelTime.changePanelTimeInFullScreen("24-h", true);
+    // Step 5: Change time to "Last 1d" in full screen
+    await pm.dashboardPanelTime.changePanelTimeInFullScreen(panelId, "1-d", true);
 
-    // Step 8: Verify URL updated
-    await assertPanelTimeInURL(page, panelId, "24h");
+    // Step 6: Verify URL updated to "1d"
+    await assertPanelTimeInURL(page, panelId, "1d");
 
-    // Step 12: Exit full screen
-    await pm.dashboardPanelTime.exitFullScreen();
+    // Step 7: Verify panel picker shows "1d"
+    const pickerText = await page.locator(`[data-test="panel-time-picker-${panelId}"]`).textContent();
+    expect(pickerText).toContain("1");
 
-    // Step 13: Verify Panel shows "Last 24h"
-    const pickerText = await page.locator(`[data-test="panel-time-picker-${panelId}-btn"]`).textContent();
-    expect(pickerText).toContain("24");
+    // Step 8: Reload to verify persistence
+    await page.reload();
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Step 9: Verify URL still has "1d" after reload
+    await assertPanelTimeInURL(page, panelId, "1d");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
@@ -117,7 +131,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       dashboardName,
       panels: [
         { panelName: `Panel_A_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "7-d" },
+        { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
         { panelName: `Panel_C_${timestamp}`, allowPanelTime: false }
       ]
     });
@@ -127,7 +141,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     // For now, verify panels are configured correctly
     await assertPanelTimePickerVisible(page, panelIds[0]);
     await assertPanelTimePickerVisible(page, panelIds[1]);
-
+    await pm.dashboardPanelTime.clickGlobalRefresh();
     // Step 7: Clone Panel A
     // Note: Clone implementation depends on UI
     // Verify original panel still works
@@ -147,7 +161,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       dashboardName,
       panels: [
         { panelName: `Panel_A_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "7-d" },
+        { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
         { panelName: `Panel_C_${timestamp}`, allowPanelTime: true, panelTimeMode: "global" },
         { panelName: `Panel_D_${timestamp}`, allowPanelTime: false }
       ]
@@ -161,7 +175,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
 
     // Step 4: Verify each panel maintains its time
     await assertPanelTimeInURL(page, panelIds[0], "1h");
-    await assertPanelTimeInURL(page, panelIds[1], "7d");
+    await assertPanelTimeInURL(page, panelIds[1], "6d");
 
     // Step 6: Change global time
     await pm.dashboardPanelTime.changeGlobalTime("1-h");
@@ -169,7 +183,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     // Step 7: Verify Panel C and D refresh with new global time
     // Panel A and B should maintain their times
     await assertPanelTimeInURL(page, panelIds[0], "1h");
-    await assertPanelTimeInURL(page, panelIds[1], "7d");
+    await assertPanelTimeInURL(page, panelIds[1], "6d");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
@@ -214,7 +228,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       dashboardName,
       panels: [
         { panelName: `Panel_1_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_2_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "7-d" },
+        { panelName: `Panel_2_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
         { panelName: `Panel_3_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "15-m" }
       ]
     });
@@ -238,22 +252,22 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     expect(await panelPicker.isVisible()).toBe(true);
 
     // Step 5: Test concurrent changes
-    await pm.dashboardPanelTime.changePanelTimeInView(panelIds[0], "24-h", true);
+    await pm.dashboardPanelTime.changePanelTimeInView(panelIds[0], "1-d", true);
     await pm.dashboardPanelTime.changeGlobalTime("1-h");
 
     // Panel time should be preserved
-    await assertPanelTimeInURL(page, panelIds[0], "24h");
+    await assertPanelTimeInURL(page, panelIds[0], "1d");
 
     // Step 7: Test quick successive changes
     await pm.dashboardPanelTime.clickPanelTimePicker(panelIds[0]);
     await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
-    await page.locator('[data-test="date-time-relative-7-d-btn"]').click();
-    await page.locator('[data-test="date-time-relative-30-d-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
+    await page.locator('[data-test="date-time-relative-1-m-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Last change (30d) should be applied
-    await assertPanelTimeInURL(page, panelIds[0], "30d");
+    // Last change (1m) should be applied
+    await assertPanelTimeInURL(page, panelIds[0], "1m");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
