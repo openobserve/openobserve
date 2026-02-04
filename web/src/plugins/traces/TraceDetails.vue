@@ -518,10 +518,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
-import {
-  parseUsageDetails,
-  parseCostDetails,
-} from "@/utils/llmUtils";
+import { parseUsageDetails, parseCostDetails } from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -683,7 +680,7 @@ export default defineComponent({
     // Calculate sidebar width based on leftWidth
     // Sidebar should take ~84% of the remaining space after left panel
     const sidebarWidth = computed(() => {
-      if (!parentContainer.value) return '84%';
+      if (!parentContainer.value) return "84%";
       const containerWidth = parentContainer.value.clientWidth || 1200;
       const remainingWidth = containerWidth - leftWidth.value;
       const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
@@ -1587,7 +1584,7 @@ export default defineComponent({
       // Parse usage details from split fields
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
-      
+
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
@@ -1892,10 +1889,12 @@ export default defineComponent({
         org_identifier: effectiveOrgIdentifier.value,
       };
 
-      router.push({
-        name: "traces",
+      const route = router.resolve({
+        name: "traceDetails",
         query,
       });
+
+      window.open(route.href, "_blank");
     };
 
     const routeToTracesList = () => {
