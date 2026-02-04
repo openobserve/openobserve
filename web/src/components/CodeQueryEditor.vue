@@ -25,11 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Streaming response preview card (shown while generating) -->
     <Transition name="slide-up">
       <div
-        v-if="isGenerating && streamingResponse"
+        v-if="isGenerating"
         class="streaming-preview-card"
         data-test="nl-streaming-preview"
       >
-        <pre class="streaming-preview-content">{{ streamingResponse }}</pre>
+        <div class="streaming-preview-content">
+          <!-- Interactive loading with animated dots (text-only, no spinner) -->
+          <div class="tw:flex tw:items-center tw:justify-center">
+            <span class="generating-text">
+              {{ streamingResponse || 'Analyzing query' }}<span class="animated-dots"></span>
+            </span>
+          </div>
+        </div>
       </div>
     </Transition>
   </div>
@@ -993,22 +1000,53 @@ export default defineComponent({
   box-shadow: 0 0.25rem 1rem 0 rgba(102, 126, 234, 0.3);
 }
 
-/* Streaming preview content - O2 AI Assistant text-block style with center alignment */
+/* Streaming preview content - O2 AI Assistant text-block style */
 .streaming-preview-content {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 0.875rem;
   line-height: 1.6; /* Better readability for text content */
   color: var(--o2-text-primary);
   margin: 0;
-  padding: 0.5rem;
-  text-align: center; /* Center-aligned text */
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  word-break: break-word;
+  padding: 1rem;
   overflow-y: auto;
   max-height: 30rem;
   max-width: 100%;
+}
+
+/* Generating text with dynamic message */
+.generating-text {
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 500;
+  color: var(--o2-text-primary);
+}
+
+/* Animated dots - ellipsis animation using pseudo-element */
+.animated-dots::after {
+  content: '';
+  animation: ellipsis 1.5s infinite;
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  font-size: inherit;
+  font-weight: inherit;
+  font-family: inherit;
+  color: inherit;
+  line-height: inherit;
+}
+
+@keyframes ellipsis {
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75%, 100% {
+    content: '...';
+  }
 }
 
 /* Code blocks within streaming preview */
