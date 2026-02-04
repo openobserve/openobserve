@@ -210,7 +210,9 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     // Step 2: Delete Panel using helper method
     await pm.dashboardPanelEdit.deletePanel(panelName);
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
+    
+    await pm.dashboardPanelTime.clickGlobalRefresh();
+    
     // Step 4: Verify URL param removed
     await assertPanelTimeNotInURL(page, panelId);
 
