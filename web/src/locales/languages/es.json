@@ -2621,7 +2621,8 @@
     "analyzeButtonLabel": "Analiza",
     "refreshTooltip": "Actualice el análisis con un percentil actualizado",
     "customSQLFieldsDisabled": "La selección de campos no está disponible para las consultas SQL personalizadas. Las dimensiones se extraen de los resultados de la consulta.",
-    "timeRangeSelected": "Intervalo de tiempo seleccionado"
+    "timeRangeSelected": "Intervalo de tiempo seleccionado",
+    "dimensionsSelected": "Dimensiones seleccionadas"
   },
   "volumeInsights": {
     "title": "Perspectivas",
