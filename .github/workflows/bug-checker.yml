@@ -18,12 +18,12 @@ on:
       days_threshold:
         description: "Only check issues older than N days"
         required: false
-        default: "30"
+        default: "7"
         type: string
       max_bugs_to_analyze:
         description: "Max bugs for Claude to analyze (controls API cost)"
         required: false
-        default: "10"
+        default: "35"
         type: string
       use_claude:
         description: "Use Claude to analyze bugs without linked PRs"
@@ -195,7 +195,8 @@ jobs:
   # Job 3: Use Claude to analyze bugs without linked PRs
   analyze-with-claude:
     needs: collect-bugs
-    if: ${{ github.event_name != 'push' && inputs.use_claude == true && needs.collect-bugs.outputs.bugs_for_claude != '[]' }}
+    # TODO: Add back 'github.event_name != 'push' &&' after testing
+    if: ${{ needs.collect-bugs.outputs.bugs_for_claude != '[]' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
