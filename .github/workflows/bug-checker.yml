@@ -71,6 +71,10 @@ jobs:
             const bugsWithPRs = [];
             const bugsWithoutPRs = [];
 
+            // Helper to delay between API calls (rate limit: 30 search requests/min)
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            let searchCount = 0;
+
             for (const issue of openBugs) {
               // Skip PRs (GitHub API returns PRs as issues too)
               if (issue.pull_request) continue;
@@ -84,12 +88,32 @@ jobs:
 
               console.log(`\nChecking issue #${issue.number}: ${issue.title}`);
 
+              // Rate limit: wait 2.5s between searches (24/min, under 30/min limit)
+              if (searchCount > 0) {
+                await sleep(2500);
+              }
+              searchCount++;
+
               // Search for merged PRs that reference this issue
               const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged "#${issue.number}"`;
-              const searchResults = await github.rest.search.issuesAndPullRequests({
-                q: searchQuery,
-                per_page: 10
-              });
+              let searchResults;
+              try {
+                searchResults = await github.rest.search.issuesAndPullRequests({
+                  q: searchQuery,
+                  per_page: 10
+                });
+              } catch (error) {
+                if (error.status === 403 && error.message.includes('rate limit')) {
+                  console.log(`Rate limited, waiting 60s...`);
+                  await sleep(60000);
+                  searchResults = await github.rest.search.issuesAndPullRequests({
+                    q: searchQuery,
+                    per_page: 10
+                  });
+                } else {
+                  throw error;
+                }
+              }
 
               // Filter PRs that actually reference this issue (use regex for exact match)
               const linkedPRs = [];
