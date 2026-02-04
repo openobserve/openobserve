@@ -328,11 +328,7 @@
     "generating": "Generieren...",
     "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
     "nlQueryGenerationSuccess": "Die Abfrage wurde erfolgreich generiert!",
-    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden",
-    "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
-    "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
-    "askAI": "Frag KI",
-    "askAITooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage"
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
   },
   "menu": {
     "home": "Startseite",

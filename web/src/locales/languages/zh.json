@@ -328,11 +328,7 @@
     "generating": "正在生成...",
     "nlQueryGenerationFailed": "无法生成查询。请再试一次。",
     "nlQueryGenerationSuccess": "查询成功生成！",
-    "nlpModeDisabledForVisualization": "在使用多个流进行可视化时，无法禁用自然语言模式",
-    "askAIPlaceholder": "让 AI 帮你完成查询...",
-    "aiBarSuccessPlaceholder": "接下来你想做什么？",
-    "askAI": "向 AI 提问",
-    "askAITooltip": "让 AI 帮你完成查询"
+    "nlpModeDisabledForVisualization": "在使用多个流进行可视化时，无法禁用自然语言模式"
   },
   "menu": {
     "home": "主页",

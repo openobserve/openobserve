@@ -328,11 +328,7 @@
     "generating": "Gerando...",
     "nlQueryGenerationFailed": "Falha ao gerar consulta. Por favor, tente novamente.",
     "nlQueryGenerationSuccess": "Consulta gerada com sucesso!",
-    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos",
-    "askAIPlaceholder": "Peça ajuda à IA com sua consulta...",
-    "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?",
-    "askAI": "Pergunte à IA",
-    "askAITooltip": "Peça ajuda à IA com sua consulta"
+    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos"
   },
   "menu": {
     "home": "Início",
