@@ -311,73 +311,67 @@ export default class DashboardPanelTime {
    * @param {string} panelId - Panel ID
    */
   async openViewPanelModal(panelId) {
-    // Click the panel actions menu
-    const actionsBtn = this.page.locator(`[data-test="panel-${panelId}-actions-btn"]`);
-    await actionsBtn.waitFor({ state: "visible", timeout: 10000 });
-    await actionsBtn.click();
+    // Hover over the panel to reveal the view panel button
+    const panel = this.page.locator(`[data-test="dashboard-panel-bar"]`);
+    await panel.waitFor({ state: "visible", timeout: 10000 });
+    await panel.hover();
 
-    // Click View option
-    const viewBtn = this.page.locator('[data-test="panel-action-view"]');
+    // Wait for and click the view panel screen button
+    const viewBtn = this.page.locator('[data-test="dashboard-panel-fullscreen-btn"]');
     await viewBtn.waitFor({ state: "visible", timeout: 5000 });
     await viewBtn.click();
 
-    // Wait for modal to open
-    await this.page.locator('[data-test="view-panel-modal"]').waitFor({ state: "visible", timeout: 5000 });
+    // Wait for view panel mode
+    await this.page.locator('[data-test="view-panel-screen"]').waitFor({ state: "visible", timeout: 5000 });
   }
 
   /**
    * Close View Panel modal
    */
   async closeViewPanelModal() {
-    const closeBtn = this.page.locator('[data-test="view-panel-modal-close"]');
+    const closeBtn = this.page.locator('[data-test="dashboard-viewpanel-close-btn"]');
     await closeBtn.click();
-    await this.page.locator('[data-test="view-panel-modal"]').waitFor({ state: "hidden", timeout: 5000 });
+    await this.page.locator('[data-test="view-panel-screen"]').waitFor({ state: "hidden", timeout: 5000 });
   }
 
   /**
-   * Open panel in full screen mode
+   * Open panel in full screen mode (which navigates to dashboard view)
    * @param {string} panelId - Panel ID
    */
   async openPanelFullScreen(panelId) {
     // Click the panel actions menu
-    const actionsBtn = this.page.locator(`[data-test="panel-${panelId}-actions-btn"]`);
+    const actionsBtn = this.page.locator(`[data-test="dashboard-fullscreen-btn"]`);
     await actionsBtn.waitFor({ state: "visible", timeout: 10000 });
     await actionsBtn.click();
 
-    // Click Full Screen option
-    const fullScreenBtn = this.page.locator('[data-test="panel-action-fullscreen"]');
-    await fullScreenBtn.waitFor({ state: "visible", timeout: 5000 });
-    await fullScreenBtn.click();
+    // // Click Full Screen option
+    // const fullScreenBtn = this.page.locator('[data-test="panel-action-fullscreen"]');
+    // await fullScreenBtn.waitFor({ state: "visible", timeout: 5000 });
+    // await fullScreenBtn.click();
 
-    // Wait for full screen mode
-    await this.page.locator('[data-test="panel-fullscreen"]').waitFor({ state: "visible", timeout: 5000 });
+    // Wait for dashboard view to load
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Wait for the panel time picker to be visible in the dashboard
+    const picker = this.page.locator(`[data-test="panel-time-picker-${panelId}"]`);
+    await picker.waitFor({ state: "visible", timeout: 10000 });
   }
 
   /**
-   * Exit full screen mode
+   * Exit full screen mode (go back to previous page)
    */
   async exitFullScreen() {
-    const exitBtn = this.page.locator('[data-test="panel-fullscreen-exit"]');
-    await exitBtn.click();
-    await this.page.locator('[data-test="panel-fullscreen"]').waitFor({ state: "hidden", timeout: 5000 });
+    await this.page.locator('[data-test="dashboard-fullscreen-btn"]').click();
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   /**
-   * Change panel time in full screen mode
+   * Change panel time in full screen mode (which is same as dashboard view)
+   * @param {string} panelId - Panel ID
    * @param {string} timeRange - e.g., "15-m", "1-h", "24-h"
    */
-  async changePanelTimeInFullScreen(timeRange, clickApply = true) {
-    // Click time picker in full screen
-    const pickerBtn = this.page.locator('[data-test="panel-fullscreen-time-picker-btn"]');
-    await pickerBtn.click();
-
-    // Select time range
-    await this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).click();
-
-    if (clickApply) {
-      // Click apply
-      await this.page.locator('[data-test="date-time-apply-btn"]').click();
-      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    }
+  async changePanelTimeInFullScreen(panelId, timeRange, clickApply = true) {
+    // Full screen is just the dashboard view, so use regular panel time picker
+    await this.changePanelTimeInView(panelId, timeRange, clickApply);
   }
 }
