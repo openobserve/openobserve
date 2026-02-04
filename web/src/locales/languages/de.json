@@ -307,7 +307,16 @@
     "show": "Zeige",
     "editor": "Redakteur",
     "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
-    "showHideColumns": "Spalten ein-/ausblenden"
+    "showHideColumns": "Spalten ein-/ausblenden",
+    "nlpModeLabel": "Modus für natürliche Sprache",
+    "generateSQL": "Generieren Sie SQL",
+    "generateQuery": "Abfrage generieren",
+    "generateSQLTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache (Strg/Cmd + Enter)",
+    "generateQueryTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache",
+    "generating": "Generieren...",
+    "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
+    "nlQueryGenerationSuccess": "Die Abfrage wurde erfolgreich generiert!",
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
   },
   "menu": {
     "home": "Startseite",
