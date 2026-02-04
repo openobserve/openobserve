@@ -594,19 +594,9 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 const evaluateAndSetStatus = (resultCount: number) => {
   const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
 
-  // For aggregation, always use > 0 (backend checks if any aggregated results exist)
-  let threshold: number;
-  let operator: string;
-
-  if (props.isAggregationEnabled) {
-    // When aggregation is enabled, backend always checks for > 0 results
-    threshold = 0;
-    operator = ">";
-  } else {
-    // Use regular trigger condition threshold values
-    threshold = props.formData.trigger_condition?.threshold || 0;
-    operator = props.formData.trigger_condition?.operator || ">=";
-  }
+  // Use the configured trigger condition threshold values
+  const threshold = props.formData.trigger_condition?.threshold || 0;
+  const operator = props.formData.trigger_condition?.operator || ">=";
 
   let wouldTrigger = false;
   let comparisonText = "";
