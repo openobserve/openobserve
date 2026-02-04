@@ -115,17 +115,17 @@
             </q-tr>
             <q-tr v-show="expandedRow === props.row.uuid" :props="props">
               <q-td colspan="100%">
-                <div class="app-tabs-schedule-list report-list-tabs">
+                <div class="app-tabs-container tw:w-fit tw:my-1">
                   <app-tabs
                     data-test="expanded-list-tabs"
-                    class="q-mr-md"
+                    class="tabs-selection-container"
                     :tabs="tabs"
                     v-model:active-tab="activeTab"
                   />
                 </div>
                 <div v-show="activeTab === 'query'">
                   <div class="text-left tw:px-2 q-mb-sm expanded-content">
-                    <div class="tw:flex tw:items-center q-py-sm">
+                    <div class="tw:flex tw:items-center q-py-sm tw:gap-2">
                       <strong
                         >SQL Query :
                         <span>
