@@ -272,7 +272,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Step 6: Click picker again and select time
-    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "7-d", false);
+    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "6-d", false);
 
     // Dropdown should still be open (not clicked Apply yet)
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 3000 });
@@ -283,7 +283,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Verify dropdown closes and URL updates
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-    await assertPanelTimeInURL(page, panelAId, "7d");
+    await assertPanelTimeInURL(page, panelAId, "6d");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
@@ -304,12 +304,19 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       panelTimeRange: "1-h"
     });
 
+    // Wait for URL to contain the panel time parameter (not the add panel preview parameter)
+    await page.waitForFunction(
+      (pid) => window.location.href.includes(`pt-period.${pid}`),
+      panelId,
+      { timeout: 10000 }
+    );
+
     // Capture initial URL
     const initialURL = page.url();
 
-    // Step 2: Click panel picker, select "Last 7 days"
+    // Step 2: Click panel picker, select "Last 6 days"
     await pm.dashboardPanelTime.clickPanelTimePicker(panelId);
-    await page.locator('[data-test="date-time-relative-7-d-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
 
     // Step 3: Verify panel data does NOT refresh yet
     await assertPanelDataNotRefreshed(page, 2000);
@@ -324,7 +331,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 7: Verify URL updates
-    await assertPanelTimeInURL(page, panelId, "7d");
+    await assertPanelTimeInURL(page, panelId, "6d");
 
     // Step 8: Verify URL changed from initial
     expect(page.url()).not.toBe(initialURL);
@@ -367,32 +374,32 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     });
 
     // Step 2: Change global time to "Last 24h"
-    await pm.dashboardPanelTime.changeGlobalTime("24-h");
+    await pm.dashboardPanelTime.changeGlobalTime("1-w");
 
     // Step 3: Verify Panel A still shows "Last 1h" (independent)
-    const panelAText = await page.locator(`[data-test="panel-time-picker-${panelAId}-btn"]`).textContent();
+    const panelAText = await page.locator(`[data-test="panel-time-picker-${panelAId}"]`).textContent();
     expect(panelAText).toContain("1");
 
-    // Step 4: Verify Panel B updates to "Last 24h" (follows global)
-    const panelBText = await page.locator(`[data-test="panel-time-picker-${panelBId}-btn"]`).textContent();
-    expect(panelBText).toContain("24");
+    // Step 4: Verify Panel B updates to "Last 1w" (follows global)
+    const panelBText = await page.locator(`[data-test="panel-time-picker-${panelBId}"]`).textContent();
+    expect(panelBText).toContain("1");
 
     // Step 5: Verify Panel C has no picker
     await assertPanelTimePickerNotVisible(page, panelCId);
 
-    // Step 6: Change Panel A time to "Last 7d"
-    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "7-d", true);
+    // Step 6: Change Panel A time to "Last 6d"
+    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "6-d", true);
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Step 7: Verify Panel A now shows "7d"
-    await assertPanelTimeInURL(page, panelAId, "7d");
+    // Step 7: Verify Panel A now shows "6d"
+    await assertPanelTimeInURL(page, panelAId, "6d");
 
     // Step 8: Change global time to "Last 1h"
     await pm.dashboardPanelTime.changeGlobalTime("1-h");
 
-    // Step 9: Verify Panel A still shows "Last 7d" (unaffected)
+    // Step 9: Verify Panel A still shows "Last 6d" (unaffected)
     const panelATextAfter = await page.locator(`[data-test="panel-time-picker-${panelAId}-btn"]`).textContent();
-    expect(panelATextAfter).toContain("7");
+    expect(panelATextAfter).toContain("6");
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);

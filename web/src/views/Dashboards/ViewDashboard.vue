@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :initialTimezone="initialTimezone"
               :disable="arePanelsLoading"
               @hide="setTimeForVariables"
+              data-test="dashboard-global-date-time-picker"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"

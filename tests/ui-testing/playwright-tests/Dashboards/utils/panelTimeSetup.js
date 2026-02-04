@@ -86,8 +86,16 @@ export async function addPanelWithPanelTime(page, pm, config) {
 
   testLogger.info('Adding panel with panel time', { panelName, allowPanelTime, panelTimeMode });
 
-  // Click add panel button
-  await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
+  // Click add panel button - handle both cases (no panels vs existing panels)
+  const noPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
+  const addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+
+  // Try to click the button for existing panels first, otherwise click the no-panel button
+  if (await addPanelBtn.isVisible().catch(() => false)) {
+    await addPanelBtn.click();
+  } else {
+    await noPanelBtn.click();
+  }
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
   // Wait for AddPanel view to load
@@ -128,6 +136,10 @@ export async function addPanelWithPanelTime(page, pm, config) {
   // Save panel and get panel ID using common function
   // Use -1 to get the last panel (the one we just added)
   const panelId = await savePanelAndGetId(page, { panelIndex: -1 });
+
+  // Wait for the Add Panel button to be ready for the next panel addition
+  // This ensures the dashboard is fully transitioned back to view mode
+  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
   testLogger.info('Panel added successfully', { panelId, panelName });
 
@@ -261,7 +273,15 @@ export async function savePanelAndGetId(page, options = {}) {
 
   // Click save button
   await page.locator('[data-test="dashboard-panel-save"]').click();
+
+  // Wait for the save to complete
   await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+  // Wait for transition back to dashboard view (add panel form should be hidden)
+  await page.locator('[data-test="dashboard-panel-name"]').waitFor({
+    state: "hidden",
+    timeout: 10000
+  }).catch(() => {});
 
   // Get panel ID from API response
   let panelId;

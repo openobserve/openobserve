@@ -193,15 +193,8 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     // Verify URL has panel time
     await assertPanelTimeInURL(page, panelId, "1h");
 
-    // Step 2: Delete Panel
-    const deleteBtn = page.locator(`[data-test="panel-${panelId}-delete-btn"]`);
-    await deleteBtn.click().catch(() => {
-      // Try alternative delete method
-      page.locator(`[data-test="panel-delete-button-${panelId}"]`).click();
-    });
-
-    // Confirm deletion
-    await page.locator('[data-test="confirm-button"]').click();
+    // Step 2: Delete Panel using helper method
+    await pm.dashboardPanelEdit.deletePanel(panelName);
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 4: Verify URL param removed
