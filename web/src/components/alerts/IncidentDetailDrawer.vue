@@ -1027,7 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated logs...</div>
           </div>
@@ -1096,7 +1096,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
@@ -1161,7 +1161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
