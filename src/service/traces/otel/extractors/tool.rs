@@ -171,7 +171,7 @@ mod tests {
         let extractor = ToolExtractor;
         let mut attrs = HashMap::new();
         attrs.insert(
-            "langfuse_observation_metadata_tool_name".to_string(),
+            "langfuse.observation.metadata.tool.name".to_string(),
             json::json!("Read"),
         );
 
@@ -184,7 +184,7 @@ mod tests {
         let extractor = ToolExtractor;
         let mut attrs = HashMap::new();
         attrs.insert(
-            "langfuse_observation_metadata_tool_id".to_string(),
+            "langfuse.observation.metadata.tool.id".to_string(),
             json::json!("toolu_01T1Mfo98ePBYgoRXG3yPkWt"),
         );
 
@@ -198,7 +198,7 @@ mod tests {
         let mut attrs = HashMap::new();
         attrs.insert("gen_ai.tool.name".to_string(), json::json!("get_weather"));
         attrs.insert(
-            "langfuse_observation_metadata_tool_name".to_string(),
+            "langfuse.observation.metadata.tool.name".to_string(),
             json::json!("Read"),
         );
 

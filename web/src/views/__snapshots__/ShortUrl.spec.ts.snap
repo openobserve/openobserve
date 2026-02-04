@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ShortUrl > should match snapshot 1`] = `
+"<div data-v-fb8cde2d="" data-test="loading-container" class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"><svg data-v-fb8cde2d="" class="q-spinner text-primary q-spinner-mat" width="3em" height="3em" viewBox="25 25 50 50" data-test="spinner">
+    <circle class="path" cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="2" stroke-miterlimit="10"></circle>
+  </svg>
+  <div data-v-fb8cde2d="" data-test="message" class="message">Redirecting...</div>
+</div>"
+`;
