@@ -1,0 +1,178 @@
+name: Bug Checker Agent
+
+# Runs weekly to check if open bugs have been fixed by merged PRs
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
+  workflow_dispatch: # Allow manual trigger
+    inputs:
+      dry_run:
+        description: "Dry run mode (only report, don't comment)"
+        required: false
+        default: "false"
+        type: boolean
+      days_threshold:
+        description: "Only check issues older than N days"
+        required: false
+        default: "7"
+        type: string
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  check-fixed-bugs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for fixed bugs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const dryRun = '${{ inputs.dry_run }}' === 'true';
+            const daysThreshold = parseInt('${{ inputs.days_threshold }}' || '7');
+
+            console.log(`Configuration: dry_run=${dryRun}, days_threshold=${daysThreshold}`);
+
+            // Get all open issues with 'bug' label
+            const openBugs = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'bug',
+              per_page: 100
+            });
+
+            console.log(`Found ${openBugs.length} open bugs`);
+
+            const now = new Date();
+            const potentiallyFixed = [];
+
+            for (const issue of openBugs) {
+              // Skip issues newer than threshold
+              const issueAge = (now - new Date(issue.created_at)) / (1000 * 60 * 60 * 24);
+              if (issueAge < daysThreshold) {
+                console.log(`Skipping #${issue.number} - too recent (${Math.floor(issueAge)} days old)`);
+                continue;
+              }
+
+              console.log(`\nChecking issue #${issue.number}: ${issue.title}`);
+
+              // Search for merged PRs that reference this issue
+              const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged ${issue.number}`;
+              const searchResults = await github.rest.search.issuesAndPullRequests({
+                q: searchQuery,
+                per_page: 10
+              });
+
+              // Filter PRs that actually reference this issue in their body or title
+              const linkedPRs = [];
+              for (const pr of searchResults.data.items) {
+                const body = (pr.body || '').toLowerCase();
+                const title = (pr.title || '').toLowerCase();
+
+                // Check for common fix patterns
+                const patterns = [
+                  `fixes #${issue.number}`,
+                  `fix #${issue.number}`,
+                  `closes #${issue.number}`,
+                  `close #${issue.number}`,
+                  `resolves #${issue.number}`,
+                  `resolve #${issue.number}`,
+                  `fixed #${issue.number}`,
+                  `#${issue.number}` // General reference
+                ];
+
+                const isLinked = patterns.some(pattern =>
+                  body.includes(pattern.toLowerCase()) || title.includes(pattern.toLowerCase())
+                );
+
+                if (isLinked) {
+                  linkedPRs.push({
+                    number: pr.number,
+                    title: pr.title,
+                    merged_at: pr.pull_request?.merged_at || 'unknown',
+                    url: pr.html_url
+                  });
+                }
+              }
+
+              if (linkedPRs.length > 0) {
+                console.log(`  Found ${linkedPRs.length} potentially fixing PR(s)`);
+                potentiallyFixed.push({
+                  issue,
+                  linkedPRs
+                });
+              }
+            }
+
+            console.log(`\n${'='.repeat(50)}`);
+            console.log(`Found ${potentiallyFixed.length} potentially fixed bugs`);
+
+            // Process results
+            for (const { issue, linkedPRs } of potentiallyFixed) {
+              const prList = linkedPRs.map(pr => `- #${pr.number}: ${pr.title}`).join('\n');
+
+              const commentBody = `## Bug Checker Agent Report
+
+            This issue appears to have been addressed by the following merged PR(s):
+
+            ${prList}
+
+            **Action requested:** Please verify if this bug has been fixed and close this issue if appropriate.
+
+            ---
+            _This is an automated message from the Bug Checker Agent. [Learn more](../tests/test-agents/bug-checker/README.md)_`;
+
+              if (dryRun) {
+                console.log(`\n[DRY RUN] Would comment on #${issue.number}:`);
+                console.log(commentBody);
+              } else {
+                // Check if we already commented on this issue recently
+                const comments = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  per_page: 10
+                });
+
+                const recentBotComment = comments.data.find(c =>
+                  c.body.includes('Bug Checker Agent Report') &&
+                  (now - new Date(c.created_at)) / (1000 * 60 * 60 * 24) < 30
+                );
+
+                if (recentBotComment) {
+                  console.log(`Skipping #${issue.number} - already commented within 30 days`);
+                  continue;
+                }
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: commentBody
+                });
+
+                console.log(`Commented on issue #${issue.number}`);
+              }
+            }
+
+            // Create summary
+            const summary = `
+            ## Bug Checker Summary
+
+            - Open bugs checked: ${openBugs.length}
+            - Potentially fixed: ${potentiallyFixed.length}
+            - Mode: ${dryRun ? 'Dry Run' : 'Live'}
+
+            ### Potentially Fixed Issues
+            ${potentiallyFixed.length > 0
+              ? potentiallyFixed.map(({ issue, linkedPRs }) =>
+                  `- #${issue.number}: ${issue.title} (PRs: ${linkedPRs.map(pr => `#${pr.number}`).join(', ')})`
+                ).join('\n')
+              : 'None found'}
+            `;
+
+            console.log(summary);
+            core.summary.addRaw(summary).write();
