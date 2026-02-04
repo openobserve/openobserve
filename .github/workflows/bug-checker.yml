@@ -1,6 +1,6 @@
 name: Bug Checker Agent
 
-# Checks open bugs to find those potentially fixed by merged PRs
+# Checks open bugs to verify if fixes exist in codebase
 # TODO: Remove push trigger after testing
 on:
   push:
@@ -35,58 +35,53 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  check-fixed-bugs:
+  # Job 1: Find bugs with linked PRs
+  find-bugs:
     runs-on: ubuntu-latest
+    outputs:
+      bugs_to_verify: ${{ steps.collect.outputs.bugs_to_verify }}
+      has_bugs: ${{ steps.collect.outputs.has_bugs }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find bugs and check for fixes
-        id: analyze
+      - name: Find bugs with linked PRs
+        id: collect
         run: |
           set -e
 
-          DRY_RUN="${{ inputs.dry_run }}"
           DAYS_THRESHOLD="${{ inputs.days_threshold || '30' }}"
           MAX_BUGS="${{ inputs.max_bugs_to_check || '35' }}"
 
-          echo "Configuration: dry_run=$DRY_RUN, days_threshold=$DAYS_THRESHOLD, max_bugs=$MAX_BUGS"
+          echo "Configuration: days_threshold=$DAYS_THRESHOLD, max_bugs=$MAX_BUGS"
 
           # Get cutoff date
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            CUTOFF_DATE=$(date -v-${DAYS_THRESHOLD}d +%Y-%m-%d)
-          else
-            CUTOFF_DATE=$(date -d "-${DAYS_THRESHOLD} days" +%Y-%m-%d)
-          fi
+          CUTOFF_DATE=$(date -d "-${DAYS_THRESHOLD} days" +%Y-%m-%d)
           echo "Checking bugs created before: $CUTOFF_DATE"
 
-          # Get open bugs older than threshold
+          # Get open bugs
           echo ""
           echo "=== Fetching open bugs with '☢️ Bug' label ==="
 
           BUGS=$(gh issue list \
             --label "☢️ Bug" \
             --state open \
-            --json number,title,body,createdAt,url \
+            --json number,title,body,createdAt \
             --limit 100)
 
           TOTAL_BUGS=$(echo "$BUGS" | jq length)
           echo "Found $TOTAL_BUGS open bugs"
 
-          # Arrays for results
-          BUGS_WITH_PRS=""
-          BUGS_WITHOUT_PRS=""
+          # Collect bugs to verify
+          BUGS_TO_VERIFY="[]"
           BUGS_CHECKED=0
 
-          # Process each bug
           echo ""
           echo "=== Checking for linked PRs ==="
 
           for row in $(echo "$BUGS" | jq -r '.[] | @base64'); do
-            # Stop if we've checked enough bugs
             if [[ "$BUGS_CHECKED" -ge "$MAX_BUGS" ]]; then
-              echo ""
-              echo "Reached limit of $MAX_BUGS bugs, stopping."
+              echo "Reached limit of $MAX_BUGS bugs."
               break
             fi
 
@@ -96,6 +91,7 @@ jobs:
 
             NUMBER=$(_jq '.number')
             TITLE=$(_jq '.title')
+            BODY=$(_jq '.body')
             CREATED=$(_jq '.createdAt')
 
             # Skip recent bugs
@@ -105,116 +101,109 @@ jobs:
             fi
 
             BUGS_CHECKED=$((BUGS_CHECKED + 1))
+            echo "[$BUGS_CHECKED] Checking #$NUMBER: $TITLE"
 
-            echo ""
-            echo "Checking #$NUMBER: $TITLE"
+            # Check if already processed
+            EXISTING=$(gh issue view "$NUMBER" --json comments \
+              --jq '.comments[] | select(.body | contains("Bug Checker Agent")) | .id' \
+              | head -1 || true)
 
-            # Search for merged PRs referencing this issue
-            # Using gh search with exact issue reference
+            if [[ -n "$EXISTING" ]]; then
+              echo "  Already processed, skipping"
+              continue
+            fi
+
+            # Search for merged PRs
             LINKED_PRS=$(gh pr list \
               --state merged \
               --search "#$NUMBER in:body,title" \
-              --json number,title,url \
-              --limit 10 2>/dev/null || echo "[]")
+              --json number,title \
+              --limit 5 2>/dev/null || echo "[]")
 
             PR_COUNT=$(echo "$LINKED_PRS" | jq length)
 
             if [[ "$PR_COUNT" -gt 0 ]]; then
               echo "  ✓ Found $PR_COUNT linked PR(s)"
 
-              # Build PR list for comment
-              PR_LIST=$(echo "$LINKED_PRS" | jq -r '.[] | "- #\(.number): \(.title)"')
+              # Add to verification list
+              PR_NUMBERS=$(echo "$LINKED_PRS" | jq -r '.[].number' | tr '\n' ',' | sed 's/,$//')
 
-              # Store bug info
-              BUGS_WITH_PRS="$BUGS_WITH_PRS
-              $NUMBER|$TITLE|$PR_LIST"
+              # Escape body for JSON (truncate to 500 chars)
+              BODY_ESCAPED=$(echo "$BODY" | head -c 500 | jq -Rs '.')
+
+              BUGS_TO_VERIFY=$(echo "$BUGS_TO_VERIFY" | jq \
+                --argjson num "$NUMBER" \
+                --arg title "$TITLE" \
+                --argjson body "$BODY_ESCAPED" \
+                --arg prs "$PR_NUMBERS" \
+                '. += [{"number": $num, "title": $title, "body": $body, "linked_prs": $prs}]')
             else
               echo "  ✗ No linked PRs"
-              BUGS_WITHOUT_PRS="$BUGS_WITHOUT_PRS
-              $NUMBER|$TITLE"
             fi
 
-            # Rate limit protection
             sleep 1
           done
 
+          BUG_COUNT=$(echo "$BUGS_TO_VERIFY" | jq length)
           echo ""
-          echo "=== Results ==="
-          echo "Bugs checked: $BUGS_CHECKED / $MAX_BUGS"
-          echo "Bugs with linked PRs: $(echo "$BUGS_WITH_PRS" | grep -c '|' || echo 0)"
-          echo "Bugs without linked PRs: $(echo "$BUGS_WITHOUT_PRS" | grep -c '|' || echo 0)"
+          echo "=== Found $BUG_COUNT bugs to verify with Claude ==="
 
-          # Comment on bugs with linked PRs
-          echo ""
-          echo "=== Processing bugs with linked PRs ==="
+          # Output for next job
+          echo "bugs_to_verify=$(echo "$BUGS_TO_VERIFY" | jq -c '.')" >> $GITHUB_OUTPUT
 
-          echo "$BUGS_WITH_PRS" | while IFS='|' read -r NUMBER TITLE PR_LIST; do
-            [[ -z "$NUMBER" ]] && continue
-            NUMBER=$(echo "$NUMBER" | xargs)  # trim whitespace
+          if [[ "$BUG_COUNT" -gt 0 ]]; then
+            echo "has_bugs=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_bugs=false" >> $GITHUB_OUTPUT
+          fi
 
-            echo ""
-            echo "Processing #$NUMBER"
+  # Job 2: Use Claude to verify each bug
+  verify-bugs:
+    needs: find-bugs
+    if: needs.find-bugs.outputs.has_bugs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-            # Check if already commented
-            EXISTING=$(gh issue view "$NUMBER" --json comments \
-              --jq '.comments[] | select(.body | contains("Bug Checker Agent")) | .id' \
-              | head -1)
+      - name: Verify bugs with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            You are a Bug Verification Agent. Analyze each bug below and check if the fix exists in the codebase.
 
-            if [[ -n "$EXISTING" ]]; then
-              echo "  Already commented, skipping"
-              continue
-            fi
+            ## Bugs to Verify
+            ${{ needs.find-bugs.outputs.bugs_to_verify }}
 
-            COMMENT_BODY="## 🔍 Bug Checker Agent Report
+            ## Instructions
+            For EACH bug in the list above:
+            1. Read the bug description to understand what the issue is
+            2. Search the codebase to find relevant code
+            3. Check if the linked PR's fix is actually present in the code
+            4. Determine if the bug appears to be fixed
 
-          **Status:** Potentially fixed via linked PR(s)
+            ## Output Format
+            For each bug, output a JSON object with your analysis:
+            ```json
+            {
+              "bug_number": <number>,
+              "title": "<title>",
+              "status": "FIXED" | "NOT_FIXED" | "NEEDS_REVIEW",
+              "evidence": "<brief explanation of what you found>",
+              "files_checked": ["<list of files you examined>"]
+            }
+            ```
 
-          This issue appears to have been addressed by the following merged PR(s):
+            After analyzing all bugs, create a summary comment on each bug that is FIXED:
+            - Use `gh issue comment <number>` to post a verification comment
+            - Only comment on bugs with status "FIXED"
+            - Include the evidence in your comment
 
-          $PR_LIST
+            DRY_RUN: ${{ inputs.dry_run || 'false' }}
+            If DRY_RUN is true, just output the analysis but don't post comments.
 
-          **Action requested:** Please verify if this bug has been fixed and close this issue if appropriate.
-
-          ---
-          _Automated message from Bug Checker Agent_"
-
-            if [[ "$DRY_RUN" == "true" ]]; then
-              echo "  [DRY RUN] Would comment on #$NUMBER"
-            else
-              gh issue comment "$NUMBER" --body "$COMMENT_BODY"
-              echo "  ✓ Commented on #$NUMBER"
-
-              # Add label
-              gh issue edit "$NUMBER" --add-label "Needs-Testing" 2>/dev/null || true
-            fi
-          done
-
-          # Generate summary
-          echo ""
-          echo "=== Summary ==="
-
-          BUGS_WITH_PRS_COUNT=$(echo "$BUGS_WITH_PRS" | grep -c '|' || echo 0)
-          BUGS_WITHOUT_PRS_COUNT=$(echo "$BUGS_WITHOUT_PRS" | grep -c '|' || echo 0)
-          MODE=$([[ "$DRY_RUN" == "true" ]] && echo "🧪 Dry Run" || echo "🚀 Live")
-
-          cat >> $GITHUB_STEP_SUMMARY << EOF
-          ## 🔍 Bug Checker Agent Summary
-
-          | Metric | Count |
-          |--------|-------|
-          | Total open bugs | $TOTAL_BUGS |
-          | Bugs checked | $BUGS_CHECKED |
-          | Bugs with linked PRs | $BUGS_WITH_PRS_COUNT |
-          | Bugs without linked PRs | $BUGS_WITHOUT_PRS_COUNT |
-          | Mode | $MODE |
-
-          ### Bugs Without Linked PRs (Need Manual Review)
-          These bugs have no linked PRs and may need investigation:
-
-          EOF
-
-          echo "$BUGS_WITHOUT_PRS" | head -20 | while IFS='|' read -r NUMBER TITLE; do
-            [[ -z "$NUMBER" ]] && continue
-            NUMBER=$(echo "$NUMBER" | xargs)
-            echo "- #$NUMBER: $TITLE" >> $GITHUB_STEP_SUMMARY
-          done
+          allowed_tools: "Read,Glob,Grep,Bash"
+          timeout_minutes: 30
