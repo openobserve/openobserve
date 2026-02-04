@@ -816,6 +816,62 @@ export default defineComponent({
                     continue;
                   }
 
+                  // Handle error events - display error message to user
+                  if (data && data.type === 'error') {
+                    // Complete any active tool call first
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
+
+                    // Format error message with suggestion if available
+                    let errorMessage = `Error: ${data.error || data.message || 'An unexpected error occurred'}`;
+                    if (data.suggestion) {
+                      errorMessage += `\n\n${data.suggestion}`;
+                    }
+
+                    // Get or create assistant message for error
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (!lastMessage || lastMessage.role !== 'assistant') {
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: errorMessage,
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                      });
+                      pendingToolCalls.value = [];
+                    } else {
+                      // Append error to existing message
+                      if (lastMessage.content) {
+                        lastMessage.content += '\n\n' + errorMessage;
+                      } else {
+                        lastMessage.content = errorMessage;
+                      }
+                      if (!lastMessage.contentBlocks) {
+                        lastMessage.contentBlocks = [];
+                      }
+                      lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                    }
+
+                    // Save error message to history
+                    await saveToHistory();
+                    await scrollToBottom();
+
+                    // Stop processing further as error occurred
+                    return;
+                  }
+
                   // Handle complete events - complete any active tool call
                   if (data && data.type === 'complete') {
                     if (activeToolCall.value) {
@@ -967,6 +1023,62 @@ export default defineComponent({
                   // Reset text segment for next text block
                   currentTextSegment.value = '';
                   continue;
+                }
+
+                // Handle error events - display error message to user
+                if (data && data.type === 'error') {
+                  // Complete any active tool call first
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
+
+                  // Format error message with suggestion if available
+                  let errorMessage = `Error: ${data.error || data.message || 'An unexpected error occurred'}`;
+                  if (data.suggestion) {
+                    errorMessage += `\n\n${data.suggestion}`;
+                  }
+
+                  // Get or create assistant message for error
+                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (!lastMessage || lastMessage.role !== 'assistant') {
+                    chatMessages.value.push({
+                      role: 'assistant',
+                      content: errorMessage,
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                    });
+                    pendingToolCalls.value = [];
+                  } else {
+                    // Append error to existing message
+                    if (lastMessage.content) {
+                      lastMessage.content += '\n\n' + errorMessage;
+                    } else {
+                      lastMessage.content = errorMessage;
+                    }
+                    if (!lastMessage.contentBlocks) {
+                      lastMessage.contentBlocks = [];
+                    }
+                    lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                  }
+
+                  // Save error message to history
+                  await saveToHistory();
+                  await scrollToBottom();
+
+                  // Stop processing further as error occurred
+                  return;
                 }
 
                 // Handle complete events - complete any active tool call
