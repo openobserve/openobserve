@@ -307,7 +307,16 @@
     "show": "Laat zien",
     "editor": "Redacteur",
     "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
-    "showHideColumns": "Kolommen tonen/verbergen"
+    "showHideColumns": "Kolommen tonen/verbergen",
+    "nlpModeLabel": "Modus voor natuurlijke taal",
+    "generateSQL": "SQL genereren",
+    "generateQuery": "Query genereren",
+    "generateSQLTooltip": "Genereer een SQL-query uit natuurlijke taal (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Genereer een SQL-query op basis van natuurlijke taal",
+    "generating": "Genereren...",
+    "nlQueryGenerationFailed": "Het genereren van een query is mislukt. Probeer het opnieuw.",
+    "nlQueryGenerationSuccess": "Zoekopdracht succesvol gegenereerd!",
+    "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams"
   },
   "menu": {
     "home": "Home",

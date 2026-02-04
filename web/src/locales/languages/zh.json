@@ -307,7 +307,16 @@
     "show": "显示",
     "editor": "编辑器",
     "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
-    "showHideColumns": "显示/隐藏列"
+    "showHideColumns": "显示/隐藏列",
+    "nlpModeLabel": "自然语言模式",
+    "generateSQL": "生成 SQL",
+    "generateQuery": "生成查询",
+    "generateSQLTooltip": "使用自然语言生成 SQL 查询 (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "使用自然语言生成 SQL 查询",
+    "generating": "正在生成...",
+    "nlQueryGenerationFailed": "无法生成查询。请再试一次。",
+    "nlQueryGenerationSuccess": "查询成功生成！",
+    "nlpModeDisabledForVisualization": "在使用多个流进行可视化时，无法禁用自然语言模式"
   },
   "menu": {
     "home": "主页",
