@@ -1272,9 +1272,36 @@ export default defineComponent({
         });
       }
 
-      // CRITICAL FIX (Issue 2): Preserve panel time URL params
-      // When global refresh happens, we need to keep panel-specific time overrides
+      // CRITICAL FIX: Generate panel time URL params for panels with panel_time_range
+      // Only generate for the currently active tab to avoid polluting URL with inactive tabs
       const panelTimeParams: Record<string, any> = {};
+
+      // Find the currently active tab and iterate through its panels only
+      if (currentDashboardData.data?.tabs && selectedTabId.value) {
+        const activeTab = currentDashboardData.data.tabs.find(
+          (tab: any) => tab.tabId === selectedTabId.value
+        );
+
+        if (activeTab?.panels) {
+          activeTab.panels.forEach((panel: any) => {
+            if (panel.id && panel.config?.panel_time_range) {
+              const panelId = panel.id;
+              const panelTimeRange = panel.config.panel_time_range;
+
+              // Generate params based on panel's configured time type
+              if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
+                panelTimeParams[`pt-period.${panelId}`] = panelTimeRange.relativeTimePeriod;
+              } else if (panelTimeRange.type === 'absolute' && panelTimeRange.startTime && panelTimeRange.endTime) {
+                panelTimeParams[`pt-from.${panelId}`] = panelTimeRange.startTime.toString();
+                panelTimeParams[`pt-to.${panelId}`] = panelTimeRange.endTime.toString();
+              }
+            }
+          });
+        }
+      }
+
+      // Preserve any panel time params from URL that might have been manually set
+      // (these override the panel config values)
       Object.keys(route.query).forEach((key) => {
         if (key.startsWith("pt-")) {
           panelTimeParams[key] = route.query[key];
@@ -1293,7 +1320,7 @@ export default defineComponent({
           refresh: generateDurationLabel(refreshInterval.value),
           ...timeParams, // Global time params (period or from/to)
           ...variableParams, // Use variables from manager or route
-          ...panelTimeParams, // CRITICAL: Preserve panel time params (Issue 2 fix)
+          ...panelTimeParams, // Panel time params (generated + preserved)
           print: store.state.printMode,
           searchtype: route.query.searchtype,
         },
