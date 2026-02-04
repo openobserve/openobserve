@@ -373,6 +373,11 @@ const useTraces = () => {
         duration: trace.duration || 0,
         services: {} as Record<string, number>,
         zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
+        _o2_llm_usage_details_input: trace._o2_llm_usage_details_input,
+        _o2_llm_usage_details_output: trace._o2_llm_usage_details_output,
+        _o2_llm_usage_details_total: trace._o2_llm_usage_details_total,
+        _o2_llm_cost_details_total: trace._o2_llm_cost_details_total,
+        _o2_llm_input: trace._o2_llm_input || {},
       };
 
       // Assign colors to services
