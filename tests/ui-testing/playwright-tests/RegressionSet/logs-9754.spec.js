@@ -251,8 +251,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     testLogger.info('Assertion passed: .ts extension preserved during highlighting');
 
     // Check if highlighting is applied (informational - not a strict requirement)
-    const highlightedElements = await page.locator('.log-highlighted').count();
-    testLogger.info(`Found ${highlightedElements} highlighted elements`);
+    await pm.logsPage.getHighlightedElementsCount();
 
     // Verify the complete file names are present (the core bug fix assertion)
     expect(tableContent).toContain('QueryEditor.spec.ts');
@@ -285,7 +284,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     await pm.logsPage.expectLogDetailSidebarVisible();
 
     // Get the detail content from JSON view (default tab)
-    const detailContent = await page.locator('[data-test="log-detail-json-content"]').textContent();
+    const detailContent = await pm.logsPage.getLogDetailJsonContentText();
 
     // CRITICAL ASSERTIONS: Full content must be preserved in detail view
     // At least one of our test cases should be visible
