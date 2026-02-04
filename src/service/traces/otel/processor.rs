@@ -452,21 +452,21 @@ mod tests {
         let processor = OtelIngestionProcessor::new();
 
         let mut span_attrs = HashMap::new();
-        span_attrs.insert("langfuse_observation_type".to_string(), json::json!("span"));
+        span_attrs.insert("langfuse.observation.type".to_string(), json::json!("span"));
         span_attrs.insert(
-            "langfuse_observation_input".to_string(),
+            "langfuse.observation.input".to_string(),
             json::json!(r#"{"file_path": "/Users/test/file.md"}"#),
         );
         span_attrs.insert(
-            "langfuse_observation_output".to_string(),
+            "langfuse.observation.output".to_string(),
             json::json!("File content here..."),
         );
         span_attrs.insert(
-            "langfuse_observation_metadata_tool_name".to_string(),
+            "langfuse.observation.metadata.tool.name".to_string(),
             json::json!("Read"),
         );
         span_attrs.insert(
-            "langfuse_observation_metadata_tool_id".to_string(),
+            "langfuse.observation.metadata.tool.id".to_string(),
             json::json!("toolu_01T1Mfo98ePBYgoRXG3yPkWt"),
         );
         span_attrs.insert("operation_name".to_string(), json::json!("Tool: Read"));
@@ -503,13 +503,13 @@ mod tests {
         );
 
         // Original input/output attributes should be removed
-        assert!(!span_attrs.contains_key("langfuse_observation_input"));
-        assert!(!span_attrs.contains_key("langfuse_observation_output"));
+        assert!(!span_attrs.contains_key("langfuse.observation.input"));
+        assert!(!span_attrs.contains_key("langfuse.observation.output"));
 
         // Tool metadata and other attributes should remain
-        assert!(span_attrs.contains_key("langfuse_observation_metadata_tool_name"));
-        assert!(span_attrs.contains_key("langfuse_observation_metadata_tool_id"));
-        assert!(span_attrs.contains_key("langfuse_observation_type"));
+        assert!(span_attrs.contains_key("langfuse.observation.metadata.tool.name"));
+        assert!(span_attrs.contains_key("langfuse.observation.metadata.tool.id"));
+        assert!(span_attrs.contains_key("langfuse.observation.type"));
         assert!(span_attrs.contains_key("operation_name"));
     }
 
@@ -692,13 +692,11 @@ mod tests {
 
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
-        // Cost should not be calculated for unknown model
-        // Cost details should be empty
-        if span_attrs.contains_key(O2Attributes::COST_DETAILS) {
-            let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
-            // Should be an empty object
-            assert!(cost.as_object().unwrap().is_empty());
-        }
+        // Cost should not be calculated for unknown model, but the structure should exist
+        // Cost details should have zero values
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+        assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.0));
     }
 
     #[test]
@@ -722,13 +720,18 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
+        // we will recalculate the tokens first if it is zero, so the cost shouldn't be zero after
+        // processing
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         // Cost should be calculated even with 0 tokens (result should be $0.00)
         assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
         let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
-        assert_eq!(cost.get("input").and_then(|v| v.as_f64()), Some(0.0));
-        assert_eq!(cost.get("output").and_then(|v| v.as_f64()), Some(0.0));
-        assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.0));
+        let input_cost = cost.get("input").and_then(|v| v.as_f64()).unwrap();
+        let output_cost = cost.get("output").and_then(|v| v.as_f64()).unwrap();
+        let total_cost = cost.get("total").and_then(|v| v.as_f64()).unwrap();
+        assert!(input_cost > 0.0);
+        assert!(output_cost > 0.0);
+        assert!(total_cost > 0.0);
     }
 }
