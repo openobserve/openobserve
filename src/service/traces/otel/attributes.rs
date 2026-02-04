@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub static O2_LLM_PREFIX: &str = "_o2_llm_";
+
 /// OpenObserve LLM Attributes
 pub struct O2Attributes;
 

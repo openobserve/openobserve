@@ -669,6 +669,7 @@ pub async fn update_stream_settings(
         // check fields with stream type
         let fields = super::schema::check_schema_for_defined_schema_fields(
             stream_type,
+            &schema,
             settings.defined_schema_fields.to_vec(),
         );
 
