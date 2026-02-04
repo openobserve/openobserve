@@ -1348,16 +1348,25 @@ export default defineComponent({
             props.currentTimeObj
           );
 
+          // Helper to check if two picker values are equal
+          const arePickerValuesEqual = (v1: any, v2: any) => {
+            if (!v1 || !v2) return v1 === v2;
+            return v1.type === v2.type && 
+                   v1.valueType === v2.valueType && 
+                   v1.relativeTimePeriod === v2.relativeTimePeriod && 
+                   v1.startTime === v2.startTime && 
+                   v1.endTime === v2.endTime;
+          };
+
           // If no resolved value from standard sources, try global time with route fallback
           if (!resolvedValue && props.currentTimeObj?.['__global']) {
-            panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(
-              props.currentTimeObj['__global']
-            );
+            const globalPickerValue = convertGlobalTimeToPickerFormat(props.currentTimeObj['__global']);
+            if (!arePickerValuesEqual(panelTimeValues.value[panelId], globalPickerValue)) {
+              panelTimeValues.value[panelId] = globalPickerValue;
+            }
           } else if (resolvedValue) {
-            panelTimeValues.value[panelId] = resolvedValue;
-            // Update URL if value came from panel config
-            if (panel.config?.panel_time_range) {
-              updateURLWithPanelTime(panelId, resolvedValue);
+            if (!arePickerValuesEqual(panelTimeValues.value[panelId], resolvedValue)) {
+              panelTimeValues.value[panelId] = resolvedValue;
             }
           }
 
@@ -1402,26 +1411,25 @@ export default defineComponent({
 
     // Handle Apply button click on panel time picker
     const onPanelTimeApply = async (panelId: string) => {
-      // Skip if this panel is being synced programmatically
+      // Guard against infinite recursion during state synchronization
       if (panelsSyncingDateTime.value.has(panelId)) {
         return;
       }
 
-      const timeValue = panelTimeValues.value[panelId];
-      if (!timeValue) {
-        return;
-      }
-
-      // Update URL with new panel time parameters
-      await updateURLWithPanelTime(panelId, timeValue);
-
-      // Refresh the panel with the new time
+      // Use the local helper which handles state syncing, URL update and variable freeze for this panel
       await refreshPanelRequest(panelId, false);
     };
 
     // Update URL with panel time params
     const updateURLWithPanelTime = async (panelId: string, timeValue: any) => {
-      const query = { ...route.query };
+      // Get the latest live variable params to ensure we don't lose uncommitted changes
+      const variableParams = variablesManager.getUrlParams({ useLive: true });
+
+      const query = {
+        ...route.query,
+        ...variableParams, // Include live variables
+        tab: selectedTabId.value, // Ensure we use the current tab ref
+      };
 
       // Remove existing panel time params
       delete query[`pt-period.${panelId}`];
@@ -1444,15 +1452,14 @@ export default defineComponent({
       initializePanelTimes();
     });
 
-    // Re-initialize when panels change
-    watch(panels, () => {
-      initializePanelTimes();
-    }, { deep: true });
-
-    // Re-initialize when currentTimeObj changes (ViewDashboard computed new times)
-    watch(() => props.currentTimeObj, () => {
-      initializePanelTimes();
-    }, { deep: true });
+    // Re-initialize panel times when panels change or when global time changes
+    watch(
+      [panels, () => props.currentTimeObj],
+      () => {
+        initializePanelTimes();
+      },
+      { deep: true, immediate: true }
+    );
 
     return {
       store,
