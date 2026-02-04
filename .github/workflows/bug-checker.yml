@@ -1,11 +1,7 @@
 name: Bug Checker Agent
 
 # Checks open bugs to verify if fixes exist in codebase (using Claude)
-# TODO: Remove push trigger after testing
 on:
-  push:
-    branches: [feature/bug-checker-agent]
-    paths: ['.github/workflows/bug-checker.yml']
   schedule:
     - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
   workflow_dispatch:
@@ -151,7 +147,6 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          timeout_minutes: 30
 
           prompt: |
             You are a Bug Verification Agent. Your job is to analyze bug reports and check if the fix already exists in the codebase.
