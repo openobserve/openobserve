@@ -1,15 +1,10 @@
 name: Bug Checker Agent
 
-# Analyzes open bugs to check if fixes exist (via linked PRs or codebase analysis)
-# Test run 6
+# Checks open bugs to find those potentially fixed by merged PRs
 on:
-  # TODO: Remove push trigger after testing
-  push:
-    branches: [feature/bug-checker-agent]
-    paths: ['.github/workflows/bug-checker.yml']
   schedule:
     - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
     inputs:
       dry_run:
         description: "Dry run mode (only report, don't comment)"
@@ -19,308 +14,190 @@ on:
       days_threshold:
         description: "Only check issues older than N days"
         required: false
-        default: "7"
+        default: "30"
         type: string
       max_bugs_to_analyze:
-        description: "Max bugs for Claude to analyze (controls API cost)"
+        description: "Max bugs to analyze with Claude"
         required: false
-        default: "35"
+        default: "5"
         type: string
-      use_claude:
-        description: "Use Claude to analyze bugs without linked PRs"
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: read
   issues: write
   pull-requests: read
 
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
-  # Job 1: Collect bugs and check for linked PRs
-  collect-bugs:
+  check-fixed-bugs:
     runs-on: ubuntu-latest
-    outputs:
-      bugs_with_prs: ${{ steps.check.outputs.bugs_with_prs }}
-      bugs_without_prs: ${{ steps.check.outputs.bugs_without_prs }}
-      bugs_for_claude: ${{ steps.check.outputs.bugs_for_claude }}
-    steps:
-      - name: Collect and categorize bugs
-        id: check
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const daysThreshold = parseInt('${{ inputs.days_threshold }}' || '7');
-            const maxBugsToAnalyze = parseInt('${{ inputs.max_bugs_to_analyze }}' || '35');
-
-            console.log(`Configuration: days_threshold=${daysThreshold}, max_bugs=${maxBugsToAnalyze}`);
-
-            // Get all open issues with bug label (note: label includes emoji)
-            const openBugs = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: '☢️ Bug',
-              per_page: 100
-            });
-
-            console.log(`Found ${openBugs.length} open bugs`);
-
-            const now = new Date();
-            const bugsWithPRs = [];
-            const bugsWithoutPRs = [];
-
-            // Helper to delay between API calls (rate limit: 30 search requests/min)
-            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-            let searchCount = 0;
-
-            // Limit total bugs to check (use same limit as Claude analysis for testing)
-            let bugsChecked = 0;
-
-            for (const issue of openBugs) {
-              // Stop if we've checked enough bugs
-              if (bugsChecked >= maxBugsToAnalyze) {
-                console.log(`\nReached limit of ${maxBugsToAnalyze} bugs checked, stopping.`);
-                break;
-              }
-
-              // Skip PRs (GitHub API returns PRs as issues too)
-              if (issue.pull_request) continue;
-
-              // Skip issues newer than threshold
-              const issueAge = (now - new Date(issue.created_at)) / (1000 * 60 * 60 * 24);
-              if (issueAge < daysThreshold) {
-                console.log(`Skipping #${issue.number} - too recent (${Math.floor(issueAge)} days old)`);
-                continue;
-              }
-
-              bugsChecked++;
-
-              console.log(`\nChecking issue #${issue.number}: ${issue.title}`);
-
-              // Rate limit: wait 2.5s between searches (24/min, under 30/min limit)
-              if (searchCount > 0) {
-                await sleep(2500);
-              }
-              searchCount++;
-
-              // Search for merged PRs that reference this issue
-              const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged "#${issue.number}"`;
-              let searchResults;
-              try {
-                searchResults = await github.rest.search.issuesAndPullRequests({
-                  q: searchQuery,
-                  per_page: 10
-                });
-              } catch (error) {
-                if (error.status === 403 && error.message.includes('rate limit')) {
-                  console.log(`Rate limited, waiting 60s...`);
-                  await sleep(60000);
-                  searchResults = await github.rest.search.issuesAndPullRequests({
-                    q: searchQuery,
-                    per_page: 10
-                  });
-                } else {
-                  throw error;
-                }
-              }
-
-              // Filter PRs that actually reference this issue (use regex for exact match)
-              const linkedPRs = [];
-              for (const pr of searchResults.data.items) {
-                const body = (pr.body || '').toLowerCase();
-                const title = (pr.title || '').toLowerCase();
-                const text = `${title} ${body}`;
-
-                // Regex with word boundary to prevent #12 matching #123
-                const pattern = new RegExp(`(fixes|fix|closes|close|resolves|resolve|fixed)?\\s*#${issue.number}(?!\\d)`, 'i');
-
-                if (pattern.test(text)) {
-                  linkedPRs.push({
-                    number: pr.number,
-                    title: pr.title,
-                    url: pr.html_url
-                  });
-                }
-              }
-
-              const bugInfo = {
-                number: issue.number,
-                title: issue.title,
-                body: issue.body?.substring(0, 2000) || '', // Limit body size
-                url: issue.html_url,
-                age_days: Math.floor(issueAge)
-              };
-
-              if (linkedPRs.length > 0) {
-                bugsWithPRs.push({ ...bugInfo, linkedPRs });
-                console.log(`  -> Has ${linkedPRs.length} linked PR(s)`);
-              } else {
-                bugsWithoutPRs.push(bugInfo);
-                console.log(`  -> No linked PRs found`);
-              }
-            }
-
-            // Select bugs for Claude analysis (oldest first, limited count)
-            const bugsForClaude = bugsWithoutPRs
-              .sort((a, b) => b.age_days - a.age_days)
-              .slice(0, maxBugsToAnalyze);
-
-            console.log(`\n${'='.repeat(50)}`);
-            console.log(`Bugs with linked PRs: ${bugsWithPRs.length}`);
-            console.log(`Bugs without linked PRs: ${bugsWithoutPRs.length}`);
-            console.log(`Bugs selected for Claude analysis: ${bugsForClaude.length}`);
-
-            core.setOutput('bugs_with_prs', JSON.stringify(bugsWithPRs));
-            core.setOutput('bugs_without_prs', JSON.stringify(bugsWithoutPRs));
-            core.setOutput('bugs_for_claude', JSON.stringify(bugsForClaude));
-
-  # Job 2: Comment on bugs with linked PRs (no AI needed)
-  comment-linked-bugs:
-    needs: collect-bugs
-    if: ${{ github.event_name != 'push' && inputs.dry_run != true }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Comment on bugs with linked PRs
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const bugsWithPRs = JSON.parse('${{ needs.collect-bugs.outputs.bugs_with_prs }}');
-            const now = new Date();
-            const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-            for (const bug of bugsWithPRs) {
-              // Check if we already commented recently
-              const comments = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: bug.number,
-                since: thirtyDaysAgo,
-                per_page: 100
-              });
-
-              if (comments.data.some(c => c.body.includes('Bug Checker Agent'))) {
-                console.log(`Skipping #${bug.number} - already commented`);
-                continue;
-              }
-
-              const prList = bug.linkedPRs.map(pr => `- #${pr.number}: ${pr.title}`).join('\n');
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: bug.number,
-                body: `## 🔍 Bug Checker Agent Report
-
-            **Status:** Potentially fixed via linked PR(s)
-
-            This issue appears to have been addressed by the following merged PR(s):
-
-            ${prList}
-
-            **Action requested:** Please verify if this bug has been fixed and close this issue if appropriate.
-
-            ---
-            _Automated message from Bug Checker Agent_`
-              });
-              console.log(`Commented on #${bug.number}`);
-            }
-
-  # Job 3: Use Claude to analyze bugs without linked PRs
-  analyze-with-claude:
-    needs: collect-bugs
-    # TODO: Add back 'github.event_name != 'push' &&' after testing
-    if: ${{ needs.collect-bugs.outputs.bugs_for_claude != '[]' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-      id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 1
+        uses: actions/checkout@v4
 
-      - name: Analyze bugs with Claude
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          direct_prompt: |
-            You are a Bug Checker Agent analyzing open bugs to determine if they have been fixed.
+      - name: Find bugs and check for fixes
+        id: analyze
+        run: |
+          set -e
 
-            ## Your Task
-            Analyze each bug below and search the codebase to determine if a fix likely exists.
+          DRY_RUN="${{ inputs.dry_run }}"
+          DAYS_THRESHOLD="${{ inputs.days_threshold || '30' }}"
+          MAX_BUGS="${{ inputs.max_bugs_to_analyze || '5' }}"
 
-            ## Bugs to Analyze
-            ${{ needs.collect-bugs.outputs.bugs_for_claude }}
+          echo "Configuration: dry_run=$DRY_RUN, days_threshold=$DAYS_THRESHOLD, max_bugs=$MAX_BUGS"
 
-            ## Instructions
-            For each bug:
-            1. Read the bug title and description
-            2. Identify keywords, file names, function names, or error messages mentioned
-            3. Search the codebase for relevant code
-            4. Determine if the bug appears to be fixed based on:
-               - Error handling that addresses the issue
-               - Code changes that fix the described behavior
-               - Features that now work differently
-               - Code that was removed/refactored
+          # Get cutoff date
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            CUTOFF_DATE=$(date -v-${DAYS_THRESHOLD}d +%Y-%m-%d)
+          else
+            CUTOFF_DATE=$(date -d "-${DAYS_THRESHOLD} days" +%Y-%m-%d)
+          fi
+          echo "Checking bugs created before: $CUTOFF_DATE"
 
-            ## Output Format
-            Create a summary comment on each issue with your findings:
-            - If likely fixed: Explain what code you found that addresses the issue
-            - If unclear: Note what you checked and why it's inconclusive
-            - If not fixed: Confirm the issue likely still exists
+          # Get open bugs older than threshold
+          echo ""
+          echo "=== Fetching open bugs with '☢️ Bug' label ==="
 
-            Use the GitHub issue comment tool to post your findings on each issue.
-            Start each comment with "## 🤖 Bug Checker Agent - Code Analysis"
+          BUGS=$(gh issue list \
+            --label "☢️ Bug" \
+            --state open \
+            --json number,title,body,createdAt,url \
+            --limit 100)
 
-            ${{ inputs.dry_run == true && 'DRY RUN MODE: Just log your findings, do not post comments.' || '' }}
+          TOTAL_BUGS=$(echo "$BUGS" | jq length)
+          echo "Found $TOTAL_BUGS open bugs"
 
-  # Job 4: Create summary
-  summary:
-    needs: [collect-bugs, comment-linked-bugs, analyze-with-claude]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create workflow summary
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const bugsWithPRs = JSON.parse('${{ needs.collect-bugs.outputs.bugs_with_prs }}' || '[]');
-            const bugsWithoutPRs = JSON.parse('${{ needs.collect-bugs.outputs.bugs_without_prs }}' || '[]');
-            const bugsForClaude = JSON.parse('${{ needs.collect-bugs.outputs.bugs_for_claude }}' || '[]');
+          # Arrays for results
+          BUGS_WITH_PRS=""
+          BUGS_WITHOUT_PRS=""
+          ANALYZED_COUNT=0
 
-            const summary = `
-            ## 🔍 Bug Checker Agent Summary
+          # Process each bug
+          echo ""
+          echo "=== Checking for linked PRs ==="
 
-            | Category | Count |
-            |----------|-------|
-            | Bugs with linked PRs | ${bugsWithPRs.length} |
-            | Bugs without linked PRs | ${bugsWithoutPRs.length} |
-            | Bugs analyzed by Claude | ${bugsForClaude.length} |
+          for row in $(echo "$BUGS" | jq -r '.[] | @base64'); do
+            _jq() {
+              echo "$row" | base64 --decode | jq -r "$1"
+            }
 
-            ### Bugs with Linked PRs (Potentially Fixed)
-            ${bugsWithPRs.length > 0
-              ? bugsWithPRs.map(b => `- #${b.number}: ${b.title}`).join('\n')
-              : '_None found_'}
+            NUMBER=$(_jq '.number')
+            TITLE=$(_jq '.title')
+            CREATED=$(_jq '.createdAt')
 
-            ### Bugs Analyzed by Claude
-            ${bugsForClaude.length > 0
-              ? bugsForClaude.map(b => `- #${b.number}: ${b.title} (${b.age_days} days old)`).join('\n')
-              : '_None selected for analysis_'}
+            # Skip recent bugs
+            if [[ "$CREATED" > "$CUTOFF_DATE" ]]; then
+              echo "Skipping #$NUMBER - too recent"
+              continue
+            fi
 
-            ### Bugs Not Analyzed (No linked PRs, not selected for Claude)
-            ${bugsWithoutPRs.filter(b => !bugsForClaude.find(c => c.number === b.number)).length > 0
-              ? bugsWithoutPRs
-                  .filter(b => !bugsForClaude.find(c => c.number === b.number))
-                  .map(b => `- #${b.number}: ${b.title}`)
-                  .join('\n')
-              : '_None_'}
-            `;
+            echo ""
+            echo "Checking #$NUMBER: $TITLE"
 
-            await core.summary.addRaw(summary).write();
-            console.log(summary);
+            # Search for merged PRs referencing this issue
+            # Using gh search with exact issue reference
+            LINKED_PRS=$(gh pr list \
+              --state merged \
+              --search "#$NUMBER in:body,title" \
+              --json number,title,url \
+              --limit 10 2>/dev/null || echo "[]")
+
+            PR_COUNT=$(echo "$LINKED_PRS" | jq length)
+
+            if [[ "$PR_COUNT" -gt 0 ]]; then
+              echo "  ✓ Found $PR_COUNT linked PR(s)"
+
+              # Build PR list for comment
+              PR_LIST=$(echo "$LINKED_PRS" | jq -r '.[] | "- #\(.number): \(.title)"')
+
+              # Store bug info
+              BUGS_WITH_PRS="$BUGS_WITH_PRS
+              $NUMBER|$TITLE|$PR_LIST"
+            else
+              echo "  ✗ No linked PRs"
+              BUGS_WITHOUT_PRS="$BUGS_WITHOUT_PRS
+              $NUMBER|$TITLE"
+
+              ((ANALYZED_COUNT++))
+            fi
+
+            # Rate limit protection
+            sleep 1
+          done
+
+          echo ""
+          echo "=== Results ==="
+          echo "Bugs with linked PRs: $(echo "$BUGS_WITH_PRS" | grep -c '|' || echo 0)"
+          echo "Bugs without linked PRs: $(echo "$BUGS_WITHOUT_PRS" | grep -c '|' || echo 0)"
+
+          # Comment on bugs with linked PRs
+          echo ""
+          echo "=== Processing bugs with linked PRs ==="
+
+          echo "$BUGS_WITH_PRS" | while IFS='|' read -r NUMBER TITLE PR_LIST; do
+            [[ -z "$NUMBER" ]] && continue
+            NUMBER=$(echo "$NUMBER" | xargs)  # trim whitespace
+
+            echo ""
+            echo "Processing #$NUMBER"
+
+            # Check if already commented
+            EXISTING=$(gh issue view "$NUMBER" --json comments \
+              --jq '.comments[] | select(.body | contains("Bug Checker Agent")) | .id' \
+              | head -1)
+
+            if [[ -n "$EXISTING" ]]; then
+              echo "  Already commented, skipping"
+              continue
+            fi
+
+            COMMENT_BODY="## 🔍 Bug Checker Agent Report
+
+          **Status:** Potentially fixed via linked PR(s)
+
+          This issue appears to have been addressed by the following merged PR(s):
+
+          $PR_LIST
+
+          **Action requested:** Please verify if this bug has been fixed and close this issue if appropriate.
+
+          ---
+          _Automated message from Bug Checker Agent_"
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "  [DRY RUN] Would comment on #$NUMBER"
+            else
+              gh issue comment "$NUMBER" --body "$COMMENT_BODY"
+              echo "  ✓ Commented on #$NUMBER"
+
+              # Add label
+              gh issue edit "$NUMBER" --add-label "Needs-Testing" 2>/dev/null || true
+            fi
+          done
+
+          # Generate summary
+          echo ""
+          echo "=== Summary ==="
+
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 🔍 Bug Checker Agent Summary
+
+          | Metric | Count |
+          |--------|-------|
+          | Total bugs checked | $TOTAL_BUGS |
+          | Bugs with linked PRs | $(echo "$BUGS_WITH_PRS" | grep -c '|' || echo 0) |
+          | Bugs without linked PRs | $(echo "$BUGS_WITHOUT_PRS" | grep -c '|' || echo 0) |
+          | Mode | $([[ "$DRY_RUN" == "true" ]] && echo "🧪 Dry Run" || echo "🚀 Live") |
+
+          ### Bugs Without Linked PRs (Need Manual Review)
+          These bugs have no linked PRs and may need investigation:
+
+          EOF
+
+          echo "$BUGS_WITHOUT_PRS" | head -20 | while IFS='|' read -r NUMBER TITLE; do
+            [[ -z "$NUMBER" ]] && continue
+            NUMBER=$(echo "$NUMBER" | xargs)
+            echo "- #$NUMBER: $TITLE" >> $GITHUB_STEP_SUMMARY
+          done
