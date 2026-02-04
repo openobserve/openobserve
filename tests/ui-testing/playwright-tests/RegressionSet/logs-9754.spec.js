@@ -286,12 +286,16 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     // Get the detail content from JSON view (default tab)
     const detailContent = await pm.logsPage.getLogDetailJsonContentText();
 
+    // Verify content was retrieved
+    expect(detailContent).not.toBeNull();
+    expect(detailContent).toBeDefined();
+
     // CRITICAL ASSERTIONS: Full content must be preserved in detail view
     // At least one of our test cases should be visible
     const hasCompleteContent =
-      detailContent.includes('.ts') ||
-      detailContent.includes('unclosed') ||
-      detailContent.includes('spec');
+      detailContent?.includes('.ts') ||
+      detailContent?.includes('unclosed') ||
+      detailContent?.includes('spec');
 
     expect(hasCompleteContent).toBe(true);
     testLogger.info('Assertion passed: Log detail shows complete content');
