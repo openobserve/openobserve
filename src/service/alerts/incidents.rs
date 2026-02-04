@@ -152,7 +152,7 @@ pub async fn correlate_alert_to_incident(
             .await;
 
     // Use enterprise correlation engine with actual hash (or None for fallback)
-    let correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
+    let mut correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
         &labels,
         service_discovery_result
             .as_ref()
@@ -160,6 +160,18 @@ pub async fn correlate_alert_to_incident(
         trace_id,
         &org_config,
     );
+
+    // BUGFIX: If stable_dimensions is empty, use alert_id as correlation_key
+    // This prevents unrelated alerts from being grouped into the same incident
+    // (they would all hash to the same value for empty dimensions)
+    if correlation_result.stable_dimensions.is_empty() {
+        let alert_id = alert.get_unique_key();
+        log::warn!(
+            "[incidents] Alert {} has no stable dimensions - using alert_id as correlation_key to prevent incorrect grouping",
+            alert.name
+        );
+        correlation_result.correlation_key = alert_id;
+    }
 
     // Guarantee service_name extraction
     let service_name = if let Some(ref sd_result) = service_discovery_result {
@@ -183,10 +195,11 @@ pub async fn correlate_alert_to_incident(
     };
 
     log::info!(
-        "[incidents] Alert {} correlation - service: {}, correlation_key: {}",
+        "[incidents] Alert {} correlation - service: {}, correlation_key: {}, stable_dimensions: {:?}",
         alert.name,
         service_name,
-        correlation_result.correlation_key
+        correlation_result.correlation_key,
+        correlation_result.stable_dimensions
     );
 
     // Find or create incident
@@ -410,6 +423,23 @@ async fn find_or_create_incident(
                 );
             }
         });
+
+        // Retry RCA if it's empty (failed in the past due to infra issues or errors)
+        #[cfg(feature = "enterprise")]
+        {
+            let org_id_rca = org_id.to_string();
+            let incident_id_rca = existing.id.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) =
+                    trigger_rca_for_incident(org_id_rca.clone(), incident_id_rca.clone()).await
+                {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Retry attempt failed for existing incident {incident_id_rca}: {e}"
+                    );
+                }
+            });
+        }
 
         return Ok(existing.id);
     }
@@ -729,6 +759,7 @@ pub async fn enrich_with_topology(
         let current_node_first_fired = topology.nodes[current_node_index].first_fired_at;
 
         // Find the most recent previous node from same service
+        // Use node index as tiebreaker when timestamps are equal (handles simultaneous alerts)
         let most_recent_previous = topology
             .nodes
             .iter()
@@ -736,9 +767,11 @@ pub async fn enrich_with_topology(
             .filter(|(idx, node)| {
                 *idx != current_node_index
                     && node.service_name == service_name
-                    && node.first_fired_at < current_node_first_fired
+                    && (node.first_fired_at < current_node_first_fired
+                        || (node.first_fired_at == current_node_first_fired
+                            && *idx < current_node_index))
             })
-            .max_by_key(|(_, node)| node.first_fired_at);
+            .max_by_key(|(idx, node)| (node.first_fired_at, *idx));
 
         if let Some((prev_idx, _)) = most_recent_previous {
             // Check if edge already exists
@@ -814,7 +847,11 @@ pub async fn enrich_with_topology(
                     let to_node = &topology.nodes[to_idx];
 
                     // Only add if from happened before to (chronological)
-                    if from_node.first_fired_at < to_node.first_fired_at {
+                    // Use node index as tiebreaker when timestamps are equal (handles simultaneous
+                    // alerts)
+                    if from_node.first_fired_at < to_node.first_fired_at
+                        || (from_node.first_fired_at == to_node.first_fired_at && from_idx < to_idx)
+                    {
                         // Check if edge already exists
                         let edge_exists = topology.edges.iter().any(|e| {
                             e.from_node_index == from_idx
@@ -843,17 +880,22 @@ pub async fn enrich_with_topology(
                 let from_node = &topology.nodes[from_idx];
 
                 // Find most recent node in to_service that fired after from_node
+                // Use node index as tiebreaker when timestamps are equal (handles simultaneous
+                // alerts)
                 let most_recent_to = to_indices
                     .iter()
                     .filter_map(|&to_idx| {
                         let to_node = &topology.nodes[to_idx];
-                        if to_node.first_fired_at > from_node.first_fired_at {
+                        if to_node.first_fired_at > from_node.first_fired_at
+                            || (to_node.first_fired_at == from_node.first_fired_at
+                                && to_idx > from_idx)
+                        {
                             Some((to_idx, to_node.first_fired_at))
                         } else {
                             None
                         }
                     })
-                    .min_by_key(|(_, fired_at)| *fired_at); // Closest in time (earliest after from_node)
+                    .min_by_key(|(to_idx, fired_at)| (*fired_at, *to_idx)); // Closest in time, then by index
 
                 if let Some((to_idx, _)) = most_recent_to {
                     // Check if edge already exists

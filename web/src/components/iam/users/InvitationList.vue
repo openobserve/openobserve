@@ -335,6 +335,11 @@ export default defineComponent({
           "confirm",
           selectedInvitation.value.org_id,
         );
+
+        // Refresh the organizations list in the store
+        const orgResponse = await organizationsService.list(0, 1000000, "name", false, "");
+        store.dispatch("setOrganizations", orgResponse.data.data);
+
         dismiss();
         $q.notify({
           color: "positive",
