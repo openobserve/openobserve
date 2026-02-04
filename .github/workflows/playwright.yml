@@ -263,6 +263,7 @@ jobs:
           #     [
           #       "logs-regression.spec.js",
           #       "logs-regression-bugs.spec.js",
+          #       "logs-9754.spec.js",
           #       "streams-regression.spec.js",
           #       "enrichment-regression.spec.js",
           #       "ui-regression.spec.js",
