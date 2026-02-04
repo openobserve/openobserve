@@ -1072,6 +1072,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-view-related-button="true"
               :hide-search-term-actions="false"
               :hide-dimension-filters="true"
+              @sendToAiChat="handleSendToAiChat"
             />
           </div>
         </div>
@@ -1258,7 +1259,7 @@ export default defineComponent({
     IncidentRCAAnalysis,
     CustomChartRenderer,
   },
-  emits: ['close', 'status-updated'],
+  emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -2059,6 +2060,10 @@ export default defineComponent({
       });
     };
 
+    const handleSendToAiChat = (value: any, append: boolean = true) => {
+      emit('sendToAiChat', value, append);
+    };
+
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
       updating.value = true;
@@ -2783,6 +2788,7 @@ export default defineComponent({
       alertActivityChartData,
       refreshCorrelation,
       close,
+      handleSendToAiChat,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
