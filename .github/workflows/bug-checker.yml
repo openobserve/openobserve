@@ -2,6 +2,10 @@ name: Bug Checker Agent
 
 # Analyzes open bugs to check if fixes exist (via linked PRs or codebase analysis)
 on:
+  # TODO: Remove push trigger after testing
+  push:
+    branches: [feature/bug-checker-agent]
+    paths: ['.github/workflows/bug-checker.yml']
   schedule:
     - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
   workflow_dispatch: # Allow manual trigger
@@ -140,7 +144,7 @@ jobs:
   # Job 2: Comment on bugs with linked PRs (no AI needed)
   comment-linked-bugs:
     needs: collect-bugs
-    if: ${{ inputs.dry_run != true }}
+    if: ${{ github.event_name != 'push' && inputs.dry_run != true }}
     runs-on: ubuntu-latest
     steps:
       - name: Comment on bugs with linked PRs
@@ -191,7 +195,7 @@ jobs:
   # Job 3: Use Claude to analyze bugs without linked PRs
   analyze-with-claude:
     needs: collect-bugs
-    if: ${{ inputs.use_claude == true && needs.collect-bugs.outputs.bugs_for_claude != '[]' }}
+    if: ${{ github.event_name != 'push' && inputs.use_claude == true && needs.collect-bugs.outputs.bugs_for_claude != '[]' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
