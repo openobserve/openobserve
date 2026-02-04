@@ -37,65 +37,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-card-section class="q-pt-md dashboard-content-section">
         <!-- Loading State -->
-        <div v-if="loading" class="tw:flex tw:items-center tw:justify-center tw:py-8">
+        <div v-if="loading" class="tw:flex tw:flex-1 tw:items-center tw:justify-center">
           <q-spinner color="primary" size="3em" />
         </div>
 
         <!-- Error State -->
-        <div v-else-if="error" class="tw:text-center tw:py-8">
+        <div v-else-if="error" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:text-center">
           <q-icon name="error_outline" size="3em" color="negative" class="tw:mb-2" />
           <div class="text-negative">{{ error }}</div>
-          <q-btn
-            flat
-            color="primary"
-            label="Retry"
-            @click="loadDashboards"
-            class="tw:mt-4"
-          />
+          <q-btn flat dense label="Retry" @click="loadDashboards" class="o2-primary-button tw:h-[36px] tw:mt-4"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'" />
         </div>
 
         <!-- Dashboard List -->
-        <div v-else>
-          <q-input
-            v-model="searchQuery"
-            placeholder="Search dashboards..."
-            dense
-            outlined
-            clearable
-            class="tw:mb-4"
-            data-test="add-dashboard-github-search"
-          >
+        <div v-else class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
+          <q-input v-model="searchQuery" placeholder="Search dashboards..." dense clearable class="tw:mb-4"
+            data-test="add-dashboard-github-search">
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
 
-          <div class="tw:text-sm tw:text-gray-600 tw:mb-2">
+          <div class="tw:text-xs tw:text-gray-500 tw:mb-2 tw:px-1">
             {{ filteredDashboards.length }} dashboard(s) available
           </div>
 
-          <q-list bordered separator class="rounded-borders dashboard-list">
-            <q-item
-              v-for="dashboard in filteredDashboards"
-              :key="dashboard.name"
-              clickable
-              v-ripple
-              @click="toggleDashboard(dashboard)"
-              :class="{ 'selected-item': isSelected(dashboard) }"
-              data-test="add-dashboard-github-item"
-            >
-              <q-item-section side>
-                <q-checkbox
-                  :model-value="isSelected(dashboard)"
-                  @update:model-value="toggleDashboard(dashboard)"
-                  color="primary"
-                />
+          <q-list :bordered="filteredDashboards.length > 0" dense class="rounded-borders dashboard-list">
+            <q-item v-for="dashboard in filteredDashboards" :key="dashboard.name" clickable v-ripple dense
+              @click="toggleDashboard(dashboard)" class="tw:py-1 tw:transition-colors tw:duration-200" :class="[
+                isSelected(dashboard)
+                  ? 'selected-item tw:bg-primary/5 tw:border-l-4 tw:border-primary'
+                  : 'tw:border-l-4 tw:border-transparent hover:tw:bg-gray-50'
+              ]" data-test="add-dashboard-github-item">
+              <q-item-section side class="tw:pr-2">
+                <q-checkbox :model-value="isSelected(dashboard)" @update:model-value="toggleDashboard(dashboard)"
+                  color="primary" dense />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">
+                <q-item-label class="text-weight-medium tw:text-sm">
                   {{ dashboard.displayName }}
                 </q-item-label>
-                <q-item-label caption v-if="dashboard.description">
+                <q-item-label caption v-if="dashboard.description" class="tw:text-xs">
                   {{ dashboard.description }}
                 </q-item-label>
               </q-item-section>
@@ -106,88 +88,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
 
-      <q-card-section class="dashboard-footer-section">
-        <div class="flex justify-end q-gutter-sm">
-          <q-btn
-            flat
-            label="Cancel"
-            color="primary"
-            v-close-popup
-            data-test="add-dashboard-github-cancel"
-          />
-          <q-btn
-            flat
-            :label="`Next (${selectedDashboards.length})`"
-            color="primary"
-            :disable="selectedDashboards.length === 0"
-            @click="handleNext"
-            data-test="add-dashboard-github-next"
-          />
+      <q-card-section class="q-py-sm dashboard-footer-section">
+        <div class="flex justify-end q-gutter-x-sm">
+          <q-btn flat dense label="Cancel" v-close-popup data-test="add-dashboard-github-cancel"
+            class="o2-secondary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'" />
+          <q-btn flat dense :label="`Next (${selectedDashboards.length})`" :disable="selectedDashboards.length === 0"
+            @click="handleNext" data-test="add-dashboard-github-next" class="o2-primary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'" />
         </div>
       </q-card-section>
     </q-card>
 
     <!-- Folder Selection Dialog -->
     <q-dialog v-model="showFolderSelection" persistent>
-      <q-card style="min-width: 600px; max-width: 800px">
-        <q-card-section>
-          <div class="text-h6">Select Destination Folder</div>
+      <q-card style="min-width: 500px; max-width: 600px" class="tw:rounded-xl">
+        <q-card-section class="q-py-md">
+          <div class="text-h6 tw:font-bold">Select Destination Folder</div>
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <div class="flex" style="align-items: flex-end">
-            <div style="flex: 1">
-              <q-select
-                v-model="selectedFolderObj"
-                :options="folderOptions"
-                label="Folder"
-                filled
-                dense
-                class="folder-select showLabelOnTop"
-                data-test="add-dashboard-github-folder-select"
-              >
-                <template v-slot:selected>
-                  <span v-if="selectedFolderObj">{{ selectedFolderObj.label }}</span>
-                </template>
-              </q-select>
-            </div>
-            <q-btn
-              class="q-ml-sm add-folder-btn"
-              style="width: 40px; height: 40px; margin-bottom: -8px"
-              flat
-              dense
-              @click="showAddFolderDialog = true"
-              data-test="add-dashboard-github-add-folder"
-            >
-              <q-icon name="add" size="xs" />
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <q-select v-model="selectedFolderObj" :options="folderOptions" label="Folder" outlined dense
+              class="tw:grow o2-custom-select-dashboard" data-test="add-dashboard-github-folder-select">
+              <template v-slot:selected>
+                <span v-if="selectedFolderObj">{{ selectedFolderObj.label }}</span>
+              </template>
+            </q-select>
+            <q-btn flat dense @click="showAddFolderDialog = true" data-test="add-dashboard-github-add-folder"
+              title="Add New Folder" class="tw:bg-gray-100 hover:tw:bg-gray-200 tw:rounded-lg"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'">
+              <q-icon name="add" size="sm" />
             </q-btn>
           </div>
         </q-card-section>
 
-        <q-card-actions align="right">
-          <q-btn flat label="Back" color="primary" @click="showFolderSelection = false" />
-          <q-btn
-            flat
-            label="Add Dashboard"
-            color="primary"
-            :disable="!selectedFolderObj"
-            @click="confirmAdd"
-            :loading="importing"
-            data-test="add-dashboard-github-confirm"
-          />
+        <q-card-actions align="right" class="q-px-md q-pb-md">
+          <q-btn flat dense label="Back" @click="showFolderSelection = false" class="o2-secondary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'" />
+          <q-btn flat dense label="Add Dashboard" :disable="!selectedFolderObj" @click="confirmAdd" :loading="importing"
+            data-test="add-dashboard-github-confirm" class="o2-primary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'" />
         </q-card-actions>
       </q-card>
     </q-dialog>
 
     <!-- Add Folder Dialog -->
-    <q-dialog
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
-      data-test="add-dashboard-github-add-folder-dialog"
-    >
-      <AddFolder @update:modelValue="updateFolderList" :edit-mode="false" />
+    <q-dialog v-model="showAddFolderDialog" position="right" full-height maximized
+      data-test="add-dashboard-github-add-folder-dialog">
+      <div style="width: 600px" class="full-height">
+        <AddFolder @update:modelValue="updateFolderList" :edit-mode="false" />
+      </div>
     </q-dialog>
   </q-dialog>
 </template>
@@ -499,6 +450,7 @@ export default defineComponent({
     return {
       show,
       loading,
+      store,
       error,
       dashboards,
       searchQuery,
@@ -523,8 +475,9 @@ export default defineComponent({
 <style scoped lang="scss">
 .dashboard-content-section {
   flex: 1;
-  overflow-y: auto;
-  max-height: calc(100vh - 140px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .dashboard-footer-section {
@@ -532,15 +485,22 @@ export default defineComponent({
 }
 
 .dashboard-list {
+  flex: 0 1 auto;
+  overflow-y: auto;
+
+  .selected-item {
+    background-color: var(--o2-tab-bg) !important;
+  }
+
   .body--light & {
-    .selected-item {
-      background-color: rgba(33, 150, 243, 0.1);
+    .q-item:hover:not(.selected-item) {
+      background-color: var(--o2-hover-gray);
     }
   }
 
   .body--dark & {
-    .selected-item {
-      background-color: rgba(255, 255, 255, 0.15);
+    .q-item:hover:not(.selected-item) {
+      background-color: var(--o2-hover-gray);
     }
   }
 }
