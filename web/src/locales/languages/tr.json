@@ -319,7 +319,16 @@
     "buildQuery": "İnşa",
     "enableSqlModeForBuild": "Lütfen SQL modunu etkinleştirin ve sorgu oluşturucuyu kullanmak için tek bir akış seçin",
     "applyToSearch": "Aramaya Uygula",
-    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma."
+    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma.",
+    "nlpModeLabel": "Doğal Dil Modu",
+    "generateSQL": "SQL oluştur",
+    "generateQuery": "Sorgu Oluştur",
+    "generateSQLTooltip": "Doğal dilden SQL sorgusu oluşturun (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Doğal dilden SQL sorgusu oluştur",
+    "generating": "Oluşturuluyor...",
+    "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
+    "nlQueryGenerationSuccess": "Sorgu başarıyla oluşturuldu!",
+    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz"
   },
   "menu": {
     "home": "Ana Sayfa",

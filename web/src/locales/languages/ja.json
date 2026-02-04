@@ -319,7 +319,16 @@
     "buildQuery": "ビルド",
     "enableSqlModeForBuild": "SQL モードを有効にして、クエリビルダーを使用するストリームを 1 つ選択してください",
     "applyToSearch": "検索に適用",
-    "complexQueryDetected": "複雑なクエリが検出されました。カスタムモードを使用する。"
+    "complexQueryDetected": "複雑なクエリが検出されました。カスタムモードを使用する。",
+    "nlpModeLabel": "自然言語モード",
+    "generateSQL": "SQL を生成",
+    "generateQuery": "[クエリを生成]",
+    "generateSQLTooltip": "自然言語から SQL クエリを生成 (Ctrl/Cmd+Enter キー)",
+    "generateQueryTooltip": "自然言語から SQL クエリを生成",
+    "generating": "生成中...",
+    "nlQueryGenerationFailed": "クエリを生成できませんでした。もう一度試してください。",
+    "nlQueryGenerationSuccess": "クエリは正常に生成されました!",
+    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません"
   },
   "menu": {
     "home": "ホーム",

@@ -319,7 +319,16 @@
     "buildQuery": "Bouwen",
     "enableSqlModeForBuild": "Schakel de SQL-modus in en selecteer een enkele stream om de querybuilder te gebruiken",
     "applyToSearch": "Toepassen om te zoeken",
-    "complexQueryDetected": "Complexe zoekopdracht gedetecteerd. Met behulp van de aangepaste modus."
+    "complexQueryDetected": "Complexe zoekopdracht gedetecteerd. Met behulp van de aangepaste modus.",
+    "nlpModeLabel": "Modus voor natuurlijke taal",
+    "generateSQL": "SQL genereren",
+    "generateQuery": "Query genereren",
+    "generateSQLTooltip": "Genereer een SQL-query uit natuurlijke taal (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Genereer een SQL-query op basis van natuurlijke taal",
+    "generating": "Genereren...",
+    "nlQueryGenerationFailed": "Het genereren van een query is mislukt. Probeer het opnieuw.",
+    "nlQueryGenerationSuccess": "Zoekopdracht succesvol gegenereerd!",
+    "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams"
   },
   "menu": {
     "home": "Home",

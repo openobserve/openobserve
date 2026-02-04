@@ -319,7 +319,16 @@
     "buildQuery": "Construir",
     "enableSqlModeForBuild": "Ative o modo SQL e selecione um único fluxo para usar o construtor de consultas",
     "applyToSearch": "Aplicar para pesquisar",
-    "complexQueryDetected": "Consulta complexa detectada. Usando o modo personalizado."
+    "complexQueryDetected": "Consulta complexa detectada. Usando o modo personalizado.",
+    "nlpModeLabel": "Modo de linguagem natural",
+    "generateSQL": "Gerar SQL",
+    "generateQuery": "Gerar consulta",
+    "generateSQLTooltip": "Gerar consulta SQL a partir de linguagem natural (Ctrl/Cmd+Enter)",
+    "generateQueryTooltip": "Gere uma consulta SQL a partir de linguagem natural",
+    "generating": "Gerando...",
+    "nlQueryGenerationFailed": "Falha ao gerar consulta. Por favor, tente novamente.",
+    "nlQueryGenerationSuccess": "Consulta gerada com sucesso!",
+    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos"
   },
   "menu": {
     "home": "Início",

@@ -319,7 +319,16 @@
     "buildQuery": "Construir",
     "enableSqlModeForBuild": "Habilite el modo SQL y seleccione una sola secuencia para usar el generador de consultas",
     "applyToSearch": "Aplicar a la búsqueda",
-    "complexQueryDetected": "Se detectó una consulta compleja. Uso del modo personalizado."
+    "complexQueryDetected": "Se detectó una consulta compleja. Uso del modo personalizado.",
+    "nlpModeLabel": "Modo de lenguaje natural",
+    "generateSQL": "Generar SQL",
+    "generateQuery": "Generar consulta",
+    "generateSQLTooltip": "Generar una consulta SQL desde lenguaje natural (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Generar consultas SQL a partir de lenguaje natural",
+    "generating": "Generando...",
+    "nlQueryGenerationFailed": "No se pudo generar la consulta. Por favor, inténtelo de nuevo.",
+    "nlQueryGenerationSuccess": "¡Consulta generada correctamente!",
+    "nlpModeDisabledForVisualization": "El modo de lenguaje natural no se puede deshabilitar durante la visualización con varias transmisiones"
   },
   "menu": {
     "home": "Inicio",

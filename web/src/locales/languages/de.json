@@ -319,7 +319,16 @@
     "buildQuery": "Bauen",
     "enableSqlModeForBuild": "Bitte aktivieren Sie den SQL-Modus und wählen Sie einen einzelnen Stream aus, um den Query Builder zu verwenden",
     "applyToSearch": "Für die Suche bewerben",
-    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus."
+    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus.",
+    "nlpModeLabel": "Modus für natürliche Sprache",
+    "generateSQL": "Generieren Sie SQL",
+    "generateQuery": "Abfrage generieren",
+    "generateSQLTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache (Strg/Cmd + Enter)",
+    "generateQueryTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache",
+    "generating": "Generieren...",
+    "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
+    "nlQueryGenerationSuccess": "Die Abfrage wurde erfolgreich generiert!",
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
   },
   "menu": {
     "home": "Startseite",

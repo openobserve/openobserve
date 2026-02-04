@@ -319,7 +319,16 @@
     "buildQuery": "构建",
     "enableSqlModeForBuild": "请启用 SQL 模式并选择单个流来使用查询生成器",
     "applyToSearch": "申请搜索",
-    "complexQueryDetected": "检测到复杂查询。使用自定义模式。"
+    "complexQueryDetected": "检测到复杂查询。使用自定义模式。",
+    "nlpModeLabel": "自然语言模式",
+    "generateSQL": "生成 SQL",
+    "generateQuery": "生成查询",
+    "generateSQLTooltip": "使用自然语言生成 SQL 查询 (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "使用自然语言生成 SQL 查询",
+    "generating": "正在生成...",
+    "nlQueryGenerationFailed": "无法生成查询。请再试一次。",
+    "nlQueryGenerationSuccess": "查询成功生成！",
+    "nlpModeDisabledForVisualization": "在使用多个流进行可视化时，无法禁用自然语言模式"
   },
   "menu": {
     "home": "主页",

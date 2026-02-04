@@ -319,7 +319,16 @@
     "buildQuery": "Costruisci",
     "enableSqlModeForBuild": "Abilita la modalità SQL e seleziona un singolo stream per utilizzare Query Builder",
     "applyToSearch": "Applica alla ricerca",
-    "complexQueryDetected": "È stata rilevata una query complessa. Utilizzo della modalità personalizzata."
+    "complexQueryDetected": "È stata rilevata una query complessa. Utilizzo della modalità personalizzata.",
+    "nlpModeLabel": "Modalità linguaggio naturale",
+    "generateSQL": "Genera SQL",
+    "generateQuery": "Genera interrogazione",
+    "generateSQLTooltip": "Genera query SQL dal linguaggio naturale (Ctrl/Cmd + Invio)",
+    "generateQueryTooltip": "Genera query SQL dal linguaggio naturale",
+    "generating": "Generazione...",
+    "nlQueryGenerationFailed": "Generazione della query non riuscita. Per favore riprova.",
+    "nlQueryGenerationSuccess": "Query generata con successo!",
+    "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream"
   },
   "menu": {
     "home": "Home",
