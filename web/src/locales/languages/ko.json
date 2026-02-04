@@ -307,7 +307,16 @@
     "show": "쇼",
     "editor": "에디터",
     "webUrlNotConfigured": "관리자가 ZO_WEB_URL을 구성할 때까지 URL 공유는 비활성화됩니다.",
-    "showHideColumns": "열 표시/숨기기"
+    "showHideColumns": "열 표시/숨기기",
+    "nlpModeLabel": "자연어 모드",
+    "generateSQL": "SQL 생성",
+    "generateQuery": "쿼리 생성",
+    "generateSQLTooltip": "자연어에서 SQL 쿼리 생성 (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "자연어에서 SQL 쿼리 생성",
+    "generating": "생성 중...",
+    "nlQueryGenerationFailed": "쿼리를 생성하지 못했습니다.다시 시도해 주세요.",
+    "nlQueryGenerationSuccess": "쿼리가 성공적으로 생성되었습니다!",
+    "nlpModeDisabledForVisualization": "다중 스트림으로 시각화하는 동안에는 자연어 모드를 비활성화할 수 없습니다."
   },
   "menu": {
     "home": "홈",

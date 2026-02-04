@@ -307,7 +307,16 @@
     "show": "Afficher",
     "editor": "Rédacteur",
     "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
-    "showHideColumns": "Afficher/masquer les colonnes"
+    "showHideColumns": "Afficher/masquer les colonnes",
+    "nlpModeLabel": "Mode langage naturel",
+    "generateSQL": "Générer du code SQL",
+    "generateQuery": "Générer une requête",
+    "generateSQLTooltip": "Générer une requête SQL à partir du langage naturel (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Générer une requête SQL à partir du langage naturel",
+    "generating": "Génération de...",
+    "nlQueryGenerationFailed": "Impossible de générer la requête. Veuillez réessayer.",
+    "nlQueryGenerationSuccess": "Requête générée avec succès !",
+    "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux"
   },
   "menu": {
     "home": "Accueil",

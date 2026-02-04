@@ -307,7 +307,16 @@
     "show": "ショー",
     "editor": "エディター",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
-    "showHideColumns": "列を表示/非表示"
+    "showHideColumns": "列を表示/非表示",
+    "nlpModeLabel": "自然言語モード",
+    "generateSQL": "SQL を生成",
+    "generateQuery": "[クエリを生成]",
+    "generateSQLTooltip": "自然言語から SQL クエリを生成 (Ctrl/Cmd+Enter キー)",
+    "generateQueryTooltip": "自然言語から SQL クエリを生成",
+    "generating": "生成中...",
+    "nlQueryGenerationFailed": "クエリを生成できませんでした。もう一度試してください。",
+    "nlQueryGenerationSuccess": "クエリは正常に生成されました!",
+    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません"
   },
   "menu": {
     "home": "ホーム",
