@@ -1,6 +1,6 @@
 name: Bug Checker Agent
 
-# Runs weekly to check if open bugs have been fixed by merged PRs
+# Analyzes open bugs to check if fixes exist (via linked PRs or codebase analysis)
 on:
   schedule:
     - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
@@ -14,26 +14,43 @@ on:
       days_threshold:
         description: "Only check issues older than N days"
         required: false
-        default: "7"
+        default: "30"
         type: string
+      max_bugs_to_analyze:
+        description: "Max bugs for Claude to analyze (controls API cost)"
+        required: false
+        default: "10"
+        type: string
+      use_claude:
+        description: "Use Claude to analyze bugs without linked PRs"
+        required: false
+        default: true
+        type: boolean
 
 permissions:
+  contents: read
   issues: write
   pull-requests: read
 
 jobs:
-  check-fixed-bugs:
+  # Job 1: Collect bugs and check for linked PRs
+  collect-bugs:
     runs-on: ubuntu-latest
+    outputs:
+      bugs_with_prs: ${{ steps.check.outputs.bugs_with_prs }}
+      bugs_without_prs: ${{ steps.check.outputs.bugs_without_prs }}
+      bugs_for_claude: ${{ steps.check.outputs.bugs_for_claude }}
     steps:
-      - name: Check for fixed bugs
+      - name: Collect and categorize bugs
+        id: check
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const dryRun = '${{ inputs.dry_run }}' === 'true';
-            const daysThreshold = parseInt('${{ inputs.days_threshold }}' || '7');
+            const daysThreshold = parseInt('${{ inputs.days_threshold }}' || '30');
+            const maxBugsToAnalyze = parseInt('${{ inputs.max_bugs_to_analyze }}' || '10');
 
-            console.log(`Configuration: dry_run=${dryRun}, days_threshold=${daysThreshold}`);
+            console.log(`Configuration: days_threshold=${daysThreshold}, max_bugs=${maxBugsToAnalyze}`);
 
             // Get all open issues with 'bug' label
             const openBugs = await github.paginate(github.rest.issues.listForRepo, {
@@ -47,13 +64,12 @@ jobs:
             console.log(`Found ${openBugs.length} open bugs`);
 
             const now = new Date();
-            const potentiallyFixed = [];
+            const bugsWithPRs = [];
+            const bugsWithoutPRs = [];
 
             for (const issue of openBugs) {
               // Skip PRs (GitHub API returns PRs as issues too)
-              if (issue.pull_request) {
-                continue;
-              }
+              if (issue.pull_request) continue;
 
               // Skip issues newer than threshold
               const issueAge = (now - new Date(issue.created_at)) / (1000 * 60 * 60 * 24);
@@ -64,20 +80,19 @@ jobs:
 
               console.log(`\nChecking issue #${issue.number}: ${issue.title}`);
 
-              // Search for merged PRs that reference this issue (use quotes to prevent partial matches)
+              // Search for merged PRs that reference this issue
               const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged "#${issue.number}"`;
               const searchResults = await github.rest.search.issuesAndPullRequests({
                 q: searchQuery,
                 per_page: 10
               });
 
-              // Filter PRs that actually reference this issue in their body or title
+              // Filter PRs that actually reference this issue
               const linkedPRs = [];
               for (const pr of searchResults.data.items) {
                 const body = (pr.body || '').toLowerCase();
                 const title = (pr.title || '').toLowerCase();
 
-                // Check for common fix patterns
                 const patterns = [
                   `fixes #${issue.number}`,
                   `fix #${issue.number}`,
@@ -86,40 +101,87 @@ jobs:
                   `resolves #${issue.number}`,
                   `resolve #${issue.number}`,
                   `fixed #${issue.number}`,
-                  `#${issue.number}` // General reference
+                  `#${issue.number}`
                 ];
 
-                const isLinked = patterns.some(pattern =>
-                  body.includes(pattern) || title.includes(pattern)
-                );
-
-                if (isLinked) {
+                if (patterns.some(p => body.includes(p) || title.includes(p))) {
                   linkedPRs.push({
                     number: pr.number,
                     title: pr.title,
-                    merged_at: pr.pull_request?.merged_at || 'unknown',
                     url: pr.html_url
                   });
                 }
               }
 
+              const bugInfo = {
+                number: issue.number,
+                title: issue.title,
+                body: issue.body?.substring(0, 2000) || '', // Limit body size
+                url: issue.html_url,
+                age_days: Math.floor(issueAge)
+              };
+
               if (linkedPRs.length > 0) {
-                console.log(`  Found ${linkedPRs.length} potentially fixing PR(s)`);
-                potentiallyFixed.push({
-                  issue,
-                  linkedPRs
-                });
+                bugsWithPRs.push({ ...bugInfo, linkedPRs });
+                console.log(`  -> Has ${linkedPRs.length} linked PR(s)`);
+              } else {
+                bugsWithoutPRs.push(bugInfo);
+                console.log(`  -> No linked PRs found`);
               }
             }
 
+            // Select bugs for Claude analysis (oldest first, limited count)
+            const bugsForClaude = bugsWithoutPRs
+              .sort((a, b) => b.age_days - a.age_days)
+              .slice(0, maxBugsToAnalyze);
+
             console.log(`\n${'='.repeat(50)}`);
-            console.log(`Found ${potentiallyFixed.length} potentially fixed bugs`);
+            console.log(`Bugs with linked PRs: ${bugsWithPRs.length}`);
+            console.log(`Bugs without linked PRs: ${bugsWithoutPRs.length}`);
+            console.log(`Bugs selected for Claude analysis: ${bugsForClaude.length}`);
 
-            // Process results
-            for (const { issue, linkedPRs } of potentiallyFixed) {
-              const prList = linkedPRs.map(pr => `- #${pr.number}: ${pr.title}`).join('\n');
+            core.setOutput('bugs_with_prs', JSON.stringify(bugsWithPRs));
+            core.setOutput('bugs_without_prs', JSON.stringify(bugsWithoutPRs));
+            core.setOutput('bugs_for_claude', JSON.stringify(bugsForClaude));
 
-              const commentBody = `## Bug Checker Agent Report
+  # Job 2: Comment on bugs with linked PRs (no AI needed)
+  comment-linked-bugs:
+    needs: collect-bugs
+    if: ${{ inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on bugs with linked PRs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const bugsWithPRs = JSON.parse('${{ needs.collect-bugs.outputs.bugs_with_prs }}');
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+            for (const bug of bugsWithPRs) {
+              // Check if we already commented recently
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: bug.number,
+                since: thirtyDaysAgo,
+                per_page: 100
+              });
+
+              if (comments.data.some(c => c.body.includes('Bug Checker Agent'))) {
+                console.log(`Skipping #${bug.number} - already commented`);
+                continue;
+              }
+
+              const prList = bug.linkedPRs.map(pr => `- #${pr.number}: ${pr.title}`).join('\n');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: bug.number,
+                body: `## 🔍 Bug Checker Agent Report
+
+            **Status:** Potentially fixed via linked PR(s)
 
             This issue appears to have been addressed by the following merged PR(s):
 
@@ -128,57 +190,103 @@ jobs:
             **Action requested:** Please verify if this bug has been fixed and close this issue if appropriate.
 
             ---
-            _This is an automated message from the Bug Checker Agent._`;
-
-              if (dryRun) {
-                console.log(`\n[DRY RUN] Would comment on #${issue.number}:`);
-                console.log(commentBody);
-              } else {
-                // Check if we already commented on this issue within last 30 days
-                const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
-                const comments = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  since: thirtyDaysAgo,
-                  per_page: 100
-                });
-
-                const recentBotComment = comments.data.find(c =>
-                  c.body.includes('Bug Checker Agent Report')
-                );
-
-                if (recentBotComment) {
-                  console.log(`Skipping #${issue.number} - already commented within 30 days`);
-                  continue;
-                }
-
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  body: commentBody
-                });
-
-                console.log(`Commented on issue #${issue.number}`);
-              }
+            _Automated message from Bug Checker Agent_`
+              });
+              console.log(`Commented on #${bug.number}`);
             }
 
-            // Create summary
+  # Job 3: Use Claude to analyze bugs without linked PRs
+  analyze-with-claude:
+    needs: collect-bugs
+    if: ${{ inputs.use_claude == true && needs.collect-bugs.outputs.bugs_for_claude != '[]' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Analyze bugs with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            You are a Bug Checker Agent analyzing open bugs to determine if they have been fixed.
+
+            ## Your Task
+            Analyze each bug below and search the codebase to determine if a fix likely exists.
+
+            ## Bugs to Analyze
+            ${{ needs.collect-bugs.outputs.bugs_for_claude }}
+
+            ## Instructions
+            For each bug:
+            1. Read the bug title and description
+            2. Identify keywords, file names, function names, or error messages mentioned
+            3. Search the codebase for relevant code
+            4. Determine if the bug appears to be fixed based on:
+               - Error handling that addresses the issue
+               - Code changes that fix the described behavior
+               - Features that now work differently
+               - Code that was removed/refactored
+
+            ## Output Format
+            Create a summary comment on each issue with your findings:
+            - If likely fixed: Explain what code you found that addresses the issue
+            - If unclear: Note what you checked and why it's inconclusive
+            - If not fixed: Confirm the issue likely still exists
+
+            Use the GitHub issue comment tool to post your findings on each issue.
+            Start each comment with "## 🤖 Bug Checker Agent - Code Analysis"
+
+            ${{ inputs.dry_run == true && 'DRY RUN MODE: Just log your findings, do not post comments.' || '' }}
+
+  # Job 4: Create summary
+  summary:
+    needs: [collect-bugs, comment-linked-bugs, analyze-with-claude]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create workflow summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const bugsWithPRs = JSON.parse('${{ needs.collect-bugs.outputs.bugs_with_prs }}' || '[]');
+            const bugsWithoutPRs = JSON.parse('${{ needs.collect-bugs.outputs.bugs_without_prs }}' || '[]');
+            const bugsForClaude = JSON.parse('${{ needs.collect-bugs.outputs.bugs_for_claude }}' || '[]');
+
             const summary = `
-            ## Bug Checker Summary
+            ## 🔍 Bug Checker Agent Summary
 
-            - Open bugs checked: ${openBugs.length}
-            - Potentially fixed: ${potentiallyFixed.length}
-            - Mode: ${dryRun ? 'Dry Run' : 'Live'}
+            | Category | Count |
+            |----------|-------|
+            | Bugs with linked PRs | ${bugsWithPRs.length} |
+            | Bugs without linked PRs | ${bugsWithoutPRs.length} |
+            | Bugs analyzed by Claude | ${bugsForClaude.length} |
 
-            ### Potentially Fixed Issues
-            ${potentiallyFixed.length > 0
-              ? potentiallyFixed.map(({ issue, linkedPRs }) =>
-                  `- #${issue.number}: ${issue.title} (PRs: ${linkedPRs.map(pr => `#${pr.number}`).join(', ')})`
-                ).join('\n')
-              : 'None found'}
+            ### Bugs with Linked PRs (Potentially Fixed)
+            ${bugsWithPRs.length > 0
+              ? bugsWithPRs.map(b => `- #${b.number}: ${b.title}`).join('\n')
+              : '_None found_'}
+
+            ### Bugs Analyzed by Claude
+            ${bugsForClaude.length > 0
+              ? bugsForClaude.map(b => `- #${b.number}: ${b.title} (${b.age_days} days old)`).join('\n')
+              : '_None selected for analysis_'}
+
+            ### Bugs Not Analyzed (No linked PRs, not selected for Claude)
+            ${bugsWithoutPRs.filter(b => !bugsForClaude.find(c => c.number === b.number)).length > 0
+              ? bugsWithoutPRs
+                  .filter(b => !bugsForClaude.find(c => c.number === b.number))
+                  .map(b => `- #${b.number}: ${b.title}`)
+                  .join('\n')
+              : '_None_'}
             `;
 
+            await core.summary.addRaw(summary).write();
             console.log(summary);
-            core.summary.addRaw(summary).write();
