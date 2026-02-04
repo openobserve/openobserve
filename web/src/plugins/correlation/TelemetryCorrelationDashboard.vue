@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-xs"
                   >
                     <q-tooltip>
-                      {{ t("correlation.viewInTracesTooltip") }}
+                      {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
                   </q-btn>
                   <q-chip dense color="primary" text-color="white">
@@ -760,7 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                 >
                   <q-tooltip>
-                    {{ t("correlation.viewInTracesTooltip") }}
+                    {{ t("correlation.viewInTraces") }}
                   </q-tooltip>
                 </q-btn>
               </div>
