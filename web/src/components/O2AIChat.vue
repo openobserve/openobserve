@@ -72,7 +72,13 @@
         </div>
       </div>
       <q-separator class="tw:bg-[#DBDBDB]" />
-      
+
+      <!-- Chat Title - appears below header with typewriter animation -->
+      <div v-if="displayedTitle" class="chat-session-title" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+        <span class="title-text">{{ displayedTitle }}</span>
+        <span v-if="isTypingTitle" class="typing-cursor">|</span>
+      </div>
+
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
         <q-card style="width: 350px; max-width: 100vw; height: 100vh;">
@@ -508,6 +514,11 @@ export default defineComponent({
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
 
+    // AI-generated chat title state
+    const aiGeneratedTitle = ref<string | null>(null);
+    const displayedTitle = ref<string>('');
+    const isTypingTitle = ref(false);
+
     // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
 
@@ -568,6 +579,31 @@ export default defineComponent({
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
       }
+    };
+
+    /**
+     * Animate title with typewriter effect
+     * Characters appear one by one from left to right
+     */
+    const animateTitle = async (title: string) => {
+      isTypingTitle.value = true;
+      displayedTitle.value = '';
+
+      for (let i = 0; i < title.length; i++) {
+        displayedTitle.value += title[i];
+        await new Promise(resolve => setTimeout(resolve, 30)); // 30ms per character
+      }
+
+      isTypingTitle.value = false;
+    };
+
+    /**
+     * Reset title state for new chat
+     */
+    const resetTitleState = () => {
+      aiGeneratedTitle.value = null;
+      displayedTitle.value = '';
+      isTypingTitle.value = false;
     };
 
     // Query history functionality
@@ -783,6 +819,13 @@ export default defineComponent({
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
+
+                  // Handle title events - AI-generated chat title from first message
+                  if (data && data.type === 'title') {
+                    aiGeneratedTitle.value = data.title;
+                    animateTitle(data.title);
+                    continue;
+                  }
 
                   // Handle tool_call events - show spinner indicator, don't add to chat yet
                   if (data && data.type === 'tool_call') {
@@ -1003,6 +1046,13 @@ export default defineComponent({
 
                 const data = JSON.parse(jsonStr);
 
+                // Handle title events - AI-generated chat title from first message
+                if (data && data.type === 'title') {
+                  aiGeneratedTitle.value = data.title;
+                  animateTitle(data.title);
+                  continue;
+                }
+
                 // Handle tool_call events - show spinner, don't add to chat yet
                 if (data && data.type === 'tool_call') {
                   // If there's already an active tool call, complete it first
@@ -1221,13 +1271,13 @@ export default defineComponent({
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const DbIndexStore = transaction.objectStore(STORE_NAME);
 
-        // Generate a title from the first user message
+        // Prefer AI-generated title, fallback to truncated first user message
         const firstUserMessage = chatMessages.value.find(msg => msg.role === 'user');
-        const title = firstUserMessage ? 
-          (firstUserMessage.content.length > 40 ? 
-            firstUserMessage.content.substring(0, 40) + '...' : 
-            firstUserMessage.content) : 
-          'New Chat';
+        const title = aiGeneratedTitle.value || (firstUserMessage ?
+          (firstUserMessage.content.length > 40 ?
+            firstUserMessage.content.substring(0, 40) + '...' :
+            firstUserMessage.content) :
+          'New Chat');
 
         // Create a serializable version of the messages (including contentBlocks)
         // Use JSON parse/stringify to strip Vue reactive proxies
@@ -1356,6 +1406,7 @@ export default defineComponent({
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
+      resetTitleState(); // Clear AI-generated title for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
@@ -1395,13 +1446,18 @@ export default defineComponent({
             currentSessionId.value = chat.sessionId || null; // Restore session ID from history
             showHistory.value = false;
             shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
-            
+
+            // Load title from history (no animation for existing chats)
+            displayedTitle.value = chat.title || '';
+            aiGeneratedTitle.value = chat.title || null;
+            isTypingTitle.value = false;
+
             if(chatId !== store.state.currentChatTimestamp) {
               store.dispatch('setCurrentChatTimestamp', chatId);
               store.dispatch('setChatUpdated', true);
             }
-            
-            
+
+
             // Scroll to bottom after loading chat
             await nextTick(() => {
               scrollToBottom();
@@ -2055,6 +2111,10 @@ export default defineComponent({
       formatToolCallMessage,
       formatTimestamp,
       formatContextValue,
+      // AI-generated title
+      aiGeneratedTitle,
+      displayedTitle,
+      isTypingTitle,
     }
   }
 });
@@ -2118,6 +2178,42 @@ export default defineComponent({
     .chat-title {
       font-weight: bold;
     }
+  }
+
+  // Chat session title with typewriter animation
+  .chat-session-title {
+    padding: 8px 16px;
+    font-size: 14px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--q-separator-color);
+
+    &.light-mode {
+      color: #1a202c;
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.08), transparent);
+    }
+
+    &.dark-mode {
+      color: #e2e8f0;
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.15), transparent);
+    }
+
+    .title-text {
+      font-weight: 600;
+    }
+
+    .typing-cursor {
+      animation: blink 0.7s infinite;
+      margin-left: 2px;
+      font-weight: 400;
+    }
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
   }
 
   .chat-content {

@@ -45,7 +45,9 @@ export const createAlertsContextProvider = (
         alertName: formData?.value?.name || '',
         isRealTime: formData?.value?.type === 'realtime',
         organization_identifier: store?.state?.selectedOrganization?.identifier || '',
-        user_intent: isUpdated ? 'edit existing alert' : 'create new alert'
+        user_intent: isUpdated ? 'edit existing alert' : 'create new alert',
+        // Current timestamp when request is fired (microseconds) for AI agent time calculations
+        request_timestamp: Date.now() * 1000,
       };
     }
   };
