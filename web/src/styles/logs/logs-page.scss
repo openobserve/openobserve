@@ -33,14 +33,16 @@
    ============================================================================ */
 
 .visualize-container {
-  // Dynamic height - will use CSS variable
-  height: calc(100vh - var(--splitter-height, 10vh) - 2.5rem); // 40px
+  // Fill the available space in the splitter's "after" slot
+  // The Q-splitter handles height distribution automatically
+  height: 100%;
   border-radius: 0.5rem;
 }
 
 .build-container {
-  // Dynamic height - will use CSS variable
-  height: calc(100vh - var(--splitter-height, 10vh) - 2.5rem); // 40px
+  // Fill the available space in the splitter's "after" slot
+  // The Q-splitter handles height distribution automatically
+  height: 100%;
   border-radius: 0.5rem;
   overflow: hidden;
 }

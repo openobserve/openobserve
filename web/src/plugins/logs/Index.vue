@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
         horizontal
+        @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
           <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
@@ -43,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
+              @buildModeToggle="onBuildModeToggle"
             />
           </div>
         </template>
@@ -2239,6 +2241,14 @@ export default defineComponent({
       searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
     };
 
+    // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
+    const onBuildModeToggle = (isCustomMode: boolean) => {
+      // Update the panel schema's customQuery flag
+      if (buildDashboardPanelData.data.queries[0]) {
+        buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
+      }
+    };
+
     const onBuildInitialized = () => {
       // Mark that we've processed the first build toggle
       // After this, chart type will always be auto-selected on tab switch
@@ -2778,6 +2788,7 @@ export default defineComponent({
       onBuildCancel,
       onBuildQueryGenerated,
       onCustomQueryModeChanged,
+      onBuildModeToggle,
       onBuildInitialized,
       selectedDateTime,
       isFirstBuildToggle,

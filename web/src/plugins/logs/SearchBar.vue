@@ -1153,7 +1153,7 @@ class="q-pr-sm q-pt-xs" />
         >
           <template #before>
             <div
-              class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
+              class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
               :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
             >
               <code-query-editor
@@ -1181,6 +1181,27 @@ class="q-pr-sm q-pt-xs" />
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
               />
+              <!-- Mode Toggle for Build Mode -->
+              <div
+                v-if="searchObj.meta.logsVisualizeToggle === 'build'"
+                class="query-mode-toggle"
+              >
+                <span class="mode-label">Mode:</span>
+                <div class="mode-buttons">
+                  <button
+                    :class="['mode-btn', { selected: searchObj.meta.buildModeQueryEditorDisabled }]"
+                    @click="onBuildModeToggle(true)"
+                  >
+                    Builder
+                  </button>
+                  <button
+                    :class="['mode-btn', { selected: !searchObj.meta.buildModeQueryEditorDisabled }]"
+                    @click="onBuildModeToggle(false)"
+                  >
+                    Custom
+                  </button>
+                </div>
+              </div>
             </div>
           </template>
           <template #after>
@@ -1762,6 +1783,7 @@ export default defineComponent({
     "onAutoIntervalTrigger",
     "showSearchHistory",
     "extractPatterns",
+    "buildModeToggle",
   ],
   methods: {
     searchData() {
@@ -3867,6 +3889,13 @@ export default defineComponent({
       }
     };
 
+    // Toggle between Builder and Custom mode in Build tab
+    const onBuildModeToggle = (isBuilderMode: boolean) => {
+      searchObj.meta.buildModeQueryEditorDisabled = isBuilderMode;
+      // Emit event so Index.vue can update panel schema's customQuery
+      emit("buildModeToggle", !isBuilderMode); // isCustomMode = !isBuilderMode
+    };
+
     const onLogsVisualizeToggleUpdate = (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
@@ -4353,6 +4382,7 @@ export default defineComponent({
       resetRegionFilter,
       cancelQuery,
       onLogsVisualizeToggleUpdate,
+      onBuildModeToggle,
       visualizeSearchRequestTraceIds,
       disable,
       cancelVisualizeQueries,
@@ -4788,6 +4818,87 @@ export default defineComponent({
 .logs-search-splitter {
   :deep(.q-splitter__separator) {
     height: 100%;
+  }
+}
+
+.query-mode-toggle {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--o2-muted-background);
+  padding: 3px 8px;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  border: 0.0625rem solid var(--o2-border-color);
+
+  .mode-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--o2-text-secondary);
+  }
+
+  .mode-buttons {
+    display: flex;
+    border: 0.0625rem solid var(--o2-border-color);
+    border-radius: 0.375rem;
+    overflow: hidden;
+
+    .mode-btn {
+      border: none;
+      background: var(--o2-muted-background);
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--o2-text-primary);
+
+      &:first-child {
+        border-right: 0.0625rem solid var(--o2-border-color);
+      }
+
+      &.selected {
+        background: var(--q-primary) !important;
+        color: white !important;
+        font-weight: 600;
+      }
+
+      &:hover:not(.selected) {
+        background: var(--o2-hover-accent);
+      }
+    }
+  }
+}
+
+// Dark mode support (both .dark-theme and .q-dark selectors)
+.dark-theme .query-mode-toggle,
+.q-dark .query-mode-toggle {
+  background: #1e1e1e;
+  border-color: #3a3a3a;
+
+  .mode-label {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .mode-buttons {
+    border-color: #3a3a3a;
+
+    .mode-btn {
+      background: #2a2a2a;
+      color: rgba(255, 255, 255, 0.8);
+
+      &:first-child {
+        border-color: #3a3a3a;
+      }
+
+      &:hover:not(.selected) {
+        background: #3a3a3a;
+        color: white;
+      }
+    }
   }
 }
 </style>

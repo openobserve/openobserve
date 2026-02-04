@@ -29,12 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @customQueryModeChanged="onCustomQueryModeChanged"
     />
 
-    <!-- Query Mode Toggle - Bottom Right Corner -->
-    <div class="query-mode-toggle">
-      <span class="query-mode-label">Mode:</span>
-      <QueryTypeSelector />
-    </div>
-
     <!-- Add to Dashboard Dialog -->
     <q-dialog
       v-model="showAddToDashboardDialog"
@@ -71,10 +65,6 @@ import PanelEditor from "@/components/dashboards/PanelEditor/PanelEditor.vue";
 // These can remain async as they're not needed immediately
 const AddToDashboard = defineAsyncComponent(
   () => import("@/plugins/metrics/AddToDashboard.vue"),
-);
-
-const QueryTypeSelector = defineAsyncComponent(
-  () => import("@/components/dashboards/addPanel/QueryTypeSelector.vue"),
 );
 
 // ============================================================================
@@ -383,26 +373,5 @@ defineExpose({
   height: 100%;
   width: 100%;
   position: relative;
-}
-
-.query-mode-toggle {
-  position: absolute;
-  bottom: 16px;
-  right: 60px; // Offset to avoid config panel
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--q-bg, #fff);
-  padding: 6px 10px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  border: 1px solid var(--q-separator, #e0e0e0);
-}
-
-.query-mode-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--q-text-secondary, #666);
 }
 </style>

@@ -858,7 +858,7 @@ const contentHeight = computed(() => {
 
 // Chart area class based on page type
 const chartAreaClass = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return "tw:h-[calc(100%-36px)] tw:min-h-[140px]";
   }
   return "tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[40px]";
@@ -872,17 +872,17 @@ const mainContentAreaClass = computed(() => {
   return "row card-container";
 });
 
-// Row style - logs needs height: 100%, others need overflow-y: auto
+// Row style - logs/build needs height: 100%, others need overflow-y: auto
 const rowStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%" };
   }
   return { overflowY: "auto" };
 });
 
-// Main content container class - logs uses vertical flex, others use horizontal
+// Main content container class - logs/build uses vertical flex, others use horizontal
 const mainContentContainerClass = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return "col flex column";
   }
   return "col tw:mr-[0.625rem]";
@@ -890,15 +890,15 @@ const mainContentContainerClass = computed(() => {
 
 // Main content container style
 const mainContentContainerStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return { width: "100%", height: "100%" };
   }
   return { display: "flex", flexDirection: "row", overflowX: "hidden" };
 });
 
-// Splitter limits - logs uses [0, 100], others use [0, 20]
+// Splitter limits - logs/build uses [0, 100], others use [0, 20]
 const splitterLimits = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return [0, 100];
   }
   return [0, 20];
@@ -906,7 +906,7 @@ const splitterLimits = computed(() => {
 
 // Splitter style
 const splitterStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return { width: "100%", height: "100%" };
   }
   return {
@@ -919,7 +919,7 @@ const splitterStyle = computed(() => {
 
 // After slot (main content area) outer div style
 const afterSlotStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return {
       height: "100%",
       width: dashboardPanelData.layout.showFieldList
@@ -930,9 +930,9 @@ const afterSlotStyle = computed(() => {
   return {};
 });
 
-// After slot inner div class - logs uses "col", others use "col scroll"
+// After slot inner div class - logs/build uses "col", others use "col scroll"
 const afterSlotInnerClass = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return "col";
   }
   return "col scroll";
@@ -940,23 +940,23 @@ const afterSlotInnerClass = computed(() => {
 
 // After slot inner div style
 const afterSlotInnerStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%" };
   }
   return { height: contentHeight.value, overflowY: "auto" };
 });
 
-// Layout panel container style - logs needs height: 100%
+// Layout panel container style - logs/build needs height: 100%
 const layoutPanelContainerStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%" };
   }
   return {};
 });
 
-// Field list wrapper class - logs doesn't need padding-bottom
+// Field list wrapper class - logs/build doesn't need padding-bottom
 const fieldListWrapperClass = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return "tw:w-full tw:h-full";
   }
   return "tw:w-full tw:h-full tw:pb-[0.625rem]";
@@ -964,15 +964,15 @@ const fieldListWrapperClass = computed(() => {
 
 // Field list container style
 const fieldListContainerStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%", overflowY: "auto" };
   }
   return { height: contentHeight.value, overflowY: "auto" };
 });
 
-// Field list inner div style - logs needs height: 100%
+// Field list inner div style - logs/build needs height: 100%
 const fieldListInnerStyle = computed(() => {
-  if (props.pageType === "logs") {
+  if (props.pageType === "logs" || props.pageType === "build") {
     return { width: "100%", height: "100%" };
   }
   return { width: "100%" };
