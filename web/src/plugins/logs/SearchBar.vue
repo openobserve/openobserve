@@ -134,6 +134,33 @@ alt="SQL Mode" class="toolbar-icon" />
             </q-tooltip>
           </q-toggle>
         </div>
+        <!-- NLP Mode Toggle - Only show when AI is enabled -->
+        <div
+          v-if="store.state.zoConfig.ai_enabled"
+          class="toolbar-toggle-container element-box-shadow"
+        >
+          <q-toggle
+            data-test="logs-search-bar-nlp-mode-toggle-btn"
+            v-model="searchObj.meta.nlpMode"
+            :disable="isSqlModeDisabled"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
+          >
+            <img :src="nlpIcon" alt="Natural Language Mode" class="toolbar-icon" />
+            <q-tooltip v-if="isSqlModeDisabled">
+              {{ t("search.nlpModeDisabledForVisualization") }}
+            </q-tooltip>
+            <q-tooltip v-else>
+              {{ t("search.nlpModeLabel") }}
+            </q-tooltip>
+          </q-toggle>
+        </div>
         <!-- Explain Query Button -->
         <q-btn
           v-if="!store.state.isAiChatEnabled && searchObj.meta.sqlMode"
@@ -985,19 +1012,27 @@ class="q-pr-sm q-pt-xs" />
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
-                  :title="t('search.runQuery')"
-                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
-                  :class="
-                    config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius'
-                  "
+                  :title="searchObj.meta.nlpMode ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                  class="q-pa-none tw:h-[30px] element-box-shadow"
+                  :class="[
+                    searchObj.meta.nlpMode ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                    searchObj.meta.nlpMode
+                      ? 'search-button-normal-border-radius'
+                      : config.isEnterprise == 'true'
+                        ? 'search-button-enterprise-border-radius'
+                        : 'search-button-normal-border-radius'
+                  ]"
+                  :color="searchObj.meta.nlpMode ? 'primary' : undefined"
                   no-caps
-                  @click="handleRunQueryFn"
-                  >{{ t("search.runQuery") }}</q-btn
+                  @click="searchObj.meta.nlpMode ? handleGenerateSQLQuery() : handleRunQueryFn()"
+                  >
+                  <img v-if="searchObj.meta.nlpMode" :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px]" />
+                  {{ searchObj.meta.nlpMode ? t("search.generateQuery") : t("search.runQuery") }}
+                </q-btn
                 >
-              <q-separator class="tw:h-[29px] tw:w-[1px]" />
+              <q-separator v-if="!searchObj.meta.nlpMode" class="tw:h-[29px] tw:w-[1px]" />
               <q-btn-dropdown
+                v-if="!searchObj.meta.nlpMode"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
@@ -1037,17 +1072,24 @@ class="q-pr-sm q-pt-xs" />
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
-                  :title="t('search.runQuery')"
-                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
-                  :class="
-                    config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius'
-                  "
+                  :title="searchObj.meta.nlpMode ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                  class="q-pa-none tw:h-[30px] element-box-shadow"
+                  :class="[
+                    searchObj.meta.nlpMode ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                    searchObj.meta.nlpMode
+                      ? 'search-button-normal-border-radius'
+                      : config.isEnterprise == 'true'
+                        ? 'search-button-enterprise-border-radius'
+                        : 'search-button-normal-border-radius'
+                  ]"
+                  :color="searchObj.meta.nlpMode ? 'primary' : undefined"
                   no-caps
-                  @click="handleRunQueryFn"
+                  @click="searchObj.meta.nlpMode ? handleGenerateSQLQuery() : handleRunQueryFn()"
                   :disable="disable"
-                  >{{ t("search.runQuery") }}</q-btn
+                  >
+                  <img v-if="searchObj.meta.nlpMode" :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px]" />
+                  {{ searchObj.meta.nlpMode ? t("search.generateQuery") : t("search.runQuery") }}
+                </q-btn
                 >
               </div>
             </div>
@@ -1074,20 +1116,31 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                :title="t('search.runQuery')"
-                class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
-                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
+                :title="searchObj.meta.nlpMode ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                class="q-pa-none tw:h-[30px] element-box-shadow"
+                :class="[
+                  searchObj.meta.nlpMode ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                  searchObj.meta.nlpMode
+                    ? 'search-button-normal-border-radius'
+                    : config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                ]"
+                :color="searchObj.meta.nlpMode ? 'primary' : undefined"
                 no-caps
-                @click="handleRunQueryFn"
+                @click="searchObj.meta.nlpMode ? handleGenerateSQLQuery() : handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true
                 "
-                >{{ t("search.runQuery") }}</q-btn
+                >
+                <img v-if="searchObj.meta.nlpMode" :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px] tw:mr-[6px]" />
+                {{ searchObj.meta.nlpMode ? t("search.generateQuery") : t("search.runQuery") }}
+              </q-btn
               >
-               <q-separator  class="tw:h-[29px] tw:w-[1px]" />
-              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw:h-[29px]"
+               <q-separator v-if="!searchObj.meta.nlpMode" class="tw:h-[29px] tw:w-[1px]" />
+              <q-btn-dropdown v-if="!searchObj.meta.nlpMode && config.isEnterprise == 'true'" flat class="tw:h-[29px]"
                 :class="[
                 config.isEnterprise == 'true' &&
                     (!!searchObj.data.searchRequestTraceIds.length ||
@@ -1160,6 +1213,8 @@ class="q-pr-sm q-pt-xs" />
                 language="sql"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+                @nlp-mode-detected="handleNlpModeDetected"
+                @nlpModeDetected="handleNlpModeDetected"
               />
             </div>
           </template>
@@ -2136,6 +2191,30 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
+    // Watch SQL mode toggle - turn off NLP mode when SQL mode is enabled
+    watch(
+      () => searchObj.meta.sqlMode,
+      (newSqlMode, oldSqlMode) => {
+        // Only act when SQL mode is turned ON (not when turning off)
+        if (newSqlMode === true && oldSqlMode === false) {
+          console.log('[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)');
+          searchObj.meta.nlpMode = false;
+        }
+      }
+    );
+
+    // Watch NLP mode toggle - turn off SQL mode when NLP mode is enabled
+    watch(
+      () => searchObj.meta.nlpMode,
+      (newNlpMode, oldNlpMode) => {
+        // Only act when NLP mode is turned ON (not when turning off)
+        if (newNlpMode === true && oldNlpMode === false) {
+          console.log('[NL2Q-Handler] NLP mode enabled, turning off SQL mode (mutually exclusive)');
+          searchObj.meta.sqlMode = false;
+        }
+      }
+    );
+
     onBeforeUnmount(() => {
       queryEditorRef.value = null;
       fnEditorRef.value = null;
@@ -2558,6 +2637,11 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      console.log('[NL2Q-SearchBar] Component mounted, handler registered:', typeof handleNlpModeDetected);
+      console.log('[NL2Q-SearchBar] AI enabled:', store.state.zoConfig?.ai_enabled);
+      console.log('[NL2Q-SearchBar] Current route:', router.currentRoute.value.name);
+      console.log('[NL2Q-SearchBar] CodeQueryEditor should render:', router.currentRoute.value.name === 'logs');
+
       searchObj.data.transformType =
         router.currentRoute.value.query.transformType || "function";
 
@@ -3882,6 +3966,48 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Auto-toggle NLP mode when natural language is detected
+     */
+    const handleNlpModeDetected = (isDetected: boolean) => {
+      console.log('[NL2Q-Handler] ===== HANDLER CALLED =====');
+      console.log('[NL2Q-Handler] handleNlpModeDetected called', {
+        isDetected,
+        aiEnabled: store.state.zoConfig.ai_enabled,
+        currentNlpMode: searchObj.meta.nlpMode
+      });
+
+      // Handle both turning on and turning off NLP mode
+      if (store.state.zoConfig.ai_enabled) {
+        if (isDetected) {
+          console.log('[NL2Q-Handler] Setting nlpMode to true (natural language detected)');
+          searchObj.meta.nlpMode = true;
+          // NLP mode and SQL mode are mutually exclusive - turn off SQL mode
+          if (searchObj.meta.sqlMode) {
+            console.log('[NL2Q-Handler] Turning off SQL mode (mutually exclusive with NLP)');
+            searchObj.meta.sqlMode = false;
+          }
+        } else {
+          console.log('[NL2Q-Handler] Setting nlpMode to false (SQL generated or not NL)');
+          searchObj.meta.nlpMode = false;
+        }
+      } else {
+        console.log('[NL2Q-Handler] AI not enabled, not changing nlpMode');
+      }
+    };
+
+    /**
+     * Handle Generate SQL Query when in NLP mode
+     * Calls the handleGenerateSQL method from CodeQueryEditor
+     */
+    const handleGenerateSQLQuery = () => {
+      // Call the exposed handleGenerateSQL method from query editor
+      const queryEditor = queryEditorRef.value;
+      if (queryEditor && typeof queryEditor.handleGenerateSQL === 'function') {
+        queryEditor.handleGenerateSQL();
+      }
+    };
+
     const onLogsVisualizeToggleUpdate = (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
@@ -4249,6 +4375,11 @@ export default defineComponent({
         ? getImageURL("images/common/hugeicons_sql_light.svg")
         : getImageURL("images/common/hugeicons_sql.svg");
     });
+    const nlpIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg");
+    });
     const quickModeIcon = computed(() => {
       return store.state.theme === "dark"
         ? getImageURL("images/common/quick_mode_light.svg")
@@ -4406,12 +4537,15 @@ export default defineComponent({
       visualizeIcon,
       histogramIcon,
       sqlIcon,
+      nlpIcon,
       quickModeIcon,
       searchHistoryIcon,
       downloadTableIcon,
       customRangeIcon,
       createScheduledSearchIcon,
       listScheduledSearchIcon,
+      handleNlpModeDetected,
+      handleGenerateSQLQuery,
       getColumnNames,
       getSearchObj,
       toggleHistogram,
@@ -4694,6 +4828,46 @@ export default defineComponent({
   width: 1rem; // 16px
   height: 1rem; // 16px
   object-fit: contain;
+}
+
+// AI Generate Button Styling (matches O2 AI Assistant - purple gradient)
+.o2-ai-generate-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border: none !important;
+  font-size: 0.6875rem !important; // 11px - match Run Query button
+  font-weight: 600 !important;
+  line-height: 1rem !important; // 16px - match Run Query button
+  transition: all 0.3s ease !important;
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important; // 0 4px 15px
+  padding: 0 0.75rem !important; // 0 12px - same as Run Query button
+  width: auto !important; // Auto width, no fixed constraint
+
+  // Flexbox alignment to control spacing
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.25rem !important; // 4px gap between icon and text (tighter spacing)
+
+  &:hover:not(.disabled):not([disabled]):not(:disabled) {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+    box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.4) !important; // 0 6px 20px
+    transform: translateY(-0.0625rem) !important; // -1px
+  }
+
+  &:active:not(.disabled):not([disabled]):not(:disabled) {
+    transform: translateY(0) !important;
+    box-shadow: 0 0.125rem 0.625rem 0 rgba(102, 126, 234, 0.3) !important; // 0 2px 10px
+  }
+
+  // Icon styling within button - white color to match text
+  img {
+    filter: brightness(0) invert(1);
+    opacity: 1;
+    margin: 0 !important; // Remove any default margin, using gap instead
+    width: 0.875rem !important; // 14px - slightly smaller for better fit
+    height: 0.875rem !important; // 14px
+  }
 }
 
 .q-dark .toolbar-icon {

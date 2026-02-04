@@ -403,6 +403,7 @@ const useSqlSuggestions = () => {
     getSuggestions,
     updateFieldKeywords,
     updateFunctionKeywords,
+    defaultSuggestions, // Export for use in natural language detection
   };
 };
 
