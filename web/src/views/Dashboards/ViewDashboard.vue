@@ -1273,10 +1273,10 @@ export default defineComponent({
       const panelTimeParams: Record<string, any> = {};
 
       // Find the currently active tab and iterate through its panels only
+      const activeTab = currentDashboardData.data.tabs.find(
+        (tab: any) => tab.tabId === selectedTabId.value
+      );
       if (currentDashboardData.data?.tabs && selectedTabId.value) {
-        const activeTab = currentDashboardData.data.tabs.find(
-          (tab: any) => tab.tabId === selectedTabId.value
-        );
 
         if (activeTab?.panels) {
           activeTab.panels.forEach((panel: any) => {
@@ -1296,10 +1296,32 @@ export default defineComponent({
         }
       }
 
-      // Preserve any panel time params from URL that might have been manually set
+      // Build set of existing panel IDs across ALL tabs (not just active tab)
+      // This ensures we keep datetime params for panels in other tabs
+      const existingPanelIds = new Set<string>();
+      if (currentDashboardData.data?.tabs) {
+        currentDashboardData.data.tabs.forEach((tab: any) => {
+          if (tab.panels) {
+            tab.panels.forEach((panel: any) => {
+              if (panel.id) {
+                existingPanelIds.add(panel.id);
+              }
+            });
+          }
+        });
+      }
+
+      // Preserve only panel time params from URL for panels that still exist in ANY tab
+      // This ensures deleted panel parameters are removed from the URL, but keeps params for other tabs
       Object.keys(route.query).forEach((key) => {
         if (key.startsWith("pt-")) {
-          panelTimeParams[key] = route.query[key];
+          // Extract panel ID from parameter name (e.g., "pt-period.panel123" -> "panel123")
+          const panelId = key.split('.').slice(1).join('.');
+
+          // Only preserve if panel still exists in any tab of the dashboard
+          if (panelId && existingPanelIds.has(panelId)) {
+            panelTimeParams[key] = route.query[key];
+          }
         }
       });
 
