@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="selectSpan(span.spanId)"
                 :data-test="`trace-tree-span-select-btn-${span.spanId}`"
               >
-                <div class="flex items-center">
+                <div class="ellipsis flex items-center span-name-section-content">
                   <q-icon
                     v-if="span.spanStatus === 'ERROR'"
                     name="error"
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="isLLMTrace(span)"
                   class="flex items-center text-caption text-red-6"
-                  style="margin-top: -2px; margin-bottom: 2px; line-height: 1;"
+                  style="margin-top: -4px; margin-bottom: 2px; line-height: 1;"
                 >
                   <span v-if="span.llm_usage?.total > 0" class="q-mr-sm">
                     <q-icon name="functions" size="10px" />
@@ -641,13 +641,17 @@ export default defineComponent({
   padding-left: 0.25rem;
 }
 
+.span-name-section-content {
+  display: block;
+}
+
 .span-background-wrapper {
   flex-grow: 1;
   position: relative;
 }
 
 .operation-name-container {
-  min-height: 1.875rem;
+  height: 1.875rem;
   overflow: visible;
 
   .view-logs-container {
