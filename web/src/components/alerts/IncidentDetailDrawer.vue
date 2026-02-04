@@ -1033,24 +1033,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || (!correlationLoading && !correlationProps)" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="logsCorrelationError || (!correlationLoading && !correlationProps)" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
-              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              :name="logsCorrelationError ? 'error_outline' : 'info_outline'"
+              :color="logsCorrelationError ? 'negative' : 'grey-5'"
               size="4rem"
             />
             <div class="text-h6 q-mt-md">
-              {{ correlationError || 'No correlated logs found' }}
-            </div>
-            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+              {{ logsCorrelationError || 'No correlated logs found' }}
             </div>
             <q-btn
-              v-if="correlationError && !correlationError.includes('FQN priority')"
+              v-if="logsCorrelationError"
               color="primary"
               outline
               size="md"
-              @click="() => { correlationProps = null; correlationError = null; loadCorrelation(); }"
+              @click="() => { correlationProps = null; logsCorrelationError = null; loadCorrelation(); }"
               icon="refresh"
               label="Retry"
               class="q-mt-md"
@@ -1351,6 +1348,7 @@ export default defineComponent({
     const correlationData = ref<IncidentCorrelatedStreams | null>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
+    const logsCorrelationError = ref<string | null>(null); // Separate error for logs tab
     const correlationProps = ref<any>(null); // For logs tab correlation
     const { findRelatedTelemetry } = useServiceCorrelation();
 
@@ -1696,7 +1694,7 @@ export default defineComponent({
         console.log(
           "[IncidentDetailDrawer] Correlation feature requires enterprise license"
         );
-        correlationError.value = "Correlation feature requires enterprise license";
+        logsCorrelationError.value = "Correlation feature requires enterprise license";
         return;
       }
 
@@ -1704,19 +1702,19 @@ export default defineComponent({
         console.warn(
           "[IncidentDetailDrawer] Cannot load correlation: missing incident details"
         );
-        correlationError.value = "Missing incident details";
+        logsCorrelationError.value = "Missing incident details";
         return;
       }
 
       correlationLoading.value = true;
-      correlationError.value = null;
+      logsCorrelationError.value = null;
 
       try {
         // Get first alert to determine source stream
         const firstAlert = alerts.value?.[0];
         if (!firstAlert) {
           console.warn("[IncidentDetailDrawer] No alerts found in incident");
-          correlationError.value = "No alerts found in incident";
+          logsCorrelationError.value = "No alerts found in incident";
           return;
         }
 
@@ -1789,12 +1787,12 @@ export default defineComponent({
             correlationProps.value
           );
         } else {
-          correlationError.value =
+          logsCorrelationError.value =
             "No related services found for this incident";
         }
       } catch (err: any) {
         console.error("[IncidentDetailDrawer] Correlation failed:", err);
-        correlationError.value =
+        logsCorrelationError.value =
           err.message || "Failed to load correlation data";
       } finally {
         correlationLoading.value = false;
@@ -1809,15 +1807,17 @@ export default defineComponent({
     // Lazy load correlation when user clicks telemetry tab for the first time
     watch(activeTab, (newTab) => {
       if (newTab === "logs") {
+        // Reset logs-specific error when switching to logs tab
+        logsCorrelationError.value = null;
         // Use new loadCorrelation for logs tab (CorrelatedLogsTable pattern)
         loadCorrelation();
       } else if (newTab === "metrics" || newTab === "traces") {
-        // Keep existing fetchCorrelatedStreams for metrics/traces tabs
-        if (
-          !correlationData.value &&
-          !correlationLoading.value &&
-          !correlationError.value
-        ) {
+        // Reset telemetry error when switching to metrics/traces tabs
+        correlationError.value = null;
+        // Remove correlationError check - logs and metrics/traces use different correlation methods
+        // Always try to fetch if not already loaded
+        if (!correlationData.value && !correlationLoading.value) {
+          console.log(`[IncidentDetailDrawer] Fetching correlation for ${newTab} tab`);
           fetchCorrelatedStreams();
         }
       }
@@ -2039,6 +2039,7 @@ export default defineComponent({
       // Reset correlation state when loading new incident
       correlationData.value = null;
       correlationError.value = null;
+      logsCorrelationError.value = null;
 
       try {
         const org = store.state.selectedOrganization.identifier;
@@ -2075,11 +2076,13 @@ export default defineComponent({
             console.warn('Invalid incident ID in URL');
             correlationData.value = null;
             correlationError.value = null;
+            logsCorrelationError.value = null;
           }
         } else {
           // Clear correlation data when drawer closes
           correlationData.value = null;
           correlationError.value = null;
+          logsCorrelationError.value = null;
         }
       },
       { immediate: true }
@@ -2110,6 +2113,7 @@ export default defineComponent({
       // Clear correlation data when closing
       correlationData.value = null;
       correlationError.value = null;
+      logsCorrelationError.value = null;
 
       // Clear incident context when explicitly closing
       contextRegistry.setActive('');
@@ -2828,6 +2832,7 @@ export default defineComponent({
       correlationData,
       correlationLoading,
       correlationError,
+      logsCorrelationError,
       correlationProps,
       hasCorrelatedData,
       hasAnyStreams,
