@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="incident-list" class="flex q-mt-xs">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
       <!-- Header with title and search -->
-      <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
-          <div class="q-table__title tw:font-[600]" data-test="incidents-list-title">
+      <div class="card-container tw-mb-[0.625rem]">
+        <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4 tw-h-[68px]">
+          <div class="q-table__title tw-font-[600]" data-test="incidents-list-title">
             {{ t("alerts.incidents.title") }}
           </div>
 
-          <div class="tw:flex tw:items-center">
+          <div class="tw-flex tw-items-center">
             <q-input
               v-model="searchQuery"
               dense
@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Incidents table -->
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class="card-container tw:h-[calc(100vh-128px)]">
+      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+      <div class="card-container tw-h-[calc(100vh-128px)]">
         <q-table
           ref="qTableRef"
           v-model:pagination="pagination"
@@ -89,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else-if="col.name === 'title'">
-                <div class="tw:flex tw:items-center tw:gap-1">
-                  <span class="tw:font-medium">
+                <div class="tw-flex tw-items-center tw-gap-1">
+                  <span class="tw-font-medium">
                     {{ props.row.title || formatDimensions(props.row.stable_dimensions) }}
                   </span>
                 </div>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatTimestamp(props.row.last_alert_at) }}
               </template>
               <template v-else-if="col.name === 'actions'">
-                <div class="tw:flex tw:justify-end">
+                <div class="tw-flex tw-justify-end">
                   <q-btn
                     v-if="props.row.status === 'open'"
                     flat
@@ -163,22 +163,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Loading state -->
         <template #loading>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
+          <div class="tw-flex tw-items-center tw-justify-center tw-py-20">
             <q-spinner-hourglass color="primary" size="3rem" />
           </div>
         </template>
 
         <!-- Empty state -->
         <template #no-data>
-          <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
+          <div v-if="!loading" class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full">
             <no-data />
           </div>
         </template>
 
         <!-- Bottom pagination -->
         <template v-slot:bottom="scope">
-          <div class="bottom-btn tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+          <div class="bottom-btn tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
               {{ pagination.rowsNumber }} {{ pagination.rowsNumber === 1 ? 'Incident' : 'Incidents' }}
             </div>
             <QTablePagination
