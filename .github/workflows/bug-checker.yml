@@ -75,7 +75,16 @@ jobs:
             const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
             let searchCount = 0;
 
+            // Limit total bugs to check (use same limit as Claude analysis for testing)
+            let bugsChecked = 0;
+
             for (const issue of openBugs) {
+              // Stop if we've checked enough bugs
+              if (bugsChecked >= maxBugsToAnalyze) {
+                console.log(`\nReached limit of ${maxBugsToAnalyze} bugs checked, stopping.`);
+                break;
+              }
+
               // Skip PRs (GitHub API returns PRs as issues too)
               if (issue.pull_request) continue;
 
@@ -85,6 +94,8 @@ jobs:
                 console.log(`Skipping #${issue.number} - too recent (${Math.floor(issueAge)} days old)`);
                 continue;
               }
+
+              bugsChecked++;
 
               console.log(`\nChecking issue #${issue.number}: ${issue.title}`);
 
