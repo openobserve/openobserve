@@ -837,7 +837,11 @@ export default defineComponent({
                     }
 
                     // Format error message with suggestion if available
-                    let errorMessage = `Error: ${data.error || data.message || 'An unexpected error occurred'}`;
+                    // Handle case where error/message might be an object instead of string
+                    const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                    const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+
+                    let errorMessage = `Error: ${errorText}`;
                     if (data.suggestion) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
@@ -862,7 +866,12 @@ export default defineComponent({
                         lastMessage.contentBlocks = [];
                       }
                       lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                      // Clear pending tool calls to avoid leaking into later messages
+                      pendingToolCalls.value = [];
                     }
+
+                    // Reset streaming state
+                    currentTextSegment.value = '';
 
                     // Save error message to history
                     await saveToHistory();
@@ -1046,7 +1055,11 @@ export default defineComponent({
                   }
 
                   // Format error message with suggestion if available
-                  let errorMessage = `Error: ${data.error || data.message || 'An unexpected error occurred'}`;
+                  // Handle case where error/message might be an object instead of string
+                  const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                  const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+
+                  let errorMessage = `Error: ${errorText}`;
                   if (data.suggestion) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
@@ -1071,7 +1084,12 @@ export default defineComponent({
                       lastMessage.contentBlocks = [];
                     }
                     lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                    // Clear pending tool calls to avoid leaking into later messages
+                    pendingToolCalls.value = [];
                   }
+
+                  // Reset streaming state
+                  currentTextSegment.value = '';
 
                   // Save error message to history
                   await saveToHistory();
