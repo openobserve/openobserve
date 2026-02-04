@@ -16,7 +16,7 @@ const generateUniqueDashboardName = () =>
 
 // Use serial mode to prevent race conditions and resource contention between tests
 // This ensures stable test execution when running the full test suite
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "parallel" });
 
 // Add retries for flaky network conditions
 test.describe.configure({ retries: 1 });
@@ -683,202 +683,6 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
-});
-
-test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => {
-  // Ensure metrics are ingested once before all PromQL tests run
-  test.beforeAll(async () => {
-    await ensureMetricsIngested();
-  });
-
-  test.beforeEach(async ({ page }) => {
-    await navigateToBase(page);
-    // Note: Metrics ingestion is handled by beforeAll, logs ingestion not needed for PromQL tests
-  });
-
-  test("should enable pagination for PromQL table chart", async ({
-    page,
-  }) => {
-    const dashboardName = generateUniqueDashboardName();
-    const pm = new PageManager(page);
-    const panelName =
-      pm.dashboardPanelActions.generateUniquePanelName("promql-pagination");
-
-    // Navigate to dashboards
-    await pm.dashboardList.menuItem("dashboards-item");
-    await waitForDashboardPage(page);
-    await pm.dashboardCreate.waitForDashboardUIStable();
-
-    // Create dashboard and add table panel with PromQL
-    await pm.dashboardCreate.createDashboard(dashboardName);
-    await pm.dashboardCreate.addPanel();
-    await pm.dashboardPanelActions.addPanelName(panelName);
-
-    // Select table chart type first
-    await pm.chartTypeSelector.selectChartType("table");
-
-    // Select metrics stream type (required for PromQL button to appear)
-    await pm.chartTypeSelector.selectStreamType("metrics");
-
-    // Check if PromQL button is visible (only shows for metrics stream type)
-    const promqlButton = page.locator('[data-test="dashboard-promql-query-type"]');
-    const isPromqlVisible = await promqlButton.isVisible().catch(() => false);
-
-    if (!isPromqlVisible) {
-      testLogger.warn('PromQL button not visible - metrics stream type may not support PromQL or no metrics data available');
-      // Skip test gracefully if PromQL is not available
-      await pm.dashboardCreate.backToDashboardList();
-      await deleteDashboard(page, dashboardName);
-      test.skip(true, 'PromQL button not available for metrics stream');
-      return;
-    }
-
-    // Switch to PromQL mode
-    await promqlButton.click();
-
-    // Switch to Custom mode to enable the query editor for manual input
-    const customButton = page.locator('[data-test="dashboard-custom-query-type"]');
-    await customButton.waitFor({ state: "visible", timeout: 5000 });
-    await customButton.click();
-
-    // Wait for query editor to appear (uses same editor for SQL and PromQL)
-    const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-    await queryEditor.waitFor({ state: "visible", timeout: 10000 });
-
-    // Focus on the editor and enter a simple PromQL query
-    await queryEditor.locator('.monaco-editor').click();
-    await queryEditor.locator('.inputarea').fill('up');
-
-    // Apply
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
-
-    // Open config panel
-    await pm.dashboardPanelConfigs.openConfigPanel();
-
-    // Verify pagination toggle is visible for PromQL table
-    const paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
-    await expect(paginationToggle).toBeVisible();
-
-    // Enable pagination
-    await paginationToggle.click();
-
-    // Verify rows per page input appears
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.waitFor({ state: "visible" });
-    await expect(rowsPerPageInput).toBeVisible();
-
-    // Set rows per page
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("20");
-
-    // Apply changes
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
-
-    testLogger.info('Verified pagination works for PromQL table chart');
-
-    // Clean up - save panel first before navigating back
-    await pm.dashboardPanelActions.savePanel();
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, dashboardName);
-  });
-
-  test("should display pagination controls in PromQL table with legend filter", async ({
-    page,
-  }) => {
-    const dashboardName = generateUniqueDashboardName();
-    const pm = new PageManager(page);
-    const panelName =
-      pm.dashboardPanelActions.generateUniquePanelName("promql-pagination");
-
-    // Navigate to dashboards
-    await pm.dashboardList.menuItem("dashboards-item");
-    await waitForDashboardPage(page);
-    await pm.dashboardCreate.waitForDashboardUIStable();
-
-    // Create dashboard and add table panel with PromQL
-    await pm.dashboardCreate.createDashboard(dashboardName);
-    await pm.dashboardCreate.addPanel();
-    await pm.dashboardPanelActions.addPanelName(panelName);
-
-    // Select table chart type first
-    await pm.chartTypeSelector.selectChartType("table");
-
-    // Select metrics stream type (required for PromQL button to appear)
-    await pm.chartTypeSelector.selectStreamType("metrics");
-
-    // Check if PromQL button is visible (only shows for metrics stream type)
-    const promqlButton = page.locator('[data-test="dashboard-promql-query-type"]');
-    const isPromqlVisible = await promqlButton.isVisible().catch(() => false);
-
-    if (!isPromqlVisible) {
-      testLogger.warn('PromQL button not visible - metrics stream type may not support PromQL or no metrics data available');
-      // Skip test gracefully if PromQL is not available
-      await pm.dashboardCreate.backToDashboardList();
-      await deleteDashboard(page, dashboardName);
-      test.skip(true, 'PromQL button not available for metrics stream');
-      return;
-    }
-
-    // Switch to PromQL mode
-    await promqlButton.click();
-
-    // Switch to Custom mode to enable the query editor for manual input
-    const customButton = page.locator('[data-test="dashboard-custom-query-type"]');
-    await customButton.waitFor({ state: "visible", timeout: 5000 });
-    await customButton.click();
-
-    // Wait for query editor to appear (uses same editor for SQL and PromQL)
-    const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-    await queryEditor.waitFor({ state: "visible", timeout: 10000 });
-
-    // Focus on the editor and enter a PromQL query
-    await queryEditor.locator('.monaco-editor').click();
-    await queryEditor.locator('.inputarea').fill('up');
-
-    // Apply
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
-
-    // Open config panel and enable pagination
-    await pm.dashboardPanelConfigs.openConfigPanel();
-    const paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
-    await paginationToggle.click();
-
-    // Set rows per page
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("10");
-
-    // Apply changes
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
-
-    // Verify both legend filter and pagination controls are visible
-    // The PromQL table has a legend filter in the footer along with pagination
-    const tableBottom = page.locator('[data-test="dashboard-panel-table"] .q-table__bottom');
-    await tableBottom.waitFor({ state: "visible", timeout: 10000 });
-    await expect(tableBottom).toBeVisible();
-
-    // Check for pagination text
-    const recordsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
-    await expect(recordsPerPageText).toBeVisible();
-
-    testLogger.info('Verified PromQL table displays both legend filter and pagination controls');
-
-    // Clean up - save panel first before navigating back
-    await pm.dashboardPanelActions.savePanel();
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, dashboardName);
-  });
-});
-
-test.describe("Dashboard Table Chart Pagination Feature - Edge Cases", () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToBase(page);
-    await ingestion(page);
-  });
 
   test("should handle rows per page input validation - minimum value", async ({
     page,
@@ -1158,6 +962,210 @@ test.describe("Dashboard Table Chart Pagination Feature - Edge Cases", () => {
     await expect(recordsPerPageText).toBeVisible();
 
     testLogger.info('Verified pagination works with custom SQL query table');
+
+    // Clean up - save panel first before navigating back
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+});
+
+test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => {
+  // Ensure metrics are ingested once before all PromQL tests run
+  test.beforeAll(async () => {
+    await ensureMetricsIngested();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await navigateToBase(page);
+    // Note: Metrics ingestion is handled by beforeAll, logs ingestion not needed for PromQL tests
+  });
+
+  test("should enable pagination for PromQL table chart", async ({
+    page,
+  }) => {
+    const dashboardName = generateUniqueDashboardName();
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("promql-pagination");
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+
+    // Create dashboard and add table panel with PromQL
+    await pm.dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Select table chart type first
+    await pm.chartTypeSelector.selectChartType("table");
+
+    // Select metrics stream type (required for PromQL button to appear)
+    await pm.chartTypeSelector.selectStreamType("metrics");
+
+    // Check if PromQL button is visible (only shows for metrics stream type)
+    const promqlButton = page.locator('[data-test="dashboard-promql-query-type"]');
+    const isPromqlVisible = await promqlButton.isVisible().catch(() => false);
+
+    if (!isPromqlVisible) {
+      testLogger.warn('PromQL button not visible - metrics stream type may not support PromQL or no metrics data available');
+      // Skip test gracefully if PromQL is not available
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+      test.skip(true, 'PromQL button not available for metrics stream');
+      return;
+    }
+
+    // Switch to PromQL mode
+    await promqlButton.click();
+
+    // Switch to Custom mode to enable the query editor for manual input
+    const customButton = page.locator('[data-test="dashboard-custom-query-type"]');
+    await customButton.waitFor({ state: "visible", timeout: 5000 });
+    await customButton.click();
+
+    // Wait for query editor to appear (uses same editor for SQL and PromQL)
+    const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+    await queryEditor.waitFor({ state: "visible", timeout: 10000 });
+
+    // Focus on the editor and enter a simple PromQL query
+    await queryEditor.locator('.monaco-editor').click();
+    await queryEditor.locator('.inputarea').fill('up');
+
+    // Apply
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Open config panel
+    await pm.dashboardPanelConfigs.openConfigPanel();
+
+    // Verify pagination toggle is visible for PromQL table
+    const paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
+    await expect(paginationToggle).toBeVisible();
+
+    // Enable pagination
+    await paginationToggle.click();
+
+    // Verify rows per page input appears
+    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
+    await rowsPerPageInput.waitFor({ state: "visible" });
+    await expect(rowsPerPageInput).toBeVisible();
+
+    // Set rows per page
+    await rowsPerPageInput.click();
+    await rowsPerPageInput.fill("20");
+
+    // Apply changes
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    testLogger.info('Verified pagination works for PromQL table chart');
+
+    // Clean up - save panel first before navigating back
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should display pagination controls in PromQL table with legend filter", async ({
+    page,
+  }) => {
+    const dashboardName = generateUniqueDashboardName();
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("promql-pagination");
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+
+    // Create dashboard and add table panel with PromQL
+    await pm.dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Select table chart type first
+    await pm.chartTypeSelector.selectChartType("table");
+
+    // Select metrics stream type (required for PromQL button to appear)
+    await pm.chartTypeSelector.selectStreamType("metrics");
+
+    // Check if PromQL button is visible (only shows for metrics stream type)
+    const promqlButton = page.locator('[data-test="dashboard-promql-query-type"]');
+    const isPromqlVisible = await promqlButton.isVisible().catch(() => false);
+
+    if (!isPromqlVisible) {
+      testLogger.warn('PromQL button not visible - metrics stream type may not support PromQL or no metrics data available');
+      // Skip test gracefully if PromQL is not available
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+      test.skip(true, 'PromQL button not available for metrics stream');
+      return;
+    }
+
+    // Switch to PromQL mode
+    await promqlButton.click();
+
+    // Switch to Custom mode to enable the query editor for manual input
+    const customButton = page.locator('[data-test="dashboard-custom-query-type"]');
+    await customButton.waitFor({ state: "visible", timeout: 5000 });
+    await customButton.click();
+
+    // Wait for query editor to appear (uses same editor for SQL and PromQL)
+    const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+    await queryEditor.waitFor({ state: "visible", timeout: 10000 });
+
+    // Focus on the editor and enter a PromQL query
+    await queryEditor.locator('.monaco-editor').click();
+    await queryEditor.locator('.inputarea').fill('up');
+
+    // Apply
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Open config panel and enable pagination
+    await pm.dashboardPanelConfigs.openConfigPanel();
+    const paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
+    await paginationToggle.click();
+
+    // Set rows per page
+    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
+    await rowsPerPageInput.click();
+    await rowsPerPageInput.fill("10");
+
+    // Apply changes and wait for table data to load
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Wait for the table to have data rows first (PromQL query needs time to execute)
+    const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
+    await tablePanel.waitFor({ state: "visible", timeout: 15000 });
+
+    // Wait for table rows to appear (ensures data is loaded)
+    const tableRows = tablePanel.locator('tbody tr, .q-table__grid-content .q-card');
+    await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).catch(() => {
+      testLogger.warn('No table rows found - PromQL query may not have returned data');
+    });
+
+    // Give extra time for pagination controls to render after data loads
+    await page.waitForTimeout(1000);
+
+    // Verify "Records per page" text is visible
+    const recordsPerPageText = tablePanel.getByText('Records per page');
+    await expect(recordsPerPageText).toBeVisible({ timeout: 10000 });
+
+    // Verify the record count display shows correct format (e.g., "1-10 of 68")
+    const paginationInfo = tablePanel.locator('.q-table__bottom, .q-table__control').getByText(/\d+-\d+\s+of\s+\d+/);
+    await expect(paginationInfo).toBeVisible({ timeout: 5000 });
+
+    // Verify pagination shows "1-10 of X" (confirms 10 rows per page setting)
+    const paginationText = await paginationInfo.textContent();
+    expect(paginationText).toMatch(/^1-10\s+of\s+\d+$/);
+
+    testLogger.info(`Verified PromQL table pagination: ${paginationText}`);
 
     // Clean up - save panel first before navigating back
     await pm.dashboardPanelActions.savePanel();
