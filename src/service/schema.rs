@@ -373,7 +373,8 @@ pub(crate) async fn handle_diff_schema(
             ALL_VALUES_COL_NAME.to_string(),
             cfg.common.column_all.to_string(),
         ];
-        let mut keep_fields = check_schema_for_defined_schema_fields(stream_type, keep_fields);
+        let mut keep_fields =
+            check_schema_for_defined_schema_fields(stream_type, &final_schema, keep_fields);
         // add FTS fields (default SQL FTS fields)
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
             keep_fields.insert(field.to_string());
@@ -504,7 +505,8 @@ pub fn generate_schema_for_defined_schema_fields(
     }
 
     let cfg = get_config();
-    let mut fields = check_schema_for_defined_schema_fields(stream_type, fields.to_vec());
+    let mut fields =
+        check_schema_for_defined_schema_fields(stream_type, schema.schema(), fields.to_vec());
     fields.insert(TIMESTAMP_COL_NAME.to_string());
     fields.insert(cfg.common.column_all.to_string());
     if need_original || index_original_data {
@@ -533,6 +535,7 @@ pub fn generate_schema_for_defined_schema_fields(
 
 pub fn check_schema_for_defined_schema_fields(
     stream_type: StreamType,
+    schema: &Schema,
     fields: Vec<String>,
 ) -> HashSet<String> {
     let mut fields: HashSet<String> = fields.into_iter().collect();
@@ -562,6 +565,12 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert("end_time".to_string());
             fields.insert("duration".to_string());
             fields.insert("events".to_string());
+            // Automatically include all fields with _o2_llm_ prefix from the schema
+            for field in schema.fields() {
+                if field.name().starts_with("_o2_llm_") {
+                    fields.insert(field.name().to_string());
+                }
+            }
         }
         _ => {}
     }
