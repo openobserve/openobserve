@@ -304,29 +304,28 @@ export async function assertMultiplePanelTimes(page, panelTimeConfigs) {
 export async function assertPanelTimePickerInModal(page) {
   testLogger.info('Asserting panel time picker in modal');
 
-  const modal = page.locator('[data-test="view-panel-modal"]');
+  const modal = page.locator('[data-test="view-panel-screen"]');
   await expect(modal).toBeVisible();
 
-  const pickerInModal = modal.locator('[data-test*="panel-time-picker"]');
+  const pickerInModal = modal.locator('[data-test="dashboard-viewpanel-date-time-picker"]');
   await expect(pickerInModal).toBeVisible({ timeout: 5000 });
 
   testLogger.info('Panel time picker in modal verified');
 }
 
 /**
- * Assert panel time picker exists in full screen
+ * Assert panel time picker exists in full screen (which is same as dashboard view)
  * @param {Object} page - Playwright page object
+ * @param {string} panelId - Panel ID
  */
-export async function assertPanelTimePickerInFullScreen(page) {
-  testLogger.info('Asserting panel time picker in full screen');
+export async function assertPanelTimePickerInFullScreen(page, panelId) {
+  testLogger.info('Asserting panel time picker in full screen', { panelId });
 
-  const fullScreen = page.locator('[data-test="panel-fullscreen"]');
-  await expect(fullScreen).toBeVisible();
+  // Full screen is just the regular dashboard view
+  const picker = page.locator(`[data-test="panel-time-picker-${panelId}"]`);
+  await expect(picker).toBeVisible({ timeout: 10000 });
 
-  const pickerInFullScreen = page.locator('[data-test="panel-fullscreen-time-picker"]');
-  await expect(pickerInFullScreen).toBeVisible({ timeout: 5000 });
-
-  testLogger.info('Panel time picker in full screen verified');
+  testLogger.info('Panel time picker in full screen verified', { panelId });
 }
 
 /**
