@@ -40,7 +40,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Navigate to metrics page
         await pm.metricsPage.gotoMetricsPage();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 30000 });
 
         // Close any dialogs or modals that might be open
         await page.keyboard.press('Escape');
