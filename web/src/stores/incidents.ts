@@ -17,12 +17,16 @@ export default {
   namespaced: true,
   state: {
     incidents: {},
+    cachedData: [], // Cache the actual incidents data
     pageBeforeSearch: 1, // Track page number before search starts (for smart restoration)
     isInitialized: false
   },
   getters: {
     getIncidents(state: any) {
       return state.incidents;
+    },
+    getCachedData(state: any) {
+      return state.cachedData;
     },
     getPageBeforeSearch(state: any) {
       return state.pageBeforeSearch;
@@ -35,6 +39,9 @@ export default {
     setIncidents(state: any, incidents: any) {
       state.incidents = incidents;
     },
+    setCachedData(state: any, data: any[]) {
+      state.cachedData = data;
+    },
     setPageBeforeSearch(state: any, page: number) {
       state.pageBeforeSearch = page;
     },
@@ -43,6 +50,7 @@ export default {
     },
     resetIncidents(state: any) {
       state.incidents = {};
+      state.cachedData = [];
       state.pageBeforeSearch = 1;
       state.isInitialized = false;
     },
@@ -50,6 +58,9 @@ export default {
   actions: {
     setIncidents(context: any, incidents: any) {
       context.commit('setIncidents', incidents);
+    },
+    setCachedData(context: any, data: any[]) {
+      context.commit('setCachedData', data);
     },
     setPageBeforeSearch(context: any, page: number) {
       context.commit('setPageBeforeSearch', page);

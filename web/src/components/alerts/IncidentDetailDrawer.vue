@@ -1216,7 +1216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed, PropType, nextTick, onUnmounted } from "vue";
+import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -2043,6 +2043,27 @@ export default defineComponent({
         },
       });
     };
+
+    // Handle ESC key to close incident detail
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        // Don't close if user is editing title
+        if (isEditingTitle.value) {
+          return;
+        }
+        close();
+      }
+    };
+
+    // Add keyboard event listener on mount
+    onMounted(() => {
+      window.addEventListener('keydown', handleEscapeKey);
+    });
+
+    // Remove keyboard event listener on unmount
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', handleEscapeKey);
+    });
 
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;

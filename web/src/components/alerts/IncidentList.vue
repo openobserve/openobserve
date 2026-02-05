@@ -24,7 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.incidents.title") }}
           </div>
 
-          <div class="tw:flex tw:items-center">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <q-btn
+              flat
+              dense
+              round
+              icon="refresh"
+              color="primary"
+              :loading="loading"
+              @click="refreshIncidents"
+              data-test="incident-refresh-btn"
+            >
+              <q-tooltip>Refresh</q-tooltip>
+            </q-btn>
             <q-input
               v-model="searchQuery"
               dense
@@ -93,6 +105,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="tw:font-medium">
                     {{ props.row.title || formatDimensions(props.row.stable_dimensions) }}
                   </span>
+                </div>
+              </template>
+              <template v-else-if="col.name === 'dimensions'">
+                <div class="tw:flex tw:flex-wrap tw:gap-1">
+                  <q-chip
+                    v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions)"
+                    :key="key"
+                    size="sm"
+                    :color="getDimensionColor(key)"
+                    text-color="white"
+                    class="dimension-chip"
+                    dense
+                  >
+                    <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                    <q-tooltip :delay="300" class="tw:text-xs">
+                      {{ key }}={{ value }}
+                    </q-tooltip>
+                  </q-chip>
                 </div>
               </template>
               <template v-else-if="col.name === 'alert_count'">
@@ -307,6 +337,13 @@ export default defineComponent({
         align: "left" as const,
       },
       {
+        name: "dimensions",
+        label: "Dimensions",
+        field: "stable_dimensions",
+        align: "left" as const,
+        style: "width: 800px;",
+      },
+      {
         name: "alert_count",
         label: t("alerts.incidents.alertCount"),
         field: "alert_count",
@@ -392,6 +429,9 @@ export default defineComponent({
 
         // Store all incidents
         allIncidents.value = response.data.incidents;
+
+        // Cache data in store for when navigating back
+        store.dispatch('incidents/setCachedData', response.data.incidents);
 
         // Apply frontend search filter
         const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
@@ -545,12 +585,69 @@ export default defineComponent({
         .join(", ");
     };
 
+    const getSortedDimensions = (dimensions: Record<string, string>) => {
+      if (!dimensions || Object.keys(dimensions).length === 0) {
+        return [];
+      }
+
+      // Sort keys alphabetically for consistency
+      return Object.keys(dimensions)
+        .sort()
+        .map(key => [key, dimensions[key]] as [string, string]);
+    };
+
+    const getDimensionColor = (key: string) => {
+      // Color palette that works in both light and dark modes
+      const colorMap: Record<string, string> = {
+        'k8s-deployment': 'blue',
+        'k8s-namespace': 'purple',
+        'deployment': 'blue',
+        'namespace': 'purple',
+        'env': 'green',
+        'environment': 'green',
+        'host': 'orange',
+        'hostname': 'orange',
+        'service': 'cyan',
+        'service_name': 'cyan',
+        'region': 'pink',
+        'zone': 'pink',
+        'cluster': 'indigo',
+        'pod': 'teal',
+        'container': 'deep-orange',
+        'app': 'lime',
+        'application': 'lime',
+      };
+
+      // Check for exact match first
+      if (colorMap[key]) {
+        return colorMap[key];
+      }
+
+      // Check for partial matches
+      const lowerKey = key.toLowerCase();
+      for (const [pattern, color] of Object.entries(colorMap)) {
+        if (lowerKey.includes(pattern)) {
+          return color;
+        }
+      }
+
+      // Hash-based fallback for consistency
+      const colors = ['blue-grey', 'brown', 'deep-purple', 'amber'];
+      let hash = 0;
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return colors[Math.abs(hash) % colors.length];
+    };
+
     /**
      * Restores state from Vuex store or resets if organization changed
      * @returns {boolean} True if state was restored, false if reset
      */
     const restoreStateFromStore = (): boolean => {
       const savedState = store.state.incidents.incidents;
+      const cachedData = store.state.incidents.cachedData;
       const isInitialized = store.state.incidents.isInitialized;
       const currentOrg = store.state.selectedOrganization.identifier;
 
@@ -562,6 +659,7 @@ export default defineComponent({
 
         // Reset local state to defaults
         searchQuery.value = "";
+        allIncidents.value = [];
         pagination.value = {
           sortBy: "last_alert_at",
           descending: true,
@@ -577,6 +675,11 @@ export default defineComponent({
 
         // Prevent watch from interfering during restoration
         isRestoringState.value = true;
+
+        // Restore cached data
+        if (cachedData && cachedData.length > 0) {
+          allIncidents.value = cachedData;
+        }
 
         // Restore pagination
         if (savedState.pagination) {
@@ -651,8 +754,19 @@ export default defineComponent({
       // Restore state from store (or reset if org changed)
       const hasRestoredState = restoreStateFromStore();
 
-      // Load incidents with restored or default state
-      await loadIncidents();
+      // Only load incidents if we don't have data (prevents reload when navigating back)
+      // If hasRestoredState is false but allIncidents has data, org changed and reset happened
+      if (allIncidents.value.length === 0) {
+        // Load incidents with restored or default state
+        await loadIncidents();
+      } else {
+        // We have cached data, just reapply filters and pagination
+        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
+        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const endIndex = startIndex + pagination.value.rowsPerPage;
+        incidents.value = filteredIncidents.slice(startIndex, endIndex);
+        pagination.value.rowsNumber = filteredIncidents.length;
+      }
 
       // Validate pagination after loading data (edge case: restored page is out of bounds)
       const wasCorrected = validateAndCorrectPagination();
@@ -773,6 +887,16 @@ export default defineComponent({
       });
     };
 
+    const refreshIncidents = async () => {
+      // Force reload from API
+      await loadIncidents();
+      $q.notify({
+        type: "positive",
+        message: "Incidents refreshed",
+        timeout: 1500,
+      });
+    };
+
 
     return {
       t,
@@ -788,6 +912,7 @@ export default defineComponent({
       columns,
       searchQuery,
       loadIncidents,
+      refreshIncidents,
       onRequest,
       viewIncident,
       acknowledgeIncident,
@@ -798,6 +923,8 @@ export default defineComponent({
       getSeverityColor,
       formatTimestamp,
       formatDimensions,
+      getSortedDimensions,
+      getDimensionColor,
       toggleStatusFilter,
       toggleSeverityFilter,
       clearStatusFilter,
@@ -806,6 +933,7 @@ export default defineComponent({
       perPageOptions,
       qTableRef,
       validateAndCorrectPagination, // Expose for testing
+      store,
     };
   },
 });
@@ -821,5 +949,19 @@ export default defineComponent({
 
 .o2-search-input {
   width: 250px;
+}
+
+.dimension-chip {
+  margin: 0 !important;
+  font-size: 11px;
+  height: 24px;
+
+  span {
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+  }
 }
 </style>
