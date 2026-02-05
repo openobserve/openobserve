@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-separator v-if="hasLLMSpans" />
 
             <!-- Timeline View - show when no LLM spans OR when timeline tab is active -->
-            <div v-if="!hasLLMSpans || activeTab === 'timeline'">
+            <div v-if="!hasLLMSpans || activeTab === 'timeline'" style="display: flex; flex-direction: column; flex: 1; min-height: 0">
               <trace-header
                 data-test="trace-details-header"
                 :baseTracePosition="baseTracePosition"
@@ -2194,11 +2194,15 @@ $traceChartCollapseHeight: 42px;
   min-height: 0;
   position: relative;
   padding-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .trace-tree-wrapper {
   overflow: hidden;
-  height: calc(100% - 2.5rem);
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
