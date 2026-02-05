@@ -248,6 +248,29 @@ describe("ViewPanel", () => {
             template: '<span data-test="relative-time">{{ timestamp }}</span>',
             props: ["timestamp", "fullTimePrefix"],
           },
+          "PanelErrorButtons": {
+            template: `<div>
+              <q-btn v-if="error" data-test="panel-error-data" class="warning">
+                <q-tooltip>{{ error }}</q-tooltip>
+              </q-btn>
+              <q-btn v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
+                <q-tooltip>{{ maxQueryRangeWarning }}</q-tooltip>
+              </q-btn>
+              <q-btn v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
+                <q-tooltip>{{ limitNumberOfSeriesWarningMessage }}</q-tooltip>
+              </q-btn>
+              <q-btn v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
+                <q-tooltip>The data shown is cached</q-tooltip>
+              </q-btn>
+              <q-btn v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
+                <q-tooltip>Partial data</q-tooltip>
+              </q-btn>
+              <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
+                <span data-test="relative-time">{{ lastTriggeredAt }}</span>
+              </span>
+            </div>`,
+            props: ['error', 'maxQueryRangeWarning', 'limitNumberOfSeriesWarningMessage', 'isCachedDataDifferWithCurrentTimeRange', 'isPartialData', 'isPanelLoading', 'lastTriggeredAt', 'viewOnly']
+          },
           "q-separator": {
             template: '<div class="q-separator"></div>',
           },
