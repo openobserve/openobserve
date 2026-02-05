@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly)"
+    v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly && !simplifiedPanelView)"
     class="row items-center no-wrap"
   >
     <q-btn
@@ -82,7 +82,7 @@
     </q-btn>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
-    <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
+    <span v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView" class="lastRefreshedAt">
       <span class="lastRefreshedAtIcon">
         🕑
         <q-tooltip anchor="bottom right" self="top right">
@@ -141,6 +141,10 @@ export default defineComponent({
       default: null,
     },
     viewOnly: {
+      type: Boolean,
+      default: false,
+    },
+    simplifiedPanelView: {
       type: Boolean,
       default: false,
     },
