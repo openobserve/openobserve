@@ -826,9 +826,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
       <div
         v-if="
-          promqlMode &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.type != 'maps'
+          promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'
         "
         class="q-py-md showLabelOnTop"
         style="font-weight: 600"
@@ -1028,11 +1026,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <CommonAutoComplete
-        v-if="
-          promqlMode &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.type != 'maps'
-        "
+        v-if="promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'"
         :label="t('common.legend')"
         v-model="
           dashboardPanelData.data.queries[
@@ -1541,12 +1535,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-rotate"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px">
+            <div style="display: flex; align-items: center; gap: 4px;">
               <span>Label Rotate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer"
+                style="cursor: pointer;"
                 data-test="dashboard-config-axis-label-rotate-info"
               >
                 <q-tooltip
@@ -1556,11 +1550,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bg-grey-8"
                 >
                   <div>
-                    Rotate the x-axis label text by a chosen angle (in degrees)
-                    to improve readability when labels are long or crowded.
+                    Rotate the x-axis label text by a chosen angle (in degrees) to improve readability when labels are long or crowded.
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for
-                    time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -1568,9 +1560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-input
-          v-model.number="
-            dashboardPanelData.data.config.axis_label_truncate_width
-          "
+          v-model.number="dashboardPanelData.data.config.axis_label_truncate_width"
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1589,12 +1579,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-truncate-width"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px">
+            <div style="display: flex; align-items: center; gap: 4px;">
               <span>Label Truncate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer"
+                style="cursor: pointer;"
                 data-test="dashboard-config-axis-label-truncate-info"
               >
                 <q-tooltip
@@ -1606,8 +1596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     Truncate x-axis labels to the specified width (in pixels).
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for
-                    time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -2632,7 +2621,7 @@ export default defineComponent({
 // Ensure label icons are always interactive
 :deep(.q-field__label) {
   pointer-events: auto !important;
-
+  
   .q-icon {
     pointer-events: auto !important;
   }
@@ -2672,7 +2661,6 @@ export default defineComponent({
   font-weight: bold;
   color: white;
 }
-
 .unit-container {
   display: flex;
   height: 36px;
