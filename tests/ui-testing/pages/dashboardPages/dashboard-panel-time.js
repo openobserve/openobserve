@@ -91,14 +91,20 @@ export default class DashboardPanelTime {
     await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await pickerBtn.click();
 
-    // Select the time range
-    const timeOptionLocator = this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`);
+    // Wait for the dropdown menu to open (use .first() to avoid strict mode violations)
+    await this.page.locator('.q-menu').first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Select the time range within the open menu to avoid strict mode violations
+    const timeOptionLocator = this.page.locator(`.q-menu [data-test="date-time-relative-${timeRange}-btn"]`).first();
     await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
     await timeOptionLocator.click();
 
     // Click apply
     await this.page.locator('[data-test="dashboard-apply"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+
+    // Ensure the time picker dropdown is fully closed before proceeding
+    await this.page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
 
   /**
@@ -171,6 +177,9 @@ export default class DashboardPanelTime {
       // Click apply button
       await this.page.locator('[data-test="dashboard-apply"]').click();
       await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+
+      // Ensure the time picker dropdown is fully closed before proceeding
+      await this.page.locator('.q-menu').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
 
   /**
@@ -211,11 +220,11 @@ export default class DashboardPanelTime {
     // Click the panel time picker button
     await this.clickPanelTimePicker(panelId);
 
-    // Wait for dropdown to open
-    await this.page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    // Wait for dropdown to open (use .first() to avoid strict mode violations)
+    await this.page.locator('.q-menu').first().waitFor({ state: "visible", timeout: 5000 });
 
-    // Select the time range
-    const timeOptionLocator = this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`);
+    // Select the time range within the open menu to avoid strict mode violations
+    const timeOptionLocator = this.page.locator(`.q-menu [data-test="date-time-relative-${timeRange}-btn"]`).first();
     await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
     await timeOptionLocator.click();
 
@@ -280,7 +289,12 @@ export default class DashboardPanelTime {
    */
   async changeGlobalTime(timeRange) {
     await this.clickGlobalTimePicker();
-    await this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).click();
+
+    // Wait for the dropdown menu to open (use .first() to avoid strict mode violations)
+    await this.page.locator('.q-menu').first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Click the time option within the open menu to avoid strict mode violations
+    await this.page.locator(`.q-menu [data-test="date-time-relative-${timeRange}-btn"]`).first().click();
     await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await this.page.locator('[data-test="date-time-apply-btn"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
