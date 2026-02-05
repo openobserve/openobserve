@@ -558,7 +558,11 @@ pub async fn prepare_cache_response(
     }
 
     // calculate hash for the query with version (after normalizing histogram interval)
-    let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
+    let mut hash_body = vec![
+        CACHE_VERSION.to_string(),
+        origin_sql.to_string(),
+        req.query.size.to_string(),
+    ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
     }
