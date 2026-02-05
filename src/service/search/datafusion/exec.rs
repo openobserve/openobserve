@@ -270,7 +270,7 @@ pub async fn merge_parquet_files_with_downsampling(
     let mut file_metas = Vec::new();
     let mut min_ts = 0;
 
-    let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
+    let mut buf = Vec::with_capacity(cfg.compact.max_file_size);
     let mut file_meta = FileMeta::default();
     let mut writer = new_parquet_writer(
         &mut buf,

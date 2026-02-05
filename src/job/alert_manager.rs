@@ -93,7 +93,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         {
             log::debug!("[SEARCH JOB] Running check on running jobs");
             let now = config::utils::time::now_micros();
-            let updated_at = now - (get_config().limit.search_job_run_timeout as i64 * 1_000_000);
+            let updated_at = now - (get_config().limit.search_job_run_timeout * 1_000_000);
             if let Err(e) =
                 service::db::search_job::search_jobs::check_running_jobs(updated_at).await
             {
@@ -121,7 +121,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::debug!("[SEARCH JOB] Running delete jobs by retention");
             let retention_seconds = get_config().limit.search_job_retention * 24 * 60 * 60;
             let now = config::utils::time::now_micros();
-            let updated_at = now - (retention_seconds as i64 * 1_000_000);
+            let updated_at = now - (retention_seconds * 1_000_000);
             if let Err(e) = service::db::search_job::search_jobs::delete_jobs(updated_at).await {
                 log::error!("[SEARCH JOB] Error deleting jobs: {e}");
             }
