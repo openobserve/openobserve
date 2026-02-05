@@ -68,7 +68,7 @@ pub const X_O2_ASSISTANT_SESSION_ID: &str = "x-o2-assistant-session-id";
 /// Extract headers from the request that match the configured passthrough patterns.
 /// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
 fn extract_passthrough_headers(
-    headers: &axum::http::HeaderMap,
+    headers: &actix_web::http::header::HeaderMap,
     passthrough_config: &str,
 ) -> std::collections::HashMap<String, String> {
     let mut result = std::collections::HashMap::new();
@@ -218,7 +218,7 @@ pub async fn chat(
         // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
         // For now, use empty string (no passthrough) until config is updated
         let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
-        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+        let passthrough_headers = extract_passthrough_headers(in_req.headers(), passthrough_config);
 
         // Transform PromptRequest -> QueryRequest
         // Extract the last user message as the query
@@ -431,7 +431,7 @@ pub async fn chat_stream(
         // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
         // For now, use empty string (no passthrough) until config is updated
         let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
-        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+        let passthrough_headers = extract_passthrough_headers(in_req.headers(), passthrough_config);
         // Merge passthrough headers, but don't override already-set headers (like session_id,
         // traceparent)
         for (key, value) in passthrough_headers {
@@ -649,10 +649,11 @@ mod tests {
     #[test]
     fn test_extract_passthrough_headers_exact_match() {
         // Create a test request with headers
-        let mut headers = axum::http::HeaderMap::new();
-        headers.insert("user-agent", "Mozilla/5.0".parse().unwrap());
-        headers.insert("x-custom-header", "custom-value".parse().unwrap());
-        headers.insert("authorization", "Bearer secret".parse().unwrap());
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("Mozilla/5.0"));
+        headers.insert(HeaderName::from_static("x-custom-header"), HeaderValue::from_static("custom-value"));
+        headers.insert(HeaderName::from_static("authorization"), HeaderValue::from_static("Bearer secret"));
 
         let config = "user-agent,x-custom-header";
         let result = extract_passthrough_headers(&headers, config);
@@ -669,11 +670,12 @@ mod tests {
 
     #[test]
     fn test_extract_passthrough_headers_wildcard_match() {
-        let mut headers = axum::http::HeaderMap::new();
-        headers.insert("x-forwarded-for", "192.168.1.1".parse().unwrap());
-        headers.insert("x-forwarded-proto", "https".parse().unwrap());
-        headers.insert("x-forwarded-host", "example.com".parse().unwrap());
-        headers.insert("x-other-header", "other".parse().unwrap());
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(HeaderName::from_static("x-forwarded-for"), HeaderValue::from_static("192.168.1.1"));
+        headers.insert(HeaderName::from_static("x-forwarded-proto"), HeaderValue::from_static("https"));
+        headers.insert(HeaderName::from_static("x-forwarded-host"), HeaderValue::from_static("example.com"));
+        headers.insert(HeaderName::from_static("x-other-header"), HeaderValue::from_static("other"));
 
         let config = "x-forwarded-*";
         let result = extract_passthrough_headers(&headers, config);
@@ -694,11 +696,12 @@ mod tests {
 
     #[test]
     fn test_extract_passthrough_headers_mixed_patterns() {
-        let mut headers = axum::http::HeaderMap::new();
-        headers.insert("user-agent", "curl/7.68.0".parse().unwrap());
-        headers.insert("x-forwarded-for", "10.0.0.1".parse().unwrap());
-        headers.insert("x-forwarded-proto", "http".parse().unwrap());
-        headers.insert("x-request-id", "abc-123".parse().unwrap());
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("curl/7.68.0"));
+        headers.insert(HeaderName::from_static("x-forwarded-for"), HeaderValue::from_static("10.0.0.1"));
+        headers.insert(HeaderName::from_static("x-forwarded-proto"), HeaderValue::from_static("http"));
+        headers.insert(HeaderName::from_static("x-request-id"), HeaderValue::from_static("abc-123"));
 
         let config = "x-forwarded-*,user-agent,x-request-id";
         let result = extract_passthrough_headers(&headers, config);
@@ -712,8 +715,9 @@ mod tests {
 
     #[test]
     fn test_extract_passthrough_headers_empty_config() {
-        let mut headers = axum::http::HeaderMap::new();
-        headers.insert("user-agent", "test".parse().unwrap());
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("test"));
 
         let config = "";
         let result = extract_passthrough_headers(&headers, config);
@@ -723,9 +727,10 @@ mod tests {
 
     #[test]
     fn test_extract_passthrough_headers_case_insensitive() {
-        let mut headers = axum::http::HeaderMap::new();
-        headers.insert("USER-AGENT", "test-agent".parse().unwrap());
-        headers.insert("X-FORWARDED-FOR", "1.2.3.4".parse().unwrap());
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("test-agent"));
+        headers.insert(HeaderName::from_static("x-forwarded-for"), HeaderValue::from_static("1.2.3.4"));
 
         let config = "User-Agent,x-forwarded-for";
         let result = extract_passthrough_headers(&headers, config);
@@ -737,9 +742,10 @@ mod tests {
 
     #[test]
     fn test_extract_passthrough_headers_whitespace_handling() {
-        let mut headers = axum::http::HeaderMap::new();
-        headers.insert("user-agent", "test".parse().unwrap());
-        headers.insert("x-custom", "value".parse().unwrap());
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("test"));
+        headers.insert(HeaderName::from_static("x-custom"), HeaderValue::from_static("value"));
 
         let config = " user-agent , x-custom , ";
         let result = extract_passthrough_headers(&headers, config);
