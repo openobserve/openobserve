@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -825,7 +825,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
-    
+
     let scale_factor = std::cmp::max(1, cfg.disk_cache.max_size / cfg.disk_cache.result_max_size);
     let release_size = std::cmp::max(
         10 * config::SIZE_IN_MB as usize,
