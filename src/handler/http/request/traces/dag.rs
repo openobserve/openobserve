@@ -179,7 +179,7 @@ pub async fn get_trace_dag(
     // Query all spans for this trace_id
     let query_sql = format!(
         "SELECT span_id, trace_id, service_name, operation_name, span_status, \
-         reference_parent_span_id \
+         reference_parent_span_id, start_time, end_time \
          FROM {stream_name} \
          WHERE trace_id = '{trace_id}'"
     );
@@ -300,6 +300,14 @@ pub async fn get_trace_dag(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
+            start_time: item
+                .get("start_time")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0),
+            end_time: item
+                .get("end_time")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0),
         };
         nodes.push(node);
 
@@ -351,6 +359,8 @@ struct SpanNode {
     service_name: String,
     operation_name: String,
     span_status: String,
+    start_time: i64,
+    end_time: i64,
 }
 
 #[derive(Debug, Serialize)]

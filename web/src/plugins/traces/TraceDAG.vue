@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <VueFlow
         :nodes="nodes"
         :edges="edges"
-        :default-viewport="{ zoom: 1.2, x: 0, y: 50 }"
-        :min-zoom="0.7"
-        :max-zoom="4"
+        :default-viewport="{ zoom: 0.8, x: 0, y: 30 }"
+        :min-zoom="0.2"
+        :max-zoom="3"
         fit-view-on-init
-        :fit-view-options="{ padding: 0.3, minZoom: 0.7, maxZoom: 2.5 }"
+        :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
         class="trace-dag-flow"
       >
         <Background pattern-color="#aaa" :gap="16" />
@@ -97,6 +97,8 @@ interface SpanNode {
   service_name: string;
   operation_name: string;
   span_status: string;
+  start_time: number;
+  end_time: number;
 }
 
 interface SpanEdge {
@@ -145,10 +147,10 @@ export default defineComponent({
 
     // Top-down tree layout algorithm
     const calculateLayout = (nodesData: SpanNode[], edgesData: SpanEdge[]) => {
-      const nodeWidth = 180;
-      const nodeHeight = 40;
-      const horizontalGap = 30;
-      const verticalGap = 60;
+      const nodeWidth = 140;
+      const nodeHeight = 28;
+      const horizontalGap = 16;
+      const verticalGap = 36;
 
       // Build adjacency list and find root nodes
       const children: Map<string, string[]> = new Map();
@@ -167,8 +169,19 @@ export default defineComponent({
         hasParent.add(edge.to);
       });
 
-      // Find root nodes (nodes without parents)
-      const roots = nodesData.filter((node) => !hasParent.has(node.span_id));
+      // Sort children by start_time for proper preorder traversal ordering
+      children.forEach((childIds, parentId) => {
+        childIds.sort((a, b) => {
+          const nodeA = nodeMap.get(a);
+          const nodeB = nodeMap.get(b);
+          return (nodeA?.start_time || 0) - (nodeB?.start_time || 0);
+        });
+      });
+
+      // Find root nodes (nodes without parents) and sort by start_time
+      const roots = nodesData
+        .filter((node) => !hasParent.has(node.span_id))
+        .sort((a, b) => (a.start_time || 0) - (b.start_time || 0));
 
       // Assign levels using BFS
       const levels: Map<string, number> = new Map();
@@ -309,8 +322,8 @@ export default defineComponent({
         animated: false,
         markerEnd: MarkerType.ArrowClosed,
         style: {
-          strokeWidth: 1.5,
-          stroke: "#666",
+          strokeWidth: 1,
+          stroke: "#888",
         },
       }));
     });
@@ -402,15 +415,15 @@ export default defineComponent({
 
   .vue-flow__node-custom {
     .custom-node {
-      padding: 6px 12px;
-      border-radius: 6px;
+      padding: 4px 8px;
+      border-radius: 4px;
       background: white;
       border: 1.5px solid #1976d2;
-      min-width: 80px;
-      max-width: 180px;
-      min-height: 28px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-      transition: all 0.2s ease;
+      min-width: 60px;
+      max-width: 140px;
+      min-height: 22px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+      transition: all 0.15s ease;
       cursor: pointer;
       text-align: center;
       display: flex;
@@ -419,8 +432,8 @@ export default defineComponent({
       justify-content: center;
 
       &:hover {
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
-        transform: scale(1.03);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        transform: scale(1.02);
       }
 
       &.node-error {
@@ -439,16 +452,16 @@ export default defineComponent({
       font-weight: 500;
       word-wrap: break-word;
       overflow-wrap: break-word;
-      max-width: 160px;
-      line-height: 1.3;
+      max-width: 124px;
+      line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .dag-handle {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       background: #1976d2;
       border: 1px solid white;
       border-radius: 50%;
@@ -456,8 +469,8 @@ export default defineComponent({
 
     .error-chip {
       font-size: 9px;
-      height: 14px;
-      margin-top: 2px;
+      height: 12px;
+      margin-top: 1px;
     }
   }
 }
@@ -476,6 +489,7 @@ body.dark {
         border-color: #64b5f6;
         color: #e0e0e0;
         border-width: 1.5px;
+        max-width: 140px;
 
         &.node-error {
           border-color: #ef5350;
@@ -490,6 +504,7 @@ body.dark {
       .node-operation {
         color: #90caf9;
         font-size: 12px;
+        max-width: 124px;
       }
     }
   }
