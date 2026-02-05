@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 emit-value
                 map-options
                 style="min-width: 200px; max-width: 400px"
-                placeholder="Select series"
+                placeholder="Select series to filter"
               >
                 <template v-slot:prepend>
                   <q-icon name="filter_list" size="xs" />
@@ -159,7 +159,7 @@ export default defineComponent({
     // Determine if legend footer should be shown
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
-       // Show legend footer in both "single" and "expanded_timeseries" modes when there are multiple series
+      // Show legend footer in both "single" and "expanded_timeseries" modes when there are multiple series
       return (
         (tableMode === "single" || tableMode === "expanded_timeseries")
       );
