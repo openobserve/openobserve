@@ -542,7 +542,7 @@ export const BUILD_PRESET: PanelEditorConfig = {
   showVariablesSelector: false,
   showLastRefreshedTime: false,
   showOutdatedWarning: false,
-  showAddToDashboardButton: false,
+  showAddToDashboardButton: true, // Show Add to Dashboard button
   showQueryTypeSelector: true, // Show SQL/PromQL and Builder/Custom toggle
   showGeneratedQueryDisplay: true, // Show generated SQL section
   hideChartPreview: false, // Show chart preview (like Add Panel)

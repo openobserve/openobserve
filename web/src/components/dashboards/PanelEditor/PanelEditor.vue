@@ -271,6 +271,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         fullTimePrefix="Last Refreshed At: "
                       />
                     </span>
+
+                    <!-- Add to Dashboard button (metrics/logs/build mode) -->
+                    <q-btn
+                      v-if="resolvedConfig.showAddToDashboardButton"
+                      size="md"
+                      class="no-border q-ml-sm"
+                      no-caps
+                      dense
+                      color="primary"
+                      style="padding: 2px 4px"
+                      @click="emit('addToDashboard')"
+                      :title="t('search.addToDashboard')"
+                    >
+                      {{ t("search.addToDashboard") }}
+                    </q-btn>
                   </div>
 
                   <!-- Chart Area -->
@@ -310,25 +325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
                       />
-                    </div>
-
-                    <!-- Add to Dashboard button (metrics/logs mode) -->
-                    <div
-                      v-if="resolvedConfig.showAddToDashboardButton"
-                      class="flex justify-end q-pr-sm q-mb-md q-pt-xs"
-                      style="position: absolute; top: 4px; right: 0px"
-                    >
-                      <q-btn
-                        size="md"
-                        class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
-                        no-caps
-                        dense
-                        style="padding: 2px 4px"
-                        @click="emit('addToDashboard')"
-                        :title="t('search.addToDashboard')"
-                      >
-                        {{ t("search.addToDashboard") }}
-                      </q-btn>
                     </div>
                   </div>
 
