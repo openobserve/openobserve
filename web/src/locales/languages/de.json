@@ -1888,7 +1888,51 @@
     "msteams": "Microsoft-Teams",
     "pagerduty": "Pager Duty",
     "opsgenie": "Opsgenie",
-    "servicenow": "Service jetzt"
+    "servicenow": "Service jetzt",
+    "saveAlert": "Warnung speichern",
+    "aggregation_threshold": "Bei Gruppen benachrichtigen",
+    "thresholdDynamic": {
+      "alertMeWhen": "Informiere mich, wenn",
+      "metricTypes": {
+        "resultsPassedFilter": "Ergebnisse haben Filter bestanden",
+        "distinctGroupsAffected": "verschiedene Gruppen sind betroffen",
+        "metricsMatchCriteria": "Metriken entsprechen den Kriterien",
+        "matchingLogsFound": "passende Logs gefunden",
+        "groupsPassFilter": "Gruppen erfüllen die Filterkriterien",
+        "distinctGroups": "verschiedene Gruppen gefunden",
+        "resultRows": "Ergebniszeilen zurückgegeben",
+        "timeSeries": "aktive Zeitreihe gefunden",
+        "matchingRecords": "passende Datensätze gefunden",
+        "groupsWithHaving": "Spielbedingungen für Gruppen",
+        "uniqueGroups": "einzigartige Gruppen",
+        "events": "Ereignisse entsprechen den Bedingungen",
+        "aggregatedValue": "Spielbedingungen"
+      },
+      "contextLabels": {
+        "groupedBy": "Gruppiert nach:",
+        "havingConditions": "UNTER FOLGENDEN BEDINGUNGEN:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Name der Warnung",
+      "sqlQuery": "SQL-Abfrage",
+      "promqlQuery": "PromQL-Abfrage",
+      "conditions": "Bedingungen",
+      "copy": "Kopieren",
+      "noCondition": "Keine Bedingung",
+      "noDescription": "Keine Beschreibung",
+      "evaluationHistory": "Verlauf der Evaluierung",
+      "loadingHistory": "Verlauf wird geladen...",
+      "noHistoryAvailable": "Für diese Warnung ist kein Bewertungsverlauf verfügbar",
+      "results": "Ergebnisse"
+    },
+    "historyTable": {
+      "timestamp": "Zeitstempel",
+      "status": "Status",
+      "evaluationTime": "Bewertung (en)",
+      "queryTime": "Anfrage (ms)",
+      "error": "Fehler"
+    }
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2597,7 +2641,8 @@
     "showLegends": "Legends anzeigen"
   },
   "alert_list": {
-    "alert_details": "Details zur Warnung"
+    "alert_details": "Details zur Warnung",
+    "alert_history": "Verlauf der Warnmeldungen"
   },
   "latencyInsights": {
     "title": "Einblicke",

@@ -1888,7 +1888,51 @@
     "msteams": "Microsoft Teams",
     "pagerduty": "Tâche du téléavertisseur",
     "opsgenie": "Opsgénie",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Enregistrer l'alerte",
+    "aggregation_threshold": "Alerter s'il y a des groupes",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avertissez-moi quand",
+      "metricTypes": {
+        "resultsPassedFilter": "les résultats ont passé les filtres",
+        "distinctGroupsAffected": "des groupes distincts sont touchés",
+        "metricsMatchCriteria": "les métriques correspondent aux critères",
+        "matchingLogsFound": "journaux correspondants trouvés",
+        "groupsPassFilter": "les groupes répondent aux critères de filtrage",
+        "distinctGroups": "groupes distincts trouvés",
+        "resultRows": "lignes de résultats renvoyées",
+        "timeSeries": "série chronologique active trouvée",
+        "matchingRecords": "enregistrements correspondants trouvés",
+        "groupsWithHaving": "conditions des matchs de groupe",
+        "uniqueGroups": "groupes uniques",
+        "events": "conditions de match des événements",
+        "aggregatedValue": "conditions du match"
+      },
+      "contextLabels": {
+        "groupedBy": "Regroupés par :",
+        "havingConditions": "CONDITIONS D'UTILISATION :"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nom de l'alerte",
+      "sqlQuery": "Requête SQL",
+      "promqlQuery": "Requête ProMQL",
+      "conditions": "Conditions",
+      "copy": "Copier",
+      "noCondition": "Aucune condition",
+      "noDescription": "Aucune description",
+      "evaluationHistory": "Historique de l'évaluation",
+      "loadingHistory": "Historique de chargement...",
+      "noHistoryAvailable": "Aucun historique d'évaluation disponible pour cette alerte",
+      "results": "Résultats"
+    },
+    "historyTable": {
+      "timestamp": "Horodatage",
+      "status": "État",
+      "evaluationTime": "Évaluation (s)",
+      "queryTime": "Requête (ms)",
+      "error": "Erreur"
+    }
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2597,7 +2641,8 @@
     "showLegends": "Afficher les légendes"
   },
   "alert_list": {
-    "alert_details": "Détails de l'alerte"
+    "alert_details": "Détails de l'alerte",
+    "alert_history": "Historique des alertes"
   },
   "latencyInsights": {
     "title": "Perspectives",

@@ -1888,7 +1888,51 @@
     "msteams": "微软团队",
     "pagerduty": "PagerDuty",
     "opsgenie": "Opsgenie",
-    "servicenow": "ServiceNo"
+    "servicenow": "ServiceNo",
+    "saveAlert": "保存提醒",
+    "aggregation_threshold": "如果有群组则发出警报",
+    "thresholdDynamic": {
+      "alertMeWhen": "什么时候提醒我",
+      "metricTypes": {
+        "resultsPassedFilter": "结果已通过过滤器",
+        "distinctGroupsAffected": "不同的群体受到影响",
+        "metricsMatchCriteria": "指标匹配标准",
+        "matchingLogsFound": "已找到匹配日志",
+        "groupsPassFilter": "群组通过筛选标准",
+        "distinctGroups": "找到了不同的群体",
+        "resultRows": "返回的结果行",
+        "timeSeries": "已找到活跃的时间序列",
+        "matchingRecords": "找到了匹配的记录",
+        "groupsWithHaving": "小组比赛条件",
+        "uniqueGroups": "独特的群组",
+        "events": "赛事匹配条件",
+        "aggregatedValue": "比赛条件"
+      },
+      "contextLabels": {
+        "groupedBy": "分组依据：",
+        "havingConditions": "有条件："
+      }
+    },
+    "alertDetails": {
+      "alertName": "警报名称",
+      "sqlQuery": "SQL 查询",
+      "promqlQuery": "PromQL 查询",
+      "conditions": "条件",
+      "copy": "复制",
+      "noCondition": "无条件",
+      "noDescription": "没有描述",
+      "evaluationHistory": "评估历史",
+      "loadingHistory": "正在加载历史记录...",
+      "noHistoryAvailable": "此警报没有评估历史记录",
+      "results": "结果"
+    },
+    "historyTable": {
+      "timestamp": "时间戳",
+      "status": "状态",
+      "evaluationTime": "评估",
+      "queryTime": "查询 (ms)",
+      "error": "错误"
+    }
   },
   "alert_templates": {
     "header": "模板",
@@ -2597,7 +2641,8 @@
     "showLegends": "显示图例"
   },
   "alert_list": {
-    "alert_details": "告警详情"
+    "alert_details": "告警详情",
+    "alert_history": "警报历史"
   },
   "latencyInsights": {
     "title": "标题",

@@ -1888,7 +1888,51 @@
     "msteams": "Microsoft Teams",
     "pagerduty": "Pager Duty",
     "opsgenie": "Opsgenie",
-    "servicenow": "Assistenza ora"
+    "servicenow": "Assistenza ora",
+    "saveAlert": "Salva avviso",
+    "aggregation_threshold": "Avvisa se ci sono gruppi",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avvisami quando",
+      "metricTypes": {
+        "resultsPassedFilter": "i risultati hanno superato i filtri",
+        "distinctGroupsAffected": "sono interessati gruppi distinti",
+        "metricsMatchCriteria": "le metriche corrispondono ai criteri",
+        "matchingLogsFound": "registri corrispondenti trovati",
+        "groupsPassFilter": "i gruppi superano i criteri di filtro",
+        "distinctGroups": "sono stati trovati gruppi distinti",
+        "resultRows": "righe dei risultati restituite",
+        "timeSeries": "serie temporali attive trovate",
+        "matchingRecords": "record corrispondenti trovati",
+        "groupsWithHaving": "i gruppi soddisfano le condizioni",
+        "uniqueGroups": "gruppi unici",
+        "events": "gli eventi soddisfano le condizioni",
+        "aggregatedValue": "condizioni della partita"
+      },
+      "contextLabels": {
+        "groupedBy": "Raggruppati per:",
+        "havingConditions": "AVENDO condizioni:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nome dell'avviso",
+      "sqlQuery": "Interrogazione SQL",
+      "promqlQuery": "Query ProMQL",
+      "conditions": "Condizioni",
+      "copy": "Copia",
+      "noCondition": "Nessuna condizione",
+      "noDescription": "Nessuna descrizione",
+      "evaluationHistory": "Cronologia delle valutazioni",
+      "loadingHistory": "Caricamento della cronologia...",
+      "noHistoryAvailable": "Nessuna cronologia delle valutazioni disponibile per questo avviso",
+      "results": "Risultati"
+    },
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Valutazione/i",
+      "queryTime": "Interrogazione (ms)",
+      "error": "Errore"
+    }
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2595,7 +2639,8 @@
     "showLegends": "Mostra leggende"
   },
   "alert_list": {
-    "alert_details": "Dettagli dell'avviso"
+    "alert_details": "Dettagli dell'avviso",
+    "alert_history": "Cronologia avvisi"
   },
   "latencyInsights": {
     "title": "Approfondimenti",

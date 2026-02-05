@@ -1888,7 +1888,51 @@
     "msteams": "Microsoft Ekipleri",
     "pagerduty": "Pager Görevi",
     "opsgenie": "Opsignia",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Uyarıyı Kaydet",
+    "aggregation_threshold": "Herhangi Bir Grup Varsa Uyarı",
+    "thresholdDynamic": {
+      "alertMeWhen": "Ne zaman beni uyar",
+      "metricTypes": {
+        "resultsPassedFilter": "sonuçlar filtreleri geçti",
+        "distinctGroupsAffected": "Farklı gruplar etkilenir",
+        "metricsMatchCriteria": "metrikler eşleştirme kriterleri",
+        "matchingLogsFound": "eşleşen günlükler bulundu",
+        "groupsPassFilter": "gruplar filtre kriterlerini geçer",
+        "distinctGroups": "farklı gruplar bulundu",
+        "resultRows": "döndürülen sonuç satırları",
+        "timeSeries": "aktif zaman serileri bulundu",
+        "matchingRecords": "eşleşen kayıtlar bulundu",
+        "groupsWithHaving": "gruplar maç koşulları",
+        "uniqueGroups": "benzersiz gruplar",
+        "events": "etkinlikler maç koşulları",
+        "aggregatedValue": "maç koşulları"
+      },
+      "contextLabels": {
+        "groupedBy": "Şunlara göre gruplandırılmıştır:",
+        "havingConditions": "SAHIP olma koşulları:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Uyarı Adı",
+      "sqlQuery": "SQL Sorgu",
+      "promqlQuery": "PromQL Sorgulama",
+      "conditions": "Koşullar",
+      "copy": "Kopyalama",
+      "noCondition": "Koşulsuz",
+      "noDescription": "Açıklama yok",
+      "evaluationHistory": "Değerlendirme Geçmişi",
+      "loadingHistory": "Geçmiş yükleniyor...",
+      "noHistoryAvailable": "Bu uyarı için değerlendirme geçmişi mevcut değil",
+      "results": "Sonuçlar"
+    },
+    "historyTable": {
+      "timestamp": "Zaman damgası",
+      "status": "Durum",
+      "evaluationTime": "Değerlendirme (lar)",
+      "queryTime": "Sorgu (ms)",
+      "error": "Hata"
+    }
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2597,7 +2641,8 @@
     "showLegends": "Efsaneleri Göster"
   },
   "alert_list": {
-    "alert_details": "Uyarı Ayrıntıları"
+    "alert_details": "Uyarı Ayrıntıları",
+    "alert_history": "Uyarı Geçmişi"
   },
   "latencyInsights": {
     "title": "İçgörüler",
