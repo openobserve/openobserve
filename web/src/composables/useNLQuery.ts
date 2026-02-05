@@ -346,7 +346,17 @@ export function useNLQuery() {
         return null;
       }
 
-      // Check if AI is asking questions instead of generating a query
+      // Try to extract SQL from AI response first (may contain explanatory text and markdown)
+      console.log('[NL2Q] Attempting to extract SQL from response...');
+      const extractedSQL = extractSQLFromResponse(rawResponse);
+
+      // If SQL was successfully extracted, return it (AI's thinking process doesn't matter)
+      if (extractedSQL) {
+        console.log('[NL2Q] Successfully generated SQL query:', extractedSQL);
+        return extractedSQL;
+      }
+
+      // Only if SQL extraction failed, check if AI is asking questions
       // Common patterns when AI doesn't have enough context
       const questionPatterns = [
         /what is your organization/i,
@@ -366,17 +376,9 @@ export function useNLQuery() {
         return null;
       }
 
-      // Extract SQL from AI response (may contain explanatory text and markdown)
-      console.log('[NL2Q] Attempting to extract SQL from response...');
-      const extractedSQL = extractSQLFromResponse(rawResponse);
-
-      if (!extractedSQL) {
-        console.warn('[NL2Q] Could not extract SQL from AI response. Full response:', rawResponse);
-        return null;
-      }
-
-      console.log('[NL2Q] Successfully generated SQL query:', extractedSQL);
-      return extractedSQL;
+      // No SQL found and no question patterns detected
+      console.warn('[NL2Q] Could not extract SQL from AI response. Full response:', rawResponse);
+      return null;
 
     } catch (error) {
       console.error('[NL2Q] Error generating SQL:', error);
