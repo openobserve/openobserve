@@ -590,7 +590,7 @@ mod tests {
             api_group_name: "api_group_name".to_string(),
             api_group_operation: "operation".to_string(),
             threshold: 100,
-            stat_interval_ms: Some(DEFAULT_STAT_INTERVAL_MS),
+            stat_interval_ms: DEFAULT_STAT_INTERVAL_MS,
             created_at: 0,
         }
     }
