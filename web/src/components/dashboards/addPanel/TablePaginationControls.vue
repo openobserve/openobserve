@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row items-center pagination-controls-wrapper">
+  <div class="row items-center">
     <!-- Records per page dropdown: only when pagination is enabled -->
     <div v-if="showPagination" class="row items-center q-gutter-sm">
       <span class="text-caption">Records per page:</span>
@@ -144,9 +144,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.pagination-controls-wrapper {
-  // Styles if needed
-}
-</style>
