@@ -230,6 +230,59 @@
         </q-card>
       </q-dialog>
 
+      <!-- Edit Title Dialog -->
+      <q-dialog v-model="showEditTitleDialog">
+        <q-card style="min-width: 350px">
+          <q-card-section>
+            <div class="text-h6">Edit Chat Title</div>
+          </q-card-section>
+
+          <q-card-section class="q-pt-none">
+            <q-input
+              v-model="editingTitle"
+              dense
+              borderless
+              autofocus
+              @keyup.enter="saveEditedTitle"
+              placeholder="Enter chat title"
+            />
+          </q-card-section>
+
+          <q-card-actions align="right" class="q-px-md q-pb-md">
+            <q-btn
+              label="Cancel"
+              class="o2-secondary-button"
+              no-caps
+              v-close-popup
+            />
+            <q-btn
+              label="Save"
+              class="o2-primary-button q-ml-sm"
+              no-caps
+              @click="saveEditedTitle"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
+
+      <!-- Delete Chat Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showDeleteChatConfirmDialog"
+        title="Delete Chat"
+        message="Are you sure you want to delete this chat? This action cannot be undone."
+        @update:ok="confirmDeleteChat"
+        @update:cancel="showDeleteChatConfirmDialog = false"
+      />
+
+      <!-- Clear All Conversations Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showClearAllConfirmDialog"
+        title="Clear All Conversations"
+        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        @update:ok="confirmClearAllConversations"
+        @update:cancel="showClearAllConfirmDialog = false"
+      />
+
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
@@ -2871,6 +2924,10 @@ export default defineComponent({
       previewImage,
       openImagePreview,
       closeImagePreview,
+      // AI-generated title
+      aiGeneratedTitle,
+      displayedTitle,
+      isTypingTitle,
     }
   }
 });
