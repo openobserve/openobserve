@@ -783,7 +783,6 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
   });
 };
 
-
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
