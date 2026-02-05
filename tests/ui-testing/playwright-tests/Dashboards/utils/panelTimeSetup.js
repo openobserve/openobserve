@@ -239,6 +239,10 @@ export async function editPanel(page, panelName) {
 export async function savePanel(page) {
   testLogger.info('Saving panel');
 
+  // Ensure any open menus/dropdowns are closed before clicking save
+  // This prevents the save button from being intercepted by overlays
+  await page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+
   await page.locator('[data-test="dashboard-panel-save"]').click();
   await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
