@@ -962,6 +962,28 @@ export default defineComponent({
   width: 100%;
   height: 100%;
 }
+.monaco-editor,
+.monaco-diff-editor .synthetic-focus,
+.monaco-editor,
+.monaco-diff-editor [tabindex="0"]:focus,
+.monaco-editor,
+.monaco-diff-editor [tabindex="-1"]:focus,
+.monaco-editor,
+.monaco-diff-editor button:focus,
+.monaco-editor,
+.monaco-diff-editor input[type="button"]:focus,
+.monaco-editor,
+.monaco-diff-editor input[type="checkbox"]:focus,
+.monaco-editor,
+.monaco-diff-editor input[type="search"]:focus,
+.monaco-editor,
+.monaco-diff-editor input[type="text"]:focus,
+.monaco-editor,
+.monaco-diff-editor select:focus,
+.monaco-editor,
+.monaco-diff-editor textarea:focus {
+  outline-width: 0px;
+}
 
 /* Generate SQL button - O2 AI Assistant gradient style (matches send-button) */
 .generate-sql-button {
