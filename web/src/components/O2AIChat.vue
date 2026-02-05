@@ -217,7 +217,7 @@
             <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
               <img :src="o2AiTitleLogo" />
               <div class="tw:relative tw:inline-block">
-                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 AI Assistant</span>
+                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
                 <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
               </div>
             </div>
