@@ -429,7 +429,6 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       "kubernetes_container_name",
       { scope: "global" }
     );
-    await pm.dashboardSetting.saveVariable();
     await page.locator(`[data-test="dashboard-edit-variable-${globalVariableName}"]`).waitFor({ state: "visible", timeout: 15000 });
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await pm.dashboardSetting.closeSettingWindow();
@@ -453,7 +452,6 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       "kubernetes_namespace_name",
       { scope: "panels", assignedPanels: [panelName] }
     );
-    await pm.dashboardSetting.saveVariable();
     await page.locator(`[data-test="dashboard-edit-variable-${panelVariableName}"]`).waitFor({ state: "visible", timeout: 15000 });
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await pm.dashboardSetting.closeSettingWindow();
