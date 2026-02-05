@@ -81,97 +81,16 @@ self="top right" max-width="220px">
           </q-tooltip>
         </q-btn>
         <!-- show error here -->
-        <q-btn
-          v-if="errorData"
-          :key="errorData"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-error-data"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ errorData }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="maxQueryRangeWarning"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-max-duration-warning"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ maxQueryRangeWarning }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="limitNumberOfSeriesWarningMessage"
-          :icon="symOutlinedDataInfoAlert"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-limit-number-of-series-warning"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right" self="top right">
-            <div style="white-space: pre-wrap">
-              {{ limitNumberOfSeriesWarningMessage }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="isCachedDataDifferWithCurrentTimeRange"
-          :icon="outlinedRunningWithErrors"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-is-cached-data-differ-with-current-time-range-warning"
-        >
-          <q-tooltip anchor="bottom right" self="top right">
-            <div style="white-space: pre-wrap">
-              The data shown is cached and is different from the selected time
-              range.
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="isPartialData && !isPanelLoading"
-          :icon="symOutlinedClockLoader20"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-partial-data-warning"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right" self="top right">
-            <div style="white-space: pre-wrap">
-              The data shown is incomplete because the loading was interrupted.
-              Refresh to load complete data.
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <span v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView" class="lastRefreshedAt">
-          <span class="lastRefreshedAtIcon"
-            >🕑
-            <q-tooltip anchor="bottom right" self="top right">
-              Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" />
-            </q-tooltip>
-          </span>
-          <RelativeTime
-            :timestamp="lastTriggeredAt"
-            fullTimePrefix="Last Refreshed At: "
-          />
-        </span>
+        <PanelErrorButtons
+          :error="errorData"
+          :maxQueryRangeWarning="maxQueryRangeWarning"
+          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+          :isPartialData="isPartialData"
+          :isPanelLoading="isPanelLoading"
+          :lastTriggeredAt="lastTriggeredAt"
+          :viewOnly="viewOnly"
+        />
         <q-btn
           v-if="!viewOnly && !simplifiedPanelView"
           icon="refresh"
@@ -495,6 +414,9 @@ import { useI18n } from "vue-i18n";
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
 });
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 
 export default defineComponent({
   name: "PanelContainer",
@@ -541,6 +463,7 @@ export default defineComponent({
     ConfirmDialog,
     SinglePanelMove,
     RelativeTime,
+    PanelErrorButtons,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
@@ -1101,26 +1024,5 @@ export default defineComponent({
 
 .warning {
   color: var(--q-warning);
-}
-
-.lastRefreshedAt {
-  font-size: smaller;
-  margin-left: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  &::after {
-    content: "";
-  }
-
-  &::before {
-    content: "";
-  }
-
-  & .lastRefreshedAtIcon {
-    font-size: smaller;
-    margin-right: 2px;
-  }
 }
 </style>
