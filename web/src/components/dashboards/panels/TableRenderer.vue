@@ -120,76 +120,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This matches the design in PromQLTableChart for consistency across all pages -->
         <div v-else class="row items-center full-width">
           <q-space />
-          <!-- Records per page dropdown: only when pagination is enabled -->
-          <div v-if="showPagination" class="row items-center q-gutter-sm">
-            <span class="text-caption">Records per page:</span>
-            <q-select
-              :model-value="scope.pagination.rowsPerPage"
-              @update:model-value="(val: number) => (pagination.rowsPerPage = val)"
-              :options="paginationOptions"
-              :option-label="(opt) => (opt === 0 ? 'All' : opt)"
-              borderless
-              dense
-              options-dense
-              class="q-table__select"
-            />
-          </div>
-          <!-- Count display -->
-          <span class="text-caption q-pa-sm">
-            {{
-              showPagination
-                ? scope.pagination.rowsPerPage === 0
-                  ? `1-${(data.rows || []).length} of ${(data.rows || []).length}`
-                  : `${(scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1}-${Math.min(
-                      scope.pagination.page * scope.pagination.rowsPerPage,
-                      (data.rows || []).length,
-                    )} of ${(data.rows || []).length}`
-                : `1-${(data.rows || []).length} of ${(data.rows || []).length}`
-            }}
-          </span>
-          <!-- Navigation arrows: only when pagination is enabled -->
-          <template v-if="showPagination">
-            <q-btn
-              v-if="scope.pagesNumber > 1"
-              icon="first_page"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isFirstPage"
-              @click="scope.firstPage"
-            />
-            <q-btn
-              v-if="scope.pagesNumber > 1"
-              icon="chevron_left"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isFirstPage"
-              @click="scope.prevPage"
-            />
-            <q-btn
-              v-if="scope.pagesNumber > 1"
-              icon="chevron_right"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isLastPage"
-              @click="scope.nextPage"
-            />
-            <q-btn
-              v-if="scope.pagesNumber > 1"
-              icon="last_page"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isLastPage"
-              @click="scope.lastPage"
-            />
-          </template>
+          <TablePaginationControls
+            :show-pagination="showPagination"
+            :pagination="scope.pagination"
+            :pagination-options="paginationOptions"
+            :total-rows="(data.rows || []).length"
+            :pages-number="scope.pagesNumber"
+            :is-first-page="scope.isFirstPage"
+            :is-last-page="scope.isLastPage"
+            @update:rows-per-page="
+              (val: number) => (pagination.rowsPerPage = val)
+            "
+            @first-page="scope.firstPage"
+            @prev-page="scope.prevPage"
+            @next-page="scope.nextPage"
+            @last-page="scope.lastPage"
+          />
         </div>
       </template>
     </q-table>
@@ -206,11 +152,13 @@ import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
+import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
 export default defineComponent({
   name: "TableRenderer",
   components: {
     JsonFieldRenderer,
+    TablePaginationControls,
   },
   props: {
     data: {
