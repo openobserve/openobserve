@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="query-editor"
       class="logs-query-editor"
       ref="editorRef"
+      v-bind="$attrs"
       :id="editorId"
     />
     <!-- Streaming response preview card (shown while generating) -->
@@ -77,6 +78,7 @@ import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
+  inheritAttrs: false,
   props: {
     editorId: {
       type: String,
