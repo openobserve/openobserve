@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+          <div
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+          >
             <search-bar
               data-test="logs-search-bar"
               ref="searchBarRef"
@@ -77,16 +79,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="logs-search-field-list-collapse-btn"
                   :icon="
-                  searchObj.meta.showFields
-                    ? 'chevron_left'
-                    : 'chevron_right'
-                "
+                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
+                  "
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
                       : 'Open Fields'
                   "
-                  :class="searchObj.meta.showFields ? 'logs-splitter-icon-expand' : 'logs-splitter-icon-collapse'"
+                  :class="
+                    searchObj.meta.showFields
+                      ? 'logs-splitter-icon-expand'
+                      : 'logs-splitter-icon-collapse'
+                  "
                   color="primary"
                   size="sm"
                   dense
@@ -95,9 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #after>
-                <div
-                  class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full"
-                >
+                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
@@ -219,8 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.noRecordFound") }}
                         <q-btn
                           v-if="
@@ -247,8 +248,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -265,8 +265,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-    size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -370,8 +369,7 @@ size="md" />
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info" class="q-mr-xs"
-size="20px" />
+              <q-icon name="info" class="q-mr-xs" size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
@@ -417,6 +415,7 @@ import {
   onMounted,
   onBeforeUnmount,
   onUnmounted,
+  toRaw,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -787,11 +786,16 @@ export default defineComponent({
       // Clear any pending timeouts
       clearAllTimeouts();
       try {
-        if (searchObj)
-          await store.dispatch(
-            "logs/setLogs",
-            JSON.parse(JSON.stringify(searchObj)),
-          );
+        if (searchObj) {
+          // Turn off all loaders before saving view
+          let savedSearchObj = JSON.parse(JSON.stringify(searchObj));
+          savedSearchObj.loading = false;
+          savedSearchObj.loadingHistogram = false;
+          savedSearchObj.loadingCounter = false;
+          savedSearchObj.loadingStream = false;
+          savedSearchObj.loadingSavedView = false;
+          await store.dispatch("logs/setLogs", savedSearchObj);
+        }
       } catch (error) {
         console.error("Failed to set logs:", error.message);
       }
@@ -952,7 +956,9 @@ export default defineComponent({
         }
 
         // Set size to -1 to let backend determine sampling size based on config
-        console.log("[Patterns] Using default sampling from backend configuration");
+        console.log(
+          "[Patterns] Using default sampling from backend configuration",
+        );
         queryReq.query.size = -1;
 
         const streamName = searchObj.data.stream.selectedStream[0];
@@ -1264,7 +1270,7 @@ export default defineComponent({
           if (!hasSelect) {
             if (currentQuery != "") {
               if (currentQuery.trim() != "") {
-                  whereClause = "WHERE " + currentQuery;
+                whereClause = "WHERE " + currentQuery;
               }
             }
 
@@ -2083,7 +2089,7 @@ export default defineComponent({
             searchObj.config.splitterModel = originalSplitterValue.value;
           }
         }
-      }
+      },
     );
 
     const handleRunQueryFn = async (clear_cache = false) => {
@@ -2318,10 +2324,15 @@ export default defineComponent({
         }
 
         // Assign stream info to dashboardPanelData before copying
-        dashboardPanelData.data.queries[currentQueryIndex].fields.stream = streamName;
+        dashboardPanelData.data.queries[currentQueryIndex].fields.stream =
+          streamName;
         // stream_type should already be set, but ensure it's preserved
-        if (!dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type) {
-          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type = "logs";
+        if (
+          !dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type
+        ) {
+          dashboardPanelData.data.queries[
+            currentQueryIndex
+          ].fields.stream_type = "logs";
         }
       }
 

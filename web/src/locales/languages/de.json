@@ -2542,7 +2542,8 @@
     "sql_query": "SQL-Abfrage",
     "resuls": "Ergebnisse",
     "wrapText": "Text umbrechen",
-    "delayMessage": "Der Suchverlauf könnte sich verzögern um"
+    "delayMessage": "Der Suchverlauf könnte sich verzögern um",
+    "results": "Ergebnisse"
   },
   "search_scheduler_job": {
     "title": "Job Scheduler durchsuchen",
@@ -2633,7 +2634,8 @@
     "analyzeButtonLabel": "Analysieren",
     "refreshTooltip": "Analyse mit aktualisiertem Perzentil aktualisieren",
     "customSQLFieldsDisabled": "Die Feldauswahl ist für benutzerdefinierte SQL-Abfragen nicht verfügbar. Dimensionen werden aus Ihren Abfrageergebnissen extrahiert.",
-    "timeRangeSelected": "Ausgewählter Zeitbereich"
+    "timeRangeSelected": "Ausgewählter Zeitbereich",
+    "dimensionsSelected": "Ausgewählte Abmessungen"
   },
   "volumeInsights": {
     "title": "Einblicke",

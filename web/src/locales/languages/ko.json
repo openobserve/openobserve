@@ -2542,7 +2542,8 @@
     "sql_query": "SQL 쿼리",
     "resuls": "결과",
     "wrapText": "줄 바꿈 텍스트",
-    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다."
+    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다.",
+    "results": "결과"
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",
@@ -2633,7 +2634,8 @@
     "analyzeButtonLabel": "분석",
     "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
     "customSQLFieldsDisabled": "사용자 지정 SQL 쿼리에는 필드 선택을 사용할 수 없습니다.차원은 쿼리 결과에서 추출됩니다.",
-    "timeRangeSelected": "시간 범위 선택"
+    "timeRangeSelected": "시간 범위 선택",
+    "dimensionsSelected": "치수 선택"
   },
   "volumeInsights": {
     "title": "인사이트",
