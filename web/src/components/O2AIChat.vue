@@ -9,34 +9,43 @@
             <q-avatar size="24px">
               <img :src="o2AiTitleLogo" />
             </q-avatar>
-            <div class="tw:flex tw:items-center">
-              <span class="tw:mr-[5.5px]">O2 Assistant
-              </span>
-              <span class="o2-ai-beta-text"
-              >Beta</span>
-            </div>
 
-          </div>
-
-          <div>
-            <q-btn flat round dense icon="add" @click="addNewChat" />
-            <q-btn flat round dense icon="history" @click="loadHistory">
+            <q-btn
+              flat
+              dense
+              no-caps
+              class="chat-title-dropdown"
+              @click="loadHistory"
+            >
+              <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
+                <span class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block">
+                  {{ displayedTitle || 'New Chat' }}
+                  <q-tooltip
+                    v-if="displayedTitle && displayedTitle.length > 25"
+                    :delay="500"
+                    anchor="bottom middle"
+                    self="top middle"
+                    :offset="[0, 8]"
+                  >
+                    {{ displayedTitle }}
+                  </q-tooltip>
+                </span>
+                <q-icon name="arrow_drop_down" size="20px" class="tw:flex-shrink-0" />
+              </div>
               <q-menu>
-                <!-- here we will show the history menu -->
-                 <!-- and also the search functionality to search the history  -->
+                <!-- History menu with search -->
                 <div class="history-menu-container">
                   <div class="search-history-bar-sticky">
                     <q-input
                       v-model="historySearchTerm"
                       placeholder="Search chat history"
                       dense
-                    filled
-                    borderless
-                      class="tw:mb-2"
+                      borderless
+                      class="tw:mt-1"
                     >
-                    <template #prepend>
-                    <q-icon name="search" />
-                  </template>
+                      <template #prepend>
+                        <q-icon name="search" />
+                      </template>
                     </q-input>
                   </div>
                   <div class="history-list-container">
@@ -49,11 +58,25 @@
                         v-close-popup
                         @click="loadChat(chat.id)"
                         dense
+                        class="history-item"
                       >
                         <q-item-section>
-                          <div class="row items-center justify-between">
-                            <div class="col-8 ellipsis">{{ chat.title }}</div>
-                            <div class="col-4 text-right text-grey-7 text-caption">{{ formatTime(chat.timestamp) }}</div>
+                          <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
+                            <div class="tw:flex-1 tw:overflow-hidden">
+                              <div class="tw:text-[13px] tw:truncate">{{ chat.title }}</div>
+                              <div class="tw:text-[11px] tw:text-gray-500">{{ formatTime(chat.timestamp) }}</div>
+                            </div>
+                            <q-btn
+                              flat
+                              round
+                              dense
+                              size="xs"
+                              icon="delete"
+                              class="delete-history-btn"
+                              @click.stop="deleteChat(chat.id)"
+                            >
+                              <q-tooltip :delay="500">Delete chat</q-tooltip>
+                            </q-btn>
                           </div>
                         </q-item-section>
                       </q-item>
@@ -64,20 +87,43 @@
                       </q-item>
                     </q-list>
                   </div>
+
+                  <!-- Clear all conversations button -->
+                  <div v-if="filteredChatHistory.length > 0" class="clear-all-container">
+                    <q-separator />
+                    <q-btn
+                      flat
+                      no-caps
+                      class="clear-all-btn"
+                      icon="delete_sweep"
+                      label="Clear all conversations"
+                      @click.stop="clearAllConversations"
+                    />
+                  </div>
                 </div>
               </q-menu>
             </q-btn>
-            <q-btn flat round dense icon="close" @click="$emit('close')" />
+          </div>
+
+          <div>
+            <!-- Edit title button -->
+            <q-btn
+              v-if="currentChatId"
+              flat
+              round
+              dense
+              size="md"
+              icon="edit"
+              @click.stop="openEditTitleDialog"
+            >
+              <q-tooltip :delay="500">Edit title</q-tooltip>
+            </q-btn>
+            <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
+            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
       </div>
       <q-separator class="tw:bg-[#DBDBDB]" />
-
-      <!-- Chat Title - appears below header with typewriter animation -->
-      <div v-if="displayedTitle" class="chat-session-title" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-        <span class="title-text">{{ displayedTitle }}</span>
-        <span v-if="isTypingTitle" class="typing-cursor">|</span>
-      </div>
 
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
@@ -112,12 +158,68 @@
         </q-card>
       </q-dialog>
 
+      <!-- Edit Title Dialog -->
+      <q-dialog v-model="showEditTitleDialog">
+        <q-card style="min-width: 350px">
+          <q-card-section>
+            <div class="text-h6">Edit Chat Title</div>
+          </q-card-section>
+
+          <q-card-section class="q-pt-none">
+            <q-input
+              v-model="editingTitle"
+              dense
+              borderless
+              autofocus
+              @keyup.enter="saveEditedTitle"
+              placeholder="Enter chat title"
+            />
+          </q-card-section>
+
+          <q-card-actions align="right" class="q-px-md q-pb-md">
+            <q-btn
+              label="Cancel"
+              class="o2-secondary-button"
+              no-caps
+              v-close-popup
+            />
+            <q-btn
+              label="Save"
+              class="o2-primary-button q-ml-sm"
+              no-caps
+              @click="saveEditedTitle"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
+
+      <!-- Delete Chat Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showDeleteChatConfirmDialog"
+        title="Delete Chat"
+        message="Are you sure you want to delete this chat? This action cannot be undone."
+        @update:ok="confirmDeleteChat"
+        @update:cancel="showDeleteChatConfirmDialog = false"
+      />
+
+      <!-- Clear All Conversations Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showClearAllConfirmDialog"
+        title="Clear All Conversations"
+        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        @update:ok="confirmClearAllConversations"
+        @update:cancel="showClearAllConfirmDialog = false"
+      />
+
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
             <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
               <img :src="o2AiTitleLogo" />
-              <span class="tw:text-[14px] tw:font-[600] tw:text-center">AI native  observability</span>
+              <div class="tw:relative tw:inline-block">
+                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 AI Assistant</span>
+                <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+              </div>
             </div>
           </div>
           <div v-for="(message, index) in processedMessages" 
@@ -320,9 +422,11 @@
             </div>
           </div>
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
-          <div v-if="isLoading && !activeToolCall" id="loading-indicator" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
-            <q-spinner-dots color="primary" size="2em" />
-            <span>{{ currentAnalyzingMessage }}</span>
+          <div v-if="isLoading && !activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+            <div class="tool-call-content">
+              <q-spinner-dots color="primary" size="1.5em" />
+              <span class="tool-call-message">{{ currentAnalyzingMessage }}</span>
+            </div>
           </div>
         </div>
         
@@ -345,6 +449,25 @@
           </q-btn>
         </div>
       </div>
+
+      <!-- Fixed loading indicator above input - only shown when scrolled up -->
+      <div
+        v-if="(isLoading || activeToolCall) && showScrollToBottom"
+        class="fixed-analyzing-indicator"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+      >
+        <!-- Show tool call if active -->
+        <div v-if="activeToolCall" class="analyzing-content">
+          <q-spinner-dots color="primary" size="1.5em" />
+          <span class="analyzing-message">{{ activeToolCall.message }}</span>
+        </div>
+        <!-- Show analyzing message if loading but no active tool call -->
+        <div v-else-if="isLoading" class="analyzing-content">
+          <q-spinner-dots color="primary" size="1.5em" />
+          <span class="analyzing-message">{{ currentAnalyzingMessage }}</span>
+        </div>
+      </div>
+
       <div class="chat-input-wrapper tw:flex tw:flex-col q-ma-md" @click="focusInput">
         <q-input
           ref="chatInput"
@@ -410,6 +533,7 @@ import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -472,6 +596,9 @@ function renderMarkdown(content: any) {
 
 export default defineComponent({
   name: 'O2AIChat',
+  components: {
+    ConfirmDialog,
+  },
   props: {
     isOpen: {
       type: Boolean,
@@ -513,6 +640,17 @@ export default defineComponent({
     const historySearchTerm = ref('');
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
+
+    // Edit title state
+    const showEditTitleDialog = ref(false);
+    const editingTitle = ref('');
+
+    // Clear all confirmation state
+    const showClearAllConfirmDialog = ref(false);
+
+    // Delete individual chat confirmation state
+    const showDeleteChatConfirmDialog = ref(false);
+    const chatToDelete = ref<number | null>(null);
 
     // AI-generated chat title state
     const aiGeneratedTitle = ref<string | null>(null);
@@ -1554,6 +1692,129 @@ export default defineComponent({
       await loadHistory();
     };
 
+    const openEditTitleDialog = () => {
+      editingTitle.value = displayedTitle.value || '';
+      showEditTitleDialog.value = true;
+    };
+
+    const saveEditedTitle = async () => {
+      if (!currentChatId.value || !editingTitle.value.trim()) {
+        showEditTitleDialog.value = false;
+        return;
+      }
+
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(currentChatId.value);
+
+        request.onsuccess = () => {
+          const chat = request.result;
+          if (chat) {
+            // Update the title
+            chat.title = editingTitle.value.trim();
+            const updateRequest = store.put(chat);
+
+            updateRequest.onsuccess = () => {
+              // Update the displayed title
+              displayedTitle.value = editingTitle.value.trim();
+              aiGeneratedTitle.value = editingTitle.value.trim();
+
+              // Reload history to reflect changes
+              loadHistory();
+
+              showEditTitleDialog.value = false;
+            };
+
+            updateRequest.onerror = () => {
+              console.error('Error updating chat title:', updateRequest.error);
+              showEditTitleDialog.value = false;
+            };
+          }
+        };
+
+        request.onerror = () => {
+          console.error('Error retrieving chat for edit:', request.error);
+          showEditTitleDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error updating chat title:', error);
+        showEditTitleDialog.value = false;
+      }
+    };
+
+    const deleteChat = (chatId: number) => {
+      chatToDelete.value = chatId;
+      showDeleteChatConfirmDialog.value = true;
+    };
+
+    const confirmDeleteChat = async () => {
+      if (!chatToDelete.value) return;
+
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const deleteRequest = store.delete(chatToDelete.value);
+
+        deleteRequest.onsuccess = () => {
+          // If the deleted chat is the current one, reset to new chat
+          if (currentChatId.value === chatToDelete.value) {
+            addNewChat();
+          }
+
+          // Reload history to reflect changes
+          loadHistory();
+
+          // Reset state
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
+
+        deleteRequest.onerror = () => {
+          console.error('Error deleting chat:', deleteRequest.error);
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error deleting chat:', error);
+        chatToDelete.value = null;
+        showDeleteChatConfirmDialog.value = false;
+      }
+    };
+
+    const clearAllConversations = () => {
+      showClearAllConfirmDialog.value = true;
+    };
+
+    const confirmClearAllConversations = async () => {
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const clearRequest = store.clear();
+
+        clearRequest.onsuccess = () => {
+          // Reset to new chat
+          addNewChat();
+
+          // Clear the chat history array
+          chatHistory.value = [];
+
+          showClearAllConfirmDialog.value = false;
+        };
+
+        clearRequest.onerror = () => {
+          console.error('Error clearing all conversations:', clearRequest.error);
+          showClearAllConfirmDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error clearing all conversations:', error);
+        showClearAllConfirmDialog.value = false;
+      }
+    };
+
     const loadChat = async (chatId: number) => {
       try {
 
@@ -2233,9 +2494,21 @@ export default defineComponent({
       selectCapability,
       showHistory,
       chatHistory,
+      currentChatId,
       addNewChat,
       openHistory,
       loadChat,
+      showEditTitleDialog,
+      editingTitle,
+      openEditTitleDialog,
+      saveEditedTitle,
+      deleteChat,
+      confirmDeleteChat,
+      showDeleteChatConfirmDialog,
+      chatToDelete,
+      clearAllConversations,
+      showClearAllConfirmDialog,
+      confirmClearAllConversations,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -2318,6 +2591,33 @@ export default defineComponent({
     .chat-title {
       font-weight: bold;
     }
+
+    .chat-title-dropdown {
+      padding: 6px 12px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+      max-width: 210px;
+      height: 32px;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+
+      &:hover {
+        background-color: var(--q-hover-color);
+      }
+
+      span {
+        color: var(--q-primary-text);
+      }
+
+      .chat-title-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+      }
+    }
   }
 
   // Chat session title with typewriter animation
@@ -2387,6 +2687,88 @@ export default defineComponent({
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  // Fixed analyzing indicator above input
+  .fixed-analyzing-indicator {
+    padding: 12px 16px;
+    margin: 0 16px 8px 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeInSlide 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    &.light-mode {
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+      border: 1px solid #d0d8e8;
+    }
+
+    &.dark-mode {
+      background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+      border: 1px solid #3a3f55;
+    }
+
+    .analyzing-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .analyzing-message {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--q-primary);
+    }
+
+    .tool-call-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .tool-call-context-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .context-query-inline {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.05);
+      max-width: 500px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .context-tag-inline {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(var(--q-primary-rgb), 0.1);
+      color: var(--q-primary);
+      font-weight: 500;
+    }
+  }
+
+  @keyframes fadeInSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .chat-input-wrapper {
@@ -2787,9 +3169,10 @@ export default defineComponent({
 
 .history-menu-container {
   position: relative;
-  max-height: 400px;
+  max-height: 450px;
   display: flex;
   flex-direction: column;
+  width: 300px;
 }
 
 .search-history-bar-sticky {
@@ -2799,11 +3182,44 @@ export default defineComponent({
   background: var(--q-page-background);
   padding: 8px;
   border-bottom: 1px solid var(--q-separator-color);
+  flex-shrink: 0;
 }
 
 .history-list-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 350px;
+}
+
+.history-item {
+  position: relative;
+
+  .delete-history-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  &:hover .delete-history-btn {
+    opacity: 1;
+  }
+}
+
+.clear-all-container {
+  background: var(--q-page-background);
+  padding: 8px;
+  border-top: 1px solid var(--q-separator-color);
+  flex-shrink: 0;
+
+  .clear-all-btn {
+    width: 100%;
+    color: var(--q-negative);
+    font-size: 13px;
+
+    &:hover {
+      background-color: rgba(var(--q-negative-rgb), 0.1);
+    }
+  }
 }
 
 // Scroll to bottom button styling
@@ -2911,7 +3327,7 @@ export default defineComponent({
 
   .tool-call-content {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     width: 100%;
   }
