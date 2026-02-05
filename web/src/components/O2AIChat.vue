@@ -816,6 +816,71 @@ export default defineComponent({
                     continue;
                   }
 
+                  // Handle error events - display error message to user
+                  if (data && data.type === 'error') {
+                    // Complete any active tool call first
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
+
+                    // Format error message with suggestion if available
+                    // Handle case where error/message might be an object instead of string
+                    const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                    const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+
+                    let errorMessage = `Error: ${errorText}`;
+                    if (data.suggestion) {
+                      errorMessage += `\n\n${data.suggestion}`;
+                    }
+
+                    // Get or create assistant message for error (reuse lastMessage)
+                    lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (!lastMessage || lastMessage.role !== 'assistant') {
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: errorMessage,
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                      });
+                      pendingToolCalls.value = [];
+                    } else {
+                      // Append error to existing message
+                      if (lastMessage.content) {
+                        lastMessage.content += '\n\n' + errorMessage;
+                      } else {
+                        lastMessage.content = errorMessage;
+                      }
+                      if (!lastMessage.contentBlocks) {
+                        lastMessage.contentBlocks = [];
+                      }
+                      lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                      // Clear pending tool calls to avoid leaking into later messages
+                      pendingToolCalls.value = [];
+                    }
+
+                    // Reset streaming state
+                    currentTextSegment.value = '';
+
+                    // Save error message to history
+                    await saveToHistory();
+                    await scrollToBottom();
+
+                    // Stop processing further as error occurred
+                    return;
+                  }
+
                   // Handle complete events - complete any active tool call
                   if (data && data.type === 'complete') {
                     if (activeToolCall.value) {
@@ -967,6 +1032,71 @@ export default defineComponent({
                   // Reset text segment for next text block
                   currentTextSegment.value = '';
                   continue;
+                }
+
+                // Handle error events - display error message to user
+                if (data && data.type === 'error') {
+                  // Complete any active tool call first
+                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
+
+                  // Format error message with suggestion if available
+                  // Handle case where error/message might be an object instead of string
+                  const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                  const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+
+                  let errorMessage = `Error: ${errorText}`;
+                  if (data.suggestion) {
+                    errorMessage += `\n\n${data.suggestion}`;
+                  }
+
+                  // Get or create assistant message for error (reuse lastMessage)
+                  lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (!lastMessage || lastMessage.role !== 'assistant') {
+                    chatMessages.value.push({
+                      role: 'assistant',
+                      content: errorMessage,
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                    });
+                    pendingToolCalls.value = [];
+                  } else {
+                    // Append error to existing message
+                    if (lastMessage.content) {
+                      lastMessage.content += '\n\n' + errorMessage;
+                    } else {
+                      lastMessage.content = errorMessage;
+                    }
+                    if (!lastMessage.contentBlocks) {
+                      lastMessage.contentBlocks = [];
+                    }
+                    lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                    // Clear pending tool calls to avoid leaking into later messages
+                    pendingToolCalls.value = [];
+                  }
+
+                  // Reset streaming state
+                  currentTextSegment.value = '';
+
+                  // Save error message to history
+                  await saveToHistory();
+                  await scrollToBottom();
+
+                  // Stop processing further as error occurred
+                  return;
                 }
 
                 // Handle complete events - complete any active tool call
