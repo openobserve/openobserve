@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :streamName="formData.stream_name"
                   :sqlQueryErrorMsg="sqlQueryErrorMsg"
                   :isAggregationEnabled="isAggregationEnabled"
+                  :promqlCondition="formData.query_condition.promql_condition"
                   @update:tab="updateTab"
                   @update-group="updateGroup"
                   @remove-group="removeConditionGroup"
@@ -167,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @editor-state-changed="handleEditorStateChanged"
                   @update:isAggregationEnabled="(value) => isAggregationEnabled = value"
                   @update:aggregation="(value) => formData.query_condition.aggregation = value"
+                  @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
                 />
               </div>
             </div>

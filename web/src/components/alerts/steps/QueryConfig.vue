@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Preview Boxes Container -->
           <div class="tw:flex tw:gap-4 tw:w-full">
             <!-- SQL/PromQL Preview Box (50% or 100% if no VRL) -->
-            <div ref="sqlPromqlPreviewRef" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
+            <div ref="sqlPromqlPreviewRef" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
               <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
                 <span class="preview-title">{{ localTab === 'sql' ? 'SQL' : 'PromQL' }} Preview</span>
               </div>
@@ -274,12 +274,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- VRL Preview Box (50%) - Only show if VRL function exists -->
-            <div v-if="vrlFunction" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
+            <div v-if="vrlFunction" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
               <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
                 <span class="preview-title">VRL Preview</span>
               </div>
               <div class="preview-content tw:px-3 tw:py-2">
                 <pre class="preview-code">{{ vrlFunction }}</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- PromQL Trigger Condition (only for PromQL tab) - Below the preview -->
+          <div v-if="localTab === 'promql' && promqlCondition" class="flex justify-start items-start q-mb-xs tw:ml-2 no-wrap">
+            <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+              Trigger if the value is *
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+              >
+                <q-tooltip anchor="center right" self="center left" max-width="300px">
+                  <span style="font-size: 14px">
+                    Defines when the alert should trigger based on the PromQL query result value.<br />
+                    Example: If set to ">= 100", the alert triggers when the query result is greater than or equal to 100.
+                  </span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div style="width: calc(100% - 190px)">
+              <div class="flex justify-start items-start">
+                <div class="tw:flex tw:flex-col">
+                  <q-select
+                    v-model="promqlCondition.operator"
+                    :options="triggerOperators"
+                    class="showLabelOnTop no-case q-py-none"
+                    borderless
+                    dense
+                    use-input
+                    hide-selected
+                    fill-input
+                    :rules="[(val: any) => !!val || 'Field is required!']"
+                    :style="{
+                      width: (promqlCondition.operator === 'Contains' || promqlCondition.operator === 'NotContains')
+                        ? '124px'
+                        : '88px',
+                      minWidth: '88px'
+                    }"
+                    @update:model-value="emitPromqlConditionUpdate"
+                  />
+                  <div
+                    v-if="!promqlCondition.operator"
+                    class="text-red-8 q-pt-xs"
+                    style="font-size: 11px; line-height: 12px"
+                  >
+                    Field is required!
+                  </div>
+                </div>
+                <div class="flex items-start tw:flex-col" style="border-left: none">
+                  <div class="tw:flex tw:items-center">
+                    <div style="width: 179px; margin-left: 0 !important">
+                      <q-input
+                        v-model.number="promqlCondition.value"
+                        type="number"
+                        dense
+                        borderless
+                        style="background: none"
+                        debounce="300"
+                        @update:model-value="emitPromqlConditionUpdate"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    v-if="promqlCondition.value === undefined || promqlCondition.value === null || promqlCondition.value === ''"
+                    class="text-red-8 q-pt-xs"
+                    style="font-size: 11px; line-height: 12px"
+                  >
+                    Field is required!
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -398,8 +471,12 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    promqlCondition: {
+      type: Object as PropType<any>,
+      default: null,
+    },
   },
-  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows", "editor-closed", "editor-state-changed", "update:isAggregationEnabled", "update:aggregation"],
+  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows", "editor-closed", "editor-state-changed", "update:isAggregationEnabled", "update:aggregation", "update:promqlCondition"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -660,6 +737,11 @@ export default defineComponent({
       emit("update:aggregation", props.inputData.aggregation);
     };
 
+    // Emit PromQL condition update
+    const emitPromqlConditionUpdate = () => {
+      emit("update:promqlCondition", props.promqlCondition);
+    };
+
     // Watch for SQL editor dialog state changes
     watch(viewSqlEditor, (newValue, oldValue) => {
       // Emit state change whenever it changes
@@ -788,6 +870,7 @@ export default defineComponent({
       addGroupByColumn,
       deleteGroupByColumn,
       emitAggregationUpdate,
+      emitPromqlConditionUpdate,
     };
   },
 });
