@@ -751,7 +751,7 @@ async fn ratelimit_check(event: &WsClientEvents, auth_str: String) -> Result<(),
     )
     .await
     {
-        log::warn!(
+        log::debug!(
             "[{trace_id}] Rate limit exceeded for path: {path}, err: {:?}",
             err
         );
@@ -763,10 +763,11 @@ async fn ratelimit_check(event: &WsClientEvents, auth_str: String) -> Result<(),
 
         let err = if let Some((blocked_err, rule)) = blocked_err {
             log::warn!(
-                "block_msg: {}, rule_id: {}, threshold: {}, resource: {}",
+                "block_msg: {}, rule_id: {}, threshold: {}, stat_interval: {}, resource: {}",
                 blocked_err.block_msg(),
                 rule.id,
                 rule.threshold,
+                rule.stat_interval_ms / 1000,
                 rule.resource
             );
             Err(errors::Error::ErrorCode(

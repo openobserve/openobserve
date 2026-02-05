@@ -1223,7 +1223,10 @@
     "updateLimit": "Update (Req/s)",
     "deleteLimit": "Delete (Req/s)",
     "table": "Table",
-    "json": "JSON"
+    "json": "JSON",
+    "per-second": "Per Second",
+    "per-minute": "Per Minute",
+    "per-hour": "Per Hour"
   },
   "nodes": {
     "header": "All Nodes",
