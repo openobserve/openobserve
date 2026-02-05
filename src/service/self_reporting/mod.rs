@@ -35,7 +35,7 @@ use config::{
     metrics,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::auditor;
+pub use o2_enterprise::enterprise::common::auditor;
 #[cfg(feature = "enterprise")]
 use proto::cluster_rpc;
 use tokio::sync::oneshot;
