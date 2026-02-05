@@ -725,7 +725,7 @@ pub async fn enrich_with_topology(
     for (idx, node) in topology.nodes.iter().enumerate() {
         service_nodes
             .entry(&node.service_name)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(idx);
     }
 
@@ -762,20 +762,18 @@ pub async fn enrich_with_topology(
                         let edge_exists = topology.edges.iter().any(|e| {
                             e.from_node_index == from_idx
                                 && e.to_node_index == to_idx
-                                && match (&e.edge_type, &edge_type) {
-                                    (EdgeType::ServiceDependency, EdgeType::ServiceDependency) => {
-                                        true
-                                    }
-                                    (EdgeType::Temporal, EdgeType::Temporal) => true,
-                                    _ => false,
-                                }
+                                && matches!(
+                                    (&e.edge_type, &edge_type),
+                                    (EdgeType::ServiceDependency, EdgeType::ServiceDependency)
+                                        | (EdgeType::Temporal, EdgeType::Temporal)
+                                )
                         });
 
                         if !edge_exists {
                             topology.edges.push(AlertEdge {
                                 from_node_index: from_idx,
                                 to_node_index: to_idx,
-                                edge_type: edge_type.clone(),
+                                edge_type,
                             });
                             log::debug!(
                                 "[incidents] Added {:?} edge: {} ({}) -> {} ({})",
