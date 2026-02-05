@@ -118,6 +118,10 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
+    nlpMode: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end"],
   setup(props, { emit }) {
@@ -333,9 +337,13 @@ export default defineComponent({
     });
 
     /**
-     * Debounced function to detect natural language and show/hide button
+     * Debounced function to detect natural language and auto-toggle NLP mode
      * Waits 500ms after user stops typing before checking
-     * Only shows button if: (1) text is natural language AND (2) stream is selected
+     *
+     * CRITICAL BEHAVIOR:
+     * - If NOT in NLP mode: Auto-detect and emit event to turn ON NLP mode for natural language
+     * - If ALREADY in NLP mode: Do NOT emit events (keep NLP mode ON regardless of what user types)
+     * - NLP mode only turns OFF when AI successfully generates SQL query
      */
     const checkForNaturalLanguage = debounce((text: string) => {
       currentEditorText.value = text;
@@ -343,17 +351,22 @@ export default defineComponent({
 
       console.log('[NL2Q-Detection]', {
         text: text.substring(0, 50),
-        isNaturalLanguage: isNL
+        isNaturalLanguage: isNL,
+        currentNlpMode: props.nlpMode
       });
 
-      // Emit event to auto-toggle NLP mode when natural language is detected
-      // The parent component (SearchBar) will handle toggling the NLP mode
-      if (isNL) {
-        console.log('[NL2Q-Detection] Emitting nlpModeDetected event');
-        emit("nlpModeDetected", true);
-        console.log('[NL2Q-Detection] Event emitted successfully');
+      // ONLY emit events if NOT already in NLP mode (auto-detection feature)
+      // If already in NLP mode (user toggled it), don't change anything
+      if (!props.nlpMode) {
+        if (isNL) {
+          console.log('[NL2Q-Detection] Natural language detected, emitting nlpModeDetected: true');
+          emit("nlpModeDetected", true);
+        } else {
+          console.log('[NL2Q-Detection] SQL detected, emitting nlpModeDetected: false');
+          emit("nlpModeDetected", false);
+        }
       } else {
-        console.log('[NL2Q-Detection] Not natural language, not emitting event');
+        console.log('[NL2Q-Detection] Already in NLP mode, not emitting auto-detection events');
       }
     }, 500);
 
@@ -1138,8 +1151,9 @@ export default defineComponent({
       display: flex !important;
       visibility: visible !important;
     }
+    --vscode-focusBorder: transparent !important;
   }
-  --vscode-focusBorder: transparent !important;
+
 }
 
 .highlight-error {
