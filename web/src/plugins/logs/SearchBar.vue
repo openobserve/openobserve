@@ -3896,7 +3896,7 @@ export default defineComponent({
       emit("buildModeToggle", !isBuilderMode); // isCustomMode = !isBuilderMode
     };
 
-    const onLogsVisualizeToggleUpdate = (value: any) => {
+    const onLogsVisualizeToggleUpdate = async (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
         value === "visualize" &&
@@ -4013,6 +4013,35 @@ export default defineComponent({
 
         // cancel all the logs queries
         cancelQuery();
+      } else if (value == "build") {
+        // Switching to build mode - enable SQL mode and generate query using buildSearch
+        const wasSqlMode = searchObj.meta.sqlMode;
+        if (!wasSqlMode) {
+          searchObj.meta.sqlMode = true;
+        }
+
+        // Generate query using buildSearch if query is empty or doesn't have SELECT
+        if (!searchObj.data.query || searchObj.data.query.toLowerCase().indexOf("select") < 0) {
+          const queryBuild = buildSearch();
+          const builtQuery = queryBuild?.query?.sql ?? "";
+          if (builtQuery) {
+            searchObj.data.query = builtQuery;
+            searchObj.data.editorValue = builtQuery;
+          }
+        }
+
+        // Wait for Vue reactivity to process query changes before switching tabs
+        await nextTick();
+
+        // Enable quick mode if config allows (same as visualization)
+        const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(searchObj.data.query || "");
+        const shouldEnableQuickMode = !searchObj.meta.sqlMode || isSelectAllQuery;
+        const isQuickModeDisabled = !searchObj.meta.quickMode;
+        const isQuickModeConfigEnabled = store.state.zoConfig.quick_mode_enabled === true;
+
+        if (shouldEnableQuickMode && isQuickModeDisabled && isQuickModeConfigEnabled) {
+          searchObj.meta.quickMode = true;
+        }
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
