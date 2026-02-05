@@ -300,14 +300,8 @@ pub async fn get_trace_dag(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            start_time: item
-                .get("start_time")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0),
-            end_time: item
-                .get("end_time")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0),
+            start_time: item.get("start_time").and_then(|v| v.as_i64()).unwrap_or(0),
+            end_time: item.get("end_time").and_then(|v| v.as_i64()).unwrap_or(0),
         };
         nodes.push(node);
 

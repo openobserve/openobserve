@@ -376,8 +376,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="parentContainer"
         >
           <div class="trace-tree-wrapper card-container">
-            <!-- Tabs for Timeline/DAG views -->
+            <!-- Tabs for Timeline/DAG views - DAG only shown for LLM traces -->
             <q-tabs
+              v-if="hasLLMSpans"
               v-model="activeTab"
               dense
               class="text-grey"
@@ -389,10 +390,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tab name="timeline" label="Timeline" data-test="trace-details-timeline-tab" />
               <q-tab name="dag" label="DAG" data-test="trace-details-dag-tab" />
             </q-tabs>
-            <q-separator />
+            <q-separator v-if="hasLLMSpans" />
 
-            <!-- Timeline View -->
-            <div v-if="activeTab === 'timeline'">
+            <!-- Timeline View - show when no LLM spans OR when timeline tab is active -->
+            <div v-if="!hasLLMSpans || activeTab === 'timeline'">
               <trace-header
                 data-test="trace-details-header"
                 :baseTracePosition="baseTracePosition"
@@ -466,8 +467,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
 
-            <!-- DAG View -->
-            <div v-if="activeTab === 'dag'" style="display: flex; flex: 1; min-height: 0;">
+            <!-- DAG View - only for LLM traces -->
+            <div v-if="hasLLMSpans && activeTab === 'dag'" style="display: flex; flex: 1; min-height: 0;">
               <div
                 class="dag-left-panel"
                 :style="{
@@ -481,6 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :streamName="currentTraceStreamName || 'default'"
                   :startTime="effectiveTimeRange.from || 0"
                   :endTime="effectiveTimeRange.to || 0"
+                  :sidebarOpen="isSidebarOpen && (!!selectedSpanId || showTraceDetails)"
                   @node-click="handleDAGNodeClick"
                 />
               </div>
@@ -589,6 +591,7 @@ import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
   parseCostDetails,
+  isLLMTrace,
 } from "@/utils/llmUtils";
 
 export default defineComponent({
@@ -865,6 +868,13 @@ export default defineComponent({
         return props.spanListProp;
       }
       return searchObj.data.traceDetails.spanList;
+    });
+
+    // Check if the trace contains any LLM spans
+    const hasLLMSpans = computed(() => {
+      const spans = effectiveSpanList.value;
+      if (!spans || spans.length === 0) return false;
+      return spans.some((span: any) => isLLMTrace(span));
     });
 
     const showTraceDetails = ref(false);
@@ -2124,6 +2134,8 @@ export default defineComponent({
       // DAG resize
       dagLeftWidth,
       startDagResize,
+      // LLM traces check
+      hasLLMSpans,
     };
   },
 });

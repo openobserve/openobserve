@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
-import { VueFlow, Position, MarkerType, Handle } from "@vue-flow/core";
+import { defineComponent, ref, computed, watch, nextTick } from "vue";
+import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
@@ -137,6 +137,10 @@ export default defineComponent({
       type: Number,
       required: true,
     },
+    sidebarOpen: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["node-click"],
   setup(props, { emit }) {
@@ -144,6 +148,9 @@ export default defineComponent({
     const isLoading = ref(true);
     const error = ref<string | null>(null);
     const dagData = ref<DAGResponse | null>(null);
+
+    // Get VueFlow instance for fitView functionality
+    const { fitView } = useVueFlow();
 
     // Top-down tree layout algorithm
     const calculateLayout = (nodesData: SpanNode[], edgesData: SpanEdge[]) => {
@@ -373,6 +380,20 @@ export default defineComponent({
     const handleNodeClick = (spanId: string) => {
       emit("node-click", spanId);
     };
+
+    // Watch for sidebar state changes and re-center the DAG
+    watch(
+      () => props.sidebarOpen,
+      () => {
+        // When sidebar state changes, wait for DOM to update then fit the view
+        nextTick(() => {
+          // Small delay to allow container resize to complete
+          setTimeout(() => {
+            fitView({ padding: 0.3, duration: 300 });
+          }, 50);
+        });
+      }
+    );
 
     return {
       isLoading,
