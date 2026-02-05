@@ -44,7 +44,9 @@ export const createPipelinesContextProvider = (
         pipelineId: pipeline?.id || '',
         pipelineName: pipeline?.name || '',
         organization_identifier: store?.state?.selectedOrganization?.identifier || '',
-        user_intent: pipelineObj?.isEditPipeline ? 'edit existing pipeline' : 'create new pipeline'
+        user_intent: pipelineObj?.isEditPipeline ? 'edit existing pipeline' : 'create new pipeline',
+        // Current timestamp when request is fired (microseconds) for AI agent time calculations
+        request_timestamp: Date.now() * 1000,
       };
     }
   };
