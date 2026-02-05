@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column logs-index-menu tw:p-[0.375rem]! tw:h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <div style="max-width: 100%; overflow: hidden;">
+    <div style="max-width: 100%; overflow: hidden">
       <q-select
         ref="streamSelect"
         data-test="log-search-index-list-select-stream"
@@ -44,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           anchor="bottom left"
           self="top left"
           max-width="280px"
-          style="font-size: 13px;"
+          style="font-size: 13px"
         >
-          {{ searchObj.data.stream.selectedStream.join(', ') }}
+          {{ searchObj.data.stream.selectedStream.join(", ") }}
         </q-tooltip>
         <template #no-option>
           <q-item>
@@ -192,12 +192,12 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components: { 
-    EqualIcon, 
-    NotEqualIcon,      
+  components: {
+    EqualIcon,
+    NotEqualIcon,
     FieldList: defineAsyncComponent(
       () => import("@/plugins/logs/components/FieldList.vue"),
-    ), 
+    ),
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
@@ -208,7 +208,11 @@ export default defineComponent({
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.inputValue && indexListSelectField.updateInputValue) {
+        if (
+          indexListSelectField &&
+          indexListSelectField.inputValue &&
+          indexListSelectField.updateInputValue
+        ) {
           indexListSelectField.updateInputValue("");
         }
       });
@@ -379,7 +383,8 @@ export default defineComponent({
     const scrollToTop = () => {
       if (fieldListRef.value) {
         // Find the scrollable container within the q-table
-        const scrollContainer = fieldListRef.value.querySelector(
+        // fieldListRef.value is a component instance, need to access $el for DOM
+        const scrollContainer = fieldListRef.value.$el?.querySelector(
           ".q-table__middle.scroll",
         );
         if (scrollContainer) {
@@ -400,7 +405,6 @@ export default defineComponent({
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
-
         if (isActive) {
           // check if its present in the array dont add it again
           if (
@@ -427,8 +431,9 @@ export default defineComponent({
             searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
           }
 
-          if(showOnlyInterestingFields.value)if (pagination.value) resetPagination();
-          
+          if (showOnlyInterestingFields.value)
+            if (pagination.value) resetPagination();
+
           showOnlyInterestingFields.value = false;
         }
       },
@@ -486,12 +491,14 @@ export default defineComponent({
     function setDefaultFieldTab() {
       if (store.state.zoConfig.log_page_default_field_list === "uds") {
         // reset pagination only if tab has changed
-        if(searchObj.meta.useUserDefinedSchemas !== 'user_defined_schema') resetPagination();
+        if (searchObj.meta.useUserDefinedSchemas !== "user_defined_schema")
+          resetPagination();
         searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
         showOnlyInterestingFields.value = false;
       } else {
         // reset pagination only if tab has changed
-        if(searchObj.meta.useUserDefinedSchemas !== 'interesting_fields') resetPagination();
+        if (searchObj.meta.useUserDefinedSchemas !== "interesting_fields")
+          resetPagination();
         searchObj.meta.useUserDefinedSchemas = "interesting_fields";
         showOnlyInterestingFields.value = true;
       }
@@ -512,8 +519,8 @@ export default defineComponent({
           }
         }
       }
-      if(!filtered.length){
-        return [{name: "no-fields-found", label: "No matching fields found"}];
+      if (!filtered.length) {
+        return [{ name: "no-fields-found", label: "No matching fields found" }];
       }
       return filtered;
     };
@@ -531,7 +538,10 @@ export default defineComponent({
         selectedFields.push(row.name);
       }
 
-      searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));;
+      searchObj.data.stream.selectedFields = selectedFields.filter(
+        (_field) =>
+          _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+      );
 
       searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
@@ -642,6 +652,18 @@ export default defineComponent({
           const parsedSQL: any = fnParsedSQL(query);
           //hack add time stamp column to parsedSQL if not already added
           query_context = fnUnparsedSQL(parsedSQL).replace(/`/g, '"') || "";
+
+          // Check if parser failed to parse the query (e.g., UNION ALL BY NAME)
+          // If both columns and from arrays are empty, the parser couldn't handle the syntax
+          if (
+            query_context === "" &&
+            parsedSQL.columns?.length === 0 &&
+            parsedSQL.from?.length === 0
+          ) {
+            // Fallback: Use simple SELECT * query for field values
+            // This will be replaced with actual stream name later
+            query_context = 'SELECT * FROM "[INDEX_NAME]"';
+          }
 
           if (searchObj.data.stream.selectedStream.length > 1) {
             queries = extractValueQuery();
@@ -1033,7 +1055,6 @@ export default defineComponent({
         ] + 1;
     };
 
-
     const toggleSchema = async (newValue: string) => {
       // Update the schema type with the new value from the toggle
       searchObj.meta.useUserDefinedSchemas = newValue;
@@ -1051,7 +1072,6 @@ export default defineComponent({
       }
 
       await resetFields();
-      
     };
 
     const toggleInterestingFields = (newValue: boolean) => {
@@ -1107,13 +1127,13 @@ export default defineComponent({
 
     const initializeWebSocketConnection = (payload: any) => {
       // if (isStreamingEnabled(store.state)) {
-        fetchQueryDataWithHttpStream(payload, {
-          data: handleSearchResponse,
-          error: handleSearchError,
-          complete: handleSearchClose,
-          reset: handleSearchReset,
-        });
-        return;
+      fetchQueryDataWithHttpStream(payload, {
+        data: handleSearchResponse,
+        error: handleSearchError,
+        complete: handleSearchClose,
+        reset: handleSearchReset,
+      });
+      return;
       // }
     };
 
@@ -1252,7 +1272,10 @@ export default defineComponent({
           aggregatedArray.sort((a, b) => b.count - a.count);
 
           // Take top N
-          fieldValues.value[fieldName].values = aggregatedArray.slice(0, store.state.zoConfig?.query_values_default_num || 10);
+          fieldValues.value[fieldName].values = aggregatedArray.slice(
+            0,
+            store.state.zoConfig?.query_values_default_num || 10,
+          );
         }
 
         // Mark as not loading

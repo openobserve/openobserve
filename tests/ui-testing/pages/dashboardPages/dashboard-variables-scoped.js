@@ -24,7 +24,9 @@ export default class DashboardVariablesScoped {
    * @param {boolean} options.showMultipleValues - Enable multi-select
    * @param {boolean} options.customValueSearch - Enable custom value search
    * @param {string} options.dependsOn - Variable name this depends on
+   * @param {string} options.dependsOnField - Field name of the variable this depends on (used in filter)
    * @param {string[]} options.dependsOnMultiple - Array of variable names for multi-dependency
+   * @param {Object} options.dependencyFieldMap - Map of {variableName: fieldName} for multi-dependency
    * @param {string} options.defaultValue - Default value for the variable
    * @param {boolean} options.hideOnDashboard - Hide variable on dashboard
    */
@@ -37,7 +39,9 @@ export default class DashboardVariablesScoped {
       showMultipleValues = false,
       customValueSearch = false,
       dependsOn = null,
+      dependsOnField = null,
       dependsOnMultiple = [],
+      dependencyFieldMap = {},
       defaultValue = null,
       hideOnDashboard = false,
     } = options;
@@ -191,13 +195,15 @@ export default class DashboardVariablesScoped {
 
     // Add dependency if specified
     if (dependsOn) {
-      await this.addDependency(dependsOn);
+      await this.addDependency(dependsOn, dependsOnField);
     }
 
     // Add multiple dependencies if specified
     if (dependsOnMultiple.length > 0) {
       for (const dep of dependsOnMultiple) {
-        await this.addDependency(dep);
+        // Use the field from dependencyFieldMap if provided, otherwise pass null
+        const depField = dependencyFieldMap[dep] || null;
+        await this.addDependency(dep, depField);
       }
     }
 
@@ -351,7 +357,7 @@ export default class DashboardVariablesScoped {
         // If clicking option failed, manually set the value with $ prefix
         await autoComplete.clear();
         await autoComplete.fill(`$${dependencyVariableName}`);
-        await this.page.keyboard.press('Escape');
+        // await this.page.keyboard.press('Escape');
       }
     } else {
       // No dropdown appeared, manually set the value with $ prefix
@@ -622,12 +628,21 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<boolean>}
    */
   async hasCircularDependencyError() {
-    const errorElement = this.page.locator('[data-test="dashboard-circular-dependency-error"]');
+    // The error is displayed as red text with the message "Variables has cycle:"
+    // Look for text containing "cycle" in red color
+    const errorElement = this.page.locator('div[style*="color: red"], div[style*="color:red"]').filter({ hasText: /cycle/i });
     try {
       await errorElement.waitFor({ state: "visible", timeout: 3000 });
       return true;
     } catch {
-      return false;
+      // Fallback: check for any text containing "Variables has cycle"
+      const fallbackError = this.page.getByText(/Variables has cycle/i);
+      try {
+        await fallbackError.waitFor({ state: "visible", timeout: 1000 });
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 
@@ -678,5 +693,106 @@ export default class DashboardVariablesScoped {
     const expectedText = normalizedType === 'tab' ? 'Deleted Tab' : 'Deleted Panel';
     const tooltip = this.page.locator('.q-tooltip, [role="tooltip"]').filter({ hasText: new RegExp(expectedText, 'i') });
     await expect(tooltip).toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Change variable value and monitor dependent variable API calls
+   * This function is designed for dependency tests where changing one variable
+   * triggers API calls for dependent variables
+   *
+   * @param {string} variableName - Name of the variable to change
+   * @param {Object} options - Configuration options
+   * @param {number} options.optionIndex - Index of option to select (default: 0 for first option)
+   * @param {number} options.expectedAPICalls - Expected number of dependent variable API calls (default: 1)
+   * @param {number} options.timeout - Timeout for API monitoring (default: 15000)
+   * @returns {Promise<Object>} - API monitoring result with actualCount, calls, success, etc.
+   */
+  async changeVariableValueAndMonitorDependencies(variableName, options = {}) {
+    const {
+      optionIndex = 0,
+      expectedAPICalls = 1,
+      timeout = 15000
+    } = options;
+
+    // Dynamic import to avoid circular dependencies
+    const { monitorVariableAPICalls } = await import('../../playwright-tests/utils/variable-helpers.js');
+
+    // Wait for variable dropdown to be visible and ready
+    const varDropdown = this.page.getByLabel(variableName, { exact: true });
+    await varDropdown.waitFor({ state: "visible", timeout: 10000 });
+
+    // Ensure network is idle before clicking
+    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Start monitoring for values stream API call BEFORE opening dropdown
+    const valuesStreamPromise = waitForValuesStreamComplete(this.page, timeout);
+
+    // Start monitoring for dependent variable API calls BEFORE opening dropdown
+    // This ensures we capture any dependent variable updates
+    const apiMonitor = monitorVariableAPICalls(this.page, {
+      expectedCount: expectedAPICalls,
+      timeout: timeout
+    });
+
+    // Click dropdown to open menu
+    await varDropdown.click();
+
+    // Wait for the values stream to complete loading options
+    try {
+      await valuesStreamPromise;
+    } catch (error) {
+      throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
+    }
+
+    // Wait for dropdown menu to open and stabilize
+    const dropdownMenu = this.page.locator('.q-menu').first();
+    await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for options to be present in the dropdown
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000 }
+    );
+
+    // Add a small stabilization delay to ensure options are fully rendered
+    await this.page.waitForTimeout(500);
+
+    // Get the text of the target option before clicking
+    const targetOptionText = await this.page.evaluate((index) => {
+      const options = document.querySelectorAll('[role="option"]');
+      return options.length > index ? options[index].textContent.trim() : null;
+    }, optionIndex);
+
+    if (!targetOptionText) {
+      throw new Error(`Could not find option at index ${optionIndex} in dropdown for variable: ${variableName}`);
+    }
+
+    // Click the target option using evaluate to avoid detachment issues
+    await this.page.evaluate((index) => {
+      const options = document.querySelectorAll('[role="option"]');
+      if (options.length > index) {
+        options[index].click();
+      }
+    }, optionIndex);
+
+    // Wait for dropdown to close
+    await dropdownMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+    // Wait for any dependent variable API calls to complete
+    const apiResult = await apiMonitor;
+
+    // Verify the value actually changed by checking the input value
+    await this.page.waitForTimeout(500);
+    const currentValue = await varDropdown.inputValue().catch(() => '');
+
+    return {
+      ...apiResult,
+      selectedValue: targetOptionText,
+      currentValue: currentValue,
+      variableName: variableName
+    };
   }
 }

@@ -232,7 +232,8 @@ export const convertServiceGraphToTree = (
   const globalVisited = new Set<string>();
 
   // Helper to build tree recursively
-  const buildTree = (nodeId: string, visited = new Set<string>()): any => {
+  // incomingEdge: the edge that led to this node (for direction-aware metrics)
+  const buildTree = (nodeId: string, visited = new Set<string>(), incomingEdge: any = null): any => {
     if (visited.has(nodeId)) return null; // Prevent cycles
     visited.add(nodeId);
     globalVisited.add(nodeId);
@@ -242,14 +243,41 @@ export const convertServiceGraphToTree = (
 
     const outgoingEdges = edgesMap.get(nodeId) || [];
     const children = outgoingEdges
-      .map((edge: any) => buildTree(edge.to, new Set(visited)))
+      .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
 
-    // Calculate node metrics - use node's own request count, not just outgoing edges
-    // This ensures leaf nodes show their actual traffic instead of 0
-    const totalRequests = node.requests || 0;
-    const failedRequests = node.errors || 0;
-    const errorRate = node.error_rate || 0;
+    // Simple: show only incoming requests from parent in this tree path
+    let totalRequests: number;
+    let failedRequests: number;
+    let errorRate: number;
+
+    if (incomingEdge) {
+      // Non-root: show incoming from parent
+      totalRequests = incomingEdge.total_requests ?? 0;
+      failedRequests = incomingEdge.failed_requests ?? 0;
+      errorRate = incomingEdge.error_rate ?? 0;
+    } else {
+      // Root: sum of outgoing edges
+      totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
+      failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
+
+      // If no edges, use node's own metrics
+      if (totalRequests === 0 && node.requests !== undefined) {
+        totalRequests = node.requests;
+        failedRequests = node.errors ?? 0;
+      }
+
+      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
+
+      // If still no data, try node.error_rate directly
+      if (errorRate === 0 && node.error_rate !== undefined) {
+        errorRate = node.error_rate;
+      }
+    }
+
+    // Calculate connections count
+    const incomingEdges = incomingEdgesMap.get(nodeId) || [];
+    const connectionCount = incomingEdges.length + outgoingEdges.length;
 
     // Determine node color based on error rate
     let nodeColor = "#4CAF50"; // Green for healthy
@@ -268,7 +296,7 @@ export const convertServiceGraphToTree = (
       },
       label: {
         show: true,
-        position: layoutType === 'vertical' ? 'bottom' : 'right',
+        position: layoutType === 'vertical' ? 'top' : 'left',
         formatter: (params: any) => {
           return `${params.name}\n${formatNumber(totalRequests)} req`;
         },
@@ -279,7 +307,8 @@ export const convertServiceGraphToTree = (
             <strong>${params.name}</strong><br/>
             Requests: ${formatNumber(totalRequests)}<br/>
             Errors: ${failedRequests}<br/>
-            Error Rate: ${errorRate.toFixed(2)}%
+            Error Rate: ${errorRate.toFixed(2)}%<br/>
+            Connections: ${connectionCount}
           `;
         },
       },
@@ -358,16 +387,16 @@ export const convertServiceGraphToTree = (
         symbol: 'circle',
         symbolSize: 20,
         label: {
-          position: layoutType === 'vertical' ? 'bottom' : 'right',
-          verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
+          position: layoutType === 'vertical' ? 'top' : 'left',
+          verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
           distance: 15,
           fontSize: 12,
           rotate: 0, // Keep text horizontal, no rotation
         },
         leaves: {
           label: {
-            position: layoutType === 'vertical' ? 'bottom' : 'right',
-            verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
+            position: layoutType === 'vertical' ? 'top' : 'left',
+            verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
             distance: 15,
             rotate: 0, // Keep text horizontal, no rotation
           },

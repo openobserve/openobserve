@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="trace-details-content"
       v-if="
         traceTree.length &&
-        spanList.length &&
+        effectiveSpanList.length &&
         !(
           searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta
@@ -28,18 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="trace-combined-header-wrapper card-container">
-        <div
-          class="full-width flex items-center toolbar flex justify-between q-pb-sm"
-        >
+        <div class="full-width flex items-center toolbar flex justify-between">
           <div class="flex items-center">
+            <!-- Back button - only show in standalone mode if explicitly enabled -->
             <div
+              v-if="mode === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
               class="flex justify-center items-center q-mr-sm cursor-pointer trace-back-btn"
               title="Traces List"
-              @click="routeToTracesList"
+              @click="handleBackOrClose"
             >
               <q-icon name="arrow_back_ios_new" size="14px" />
             </div>
+
             <div
               data-test="trace-details-operation-name"
               class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
@@ -48,32 +49,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ traceTree[0]["operationName"] }}
             </div>
             <div class="q-mr-lg flex items-center text-body2">
-              <div class="flex items-center">
-                Trace ID:
-                <div
-                  data-test="trace-details-trace-id"
-                  class="toolbar-trace-id ellipsis q-pl-xs"
-                  :title="spanList[0]['trace_id']"
-                >
-                  {{ spanList[0]["trace_id"] }}
-                </div>
+              <span class="text-grey-7">Trace ID:</span>
+
+              <!-- Clickable trace ID (embedded mode - no ellipsis) -->
+              <div
+                v-if="mode === 'embedded'"
+                data-test="trace-details-trace-id"
+                class="toolbar-trace-id q-pl-xs cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                :title="`Open ${effectiveSpanList[0]['trace_id']} in Traces`"
+                @click="handleExpandToFullView"
+              >
+                {{ effectiveSpanList[0]["trace_id"] }}
               </div>
+
+              <!-- Non-clickable with ellipsis (standalone mode) -->
+              <div
+                v-else
+                data-test="trace-details-trace-id"
+                class="toolbar-trace-id tw:m-w-[5rem] ellipsis q-pl-xs"
+                :title="effectiveSpanList[0]['trace_id']"
+              >
+                {{ effectiveSpanList[0]["trace_id"] }}
+              </div>
+
+              <!-- Open in new icon (embedded mode only) -->
+              <q-icon
+                v-if="mode === 'embedded' && showExpandButton"
+                class="cursor-pointer q-ml-xs hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                size="14px"
+                name="open_in_new"
+                title="Open in Traces"
+                @click="handleExpandToFullView"
+                data-test="trace-details-trace-id-open-btn"
+              />
+
+              <!-- Copy button (both modes) -->
               <q-icon
                 data-test="trace-details-copy-trace-id-btn"
-                class="q-ml-xs cursor-pointer trace-copy-icon"
+                class="cursor-pointer trace-copy-icon q-ml-xs"
                 size="12px"
                 name="content_copy"
-                title="Copy"
+                title="Copy Trace ID"
                 @click="copyTraceId"
               />
             </div>
 
             <div data-test="trace-details-spans-count" class="q-pb-xs q-mr-lg">
-              Spans: {{ spanList.length }}
+              Spans: {{ effectiveSpanList.length }}
             </div>
 
             <!-- TODO OK: Create component for this usecase multi select with button -->
-            <div class="o2-input flex items-center trace-logs-selector">
+            <div
+              v-if="showLogStreamSelector"
+              class="o2-input flex items-center trace-logs-selector"
+            >
               <q-select
                 data-test="trace-details-log-streams-select"
                 v-model="searchObj.data.traceDetails.selectedLogStreams"
@@ -141,25 +170,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="trace-details-view-logs-btn"
                 v-close-popup="true"
-                class="text-bold traces-view-logs-btn tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="text-bold traces-view-logs-btn tw:border! tw:border-solid! tw:border-[var(--o2-theme-color)]!"
                 :label="
                   searchObj.meta.redirectedFromLogs
                     ? t('traces.backToLogs')
                     : t('traces.viewLogs')
                 "
                 padding="sm sm"
-                color="primary"
                 size="sm"
                 no-caps
+                outline
+                color="primary"
+                flat
                 dense
                 icon="search"
                 @click="redirectToLogs"
+              />
+              <q-btn
+                v-if="hasRumSessionId"
+                data-test="trace-details-view-session-replay-btn"
+                v-close-popup="true"
+                class="traces-view-session-replay-btn text-bold q-ml-md tw-text-[16px]! tw:border! tw:border-solid tw:border-[var(--o2-theme-color)]!"
+                :label="t('rum.playSessionReplay')"
+                padding="sm sm"
+                size="sm"
+                no-caps
+                flat
+                color="primary"
+                outline
+                dense
+                :icon="outlinedPlayCircle"
+                @click="redirectToSessionReplay"
               />
             </div>
           </div>
           <div class="flex items-center">
             <div
-              class="flex justify-center items-center tw:pl-2 trace-search-container"
+              class="o2-input flex justify-center items-center tw:pl-2 trace-search-container"
             >
               <q-input
                 data-test="trace-details-search-input"
@@ -209,94 +256,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="`sm`"
               />
             </div>
+            <!-- Expand button - for embedded mode -->
+            <q-btn
+              v-if="mode === 'embedded' && showExpandButton"
+              data-test="trace-details-expand-btn"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
+              icon="open_in_new"
+              size="xs"
+              @click="handleExpandToFullView"
+              flat
+            >
+              <q-tooltip>
+                {{ t("traces.openInTraces") }}
+              </q-tooltip>
+            </q-btn>
+            <!-- Share button - conditional -->
             <share-button
+              v-if="mode === 'standalone' && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
               button-size="xs"
             />
+            <!-- Close button - conditional -->
             <q-btn
+              v-if="mode === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
               class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
               icon="cancel"
               size="xs"
-              @click="routeToTracesList"
+              @click="handleBackOrClose"
             >
               <q-tooltip>
-                {{ t('common.cancel') }}
+                {{ t("common.cancel") }}
               </q-tooltip>
             </q-btn>
           </div>
         </div>
 
-        <q-separator class="q-my-sm" />
+        <!-- Timeline section - conditional -->
+        <template v-if="showTimeline">
+          <q-separator class="q-my-sm" />
 
-        <div class="flex justify-between items-end q-pr-sm q-pb-sm">
-          <div
-            data-test="trace-details-toggle-timeline-btn"
-            class="trace-chart-btn flex items-center no-wrap cursor-pointer"
-            @click="toggleTimeline"
-          >
-            <q-icon
-              name="expand_more"
-              :class="!isTimelineExpanded ? 'rotate-270' : ''"
-              size="22px"
-              class="cursor-pointer text-grey-10"
-            />
+          <div class="flex justify-between items-end q-pr-sm q-pb-sm">
             <div
-              data-test="trace-details-visual-title"
-              class="text-subtitle2 text-bold"
+              data-test="trace-details-toggle-timeline-btn"
+              class="trace-chart-btn flex items-center no-wrap cursor-pointer"
+              @click="toggleTimeline"
             >
-              {{
-                activeVisual === "timeline"
-                  ? "Trace Timeline"
-                  : "Trace Service Map"
-              }}
+              <q-icon
+                name="expand_more"
+                :class="!isTimelineExpanded ? 'rotate-270' : ''"
+                size="22px"
+                class="cursor-pointer text-grey-10"
+              />
+              <div
+                data-test="trace-details-visual-title"
+                class="text-subtitle2 text-bold"
+              >
+                {{
+                  activeVisual === "timeline"
+                    ? "Trace Timeline"
+                    : "Trace Service Map"
+                }}
+              </div>
+            </div>
+
+            <div
+              v-if="isTimelineExpanded"
+              class="rounded-borders visual-selector-container"
+              :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            >
+              <template v-for="visual in traceVisuals" :key="visual.value">
+                <q-btn
+                  :data-test="`trace-details-visual-${visual.value}-btn`"
+                  :color="visual.value === activeVisual ? 'primary' : ''"
+                  :flat="visual.value === activeVisual ? false : true"
+                  dense
+                  no-caps
+                  size="11px"
+                  class="q-px-sm visual-selection-btn tw:rounded-[0.25rem]"
+                  @click="activeVisual = visual.value"
+                >
+                  <q-icon><component :is="visual.icon" /></q-icon>
+                  {{ visual.label }}</q-btn
+                >
+              </template>
             </div>
           </div>
-
           <div
-            v-if="isTimelineExpanded"
-            class="rounded-borders visual-selector-container"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            v-show="isTimelineExpanded"
+            class="chart-container-inner q-px-sm q-pb-sm"
+            :key="isTimelineExpanded.toString()"
           >
-            <template v-for="visual in traceVisuals" :key="visual.value">
-              <q-btn
-                :data-test="`trace-details-visual-${visual.value}-btn`"
-                :color="visual.value === activeVisual ? 'primary' : ''"
-                :flat="visual.value === activeVisual ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-sm visual-selection-btn tw:rounded-[0.25rem]"
-                @click="activeVisual = visual.value"
-              >
-                <q-icon><component :is="visual.icon" /></q-icon>
-                {{ visual.label }}</q-btn
-              >
-            </template>
+            <ChartRenderer
+              data-test="trace-details-timeline-chart"
+              v-if="activeVisual === 'timeline'"
+              class="trace-details-chart trace-chart-height"
+              id="trace_details_gantt_chart"
+              :data="ChartData"
+              @updated:chart="updateChart"
+            />
+            <ChartRenderer
+              data-test="trace-details-service-map-chart"
+              v-else
+              :data="traceServiceMap"
+              class="trace-chart-height"
+            />
           </div>
-        </div>
-        <div
-          v-show="isTimelineExpanded"
-          class="chart-container-inner q-px-sm q-pb-sm"
-          :key="isTimelineExpanded.toString()"
-        >
-          <ChartRenderer
-            data-test="trace-details-timeline-chart"
-            v-if="activeVisual === 'timeline'"
-            class="trace-details-chart trace-chart-height"
-            id="trace_details_gantt_chart"
-            :data="ChartData"
-            @updated:chart="updateChart"
-          />
-          <ChartRenderer
-            data-test="trace-details-service-map-chart"
-            v-else
-            :data="traceServiceMap"
-            class="trace-chart-height"
-          />
-        </div>
+        </template>
       </div>
       <div style="display: flex; flex: 1; min-height: 0">
         <div
@@ -346,6 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ref="traceTreeRef"
                       :search-query="searchQuery"
                       :spanList="spanList"
+                      :selectedSpanId="selectedSpanId"
                       @toggle-collapse="toggleSpanCollapse"
                       @select-span="updateSelectedSpan"
                       @update-current-index="handleIndexUpdate"
@@ -362,6 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
                 class="histogram-sidebar-inner"
                 :class="isTimelineExpanded ? '' : 'full'"
+                :style="{ flex: `0 0 ${sidebarWidth}`, maxWidth: sidebarWidth }"
               >
                 <trace-details-sidebar
                   data-test="trace-details-sidebar"
@@ -370,6 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
+                  :parent-mode="mode"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -382,8 +453,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else-if="
-        searchObj.data.traceDetails.isLoadingTraceDetails ||
-        searchObj.data.traceDetails.isLoadingTraceMeta
+        shouldFetchData &&
+        (searchObj.data.traceDetails.isLoadingTraceDetails ||
+          searchObj.data.traceDetails.isLoadingTraceMeta)
       "
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
@@ -406,6 +478,7 @@ import {
   defineComponent,
   ref,
   type Ref,
+  type PropType,
   onMounted,
   watch,
   defineAsyncComponent,
@@ -436,19 +509,85 @@ import {
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedInfo,
+  outlinedPlayCircle,
+} from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
+import {
+  parseUsageDetails,
+  parseCostDetails,
+} from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceDetails",
   props: {
-    traceId: {
+    // Mode control
+    mode: {
+      type: String as PropType<"standalone" | "embedded">,
+      default: "standalone",
+      validator: (value: string) => ["standalone", "embedded"].includes(value),
+    },
+
+    // Data props (used in embedded mode)
+    traceIdProp: {
       type: String,
       default: "",
+    },
+    streamNameProp: {
+      type: String,
+      default: "",
+    },
+    spanListProp: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    startTimeProp: {
+      type: Number,
+      default: 0,
+    },
+    endTimeProp: {
+      type: Number,
+      default: 0,
+    },
+
+    // UI visibility controls
+    showBackButton: {
+      type: Boolean,
+      default: true,
+    },
+    showHeader: {
+      type: Boolean,
+      default: true,
+    },
+    showTimeline: {
+      type: Boolean,
+      default: true,
+    },
+    showLogStreamSelector: {
+      type: Boolean,
+      default: true,
+    },
+    showShareButton: {
+      type: Boolean,
+      default: true,
+    },
+    showCloseButton: {
+      type: Boolean,
+      default: true,
+    },
+    showExpandButton: {
+      type: Boolean,
+      default: false,
+    },
+    // Correlation-specific props
+    enableCorrelationLinks: {
+      type: Boolean,
+      default: false,
     },
   },
   components: {
@@ -464,7 +603,7 @@ export default defineComponent({
     ),
   },
 
-  emits: ["searchQueryUpdated"],
+  emits: ["searchQueryUpdated", "close", "spanSelected"],
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
@@ -541,6 +680,16 @@ export default defineComponent({
 
     const throttledResizing = ref<any>(null);
 
+    // Calculate sidebar width based on leftWidth
+    // Sidebar should take ~84% of the remaining space after left panel
+    const sidebarWidth = computed(() => {
+      if (!parentContainer.value) return '84%';
+      const containerWidth = parentContainer.value.clientWidth || 1200;
+      const remainingWidth = containerWidth - leftWidth.value;
+      const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
+      return `${sidebarWidthPx}px`;
+    });
+
     const serviceColorIndex = ref(0);
     const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
 
@@ -556,14 +705,88 @@ export default defineComponent({
 
     // Current trace stream name for correlation
     const currentTraceStreamName = computed(() => {
-      return (router.currentRoute.value.query.stream as string) ||
+      return (
+        (router.currentRoute.value.query.stream as string) ||
         searchObj.data.stream.selectedStream.value ||
-        '';
+        ""
+      );
     });
 
     // Check if service streams feature is enabled
     const serviceStreamsEnabled = computed(() => {
       return store.state.zoConfig.service_streams_enabled !== false;
+    });
+
+    // Check if any RUM span has a session_id
+    const hasRumSessionId = computed(() => {
+      return spanList.value.some((span: any) => span.rum_session_id);
+    });
+
+    // Get the first RUM event with session_id for navigation
+    const firstRumSessionData = computed(() => {
+      const rumSpan = spanList.value.find((span: any) => span.rum_session_id);
+      return rumSpan || null;
+    });
+
+    // Computed properties for mode-based priority logic
+    const effectiveTraceId = computed(() => {
+      if (props.mode === "embedded") {
+        return props.traceIdProp;
+      }
+      // Standalone mode - get from URL
+      return (router.currentRoute.value.query.trace_id as string) || "";
+    });
+
+    const effectiveStreamName = computed(() => {
+      if (props.mode === "embedded") {
+        return props.streamNameProp;
+      }
+      // Standalone mode - get from URL
+      return (
+        (router.currentRoute.value.query.stream as string) ||
+        searchObj.data.stream.selectedStream.value ||
+        ""
+      );
+    });
+
+    const effectiveTimeRange = computed(() => {
+      if (props.mode === "embedded") {
+        return {
+          from: props.startTimeProp,
+          to: props.endTimeProp,
+        };
+      }
+      // Standalone mode - get from URL
+      return {
+        from: Number(router.currentRoute.value.query.from),
+        to: Number(router.currentRoute.value.query.to),
+      };
+    });
+
+    const effectiveOrgIdentifier = computed(() => {
+      if (props.mode === "embedded") {
+        return store.state.selectedOrganization?.identifier;
+      }
+      // Standalone mode - get from URL (for sharing links)
+      return (
+        (router.currentRoute.value?.query?.org_identifier as string) ||
+        store.state.selectedOrganization?.identifier
+      );
+    });
+
+    // Check if we should fetch data or use provided span list
+    const shouldFetchData = computed(() => {
+      return (
+        props.mode === "standalone" ||
+        (props.mode === "embedded" && props.spanListProp.length === 0)
+      );
+    });
+
+    const effectiveSpanList = computed(() => {
+      if (props.mode === "embedded" && props.spanListProp.length > 0) {
+        return props.spanListProp;
+      }
+      return searchObj.data.traceDetails.spanList;
     });
 
     const showTraceDetails = ref(false);
@@ -617,6 +840,30 @@ export default defineComponent({
       },
     );
 
+    // Watch for external span list changes in embedded mode
+    watch(
+      () => props.spanListProp,
+      (newSpanList) => {
+        if (props.mode === "embedded" && newSpanList.length > 0) {
+          searchObj.data.traceDetails.spanList = newSpanList;
+          updateServiceColors();
+          buildTracesTree();
+        }
+      },
+      { deep: true },
+    );
+
+    // Watch for trace ID changes in embedded mode
+    watch(
+      () => props.traceIdProp,
+      (newTraceId) => {
+        if (props.mode === "embedded" && newTraceId && shouldFetchData.value) {
+          resetTraceDetails();
+          setupTraceDetails();
+        }
+      },
+    );
+
     const backgroundStyle = computed(() => {
       return {
         background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
@@ -636,13 +883,22 @@ export default defineComponent({
       searchObj.data.traceDetails.isLoadingTraceMeta = false;
     };
 
-    const setupTraceDetails = async () => {
-      showTraceDetails.value = false;
-      searchObj.data.traceDetails.showSpanDetails = false;
-      searchObj.data.traceDetails.selectedSpanId = "";
+    // Helper to extract service names from span list
+    const extractServiceNames = (spans: any[]) => {
+      const serviceMap = new Map<string, number>();
+      spans.forEach((span) => {
+        const service = span.service_name;
+        serviceMap.set(service, (serviceMap.get(service) || 0) + 1);
+      });
 
-      await getTraceMeta();
-      await getStreams("logs", false)
+      return Array.from(serviceMap.entries()).map(([service_name, count]) => ({
+        service_name,
+        count,
+      }));
+    };
+
+    const loadLogStreams = async () => {
+      return getStreams("logs", false)
         .then((res: any) => {
           logStreams.value = res.list.map((option: any) => option.name);
           filteredStreamOptions.value = JSON.parse(
@@ -656,6 +912,48 @@ export default defineComponent({
         })
         .catch(() => Promise.reject())
         .finally(() => {});
+    };
+
+    const setupTraceDetails = async () => {
+      showTraceDetails.value = false;
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = "";
+
+      // If embedded mode with span list provided, skip fetching
+      if (props.mode === "embedded" && props.spanListProp.length > 0) {
+        // Use provided span list directly
+        searchObj.data.traceDetails.spanList = props.spanListProp;
+
+        // Set up minimal trace metadata from span list
+        if (props.spanListProp.length > 0) {
+          const firstSpan = props.spanListProp[0];
+          const serviceNames = extractServiceNames(props.spanListProp);
+          (searchObj.data.traceDetails.selectedTrace as any) = {
+            trace_id: props.traceIdProp || firstSpan.trace_id,
+            trace_start_time: Math.min(
+              ...props.spanListProp.map((s) => s.start_time / 1000),
+            ),
+            trace_end_time: Math.max(
+              ...props.spanListProp.map((s) => s.end_time / 1000),
+            ),
+            service_name: serviceNames,
+            services: {},
+          };
+        }
+
+        updateServiceColors();
+        buildTracesTree();
+
+        // Load log streams
+        await loadLogStreams();
+        return;
+      }
+
+      // Standalone mode - fetch from API
+      if (props.mode === "standalone") {
+        await loadLogStreams();
+        await getTraceMeta();
+      }
     };
 
     onMounted(() => {
@@ -698,26 +996,20 @@ export default defineComponent({
         let filter = (router.currentRoute.value.query.filter as string) || "";
 
         if (filter?.length)
-          filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
-        else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
+          filter += ` and trace_id='${effectiveTraceId.value}'`;
+        else filter += `trace_id='${effectiveTraceId.value}'`;
 
-        const streamName =
-          (router.currentRoute.value.query.stream as string) ||
-          searchObj.data.stream.selectedStream.value;
-
-        const orgIdentifier =
-          (router.currentRoute.value?.query?.org_identifier as string) ||
-          store.state.selectedOrganization?.identifier;
+        const timeRange = effectiveTimeRange.value;
 
         searchService
           .get_traces({
-            org_identifier: orgIdentifier,
-            start_time: Number(router.currentRoute.value.query.from) - 10000,
-            end_time: Number(router.currentRoute.value.query.to) + 10000,
+            org_identifier: effectiveOrgIdentifier.value,
+            start_time: timeRange.from - 10000,
+            end_time: timeRange.to + 10000,
             filter: filter || "",
             size: 1,
             from: 0,
-            stream_name: streamName,
+            stream_name: effectiveStreamName.value,
           })
           .then(async (res: any) => {
             const trace = getTracesMetaData(res.data.hits)[0];
@@ -752,7 +1044,7 @@ export default defineComponent({
             }
 
             getTraceDetails({
-              stream: streamName,
+              stream: effectiveStreamName.value,
               trace_id: trace.trace_id,
               from: startTime - 10000,
               to: endTime + 10000,
@@ -811,29 +1103,176 @@ export default defineComponent({
       return req;
     };
 
+    /**
+     * Fetch RUM events that have the matching trace_id
+     */
+    const fetchRumEventsForTrace = async (
+      traceId: string,
+      startTime: number,
+      endTime: number,
+    ) => {
+      try {
+        // Check if _rumdata stream exists in logs
+        if (!logStreams.value.includes("_rumdata")) {
+          return [];
+        }
+
+        // Check if traceId is valid (indicating _oo_trace_id might be present)
+        if (!traceId) {
+          return [];
+        }
+
+        const req = {
+          query: {
+            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${traceId}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+            start_time: startTime - 10000000,
+            end_time: endTime + 10000000,
+            from: 0,
+            size: 100,
+          },
+        };
+
+        const res = await searchService.search(
+          {
+            org_identifier:
+              (router.currentRoute.value.query?.org_identifier as string) ||
+              store.state.selectedOrganization.identifier,
+            query: req,
+            page_type: "logs",
+          },
+          "RUM",
+        );
+
+        return res.data?.hits || [];
+      } catch (error) {
+        console.error("Error fetching RUM events for trace:", error);
+        return [];
+      }
+    };
+
+    /**
+     * Format RUM events as trace spans
+     * This converts RUM event structure to span structure
+     */
+    const formatRumEventsAsSpans = (rumEvents: any[]) => {
+      if (!rumEvents || !rumEvents.length) return [];
+
+      return rumEvents.map((event: any) => {
+        // Calculate start_time and end_time from event timestamp and duration
+        const eventTimestamp = event.date * 1000000; // Convert to nanoseconds
+        const durationNs =
+          event.resource_duration || event.action_duration || 0; // in nanoseconds
+
+        const startTime = eventTimestamp;
+        const endTime = eventTimestamp + durationNs;
+
+        // Determine operation name based on event type
+        let operationName = "Unknown RUM Event";
+        if (event.type === "resource") {
+          operationName = `${event.resource_method || "GET"} ${event.resource_url || "Unknown URL"}`;
+        } else if (event.type === "action") {
+          operationName = `Action: ${event.action_type || "Unknown"} on ${event.action_target_name || "Unknown"}`;
+        } else if (event.type === "view") {
+          operationName = `View: ${event.view_url || "Unknown Page"}`;
+        } else if (event.type === "error") {
+          operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
+        }
+
+        // Generate a unique span_id for the RUM event
+        const spanId =
+          event._oo_span_id ||
+          event[`${event.type}_id`] ||
+          `rum_${event.type}_${event.date}_${Math.random().toString(36).substring(7)}`;
+
+        // Determine parent_span_id from _oo_span_id if available
+        const parentSpanId =
+          event._oo_parent_span_id || event._oo_span_id || "";
+
+        // Add service to selectedTrace if not already present
+        const serviceName = event.service || "Frontend";
+        const existingService =
+          searchObj.data.traceDetails.selectedTrace.service_name.find(
+            (s: any) => s.service_name === serviceName,
+          );
+
+        if (!existingService) {
+          searchObj.data.traceDetails.selectedTrace.service_name.push({
+            service_name: serviceName,
+            count: 1,
+          });
+        } else {
+          existingService.count = (existingService.count || 0) + 1;
+        }
+
+        return {
+          [store.state.zoConfig.timestamp_column]:
+            event[store.state.zoConfig.timestamp_column],
+          start_time: startTime,
+          end_time: endTime,
+          duration: durationNs / 1000,
+          span_id: spanId,
+          trace_id: event._oo_trace_id,
+          operation_name: operationName,
+          service_name: event.service || "Frontend",
+          span_status:
+            event.type === "error" ||
+            (event.type === "resource" && event.resource_status_code >= 400)
+              ? "ERROR"
+              : "OK",
+          span_kind: event.type === "resource" ? "3" : "0", // 3 = Client, 0 = Unspecified
+          // Store original RUM event data for reference
+          rum_event_type: event.type,
+          rum_session_id: event.session_id,
+          events: JSON.stringify([event]),
+          rum_date: event.date,
+        };
+      });
+    };
+
     const getTraceDetails = async (data: any) => {
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
         const req = buildTraceSearchQuery(data);
 
-        searchService
-          .search(
-            {
-              org_identifier: router.currentRoute.value.query
-                ?.org_identifier as string,
-              query: req,
-              page_type: "traces",
-            },
-            "ui",
-          )
-          .then((res: any) => {
-            if (!res.data?.hits?.length) {
+        // Fetch trace spans
+        const tracePromise = searchService.search(
+          {
+            org_identifier: router.currentRoute.value.query
+              ?.org_identifier as string,
+            query: req,
+            page_type: "traces",
+          },
+          "ui",
+        );
+
+        // Fetch RUM events with matching trace_id
+        const rumPromise = fetchRumEventsForTrace(
+          data.trace_id,
+          req.query.start_time,
+          req.query.end_time,
+        );
+
+        // Wait for both requests to complete
+        Promise.all([tracePromise, rumPromise])
+          .then(([traceRes, rumEvents]) => {
+            if (!traceRes.data?.hits?.length) {
               showTraceDetailsError();
               return;
             }
-            searchObj.data.traceDetails.spanList = res.data?.hits || [];
+
+            // Combine trace spans and RUM events
+            const traceSpans = traceRes.data?.hits || [];
+            const rumSpans = formatRumEventsAsSpans(rumEvents);
+
+            searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
+            updateServiceColors();
             buildTracesTree();
+          })
+          .catch((error) => {
+            console.error("Error fetching trace details:", error);
+            searchObj.data.traceDetails.isLoadingTraceDetails = false;
+            showTraceDetailsError();
           })
           .finally(() => {
             searchObj.data.traceDetails.isLoadingTraceDetails = false;
@@ -861,7 +1300,13 @@ export default defineComponent({
           services: {} as any,
           zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
         };
-        trace.service_name.forEach((service: any) => {
+        return _trace;
+      });
+    };
+
+    const updateServiceColors = () => {
+      searchObj.data.traceDetails.selectedTrace.service_name.forEach(
+        (service: any) => {
           if (!searchObj.meta.serviceColors[service.service_name]) {
             if (serviceColorIndex.value >= colors.value.length)
               generateNewColor();
@@ -871,10 +1316,11 @@ export default defineComponent({
 
             serviceColorIndex.value++;
           }
-          _trace.services[service.service_name] = service.count;
-        });
-        return _trace;
-      });
+          searchObj.data.traceDetails.selectedTrace.services[
+            service.service_name
+          ] = service.count;
+        },
+      );
     };
 
     const showTraceDetailsError = () => {
@@ -906,7 +1352,7 @@ export default defineComponent({
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
-        traceTree.value[0].startTimeUs + (timeRange.value.start * 1000);
+        traceTree.value[0].startTimeUs + timeRange.value.start * 1000;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
       for (let i = 0; i <= 4; i++) {
@@ -985,7 +1431,6 @@ export default defineComponent({
           parentSpan.spans.push(span);
         }
       }
-      
 
       // Purposely converting to microseconds to avoid floating point precision issues
       // In updateChart method, we are using start and end time to set the time range of trace
@@ -1139,6 +1584,10 @@ export default defineComponent({
     // Convert span object to required format
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
+      // Parse usage details from split fields
+      const usage = parseUsageDetails(span);
+      const cost = parseCostDetails(span);
+      
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
@@ -1146,7 +1595,9 @@ export default defineComponent({
         startTimeMs: convertTimeFromNsToMs(span.start_time),
         endTimeMs: convertTimeFromNsToMs(span.end_time),
         endTimeUs: Math.floor(span.end_time / 1000),
-        durationMs: span?.duration ? Number((span?.duration / 1000).toFixed(4)) : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationMs: span?.duration
+          ? Number((span?.duration / 1000).toFixed(4))
+          : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
         durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
         busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
@@ -1162,6 +1613,8 @@ export default defineComponent({
           color: "",
         },
         links: JSON.parse(span.links || "[]"),
+        llm_usage: usage,
+        llm_cost: cost,
       };
     };
 
@@ -1377,6 +1830,26 @@ export default defineComponent({
       });
     };
 
+    const redirectToSessionReplay = () => {
+      if (!firstRumSessionData.value.rum_session_id) {
+        return;
+      }
+
+      router.push({
+        name: "SessionViewer",
+        params: {
+          id: firstRumSessionData.value.rum_session_id,
+        },
+        query: {
+          start_time:
+            Math.floor(firstRumSessionData.value.start_time / 1000) - 1000000,
+          end_time:
+            Math.ceil(firstRumSessionData.value.end_time / 1000) + 1000000,
+          event_time: firstRumSessionData.value.rum_date,
+        },
+      });
+    };
+
     const filterStreamFn = (val: any = "") => {
       filteredStreamOptions.value = logStreams.value.filter((stream: any) => {
         return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
@@ -1392,9 +1865,43 @@ export default defineComponent({
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
+
+      // Emit event for embedded mode
+      if (props.mode === "embedded") {
+        emit("spanSelected", spanMap.value[spanId]);
+      }
+    };
+
+    const handleBackOrClose = () => {
+      if (props.mode === "embedded") {
+        emit("close");
+      } else {
+        routeToTracesList();
+      }
+    };
+
+    const handleExpandToFullView = () => {
+      // Navigate to full trace details page from embedded mode
+      if (props.mode !== "embedded") return;
+
+      const query: any = {
+        trace_id: effectiveTraceId.value,
+        stream: effectiveStreamName.value,
+        from: effectiveTimeRange.value.from.toString(),
+        to: effectiveTimeRange.value.to.toString(),
+        org_identifier: effectiveOrgIdentifier.value,
+      };
+
+      router.push({
+        name: "traces",
+        query,
+      });
     };
 
     const routeToTracesList = () => {
+      // Only navigate if in standalone mode
+      if (props.mode !== "standalone") return;
+
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
 
@@ -1444,6 +1951,7 @@ export default defineComponent({
       getImageURL,
       store,
       leftWidth,
+      sidebarWidth,
       startResize,
       isTimelineExpanded,
       toggleTimeline,
@@ -1451,7 +1959,11 @@ export default defineComponent({
       copyTraceId,
       traceDetailsShareURL,
       outlinedInfo,
+      outlinedPlayCircle,
       redirectToLogs,
+      redirectToSessionReplay,
+      hasRumSessionId,
+      firstRumSessionData,
       filteredStreamOptions,
       filterStreamFn,
       streamSearchValue,
@@ -1461,6 +1973,7 @@ export default defineComponent({
       traceDetails,
       updateSelectedSpan,
       routeToTracesList,
+      handleExpandToFullView,
       openTraceLink,
       convertTimeFromNsToMs,
       searchQuery,
@@ -1482,19 +1995,30 @@ export default defineComponent({
       buildTraceChart,
       validateSpan,
       calculateTracePosition,
+      fetchRumEventsForTrace,
+      formatRumEventsAsSpans,
       buildServiceTree,
       // Correlation props
       currentTraceStreamName,
       serviceStreamsEnabled,
+      // New computed properties for mode-based priority
+      effectiveTraceId,
+      effectiveStreamName,
+      effectiveTimeRange,
+      effectiveOrgIdentifier,
+      shouldFetchData,
+      effectiveSpanList,
+      // New event handlers
+      handleBackOrClose,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
-$sidebarWidth: 60%;
+$sidebarWidth: 84%;
 $separatorWidth: 2px;
-$toolbarHeight: 50px;
+$toolbarHeight: 36px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 210px;
 $appNavbarHeight: 57px;
@@ -1523,23 +2047,24 @@ $traceChartCollapseHeight: 42px;
   box-sizing: border-box;
 }
 .histogram-container-full {
-  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .histogram-container {
-  width: calc(100% - $sidebarWidth - $separatorWidth);
-}
-
-.histogram-sidebar-inner {
-  width: $sidebarWidth;
-  flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
   flex: 1;
   min-height: 0;
 }
 
+.histogram-sidebar-inner {
+  flex: 0 0 $sidebarWidth;
+  max-width: $sidebarWidth;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
 .histogram-spans-container {
-  flex: 1;
   min-height: 0;
   position: relative;
   padding-bottom: 0.5rem;
@@ -1585,10 +2110,6 @@ $traceChartCollapseHeight: 42px;
   }
 }
 
-.toolbar-trace-id {
-  max-width: 150px;
-}
-
 .toolbar-operation-name {
   max-width: 225px;
 }
@@ -1600,8 +2121,17 @@ html:has(.trace-details) {
   overflow: hidden !important;
 }
 
-.trace-content-scroll {
+.histogram-container .trace-content-scroll {
   flex: 1 !important;
+  max-width: 100% !important;
+}
+
+.histogram-container-full .trace-content-scroll {
+  flex: 1 !important;
+  max-width: 100% !important;
+}
+
+.trace-content-scroll {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   min-height: 0 !important;
@@ -1741,13 +2271,17 @@ html:has(.trace-details) {
   border-bottom-left-radius: 0 !important;
   border-top-right-radius: 0.5rem !important;
   border-bottom-right-radius: 0.5rem !important;
+}
 
+.traces-view-logs-btn,
+.traces-view-session-replay-btn {
   .q-btn__content {
     span {
       font-size: 12px;
     }
   }
 }
+
 .custom-height {
   height: 30px;
 }

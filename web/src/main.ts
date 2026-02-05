@@ -31,9 +31,11 @@ import configService from "./services/config";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
-import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
+import {
+  contextRegistry,
+  createDefaultContextProvider,
+} from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
-
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -53,13 +55,11 @@ app.use(store).use(router);
 
 // Initialize default context provider globally
 const defaultProvider = createDefaultContextProvider(router, store);
-contextRegistry.register('default', defaultProvider);
+contextRegistry.register("default", defaultProvider);
 
 const { reoInit } = useReo();
 
 reoInit();
-
-
 
 // app.use(SearchPlugin);
 
@@ -99,6 +99,12 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
         defaultPrivacyLevel: "allow",
+        allowedTracingUrls: [
+          {
+            match: store.state.API_ENDPOINT + "/api",
+            propagatorTypes: ["openobserve", "tracecontext"],
+          },
+        ],
       });
 
       openobserveLogs.init({
@@ -146,58 +152,64 @@ function showNewVersionNotification() {
         color: "white",
         handler: () => {
           window.location.reload();
-        }
-      }
+        },
+      },
     ],
     position: "top",
     icon: "update",
     color: "negative",
     textColor: "white",
-    classes: "stale-build-notification"
+    classes: "stale-build-notification",
   });
 }
 
 // Handle resource load errors (script/link tags)
-window.addEventListener("error", async (event) => {
-  const target = event.target as HTMLScriptElement | HTMLLinkElement;
+window.addEventListener(
+  "error",
+  async (event) => {
+    const target = event.target as HTMLScriptElement | HTMLLinkElement;
 
-  // Check if the error is from loading a script or stylesheet
-  if (target && (target.tagName === "SCRIPT" || target.tagName === "LINK")) {
-    const url = target.tagName === "SCRIPT"
-      ? (target as HTMLScriptElement).src
-      : (target as HTMLLinkElement).href;
+    // Check if the error is from loading a script or stylesheet
+    if (target && (target.tagName === "SCRIPT" || target.tagName === "LINK")) {
+      const url =
+        target.tagName === "SCRIPT"
+          ? (target as HTMLScriptElement).src
+          : (target as HTMLLinkElement).href;
 
-    if (!url) return;
+      if (!url) return;
 
-    // Only check for OpenObserve's own chunks (relative URLs or same origin)
-    // Ignore external CDN resources (absolute URLs with different origins)
-    const isOpenObserveResource = (() => {
-      try {
-        // Resolve relative URLs against current origin
-        const resourceUrl = new URL(url, window.location.origin);
-        // Only check resources from same origin
-        return resourceUrl.origin === window.location.origin;
-      } catch (e) {
-        // Invalid URL - assume it's a relative path (OpenObserve resource)
-        return true;
-      }
-    })();
+      // Only check for OpenObserve's own chunks (relative URLs or same origin)
+      // Ignore external CDN resources (absolute URLs with different origins)
+      const isOpenObserveResource = (() => {
+        try {
+          // Resolve relative URLs against current origin
+          const resourceUrl = new URL(url, window.location.origin);
+          // Only check resources from same origin
+          return resourceUrl.origin === window.location.origin;
+        } catch (e) {
+          // Invalid URL - assume it's a relative path (OpenObserve resource)
+          return true;
+        }
+      })();
 
-    if (isOpenObserveResource) {
-      // Smart detection: Check if it's stale build
-      const isStale = await buildVersionChecker.isStaleResourceError();
+      if (isOpenObserveResource) {
+        // Smart detection: Check if it's stale build
+        const isStale = await buildVersionChecker.isStaleResourceError();
 
-      if (isStale) {
-        showNewVersionNotification();
-        event.preventDefault();
+        if (isStale) {
+          showNewVersionNotification();
+          event.preventDefault();
+        }
       }
     }
-  }
-}, true);
+  },
+  true,
+);
 
 // Handle dynamic import errors (for code splitting)
 router.onError(async (error) => {
-  const chunkFailedPattern = /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
+  const chunkFailedPattern =
+    /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
 
   if (chunkFailedPattern.test(error.message)) {
     // Smart detection: Check if it's stale build or network error

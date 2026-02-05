@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
+use crate::stats::MemorySize;
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
 #[serde(rename_all = "snake_case")]
@@ -33,6 +35,15 @@ pub struct Destination {
 impl Destination {
     pub fn is_alert_destinations(&self) -> bool {
         matches!(&self.module, Module::Alert { .. })
+    }
+}
+
+impl MemorySize for Destination {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Destination>()
+            + self.id.mem_size()
+            + self.org_id.mem_size()
+            + self.name.mem_size()
     }
 }
 
@@ -222,6 +233,16 @@ pub struct Template {
     pub body: String,
 }
 
+impl MemorySize for Template {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Template>()
+            + self.id.mem_size()
+            + self.org_id.mem_size()
+            + self.name.mem_size()
+            + self.body.mem_size()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum TemplateType {
@@ -240,6 +261,17 @@ impl fmt::Display for TemplateType {
             TemplateType::Email { .. } => write!(f, "email"),
             TemplateType::Sns => write!(f, "sns"),
         }
+    }
+}
+
+impl Destination {
+    /// Get prebuilt destination configurations for common services
+    ///
+    /// This provides predefined configurations for popular notification services
+    /// that users can customize with their own URLs and credentials.
+    pub fn prebuilt_destinations() -> Vec<Self> {
+        // Load from config file instead of embedded code
+        crate::prebuilt_loader::load_prebuilt_destinations()
     }
 }
 
@@ -494,6 +526,63 @@ mod tests {
                 assert_eq!(title, "Welcome Email");
             }
             _ => panic!("Should be Email template type"),
+        }
+    }
+
+    #[test]
+    fn test_prebuilt_destinations() {
+        let prebuilt = Destination::prebuilt_destinations();
+
+        // Should have 8 prebuilt destinations: Slack, Teams, PagerDuty, Discord, Generic Webhook,
+        // Opsgenie, ServiceNow, Email
+        assert_eq!(prebuilt.len(), 8);
+
+        // Check that each destination has expected properties
+        // Use flexible matching since names may vary between JSON config and built-in defaults
+        let slack = prebuilt.iter().find(|d| d.name.contains("Slack")).unwrap();
+        assert_eq!(slack.org_id, "");
+        match &slack.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Http(endpoint) => {
+                    assert!(endpoint.url.contains("slack.com"));
+                    assert_eq!(endpoint.method, HTTPType::POST);
+                    assert_eq!(endpoint.destination_type.as_ref().unwrap(), "slack");
+                }
+                _ => panic!("Slack destination should be HTTP type"),
+            },
+            _ => panic!("Should be Alert module"),
+        }
+
+        // Check Teams destination
+        let teams = prebuilt.iter().find(|d| d.name.contains("Teams")).unwrap();
+        match &teams.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Http(endpoint) => {
+                    assert!(endpoint.url.contains("webhook.office.com"));
+                    assert_eq!(endpoint.destination_type.as_ref().unwrap(), "teams");
+                }
+                _ => panic!("Teams destination should be HTTP type"),
+            },
+            _ => panic!("Should be Alert module"),
+        }
+
+        // Check Email destination
+        let email = prebuilt.iter().find(|d| d.name.contains("Email")).unwrap();
+        match &email.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Email(email_config) => {
+                    assert!(!email_config.recipients.is_empty());
+                    assert!(email_config.recipients[0].contains("@"));
+                }
+                _ => panic!("Email destination should be Email type"),
+            },
+            _ => panic!("Should be Alert module"),
         }
     }
 }

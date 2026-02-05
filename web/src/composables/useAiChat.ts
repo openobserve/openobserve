@@ -47,38 +47,46 @@ const useAiChat = () => {
 
     /**
      * Fetches AI chat response with streaming support and optional request cancellation
-     * 
+     *
      * @param messages - Array of chat messages to send to the AI
      * @param model - AI model to use (optional, defaults to server-side config)
      * @param org_id - Organization identifier for API routing
      * @param abortSignal - Optional AbortController signal for request cancellation
+     * @param explicitContext - Optional explicit context to use (takes precedence over registered context)
+     * @param sessionId - Optional UUID v7 session ID for tracking all API calls in a chat session
      * @returns Promise<Response> - Fetch response object with streaming capabilities
-     * 
+     *
      * Example usage:
      * ```typescript
      * const abortController = new AbortController();
      * const response = await fetchAiChat(messages, 'gpt-4', 'org123', abortController.signal);
-     * 
+     *
      * // To cancel the request:
      * abortController.abort();
      * ```
      */
-    const fetchAiChat = async (messages: any[], model: string, org_id: string, abortSignal?: AbortSignal) => {
+    const fetchAiChat = async (messages: any[], model: string, org_id: string, abortSignal?: AbortSignal, explicitContext?: any, sessionId?: string) => {
         let url  = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chat_stream`;
-        
-        // Try structured context first, fallback to legacy context
-        const structuredContext = await getStructuredContext();
+
+        // Try explicit context first, then structured context, then fallback to legacy context
+        const contextToUse = explicitContext || await getStructuredContext();
         const legacyContext = await getContext();
 
         // Clone the messages array to avoid mutating the original array, as it saves it in the indexDB
         const _messages = JSON.parse(JSON.stringify(messages));
 
         let body = '';
-        if (structuredContext) {
-            // Send structured context as separate field
-            body = model.length > 0 
-                ? JSON.stringify({ model, messages: _messages, context: structuredContext }) 
-                : JSON.stringify({ messages: _messages, context: structuredContext });
+        if (contextToUse) {
+            // Extract agent_type from context if present (for SRE agent routing)
+            const { agent_type, ...contextWithoutAgentType } = contextToUse;
+
+            // Build payload with agent_type at root level if present
+            const payload: any = {
+                messages: _messages,
+                context: contextWithoutAgentType
+            };
+
+            body = JSON.stringify(payload);
         } else if (legacyContext && _messages.length > 0) {
             // Fallback to legacy approach - inject context into message content
             const currentMessage = _messages[_messages.length - 1];
@@ -97,15 +105,24 @@ const useAiChat = () => {
             // Generate traceparent header with UUID v7 for distributed tracing
             const { traceparent } = generateTraceContext();
 
+            // Build headers object
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'traceparent': traceparent,
+            };
+
+            // Add session ID header if provided for linking API calls within a chat session
+            if (sessionId) {
+                headers['x-o2-assistant-session-id'] = sessionId;
+                console.log('[O2 Assistant] Session ID:', sessionId);
+            }
+
             // Configure fetch options with abort signal for request cancellation
             const fetchOptions: RequestInit = {
                 method: 'POST',
                 body: body,
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'traceparent': traceparent,
-                },
+                headers,
                 // Add abort signal if provided to enable request cancellation
                 ...(abortSignal && { signal: abortSignal })
             };

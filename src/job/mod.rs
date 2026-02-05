@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ use crate::{
         organization::DEFAULT_ORG,
         user::{UserOrgRole, UserRequest},
     },
-    service::{db, self_reporting, users},
+    service::{alerts, db, self_reporting, users},
 };
 
 #[cfg(feature = "enterprise")]
@@ -78,6 +78,62 @@ async fn enforce_usage_stream_retention() {
         .await
         .unwrap(); //unwrap is intentional, we should panic if this fails
     }
+}
+
+#[cfg(feature = "cloud")]
+async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
+    if !LOCAL_NODE.is_alert_manager() {
+        return Ok(None);
+    }
+    use infra::{cluster::get_node_by_uuid, dist_lock};
+
+    let db = infra::db::get_db().await;
+    let node = db
+        .get("/cloud/metering/node")
+        .await
+        .ok()
+        .unwrap_or_default();
+    let node = String::from_utf8_lossy(&node);
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        log::info!("[o2::ENT] metering is locked by node {node}");
+        return Ok(None); // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let locker = infra::dist_lock::lock("/cloud/metering/node", 0).await?;
+        // check the working node again, maybe other node locked it first
+        let node = db
+            .get("/cloud/metering/node")
+            .await
+            .ok()
+            .unwrap_or_default();
+        let node = String::from_utf8_lossy(&node);
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            dist_lock::unlock(&locker).await?;
+            return Ok(None); // other node is processing
+        }
+        // set to current node
+        let ret = db
+            .put(
+                "/cloud/metering/node",
+                LOCAL_NODE.uuid.clone().into(),
+                infra::db::NO_NEED_WATCH,
+                None,
+            )
+            .await;
+        // Check db.put result before releasing the lock to ensure consistent state
+        if let Err(e) = ret {
+            dist_lock::unlock(&locker).await?;
+            drop(locker);
+            return Err(e);
+        }
+        dist_lock::unlock(&locker).await?;
+        log::info!("[o2::ENT] Metering lock acquired");
+        drop(locker);
+    }
+
+    Ok(Some(()))
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -237,8 +293,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(db::ai_prompts::watch());
     // Service streams watch only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() {
@@ -279,10 +333,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("system settings cache failed");
 
-    // cache alerts
+    // ensure system templates exist in database BEFORE caching
+    alerts::templates::ensure_system_templates()
+        .await
+        .expect("system templates initialization failed");
+
+    // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
         .await
         .expect("alerts templates cache failed");
+
     db::alerts::destinations::cache()
         .await
         .expect("alerts destinations cache failed");
@@ -296,10 +356,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
-    #[cfg(feature = "enterprise")]
-    db::ai_prompts::cache()
-        .await
-        .expect("ai prompts cache failed");
     // Service streams cache only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() {
@@ -368,14 +424,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // load metrics disk cache
     tokio::task::spawn(crate::service::promql::search::init());
+
     // start pipeline data retention
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
-
-    #[cfg(feature = "enterprise")]
     {
+        tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
         tokio::task::spawn(cipher::run());
         tokio::task::spawn(db::keys::watch());
+    }
+
+    #[cfg(feature = "vectorscan")]
+    {
         tokio::task::spawn(db::re_pattern::watch_patterns());
         tokio::task::spawn(db::re_pattern::watch_pattern_associations());
         // we do this call here so the pattern manager gets init-ed at the very start instead at
@@ -396,9 +455,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .expect("cloud ofga migrations failed");
 
         use crate::service::self_reporting::{ingest_data_retention_usages, search::get_usage};
-        o2_enterprise::enterprise::metering::init(get_usage, ingest_data_retention_usages)
+        o2_enterprise::enterprise::metering::init(
+            get_metering_lock,
+            get_usage,
+            ingest_data_retention_usages,
+        )
+        .await
+        .expect("cloud usage metering job init failed");
+
+        // Initialize AWS Marketplace SQS notification polling
+        o2_enterprise::enterprise::aws_marketplace::init()
             .await
-            .expect("cloud usage metering job init failed");
+            .expect("AWS Marketplace integration init failed");
 
         // run these cloud jobs only in alert manager
         if LOCAL_NODE.is_alert_manager() {

@@ -315,3 +315,57 @@ pub async fn delete_template_bulk(
         err,
     })
 }
+
+/// GetSystemTemplates
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/templates/system/prebuilt",
+    context_path = "/api",
+    tag = "Templates",
+    operation_id = "GetSystemTemplates",
+    summary = "Get system prebuilt templates",
+    description = "Retrieves all system-defined prebuilt templates. These templates are provided by OpenObserve for common \
+                   notification destinations like Slack, Microsoft Teams, Email, PagerDuty, etc. System templates are read-only \
+                   and serve as the foundation for prebuilt alert destinations. This endpoint returns the complete template \
+                   configurations including body, type, and metadata. Requires LIST permission on templates.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Template>)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 500, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "Get system prebuilt templates", "category": "alerts"}))
+    )
+)]
+pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
+    use config::prebuilt_loader::get_prebuilt_template;
+
+    let prebuilt_types = vec![
+        "slack",
+        "msteams",
+        "pagerduty",
+        "discord",
+        "webhook",
+        "opsgenie",
+        "servicenow",
+        "email",
+    ];
+
+    let mut templates = Vec::new();
+    for prebuilt_type in prebuilt_types {
+        if let Some(mut template) = get_prebuilt_template(prebuilt_type) {
+            // Set org_id for the template
+            template.org_id = org_id.clone();
+            templates.push(Template::from(template));
+        }
+    }
+
+    MetaHttpResponse::json(templates)
+}

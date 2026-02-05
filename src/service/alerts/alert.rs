@@ -835,6 +835,54 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     };
     let now = Utc::now().timestamp_micros();
     let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+    {
+        // Create synthetic result row with alert metadata
+        let synthetic_row = config::utils::json::json!({
+            "stream_name": alert.stream_name,
+            "stream_type": alert.stream_type.to_string(),
+            "alert_name": alert.name,
+            "alert_id": alert_id.to_string(),
+            "trigger_type": "manual"
+        });
+        let synthetic_row = synthetic_row.as_object().unwrap();
+
+        match crate::service::alerts::incidents::correlate_alert_to_incident(
+            &alert,
+            synthetic_row,
+            now,
+            None,
+            None,
+        )
+        .await
+        {
+            Ok(Some((incident_id, service_name))) => {
+                log::info!(
+                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
+                    org_id,
+                    &alert.name,
+                    incident_id,
+                    service_name
+                );
+            }
+            Ok(None) => {
+                log::debug!(
+                    "No incident correlation for manually triggered alert {}/{}",
+                    org_id,
+                    &alert.name
+                );
+            }
+            Err(e) => {
+                log::error!("Error correlating manual trigger to incident: {e}");
+                // Don't fail the trigger if incident correlation fails
+            }
+        }
+    }
+
     Ok((success_message, err_message))
 }
 
@@ -852,6 +900,54 @@ pub async fn trigger_by_name(
     };
     let now = Utc::now().timestamp_micros();
     let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
+
+    // [ENTERPRISE] Create incident for manual trigger
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+    {
+        // Create synthetic result row with alert metadata
+        let synthetic_row = config::utils::json::json!({
+            "stream_name": alert.stream_name,
+            "stream_type": alert.stream_type.to_string(),
+            "alert_name": alert.name,
+            "trigger_type": "manual"
+        });
+        let synthetic_row = synthetic_row.as_object().unwrap();
+
+        match crate::service::alerts::incidents::correlate_alert_to_incident(
+            &alert,
+            synthetic_row,
+            now,
+            None,
+            None,
+        )
+        .await
+        {
+            Ok(Some((incident_id, service_name))) => {
+                log::info!(
+                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
+                    org_id,
+                    &alert.name,
+                    incident_id,
+                    service_name
+                );
+            }
+            Ok(None) => {
+                log::debug!(
+                    "No incident correlation for manually triggered alert {}/{}",
+                    org_id,
+                    &alert.name
+                );
+            }
+            Err(e) => {
+                log::error!("Error correlating manual trigger to incident: {e}");
+                // Don't fail the trigger if incident correlation fails
+            }
+        }
+    }
+
     Ok((success_message, err_message))
 }
 

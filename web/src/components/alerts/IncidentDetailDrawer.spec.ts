@@ -125,13 +125,6 @@ describe("IncidentDetailDrawer.vue", () => {
       subscription_type: "",
     };
     store.state.theme = "light";
-    store.state.sreChatContext = null;
-
-    // Mock store action
-    if (!store._actions) {
-      store._actions = {};
-    }
-    store._actions['setIsSREChatOpen'] = [vi.fn()];
 
     // Default mock implementation
     (incidentsService.get as any).mockResolvedValue({
@@ -197,7 +190,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
 
     it("should load details when incident_id is in URL", async () => {
@@ -399,9 +392,8 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should check for existing RCA", () => {
       wrapper.vm.incidentDetails.topology_context = {
-        service: "api",
-        upstream_services: [],
-        downstream_services: [],
+        nodes: [],
+        edges: [],
         related_incident_ids: [],
         suggested_root_cause: "Existing RCA content",
       };
@@ -411,9 +403,8 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should return false when no RCA exists", () => {
       wrapper.vm.incidentDetails.topology_context = {
-        service: "api",
-        upstream_services: [],
-        downstream_services: [],
+        nodes: [],
+        edges: [],
         related_incident_ids: [],
       };
 
@@ -499,16 +490,6 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should toggle SRE chat visibility", () => {
-      expect(wrapper.vm.showAIChat).toBe(false);
-
-      wrapper.vm.openSREChat();
-      expect(wrapper.vm.showAIChat).toBe(true);
-
-      wrapper.vm.openSREChat();
-      expect(wrapper.vm.showAIChat).toBe(false);
-    });
-
     it("should compute incident context data correctly", () => {
       const contextData = wrapper.vm.incidentContextData;
 
@@ -543,9 +524,8 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should include existing RCA in context data when available", async () => {
       wrapper.vm.incidentDetails.topology_context = {
-        service: "api",
-        upstream_services: [],
-        downstream_services: [],
+        nodes: [],
+        edges: [],
         related_incident_ids: [],
         suggested_root_cause: "Existing RCA",
       };
@@ -577,7 +557,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should return correct color for acknowledged status", () => {
-      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("warning");
+      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("orange");
     });
 
     it("should return correct color for resolved status", () => {
@@ -614,82 +594,6 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should return status as-is for unknown status", () => {
       expect(wrapper.vm.getStatusLabel("custom-status")).toBe("custom-status");
-    });
-  });
-
-  describe("Utility Functions - Severity Colors", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper();
-    });
-
-    it("should return correct color for P1 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P1")).toBe("red-10");
-    });
-
-    it("should return correct color for P2 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P2")).toBe("orange-8");
-    });
-
-    it("should return correct color for P3 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P3")).toBe("amber-8");
-    });
-
-    it("should return correct color for P4 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P4")).toBe("grey-7");
-    });
-
-    it("should return grey for unknown severity", () => {
-      expect(wrapper.vm.getSeverityColor("unknown")).toBe("grey");
-    });
-  });
-
-  describe("Utility Functions - Correlation Reason Colors", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper();
-    });
-
-    it("should return correct color for service_discovery", () => {
-      expect(wrapper.vm.getReasonColor("service_discovery")).toBe("blue");
-    });
-
-    it("should return correct color for manual_extraction", () => {
-      expect(wrapper.vm.getReasonColor("manual_extraction")).toBe("purple");
-    });
-
-    it("should return correct color for temporal", () => {
-      expect(wrapper.vm.getReasonColor("temporal")).toBe("teal");
-    });
-
-    it("should return grey for unknown reason", () => {
-      expect(wrapper.vm.getReasonColor("unknown")).toBe("grey");
-    });
-  });
-
-  describe("Utility Functions - Correlation Reason Labels", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper();
-    });
-
-    it("should return translated label for service_discovery", () => {
-      const label = wrapper.vm.getReasonLabel("service_discovery");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
-    });
-
-    it("should return translated label for manual_extraction", () => {
-      const label = wrapper.vm.getReasonLabel("manual_extraction");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
-    });
-
-    it("should return translated label for temporal", () => {
-      const label = wrapper.vm.getReasonLabel("temporal");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
-    });
-
-    it("should return reason as-is for unknown reason", () => {
-      expect(wrapper.vm.getReasonLabel("custom-reason")).toBe("custom-reason");
     });
   });
 
@@ -807,9 +711,31 @@ describe("IncidentDetailDrawer.vue", () => {
       const mockIncidentData = createIncidentWithAlerts({
         id: "test-123",
         topology_context: {
-          service: "api-gateway",
-          upstream_services: ["auth-service", "user-service"],
-          downstream_services: ["database", "cache"],
+          nodes: [
+            {
+              alert_id: "alert_cpu",
+              alert_name: "High CPU",
+              service_name: "api-gateway",
+              alert_count: 2,
+              first_fired_at: 1000,
+              last_fired_at: 2000,
+            },
+            {
+              alert_id: "alert_memory",
+              alert_name: "High Memory",
+              service_name: "auth-service",
+              alert_count: 1,
+              first_fired_at: 1500,
+              last_fired_at: 1500,
+            },
+          ],
+          edges: [
+            {
+              from_node_index: 0,
+              to_node_index: 1,
+              edge_type: "service_dependency",
+            },
+          ],
           related_incident_ids: ["incident-2", "incident-3"],
           suggested_root_cause: "High memory usage in auth-service",
         },
@@ -825,18 +751,14 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should display topology service", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.service).toBe("api-gateway");
+    it("should display topology nodes", () => {
+      expect(wrapper.vm.incidentDetails.topology_context.nodes).toHaveLength(2);
+      expect(wrapper.vm.incidentDetails.topology_context.nodes[0].alert_name).toBe("High CPU");
     });
 
-    it("should display upstream services", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.upstream_services).toHaveLength(2);
-      expect(wrapper.vm.incidentDetails.topology_context.upstream_services).toContain("auth-service");
-    });
-
-    it("should display downstream services", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.downstream_services).toHaveLength(2);
-      expect(wrapper.vm.incidentDetails.topology_context.downstream_services).toContain("database");
+    it("should display topology edges", () => {
+      expect(wrapper.vm.incidentDetails.topology_context.edges).toHaveLength(1);
+      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe("service_dependency");
     });
   });
 
@@ -921,7 +843,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
 
     it("should navigate back to incident list on close", async () => {
@@ -932,7 +854,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Verify navigation to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
   });
 
@@ -987,6 +909,266 @@ describe("IncidentDetailDrawer.vue", () => {
         "org-456",
         expect.any(String)
       );
+    });
+  });
+
+  describe("Unique Alerts Computation", () => {
+    it("should compute unique alerts map from triggers", async () => {
+      const triggers = [
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
+        createAlert({ alert_id: "alert-3", alert_name: "Disk Alert" }),
+        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
+
+      expect(uniqueAlertsMap.size).toBe(3);
+      expect(uniqueAlertsMap.get("alert-1")).toBe(2);
+      expect(uniqueAlertsMap.get("alert-2")).toBe(2);
+      expect(uniqueAlertsMap.get("alert-3")).toBe(1);
+    });
+
+    it("should compute unique alerts count correctly", async () => {
+      const triggers = [
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.uniqueAlertsCount).toBe(2);
+    });
+
+    it("should return 0 unique alerts when no triggers", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.uniqueAlertsCount).toBe(0);
+      expect(wrapper.vm.uniqueAlertsMap.size).toBe(0);
+    });
+
+    it("should handle triggers with missing alert names", async () => {
+      // Create triggers directly without using factory to avoid default values
+      const triggers: IncidentAlert[] = [
+        {
+          incident_id: "incident-1",
+          alert_id: "alert-1",
+          alert_name: "" as any, // Empty string, but we use alert_id for uniqueness
+          alert_fired_at: 1700000000000000,
+          correlation_reason: "service_discovery",
+          created_at: 1700000000000000,
+        },
+        createAlert({ alert_id: "alert-2", alert_name: "Valid Alert" }),
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
+
+      // Should have 2 unique alerts by alert_id regardless of alert_name
+      expect(uniqueAlertsMap.size).toBe(2);
+      // Check by alert_id instead of alert_name
+      const alert1Count = uniqueAlertsMap.get("alert-1");
+      const alert2Count = uniqueAlertsMap.get("alert-2");
+
+      expect(alert1Count).toBeDefined();
+      expect(alert1Count).toBe(1);
+      expect(alert2Count).toBeDefined();
+      expect(alert2Count).toBe(1);
+    });
+
+    it("should count alerts with same name but different IDs as separate alerts", async () => {
+      // This test verifies the fix: uniqueness should be by alert_id, not alert_name
+      const triggers = [
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }),  // Same name, different ID
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
+
+      // Should have 3 unique alerts by alert_id (alert-1, alert-2, alert-3)
+      // even though all have the same name "High CPU"
+      expect(uniqueAlertsMap.size).toBe(3);
+      expect(wrapper.vm.uniqueAlertsCount).toBe(3);
+      expect(uniqueAlertsMap.get("alert-1")).toBe(2);
+      expect(uniqueAlertsMap.get("alert-2")).toBe(1);
+      expect(uniqueAlertsMap.get("alert-3")).toBe(1);
+    });
+  });
+
+  describe("Sorted Alerts By Trigger Count", () => {
+    it("should sort alerts by trigger count descending", async () => {
+      const triggers = [
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
+        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
+        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
+        createAlert({ alert_id: "alert-3", alert_name: "Disk Alert" }),
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      const sorted = wrapper.vm.sortedAlertsByTriggerCount;
+
+      expect(sorted).toHaveLength(3);
+      expect(sorted[0].name).toBe("High CPU");
+      expect(sorted[0].count).toBe(3);
+      expect(sorted[1].name).toBe("Memory Alert");
+      expect(sorted[1].count).toBe(2);
+      expect(sorted[2].name).toBe("Disk Alert");
+      expect(sorted[2].count).toBe(1);
+    });
+
+    it("should return empty array when no triggers", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.sortedAlertsByTriggerCount).toEqual([]);
+    });
+
+    it("should include alert id and name in sorted results", async () => {
+      const triggers = [
+        createAlert({ alert_id: "alert-1", alert_name: "Test Alert" }),
+        createAlert({ alert_id: "alert-1", alert_name: "Test Alert" }),
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      const sorted = wrapper.vm.sortedAlertsByTriggerCount;
+
+      expect(sorted[0]).toHaveProperty("id");
+      expect(sorted[0]).toHaveProperty("name");
+      expect(sorted[0]).toHaveProperty("count");
+      expect(sorted[0].id).toBe("alert-1");
+      expect(sorted[0].name).toBe("Test Alert");
+      expect(sorted[0].count).toBe(2);
+    });
+
+    it("should derive alerts from triggers instead of API alerts array", async () => {
+      const triggers = [
+        createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" }),
+      ];
+
+      (incidentsService.get as any).mockResolvedValue({
+        data: {
+          ...createIncidentWithAlerts({ id: "test-123", triggers }),
+          alerts: [], // Empty alerts array from API
+        },
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      await flushPromises();
+
+      const sorted = wrapper.vm.sortedAlertsByTriggerCount;
+
+      // Should have 1 alert from triggers, not 0 from API alerts
+      expect(sorted).toHaveLength(1);
+      expect(sorted[0].name).toBe("From Triggers");
+    });
+  });
+
+  describe("Internationalization (i18n)", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("should have translation for unique alerts", () => {
+      const translation = wrapper.vm.t("alerts.incidents.uniqueAlerts");
+      expect(translation).toBe("Unique Alerts");
+    });
+
+    it("should have translation for related alerts", () => {
+      const translation = wrapper.vm.t("alerts.incidents.relatedAlerts");
+      expect(translation).toBe("Related Alerts");
+    });
+
+    it("should have translation for alert triggers", () => {
+      const translation = wrapper.vm.t("alerts.incidents.alertTriggers");
+      expect(translation).toBe("Alert Triggers");
+    });
+
+    it("should have translation for incident timeline", () => {
+      const translation = wrapper.vm.t("alerts.incidents.incidentTimeline");
+      expect(translation).toBe("Incident Timeline");
+    });
+
+    it("should have translation for incident details", () => {
+      const translation = wrapper.vm.t("alerts.incidents.incidentDetails");
+      expect(translation).toBe("Incident Details");
+    });
+
+    it("should have translation for fired times with parameter", () => {
+      const translation = wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 });
+      expect(translation).toBe("Fired 5 time(s)");
+    });
+
+    it("should have translation for refresh correlated data", () => {
+      const translation = wrapper.vm.t("alerts.incidents.refreshCorrelatedData");
+      expect(translation).toBe("Refresh correlated data");
+    });
+
+    it("should have translation for incident title updated success", () => {
+      const translation = wrapper.vm.t("alerts.incidents.incidentTitleUpdatedSuccess");
+      expect(translation).toBe("Incident title updated successfully");
     });
   });
 });

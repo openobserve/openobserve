@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="events-container relative-position">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b" />
     <template v-if="activeTab === 'tags'">
-      <div class="row q-pa-sm event-metadata tw:px-[0.375rem]">
+      <div
+        data-test="event-metadata"
+        class="row q-pa-sm event-metadata tw:px-[0.375rem]"
+      >
         <div class="col-12 row">
           <div class="col-12 q-pb-sm text-caption">
             <q-icon name="mail" size="1rem" class="q-pr-xs" />
@@ -73,7 +76,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="xs"
             data-test="player-events-filter-select"
             @update:model-value="searchEvents(searchEvent)"
-          />
+          >
+            <template
+              v-slot:option="{ itemProps, opt, selected, toggleOption }"
+            >
+              <q-item v-bind="itemProps">
+                <q-item-section side class="tw:pr-0!">
+                  <q-checkbox
+                    :model-value="selected"
+                    @update:model-value="toggleOption(opt)"
+                    class="tw:mr-0! tw:pr-0!"
+                    size="xs"
+                  />
+                </q-item-section>
+                <q-item-section class="tw:ml-0! tw-pl-0!">
+                  <q-item-label class="tw:ml-0! tw-pl-0!">{{
+                    opt.label
+                  }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
         </div>
       </div>
       <q-separator class="q-mt-sm" />
@@ -88,7 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
             <div class="ellipsis">
-              <div class="q-mr-md inline" data-test="event-display-time">{{ filteredEvent.displayTime }}</div>
+              <div class="q-mr-md inline" data-test="event-display-time">
+                {{ filteredEvent.displayTime }}
+              </div>
               <div
                 class="q-mr-md inline event-type q-px-xs tw:rounded-[0.25rem]"
                 :class="filteredEvent.type === 'error' ? 'bg-red-3' : ''"
@@ -107,7 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs inline"
                 />
               </template>
-              <div class="inline" :title="filteredEvent.name" data-test="event-name">
+              <div
+                class="inline"
+                :title="filteredEvent.name"
+                data-test="event-name"
+              >
                 {{ filteredEvent.name }}
               </div>
             </div>
@@ -142,7 +171,11 @@ const tabs = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
-    style: { width: "fit-content", padding: "0.5rem 0.625rem", "margin-right": "0.25rem" },
+    style: {
+      width: "fit-content",
+      padding: "0.5rem 0.625rem",
+      "margin-right": "0.25rem",
+    },
   },
   {
     label: t("rum.tags"),
@@ -160,10 +193,15 @@ watch(
   () => {
     filteredEvents.value = [...props.events];
   },
-  { immediate: true, deep: true }
+  { immediate: true, deep: true },
 );
 
-const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustration"]);
+const selectedEventTypes = ref<string[]>([
+  "error",
+  "action",
+  "view",
+  "frustration",
+]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
@@ -179,15 +217,26 @@ const searchEvents = (value: string | number | null) => {
   }
   const _value = value.toString();
   filteredEvents.value = props.events.filter((event: any) => {
-    // Check if event type is selected
-    const isTypeSelected = selectedEventTypes.value.includes(event.type);
+    // If no event types are selected, show all events
+    const shouldShow =
+      selectedEventTypes.value.length === 0
+        ? true
+        : (() => {
+            // Check if event type is selected
+            const isTypeSelected = selectedEventTypes.value.includes(
+              event.type,
+            );
 
-    // Check if frustration filter is active and event has frustrations
-    const hasFrustration = event.frustration_types && event.frustration_types.length > 0;
-    const showFrustration = selectedEventTypes.value.includes("frustration") && hasFrustration;
+            // Check if frustration filter is active and event has frustrations
+            const hasFrustration =
+              event.frustration_types && event.frustration_types.length > 0;
+            const showFrustration =
+              selectedEventTypes.value.includes("frustration") &&
+              hasFrustration;
 
-    // Show event if its type is selected OR if frustration filter is active and event has frustrations
-    const shouldShow = isTypeSelected || showFrustration;
+            // Show event if its type is selected OR if frustration filter is active and event has frustrations
+            return isTypeSelected || showFrustration;
+          })();
 
     // Apply text search filter
     const matchesSearch = (event.type + " " + event?.name)

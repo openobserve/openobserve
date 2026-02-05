@@ -59,8 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             @update:model-value="emitUpdate"
           >
-            <span class="checkbox-label">{{ t('correlation.scope') }}</span>
-            <q-tooltip max-width="300px">{{ t('correlation.scopeTooltip') }}</q-tooltip>
+            <span class="checkbox-label">{{ t("correlation.scope") }}</span>
+            <q-tooltip max-width="300px">{{
+              t("correlation.scopeTooltip")
+            }}</q-tooltip>
           </q-checkbox>
           <q-checkbox
             data-test="semantic-group-action-stable-chkbox"
@@ -69,8 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             @update:model-value="emitUpdate"
           >
-            <span class="checkbox-label">{{ t('correlation.stable') }}</span>
-            <q-tooltip max-width="300px">{{ t('correlation.stableTooltip') }}</q-tooltip>
+            <span class="checkbox-label">{{ t("correlation.stable") }}</span>
+            <q-tooltip max-width="300px">{{
+              t("correlation.stableTooltip")
+            }}</q-tooltip>
           </q-checkbox>
           <q-checkbox
             data-test="semantic-group-action-normalize-chkbox"
@@ -79,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             @update:model-value="emitUpdate"
           >
-            <span class="checkbox-label">{{ t('correlation.normalize') }}</span>
+            <span class="checkbox-label">{{ t("correlation.normalize") }}</span>
             <q-tooltip>{{ t("correlation.actionNormalize") }}</q-tooltip>
           </q-checkbox>
         </div>
@@ -142,19 +146,29 @@ const generateIdFromDisplay = (display: string): string => {
   return display
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 };
 
-// Handle display name change - auto-generate ID for new groups
+// Handle display name change (just emit, don't generate ID yet)
 const handleDisplayChange = () => {
-  // Only auto-generate ID if it's empty (new group)
-  if (!props.group.id && localGroup.value.display) {
-    localGroup.value.id = generateIdFromDisplay(localGroup.value.display);
-  }
   emitUpdate();
+};
+
+// Handle display name blur - generate ID on focus out
+const handleDisplayBlur = () => {
+  // Generate ID from display name if display is not empty
+  // If display is empty, keep the current ID (UUID or previous display-based ID)
+  if (localGroup.value.display) {
+    const newId = generateIdFromDisplay(localGroup.value.display);
+    // Only update if ID actually changed
+    if (localGroup.value.id !== newId) {
+      localGroup.value.id = newId;
+      emitUpdate();
+    }
+  }
 };
 
 const emitUpdate = () => {

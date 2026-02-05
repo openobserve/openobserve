@@ -15,46 +15,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-table
-    :class="[
-      'my-sticky-virtscroll-table',
-      { 'no-position-absolute': store.state.printMode },
-      { 'wrap-enabled': wrapCells },
-    ]"
-    virtual-scroll
-    v-model:pagination="pagination"
-    :rows-per-page-options="[0]"
-    :virtual-scroll-sticky-size-start="48"
-    dense
-    :wrap-cells="wrapCells"
-    :rows="data.rows || []"
-    :columns="data.columns"
-    row-key="id"
-    ref="tableRef"
-    data-test="dashboard-panel-table"
-    @row-click="(...args: any) => $emit('row-click', ...args)"
-    hide-no-data
-  >
-    <template v-slot:body-cell="props">
-      <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
-        <!-- Copy button on left for numeric/right-aligned columns -->
-        <q-btn
-          v-if="props.col.align === 'right' && shouldShowCopyButton(props.value)"
-          :icon="
-            isCellCopied(props.rowIndex, props.col.name)
-              ? 'check'
-              : 'content_copy'
-          "
-          dense
-          size="xs"
-          no-caps
-          flat
-          class="copy-btn q-mr-xs"
-          @click.stop="
-            copyCellContent(props.value, props.rowIndex, props.col.name)
-          "
+  <div class="table-wrapper">
+    <q-table
+      :class="[
+        'my-sticky-virtscroll-table',
+        { 'no-position-absolute': store.state.printMode },
+        { 'wrap-enabled': wrapCells },
+      ]"
+      virtual-scroll
+      v-model:pagination="pagination"
+      :rows-per-page-options="[0]"
+      :virtual-scroll-sticky-size-start="48"
+      dense
+      :wrap-cells="wrapCells"
+      :rows="data.rows || []"
+      :columns="data.columns"
+      row-key="id"
+      ref="tableRef"
+      data-test="dashboard-panel-table"
+      @row-click="(...args: any) => $emit('row-click', ...args)"
+      hide-no-data
+    >
+      <template v-slot:body-cell="props">
+        <q-td
+          :props="props"
+          :style="[getStyle(props), getStickyColumnStyle(props.col)]"
+          :class="{ 'sticky-column': props.col.sticky }"
+          :data-col-index="props.col.__colIndex"
+          class="copy-cell-td"
         >
-        </q-btn>
+          <!-- Copy button on left for numeric/right-aligned columns -->
+          <q-btn
+            v-if="
+              props.col.align === 'right' && shouldShowCopyButton(props.value)
+            "
+            :icon="
+              isCellCopied(props.rowIndex, props.col.name)
+                ? 'check'
+                : 'content_copy'
+            "
+            dense
+            size="xs"
+            no-caps
+            flat
+            class="copy-btn q-mr-xs"
+            @click.stop="
+              copyCellContent(props.value, props.rowIndex, props.col.name)
+            "
+          >
+          </q-btn>
           <!-- Use JsonFieldRenderer if column is marked as JSON -->
           <JsonFieldRenderer
             v-if="props.col.showFieldAsJson"
@@ -62,17 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Otherwise show normal value -->
           <template v-else>
-              {{
-                props.value === "undefined" || props.value === null
-                  ? ""
-                  : props.col.format
-                    ? props.col.format(props.value, props.row)
-                    : props.value
-              }}
+            {{
+              props.value === "undefined" || props.value === null
+                ? ""
+                : props.col.format
+                  ? props.col.format(props.value, props.row)
+                  : props.value
+            }}
           </template>
-        <!-- Copy button on right for non-numeric columns -->
+          <!-- Copy button on right for non-numeric columns -->
           <q-btn
-            v-if="props.col.align !== 'right' && shouldShowCopyButton(props.value)"
+            v-if="
+              props.col.align !== 'right' && shouldShowCopyButton(props.value)
+            "
             :icon="
               isCellCopied(props.rowIndex, props.col.name)
                 ? 'check'
@@ -88,18 +99,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
           </q-btn>
-      </q-td>
-    </template>
+        </q-td>
+      </template>
 
-    <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
-    <template v-slot:bottom="scope" v-if="$slots.bottom">
-      <slot name="bottom" v-bind="scope" />
-    </template>
-  </q-table>
+      <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
+      <template v-slot:bottom="scope" v-if="$slots.bottom">
+        <slot name="bottom" v-bind="scope" />
+      </template>
+    </q-table>
+  </div>
 </template>
 
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
+import { useStickyColumns } from "@/composables/useStickyColumns";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
 import { defineComponent, ref } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
@@ -138,6 +151,10 @@ export default defineComponent({
 
     const { showErrorNotification, showPositiveNotification } =
       useNotifications();
+
+    // Use sticky columns composable
+    const { getStickyColumnStyle } = useStickyColumns(props, store);
+
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
 
@@ -305,8 +322,7 @@ export default defineComponent({
             copiedCells.value.delete(key);
           }, 3000);
         })
-        .catch(() => {
-        });
+        .catch(() => {});
     };
 
     return {
@@ -317,6 +333,7 @@ export default defineComponent({
       downloadTableAsJSON,
       tableRef,
       getStyle,
+      getStickyColumnStyle,
       store,
       copyCellContent,
       isCellCopied,

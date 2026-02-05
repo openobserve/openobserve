@@ -18,8 +18,8 @@
 //! Provides CRUD operations for incidents and incident-alert associations.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 use svix_ksuid::KsuidLike;
 
@@ -175,6 +175,52 @@ pub async fn update_status(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Update incident title
+pub async fn update_title(
+    org_id: &str,
+    id: &str,
+    title: &str,
+) -> Result<alert_incidents::Model, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let incident = get(org_id, id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    let mut active: alert_incidents::ActiveModel = incident.into();
+    active.title = Set(Some(title.to_string()));
+    active.updated_at = Set(now);
+
+    active
+        .update(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Update incident severity
+pub async fn update_severity(
+    org_id: &str,
+    id: &str,
+    severity: &str,
+) -> Result<alert_incidents::Model, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let incident = get(org_id, id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    let mut active: alert_incidents::ActiveModel = incident.into();
+    active.severity = Set(severity.to_string());
+    active.updated_at = Set(now);
+
+    active
+        .update(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// List incidents with optional filters
 pub async fn list(
     org_id: &str,
@@ -185,6 +231,22 @@ pub async fn list(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let mut query = alert_incidents::Entity::find()
+        .select_only()
+        // Select all columns EXCEPT topology_context for performance
+        .column(alert_incidents::Column::Id)
+        .column(alert_incidents::Column::OrgId)
+        .column(alert_incidents::Column::CorrelationKey)
+        .column(alert_incidents::Column::Status)
+        .column(alert_incidents::Column::Severity)
+        .column(alert_incidents::Column::StableDimensions)
+        .column(alert_incidents::Column::FirstAlertAt)
+        .column(alert_incidents::Column::LastAlertAt)
+        .column(alert_incidents::Column::ResolvedAt)
+        .column(alert_incidents::Column::AlertCount)
+        .column(alert_incidents::Column::Title)
+        .column(alert_incidents::Column::AssignedTo)
+        .column(alert_incidents::Column::CreatedAt)
+        .column(alert_incidents::Column::UpdatedAt)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .order_by_desc(alert_incidents::Column::LastAlertAt);
 
@@ -211,6 +273,47 @@ pub async fn get_incident_alerts(
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Get actual alert counts for multiple incidents (source of truth)
+///
+/// Returns a HashMap of incident_id -> actual_count from junction table.
+/// Use this to fix denormalized alert_count fields that may be out of sync.
+pub async fn get_alert_counts(
+    incident_ids: &[String],
+) -> Result<std::collections::HashMap<String, i32>, errors::Error> {
+    use sea_orm::FromQueryResult;
+
+    if incident_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    #[derive(Debug, FromQueryResult)]
+    struct CountResult {
+        incident_id: String,
+        count: i64,
+    }
+
+    let results = alert_incident_alerts::Entity::find()
+        .filter(
+            alert_incident_alerts::Column::IncidentId
+                .is_in(incident_ids.iter().map(|s| s.as_str())),
+        )
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .column_as(alert_incident_alerts::Column::IncidentId.count(), "count")
+        .group_by(alert_incident_alerts::Column::IncidentId)
+        .into_model::<CountResult>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(results
+        .into_iter()
+        .map(|r| (r.incident_id, r.count as i32))
+        .collect())
 }
 
 /// Count open incidents for an org
@@ -242,11 +345,48 @@ pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Er
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Get topology context from incident with proper deserialization
+///
+/// This is the SINGLE SOURCE OF TRUTH for topology deserialization.
+/// Returns None if incident doesn't exist, has no topology, or deserialization fails.
+pub async fn get_topology(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<config::meta::alerts::incidents::IncidentTopology>, errors::Error> {
+    let incident = get(org_id, id).await?;
+
+    match incident {
+        Some(inc) => match inc.topology_context {
+            Some(json_value) => {
+                match serde_json::from_value::<config::meta::alerts::incidents::IncidentTopology>(
+                    json_value.clone(),
+                ) {
+                    Ok(topology) => Ok(Some(topology)),
+                    Err(e) => {
+                        log::error!(
+                            "[DB::alert_incidents] Failed to deserialize topology_context for incident {}: {}. Raw JSON: {:?}",
+                            id,
+                            e,
+                            json_value
+                        );
+                        Ok(None)
+                    }
+                }
+            }
+            None => Ok(None),
+        },
+        None => Ok(None),
+    }
+}
+
 /// Update topology context for an incident
+///
+/// Accepts typed IncidentTopology and handles serialization internally.
+/// This is the SINGLE SOURCE OF TRUTH for topology serialization.
 pub async fn update_topology(
     org_id: &str,
     id: &str,
-    topology_context: serde_json::Value,
+    topology: &config::meta::alerts::incidents::IncidentTopology,
 ) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
@@ -255,8 +395,16 @@ pub async fn update_topology(
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
+    // Serialize topology to JSON - ONLY place this happens
+    let topology_json = serde_json::to_value(topology).map_err(|e| {
+        Error::DbError(DbError::SeaORMError(format!(
+            "Failed to serialize topology: {}",
+            e
+        )))
+    })?;
+
     let mut active: alert_incidents::ActiveModel = incident.into();
-    active.topology_context = Set(Some(topology_context));
+    active.topology_context = Set(Some(topology_json));
     active.updated_at = Set(now);
 
     active
@@ -360,5 +508,129 @@ mod tests {
     fn test_ksuid_generation() {
         let id = svix_ksuid::Ksuid::new(None, None).to_string();
         assert_eq!(id.len(), 27);
+    }
+
+    #[tokio::test]
+    async fn test_topology_serialization() {
+        // Test that update_topology properly serializes typed IncidentTopology
+        use config::meta::alerts::incidents::{AlertEdge, AlertNode, EdgeType};
+
+        let node1 = AlertNode {
+            alert_id: "alert_cpu_high".to_string(),
+            alert_name: "High CPU Usage".to_string(),
+            service_name: "api-gateway".to_string(),
+            alert_count: 1,
+            first_fired_at: 1000,
+            last_fired_at: 1000,
+        };
+
+        let node2 = AlertNode {
+            alert_id: "alert_db_pool".to_string(),
+            alert_name: "Connection Pool Exhausted".to_string(),
+            service_name: "database".to_string(),
+            alert_count: 1,
+            first_fired_at: 1500,
+            last_fired_at: 1500,
+        };
+
+        let edge = AlertEdge {
+            from_node_index: 0,
+            to_node_index: 1,
+            edge_type: EdgeType::ServiceDependency,
+        };
+
+        let topology = config::meta::alerts::incidents::IncidentTopology {
+            nodes: vec![node1, node2],
+            edges: vec![edge],
+            related_incident_ids: vec![],
+            suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
+        };
+
+        // Serialize to JSON
+        let json = serde_json::to_value(&topology).unwrap();
+
+        // Verify structure
+        assert_eq!(json["nodes"][0]["alert_id"], "alert_cpu_high");
+        assert_eq!(json["nodes"][1]["service_name"], "database");
+        assert_eq!(json["edges"][0]["from_node_index"], 0);
+        assert_eq!(json["edges"][0]["edge_type"], "service_dependency");
+        assert!(
+            json["suggested_root_cause"]
+                .as_str()
+                .unwrap()
+                .contains("RCA Analysis")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topology_deserialization() {
+        // Test that get_topology properly deserializes JSON to typed IncidentTopology
+        let json = serde_json::json!({
+            "nodes": [
+                {
+                    "alert_id": "alert_1",
+                    "alert_name": "High Latency",
+                    "service_name": "api-gateway",
+                    "alert_count": 2,
+                    "first_fired_at": 1000,
+                    "last_fired_at": 2000
+                }
+            ],
+            "edges": [
+                {
+                    "from_node_index": 0,
+                    "to_node_index": 1,
+                    "edge_type": "temporal"
+                }
+            ],
+            "related_incident_ids": [],
+            "suggested_root_cause": "# Root Cause\n\nDatabase connection pool exhausted"
+        });
+
+        // Deserialize
+        let topology: config::meta::alerts::incidents::IncidentTopology =
+            serde_json::from_value(json).unwrap();
+
+        assert_eq!(topology.nodes.len(), 1);
+        assert_eq!(topology.edges.len(), 1);
+        assert_eq!(topology.nodes[0].alert_id, "alert_1");
+        assert_eq!(topology.nodes[0].alert_count, 2);
+        assert!(
+            topology
+                .suggested_root_cause
+                .unwrap()
+                .contains("Database connection")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topology_deserialization_handles_missing_fields() {
+        // Test minimal topology structure
+        let json = serde_json::json!({
+            "nodes": [],
+            "edges": [],
+            "related_incident_ids": []
+        });
+
+        let topology: config::meta::alerts::incidents::IncidentTopology =
+            serde_json::from_value(json).unwrap();
+
+        assert!(topology.nodes.is_empty());
+        assert!(topology.edges.is_empty());
+        assert_eq!(topology.suggested_root_cause, None);
+    }
+
+    #[tokio::test]
+    async fn test_topology_deserialization_rejects_invalid_json() {
+        // Test that malformed JSON is properly rejected
+        let json = serde_json::json!({
+            "invalid_field": "value",
+            "nodes": 123  // Wrong type
+        });
+
+        let result: Result<config::meta::alerts::incidents::IncidentTopology, _> =
+            serde_json::from_value(json);
+
+        assert!(result.is_err(), "Should reject malformed JSON");
     }
 }

@@ -167,24 +167,24 @@ pub async fn search_multi(
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         format!("org {org_id} has expired its trial period"),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             Err(e) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         e.to_string(),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             _ => {}
         }
@@ -763,24 +763,24 @@ pub async fn _search_partition_multi(
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         format!("org {org_id} has expired its trial period"),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             Err(e) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         e.to_string(),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             _ => {}
         }
@@ -1418,11 +1418,15 @@ pub async fn search_multi_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
-    let search_span = setup_tracing_with_trace_id(
-        &trace_id,
-        tracing::info_span!("service::search::search_multi_stream_h2"),
-    )
-    .await;
+    // Create search_span as a child of http_span by entering http_span first
+    let search_span = {
+        let _guard = http_span.enter();
+        setup_tracing_with_trace_id(
+            &trace_id,
+            tracing::info_span!("service::search::search_multi_stream_h2"),
+        )
+        .await
+    };
 
     // Spawn the multi-stream search task
     tokio::spawn(process_search_stream_request_multi(

@@ -488,11 +488,15 @@ pub async fn search_http2_stream(
 
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
-    let search_span = setup_tracing_with_trace_id(
-        &trace_id,
-        tracing::info_span!("service::search::search_stream_h2"),
-    )
-    .await;
+    // Create search_span as a child of http_span by entering http_span first
+    let search_span = {
+        let _guard = http_span.enter();
+        setup_tracing_with_trace_id(
+            &trace_id,
+            tracing::info_span!("service::search::search_stream_h2"),
+        )
+        .await
+    };
 
     if req.search_type.is_none() {
         req.search_type = Some(SearchEventType::Other);
@@ -862,11 +866,15 @@ pub async fn values_http2_stream(
         }
     }
 
-    let search_span = setup_tracing_with_trace_id(
-        &trace_id,
-        tracing::info_span!("service::search::values_stream_h2"),
-    )
-    .await;
+    // Create search_span as a child of http_span by entering http_span first
+    let search_span = {
+        let _guard = http_span.enter();
+        setup_tracing_with_trace_id(
+            &trace_id,
+            tracing::info_span!("service::search::values_stream_h2"),
+        )
+        .await
+    };
 
     // Create a channel for streaming results
     let (tx, rx) =

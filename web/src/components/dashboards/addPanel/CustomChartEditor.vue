@@ -48,7 +48,8 @@ import {
   ref,
   watch,
 } from "vue";
-import QueryEditor from "@/components/CodeQueryEditor.vue";
+import { defineAsyncComponent } from "vue";
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 

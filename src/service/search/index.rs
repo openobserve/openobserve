@@ -27,7 +27,7 @@ use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     config::ConfigOptions,
     logical_expr::Operator,
-    physical_expr::ScalarFunctionExpr,
+    physical_expr::{ScalarFunctionExpr, conjunction},
     physical_plan::{
         PhysicalExpr,
         expressions::{
@@ -958,20 +958,6 @@ fn disjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
         let mut expr = exprs[0].clone();
         for e in exprs.into_iter().skip(1) {
             expr = Arc::new(BinaryExpr::new(expr, Operator::Or, e));
-        }
-        expr
-    }
-}
-
-// combine all exprs with AND operator
-fn conjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
-    if exprs.len() == 1 {
-        exprs[0].clone()
-    } else {
-        // conjuction all expr in exprs
-        let mut expr = exprs[0].clone();
-        for e in exprs.into_iter().skip(1) {
-            expr = Arc::new(BinaryExpr::new(expr, Operator::And, e));
         }
         expr
     }
@@ -2012,15 +1998,6 @@ mod tests {
 
         let expr = Arc::new(Literal::new(ScalarValue::Boolean(Some(true))));
         let result = disjunction(vec![expr.clone()]);
-        assert_eq!(result.as_ref() as *const _, expr.as_ref() as *const _);
-    }
-
-    #[test]
-    fn test_conjunction_single() {
-        use datafusion::{physical_expr::expressions::Literal, scalar::ScalarValue};
-
-        let expr = Arc::new(Literal::new(ScalarValue::Boolean(Some(true))));
-        let result = conjunction(vec![expr.clone()]);
         assert_eq!(result.as_ref() as *const _, expr.as_ref() as *const _);
     }
 

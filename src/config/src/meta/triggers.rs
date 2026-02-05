@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::utils::json;
+use crate::{stats::MemorySize, utils::json};
 
 #[derive(Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default)]
 #[repr(i32)]
@@ -76,6 +76,15 @@ pub struct Trigger {
     pub retries: i32,
     #[serde(default)]
     pub data: String,
+}
+
+impl MemorySize for Trigger {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Trigger>()
+            + self.org.mem_size()
+            + self.module_key.mem_size()
+            + self.data.mem_size()
+    }
 }
 
 #[derive(Default, Serialize, Deserialize, Debug)]

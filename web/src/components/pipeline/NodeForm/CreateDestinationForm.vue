@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- OpenObserve Organization and Stream fields -->
             <div
               v-if="formData.destination_type === 'openobserve'"
-              class="row q-col-gutter-sm q-mt-xs tw:ml-[0.1rem]"
+              class="row q-col-gutter-xs q-mt-xs q-ml-xs"
             >
               <div class="col-6">
                 <q-input
@@ -1444,6 +1444,7 @@ defineExpose({
     text-align: center;
     line-height: 1.3;
     margin-top: 4px;
+    color: var(--o2-text-primary);
   }
 
   .check-icon {

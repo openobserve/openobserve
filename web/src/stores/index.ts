@@ -21,6 +21,7 @@ import {
 } from "../utils/zincutils";
 import streams from "./streams";
 import logs from "./logs";
+import incidents from "./incidents";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -94,12 +95,6 @@ export default createStore({
     isAiChatEnabled: false,
     currentChatTimestamp: null,
     chatUpdated: false,
-    // SRE Chat state
-    isSREChatOpen: false,
-    sreChatContext: {
-      type: null,
-      data: null,
-    },
     // Default theme colors (Default Blue theme)
     // These are the application's default colors used as fallback when no custom colors are set
     // Centralized here so they can be updated in one place instead of duplicating across components
@@ -258,9 +253,6 @@ export default createStore({
     },
     setIsAiChatEnabled(state, payload) {
       state.isAiChatEnabled = payload;
-    },
-    setIsSREChatOpen(state, payload) {
-      state.isSREChatOpen = payload;
     },
     setCurrentChatTimestamp(state, payload) {
       state.currentChatTimestamp = payload;
@@ -437,9 +429,6 @@ export default createStore({
     setIsAiChatEnabled(context, payload) {
       context.commit("setIsAiChatEnabled", payload);
     },
-    setIsSREChatOpen(context, payload) {
-      context.commit("setIsSREChatOpen", payload);
-    },
     setCurrentChatTimestamp(context, payload) {
       context.commit("setCurrentChatTimestamp", payload);
     },
@@ -452,6 +441,7 @@ export default createStore({
   },
   modules: {
     streams,
-    logs
+    logs,
+    incidents
   },
 });

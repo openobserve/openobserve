@@ -127,12 +127,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
                   <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm" />
+                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
                     <div class="text-caption text-orange-800">
-                      <strong>Warning:</strong> This will permanently delete all
-                      data in the destination stream for the specified time
-                      range before running the backfill. This action cannot be
-                      undone.
+                      <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
+                      <div class="tw-mb-2">
+                        This will permanently delete all data in the destination stream for the specified time
+                        range before running the backfill. This action cannot be undone.
+                      </div>
+                      <div class="tw-font-semibold tw-text-xs tw-mb-1">Time Alignment Requirements (UTC):</div>
+                      <ul class="tw-ml-5 tw-space-y-0.5 tw-list-disc tw-text-xs">
+                        <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
+                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -171,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
@@ -211,11 +217,11 @@ const formData = ref({
   deleteBeforeBackfill: false,
 });
 
-// Watch for job changes to populate form
+// Watch for dialog opening and job changes to populate form
 watch(
-  () => props.job,
-  (job) => {
-    if (job) {
+  () => [props.modelValue, props.job] as const,
+  async ([isOpen, job]) => {
+    if (isOpen && job) {
       formData.value = {
         startTimeMicros: job.start_time,
         endTimeMicros: job.end_time,
@@ -224,7 +230,10 @@ watch(
         deleteBeforeBackfill: job.delete_before_backfill || false,
       };
 
-      // Set date time component
+      // Wait for the next tick to ensure dateTimeRef is mounted
+      await nextTick();
+
+      // Set date time component with the job's time range
       if (dateTimeRef.value) {
         dateTimeRef.value.setCustomDate("absolute", {
           start: job.start_time / 1000, // Convert from microseconds to milliseconds
@@ -311,6 +320,7 @@ const updateBackfillJobRequest = async () => {
   try {
     await backfillService.updateBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: props.job!.pipeline_id,
       job_id: props.job!.job_id,
       data: {
         start_time: formData.value.startTimeMicros,

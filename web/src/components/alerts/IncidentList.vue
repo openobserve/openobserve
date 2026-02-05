@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch } from "vue";
+import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -227,6 +227,7 @@ export default defineComponent({
     const incidents = ref<Incident[]>([]);
     const allIncidents = ref<Incident[]>([]); // Store all incidents for FE filtering
     const searchQuery = ref("");
+    const isRestoringState = ref(false); // Simple flag to prevent watch from firing during restoration
 
     // Filter state for status and severity columns
     const statusFilter = ref<string[]>([]);
@@ -423,14 +424,37 @@ export default defineComponent({
       const endIndex = startIndex + pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
       pagination.value.rowsNumber = filteredIncidents.length;
+
+      // Save to store after pagination update (only search query, page, and rowsPerPage)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
     };
 
     const viewIncident = (incident: Incident) => {
+      // Ensure state is saved before navigation (only search query, page, and rowsPerPage)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
+
       // Navigate to incident detail page
       router.push({
         name: "incidentDetail",
         params: {
           id: incident.id,
+        },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
@@ -521,21 +545,181 @@ export default defineComponent({
         .join(", ");
     };
 
+    /**
+     * Restores state from Vuex store or resets if organization changed
+     * @returns {boolean} True if state was restored, false if reset
+     */
+    const restoreStateFromStore = (): boolean => {
+      const savedState = store.state.incidents.incidents;
+      const isInitialized = store.state.incidents.isInitialized;
+      const currentOrg = store.state.selectedOrganization.identifier;
+
+      // Check if organization has changed - if so, reset the store
+      if (isInitialized && savedState && savedState.organizationIdentifier &&
+          savedState.organizationIdentifier !== currentOrg) {
+        // Organization changed - reset store to clear old org's state
+        store.dispatch('incidents/resetIncidents');
+
+        // Reset local state to defaults
+        searchQuery.value = "";
+        pagination.value = {
+          sortBy: "last_alert_at",
+          descending: true,
+          page: 1,
+          rowsPerPage: 20,
+          rowsNumber: 0,
+        };
+        return false;
+      }
+      // Restore state if available and same organization
+      else if (isInitialized && savedState &&
+               savedState.organizationIdentifier === currentOrg) {
+
+        // Prevent watch from interfering during restoration
+        isRestoringState.value = true;
+
+        // Restore pagination
+        if (savedState.pagination) {
+          pagination.value.page = savedState.pagination.page || 1;
+          pagination.value.rowsPerPage = savedState.pagination.rowsPerPage || 20;
+        }
+
+        // Restore search query
+        if (savedState.searchQuery !== undefined) {
+          searchQuery.value = savedState.searchQuery;
+        }
+
+        // Note: isRestoringState reset at end of onMounted after all async ops complete
+
+        return true;
+      }
+
+      return false;
+    };
+
+    /**
+     * Validates pagination after data load and auto-corrects if current page is out of bounds
+     * This handles edge cases like:
+     * - User had page=3 with 150 records, comes back to find only 10 records left
+     * - Search results have fewer items than expected
+     * - All data was deleted (totalRecords = 0)
+     * - Invalid rowsPerPage values (e.g., 0, negative, corrupt store data)
+     * - pageBeforeSearch out of bounds when clearing search
+     * @returns {boolean} True if pagination was corrected, false if valid
+     */
+    const validateAndCorrectPagination = (): boolean => {
+      const totalRecords = pagination.value.rowsNumber;
+      let currentPage = pagination.value.page;
+      let rowsPerPage = pagination.value.rowsPerPage;
+      let wasCorrected = false;
+
+      // Safety: Validate rowsPerPage (must be positive, default to 20)
+      if (!rowsPerPage || rowsPerPage <= 0) {
+        pagination.value.rowsPerPage = 20;
+        rowsPerPage = 20;
+        wasCorrected = true;
+      }
+
+      // Safety: Validate currentPage (must be positive, default to 1)
+      if (!currentPage || currentPage < 1) {
+        pagination.value.page = 1;
+        currentPage = 1;
+        wasCorrected = true;
+      }
+
+      // Calculate max valid page (at least 1)
+      const maxPage = Math.max(1, Math.ceil(totalRecords / rowsPerPage));
+
+      // Check if current page is out of bounds
+      if (currentPage > maxPage) {
+        pagination.value.page = maxPage;
+        wasCorrected = true;
+      }
+
+      // Re-apply pagination if any correction was made
+      if (wasCorrected) {
+        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
+        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const endIndex = startIndex + pagination.value.rowsPerPage;
+        incidents.value = filteredIncidents.slice(startIndex, endIndex);
+      }
+
+      return wasCorrected;
+    };
+
     onMounted(async () => {
+      // Restore state from store (or reset if org changed)
+      const hasRestoredState = restoreStateFromStore();
+
+      // Load incidents with restored or default state
       await loadIncidents();
+
+      // Validate pagination after loading data (edge case: restored page is out of bounds)
+      const wasCorrected = validateAndCorrectPagination();
+
+      // Mark as initialized after first load
+      if (!store.state.incidents.isInitialized) {
+        store.dispatch('incidents/setIsInitialized', true);
+      }
+
+      // Save the state to store (either restored or corrected)
+      if (hasRestoredState || wasCorrected) {
+        store.dispatch('incidents/setIncidents', {
+          searchQuery: searchQuery.value,
+          pagination: {
+            page: pagination.value.page,
+            rowsPerPage: pagination.value.rowsPerPage
+          },
+          organizationIdentifier: store.state.selectedOrganization.identifier
+        });
+      }
+
+      // Wait for next tick to ensure watches fire with isRestoringState=true
+      await nextTick();
+
+      // Clear restoration flag after all operations complete
+      isRestoringState.value = false;
     });
 
     // Watch for search query changes and apply FE filter
-    watch(() => searchQuery.value, () => {
-      // Reset to page 1 when search query changes
-      pagination.value.page = 1;
+    watch(() => searchQuery.value, (newValue, oldValue) => {
+      // Skip page manipulation during state restoration
+      if (!isRestoringState.value) {
+        // If starting a search (going from empty to something)
+        if (!oldValue && newValue) {
+          store.dispatch('incidents/setPageBeforeSearch', pagination.value.page);
+          pagination.value.page = 1;
+        }
+        // If clearing the search (going from something to empty)
+        else if (oldValue && !newValue) {
+          const pageBeforeSearch = store.state.incidents.pageBeforeSearch;
+          pagination.value.page = pageBeforeSearch || 1;
+        }
+        // If changing search query (both old and new have values)
+        else if (oldValue && newValue) {
+          pagination.value.page = 1;
+        }
+      }
 
       // Apply FE search filter without API call
       const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
-      const startIndex = 0; // Always start from first page
-      const endIndex = pagination.value.rowsPerPage;
+      const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+      const endIndex = startIndex + pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
       pagination.value.rowsNumber = filteredIncidents.length;
+
+      // Validate pagination after applying search (handles edge case: pageBeforeSearch is out of bounds)
+      validateAndCorrectPagination();
+
+      // Save to store (only search query, page, and rowsPerPage - not sort settings)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
     });
 
     // Filter toggle functions
@@ -577,15 +761,18 @@ export default defineComponent({
       qTableRef.value?.requestServerInteraction({
         pagination: pagination.value
       });
+
+      // Save to store (only search query, page, and rowsPerPage)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
     };
 
-    const openSREChat = (incident: any) => {
-      store.state.sreChatContext = {
-        type: 'incident',
-        data: incident,
-      };
-      store.dispatch("setIsSREChatOpen", true);
-    };
 
     return {
       t,
@@ -616,9 +803,9 @@ export default defineComponent({
       clearStatusFilter,
       clearSeverityFilter,
       changePagination,
-      openSREChat,
       perPageOptions,
       qTableRef,
+      validateAndCorrectPagination, // Expose for testing
     };
   },
 });

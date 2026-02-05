@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -342,9 +342,15 @@ async fn send_cached_responses(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
 ) -> Result<(), infra::errors::Error> {
-    log::info!("[HTTP2_STREAM]: Processing cached response for trace_id: {trace_id}");
+    log::info!(
+        "[HTTP2_STREAM]: Processing cached response for trace_id: {trace_id}, cache_order_by: {cache_order_by:?}, fallback_order_by_col: {fallback_order_by_col:?}"
+    );
 
     let mut cached = cached.clone();
+    cached.cached_response.trace_id = trace_id.to_string();
+    if cached.cached_response.order_by.is_none() && fallback_order_by_col.is_none() {
+        cached.cached_response.order_by = Some(*cache_order_by);
+    }
 
     // add cache hits to `curr_res_size`
     *curr_res_size += cached.cached_response.hits.len() as i64;
@@ -383,7 +389,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     crate::service::search::cache::apply_regex_to_response(
         req,
         org_id,

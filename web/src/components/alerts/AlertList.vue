@@ -602,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template>
       <q-dialog class="q-pa-md" v-model="showForm" persistent>
-        <q-card class="clone-alert-popup">
+        <q-card class="clone-alert-popup tw:pt-2">
           <div class="row items-center no-wrap q-mx-md q-my-sm">
             <div class="flex items-center">
               <div
@@ -670,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :activeFolderId="folderIdToBeCloned"
                 />
               </div>
-              <div class="flex justify-center q-mt-sm">
+              <div class="flex justify-end q-mt-sm">
                 <q-btn
                   data-test="clone-alert-cancel-btn"
                   v-close-popup="true"
@@ -2448,14 +2448,6 @@ export default defineComponent({
     confirmBulkDelete.value = false;
   };
 
-    const openSREChat = (alert?: any) => {
-      store.state.sreChatContext = {
-        type: 'alert',
-        data: alert || null,
-      };
-      store.dispatch("setIsSREChatOpen", true);
-    };
-
     return {
       t,
       qTable,
@@ -2574,7 +2566,6 @@ export default defineComponent({
       bulkDeleteAlerts,
       confirmBulkDelete,
       symOutlinedSoundSampler,
-      openSREChat,
       config,
     };
   },

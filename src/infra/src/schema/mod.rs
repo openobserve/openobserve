@@ -23,6 +23,7 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
+    stats::MemorySize,
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
@@ -278,6 +279,13 @@ pub async fn get_flatten_level(org_id: &str, stream_name: &str, stream_type: Str
         return level as u32;
     }
     get_config().limit.ingest_flatten_level
+}
+
+pub async fn get_is_llm_stream(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    if let Some(settings) = get_settings(org_id, stream_name, stream_type).await {
+        return settings.is_llm_stream;
+    }
+    false
 }
 
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
@@ -801,6 +809,15 @@ impl SchemaCache {
         }
         size += std::mem::size_of::<String>() + self.hash_key.len();
         size
+    }
+}
+
+impl MemorySize for SchemaCache {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<SchemaCache>()
+            + self.schema.size()
+            + self.fields_map.mem_size()
+            + self.hash_key.mem_size()
     }
 }
 

@@ -517,11 +517,12 @@ class APICleanup {
     }
 
     /**
-     * Clean up enrichment tables matching specified patterns
+     * Clean up file-based enrichment tables matching specified patterns
+     * These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
      * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
      */
-    async cleanupEnrichmentTables(patterns = []) {
-        testLogger.info('Starting enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
+    async cleanupFileEnrichmentTables(patterns = []) {
+        testLogger.info('Starting file-based enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
             // Fetch all enrichment tables
@@ -555,14 +556,95 @@ class APICleanup {
                 }
             }
 
-            testLogger.info('Enrichment tables cleanup completed', {
+            testLogger.info('File-based enrichment tables cleanup completed', {
                 total: matchingTables.length,
                 deleted: deletedCount,
                 failed: failedCount
             });
 
         } catch (error) {
-            testLogger.error('Enrichment tables cleanup failed', { error: error.message });
+            testLogger.error('File-based enrichment tables cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all URL-based enrichment tables from the status API
+     * @returns {Promise<Array<string>>} Array of URL enrichment table names
+     */
+    async fetchUrlEnrichmentTables() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/enrichment_tables/status`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                testLogger.error('Failed to fetch URL enrichment tables', { status: response.status, body: errorBody });
+                return [];
+            }
+
+            const data = await response.json();
+            // Response is a map where keys are table names
+            // Guard against null/undefined response
+            return Object.keys(data || {});
+        } catch (error) {
+            testLogger.error('Failed to fetch URL enrichment tables', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Clean up URL-based enrichment tables matching specified patterns
+     * These are tables created via URL ingestion that show as "NaN MB" in the UI
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
+     */
+    async cleanupUrlEnrichmentTables(patterns = []) {
+        testLogger.info('Starting URL enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
+
+        try {
+            // Fetch all URL-based enrichment tables
+            const tableNames = await this.fetchUrlEnrichmentTables();
+            testLogger.info('Fetched URL enrichment tables', { total: tableNames.length });
+
+            // Filter tables matching patterns
+            const matchingTables = tableNames.filter(name =>
+                patterns.some(pattern => pattern.test(name))
+            );
+            testLogger.info('Found URL enrichment tables matching cleanup pattern', { count: matchingTables.length });
+
+            if (matchingTables.length === 0) {
+                testLogger.info('No URL enrichment tables to clean up');
+                return;
+            }
+
+            // Delete each table (uses same delete endpoint as file-based tables)
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const tableName of matchingTables) {
+                const result = await this.deleteEnrichmentTable(tableName);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted URL enrichment table', { name: tableName });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete URL enrichment table', { name: tableName, result });
+                }
+            }
+
+            testLogger.info('URL enrichment tables cleanup completed', {
+                total: matchingTables.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('URL enrichment tables cleanup failed', { error: error.message });
         }
     }
 
@@ -1902,7 +1984,13 @@ class APICleanup {
             'auto_',
             'Automation_',
             'sanity',
-            'rbac_'
+            'rbac_',
+            'user_delete_test_',      // RBAC user delete test alerts (orphaned)
+            'user_update_test_',      // RBAC user update test alerts (orphaned)
+            'viewer_delete_test_',    // RBAC viewer delete test alerts (orphaned)
+            'viewer_update_test_',    // RBAC viewer update test alerts (orphaned)
+            'editor_create_test_',    // RBAC editor create test alerts (orphaned)
+            'editor_delete_test_'     // RBAC editor delete test alerts (orphaned)
         ];
 
         try {
@@ -2608,6 +2696,93 @@ class APICleanup {
         } catch (error) {
             testLogger.error('SDR Test Cleanup failed', { error: error.message });
             // Don't throw - allow test to continue even if cleanup fails
+        }
+    }
+
+    /**
+     * ==========================================
+     * CORRELATION SETTINGS CLEANUP METHODS
+     * ==========================================
+     */
+
+    /**
+     * Clean up test semantic groups created by correlation settings tests
+     * Uses the alerts deduplication config API (same as frontend)
+     * Test groups created by ensureSemanticGroupsExist(): k8s-cluster, k8s-namespace, k8s-deployment, service
+     * @param {Array<string>} groupIds - Array of semantic group IDs to delete (default: test group IDs)
+     */
+    async cleanupCorrelationSettings(groupIds = ['k8s-cluster', 'k8s-namespace', 'k8s-deployment', 'service']) {
+        testLogger.info('Starting correlation settings cleanup', { groupIds });
+
+        try {
+            // First, fetch the current deduplication config
+            const getResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!getResponse.ok) {
+                if (getResponse.status === 404) {
+                    testLogger.info('Deduplication config not found (nothing to clean up)');
+                    return;
+                }
+                testLogger.warn('Failed to fetch deduplication config', { status: getResponse.status });
+                return;
+            }
+
+            const config = await getResponse.json();
+            const currentGroups = config.semantic_field_groups || [];
+            testLogger.info('Current semantic groups in dedup config', { count: currentGroups.length });
+
+            if (currentGroups.length === 0) {
+                testLogger.info('No semantic groups to clean up');
+                return;
+            }
+
+            // Filter out the test groups
+            const remainingGroups = currentGroups.filter(g => !groupIds.includes(g.id));
+            const removedCount = currentGroups.length - remainingGroups.length;
+
+            if (removedCount === 0) {
+                testLogger.info('No test semantic groups found to clean up');
+                return;
+            }
+
+            testLogger.info('Removing test semantic groups', {
+                total: currentGroups.length,
+                removing: removedCount,
+                remaining: remainingGroups.length
+            });
+
+            // Update the config with remaining groups
+            const updatePayload = {
+                ...config,
+                semantic_field_groups: remainingGroups,
+                // Also clean up fingerprint groups that reference removed semantic groups
+                alert_fingerprint_groups: (config.alert_fingerprint_groups || [])
+                    .filter(id => !groupIds.includes(id))
+            };
+
+            const updateResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatePayload)
+            });
+
+            if (updateResponse.ok) {
+                testLogger.info('Correlation settings cleanup completed', { removedGroups: removedCount });
+            } else {
+                testLogger.warn('Failed to update deduplication config', { status: updateResponse.status });
+            }
+
+        } catch (error) {
+            testLogger.error('Correlation settings cleanup failed', { error: error.message });
         }
     }
 

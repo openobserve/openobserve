@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             
-            <div class="tile">
+            <div class="tile" v-if="config.isCloud == 'false'">
               <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
                role="article"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
 
-            <div class="tile">
+            <div class="tile" v-if="config.isCloud == 'false'">
               <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
                role="article"
@@ -859,6 +859,7 @@ export default defineComponent({
       t,
       store,
       summary,
+      config,
       no_data_ingest,
       getSummary,
       isCloud,
@@ -905,9 +906,9 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      if (newVal != oldVal || this.summary.value == undefined) {
+      if (newVal && (newVal != oldVal || this.summary.value == undefined)) {
         this.summary = {};
-        this.getSummary(this.store.state?.selectedOrganization?.identifier);
+        this.getSummary(newVal);
       }
     },
   },

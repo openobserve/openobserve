@@ -162,8 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs"
-name="warning" class="q-mr-xs" />
+              <q-icon size="xs" name="warning" class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -287,14 +286,15 @@ name="warning" class="q-mr-xs" />
                 mode="expanded"
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
+                :hide-view-related="hideViewRelatedButton"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
                 @view-trace="
-                  viewTrace(formattedRows[virtualRow.index]?.original)
+                  viewTrace(formattedRows[virtualRow.index - 1]?.original)
                 "
                 @show-correlation="
-                  showCorrelation(formattedRows[virtualRow.index]?.original)
+                  showCorrelation(formattedRows[virtualRow.index - 1]?.original)
                 "
                 :streamName="jsonpreviewStreamName"
                 @send-to-ai-chat="sendToAiChat"
@@ -353,6 +353,7 @@ name="warning" class="q-mr-xs" />
                     :column="cell.column"
                     :row="cell.row.original as any"
                     :selectedStreamFields="selectedStreamFields"
+                    :hide-search-term-actions="hideSearchTermActions"
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
@@ -361,12 +362,16 @@ name="warning" class="q-mr-xs" />
                 </template>
                 <span
                   v-if="
-                    processedResults[`${cell.column.id}_${virtualRow.index}`]
+                    processedResults[
+                      `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                    ]
                   "
-                  :key="`${cell.column.id}_${virtualRow.index}`"
+                  :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
                   :class="store.state.theme === 'dark' ? 'dark' : ''"
                   v-html="
-                    processedResults[`${cell.column.id}_${virtualRow.index}`]
+                    processedResults[
+                      `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                    ]
                   "
                 />
                 <span v-else>
@@ -377,7 +382,7 @@ name="warning" class="q-mr-xs" />
                     cell.column.columnDef.id ===
                     store.state.zoConfig.timestamp_column
                   "
-                  class="tw:absolute tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                  class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
                   @send-to-ai-chat="
                     sendToAiChat(JSON.stringify(cell.row.original), true)
                   "
@@ -400,7 +405,6 @@ import {
   onMounted,
   onBeforeUnmount,
   ComputedRef,
-  defineExpose,
 } from "vue";
 import type { PropType } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
@@ -487,6 +491,14 @@ const props = defineProps({
     type: Array as PropType<StreamField[]>,
     default: () => [],
   },
+  hideSearchTermActions: {
+    type: Boolean,
+    default: false,
+  },
+  hideViewRelatedButton: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const { t } = useI18n();
@@ -561,8 +573,8 @@ watch(
         props.columns,
         true,
         props.highlightQuery,
-        200,
-        selectedStreamFtsKeys.value
+        100,
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -588,13 +600,15 @@ watch(
         false,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value
+        selectedStreamFtsKeys.value,
       );
     }
 
     expandedRowIndices.value.clear();
     // Clear height cache when rows change
     expandedRowHeights.value = {};
+    // Clear actual index cache when rows change
+    actualIndexCache.value.clear();
     setExpandedRows();
 
     await nextTick();
@@ -604,6 +618,25 @@ watch(
     deep: true,
   },
 );
+
+// watch(
+//   () => props.highlightQuery,
+//   async (newVal, oldVal) => {
+//     // Only re-process if highlightQuery actually changed and we have data
+//     if (newVal !== oldVal && props.columns?.length && tableRows.value?.length) {
+//       await nextTick();
+
+//       processHitsInChunks(
+//         tableRows.value,
+//         props.columns,
+//         true, // Clear cache to re-process with new highlight query
+//         props.highlightQuery,
+//         100,
+//         selectedStreamFtsKeys.value,
+//       );
+//     }
+//   },
+// );
 
 watch(
   () => columnOrder.value,
@@ -758,7 +791,7 @@ const rowVirtualizerOptions = computed(() => {
         ? expandedRowHeights.value[index] || 300 // Default expanded height
         : 24; // Fixed collapsed height
     },
-    overscan: 20,
+    overscan: 100,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => {
@@ -790,6 +823,8 @@ const setExpandedRows = () => {
       expandRow(virtualIndex as number);
     }
   });
+  // Clear the actual index cache since expanded rows are changing
+  actualIndexCache.value.clear();
 };
 
 const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
@@ -836,9 +871,17 @@ const handleDragEnd = async () => {
 const expandedRowIndices = ref<Set<number>>(new Set());
 
 const handleExpandRow = (index: number) => {
-  emits("expandRow", calculateActualIndex(index));
+  // Calculate actual index BEFORE expanding (using current state)
+  const actualIndex = calculateActualIndex(index);
 
+  // Emit the event with the calculated actual index
+  emits("expandRow", actualIndex);
+
+  // Now expand the row (this modifies expandedRowIndices)
   expandRow(index);
+
+  // Clear the actual index cache since expanded rows have changed
+  actualIndexCache.value.clear();
 };
 
 const expandRow = async (index: number) => {
@@ -910,13 +953,34 @@ const expandRow = async (index: number) => {
   }
 };
 
-const calculateActualIndex = (index: number): number => {
-  let actualIndex = index;
+// Cache for calculated actual indices - maps virtual index to actual index
+// Cache is cleared whenever expandedRowIndices changes (expand/collapse operations)
+const actualIndexCache = ref<Map<number, number>>(new Map());
+
+/**
+ * Converts a virtual index (including expanded rows) to an actual index (in original data).
+ * Uses caching to avoid redundant calculations, especially during render and hover events.
+ *
+ * @param virtualIndex - Index in the displayed table (includes expanded rows)
+ * @returns Actual index in the original data array (without expanded rows)
+ */
+const calculateActualIndex = (virtualIndex: number): number => {
+  // Check cache first for O(1) lookup
+  if (actualIndexCache.value.has(virtualIndex)) {
+    return actualIndexCache.value.get(virtualIndex)!;
+  }
+
+  // Calculate actual index from virtual index
+  // For each expanded row before this virtual index, subtract 1
+  let actualIndex = virtualIndex;
   expandedRowIndices.value.forEach((expandedIndex) => {
-    if (expandedIndex !== -1 && expandedIndex < index) {
+    if (expandedIndex !== -1 && expandedIndex < virtualIndex) {
       actualIndex -= 1;
     }
   });
+
+  // Store in cache for future lookups
+  actualIndexCache.value.set(virtualIndex, actualIndex);
   return actualIndex;
 };
 
@@ -970,7 +1034,7 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
+const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
   if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -982,14 +1046,14 @@ const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
     //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
     //otherwise we need to filter the row based on the columns that user have applied
     if (checkIfSourceColumnPresent(props.columns)) {
-      emits("sendToAiChat", JSON.stringify(row));
+      emits("sendToAiChat", JSON.stringify(row), append);
     } else {
       //we need to filter the row based on the columns that user have applied
       const filteredRow = filterRowBasedOnColumns(row, props.columns);
-      emits("sendToAiChat", JSON.stringify(filteredRow));
+      emits("sendToAiChat", JSON.stringify(filteredRow), append);
     }
   } else {
-    emits("sendToAiChat", value);
+    emits("sendToAiChat", value, append);
   }
 };
 

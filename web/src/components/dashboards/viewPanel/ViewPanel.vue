@@ -278,6 +278,7 @@ import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { inject, provide, computed } from "vue";
+import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
@@ -364,7 +365,7 @@ export default defineComponent({
     });
     let variablesData: any = reactive({});
     const initialVariableValues = ref<any>({}); // Store the initial variable values
-    const isVariablesChanged = ref(false); // Flag to track if variables have changed
+    const isVariablesChanged = ref(true); // Flag to track if variables have changed
     let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
@@ -424,6 +425,9 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
+    // Track if we're in initial setup to avoid marking interval as changed on mount
+    let isInitialHistogramSetup = true;
+
     watch(
       () => histogramInterval.value,
       async () => {
@@ -433,57 +437,20 @@ export default defineComponent({
         }
         // replace the histogram interval in the query by finding histogram aggregation
         dashboardPanelData?.data?.queries?.forEach((query: any) => {
-          const ast: any = parser.astify(query?.query);
+          const originalQuery = query.query;
+          const updatedQuery = replaceHistogramInterval(originalQuery, histogramInterval.value);
 
-          // Iterate over the columns to check if the column is histogram
-          ast.columns.forEach((column: any) => {
-            // check if the column is histogram
-            if (
-              column.expr.type === "function" &&
-              column?.expr?.name?.name[0]?.value === "histogram"
-            ) {
-              const histogramExpr = column.expr;
-              if (
-                histogramExpr.args &&
-                histogramExpr.args.type === "expr_list"
-              ) {
-                // if selected histogramInterval is null then remove interval argument
-                if (!histogramInterval.value) {
-                  histogramExpr.args.value = histogramExpr.args.value.slice(
-                    0,
-                    1,
-                  );
-                }
-
-                // else update interval argument
-                else {
-                  // check if there is existing interval value
-                  // if have then simply update
-                  // else insert new arg
-                  if (histogramExpr.args.value[1]) {
-                    // Update existing interval value
-                    histogramExpr.args.value[1] = {
-                      type: "single_quote_string",
-                      value: `${histogramInterval.value}`,
-                    };
-                  } else {
-                    // create new arg for interval
-                    histogramExpr.args.value.push({
-                      type: "single_quote_string",
-                      value: `${histogramInterval.value}`,
-                    });
-                  }
-                }
-              }
-            }
-            const sql = parser.sqlify(ast);
-            query.query = sql.replace(/`/g, '"');
-          });
+          // Only update if the query actually changed
+          if (updatedQuery !== originalQuery) {
+            query.query = updatedQuery;
+          }
         });
-        // copy the data object excluding the reactivity
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        // refresh the date time based on current time if relative date is selected
-        dateTimePickerRef.value && dateTimePickerRef.value.refresh();
+
+        // Mark as changed to signal refresh needed (unless this is initial setup)
+        // Note: false means changes need to be applied (flag logic is inverted)
+        if (!isInitialHistogramSetup) {
+          isVariablesChanged.value = false;
+        }
       },
     );
 
@@ -589,7 +556,11 @@ export default defineComponent({
           }
         }
       }
+
+      // Mark that initial histogram setup is complete
       await nextTick();
+      isInitialHistogramSetup = false;
+
       loadDashboard();
     });
 
@@ -620,12 +591,15 @@ export default defineComponent({
     );
     const refreshData = () => {
       if (!disable.value) {
+        // Apply any pending histogram interval changes
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         dateTimePickerRef.value.refresh();
         Object.assign(
           currentVariablesDataRef,
           JSON.parse(JSON.stringify(variablesData)),
         );
-        isVariablesChanged.value = false;
+        // Set to true to indicate everything is now in sync (flag logic is inverted)
+        isVariablesChanged.value = true;
       }
     };
 
@@ -658,6 +632,7 @@ export default defineComponent({
         );
 
         // Mark current tab and panel as visible so their variables can load
+        // This needs to happen BEFORE loading from URL so tab/panel scoped variables exist
         if (tabId) {
           variablesManager.setTabVisibility(tabId, true);
         }
@@ -666,6 +641,37 @@ export default defineComponent({
         if (props.panelId) {
           variablesManager.setPanelVisibility(props.panelId, true);
         }
+
+        // If parent passed variable values, use them to prevent API calls for those variables
+        if (props.initialVariableValues && props.initialVariableValues.values && props.initialVariableValues.values.length > 0) {
+          // Update variablesManager with passed values
+          props.initialVariableValues.values.forEach((passedVar: any) => {
+            // Find and update the variable in the manager (global scope)
+            const globalVar = variablesManager.variablesData.global.find((v: any) => v.name === passedVar.name);
+            if (globalVar) {
+              globalVar.value = passedVar.value;
+              globalVar.isVariablePartialLoaded = true;
+              globalVar.isLoading = false;
+              // KEY FIX: Set pending to false to prevent API call
+              globalVar.isVariableLoadingPending = false;
+            }
+          });
+
+          // Also populate currentVariablesDataRef with passed values
+          Object.assign(currentVariablesDataRef, props.initialVariableValues);
+          Object.assign(variablesData, props.initialVariableValues);
+        }
+
+        // Load variable values from URL parameters (supports tab-level and panel-level variables)
+        // This handles patterns like:
+        // - var-myVar (global)
+        // - var-myVar.t.tabId (tab-scoped)
+        // - var-myVar.p.panelId (panel-scoped)
+        // URL values will OVERRIDE parent-passed values
+        variablesManager.loadFromUrl(route);
+
+        // Commit the values immediately so they're used by the chart
+        variablesManager.commitAll();
       } catch (error) {
       }
 

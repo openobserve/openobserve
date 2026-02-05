@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -39,6 +39,7 @@ use datafusion::{
 };
 use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::{HashMap, HashSet};
+use infra::errors::{Error, ErrorCodes};
 use promql_parser::{
     label::{MatchOp, Matchers},
     parser::{
@@ -56,6 +57,8 @@ use super::{
 use crate::service::promql::{
     aggregations, binaries, functions, micros, rewrite::remove_filter_all,
 };
+#[cfg(feature = "enterprise")]
+use crate::service::search::SEARCH_SERVER;
 
 type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Sample>>, HashSet<i64>)>>;
 type TokioExemplarsResult =
@@ -549,7 +552,7 @@ impl Engine {
             Value::Matrix(metric_values)
         };
         log::info!(
-            "[trace_id: {}] sort samples by timestamps took: {:?}",
+            "[trace_id: {}] [PromQL] sort samples by timestamps took: {:?}",
             self.trace_id,
             start.elapsed()
         );
@@ -572,7 +575,7 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[trace_id: {}] loading data for stream: {table_name}, range: [{start},{end}), filter: {:?}",
+            "[trace_id: {}] [PromQL] loading data for stream: {table_name}, range: [{start},{end}), filter: {:?}",
             self.trace_id,
             selector.to_string(),
         );
@@ -591,17 +594,18 @@ impl Engine {
             .collect::<Vec<(_, _)>>();
 
         // check for super cluster
+        let trace_id = self.ctx.query_ctx.trace_id.clone();
         #[cfg(feature = "enterprise")]
         let (super_tx, mut super_rx) = tokio::sync::mpsc::channel::<
             Result<(HashMap<u64, RangeValue>, config::meta::search::ScanStats)>,
         >(1);
         #[cfg(feature = "enterprise")]
         if self.ctx.query_ctx.is_super_cluster {
-            let trace_id = self.ctx.query_ctx.trace_id.clone();
             let query_ctx = self.ctx.query_ctx.clone();
             let step = self.eval_ctx.step;
             let selector = selector.clone();
             let label_selector = self.label_selector.clone();
+            let trace_id_clone = trace_id.clone();
             tokio::task::spawn(async move {
                 let ret = o2_enterprise::enterprise::metrics::super_cluster::selector_load_data(
                     query_ctx,
@@ -615,7 +619,7 @@ impl Engine {
                 .await;
                 if let Err(e) = super_tx.send(ret).await {
                     log::error!(
-                        "[trace_id: {trace_id}] [PromQL] Failed to send super cluster result to channel, error: {e:?}",
+                        "[trace_id: {trace_id_clone}] [PromQL] Failed to send super cluster result to channel, error: {e:?}",
                     );
                 }
                 drop(super_tx);
@@ -661,6 +665,7 @@ impl Engine {
         let lookback = range.map_or(self.ctx.lookback_delta, micros);
 
         let mut tasks = Vec::with_capacity(ctxs.len());
+        let mut abort_handles = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats, keep_filters) in ctxs {
             let query_ctx = self.ctx.query_ctx.clone();
             let mut selector = selector.clone();
@@ -668,9 +673,9 @@ impl Engine {
                 selector.matchers = Matchers::empty();
             };
             let label_selector = label_selector.clone();
-            let task = tokio::time::timeout(
-                Duration::from_secs(self.ctx.query_ctx.timeout),
-                async move {
+            let task = tokio::spawn(async move {
+                tokio::time::timeout(
+                    Duration::from_secs(query_ctx.timeout),
                     selector_load_data_from_datafusion(
                         query_ctx,
                         ctx,
@@ -681,29 +686,100 @@ impl Engine {
                         end,
                         step,
                         lookback,
-                    )
-                    .await
-                },
-            );
+                    ),
+                )
+                .await
+            });
+            abort_handles.push(task.abort_handle());
             tasks.push(task);
             // update stats
             let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
             ctx_scan_stats.add(&scan_stats);
         }
 
-        let task_results = try_join_all(tasks)
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if SEARCH_SERVER
+            .insert_sender(&trace_id, abort_sender, true)
             .await
-            .map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
+            .is_err()
+        {
+            log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan");
+            return Err(DataFusionError::Plan(
+                Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+                    "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
+                )))
+                .to_string(),
+            ));
+        }
+
+        // run datafusion collect data task
+        let timeout = self.ctx.query_ctx.timeout;
+        let query_task = try_join_all(tasks);
+        tokio::pin!(query_task);
+        let task_results = tokio::select! {
+            ret = &mut query_task => {
+                match ret {
+                    Ok(ret) => {
+                        // Unwrap the nested Results: JoinHandle result -> timeout result -> actual result
+                        let mut unwrapped_results = Vec::new();
+                        for result in ret {
+                            match result {
+                                Ok(Ok(data)) => unwrapped_results.push(data),
+                                Ok(Err(_)) => {
+                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search load data task timeout");
+                                    return Err(DataFusionError::Plan(
+                                        Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search load data task timeout".to_string())).to_string()
+                                    ));
+                                }
+                                Err(err) => {
+                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
+                                    return Err(DataFusionError::Plan(format!("task error: {err}")));
+                                }
+                            }
+                        }
+                        Ok(unwrapped_results)
+                    },
+                    Err(err) => {
+                        log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
+                        Err(Error::Message(err.to_string()))
+                    }
+                }
+            },
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout )) => {
+                for handle in abort_handles {
+                    handle.abort();
+                }
+                log::error!("[trace_id {trace_id}] [PromQL] grpc search timeout");
+                Err(Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search timeout".to_string())))
+            },
+            _ = async {
+                #[cfg(feature = "enterprise")]
+                let _ = abort_receiver.await;
+                #[cfg(not(feature = "enterprise"))]
+                futures::future::pending::<()>().await;
+            } => {
+                for handle in abort_handles {
+                    handle.abort();
+                }
+                log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled");
+                Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("[PromQL] grpc search canceled".to_string())))
+            }
+        };
+
+        let task_results =
+            task_results.map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
 
         let mut metrics: HashMap<u64, RangeValue> = HashMap::default();
         let task_results_len = task_results.len();
         for task_result in task_results {
             if task_results_len == 1 {
                 // only one ctx, no need to merge, just set it to metrics
-                metrics = task_result?;
+                metrics = task_result;
                 break;
             }
-            for (key, value) in task_result? {
+            for (key, value) in task_result {
                 if let Some(metric) = metrics.get_mut(&key) {
                     metric.extend(value);
                 } else {

@@ -160,8 +160,8 @@ pub struct PanelFields {
     pub stream_type: StreamType,
     pub x: Vec<AxisItem>,
     pub y: Vec<AxisItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub z: Option<Vec<AxisItem>>,
+    #[serde(default)]
+    pub z: Vec<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakdown: Option<Vec<AxisItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -434,6 +434,10 @@ pub struct PanelConfig {
     hidden_columns: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sticky_columns: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sticky_first_column: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    column_order: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

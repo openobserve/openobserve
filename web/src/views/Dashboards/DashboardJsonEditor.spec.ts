@@ -18,23 +18,28 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   validateDashboardJson: vi.fn(() => []),
 }));
 
-// Mock QueryEditor component
-vi.mock("@/components/CodeQueryEditor.vue", () => ({
-  default: {
+// Mock QueryEditor component - handle async component wrapper
+vi.mock("@/components/CodeQueryEditor.vue", async () => {
+  const { defineComponent } = await import("vue");
+  const component = defineComponent({
     name: "QueryEditor",
-    template: '<div data-test="mocked-query-editor"><textarea v-model="query" @input="onInput"></textarea></div>',
-    props: ["debounceTime", "language", "editorId"],
+    template: '<div data-test="dashboard-json-editor" class="mocked-query-editor"><textarea v-model="query" @input="onInput"></textarea></div>',
+    props: ["debounceTime", "language", "editorId", "query"],
     emits: ["update:query"],
     setup(props: any, { emit }: any) {
-      const query = ref("");
+      const query = ref(props.query || "");
       const onInput = (event: Event) => {
         const target = event.target as HTMLTextAreaElement;
         emit("update:query", target.value);
       };
       return { query, onInput };
     },
-  },
-}));
+  });
+
+  return {
+    default: component,
+  };
+});
 
 // Mock Vuex
 const mockStore = {
@@ -76,6 +81,13 @@ describe("DashboardJsonEditor", () => {
           "q-icon": {
             template: '<i class="q-icon" :data-test="$attrs[\'data-test\']"></i>',
             props: ["name", "size"],
+          },
+          // Stub QueryEditor with proper data-test attribute
+          "QueryEditor": {
+            name: "QueryEditor",
+            template: '<div data-test="dashboard-json-editor" class="query-editor"><slot /></div>',
+            props: ["debounceTime", "language", "editorId", "query"],
+            emits: ["update:query"],
           },
         },
       },
@@ -472,11 +484,11 @@ describe("DashboardJsonEditor", () => {
   it("should handle editor change from QueryEditor component", () => {
     wrapper = createWrapper();
     const validJson = JSON.stringify({ test: "value from editor" });
-    
+
     // Simulate the editor update event
-    const queryEditor = wrapper.findComponent('[data-test="dashboard-json-editor"]');
+    const queryEditor = wrapper.findComponent({ name: 'QueryEditor' });
     queryEditor.vm.$emit('update:query', validJson);
-    
+
     expect(wrapper.vm.isValidJson).toBe(true);
   });
 
@@ -503,13 +515,13 @@ describe("DashboardJsonEditor", () => {
   // Test 31: Component properly renders editor content
   it("should render initial JSON content in editor", () => {
     wrapper = createWrapper();
-    
+
     // Check that the JSON content is properly set
     const expectedJson = JSON.stringify(mockDashboardData, null, 2);
     expect(wrapper.vm.jsonContent).toBe(expectedJson);
-    
+
     // Check that the editor is rendered
-    const queryEditor = wrapper.findComponent('[data-test="dashboard-json-editor"]');
+    const queryEditor = wrapper.findComponent({ name: 'QueryEditor' });
     expect(queryEditor.exists()).toBe(true);
   });
 
