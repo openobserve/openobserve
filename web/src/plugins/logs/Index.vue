@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
               @buildModeToggle="onBuildModeToggle"
+              @sendToAiChat="sendToAiChat"
             />
           </div>
         </template>
