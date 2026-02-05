@@ -2530,7 +2530,8 @@
     "sql_query": "Interrogazione SQL",
     "resuls": "Risultati",
     "wrapText": "Avvolgi testo",
-    "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata"
+    "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata",
+    "results": "Risultati"
   },
   "search_scheduler_job": {
     "title": "Cerca Job Scheduler",
@@ -2621,7 +2622,8 @@
     "analyzeButtonLabel": "Analizza",
     "refreshTooltip": "Aggiorna l'analisi con il percentile aggiornato",
     "customSQLFieldsDisabled": "La selezione dei campi non è disponibile per le query SQL personalizzate. Le dimensioni vengono estratte dai risultati della query.",
-    "timeRangeSelected": "Intervallo di tempo selezionato"
+    "timeRangeSelected": "Intervallo di tempo selezionato",
+    "dimensionsSelected": "Dimensioni selezionate"
   },
   "volumeInsights": {
     "title": "Approfondimenti",
