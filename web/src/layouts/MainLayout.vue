@@ -1602,12 +1602,8 @@ body.ai-chat-open {
   color: white;
 }
 .dark-mode-chat-container {
-  border-left: 1.5px solid #232323ff;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 .light-mode-chat-container {
-  border-left: 1.5px solid #f7f7f7;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 
 .ai-btn-active {

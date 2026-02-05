@@ -2287,44 +2287,20 @@ export default defineComponent({
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
-  height: 100vh;
+  height: calc(100% - 45px);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  
-  // Light mode gradient - more sophisticated
-  &.light-mode {
-    background: rgba(255,255,255,0.7);
-    background-size: 400% 400%;
-    animation: subtleShift 20s ease-in-out infinite;
-  }
-  
-  // Dark mode gradient - more sophisticated
-  &.dark-mode {
-    background: rgba(0,0,0,0.7);
-    background-size: 400% 400%;
-    animation: subtleShift 25s ease-in-out infinite;
-  }
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 
   .chat-content-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
-    
-    // Light mode gradient - more sophisticated
-    &.light-mode {
-      background: transparent;
-      background-size: 400% 400%;
-      animation: subtleShift 20s ease-in-out infinite;
-    }
-    
-    // Dark mode gradient - more sophisticated
-    &.dark-mode {
-      background: transparent;
-      background-size: 400% 400%;
-      animation: subtleShift 25s ease-in-out infinite;
-    }
+    background: transparent;
   }
 
 
@@ -2913,24 +2889,6 @@ export default defineComponent({
   }
 }
 
-// Subtle gradient animation
-@keyframes subtleShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  25% {
-    background-position: 100% 50%;
-  }
-  50% {
-    background-position: 100% 100%;
-  }
-  75% {
-    background-position: 0% 100%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
 
 // Tool call indicator styling
 .tool-call-indicator {
