@@ -311,10 +311,6 @@ fn default_enable_streaming_search() -> bool {
     false
 }
 
-fn default_usage_stream_enabled() -> bool {
-    false
-}
-
 #[cfg(feature = "enterprise")]
 fn default_claim_parser_function() -> String {
     "".to_string()
@@ -379,7 +375,6 @@ pub struct OrganizationSetting {
     pub dark_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_series_per_query: Option<usize>,
-    #[serde(default = "default_usage_stream_enabled")]
     pub usage_stream_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
@@ -412,7 +407,7 @@ impl Default for OrganizationSetting {
             light_mode_theme_color,
             dark_mode_theme_color,
             max_series_per_query: None,
-            usage_stream_enabled: default_usage_stream_enabled(),
+            usage_stream_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
         }
