@@ -1597,71 +1597,86 @@ export default defineComponent({
         const streamType = firstAlert.stream_type || "logs";
         const streamName = firstAlert.stream_name || "default";
 
-        // Get stream schema
+        // Step 1: Get stream schema (like logs page does)
         const schemaResponse = await streamService.schema(org, streamName, streamType);
         const schema = schemaResponse.data;
 
-        // Get semantic groups
+        // Step 2: Extract schema fields (like logs page does)
+        // CRITICAL FIX: Use uds_schema (user-defined schema) if available!
+        // The logs page shows uds_schema fields in the left pane, NOT all schema fields
+        // uds_schema is the curated list of fields the user cares about
+        const schemaFieldsArray = (schema.uds_schema && schema.uds_schema.length > 0)
+          ? schema.uds_schema
+          : (schema.schema || schema.fields || []);
+        const schemaFields = new Set(schemaFieldsArray.map((f: any) => f.name));
+
+        console.log("[Fallback Correlation] Incident dimensions:", incident.stable_dimensions);
+        console.log("[Fallback Correlation] Using schema type:", schema.uds_schema && schema.uds_schema.length > 0 ? 'uds_schema (user-defined)' : 'schema (full)');
+        console.log("[Fallback Correlation] Total schema fields:", schemaFields.size);
+        console.log("[Fallback Correlation] Schema fields:", Array.from(schemaFields).filter(f => !f.startsWith('_')).slice(0, 30));
+
+        // Step 3: Get semantic groups to resolve dimension names to field patterns
         const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
         const semanticGroups = semanticGroupsResponse.data;
 
-        // Map incident dimensions to field names in schema
-        // Schema response has .schema array with {name, type} objects
-        const schemaFields = new Set(
-          (schema.schema || schema.fields || []).map((f: any) => f.name)
-        );
-
-        console.log("[Fallback Correlation] Incident dimensions:", incident.stable_dimensions);
-        console.log("[Fallback Correlation] Total schema fields:", schemaFields.size);
-        console.log("[Fallback Correlation] Sample schema fields:", Array.from(schemaFields).slice(0, 10));
-
         const filters: Record<string, string> = {};
 
+        // Step 4: For each dimension, find the matching schema field
         for (const [dimId, dimValue] of Object.entries(incident.stable_dimensions)) {
-          // Find semantic group
+          console.log(`[Fallback Correlation] Processing dimension: ${dimId} = ${dimValue}`);
+
+          let matchedField = null;
+
+          // Get semantic group
           const group = semanticGroups.find((g: any) => g.id === dimId);
 
-          console.log(`[Fallback Correlation] Processing ${dimId} = ${dimValue}`);
+          if (group && group.fields && group.fields.length > 0) {
+            console.log(`[Fallback Correlation] Semantic group fields for ${dimId}:`, group.fields);
+            console.log(`[Fallback Correlation] Checking which fields exist in schema...`);
 
-          if (!group) {
+            // Check each field from semantic group
+            for (const fieldName of group.fields) {
+              const existsInSchema = schemaFields.has(fieldName);
+              console.log(`  - ${fieldName}: ${existsInSchema ? '✅ EXISTS' : '❌ not in schema'}`);
+
+              if (existsInSchema && !matchedField) {
+                matchedField = fieldName;
+                // Don't break - keep logging all fields for debugging
+              }
+            }
+
+            if (matchedField) {
+              console.log(`[Fallback Correlation] ✅ Selected field from semantic group: ${matchedField}`);
+            }
+          } else {
             console.warn(`[Fallback Correlation] No semantic group found for: ${dimId}`);
-            continue;
           }
 
-          if (!group.fields || group.fields.length === 0) {
-            console.warn(`[Fallback Correlation] Semantic group ${dimId} has empty fields array`);
-            continue;
-          }
+          // Fallback: If semantic group didn't work, scan schema directly by pattern
+          if (!matchedField) {
+            console.warn(`[Fallback Correlation] Semantic group failed, scanning schema fields directly...`);
+            const dimParts = dimId.split('-');
+            console.log(`[Fallback Correlation] Looking for fields matching parts:`, dimParts);
 
-          console.log(`[Fallback Correlation] Trying field variants for ${dimId}:`, group.fields.slice(0, 5));
+            const schemaFieldsArray = Array.from(schemaFields).filter(f => !f.startsWith('_'));
+            for (const schemaField of schemaFieldsArray) {
+              const fieldLower = schemaField.toLowerCase();
+              const allPartsMatch = dimParts.every(part => fieldLower.includes(part.toLowerCase()));
 
-          // Collect ALL matching field names and pick the best one
-          const matchingFields = [];
-          for (const fieldName of group.fields) {
-            if (schemaFields.has(fieldName)) {
-              matchingFields.push(fieldName);
+              if (allPartsMatch) {
+                matchedField = schemaField;
+                console.log(`[Fallback Correlation] ✅ Found via pattern match: ${schemaField}`);
+                break;
+              }
             }
           }
 
-          if (matchingFields.length > 0) {
-            // Prefer shorter field names without prefixes
-            const bestField = matchingFields.sort((a, b) => {
-              // Penalize long prefixes
-              const aPenalty = a.startsWith('service_') ? 1000 :
-                               a.startsWith('resource_') ? 500 :
-                               a.startsWith('attributes_') ? 300 : 0;
-              const bPenalty = b.startsWith('service_') ? 1000 :
-                               b.startsWith('resource_') ? 500 :
-                               b.startsWith('attributes_') ? 300 : 0;
-
-              // Then by length (shorter = better)
-              return (a.length + aPenalty) - (b.length + bPenalty);
-            })[0];
-
-            filters[bestField] = dimValue;
-            console.log(`[Fallback Correlation] ✅ Mapped ${dimId} → ${bestField} = ${dimValue} (from ${matchingFields.length} options: ${matchingFields.slice(0, 3).join(', ')})`);
+          if (matchedField) {
+            filters[matchedField] = dimValue;
+            console.log(`[Fallback Correlation] ✅✅✅ FINAL: ${dimId} → ${matchedField} = ${dimValue}`);
           } else {
-            console.warn(`[Fallback Correlation] ❌ No matching field in schema for ${dimId}`);
+            console.error(`[Fallback Correlation] ❌❌❌ FAILED to find field for: ${dimId}`);
+            console.error(`[Fallback Correlation] Schema fields:`, Array.from(schemaFields).filter(f => !f.startsWith('_')).slice(0, 30));
           }
         }
 
