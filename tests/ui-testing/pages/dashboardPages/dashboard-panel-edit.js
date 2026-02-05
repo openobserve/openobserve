@@ -156,10 +156,22 @@ export default class DashboardPanel {
   //open Query inspector
 
   async openQueryInspector(panelName) {
-    await this.page
-      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-      .click();
-    await this.queryInspector.waitFor({ state: "visible" });
+    const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+
+    // Wait for dropdown button to be visible with retry
+    await dropdownBtn.waitFor({ state: "visible", timeout: 15000 });
+    await dropdownBtn.click();
+
+    // Wait for query inspector option with retry
+    try {
+      await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
+    } catch (e) {
+      // Menu may not have opened, retry click
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(500);
+      await dropdownBtn.click();
+      await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
+    }
     await this.queryInspector.click();
   }
 }

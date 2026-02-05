@@ -7,45 +7,26 @@ const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
-import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { waitForDashboardPage, deleteDashboard, addSimplePanel } from "./utils/dashCreation.js";
 import {
   hasRefreshIndicator,
   monitorVariableAPICalls,
   trackPanelReload,
   waitForAllPanelsToLoad
 } from "../utils/variable-helpers.js";
+const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
+// Import centralized selectors
+const {
+  SELECTORS,
+  getVariableSelector,
+  getEditVariableBtn,
+  getPanelRefreshBtn,
+} = require("../../pages/dashboardPages/dashboard-selectors.js");
+const testLogger = require("../utils/test-logger.js");
 
 test.describe.configure({ mode: "parallel" });
 
-/**
- * Helper function to change a variable value to a different option
- * Selects the second option to ensure the value actually changes
- */
-async function changeVariableValue(page, variableName) {
-  const apiMonitor = monitorVariableAPICalls(page, {expectedCount: 1, timeout: 15000});
-  // Wait for variable dropdown to be visible and ready
-  const varDropdown = page.getByLabel(variableName, { exact: true });
-  await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-
-  // Ensure network is idle before clicking
-  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-  await varDropdown.click();
-
-  // Wait for dropdown menu to open
-  await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-  await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 10000 });
-
-  // Click second option (index 1) to change value - first option is already selected
-  await page.locator('[role="option"]').nth(1).click();
-
-  // Wait for dropdown to close
-  await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-  const apiResult = await apiMonitor;
-  return apiResult;
-}
-
-test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
+test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: ['@dashboards', '@dashboardVariables', '@refresh', '@P1'] }, () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
@@ -62,7 +43,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add global variable
     await pm.dashboardSetting.openSetting();
@@ -74,29 +55,27 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
       { scope: "global" }
     );
     await pm.dashboardSetting.closeSettingWindow();
+    // Wait for settings dialog to be fully closed and network idle
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
 
-    // Add panel
-    await pm.dashboardCreate.addPanel();
-    await pm.chartTypeSelector.selectChartType("line");
-    await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
-    await pm.dashboardPanelActions.addPanelName("Panel1");
-    await pm.dashboardPanelActions.savePanel();
+    // Add panel using consolidated helper
+    await addSimplePanel(pm, "Panel1");
 
     // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
 
     // Change variable value - select a DIFFERENT value than current
-    await changeVariableValue(page, variableName);
+    await scopedVars.changeVariableValue(variableName, { monitorApi: true });
 
     // Wait for any loading to complete before checking refresh indicator
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Check global refresh button shows indicator
-    const globalRefreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
+    const globalRefreshBtn = page.locator(SELECTORS.REFRESH_BTN);
     await globalRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for the refresh indicator to appear (button should change from outline to filled warning color)
@@ -124,7 +103,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add variables
     await pm.dashboardSetting.openSetting();
@@ -135,8 +114,8 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardSetting.openSetting();
     // await pm.dashboardSetting.openVariables();
     // // Wait for variable to be saved and visible in settings
-    // await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
-    // await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 15000 });
+    // await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", {
       scope: "global",
@@ -145,17 +124,17 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     });
 
     // Wait for variable to be saved
-    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.locator(getEditVariableBtn(varB)).waitFor({ state: "visible", timeout: 15000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(varB)).waitFor({ state: "visible", timeout: 15000 });
 
     // Add panel using variable B with filter
     await pm.dashboardCreate.addPanel();
@@ -176,26 +155,26 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
 
     // Wait for panel to fully render and both variables to be visible and ready
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for both variable selectors to be fully visible and stable
-    await page.locator(`[data-test="variable-selector-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.locator(getVariableSelector(varA)).waitFor({ state: "visible", timeout: 15000 });
+    await page.locator(getVariableSelector(varB)).waitFor({ state: "visible", timeout: 15000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Change variable A (which affects B) - select a DIFFERENT value than current
-    await changeVariableValue(page, varA);
+    await scopedVars.changeVariableValue(varA, { monitorApi: true });
 
     // Wait for any loading to complete before checking refresh indicator
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Check the panel refresh button for warning indicator
     // When a variable changes that affects a panel, the panel's refresh button should show warning color
-    const panelRefreshBtn = page.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
+    const panelRefreshBtn = page.locator(SELECTORS.PANEL_REFRESH_BTN);
     await panelRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for the panel refresh button to get warning color
@@ -218,7 +197,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -230,8 +209,11 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
       { scope: "global" }
     );
     await pm.dashboardSetting.closeSettingWindow();
+    // Wait for settings dialog to be fully closed and network idle
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
 
     // Add two panels
     await pm.dashboardCreate.addPanel();
@@ -242,8 +224,8 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
 
     await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
@@ -253,17 +235,17 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for second panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
+    await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Change variable
-    await changeVariableValue(page, variableName);
+    await scopedVars.changeVariableValue(variableName, { monitorApi: true });
 
     // Click global refresh and track reloads
     const reloadTracker = trackPanelReload(
       page,
       null,
       async () => {
-        await page.locator('[data-test="dashboard-refresh-btn"]').click();
+        await page.locator(SELECTORS.REFRESH_BTN).click();
       },
       15000
     );
@@ -290,7 +272,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -302,8 +284,11 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
       { scope: "global" }
     );
     await pm.dashboardSetting.closeSettingWindow();
+    // Wait for settings dialog to be fully closed and network idle
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
 
     // Add Panel1 with filter using the variable - only this panel will be affected by variable changes
     await pm.dashboardCreate.addPanel();
@@ -323,14 +308,14 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard and get panel container with data-test-panel-id
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
 
     // Wait a bit for the panel ID to be set in the DOM
     await page.waitForTimeout(1000);
 
     // Get the panel container that has data-test-panel-id attribute
-    const panelContainer1 = page.locator('[data-test="dashboard-panel-container"]').first();
+    const panelContainer1 = page.locator(SELECTORS.PANEL_CONTAINER).first();
     await panelContainer1.waitFor({ state: "attached", timeout: 5000 });
     const panelId1 = await panelContainer1.getAttribute("data-test-panel-id");
 
@@ -343,19 +328,19 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for second panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
+    await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Wait for panels to fully render
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Change variable - this should only affect Panel1
-    await changeVariableValue(page, variableName);
+    await scopedVars.changeVariableValue(variableName, { monitorApi: true });
 
     // Wait for any loading to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Check Panel1's refresh button for warning indicator - scope to specific panel using data-test-panel-id
-    const panel1RefreshBtn = page.locator(`[data-test-panel-id="${panelId1}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
+    const panel1RefreshBtn = page.locator(getPanelRefreshBtn(panelId1));
     await panel1RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
     // Panel1's refresh button should have warning color since it uses the variable
@@ -393,7 +378,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -407,11 +392,11 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Wait for variable to appear on dashboard with increased timeout
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 15000 });
+    // Wait for variable to appear on dashboard with increased timeout using page object helper
+    await scopedVars.waitForVariableSelectorVisible(variableName, { timeout: 20000 });
 
     // Add panel with filter using the variable
     await pm.dashboardCreate.addPanel();
@@ -431,64 +416,64 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Capture the initial query inspector content before making changes
     // Hover over panel to make dropdown visible
-    await page.locator('[data-test="dashboard-panel-container"]').first().hover();
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.locator(SELECTORS.PANEL_CONTAINER).first().hover();
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Use page object method to open query inspector
     await pm.dashboardPanelEdit.openQueryInspector("Panel1");
 
     // Wait for Query Inspector dialog to open and load content
-    await page.locator('.q-dialog').waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator(SELECTORS.DIALOG).waitFor({ state: "visible", timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Get all text from Query Inspector dialog (includes query, time, variables)
-    const dialogContent = page.locator('.q-dialog').first();
+    const dialogContent = page.locator(SELECTORS.DIALOG).first();
     await dialogContent.waitFor({ state: "visible", timeout: 5000 });
     const queryInspectorBeforeRefresh = await dialogContent.textContent();
 
     // Close Query Inspector dialog
     await page.keyboard.press('Escape');
-    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
 
     // Change variable
-    await changeVariableValue(page, variableName);
+    await scopedVars.changeVariableValue(variableName, { monitorApi: true });
 
     // Change time range
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator(SELECTORS.DATE_TIME_BTN).click();
+    await page.locator(SELECTORS.DATE_TIME_RELATIVE_6H).click();
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Click global refresh
-    await page.locator('[data-test="dashboard-refresh-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for panels to finish loading
     await waitForAllPanelsToLoad(page, 1, 10000);
 
     // Capture the query inspector content after refresh
     // Hover over panel to make dropdown visible
-    await page.locator('[data-test="dashboard-panel-container"]').first().hover();
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.locator(SELECTORS.PANEL_CONTAINER).first().hover();
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Use page object method to open query inspector
     await pm.dashboardPanelEdit.openQueryInspector("Panel1");
 
     // Wait for Query Inspector dialog to open and load content
-    await page.locator('.q-dialog').waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator(SELECTORS.DIALOG).waitFor({ state: "visible", timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Get all text from Query Inspector dialog (includes query, time, variables)
     const queryInspectorAfterRefresh = await dialogContent.textContent();
 
     // Close Query Inspector dialog
     await page.keyboard.press('Escape');
-    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
 
     // Verify query inspector content is different - both variable value and time range should have changed
     expect(queryInspectorBeforeRefresh).not.toBe(queryInspectorAfterRefresh);
@@ -498,7 +483,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     expect(queryInspectorAfterRefresh).toContain("kubernetes_namespace_name");
 
     // Verify panel reloaded with new data
-    const panelElement = page.locator('[data-test*="dashboard-panel-"]').first();
+    const panelElement = page.locator(SELECTORS.PANEL_ANY).first();
     await expect(panelElement).toBeVisible();
 
     // Verify panel is loaded (not in loading state)
@@ -521,7 +506,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -533,29 +518,27 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
       { scope: "global" }
     );
     await pm.dashboardSetting.closeSettingWindow();
+    // Wait for settings dialog to be fully closed and network idle
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
 
-    // Add panel
-    await pm.dashboardCreate.addPanel();
-    await pm.chartTypeSelector.selectChartType("line");
-    await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
-    await pm.dashboardPanelActions.addPanelName("Panel1");
-    await pm.dashboardPanelActions.savePanel();
+    // Add panel using consolidated helper
+    await addSimplePanel(pm, "Panel1");
 
     // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
 
     // Change variable
-    await changeVariableValue(page, variableName);
+    await scopedVars.changeVariableValue(variableName, { monitorApi: true });
 
     // Wait for any loading to complete before checking refresh indicator
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for the refresh indicator to appear
-    const globalRefreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
+    const globalRefreshBtn = page.locator(SELECTORS.REFRESH_BTN);
     await expect(globalRefreshBtn).toHaveClass(/bg-warning/, { timeout: 10000 });
 
     // Verify indicator shows
@@ -563,8 +546,8 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     expect(hasIndicator).toBe(true);
 
     // Click global refresh
-    await page.locator('[data-test="dashboard-refresh-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for panels to finish loading
     await waitForAllPanelsToLoad(page, 1, 10000);
@@ -589,7 +572,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -601,8 +584,11 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
       { scope: "global" }
     );
     await pm.dashboardSetting.closeSettingWindow();
+    // Wait for settings dialog to be fully closed and network idle
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
 
     // Add panel with filter using the variable
     await pm.dashboardCreate.addPanel();
@@ -622,28 +608,28 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard and get panel ID
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
 
     await page.waitForTimeout(1000);
-    const panelContainer = page.locator('[data-test="dashboard-panel-container"]').first();
+    const panelContainer = page.locator(SELECTORS.PANEL_CONTAINER).first();
     await panelContainer.waitFor({ state: "attached", timeout: 5000 });
     const panelId = await panelContainer.getAttribute("data-test-panel-id");
 
     // Change variable
-    await changeVariableValue(page, variableName);
+    await scopedVars.changeVariableValue(variableName, { monitorApi: true });
 
     // Wait for any loading to complete before checking refresh indicator
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for panel refresh button to show warning color
-    const panelRefreshBtn = page.locator(`[data-test-panel-id="${panelId}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
+    const panelRefreshBtn = page.locator(getPanelRefreshBtn(panelId));
     await panelRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
     await expect(panelRefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
 
     // Click panel refresh
     await panelRefreshBtn.click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Verify indicator cleared - button should no longer have warning class
     await expect(panelRefreshBtn).not.toHaveClass(/text-warning/, { timeout: 10000 });
@@ -664,7 +650,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -676,8 +662,11 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
       { scope: "global" }
     );
     await pm.dashboardSetting.closeSettingWindow();
+    // Wait for settings dialog to be fully closed and network idle
+    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
 
     // Add Panel1 with filter using the variable
     await pm.dashboardCreate.addPanel();
@@ -697,11 +686,11 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard and get panel ID
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady();
 
     await page.waitForTimeout(1000);
-    const panelContainer1 = page.locator('[data-test="dashboard-panel-container"]').first();
+    const panelContainer1 = page.locator(SELECTORS.PANEL_CONTAINER).first();
     await panelContainer1.waitFor({ state: "attached", timeout: 5000 });
     const panelId1 = await panelContainer1.getAttribute("data-test-panel-id");
 
@@ -723,22 +712,22 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for second panel to be added to dashboard and get panel ID
-    await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
+    await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
 
     await page.waitForTimeout(1000);
-    const panelContainer2 = page.locator('[data-test="dashboard-panel-container"]').nth(1);
+    const panelContainer2 = page.locator(SELECTORS.PANEL_CONTAINER).nth(1);
     await panelContainer2.waitFor({ state: "attached", timeout: 5000 });
     const panelId2 = await panelContainer2.getAttribute("data-test-panel-id");
 
     // Change variable - both panels should be affected
-    await changeVariableValue(page, variableName);
+    await scopedVars.changeVariableValue(variableName, { monitorApi: true });
 
     // Wait for any loading to complete before checking refresh indicator
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for both panel refresh buttons to show warning color
-    const panel1RefreshBtn = page.locator(`[data-test-panel-id="${panelId1}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
-    const panel2RefreshBtn = page.locator(`[data-test-panel-id="${panelId2}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
+    const panel1RefreshBtn = page.locator(getPanelRefreshBtn(panelId1));
+    const panel2RefreshBtn = page.locator(getPanelRefreshBtn(panelId2));
 
     await panel1RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
     await panel2RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
@@ -748,7 +737,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
 
     // Click refresh only on Panel1
     await panel1RefreshBtn.click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Panel1 indicator should clear, Panel2 should remain
     await expect(panel1RefreshBtn).not.toHaveClass(/text-warning/, { timeout: 10000 });

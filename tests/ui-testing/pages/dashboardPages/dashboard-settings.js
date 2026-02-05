@@ -2,6 +2,7 @@
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getTabSelector } = require('./dashboard-selectors.js');
 
 export default class DashboardSetting {
   constructor(page) {
@@ -63,6 +64,11 @@ export default class DashboardSetting {
     // Wait for settings dialog to open - use more specific selector
     await this.page.locator('[data-test="dashboard-settings-general-tab"]').waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+
+    // Wait for all tabs to be rendered in the dialog
+    // The dialog has General, Tab, and Variables tabs - wait for the container to stabilize
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(500); // Allow Vue to finish rendering all tabs
   }
   //General Setting//
   //Change Dashboard Name//
@@ -128,6 +134,29 @@ export default class DashboardSetting {
     await this.saveTab.click();
   }
 
+  /**
+   * Add a new tab and wait for it to be visible on the dashboard
+   * Consolidates the common pattern:
+   *   await pm.dashboardSetting.addTabSetting("Tab1");
+   *   await pm.dashboardSetting.saveTabSetting();
+   *   await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+   *
+   * @param {string} tabName - Name for the new tab
+   * @param {Object} options - Additional options
+   * @param {number} options.timeout - Timeout in ms for waiting for tab visibility (default: 10000)
+   */
+  async addTabAndWait(tabName, options = {}) {
+    const { timeout = 10000 } = options;
+
+    testLogger.info('Adding tab and waiting for visibility', { tabName });
+
+    await this.addTabSetting(tabName);
+    await this.saveTabSetting();
+    await this.page.locator(getTabSelector(tabName)).waitFor({ state: "visible", timeout });
+
+    testLogger.info('Tab added and visible', { tabName });
+  }
+
   //Edit tab in settings//
   editTabnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
@@ -155,29 +184,82 @@ export default class DashboardSetting {
   //Open Variables tab
 
   async openVariables() {
+    // Check if the settings dialog is already open
+    const generalTab = this.page.locator('[data-test="dashboard-settings-general-tab"]');
+    const isDialogOpen = await generalTab.isVisible().catch(() => false);
+
+    if (!isDialogOpen) {
+      testLogger.warn('openVariables: Settings dialog not open, opening it first...');
+      // Need to open the settings dialog first
+      await this.openSetting();
+    }
+
     // Wait for settings dialog to be fully open before clicking variables tab
-    // Use specific selector instead of generic .q-dialog to avoid matching multiple dialogs
-    await this.page.locator('[data-test="dashboard-settings-general-tab"]').waitFor({ state: "visible", timeout: 10000 });
+    await generalTab.waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
-    await this.page
-      .locator('[data-test="dashboard-settings-variable-tab"]')
-      .waitFor({ state: "visible", timeout: 10000 });
-    await this.page
-      .locator('[data-test="dashboard-settings-variable-tab"]')
-      .click();
+
+    // Wait for dialog tabs to be fully loaded - the tabs are in a q-tabs container
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(500); // Allow Vue to finish rendering tabs
+
+    // Retry pattern for clicking variables tab (element can get detached during dialog transitions)
+    const maxRetries = 5;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const variablesTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+
+        // Check if tab exists in DOM first
+        const tabCount = await variablesTab.count();
+        if (tabCount === 0) {
+          testLogger.warn(`openVariables attempt ${attempt}: Variables tab not found in DOM, waiting...`);
+          await this.page.waitForTimeout(1000);
+          continue;
+        }
+
+        await variablesTab.waitFor({ state: "visible", timeout: 10000 });
+        await this.page.waitForTimeout(200); // Brief pause to let DOM stabilize
+        await variablesTab.scrollIntoViewIfNeeded();
+        await variablesTab.click();
+        return; // Success
+      } catch (e) {
+        testLogger.warn(`openVariables attempt ${attempt} failed: ${e.message}`);
+        if (attempt === maxRetries) throw e;
+        await this.page.waitForTimeout(1000); // Wait before retry
+      }
+    }
   }
 
   // Navigate to Variables tab after opening settings
   async goToVariablesTab() {
-    // Wait for settings dialog to be fully visible
-    await this.page
-      .locator('[data-test="dashboard-settings-variable-tab"]')
-      .waitFor({ state: "visible", timeout: 10000 });
+    // Wait for dialog to be fully loaded
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(500); // Allow Vue to finish rendering tabs
 
-    // Click on Variables tab
-    await this.page
-      .locator('[data-test="dashboard-settings-variable-tab"]')
-      .click();
+    // Retry pattern for clicking variables tab (element can get detached during dialog transitions)
+    const maxRetries = 5;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const variablesTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+
+        // Check if tab exists in DOM first
+        const tabCount = await variablesTab.count();
+        if (tabCount === 0) {
+          testLogger.warn(`goToVariablesTab attempt ${attempt}: Variables tab not found in DOM, waiting...`);
+          await this.page.waitForTimeout(1000);
+          continue;
+        }
+
+        await variablesTab.waitFor({ state: "visible", timeout: 10000 });
+        await this.page.waitForTimeout(200); // Brief pause to let DOM stabilize
+        await variablesTab.scrollIntoViewIfNeeded();
+        await variablesTab.click();
+        return; // Success
+      } catch (e) {
+        testLogger.warn(`goToVariablesTab attempt ${attempt} failed: ${e.message}`);
+        if (attempt === maxRetries) throw e;
+        await this.page.waitForTimeout(1000); // Wait before retry
+      }
+    }
   }
 
   //Generate unique variable name
@@ -478,23 +560,41 @@ export default class DashboardSetting {
       return;
     }
 
-    // Dialog is open, try to close it
-    try {
-      // Wait for close button with a short timeout
-      await closeBtn.waitFor({ state: "visible", timeout: 2000 });
-      await closeBtn.click({ timeout: 2000 });
+    // Retry pattern for closing the dialog
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Wait for close button with a short timeout
+        await closeBtn.waitFor({ state: "visible", timeout: 3000 });
+        await closeBtn.click({ timeout: 2000 });
 
-      // Wait for dialog to actually disappear
-      await settingsDialog.waitFor({ state: "hidden", timeout: 5000 });
-    } catch (error) {
-      // If clicking fails, the dialog might have already closed
-      // Verify if dialog is actually closed
-      const stillVisible = await settingsDialog.isVisible().catch(() => false);
-      if (stillVisible) {
-        // Dialog is still open but we couldn't close it - this is a real error
-        throw error;
+        // Wait for dialog to actually disappear
+        await settingsDialog.waitFor({ state: "hidden", timeout: 5000 });
+
+        // Wait for network to settle after closing
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Verify the dialog is really closed
+        const stillVisible = await settingsDialog.isVisible().catch(() => false);
+        if (!stillVisible) {
+          return; // Success
+        }
+      } catch (error) {
+        // Check if dialog is actually closed
+        const stillVisible = await settingsDialog.isVisible().catch(() => false);
+        if (!stillVisible) {
+          // Dialog closed - success
+          return;
+        }
+
+        // If this is the last attempt, throw the error
+        if (attempt === maxRetries) {
+          throw error;
+        }
+
+        // Wait before retry
+        await this.page.waitForTimeout(500);
       }
-      // Dialog closed on its own - this is fine
     }
   }
 
