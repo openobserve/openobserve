@@ -177,8 +177,8 @@ export default class DashboardVariablesScoped {
    */
   async selectMenuItem(text, options = {}) {
     const { exact = true, timeout = 5000 } = options;
-    const pattern = exact ? new RegExp(`^${text}$`) : text;
-    const item = this.page.locator(SELECTORS.MENU_ITEM).filter({ hasText: pattern });
+    // Use Playwright's getByText for safe text matching (avoids regex metacharacter issues)
+    const item = this.page.locator(SELECTORS.MENU_ITEM).getByText(text, { exact });
     await item.waitFor({ state: "visible", timeout });
     await item.click();
   }
