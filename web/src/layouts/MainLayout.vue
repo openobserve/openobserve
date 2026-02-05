@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="col-auto"
         v-show="store.state.isAiChatEnabled && isLoading"
-        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
+        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;"
         :class="
           store.state.theme == 'dark'
             ? 'dark-mode-chat-container'
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <O2AIChat
-          :header-height="82.5"
+          :header-height="42.5"
           :is-open="store.state.isAiChatEnabled"
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
