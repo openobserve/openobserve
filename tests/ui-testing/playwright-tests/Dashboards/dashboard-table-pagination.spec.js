@@ -1150,27 +1150,27 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
       testLogger.warn('No table rows found - PromQL query may not have returned data');
     });
 
-    // Give extra time for pagination controls to render after data loads
-    await page.waitForTimeout(1000);
+    // Wait for the table bottom container which holds all pagination controls
+    const tableBottom = page.locator('.q-table__bottom');
+    await tableBottom.waitFor({ state: "visible", timeout: 15000 });
 
-    // Verify "Records per page" text is visible
-    // Search on page level as pagination controls may be outside the table panel container
-    const recordsPerPageText = page.getByText('Records per page');
+    // Verify "Records per page:" text is visible (note: text includes colon)
+    const recordsPerPageText = tableBottom.locator('span.text-caption').filter({ hasText: 'Records per page' });
     await expect(recordsPerPageText).toBeVisible({ timeout: 10000 });
 
-    // Verify the record count display shows correct format (e.g., "1-10 of 68" or "1-7 of 7")
-    // Search on page level for the pagination info
-    const paginationInfo = page.getByText(/^\d+-\d+\s+of\s+\d+$/);
+    // Verify the record count display shows correct format (e.g., "1-10 of 99")
+    // The pagination info is in a span with class "text-caption q-pa-sm"
+    const paginationInfo = tableBottom.locator('span.text-caption').filter({ hasText: /\d+-\d+\s+of\s+\d+/ });
     await expect(paginationInfo).toBeVisible({ timeout: 5000 });
 
     // Verify pagination shows correct format (e.g., "1-10 of X" or "1-N of N" if fewer records)
     const paginationText = await paginationInfo.textContent();
-    expect(paginationText).toMatch(/^1-\d+\s+of\s+\d+$/);
+    expect(paginationText.trim()).toMatch(/^\d+-\d+\s+of\s+\d+$/);
 
     // Verify we're on the first page (starts with "1-")
-    expect(paginationText.startsWith('1-')).toBe(true);
+    expect(paginationText.trim().startsWith('1-')).toBe(true);
 
-    testLogger.info(`Verified PromQL table pagination: ${paginationText}`);
+    testLogger.info(`Verified PromQL table pagination: ${paginationText.trim()}`);
 
     // Clean up - save panel first before navigating back
     await pm.dashboardPanelActions.savePanel();
