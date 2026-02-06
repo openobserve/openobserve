@@ -305,6 +305,14 @@ jobs:
                 "dashboard-variables-creation-scopes.spec.js",
                 "dashboard-variables-null-handling.spec.js",
               ]
+          - testfolder: "Dashboards-Panel-Level-DateTime-Config"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-panel-time-part1-config-behavior.spec.js",
+                "dashboard-panel-time-part2-url-priority.spec.js",
+                "dashboard-panel-time-part3-advanced-edge-cases.spec.js",
+              ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -464,7 +472,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables-Scoped"|"Dashboards-Variables-Dependency"|"Dashboards-Variables-Refresh"|"Dashboards-Variables-URL"|"Dashboards-Variables-Creation")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables-Scoped"|"Dashboards-Variables-Dependency"|"Dashboards-Variables-Refresh"|"Dashboards-Variables-URL"|"Dashboards-Variables-Creation"|"Dashboards-Panel-Level-DateTime-Config")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)
