@@ -19,7 +19,8 @@ export default {
     incidents: {},
     cachedData: [], // Cache the actual incidents data
     pageBeforeSearch: 1, // Track page number before search starts (for smart restoration)
-    isInitialized: false
+    isInitialized: false,
+    shouldRefresh: false // Flag to indicate when data should be refreshed (e.g., after updates)
   },
   getters: {
     getIncidents(state: any) {
@@ -33,6 +34,9 @@ export default {
     },
     getIsInitialized(state: any) {
       return state.isInitialized;
+    },
+    getShouldRefresh(state: any) {
+      return state.shouldRefresh;
     },
   },
   mutations: {
@@ -48,11 +52,15 @@ export default {
     setIsInitialized(state: any, isInitialized: boolean) {
       state.isInitialized = isInitialized;
     },
+    setShouldRefresh(state: any, shouldRefresh: boolean) {
+      state.shouldRefresh = shouldRefresh;
+    },
     resetIncidents(state: any) {
       state.incidents = {};
       state.cachedData = [];
       state.pageBeforeSearch = 1;
       state.isInitialized = false;
+      state.shouldRefresh = false;
     },
   },
   actions: {
@@ -67,6 +75,9 @@ export default {
     },
     setIsInitialized(context: any, isInitialized: boolean) {
       context.commit('setIsInitialized', isInitialized);
+    },
+    setShouldRefresh(context: any, shouldRefresh: boolean) {
+      context.commit('setShouldRefresh', shouldRefresh);
     },
     resetIncidents(context: any) {
       context.commit('resetIncidents');

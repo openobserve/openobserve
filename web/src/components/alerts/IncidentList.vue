@@ -89,16 +89,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ (pagination.page - 1) * pagination.rowsPerPage + props.pageIndex + 1 }}
               </template>
               <template v-else-if="col.name === 'status'">
-                <q-badge
-                  :color="getStatusColor(props.row.status)"
-                  :label="getStatusLabel(props.row.status)"
-                />
+                <span
+                  class="status-badge"
+                  :class="getStatusColorClass(props.row.status)"
+                >
+                  {{ getStatusLabel(props.row.status) }}
+                </span>
               </template>
               <template v-else-if="col.name === 'severity'">
-                <q-badge
-                  :color="getSeverityColor(props.row.severity)"
-                  :label="props.row.severity"
-                />
+                <span
+                  class="severity-badge"
+                  :class="getSeverityColorClass(props.row.severity)"
+                >
+                  {{ props.row.severity }}
+                </span>
               </template>
               <template v-else-if="col.name === 'title'">
                 <div class="tw:flex tw:items-center tw:gap-1">
@@ -109,20 +113,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="col.name === 'dimensions'">
                 <div class="tw:flex tw:flex-wrap tw:gap-1">
-                  <q-chip
-                    v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions)"
+                  <!-- Show first 2 dimensions -->
+                  <span
+                    v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(0, 2)"
                     :key="key"
-                    size="sm"
-                    :color="getDimensionColor(key)"
-                    text-color="white"
-                    class="dimension-chip"
-                    dense
+                    class="dimension-badge"
+                    :class="getDimensionColorClass(key)"
                   >
                     <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
                     <q-tooltip :delay="300" class="tw:text-xs">
                       {{ key }}={{ value }}
                     </q-tooltip>
-                  </q-chip>
+                  </span>
+                  <!-- Show +X more badge if there are more than 2 dimensions -->
+                  <span
+                    v-if="getSortedDimensions(props.row.stable_dimensions).length > 2"
+                    class="dimension-badge badge-more"
+                  >
+                    +{{ getSortedDimensions(props.row.stable_dimensions).length - 2 }} more
+                    <q-tooltip :delay="300" class="tw:text-xs tw:max-w-md">
+                      <div class="tw:space-y-1">
+                        <div
+                          v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(2)"
+                          :key="key"
+                        >
+                          <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                        </div>
+                      </div>
+                    </q-tooltip>
+                  </span>
                 </div>
               </template>
               <template v-else-if="col.name === 'alert_count'">
@@ -341,7 +360,7 @@ export default defineComponent({
         label: "Dimensions",
         field: "stable_dimensions",
         align: "left" as const,
-        style: "width: 800px;",
+        style: "width: 400px;",
       },
       {
         name: "alert_count",
@@ -507,7 +526,10 @@ export default defineComponent({
           type: "positive",
           message: t("alerts.incidents.statusUpdated"),
         });
+        // Reload the incidents list to show updated status
         loadIncidents();
+        // Also mark data as stale in store for when navigating back from other pages
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -530,16 +552,16 @@ export default defineComponent({
     };
 
 
-    const getStatusColor = (status: string) => {
+    const getStatusColorClass = (status: string) => {
       switch (status) {
         case "open":
-          return "negative";
+          return "status-open";
         case "acknowledged":
-          return "warning";
+          return "status-acknowledged";
         case "resolved":
-          return "positive";
+          return "status-resolved";
         default:
-          return "grey";
+          return "status-default";
       }
     };
 
@@ -556,18 +578,18 @@ export default defineComponent({
       }
     };
 
-    const getSeverityColor = (severity: string) => {
+    const getSeverityColorClass = (severity: string) => {
       switch (severity) {
         case "P1":
-          return "red-10";
+          return "severity-p1";
         case "P2":
-          return "orange-8";
+          return "severity-p2";
         case "P3":
-          return "amber-8";
+          return "severity-p3";
         case "P4":
-          return "grey-7";
+          return "severity-p4";
         default:
-          return "grey";
+          return "severity-default";
       }
     };
 
@@ -596,26 +618,26 @@ export default defineComponent({
         .map(key => [key, dimensions[key]] as [string, string]);
     };
 
-    const getDimensionColor = (key: string) => {
-      // Color palette that works in both light and dark modes
+    const getDimensionColorClass = (key: string) => {
+      // Color palette using CSS classes matching schema.scss style
       const colorMap: Record<string, string> = {
-        'k8s-deployment': 'blue',
-        'k8s-namespace': 'purple',
-        'deployment': 'blue',
-        'namespace': 'purple',
-        'env': 'green',
-        'environment': 'green',
-        'host': 'orange',
-        'hostname': 'orange',
-        'service': 'cyan',
-        'service_name': 'cyan',
-        'region': 'pink',
-        'zone': 'pink',
-        'cluster': 'indigo',
-        'pod': 'teal',
-        'container': 'deep-orange',
-        'app': 'lime',
-        'application': 'lime',
+        'k8s-deployment': 'badge-blue',
+        'k8s-namespace': 'badge-purple',
+        'deployment': 'badge-blue',
+        'namespace': 'badge-purple',
+        'env': 'badge-green',
+        'environment': 'badge-green',
+        'host': 'badge-orange',
+        'hostname': 'badge-orange',
+        'service': 'badge-cyan',
+        'service_name': 'badge-cyan',
+        'region': 'badge-pink',
+        'zone': 'badge-pink',
+        'cluster': 'badge-indigo',
+        'pod': 'badge-teal',
+        'container': 'badge-red',
+        'app': 'badge-yellow',
+        'application': 'badge-yellow',
       };
 
       // Check for exact match first
@@ -625,20 +647,20 @@ export default defineComponent({
 
       // Check for partial matches
       const lowerKey = key.toLowerCase();
-      for (const [pattern, color] of Object.entries(colorMap)) {
+      for (const [pattern, className] of Object.entries(colorMap)) {
         if (lowerKey.includes(pattern)) {
-          return color;
+          return className;
         }
       }
 
       // Hash-based fallback for consistency
-      const colors = ['blue-grey', 'brown', 'deep-purple', 'amber'];
+      const classes = ['badge-gray', 'badge-amber', 'badge-violet', 'badge-rose'];
       let hash = 0;
       for (let i = 0; i < key.length; i++) {
         hash = ((hash << 5) - hash) + key.charCodeAt(i);
         hash = hash & hash;
       }
-      return colors[Math.abs(hash) % colors.length];
+      return classes[Math.abs(hash) % classes.length];
     };
 
     /**
@@ -754,13 +776,21 @@ export default defineComponent({
       // Restore state from store (or reset if org changed)
       const hasRestoredState = restoreStateFromStore();
 
-      // Only load incidents if we don't have data (prevents reload when navigating back)
-      // If hasRestoredState is false but allIncidents has data, org changed and reset happened
-      if (allIncidents.value.length === 0) {
+      // Check if data should be refreshed (e.g., after incident updates)
+      const shouldRefresh = store.state.incidents?.shouldRefresh || false;
+
+      // Load incidents if:
+      // 1. We don't have cached data, OR
+      // 2. shouldRefresh flag is set (indicates changes were made)
+      if (allIncidents.value.length === 0 || shouldRefresh) {
         // Load incidents with restored or default state
         await loadIncidents();
+        // Clear the shouldRefresh flag after loading
+        if (shouldRefresh) {
+          store.dispatch('incidents/setShouldRefresh', false);
+        }
       } else {
-        // We have cached data, just reapply filters and pagination
+        // We have cached data and no refresh needed, just reapply filters and pagination
         const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
         const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
         const endIndex = startIndex + pagination.value.rowsPerPage;
@@ -918,13 +948,13 @@ export default defineComponent({
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
-      getStatusColor,
+      getStatusColorClass,
       getStatusLabel,
-      getSeverityColor,
+      getSeverityColorClass,
       formatTimestamp,
       formatDimensions,
       getSortedDimensions,
-      getDimensionColor,
+      getDimensionColorClass,
       toggleStatusFilter,
       toggleSeverityFilter,
       clearStatusFilter,
@@ -951,17 +981,294 @@ export default defineComponent({
   width: 250px;
 }
 
-.dimension-chip {
-  margin: 0 !important;
+/* Status badge styling - matching schema.scss */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-size: 11px;
-  height: 24px;
+  font-weight: 600;
+}
+
+.status-open {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-acknowledged {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.status-resolved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-default {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Severity badge styling - matching schema.scss */
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.severity-p1 {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.severity-p2 {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+.severity-p3 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.severity-p4 {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.severity-default {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Dark mode adjustments for status badges */
+body.body--dark {
+  .status-open {
+    background: #991b1b;
+    color: #fca5a5;
+  }
+
+  .status-acknowledged {
+    background: #78350f;
+    color: #fbbf24;
+  }
+
+  .status-resolved {
+    background: #065f46;
+    color: #6ee7b7;
+  }
+
+  .status-default {
+    background: #374151;
+    color: #d1d5db;
+  }
+
+  .severity-p1 {
+    background: #7f1d1d;
+    color: #fca5a5;
+  }
+
+  .severity-p2 {
+    background: #7c2d12;
+    color: #fdba74;
+  }
+
+  .severity-p3 {
+    background: #78350f;
+    color: #fcd34d;
+  }
+
+  .severity-p4 {
+    background: #374151;
+    color: #d1d5db;
+  }
+
+  .severity-default {
+    background: #374151;
+    color: #d1d5db;
+  }
+}
+
+/* Dimension badge base styling - matching schema.scss */
+.dimension-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 2px;
+  max-width: 180px;
+  overflow: hidden;
 
   span {
     display: inline-block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 120px;
+  }
+}
+
+/* "+X more" badge styling */
+.badge-more {
+  background: #e5e7eb;
+  color: #6b7280;
+  cursor: help;
+  font-weight: 500;
+}
+
+body.body--dark .badge-more {
+  background: #4b5563;
+  color: #d1d5db;
+}
+
+/* Color scheme matching schema.scss type badges */
+.badge-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badge-green {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-yellow {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-pink {
+  background: #fce7f3;
+  color: #9f1239;
+}
+
+.badge-purple {
+  background: #e9d5ff;
+  color: #7c3aed;
+}
+
+.badge-orange {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+.badge-cyan {
+  background: #cffafe;
+  color: #0e7490;
+}
+
+.badge-indigo {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
+.badge-teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.badge-red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.badge-gray {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.badge-amber {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.badge-violet {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.badge-rose {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+/* Dark mode adjustments - more muted colors */
+body.body--dark {
+  .badge-blue {
+    background: #1e3a8a;
+    color: #93c5fd;
+  }
+
+  .badge-green {
+    background: #065f46;
+    color: #6ee7b7;
+  }
+
+  .badge-yellow {
+    background: #78350f;
+    color: #fcd34d;
+  }
+
+  .badge-pink {
+    background: #831843;
+    color: #f9a8d4;
+  }
+
+  .badge-purple {
+    background: #5b21b6;
+    color: #c4b5fd;
+  }
+
+  .badge-orange {
+    background: #7c2d12;
+    color: #fdba74;
+  }
+
+  .badge-cyan {
+    background: #164e63;
+    color: #67e8f9;
+  }
+
+  .badge-indigo {
+    background: #3730a3;
+    color: #a5b4fc;
+  }
+
+  .badge-teal {
+    background: #134e4a;
+    color: #5eead4;
+  }
+
+  .badge-red {
+    background: #991b1b;
+    color: #fca5a5;
+  }
+
+  .badge-gray {
+    background: #374151;
+    color: #d1d5db;
+  }
+
+  .badge-amber {
+    background: #78350f;
+    color: #fbbf24;
+  }
+
+  .badge-violet {
+    background: #5b21b6;
+    color: #c4b5fd;
+  }
+
+  .badge-rose {
+    background: #9f1239;
+    color: #fda4af;
   }
 }
 </style>

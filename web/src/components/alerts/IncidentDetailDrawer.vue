@@ -2088,6 +2088,8 @@ export default defineComponent({
           type: "positive",
           message: t("alerts.incidents.statusUpdated"),
         });
+        // Mark data as stale so incident list will refresh when navigating back
+        store.dispatch('incidents/setShouldRefresh', true);
         emit("status-updated");
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
