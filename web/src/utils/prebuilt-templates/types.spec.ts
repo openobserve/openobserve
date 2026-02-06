@@ -107,7 +107,7 @@ describe('Prebuilt Templates Types', () => {
   describe('PrebuiltConfig', () => {
     it('should have all required properties', () => {
       const config: PrebuiltConfig = {
-        templateName: 'system-prebuilt-slack',
+        templateName: 'prebuilt_slack',
         templateBody: '{"text": "test"}',
         headers: { 'Content-Type': 'application/json' },
         method: 'post',
@@ -253,7 +253,7 @@ describe('Prebuilt Templates Types', () => {
   describe('PrebuiltTemplate', () => {
     it('should have required properties', () => {
       const template: PrebuiltTemplate = {
-        name: 'system-prebuilt-slack',
+        name: 'prebuilt_slack',
         body: '{"text": "Alert fired"}',
         type: 'http',
         isDefault: false
@@ -274,7 +274,7 @@ describe('Prebuilt Templates Types', () => {
         url: 'https://example.com/webhook',
         method: 'post',
         skip_tls_verify: false,
-        template: 'system-prebuilt-slack',
+        template: 'prebuilt_slack',
         headers: { 'Content-Type': 'application/json' },
         emails: '',
         action_id: '',
@@ -294,7 +294,7 @@ describe('Prebuilt Templates Types', () => {
         url: 'https://hooks.slack.com/services/xxx',
         method: 'post',
         skip_tls_verify: false,
-        template: 'system-prebuilt-slack',
+        template: 'prebuilt_slack',
         headers: {},
         emails: '',
         action_id: '',

@@ -242,6 +242,61 @@ pub struct UsageData {
     pub peak_memory_usage: Option<f64>,
 }
 
+impl UsageData {
+    /// Creates a sample UsageData instance with all fields populated for schema inference.
+    ///
+    /// This is used for:
+    /// - Schema inference via reflection (ensures all Optional fields are present)
+    /// - Field name extraction for testing/validation
+    ///
+    /// All Optional fields are set to Some() with default values to ensure they appear
+    /// in serialization (avoiding `#[serde(skip_serializing_if = "Option::is_none")]`).
+    pub fn init_for_reflection() -> Self {
+        Self {
+            _timestamp: 0,
+            event: UsageEvent::Other,
+            year: 0,
+            month: 0,
+            day: 0,
+            hour: 0,
+            event_time_hour: String::new(),
+            org_id: String::new(),
+            request_body: String::new(),
+            size: 0.0,
+            unit: String::new(),
+            user_email: String::new(),
+            response_time: 0.0,
+            stream_type: StreamType::Logs,
+            num_records: 0,
+            dropped_records: 0,
+            stream_name: String::new(),
+            // All optional fields set to Some() for schema inference
+            trace_id: Some(String::new()),
+            cached_ratio: Some(0),
+            scan_files: Some(0),
+            compressed_size: Some(0.0),
+            min_ts: Some(0),
+            max_ts: Some(0),
+            search_type: Some(SearchEventType::UI),
+            search_event_context: Some(SearchEventContext::default()),
+            took_wait_in_queue: Some(0),
+            result_cache_ratio: Some(0),
+            function: Some(String::new()),
+            is_partial: false,
+            work_group: Some(String::new()),
+            node_name: Some(String::new()),
+            dashboard_info: Some(DashboardInfo {
+                run_id: String::new(),
+                panel_id: String::new(),
+                panel_name: String::new(),
+                tab_id: String::new(),
+                tab_name: String::new(),
+            }),
+            peak_memory_usage: Some(0.0),
+        }
+    }
+}
+
 #[derive(Hash, PartialEq, Eq)]
 pub struct GroupKey {
     pub stream_name: String,

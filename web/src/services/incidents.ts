@@ -101,19 +101,6 @@ export interface IncidentCorrelatedStreams {
   correlationData: CorrelationResponse | null;
 }
 
-// Service Graph visualization types
-export interface IncidentServiceGraph {
-  nodes: AlertNode[];
-  edges: AlertEdge[];
-  stats: IncidentGraphStats;
-}
-
-export interface IncidentGraphStats {
-  total_services: number;
-  total_alerts: number;
-  services_with_alerts: number;
-}
-
 const incidents = {
   /**
    * List incidents with optional filtering and pagination
@@ -262,15 +249,6 @@ const incidents = {
       dimensions["traceId"] ||
       dimensions["trace.id"] ||
       dimensions["TraceId"]
-    );
-  },
-
-  /**
-   * Get service graph visualization data for an incident
-   */
-  getServiceGraph: (org_identifier: string, incident_id: string) => {
-    return http().get<IncidentServiceGraph>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/service_graph`
     );
   },
 };

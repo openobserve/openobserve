@@ -305,21 +305,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Traces Tab Panel -->
         <q-tab-panel name="traces" class="tw:p-0">
           <!-- Refresh Button -->
-          <div
-            v-if="traceCorrelationMode !== null"
-            class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-          >
-            <q-btn
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadCorrelatedTraces"
-              :loading="tracesLoading"
-              size="sm"
-            />
-          </div>
 
           <!-- Loading State -->
           <div
@@ -363,105 +348,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="
               traceCorrelationMode === 'direct' && traceSpanList.length > 0
             "
-            class="tw:h-full"
+            class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
           >
-            <!-- Trace Header -->
-            <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
-            >
-              <div class="tw:flex tw:items-center tw:gap-3">
-                <q-icon name="link" color="positive" size="1.25rem" />
-                <div class="tw:flex tw:flex-col">
-                  <span class="tw:text-sm tw:font-semibold">{{
-                    t("correlation.directTraceMatch")
-                  }}</span>
-                  <a
-                    href="#"
-                    class="tw:text-xs tw:text-blue-500 tw:font-mono tw:underline hover:tw:text-blue-700 tw:cursor-pointer"
-                    @click.prevent="openTraceInNewWindow"
-                    :title="t('correlation.openTraceInNewWindow')"
-                  >
-                    {{ extractedTraceId }}
-                    <q-icon name="open_in_new" size="xs" class="tw:ml-1" />
-                  </a>
-                </div>
-                <q-chip
-                  dense
-                  color="primary"
-                  text-color="white"
-                  class="tw:ml-auto"
-                >
-                  {{ traceSpanList.length }} {{ t("correlation.spans") }}
-                </q-chip>
-              </div>
-            </div>
-
-            <!-- Span Table -->
-            <div
-              class="tw:p-3 tw:overflow-auto"
-              style="max-height: calc(100% - 4rem)"
-            >
-              <q-table
-                :rows="traceSpanList"
-                :columns="spanTableColumns"
-                row-key="span_id"
-                flat
-                dense
-                :rows-per-page-options="[0]"
-                class="trace-span-table"
-              >
-                <template v-slot:body-cell-service_name="props">
-                  <q-td :props="props">
-                    <div class="tw:flex tw:items-center tw:gap-2">
-                      <div
-                        class="tw:w-2 tw:h-2 tw:rounded-full"
-                        :style="{
-                          backgroundColor: getServiceColor(
-                            props.row.service_name,
-                          ),
-                        }"
-                      />
-                      <span class="tw:font-mono tw:text-xs">{{
-                        props.row.service_name
-                      }}</span>
-                    </div>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-operation_name="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      props.row.operation_name
-                    }}</span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-duration="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatDuration(props.row.duration || 0)
-                    }}</span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-span_status="props">
-                  <q-td :props="props">
-                    <q-badge
-                      :color="
-                        props.row.span_status === 'ERROR'
-                          ? 'negative'
-                          : 'positive'
-                      "
-                      :label="props.row.span_status || 'OK'"
-                    />
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-start_time="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatTimestamp(props.row.start_time)
-                    }}</span>
-                  </q-td>
-                </template>
-              </q-table>
-            </div>
+            <TraceDetails
+              mode="embedded"
+              :trace-id-prop="extractedTraceId || ''"
+              :stream-name-prop="
+                traceStreams && traceStreams[0]
+                  ? traceStreams[0].stream_name
+                  : ''
+              "
+              :span-list-prop="traceSpanList"
+              :start-time-prop="computedTraceStartTime"
+              :end-time-prop="computedTraceEndTime"
+              :show-back-button="false"
+              :show-timeline="false"
+              :show-log-stream-selector="false"
+              :show-share-button="false"
+              :show-close-button="false"
+              :show-expand-button="true"
+              :enable-correlation-links="true"
+              :initial-timeline-expanded="false"
+            />
           </div>
 
           <!-- Dimension-based Correlation - Traces List -->
@@ -486,113 +394,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
-                <q-chip
-                  dense
-                  color="primary"
-                  text-color="white"
-                  class="tw:ml-auto"
-                >
-                  {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-                </q-chip>
+                <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
+                  <q-btn
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="open_in_new"
+                    :label="t('correlation.viewInTraces')"
+                    @click="openTracesPage"
+                    data-test="correlation-view-traces-page"
+                    class="tw:text-xs"
+                  >
+                    <q-tooltip>
+                      {{ t("correlation.viewInTracesTooltip") }}
+                    </q-tooltip>
+                  </q-btn>
+                  <q-chip dense color="primary" text-color="white">
+                    {{ tracesForDimensions.length }} {{ t("menu.traces") }}
+                  </q-chip>
+                </div>
               </div>
             </div>
 
-            <!-- Traces Table -->
+            <!-- Traces List with TraceBlock -->
             <div
               class="tw:p-3 tw:overflow-auto"
               style="max-height: calc(100% - 4rem)"
             >
-              <q-table
-                :rows="tracesForDimensions"
-                :columns="traceListColumns"
-                row-key="trace_id"
-                flat
-                dense
-                :rows-per-page-options="[0]"
-                class="trace-list-table"
-              >
-                <template v-slot:body-cell-trace_id="slotProps">
-                  <q-td :props="slotProps">
-                    <span
-                      class="tw:font-mono tw:text-xs tw:text-primary tw:cursor-pointer hover:tw:underline"
-                      @click="openTraceInNewWindow(slotProps.row.trace_id)"
-                      :title="t('correlation.openTraceInNewWindow')"
-                    >
-                      {{ slotProps.row.trace_id?.substring(0, 16) }}...
-                      <q-icon
-                        name="open_in_new"
-                        size="0.75rem"
-                        class="tw:ml-1"
-                      />
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-service_name="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">
-                      {{
-                        Array.isArray(props.row.service_name)
-                          ? props.row.service_name
-                              .map((s: any) => s.service_name)
-                              .join(", ")
-                          : props.row.service_name
-                      }}
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-operation_name="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">
-                      {{
-                        Array.isArray(props.row.operation_name)
-                          ? props.row.operation_name[0]
-                          : props.row.operation_name
-                      }}
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-duration="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatDuration(props.row.duration || 0)
-                    }}</span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-spans="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">
-                      {{
-                        Array.isArray(props.row.spans)
-                          ? props.row.spans[0]
-                          : props.row.spans
-                      }}
-                    </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-errors="props">
-                  <q-td :props="props">
-                    <q-badge
-                      :color="
-                        (Array.isArray(props.row.spans)
-                          ? props.row.spans[1]
-                          : 0) > 0
-                          ? 'negative'
-                          : 'grey'
-                      "
-                      :label="
-                        Array.isArray(props.row.spans) ? props.row.spans[1] : 0
-                      "
-                    />
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-start_time="props">
-                  <q-td :props="props">
-                    <span class="tw:font-mono tw:text-xs">{{
-                      formatTimestamp(props.row.start_time)
-                    }}</span>
-                  </q-td>
-                </template>
-              </q-table>
+              <div class="tw:space-y-2">
+                <TraceBlock
+                  v-for="(trace, index) in tracesForDimensions"
+                  :key="trace.trace_id"
+                  :item="trace"
+                  :index="index"
+                  @click="openTraceInNewWindow(trace)"
+                  data-test="correlation-trace-block"
+                />
+              </div>
             </div>
           </div>
 
@@ -644,6 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="correlation-dashboard-embedded">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
+      v-if="!props.hideDimensionFilters"
       :dimensions="pendingDimensions"
       :unstable-dimension-keys="unstableDimensionKeys"
       :get-dimension-options="getDimensionOptions"
@@ -678,8 +518,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <!-- Loading State -->
+        <div
+          v-if="loading"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+        >
+          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+          <div class="tw:text-base">{{ t("correlation.loading") }}</div>
+          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+            {{ t("correlation.loadingLogs") }}
+          </div>
+        </div>
+
+        <!-- Logs Dashboard -->
         <RenderDashboardCharts
-          v-if="logsDashboardData"
+          v-else-if="logsDashboardData"
           :key="logsDashboardRenderKey"
           :dashboardData="logsDashboardData"
           :currentTimeObj="currentTimeObj"
@@ -687,6 +540,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :allowAlertCreation="false"
           searchType="dashboards"
         />
+
+        <!-- No Logs State -->
+        <div
+          v-else
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+        >
+          <q-icon
+            name="article"
+            size="3.75rem"
+            color="grey-6"
+            class="tw:mb-4"
+          />
+          <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
+          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
+            {{ t("correlation.service", { service: serviceName }) }}
+          </div>
+        </div>
       </div>
 
       <div v-if="activeTab == 'metrics'" class="tw:h-full">
@@ -720,8 +590,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:p-0 tw:flex-1 tw:overflow-auto"
           style="height: calc(100vh - 272px)"
         >
+          <!-- Loading State -->
+          <div
+            v-if="loading"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          >
+            <q-spinner-hourglass
+              color="primary"
+              size="3.75rem"
+              class="tw:mb-4"
+            />
+            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
+            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+              {{
+                t("correlation.loadingMetrics", {
+                  count: selectedMetricStreams.length,
+                })
+              }}
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="error"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          >
+            <q-icon
+              name="error_outline"
+              size="3.75rem"
+              color="negative"
+              class="tw:mb-4"
+            />
+            <div class="tw:text-base tw:mb-2">
+              {{ t("correlation.failedToLoad") }}
+            </div>
+            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+            <q-btn
+              outline
+              color="primary"
+              :label="t('correlation.retryButton')"
+              class="tw:mt-4"
+              @click="loadDashboard"
+            />
+          </div>
+
+          <!-- Dashboard -->
           <RenderDashboardCharts
-            v-if="dashboardData"
+            v-else-if="dashboardData"
             :key="dashboardRenderKey"
             :dashboardData="dashboardData"
             :currentTimeObj="currentTimeObj"
@@ -729,27 +644,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :allowAlertCreation="false"
             searchType="dashboards"
           />
+
+          <!-- No Metrics State -->
+          <div
+            v-else
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          >
+            <q-icon
+              name="info_outline"
+              size="3.75rem"
+              color="grey-6"
+              class="tw:mb-4"
+            />
+            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
+          </div>
         </div>
       </div>
 
       <div v-if="activeTab == 'traces'" class="tw:h-full">
-        <!-- Refresh Button -->
-        <div
-          v-if="traceCorrelationMode !== null"
-          class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-        >
-          <q-btn
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadCorrelatedTraces"
-            :loading="tracesLoading"
-            size="sm"
-          />
-        </div>
-
         <!-- Loading State -->
         <div
           v-if="tracesLoading"
@@ -788,105 +700,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             traceCorrelationMode === 'direct' && traceSpanList.length > 0
           "
-          class="tw:h-full"
+          class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
         >
-          <!-- Trace Header -->
-          <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
-          >
-            <div class="tw:flex tw:items-center tw:gap-3">
-              <q-icon name="link" color="positive" size="1.25rem" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-semibold">{{
-                  t("correlation.directTraceMatch")
-                }}</span>
-                <a
-                  href="#"
-                  class="tw:text-xs tw:text-blue-500 tw:font-mono tw:underline hover:tw:text-blue-700 tw:cursor-pointer"
-                  @click.prevent="openTraceInNewWindow"
-                  :title="t('correlation.openTraceInNewWindow')"
-                >
-                  {{ extractedTraceId }}
-                  <q-icon name="open_in_new" size="xs" class="tw:ml-1" />
-                </a>
-              </div>
-              <q-chip
-                dense
-                color="primary"
-                text-color="white"
-                class="tw:ml-auto"
-              >
-                {{ traceSpanList.length }} {{ t("correlation.spans") }}
-              </q-chip>
-            </div>
-          </div>
-
-          <!-- Span Table -->
-          <div
-            class="tw:p-3 tw:overflow-auto"
-            style="max-height: calc(100% - 4rem)"
-          >
-            <q-table
-              :rows="traceSpanList"
-              :columns="spanTableColumns"
-              row-key="span_id"
-              flat
-              dense
-              :rows-per-page-options="[0]"
-              class="trace-span-table"
-            >
-              <template v-slot:body-cell-service_name="props">
-                <q-td :props="props">
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <div
-                      class="tw:w-2 tw:h-2 tw:rounded-full"
-                      :style="{
-                        backgroundColor: getServiceColor(
-                          props.row.service_name,
-                        ),
-                      }"
-                    />
-                    <span class="tw:font-mono tw:text-xs">{{
-                      props.row.service_name
-                    }}</span>
-                  </div>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-operation_name="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    props.row.operation_name
-                  }}</span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-duration="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatDuration(props.row.duration || 0)
-                  }}</span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-span_status="props">
-                <q-td :props="props">
-                  <q-badge
-                    :color="
-                      props.row.span_status === 'ERROR'
-                        ? 'negative'
-                        : 'positive'
-                    "
-                    :label="props.row.span_status || 'OK'"
-                  />
-                </q-td>
-              </template>
-              <template v-slot:body-cell-start_time="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatTimestamp(props.row.start_time)
-                  }}</span>
-                </q-td>
-              </template>
-            </q-table>
-          </div>
+          <TraceDetails
+            mode="embedded"
+            :trace-id-prop="extractedTraceId || ''"
+            :stream-name-prop="
+              traceStreams && traceStreams[0] ? traceStreams[0].stream_name : ''
+            "
+            :span-list-prop="traceSpanList"
+            :start-time-prop="computedTraceStartTime"
+            :end-time-prop="computedTraceEndTime"
+            :show-back-button="false"
+            :show-timeline="false"
+            :show-log-stream-selector="false"
+            :show-share-button="false"
+            :show-close-button="false"
+            :show-expand-button="true"
+            :enable-correlation-links="true"
+            :initial-timeline-expanded="false"
+          />
         </div>
 
         <!-- Dimension-based Correlation - Traces List -->
@@ -911,109 +744,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <q-chip
-                dense
-                color="primary"
-                text-color="white"
-                class="tw:ml-auto"
-              >
+              <q-chip dense color="primary" text-color="white">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </q-chip>
+              <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
+                <q-btn
+                  flat
+                  dense
+                  no-caps
+                  color="primary"
+                  icon="open_in_new"
+                  :label="t('correlation.viewInTraces')"
+                  @click="openTracesPage"
+                  data-test="correlation-view-traces-page"
+                  class="tw:text-xs"
+                >
+                  <q-tooltip>
+                    {{ t("correlation.viewInTracesTooltip") }}
+                  </q-tooltip>
+                </q-btn>
+              </div>
             </div>
           </div>
 
-          <!-- Traces Table -->
+          <!-- Traces List with TraceBlock -->
           <div
             class="tw:p-3 tw:overflow-auto"
-            style="max-height: calc(100vh - 332px)"
+            style="max-height: calc(100vh - 11rem)"
           >
-            <q-table
-              :rows="tracesForDimensions"
-              :columns="traceListColumns"
-              row-key="trace_id"
-              flat
-              dense
-              :rows-per-page-options="[0]"
-              class="trace-list-table"
-            >
-              <template v-slot:body-cell-trace_id="slotProps">
-                <q-td :props="slotProps">
-                  <span
-                    class="tw:font-mono tw:text-xs tw:text-primary tw:cursor-pointer hover:tw:underline"
-                    @click="openTraceInNewWindow(slotProps.row.trace_id)"
-                    :title="t('correlation.openTraceInNewWindow')"
-                  >
-                    {{ slotProps.row.trace_id?.substring(0, 16) }}...
-                    <q-icon name="open_in_new" size="0.75rem" class="tw:ml-1" />
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-service_name="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">
-                    {{
-                      Array.isArray(props.row.service_name)
-                        ? props.row.service_name
-                            .map((s: any) => s.service_name)
-                            .join(", ")
-                        : props.row.service_name
-                    }}
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-operation_name="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">
-                    {{
-                      Array.isArray(props.row.operation_name)
-                        ? props.row.operation_name[0]
-                        : props.row.operation_name
-                    }}
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-duration="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatDuration(props.row.duration || 0)
-                  }}</span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-spans="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">
-                    {{
-                      Array.isArray(props.row.spans)
-                        ? props.row.spans[0]
-                        : props.row.spans
-                    }}
-                  </span>
-                </q-td>
-              </template>
-              <template v-slot:body-cell-errors="props">
-                <q-td :props="props">
-                  <q-badge
-                    :color="
-                      (Array.isArray(props.row.spans)
-                        ? props.row.spans[1]
-                        : 0) > 0
-                        ? 'negative'
-                        : 'grey'
-                    "
-                    :label="
-                      Array.isArray(props.row.spans) ? props.row.spans[1] : 0
-                    "
-                  />
-                </q-td>
-              </template>
-              <template v-slot:body-cell-start_time="props">
-                <q-td :props="props">
-                  <span class="tw:font-mono tw:text-xs">{{
-                    formatTimestamp(props.row.start_time)
-                  }}</span>
-                </q-td>
-              </template>
-            </q-table>
+            <div class="tw:space-y-2">
+              <TraceBlock
+                v-for="(trace, index) in tracesForDimensions"
+                :key="trace.trace_id"
+                :item="trace"
+                :index="index"
+                @click="openTraceInNewWindow(trace)"
+                data-test="correlation-trace-block"
+              />
+            </div>
           </div>
         </div>
 
@@ -1133,6 +901,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
+import useTraces from "@/composables/useTraces";
 import {
   useMetricsCorrelationDashboard,
   type MetricsCorrelationConfig,
@@ -1145,6 +914,8 @@ import searchService from "@/services/search";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import TraceBlock from "@/plugins/traces/TraceBlock.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1169,6 +940,7 @@ interface Props {
   ftsFields?: string[]; // Full text search fields from the source stream (used for trace_id extraction from log body)
   mode?: "dialog" | "embedded-tabs"; // Render mode: 'dialog' = full dialog, 'embedded-tabs' = just tabs content for DetailTable
   externalActiveTab?: string; // For embedded-tabs mode, allows parent to control active tab
+  hideDimensionFilters?: boolean; // Hide dimension filters in embedded-tabs mode
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -1187,6 +959,7 @@ const { t } = useI18n();
 const { generateDashboard, generateLogsDashboard } =
   useMetricsCorrelationDashboard();
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
+const { formatTracesMetaData } = useTraces();
 
 // Check if embedded tabs mode
 const isEmbeddedTabs = computed(() => props.mode === "embedded-tabs");
@@ -1210,6 +983,15 @@ const dashboardChartsRef = ref<any>(null);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 
+// Panel data caching for hide/unhide optimization
+const panelDataCache = ref<Map<string, { panel: any; timestamp: number }>>(
+  new Map(),
+);
+const PANEL_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
+let streamChangeDebounceTimeout: any = null; // Debounce timeout for batching multiple hide/unhide operations
+const STREAM_CHANGE_DEBOUNCE_MS = 300; // 300ms debounce delay
+let wasEmptyBeforeChange = false; // Track if we're transitioning from empty state
+
 // Trace correlation state
 const tracesLoading = ref(false);
 const tracesError = ref<string | null>(null);
@@ -1217,6 +999,21 @@ const extractedTraceId = ref<string | null>(null);
 const traceCorrelationMode = ref<"direct" | "dimension-based" | null>(null);
 const traceSpanList = ref<any[]>([]);
 const tracesForDimensions = ref<any[]>([]); // Traces found via dimension-based correlation
+
+// Computed properties for trace time range
+const computedTraceStartTime = computed(() => {
+  if (traceSpanList.value.length === 0) return 0;
+  return Math.min(
+    ...traceSpanList.value.map((s) => Math.floor(s.start_time / 1000)),
+  );
+});
+
+const computedTraceEndTime = computed(() => {
+  if (traceSpanList.value.length === 0) return 0;
+  return Math.max(
+    ...traceSpanList.value.map((s) => Math.ceil(s.end_time / 1000)),
+  );
+});
 
 // Table columns for span list (direct trace correlation)
 const spanTableColumns = [
@@ -1256,68 +1053,6 @@ const spanTableColumns = [
     sortable: true,
   },
 ];
-
-// Table columns for trace list (dimension-based correlation)
-const traceListColumns = [
-  {
-    name: "trace_id",
-    label: "Trace ID",
-    field: "trace_id",
-    align: "left" as const,
-  },
-  {
-    name: "service_name",
-    label: "Service",
-    field: "service_name",
-    align: "left" as const,
-  },
-  {
-    name: "operation_name",
-    label: "Operation",
-    field: "operation_name",
-    align: "left" as const,
-  },
-  {
-    name: "duration",
-    label: "Duration",
-    field: "duration",
-    align: "left" as const,
-    sortable: true,
-  },
-  { name: "spans", label: "Spans", field: "spans", align: "left" as const },
-  { name: "errors", label: "Errors", field: "errors", align: "left" as const },
-  {
-    name: "start_time",
-    label: "Time",
-    field: "start_time",
-    align: "left" as const,
-    sortable: true,
-  },
-];
-
-// Service colors for span visualization
-const serviceColors: Record<string, string> = {};
-const colorPalette = [
-  "#b7885e",
-  "#1ab8be",
-  "#ffcb99",
-  "#f89570",
-  "#839ae2",
-  "#ff6b6b",
-  "#4ecdc4",
-  "#45b7d1",
-  "#96ceb4",
-  "#ffeaa7",
-];
-let colorIndex = 0;
-
-const getServiceColor = (serviceName: string): string => {
-  if (!serviceColors[serviceName]) {
-    serviceColors[serviceName] = colorPalette[colorIndex % colorPalette.length];
-    colorIndex++;
-  }
-  return serviceColors[serviceName];
-};
 
 // Use external tab control in embedded mode, otherwise manage internally
 const activeTab = computed({
@@ -1551,6 +1286,19 @@ const getDimensionOptions = (key: string, currentValue: string) => {
     });
   }
 
+  // Add the current value if it's different from both original and SELECT_ALL_VALUE
+  // This preserves previously selected values in the dropdown
+  if (
+    currentValue &&
+    currentValue !== SELECT_ALL_VALUE &&
+    currentValue !== originalValue
+  ) {
+    options.push({
+      label: currentValue,
+      value: currentValue,
+    });
+  }
+
   return options;
 };
 
@@ -1733,6 +1481,7 @@ const loadDashboard = async () => {
 /**
  * Add new metric panels without re-rendering existing ones
  * This is called when user adds new metrics to avoid reloading all panels
+ * Uses cached panel data if available to avoid refetching
  */
 const addMetricPanels = async (addedStreams: StreamInfo[]) => {
   if (!dashboardData.value || !dashboardData.value.tabs?.[0]?.panels) {
@@ -1745,44 +1494,76 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
     // Get current panels
     const currentPanels = dashboardData.value.tabs[0].panels;
     const existingCount = currentPanels.length;
-
-    // Fetch schemas for new streams only
-    const newStreamNames = addedStreams.map((s) => s.stream_name);
-    const newSchemas = await fetchMetricSchemas(newStreamNames);
-
-    // Build config for new panels
-    const config: MetricsCorrelationConfig = {
-      serviceName: props.serviceName,
-      matchedDimensions: activeDimensions.value,
-      metricStreams: addedStreams,
-      logStreams: props.logStreams,
-      traceStreams: props.traceStreams,
-      orgIdentifier: currentOrgIdentifier.value,
-      timeRange: props.timeRange,
-      sourceStream: props.sourceStream,
-      sourceType: props.sourceType,
-      availableDimensions: props.availableDimensions,
-      metricSchemas: newSchemas,
-    };
-
-    // Generate panels for new streams only
-    const newDashboard = generateDashboard(addedStreams, config);
-    const newPanels = newDashboard.tabs[0].panels;
-
-    // Update layout positions for new panels to appear after existing ones
     const timestamp = Date.now();
-    newPanels.forEach((panel: any, index: number) => {
-      const absoluteIndex = existingCount + index;
-      // Use completely unique ID with timestamp to avoid collision
-      const uniqueId = `${panel.layout.i}_${timestamp}_${absoluteIndex}`;
+
+    // Separate streams into cached and new ones
+    const cachedPanels: any[] = [];
+    const streamsNeedingGeneration: StreamInfo[] = [];
+
+    addedStreams.forEach((stream) => {
+      const cached = panelDataCache.value.get(stream.stream_name);
+      if (cached && timestamp - cached.timestamp < PANEL_CACHE_DURATION) {
+        // Use cached panel data (no API call needed)
+        cachedPanels.push({ stream, cachedPanel: cached.panel });
+      } else {
+        // Need to generate new panel (will fetch data)
+        streamsNeedingGeneration.push(stream);
+        // Clean up stale cache entry
+        panelDataCache.value.delete(stream.stream_name);
+      }
+    });
+
+    let newPanels: any[] = [];
+
+    // Generate panels for streams that need fresh data
+    if (streamsNeedingGeneration.length > 0) {
+      const newStreamNames = streamsNeedingGeneration.map((s) => s.stream_name);
+      const newSchemas = await fetchMetricSchemas(newStreamNames);
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: props.serviceName,
+        matchedDimensions: activeDimensions.value,
+        metricStreams: streamsNeedingGeneration,
+        logStreams: props.logStreams,
+        traceStreams: props.traceStreams,
+        orgIdentifier: currentOrgIdentifier.value,
+        timeRange: props.timeRange,
+        sourceStream: props.sourceStream,
+        sourceType: props.sourceType,
+        availableDimensions: props.availableDimensions,
+        metricSchemas: newSchemas,
+      };
+
+      const newDashboard = generateDashboard(streamsNeedingGeneration, config);
+      newPanels = newDashboard.tabs[0].panels;
+    }
+
+    // Combine cached panels with newly generated ones
+    // Deep clone cached panels to avoid modifying the cache
+    const allPanelsToAdd = [
+      ...cachedPanels.map((cp) => JSON.parse(JSON.stringify(cp.cachedPanel))),
+      ...newPanels,
+    ];
+
+    // Find the maximum Y position from existing panels to place new panels below
+    let maxY = 0;
+    currentPanels.forEach((p: any) => {
+      if (p.layout) {
+        const panelBottom = (p.layout.y || 0) + (p.layout.h || 16);
+        if (panelBottom > maxY) maxY = panelBottom;
+      }
+    });
+
+    // Update layout positions for all panels being added
+    allPanelsToAdd.forEach((panel: any, index: number) => {
+      const uniqueId = `${panel.layout.i}_${timestamp}_${index}`;
+      // Preserve original layout properties (w, h) from generateDashboard or cache
       panel.layout = {
-        x: (absoluteIndex % 3) * 64,
-        y: Math.floor(absoluteIndex / 3) * 16,
-        w: 64,
-        h: 16,
+        ...panel.layout,
+        x: (index % 3) * 64,
+        y: maxY + Math.floor(index / 3) * 16,
         i: uniqueId,
       };
-      // Update panel ID to match
       panel.id = `${panel.id}_${timestamp}`;
     });
 
@@ -1792,7 +1573,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       tabs: [
         {
           ...dashboardData.value.tabs[0],
-          panels: [...currentPanels, ...newPanels],
+          panels: [...currentPanels, ...allPanelsToAdd],
         },
         ...dashboardData.value.tabs.slice(1),
       ],
@@ -1800,13 +1581,27 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
     dashboardData.value = updatedDashboard;
 
-    // DON'T increment dashboardRenderKey - let Vue's reactivity handle it
-    // Since each panel has a unique ID, Vue will only render the new panels
-
-    // Wait for DOM to update, then refresh GridStack to position new panels
+    // Wait for DOM to fully update before refreshing GridStack
     await nextTick();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    await nextTick();
+
     if (dashboardChartsRef.value?.refreshGridStack) {
       await dashboardChartsRef.value.refreshGridStack();
+
+      // Additional refresh after a short delay to ensure proper layout
+      setTimeout(async () => {
+        if (dashboardChartsRef.value?.refreshGridStack) {
+          await dashboardChartsRef.value.refreshGridStack();
+        }
+      }, 100);
+    }
+
+    // Log cache usage for debugging
+    if (cachedPanels.length > 0) {
+      console.log(
+        `[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`,
+      );
     }
   } catch (err: any) {
     console.error(
@@ -2305,40 +2100,17 @@ const fetchTracesByDimensions = async () => {
     stream_name: streamName,
   });
 
-  return response.data?.hits || [];
-};
-
-/**
- * Format duration in a human-readable way
- */
-const formatDuration = (durationNs: number): string => {
-  if (durationNs < 1000) {
-    return `${durationNs}ns`;
-  } else if (durationNs < 1000000) {
-    return `${(durationNs / 1000).toFixed(2)}µs`;
-  } else if (durationNs < 1000000000) {
-    return `${(durationNs / 1000000).toFixed(2)}ms`;
-  } else {
-    return `${(durationNs / 1000000000).toFixed(2)}s`;
-  }
-};
-
-/**
- * Format timestamp for display
- */
-const formatTimestamp = (timestampMicros: number): string => {
-  const date = new Date(timestampMicros / 1000);
-  return date.toLocaleString();
+  // Format traces with service colors and proper structure for TraceBlock
+  return formatTracesMetaData(response.data?.hits || []);
 };
 
 /**
  * Open traces screen in new window with trace_id filter
  * @param traceIdOrEvent - trace_id string to use, or event object (when called from @click without args)
  */
-const openTraceInNewWindow = (traceIdOrEvent?: string | Event) => {
+const openTraceInNewWindow = (trace) => {
   // Handle case where event object is passed instead of trace_id (e.g., from @click without args)
-  const traceId =
-    typeof traceIdOrEvent === "string" ? traceIdOrEvent : undefined;
+  const traceId = typeof trace === "string" ? trace : trace.trace_id;
   const targetTraceId = traceId || extractedTraceId.value;
   if (!targetTraceId) return;
 
@@ -2347,14 +2119,39 @@ const openTraceInNewWindow = (traceIdOrEvent?: string | Event) => {
 
   // Build the URL with sql_mode and just trace_id filter
   const route = router.resolve({
+    name: "traceDetails",
+    query: {
+      stream: traceStream,
+      trace_id: targetTraceId,
+      from: trace.trace_start_time - 10000000,
+      to: trace.trace_end_time + 10000000,
+      org_identifier: org,
+    },
+  });
+
+  // Open in new window/tab
+  window.open(route.href, "_blank");
+};
+
+/**
+ * Open traces page with filters for all dimension-based correlated traces
+ */
+const openTracesPage = () => {
+  const org = store.state.selectedOrganization.identifier;
+  const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+
+  // Build filter query for service_name
+  const filterQuery = `service_name='${props.serviceName}'`;
+
+  // Build the URL to open traces page with filters
+  const route = router.resolve({
     name: "traces",
     query: {
-      org_identifier: org,
       stream: traceStream,
-      sql_mode: "true",
-      query: b64EncodeUnicode(`trace_id='${targetTraceId}'`),
-      from: props.timeRange.startTime.toString(),
-      to: props.timeRange.endTime.toString(),
+      from: props.timeRange.startTime,
+      to: props.timeRange.endTime,
+      query: b64EncodeUnicode(filterQuery), // Base64 encode the filter query
+      org_identifier: org,
     },
   });
 
@@ -2458,7 +2255,7 @@ watch(
   selectedMetricStreams,
   (newStreams, oldStreams) => {
     // Skip if this is the initial load (already handled by isOpen watcher)
-    if (!oldStreams || oldStreams.length === 0 || !initialLoadCompleted.value) {
+    if (!oldStreams || !initialLoadCompleted.value) {
       return;
     }
 
@@ -2471,29 +2268,94 @@ watch(
       return;
     }
 
-    // Determine which streams were added vs removed
-    const oldStreamNames = new Set(oldStreams.map((s) => s.stream_name));
-    const newStreamNames = new Set(newStreams.map((s) => s.stream_name));
-
-    const addedStreams = newStreams.filter(
-      (s) => !oldStreamNames.has(s.stream_name),
-    );
-    const removedStreams = oldStreams.filter(
-      (s) => !newStreamNames.has(s.stream_name),
-    );
-
-    if (isOpen.value && newStreams.length > 0) {
-      if (removedStreams.length > 0) {
-        // If streams were removed, we need full reload to remove panels
-        dashboardData.value = null;
-        nextTick(() => {
-          loadDashboard();
-        });
-      } else if (addedStreams.length > 0) {
-        // If only added, append new panels without regenerating existing ones
-        addMetricPanels(addedStreams);
-      }
+    // Track if we're starting from empty state
+    if (oldStreams.length === 0 && newStreams.length > 0) {
+      wasEmptyBeforeChange = true;
     }
+
+    // Clear any pending debounced operation
+    if (streamChangeDebounceTimeout) {
+      clearTimeout(streamChangeDebounceTimeout);
+    }
+
+    // Debounce the stream change to batch multiple hide/unhide operations
+    streamChangeDebounceTimeout = setTimeout(() => {
+      streamChangeDebounceTimeout = null;
+
+      // Check actual current state when timeout fires (not captured values)
+      const currentStreams = selectedMetricStreams.value;
+      const currentPanels = dashboardData.value?.tabs?.[0]?.panels || [];
+
+      // Get current panel stream names
+      const currentPanelStreamNames = new Set(
+        currentPanels
+          .map((p: any) => {
+            // Extract stream name from panel id or layout
+            const match =
+              p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+            return match ? match[1] : null;
+          })
+          .filter(Boolean),
+      );
+
+      // If no dashboard or transitioning from empty, do full reload
+      if (
+        !dashboardData.value ||
+        wasEmptyBeforeChange ||
+        currentPanels.length === 0
+      ) {
+        wasEmptyBeforeChange = false;
+        if (isOpen.value && currentStreams.length > 0) {
+          dashboardData.value = null;
+          loadDashboard();
+        }
+        return;
+      }
+
+      // Determine which streams need to be added based on current state
+      const streamsToAdd = currentStreams.filter(
+        (s) => !currentPanelStreamNames.has(s.stream_name),
+      );
+
+      // Determine which panels need to be removed based on current state
+      const currentStreamNames = new Set(
+        currentStreams.map((s) => s.stream_name),
+      );
+      const panelsToRemove = currentPanels.filter((p: any) => {
+        const match =
+          p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+        const streamName = match ? match[1] : null;
+        return streamName && !currentStreamNames.has(streamName);
+      });
+
+      // Cache panels before removal
+      if (panelsToRemove.length > 0) {
+        panelsToRemove.forEach((panel: any) => {
+          const match =
+            panel.id?.match(/^(.+?)_\d+$/) || panel.layout?.i?.match(/^(.+?)_/);
+          const streamName = match ? match[1] : null;
+          if (streamName) {
+            panelDataCache.value.set(streamName, {
+              panel: JSON.parse(JSON.stringify(panel)),
+              timestamp: Date.now(),
+            });
+          }
+        });
+      }
+
+      if (isOpen.value && currentStreams.length > 0) {
+        if (panelsToRemove.length > 0) {
+          // If panels need to be removed, do full reload
+          dashboardData.value = null;
+          nextTick(() => {
+            loadDashboard();
+          });
+        } else if (streamsToAdd.length > 0) {
+          // If only adding, use optimized append
+          addMetricPanels(streamsToAdd);
+        }
+      }
+    }, STREAM_CHANGE_DEBOUNCE_MS);
   },
   { deep: true },
 );
@@ -2620,6 +2482,16 @@ watch(
     overflow: auto;
     min-height: 0;
     background: #f5f5f5 !important;
+  }
+}
+
+.telemetry-correlation-traces {
+  :deep(.trace-details-content) {
+    padding: 0 !important;
+  }
+
+  :deep(.trace-combined-header-wrapper) {
+    margin-bottom: 0 !important;
   }
 }
 

@@ -17,7 +17,7 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use config::{
     meta::alerts::{
@@ -25,7 +25,7 @@ use config::{
         deduplication::GlobalDeduplicationConfig,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentGraphStats, IncidentServiceGraph, IncidentTopology, IncidentWithAlerts,
+            IncidentTopology, IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -152,7 +152,7 @@ pub async fn correlate_alert_to_incident(
             .await;
 
     // Use enterprise correlation engine with actual hash (or None for fallback)
-    let correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
+    let mut correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
         &labels,
         service_discovery_result
             .as_ref()
@@ -160,6 +160,18 @@ pub async fn correlate_alert_to_incident(
         trace_id,
         &org_config,
     );
+
+    // BUGFIX: If stable_dimensions is empty, use alert_id as correlation_key
+    // This prevents unrelated alerts from being grouped into the same incident
+    // (they would all hash to the same value for empty dimensions)
+    if correlation_result.stable_dimensions.is_empty() {
+        let alert_id = alert.get_unique_key();
+        log::warn!(
+            "[incidents] Alert {} has no stable dimensions - using alert_id as correlation_key to prevent incorrect grouping",
+            alert.name
+        );
+        correlation_result.correlation_key = alert_id;
+    }
 
     // Guarantee service_name extraction
     let service_name = if let Some(ref sd_result) = service_discovery_result {
@@ -183,10 +195,11 @@ pub async fn correlate_alert_to_incident(
     };
 
     log::info!(
-        "[incidents] Alert {} correlation - service: {}, correlation_key: {}",
+        "[incidents] Alert {} correlation - service: {}, correlation_key: {}, stable_dimensions: {:?}",
         alert.name,
         service_name,
-        correlation_result.correlation_key
+        correlation_result.correlation_key,
+        correlation_result.stable_dimensions
     );
 
     // Find or create incident
@@ -223,6 +236,10 @@ async fn query_service_discovery_key(
         let semantic_groups =
             crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
 
+        // Get the updated_at timestamp for semantic_field_groups setting
+        let semantic_groups_updated_at =
+            crate::service::db::system_settings::get_semantic_field_groups_updated_at(org_id).await;
+
         // Use the existing ServiceStorage::correlate API for proper dimension matching
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
             org_id,
@@ -231,6 +248,7 @@ async fn query_service_discovery_key(
             labels,
             &fqn_priority,
             &semantic_groups,
+            semantic_groups_updated_at,
         )
         .await
         {
@@ -406,6 +424,23 @@ async fn find_or_create_incident(
             }
         });
 
+        // Retry RCA if it's empty (failed in the past due to infra issues or errors)
+        #[cfg(feature = "enterprise")]
+        {
+            let org_id_rca = org_id.to_string();
+            let incident_id_rca = existing.id.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) =
+                    trigger_rca_for_incident(org_id_rca.clone(), incident_id_rca.clone()).await
+                {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Retry attempt failed for existing incident {incident_id_rca}: {e}"
+                    );
+                }
+            });
+        }
+
         return Ok(existing.id);
     }
 
@@ -524,7 +559,41 @@ pub async fn get_incident_with_alerts(
     let incident_org_id = incident.org_id.clone();
 
     // Convert to config types
-    let incident_data = model_to_incident(incident).await?;
+    let mut incident_data = model_to_incident(incident).await?;
+
+    // Fix alert_count from actual triggers (source of truth)
+    // This heals any inconsistencies from race conditions or historical bugs
+    let actual_count = incident_alerts.len() as i32;
+    if incident_data.alert_count != actual_count {
+        log::warn!(
+            "[incidents] Incident {} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            incident_id,
+            incident_data.alert_count,
+            actual_count
+        );
+        incident_data.alert_count = actual_count;
+    }
+
+    // Fix topology node alert_counts from actual triggers
+    if let Some(ref mut topology) = incident_data.topology_context {
+        for node in &mut topology.nodes {
+            let actual_node_count = incident_alerts
+                .iter()
+                .filter(|t| t.alert_id == node.alert_id)
+                .count() as u32;
+
+            if node.alert_count != actual_node_count {
+                log::debug!(
+                    "[incidents] Topology node {} in incident {} count mismatch: stored={}, actual={}",
+                    node.alert_id,
+                    incident_id,
+                    node.alert_count,
+                    actual_node_count
+                );
+                node.alert_count = actual_node_count;
+            }
+        }
+    }
 
     // Convert incident_alerts to triggers
     let triggers: Vec<IncidentAlert> = incident_alerts
@@ -591,25 +660,29 @@ pub async fn list_incidents(
 
     let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
 
-    let incidents_list = incidents
+    // Get actual alert counts from junction table (source of truth)
+    let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
+    let actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
+
+    let incidents_list: Vec<Incident> = incidents
         .into_iter()
         .map(|i| {
-            let incident_id = i.id.clone();
-            let topology_context = i.topology_context.as_ref().and_then(|v| {
-                match serde_json::from_value(v.clone()) {
-                    Ok(topology) => Some(topology),
-                    Err(e) => {
-                        log::error!(
-                            "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
-                            incident_id,
-                            e,
-                            v
-                        );
-                        None
-                    }
-                }
-            });
-            model_to_incident_with_topology(i, topology_context)
+            let mut incident = model_to_incident_with_topology(i.clone(), None);
+
+            // Fix alert_count from actual triggers (self-healing for corrupted data)
+            if let Some(&actual_count) = actual_counts.get(&i.id)
+                && incident.alert_count != actual_count
+            {
+                log::debug!(
+                    "[incidents] List: Incident {} alert_count mismatch: stored={}, actual={}",
+                    i.id,
+                    incident.alert_count,
+                    actual_count
+                );
+                incident.alert_count = actual_count;
+            }
+
+            incident
         })
         .collect();
 
@@ -685,38 +758,48 @@ pub async fn enrich_with_topology(
     if is_new_node {
         let current_node_first_fired = topology.nodes[current_node_index].first_fired_at;
 
-        for (idx, node) in topology.nodes.iter().enumerate() {
-            if idx == current_node_index {
-                continue; // Skip self
-            }
+        // Find the most recent previous node from same service
+        // Use node index as tiebreaker when timestamps are equal (handles simultaneous alerts)
+        let most_recent_previous = topology
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(idx, node)| {
+                *idx != current_node_index
+                    && node.service_name == service_name
+                    && (node.first_fired_at < current_node_first_fired
+                        || (node.first_fired_at == current_node_first_fired
+                            && *idx < current_node_index))
+            })
+            .max_by_key(|(idx, node)| (node.first_fired_at, *idx));
 
-            // Only connect nodes from same service
-            if node.service_name == service_name && node.first_fired_at < current_node_first_fired {
-                // Check if edge already exists
-                let edge_exists = topology.edges.iter().any(|e| {
-                    e.from_node_index == idx
-                        && e.to_node_index == current_node_index
-                        && matches!(e.edge_type, EdgeType::Temporal)
+        if let Some((prev_idx, _)) = most_recent_previous {
+            // Check if edge already exists
+            let edge_exists = topology.edges.iter().any(|e| {
+                e.from_node_index == prev_idx
+                    && e.to_node_index == current_node_index
+                    && matches!(e.edge_type, EdgeType::Temporal)
+            });
+
+            if !edge_exists {
+                topology.edges.push(AlertEdge {
+                    from_node_index: prev_idx,
+                    to_node_index: current_node_index,
+                    edge_type: EdgeType::Temporal,
                 });
-
-                if !edge_exists {
-                    topology.edges.push(AlertEdge {
-                        from_node_index: idx,
-                        to_node_index: current_node_index,
-                        edge_type: EdgeType::Temporal,
-                    });
-                    log::debug!(
-                        "[incidents] Added temporal edge: {} -> {} (same service)",
-                        idx,
-                        current_node_index
-                    );
-                }
+                log::debug!(
+                    "[incidents] Added temporal edge: {} -> {} (most recent from same service)",
+                    prev_idx,
+                    current_node_index
+                );
             }
         }
     }
 
     // Build service dependency edges (different services, from Service Graph)
-    let sg_edges = match service_graph::query_edges_from_stream_internal(org_id, None).await {
+    let sg_edges = match service_graph::query_edges_from_stream_internal(org_id, None, None, None)
+        .await
+    {
         Ok(e) => e,
         Err(e) => {
             log::debug!(
@@ -756,42 +839,80 @@ pub async fn enrich_with_topology(
             .iter()
             .any(|e| &e.from == from_service && &e.to == to_service);
 
-        // Add edge from each node in from_service to each node in to_service
-        // that occurred chronologically after
-        for &from_idx in from_indices {
-            for &to_idx in to_indices {
+        if has_sg_edge {
+            // Service dependency: connect ALL nodes (full causality)
+            for &from_idx in from_indices {
+                for &to_idx in to_indices {
+                    let from_node = &topology.nodes[from_idx];
+                    let to_node = &topology.nodes[to_idx];
+
+                    // Only add if from happened before to (chronological)
+                    // Use node index as tiebreaker when timestamps are equal (handles simultaneous
+                    // alerts)
+                    if from_node.first_fired_at < to_node.first_fired_at
+                        || (from_node.first_fired_at == to_node.first_fired_at && from_idx < to_idx)
+                    {
+                        // Check if edge already exists
+                        let edge_exists = topology.edges.iter().any(|e| {
+                            e.from_node_index == from_idx
+                                && e.to_node_index == to_idx
+                                && matches!(e.edge_type, EdgeType::ServiceDependency)
+                        });
+
+                        if !edge_exists {
+                            topology.edges.push(AlertEdge {
+                                from_node_index: from_idx,
+                                to_node_index: to_idx,
+                                edge_type: EdgeType::ServiceDependency,
+                            });
+                            log::debug!(
+                                "[incidents] Added ServiceDependency edge: {from_idx} ({from_service}) -> {to_idx} ({to_service})"
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            // Temporal only: connect to most recent node in target service
+            // For each node in from_service, find the most recent
+            // chronologically-after node in to_service
+            for &from_idx in from_indices {
                 let from_node = &topology.nodes[from_idx];
-                let to_node = &topology.nodes[to_idx];
 
-                // Only add if from happened before to (chronological)
-                if from_node.first_fired_at < to_node.first_fired_at {
-                    // Determine edge type: ServiceDependency if SG edge exists, otherwise
-                    // Temporal
-                    let edge_type = if has_sg_edge {
-                        EdgeType::ServiceDependency
-                    } else {
-                        EdgeType::Temporal
-                    };
+                // Find most recent node in to_service that fired after from_node
+                // Use node index as tiebreaker when timestamps are equal (handles simultaneous
+                // alerts)
+                let most_recent_to = to_indices
+                    .iter()
+                    .filter_map(|&to_idx| {
+                        let to_node = &topology.nodes[to_idx];
+                        if to_node.first_fired_at > from_node.first_fired_at
+                            || (to_node.first_fired_at == from_node.first_fired_at
+                                && to_idx > from_idx)
+                        {
+                            Some((to_idx, to_node.first_fired_at))
+                        } else {
+                            None
+                        }
+                    })
+                    .min_by_key(|(to_idx, fired_at)| (*fired_at, *to_idx)); // Closest in time, then by index
 
+                if let Some((to_idx, _)) = most_recent_to {
                     // Check if edge already exists
                     let edge_exists = topology.edges.iter().any(|e| {
                         e.from_node_index == from_idx
                             && e.to_node_index == to_idx
-                            && matches!(
-                                (&e.edge_type, &edge_type),
-                                (EdgeType::ServiceDependency, EdgeType::ServiceDependency)
-                                    | (EdgeType::Temporal, EdgeType::Temporal)
-                            )
+                            && matches!(e.edge_type, EdgeType::Temporal)
                     });
 
                     if !edge_exists {
                         topology.edges.push(AlertEdge {
                             from_node_index: from_idx,
                             to_node_index: to_idx,
-                            edge_type,
+                            edge_type: EdgeType::Temporal,
                         });
                         log::debug!(
-                            "[incidents] Added {edge_type:?} edge: {from_idx} ({from_service}) -> {to_idx} ({to_service})"
+                            "[incidents] Added Temporal edge: {from_idx} ({from_service}) -> {to_idx} ({to_service}, most recent)"
                         );
                     }
                 }
@@ -950,60 +1071,6 @@ fn model_to_incident_with_topology(
         created_at: db_model.created_at,
         updated_at: db_model.updated_at,
     }
-}
-
-/// Get alert flow graph for an incident
-///
-/// Returns the pre-built alert flow graph showing how alerts cascaded
-/// across services over time. Graph is built incrementally as alerts fire.
-pub async fn get_service_graph(
-    org_id: &str,
-    incident_id: &str,
-) -> Result<Option<IncidentServiceGraph>, anyhow::Error> {
-    // Check if incident exists
-    if infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
-        .is_none()
-    {
-        return Ok(None);
-    }
-
-    // Get topology from DB
-    let topology = infra::table::alert_incidents::get_topology(org_id, incident_id).await?;
-
-    // If no topology, return empty graph
-    let topology = match topology {
-        Some(t) => t,
-        None => {
-            return Ok(Some(IncidentServiceGraph::default()));
-        }
-    };
-
-    // Calculate stats from nodes before moving topology
-    let total_services = topology
-        .nodes
-        .iter()
-        .map(|n| &n.service_name)
-        .collect::<HashSet<_>>()
-        .len();
-    let total_alerts: u32 = topology.nodes.iter().map(|n| n.alert_count).sum();
-    let services_with_alerts = topology
-        .nodes
-        .iter()
-        .map(|n| &n.service_name)
-        .collect::<HashSet<_>>()
-        .len();
-
-    // Return topology directly
-    Ok(Some(IncidentServiceGraph {
-        nodes: topology.nodes,
-        edges: topology.edges,
-        stats: IncidentGraphStats {
-            total_services,
-            total_alerts,
-            services_with_alerts,
-        },
-    }))
 }
 
 /// Update incident status

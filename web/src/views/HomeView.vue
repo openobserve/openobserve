@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="tw:px-[0.625rem] q-pt-xs" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:h-full tw:px-[0.625rem] tw:py-[0.625rem] card-container" style="display: flex; flex-direction: column; ">
+  <q-page class="tw:px-[0.625rem] q-pt-xs" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             
-            <div class="tile">
+            <div class="tile" v-if="config.isCloud == 'false'">
               <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
                role="article"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
 
-            <div class="tile">
+            <div class="tile" v-if="config.isCloud == 'false'">
               <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
                role="article"
@@ -859,6 +859,7 @@ export default defineComponent({
       t,
       store,
       summary,
+      config,
       no_data_ingest,
       getSummary,
       isCloud,
@@ -905,9 +906,9 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      if (newVal != oldVal || this.summary.value == undefined) {
+      if (newVal && (newVal != oldVal || this.summary.value == undefined)) {
         this.summary = {};
-        this.getSummary(this.store.state?.selectedOrganization?.identifier);
+        this.getSummary(newVal);
       }
     },
   },
@@ -1231,11 +1232,23 @@ export default defineComponent({
   margin-top: 1rem;
   align-items: stretch;
 
-  // Responsive: stack on smaller screens
-  @media (max-width: 1280px) {
+  // Stack on smaller screens
+  @media (max-width: 1400px) {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
   }
+
+  // Also stack on mobile
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+}
+
+// When AI chat is enabled, force vertical stacking (overrides all breakpoints)
+.ai-enabled-home-view .charts-main-container {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto auto auto !important;
 }
 
 .functions-dashboards-column {
@@ -1244,14 +1257,23 @@ export default defineComponent({
   gap: 1rem;
   width: 100%;
 
-  // On smaller screens, display as a row
-  @media (max-width: 1280px) {
+  // Display as row when stacked
+  @media (max-width: 1400px) {
     flex-direction: row;
   }
 
-  // On mobile, stack vertically again
+  // Stack on mobile
   @media (max-width: 768px) {
     flex-direction: column;
+  }
+}
+
+// When AI chat is enabled, display functions/dashboards in a row (overrides breakpoints)
+.ai-enabled-home-view .functions-dashboards-column {
+  flex-direction: row !important;
+
+  @media (max-width: 768px) {
+    flex-direction: column !important;
   }
 }
 

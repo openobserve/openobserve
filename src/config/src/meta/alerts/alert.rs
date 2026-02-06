@@ -25,6 +25,7 @@ use crate::{
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
+    stats::MemorySize,
     utils::json,
 };
 
@@ -91,6 +92,27 @@ pub struct Alert {
     pub last_edited_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deduplication: Option<DeduplicationConfig>,
+}
+
+impl MemorySize for Alert {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Alert>()
+            + self.id.mem_size()
+            + self.name.mem_size()
+            + self.org_id.mem_size()
+            + self.stream_type.to_string().mem_size()
+            + self.stream_name.mem_size()
+            + self.query_condition.mem_size()
+            + self.trigger_condition.mem_size()
+            + self.destinations.mem_size()
+            + self.context_attributes.mem_size()
+            + self.template.mem_size()
+            + self.row_template.mem_size()
+            + self.description.mem_size()
+            + self.owner.mem_size()
+            + self.last_edited_by.mem_size()
+            + self.deduplication.mem_size()
+    }
 }
 
 impl PartialEq for Alert {

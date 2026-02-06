@@ -18,7 +18,7 @@ import { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from '@/uti
 describe('opsgenie template', () => {
   describe('opsgenieTemplate', () => {
     it('has correct name', () => {
-      expect(opsgenieTemplate.name).toBe('system-prebuilt-opsgenie');
+      expect(opsgenieTemplate.name).toBe('prebuilt_opsgenie');
     });
 
     it('has type as http', () => {
@@ -43,7 +43,7 @@ describe('opsgenie template', () => {
 
   describe('opsgenieConfig', () => {
     it('references correct template name', () => {
-      expect(opsgenieConfig.templateName).toBe('system-prebuilt-opsgenie');
+      expect(opsgenieConfig.templateName).toBe('prebuilt_opsgenie');
     });
 
     it('has correct headers', () => {

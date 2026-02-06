@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::user::UserRole;
+use config::{meta::user::UserRole, stats::MemorySize};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -39,6 +39,16 @@ pub struct Organization {
     /// When specified, only this service account will be added (not the API caller)
     #[serde(default)]
     pub service_account: Option<String>,
+}
+
+impl MemorySize for Organization {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Organization>()
+            + self.identifier.mem_size()
+            + self.name.mem_size()
+            + self.org_type.mem_size()
+            + self.service_account.mem_size()
+    }
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
@@ -330,6 +340,8 @@ pub struct OrganizationSettingPayload {
     pub dark_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_series_per_query: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage_stream_enabled: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
@@ -363,6 +375,7 @@ pub struct OrganizationSetting {
     pub dark_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_series_per_query: Option<usize>,
+    pub usage_stream_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -394,9 +407,20 @@ impl Default for OrganizationSetting {
             light_mode_theme_color,
             dark_mode_theme_color,
             max_series_per_query: None,
+            usage_stream_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
         }
+    }
+}
+
+impl MemorySize for OrganizationSetting {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<OrganizationSetting>()
+            + self.trace_id_field_name.mem_size()
+            + self.span_id_field_name.mem_size()
+            + self.light_mode_theme_color.mem_size()
+            + self.dark_mode_theme_color.mem_size()
     }
 }
 

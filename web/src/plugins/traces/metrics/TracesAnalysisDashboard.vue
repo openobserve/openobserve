@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card class="analysis-dashboard-card">
       <!-- Header -->
-      <q-card-section class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+      <q-card-section class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
         <div class="tw:flex tw:items-center tw:gap-3">
           <q-icon name="dashboard" size="md" color="primary" />
           <div class="tw:flex tw:flex-col tw:gap-0">
@@ -74,27 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip>{{ t('latencyInsights.refreshTooltip') }}</q-tooltip>
           </q-btn>
 
-          <!-- Dimension selector button -->
-          <q-btn
-            outline
-            dense
-            no-caps
-            color="primary"
-            icon="tune"
-            :label="t('latencyInsights.dimensionsButton', { count: selectedDimensions.length })"
-            :disable="isCustomSQLMode"
-            @click="showDimensionSelector = true"
-            data-test="dimension-selector-button"
-          >
-            <q-tooltip v-if="isCustomSQLMode">{{ t('latencyInsights.customSQLFieldsDisabled') }}</q-tooltip>
-            <q-tooltip v-else>{{ t('latencyInsights.dimensionsTooltip') }}</q-tooltip>
-          </q-btn>
-
           <q-btn
             flat
             round
             dense
-            icon="close"
+            icon="cancel"
             @click="isOpen = false"
             data-test="analysis-dashboard-close"
           />
@@ -122,104 +106,160 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-tabs>
 
-      <!-- Dashboard Content -->
-      <q-card-section class="analysis-content tw:flex-1 tw:overflow-auto tw:p-0">
-        <!-- Loading State -->
-        <div
-          v-if="loading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+      <!-- Dashboard Content with Sidebar -->
+      <q-card-section class="analysis-content tw:flex-1 tw:p-0">
+        <q-splitter
+          v-model="splitterModel"
+          :limits="splitterLimits"
+          class="full-height full-width analysis-splitter-smooth"
+          @update:model-value="onSplitterUpdate"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
-          <div class="tw:text-base">{{ t('latencyInsights.analyzingDimensions') }}</div>
-          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
-            {{ t('latencyInsights.computingDistributions', { count: selectedDimensions.length }) }}
-          </div>
-        </div>
+          <!-- LEFT: Dimension Selector Sidebar -->
+          <template #before>
+            <div class="relative-position tw:h-full ">
+              <div
+                v-if="showDimensionSelector"
+                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
+                data-test="dimension-selector-sidebar"
+              >
+                <!-- Sidebar Header -->
+                <div class="tw:p-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <div class="tw:text-base tw:font-semibold tw:mb-3">
+                    {{ t('latencyInsights.selectDimensions') }}
+                  </div>
 
-        <!-- Error State -->
-        <div
-          v-else-if="error"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <q-icon name="error_outline" size="3.75rem" color="negative" class="tw:mb-4" />
-          <div class="tw:text-base tw:mb-2">{{ t('latencyInsights.failedToLoad') }}</div>
-          <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
-          <q-btn
-            outline
-            color="primary"
-            :label="t('latencyInsights.retryButton')"
-            class="tw:mt-4"
-            @click="loadAnalysis"
-          />
-        </div>
+                  <!-- Search Input -->
+                  <q-input
+                    v-model="dimensionSearchText"
+                    dense
+                    borderless
+                    :placeholder="t('search.searchField')"
+                    clearable
+                    class="tw:w-full"
+                    data-test="dimension-search-input"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" />
+                    </template>
+                  </q-input>
+                </div>
 
-        <!-- Dashboard -->
-        <RenderDashboardCharts
-          v-else-if="dashboardData"
-          :key="`${activeAnalysisType}-${dashboardRenderKey}`"
-          ref="dashboardChartsRef"
-          :dashboardData="dashboardData"
-          :currentTimeObj="currentTimeObj"
-          :viewOnly="true"
-          :allowAlertCreation="false"
-          searchType="dashboards"
-          @variablesManagerReady="onVariablesManagerReady"
-        />
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+                <!-- Dimension List -->
+                <div class="dimension-list-container tw:flex-1 tw:overflow-y-auto">
+                  <q-list v-if="filteredDimensions.length > 0">
+                    <q-item
+                      v-for="dimension in filteredDimensions"
+                      :key="dimension.value"
+                      dense
+                      class="dimension-list-item"
+                    >
+                      <q-item-section side>
+                        <q-checkbox
+                          :model-value="selectedDimensions.includes(dimension.value)"
+                          @update:model-value="toggleDimension(dimension.value)"
+                          color="primary"
+                          size="xs"
+                          dense
+                          :data-test="`dimension-checkbox-${dimension.value}`"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="dimension-label tw:truncate tw:cursor-pointer">
+                          {{ dimension.label }}
+                          <q-tooltip
+                            anchor="top middle"
+                            self="bottom middle"
+                            :offset="[0, 8]"
+                            :delay="500"
+                            max-width="300px"
+                          >
+                            {{ dimension.label }}
+                          </q-tooltip>
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
 
-  <!-- Dimension Selector Dialog -->
-  <q-dialog v-model="showDimensionSelector">
-    <q-card class="dimension-selector-dialog">
-      <q-card-section class="tw:p-4 tw:border-b">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
-          <div class="tw:text-base tw:font-semibold">{{ t('latencyInsights.selectDimensions') }}</div>
-          <q-btn flat round dense icon="close" v-close-popup />
-        </div>
+                  <!-- No results message -->
+                  <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+                    {{ t('search.noResult') }}
+                  </div>
+                </div>
 
-        <!-- Search Input -->
-        <q-input
-          v-model="dimensionSearchText"
-          dense
-          outlined
-          :placeholder="t('search.searchField')"
-          clearable
-          class="tw:w-full"
-        >
-          <template #prepend>
-            <q-icon name="search" />
+                <!-- Selected Count Footer -->
+                <div class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title">
+                  {{ selectedDimensions.length }} {{ t('latencyInsights.dimensionsSelected') }}
+                </div>
+              </div>
+            </div>
           </template>
-        </q-input>
-      </q-card-section>
 
-      <q-card-section class="tw:p-0 dimension-list-container">
-        <q-list v-if="filteredDimensions.length > 0">
-          <q-item
-            v-for="dimension in filteredDimensions"
-            :key="dimension.value"
-            dense
-            class="dimension-list-item"
-          >
-            <q-item-section side>
-              <q-checkbox
-                :model-value="selectedDimensions.includes(dimension.value)"
-                @update:model-value="toggleDimension(dimension.value)"
-                color="primary"
-                size="xs"
-                dense
-              />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label class="dimension-label">{{ dimension.label }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
+          <!-- SEPARATOR: Collapse/Expand Button -->
+          <template #separator>
+            <q-btn
+              data-test="dimension-selector-collapse-btn"
+              :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
+              :title="showDimensionSelector ? 'Collapse Dimensions' : 'Expand Dimensions'"
+              :class="showDimensionSelector ? 'logs-splitter-icon-expand' : 'logs-splitter-icon-collapse'"
+              color="primary"
+              size="sm"
+              dense
+              round
+              @click="toggleDimensionSelector"
+            />
+          </template>
 
-        <!-- No results message -->
-        <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
-          {{ t('search.noResult') }}
-        </div>
+          <!-- RIGHT: Dashboard Charts -->
+          <template #after>
+            <div class="tw:h-full">
+              <div class="tw:h-full tw:w-full relative-position tw:overflow-auto">
+                <!-- Loading State -->
+                <div
+                  v-if="loading"
+                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                >
+                  <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+                  <div class="tw:text-base">{{ t('latencyInsights.analyzingDimensions') }}</div>
+                  <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+                    {{ t('latencyInsights.computingDistributions', { count: selectedDimensions.length }) }}
+                  </div>
+                </div>
+
+                <!-- Error State -->
+                <div
+                  v-else-if="error"
+                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                >
+                  <q-icon name="error_outline" size="3.75rem" color="negative" class="tw:mb-4" />
+                  <div class="tw:text-base tw:mb-2">{{ t('latencyInsights.failedToLoad') }}</div>
+                  <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+                  <q-btn
+                    outline
+                    color="primary"
+                    :label="t('latencyInsights.retryButton')"
+                    class="tw:mt-4"
+                    @click="loadAnalysis"
+                  />
+                </div>
+
+                <!-- Dashboard -->
+                <RenderDashboardCharts
+                  v-else-if="dashboardData"
+                  :key="`${activeAnalysisType}-${dashboardRenderKey}`"
+                  ref="dashboardChartsRef"
+                  :dashboardData="dashboardData"
+                  :currentTimeObj="currentTimeObj"
+                  :viewOnly="false"
+                  :allowAlertCreation="false"
+                  :simplifiedPanelView="true"
+                  searchType="dashboards"
+                  @variablesManagerReady="onVariablesManagerReady"
+                  @onDeletePanel="handlePanelDelete"
+                />
+              </div>
+            </div>
+          </template>
+        </q-splitter>
       </q-card-section>
     </q-card>
   </q-dialog>
@@ -308,9 +348,14 @@ const variablesManager = ref(null);
 const isOpen = ref(true);
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
-const showDimensionSelector = ref(false);
+const showDimensionSelector = ref(true); // Changed to true - now controls sidebar visibility
 const dashboardRenderKey = ref(0); // Only increment on full reload to avoid re-rendering on panel append
 const dimensionSearchText = ref('');
+
+// Splitter configuration for dimension selector sidebar (using percentage)
+const splitterModel = ref(25); // 25% width for dimension selector (default)
+const splitterLimits = [0, 30]; // Min 0% (allow full collapse), Max 30%
+const lastSplitterPosition = ref(25); // Remember last position before collapse
 
 // Percentile change tracking - use variables manager's hasUncommittedChanges
 // This matches the pattern used in ViewDashboard
@@ -400,16 +445,30 @@ const availableDimensions = computed(() => {
     .sort((a, b) => a.label.localeCompare(b.label));
 });
 
-// Filter dimensions based on search text
+// Filter dimensions based on search text and sort (selected items first)
 const filteredDimensions = computed(() => {
-  if (!dimensionSearchText.value?.trim()) {
-    return availableDimensions.value;
+  let dimensions = availableDimensions.value;
+
+  // Filter by search text if provided
+  if (dimensionSearchText.value?.trim()) {
+    const searchLower = dimensionSearchText.value.toLowerCase();
+    dimensions = dimensions.filter(dim =>
+      dim.label.toLowerCase().includes(searchLower)
+    );
   }
 
-  const searchLower = dimensionSearchText.value.toLowerCase();
-  return availableDimensions.value.filter(dim =>
-    dim.label.toLowerCase().includes(searchLower)
-  );
+  // Sort: selected dimensions first, then unselected
+  return dimensions.sort((a, b) => {
+    const aSelected = selectedDimensions.value.includes(a.value);
+    const bSelected = selectedDimensions.value.includes(b.value);
+
+    // If one is selected and other is not, selected comes first
+    if (aSelected && !bSelected) return -1;
+    if (!aSelected && bSelected) return 1;
+
+    // If both selected or both unselected, maintain original order (alphabetical)
+    return a.label.localeCompare(b.label);
+  });
 });
 
 const currentOrgIdentifier = computed(() => {
@@ -429,12 +488,67 @@ const currentTimeObj = computed(() => {
 const toggleDimension = (dimensionValue: string) => {
   const index = selectedDimensions.value.indexOf(dimensionValue);
   if (index > -1) {
+    // Prevent removing the last dimension - at least one must remain
+    if (selectedDimensions.value.length <= 1) {
+      return;
+    }
     // Remove dimension - create new array to trigger reactivity
     selectedDimensions.value = selectedDimensions.value.filter(d => d !== dimensionValue);
   } else {
     // Add dimension - create new array to trigger reactivity
     selectedDimensions.value = [...selectedDimensions.value, dimensionValue];
   }
+};
+
+// Get dimension label from value
+const getDimensionLabel = (dimensionValue: string): string => {
+  const dimension = availableDimensions.value.find(d => d.value === dimensionValue);
+  return dimension?.label || dimensionValue;
+};
+
+// Handle panel deletion - extract dimension name from panel and remove from selection
+const handlePanelDelete = (panelId: string) => {
+  if (!dashboardData.value?.tabs?.[0]?.panels) return;
+
+  // Find the panel by ID
+  const panel = dashboardData.value.tabs[0].panels.find((p: any) => p.id === panelId);
+
+  if (panel?.title) {
+    // Panel title is the dimension name - remove it from selectedDimensions
+    const dimensionName = panel.title;
+    toggleDimension(dimensionName);
+  }
+};
+
+// Toggle dimension selector sidebar visibility (same pattern as settings page controlManagementTabs)
+const toggleDimensionSelector = () => {
+  if (showDimensionSelector.value) {
+    // Collapsing: save current position and set to 0
+    const prevVal = splitterModel.value;
+    lastSplitterPosition.value = prevVal;
+    splitterModel.value = 0;
+    showDimensionSelector.value = false;
+  } else {
+    // Expanding: restore previous position, but use 25% if it was too small (< 10) or not set
+    const savedPosition = lastSplitterPosition.value;
+    splitterModel.value = (savedPosition && savedPosition >= 10) ? savedPosition : 25;
+    showDimensionSelector.value = true;
+  }
+
+  // Redraw charts after sidebar collapse/expand
+  nextTick(() => {
+    window.dispatchEvent(new Event('resize'));
+  });
+};
+
+// Handle splitter resize to redraw charts
+const onSplitterUpdate = () => {
+  // Save position when user manually drags (but only if > 0)
+  if (splitterModel.value > 0) {
+    lastSplitterPosition.value = splitterModel.value;
+  }
+
+  window.dispatchEvent(new Event('resize'));
 };
 
 const baselineTimeRange = computed(() => {
@@ -745,6 +859,7 @@ watch(
   },
   { deep: true }
 );
+
 </script>
 
 <style lang="scss" scoped>
@@ -754,31 +869,31 @@ watch(
   height: 100%;
   width: 90vw;
   max-width: 87.5rem;
-  background: #ffffff !important;
-
   .analysis-header {
     flex-shrink: 0;
-    background: #ffffff !important;
     z-index: 1;
+    margin: 8px 0px;
   }
 
   .analysis-content {
     flex: 1;
-    overflow: auto;
+    overflow: hidden; // Changed to hidden - q-splitter handles overflow
     min-height: 0;
     background: #f5f5f5 !important;
   }
+  .q-card__section--vert{
+    padding: 8px !important;
+  }
 }
 
-// Dimension selector dialog
-.dimension-selector-dialog {
-  min-width: 25rem;
-  max-width: 31.25rem;
+// Dimension sidebar (in splitter)
+.dimension-sidebar {
+  background: #ffffff;
+  // border-right: 1px solid var(--q-border-color, #e0e0e0);
 }
 
 .dimension-list-container {
-  max-height: 25rem;
-  overflow-y: auto;
+  // max-height removed - now handled by flex container
 
   .dimension-list-item {
     padding: 0.5rem 1rem;
@@ -795,16 +910,21 @@ watch(
   }
 }
 
-// Dark mode support for dimension selector
-body.body--dark {
-  .dimension-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
+// Splitter smooth transition
+.analysis-splitter-smooth {
+  transition: all 0.3s ease;
 }
+
+// Splitter icon positioning (at top, like logs page)
+.analysis-splitter-icon-collapse {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 15px !important;
+}
+
+
 
 // Dark mode support
 body.body--dark {
@@ -817,6 +937,18 @@ body.body--dark {
 
     .analysis-content {
       background: #2a2a2a !important;
+    }
+  }
+
+  .dimension-sidebar {
+    background: #202223 !important;
+  }
+
+  .dimension-list-item {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
     }
   }
 }

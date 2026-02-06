@@ -29,7 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         horizontal
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+          <div
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+          >
             <search-bar
               data-test="logs-search-bar"
               ref="searchBarRef"
@@ -75,16 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="logs-search-field-list-collapse-btn"
                   :icon="
-                  searchObj.meta.showFields
-                    ? 'chevron_left'
-                    : 'chevron_right'
-                "
+                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
+                  "
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
                       : 'Open Fields'
                   "
-                  :class="searchObj.meta.showFields ? 'logs-splitter-icon-expand' : 'logs-splitter-icon-collapse'"
+                  :class="
+                    searchObj.meta.showFields
+                      ? 'logs-splitter-icon-expand'
+                      : 'logs-splitter-icon-collapse'
+                  "
                   color="primary"
                   size="sm"
                   dense
@@ -93,9 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #after>
-                <div
-                  class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full"
-                >
+                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
@@ -217,8 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.noRecordFound") }}
                         <q-btn
                           v-if="
@@ -245,8 +246,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -263,8 +263,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-    size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -350,8 +349,7 @@ size="md" />
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info" class="q-mr-xs"
-size="20px" />
+              <q-icon name="info" class="q-mr-xs" size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
@@ -397,6 +395,7 @@ import {
   onMounted,
   onBeforeUnmount,
   onUnmounted,
+  toRaw,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -759,11 +758,16 @@ export default defineComponent({
       // Clear any pending timeouts
       clearAllTimeouts();
       try {
-        if (searchObj)
-          await store.dispatch(
-            "logs/setLogs",
-            JSON.parse(JSON.stringify(searchObj)),
-          );
+        if (searchObj) {
+          // Turn off all loaders before saving view
+          let savedSearchObj = JSON.parse(JSON.stringify(searchObj));
+          savedSearchObj.loading = false;
+          savedSearchObj.loadingHistogram = false;
+          savedSearchObj.loadingCounter = false;
+          savedSearchObj.loadingStream = false;
+          savedSearchObj.loadingSavedView = false;
+          await store.dispatch("logs/setLogs", savedSearchObj);
+        }
       } catch (error) {
         console.error("Failed to set logs:", error.message);
       }
@@ -924,7 +928,9 @@ export default defineComponent({
         }
 
         // Set size to -1 to let backend determine sampling size based on config
-        console.log("[Patterns] Using default sampling from backend configuration");
+        console.log(
+          "[Patterns] Using default sampling from backend configuration",
+        );
         queryReq.query.size = -1;
 
         const streamName = searchObj.data.stream.selectedStream[0];
@@ -1236,7 +1242,7 @@ export default defineComponent({
           if (!hasSelect) {
             if (currentQuery != "") {
               if (currentQuery.trim() != "") {
-                  whereClause = "WHERE " + currentQuery;
+                whereClause = "WHERE " + currentQuery;
               }
             }
 
@@ -1604,6 +1610,20 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
+            // Copy VRL function query if present
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function"
+            ) {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+            } else {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = "";
+            }
+
             // Store current config and chart type to preserve them during rebuild
             const queryParams = router.currentRoute.value.query;
             let preservedConfig = null;
@@ -1694,6 +1714,35 @@ export default defineComponent({
               return;
             }
 
+            // Force table chart if VRL functions are present
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function" &&
+              shouldAutoSelectChartType
+            ) {
+              dashboardPanelData.data.type = "table";
+              // Enable dynamic columns for VRL table charts
+              dashboardPanelData.data.config.table_dynamic_columns = true;
+            }
+
+            // Clear VRL if chart type is not table (VRL only supported for table in visualization)
+            if (
+              dashboardPanelData.data.type !== "table" &&
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery
+            ) {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = "";
+            }
+
+            // Recalculate shouldUseHistogramQuery after chart type is finalized
+            // Table charts should not use histogram query
+            if (dashboardPanelData.data.type === "table") {
+              shouldUseHistogramQuery.value = false;
+            }
+
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogramQuery.value === true) {
               // only do it if is_histogram_eligible is true on logs page
@@ -1721,6 +1770,8 @@ export default defineComponent({
                   // assign to visualizeChartData as well
                   visualizeChartData.value.queries[0].query =
                     dashboardPanelData.data.queries[0].query;
+                  visualizeChartData.value.queries[0].vrlFunctionQuery =
+                    dashboardPanelData.data.queries[0].vrlFunctionQuery;
                 }
               }
             } else {
@@ -1783,6 +1834,15 @@ export default defineComponent({
               };
             }
 
+            // Enable dynamic columns for VRL table charts (after preservedConfig to ensure it's set)
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function" &&
+              dashboardPanelData.data.type === "table"
+            ) {
+              dashboardPanelData.data.config.table_dynamic_columns = true;
+            }
+
             // run query
             await copyDashboardDataToVisualize();
 
@@ -1831,6 +1891,22 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
 
+          // Update VRL function query if present
+          // VRL is only supported for table chart type in visualization
+          if (
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function" &&
+            dashboardPanelData.data.type === "table"
+          ) {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+          } else {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].vrlFunctionQuery = "";
+          }
+
           // reset old rendered chart
           visualizeChartData.value = {};
 
@@ -1840,6 +1916,15 @@ export default defineComponent({
           // if not able to parse query, do not do anything
           if (shouldUseHistogramQuery.value === null) {
             return false;
+          }
+
+          // Enable dynamic columns for VRL table charts
+          if (
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function" &&
+            dashboardPanelData.data.type === "table"
+          ) {
+            dashboardPanelData.data.config.table_dynamic_columns = true;
           }
 
           // emit resize event
@@ -1927,6 +2012,25 @@ export default defineComponent({
             : cloneDeep(searchObj.data.datetime);
       },
       { deep: true },
+    );
+
+    // Watch AI chat state and adjust splitter to give more space when chat is open
+    const originalSplitterValue = ref(searchObj.config.splitterModel);
+    watch(
+      () => store.state.isAiChatEnabled,
+      (isEnabled) => {
+        // Only adjust splitter if field list is shown
+        if (searchObj.meta.showFields) {
+          if (isEnabled) {
+            // AI chat opened - save current value and set splitter to 25
+            originalSplitterValue.value = searchObj.config.splitterModel;
+            searchObj.config.splitterModel = 25;
+          } else {
+            // AI chat closed - restore original splitter value
+            searchObj.config.splitterModel = originalSplitterValue.value;
+          }
+        }
+      },
     );
 
     const handleRunQueryFn = async (clear_cache = false) => {
@@ -2078,10 +2182,15 @@ export default defineComponent({
         }
 
         // Assign stream info to dashboardPanelData before copying
-        dashboardPanelData.data.queries[currentQueryIndex].fields.stream = streamName;
+        dashboardPanelData.data.queries[currentQueryIndex].fields.stream =
+          streamName;
         // stream_type should already be set, but ensure it's preserved
-        if (!dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type) {
-          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type = "logs";
+        if (
+          !dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type
+        ) {
+          dashboardPanelData.data.queries[
+            currentQueryIndex
+          ].fields.stream_type = "logs";
         }
       }
 
@@ -2221,9 +2330,18 @@ export default defineComponent({
         checkAbort();
 
         /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        /* Note: VRL functions are only supported for table charts, and VRL will force table chart type */
+        /* So if VRL is present and autoSelectChartType is true, we know chart will be table */
+        const willBeTableChart =
+          dashboardPanelData.data.type === "table" ||
+          (autoSelectChartType &&
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function");
+
         shouldUseHistogramQuery.value =
-          dashboardPanelData.data.type !== "table" &&
+          !willBeTableChart &&
           !(extractedFields?.group_by && extractedFields.group_by.length);
+
 
         const finalQuery = logsPageQuery;
 
@@ -2451,8 +2569,8 @@ export default defineComponent({
 
     // [END] Context Provider Setup
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
     };
 
     const clearAllTimeouts = () => {

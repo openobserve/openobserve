@@ -21,13 +21,6 @@ import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
-// Mock services
-vi.mock("@/services/incidents", () => ({
-  default: {
-    getServiceGraph: vi.fn(),
-  },
-}));
-
 // Mock ChartRenderer component
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   default: {
@@ -35,8 +28,6 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
     template: '<div data-test="chart-renderer"></div>',
   },
 }));
-
-import incidentsService from "@/services/incidents";
 
 installQuasar({ plugins: [Notify] });
 
@@ -441,9 +432,10 @@ describe("IncidentServiceGraph.vue", () => {
       const node2 = chartData.options.series[0].data[1]; // 7 alerts
       const node3 = chartData.options.series[0].data[2]; // 12 alerts
 
-      expect(node1.symbolSize).toBe(45); // 30 + 3*5
-      expect(node2.symbolSize).toBe(65); // 30 + 7*5
-      expect(node3.symbolSize).toBe(90); // 30 + 12*5
+      // All nodes have fixed size of 60
+      expect(node1.symbolSize).toBe(60);
+      expect(node2.symbolSize).toBe(60);
+      expect(node3.symbolSize).toBe(60);
     });
 
     it("should cap node size at 100", async () => {
@@ -472,7 +464,7 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const largeNode = chartData.options.series[0].data[0];
-      expect(largeNode.symbolSize).toBe(100); // Capped at 100
+      expect(largeNode.symbolSize).toBe(60); // Fixed size for all nodes
     });
 
     it("should add border to primary service nodes", async () => {
@@ -848,7 +840,7 @@ describe("IncidentServiceGraph.vue", () => {
       const chartData = wrapper.vm.chartData;
       // Second node has 0 alerts
       const zeroAlertNode = chartData.options.series[0].data[1];
-      expect(zeroAlertNode.symbolSize).toBe(30); // Base size
+      expect(zeroAlertNode.symbolSize).toBe(60); // Fixed size for all nodes
     });
 
     it("should handle very large alert counts", async () => {
@@ -876,7 +868,7 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const largeNode = chartData.options.series[0].data[0];
-      expect(largeNode.symbolSize).toBe(100); // Capped at 100
+      expect(largeNode.symbolSize).toBe(60); // Fixed size for all nodes
     });
 
     it("should handle null orgId gracefully", () => {

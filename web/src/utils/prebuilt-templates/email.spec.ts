@@ -18,7 +18,7 @@ import { emailTemplate, emailConfig, emailDestinationType } from '@/utils/prebui
 describe('email template', () => {
   describe('emailTemplate', () => {
     it('has correct name', () => {
-      expect(emailTemplate.name).toBe('system-prebuilt-email');
+      expect(emailTemplate.name).toBe('prebuilt_email');
     });
 
     it('has type as email', () => {
@@ -46,7 +46,7 @@ describe('email template', () => {
 
   describe('emailConfig', () => {
     it('references correct template name', () => {
-      expect(emailConfig.templateName).toBe('system-prebuilt-email');
+      expect(emailConfig.templateName).toBe('prebuilt_email');
     });
 
     it('has credential fields', () => {

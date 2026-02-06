@@ -34,7 +34,7 @@ function isValidTeamsWebhookUrl(url: string): boolean {
  * Uses Adaptive Cards for rich formatting
  */
 export const msteamsTemplate = {
-  name: 'system-prebuilt-msteams',
+  name: 'prebuilt_msteams',
   body: JSON.stringify({
     "@type": "MessageCard",
     "@context": "http://schema.org/extensions",
@@ -92,7 +92,7 @@ export const msteamsTemplate = {
 };
 
 export const msteamsConfig: PrebuiltConfig = {
-  templateName: 'system-prebuilt-msteams',
+  templateName: 'prebuilt_msteams',
   templateBody: msteamsTemplate.body,
   headers: {
     'Content-Type': 'application/json'
