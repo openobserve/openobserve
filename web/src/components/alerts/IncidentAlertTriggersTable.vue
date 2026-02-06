@@ -15,8 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div data-test="alert-triggers-table" class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
     <q-table
+      data-test="triggers-qtable"
       ref="qTableRef"
       :rows="triggers"
       :columns="columns"
@@ -28,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="onRowClick"
     >
       <template #no-data>
-        <div class="tw:text-center tw:py-8">
+        <div data-test="no-triggers-message" class="tw:text-center tw:py-8">
           <span :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm">
             No triggers loaded
           </span>
@@ -36,24 +37,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #body-cell-alert_name="props">
-        <q-td :props="props">
-          <span :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
+        <q-td :props="props" data-test="alert-name-cell">
+          <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
             {{ props.row.alert_name }}
           </span>
         </q-td>
       </template>
 
       <template #body-cell-alert_fired_at="props">
-        <q-td :props="props">
-          <span class="tw:text-xs">
+        <q-td :props="props" data-test="fired-at-cell">
+          <span data-test="fired-at-timestamp" class="tw:text-xs">
             {{ formatTimestamp(props.row.alert_fired_at) }}
           </span>
         </q-td>
       </template>
 
       <template #body-cell-correlation_reason="props">
-        <q-td :props="props" class="tw:text-right">
+        <q-td :props="props" class="tw:text-right" data-test="correlation-reason-cell">
           <q-badge
+            data-test="correlation-reason-badge"
             :color="getReasonColor(props.row.correlation_reason)"
             :label="getReasonLabel(props.row.correlation_reason)"
             outline
