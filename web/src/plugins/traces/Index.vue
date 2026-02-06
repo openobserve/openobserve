@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -577,7 +577,7 @@ const buildTraceSearchQuery = (trace: string) => {
   req.query.end_time = trace.trace_end_time + 30000000;
 
   req.query.sql = b64EncodeUnicode(
-    `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
+    `SELECT * FROM "${selectedStreamName.value}" WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
   );
 
   return req;
@@ -1151,7 +1151,7 @@ const restoreFiltersFromQuery = (node: any) => {
 const restoreFilters = (query: string) => {
   // const filters = searchObj.data.stream.filters;
 
-  const defaultQuery = `SELECT * FROM '${selectedStreamName.value}' WHERE `;
+  const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
   const parsedQuery = parser.astify(defaultQuery + query);
 

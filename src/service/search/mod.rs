@@ -476,9 +476,12 @@ pub async fn search_multi(
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
+    multi_res.hits = if let Some(query_fn) = query_fn.as_ref()
+        && !multi_res.hits.is_empty()
+        && !multi_res.is_partial
+    {
         // compile vrl function & apply the same before returning the response
-        let input_fn = query_fn.unwrap().trim().to_string();
+        let input_fn = query_fn.trim().to_string();
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         let mut runtime = init_vrl_runtime();
