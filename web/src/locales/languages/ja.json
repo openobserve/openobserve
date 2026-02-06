@@ -1905,7 +1905,51 @@
     "msteams": "マイクロソフトチーム",
     "pagerduty": "ポケットベル・デューティ",
     "opsgenie": "オプスゲニー",
-    "servicenow": "サービスナウ"
+    "servicenow": "サービスナウ",
+    "saveAlert": "アラートを保存",
+    "aggregation_threshold": "グループがある場合はアラート",
+    "thresholdDynamic": {
+      "alertMeWhen": "次の場合に通知する",
+      "metricTypes": {
+        "resultsPassedFilter": "フィルターを通過した結果",
+        "distinctGroupsAffected": "個別のグループが影響を受ける",
+        "metricsMatchCriteria": "メトリックス一致基準",
+        "matchingLogsFound": "一致するログが見つかりました",
+        "groupsPassFilter": "グループはフィルター条件に合格します",
+        "distinctGroups": "異なるグループが見つかりました",
+        "resultRows": "結果行が返されました",
+        "timeSeries": "アクティブな時系列が見つかりました",
+        "matchingRecords": "一致するレコードが見つかりました",
+        "groupsWithHaving": "グループ一致条件",
+        "uniqueGroups": "ユニークグループ",
+        "events": "イベント一致条件",
+        "aggregatedValue": "マッチ条件"
+      },
+      "contextLabels": {
+        "groupedBy": "グループ化:",
+        "havingConditions": "条件がある:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "アラート名",
+      "sqlQuery": "SQL クエリー",
+      "promqlQuery": "プロムQL クエリ",
+      "conditions": "条件",
+      "copy": "[コピー]",
+      "noCondition": "条件なし",
+      "noDescription": "説明なし",
+      "evaluationHistory": "評価履歴",
+      "loadingHistory": "履歴をロード中...",
+      "noHistoryAvailable": "このアラートの評価履歴はありません",
+      "results": "結果"
+    },
+    "historyTable": {
+      "timestamp": "タイムスタンプ",
+      "status": "ステータス",
+      "evaluationTime": "評価 (s)",
+      "queryTime": "クエリ (ミリ秒)",
+      "error": "[エラー]"
+    }
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2597,7 +2641,8 @@
     "showLegends": "レジェンドを表示"
   },
   "alert_list": {
-    "alert_details": "アラートの詳細"
+    "alert_details": "アラートの詳細",
+    "alert_history": "アラート履歴"
   },
   "latencyInsights": {
     "title": "インサイト",

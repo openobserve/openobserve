@@ -1888,7 +1888,51 @@
     "msteams": "Equipes da Microsoft",
     "pagerduty": "Dever de pager",
     "opsgenie": "Opsgenie",
-    "servicenow": "Atenda agora"
+    "servicenow": "Atenda agora",
+    "saveAlert": "Salvar alerta",
+    "aggregation_threshold": "Alerte se houver algum grupo",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avise-me quando",
+      "metricTypes": {
+        "resultsPassedFilter": "filtros de resultados aprovados",
+        "distinctGroupsAffected": "grupos distintos são afetados",
+        "metricsMatchCriteria": "as métricas correspondem aos critérios",
+        "matchingLogsFound": "registros correspondentes encontrados",
+        "groupsPassFilter": "grupos passam por critérios de filtro",
+        "distinctGroups": "grupos distintos encontrados",
+        "resultRows": "linhas de resultados retornadas",
+        "timeSeries": "série temporal ativa encontrada",
+        "matchingRecords": "registros correspondentes encontrados",
+        "groupsWithHaving": "condições de partida de grupos",
+        "uniqueGroups": "grupos exclusivos",
+        "events": "condições de jogo de eventos",
+        "aggregatedValue": "condições da partida"
+      },
+      "contextLabels": {
+        "groupedBy": "Agrupados por:",
+        "havingConditions": "TENDO condições:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nome do alerta",
+      "sqlQuery": "Consulta SQL",
+      "promqlQuery": "Consulta ProMQL",
+      "conditions": "Condições",
+      "copy": "Copiar",
+      "noCondition": "Sem condição",
+      "noDescription": "Sem descrição",
+      "evaluationHistory": "Histórico de avaliação",
+      "loadingHistory": "Carregando histórico...",
+      "noHistoryAvailable": "Não há histórico de avaliação disponível para este alerta",
+      "results": "Resultados"
+    },
+    "historyTable": {
+      "timestamp": "Carimbo de data/hora",
+      "status": "Status",
+      "evaluationTime": "Avaliação (ões)",
+      "queryTime": "Consulta (ms)",
+      "error": "Erro"
+    }
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2597,7 +2641,8 @@
     "showLegends": "Mostrar lendas"
   },
   "alert_list": {
-    "alert_details": "Detalhes do alerta"
+    "alert_details": "Detalhes do alerta",
+    "alert_history": "Histórico de alertas"
   },
   "latencyInsights": {
     "title": "Percepções",

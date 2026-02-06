@@ -1888,7 +1888,51 @@
     "msteams": "마이크로소프트 팀즈",
     "pagerduty": "페이저 듀티",
     "opsgenie": "옵스제니",
-    "servicenow": "서비스 나우"
+    "servicenow": "서비스 나우",
+    "saveAlert": "알림 저장",
+    "aggregation_threshold": "그룹이 있는 경우 경고",
+    "thresholdDynamic": {
+      "alertMeWhen": "언제 알려줘",
+      "metricTypes": {
+        "resultsPassedFilter": "결과 통과 필터",
+        "distinctGroupsAffected": "별개의 그룹이 영향을 받음",
+        "metricsMatchCriteria": "지표 일치 기준",
+        "matchingLogsFound": "일치하는 로그가 발견됨",
+        "groupsPassFilter": "그룹이 필터 기준을 통과함",
+        "distinctGroups": "별개의 그룹이 발견됨",
+        "resultRows": "결과 행 반환",
+        "timeSeries": "활성 시계열이 발견됨",
+        "matchingRecords": "일치하는 레코드를 찾았습니다",
+        "groupsWithHaving": "그룹 일치 조건",
+        "uniqueGroups": "고유 그룹",
+        "events": "이벤트 일치 조건",
+        "aggregatedValue": "경기 조건"
+      },
+      "contextLabels": {
+        "groupedBy": "그룹화 기준:",
+        "havingConditions": "조건 있음:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "경고 이름",
+      "sqlQuery": "SQL 쿼리",
+      "promqlQuery": "프롬큐 쿼리",
+      "conditions": "조건",
+      "copy": "복사",
+      "noCondition": "조건 없음",
+      "noDescription": "설명 없음",
+      "evaluationHistory": "평가 기록",
+      "loadingHistory": "기록 로드 중...",
+      "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다.",
+      "results": "결과"
+    },
+    "historyTable": {
+      "timestamp": "타임스탬프",
+      "status": "상태",
+      "evaluationTime": "평가 (들)",
+      "queryTime": "쿼리 (밀리초)",
+      "error": "오류"
+    }
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2597,7 +2641,8 @@
     "showLegends": "쇼 레전드"
   },
   "alert_list": {
-    "alert_details": "경고 세부 정보"
+    "alert_details": "경고 세부 정보",
+    "alert_history": "알림 기록"
   },
   "latencyInsights": {
     "title": "인사이트",

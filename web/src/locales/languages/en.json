@@ -1809,6 +1809,7 @@
     "move": "Move alert",
     "name": "Name",
     "save": "Save",
+    "saveAlert": "Save Alert",
     "actions": "Actions",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -1834,7 +1835,30 @@
     "trigger": "Trigger",
     "period": "Look back window",
     "frequency": "Check every",
-    "threshold": "Alert when count is",
+    "threshold": "Alert if ",
+    "aggregation_threshold": "Alert If Any Groups",
+    "thresholdDynamic": {
+      "alertMeWhen": "Alert me when",
+      "metricTypes": {
+        "resultsPassedFilter": "results passed filters",
+        "distinctGroupsAffected": "distinct groups are affected",
+        "metricsMatchCriteria": "metrics match criteria",
+        "matchingLogsFound": "matching logs found",
+        "groupsPassFilter": "groups pass filter criteria",
+        "distinctGroups": "distinct groups found",
+        "resultRows": "result rows returned",
+        "timeSeries": "active time series found",
+        "matchingRecords": "matching records found",
+        "groupsWithHaving": "groups match conditions",
+        "uniqueGroups": "unique groups",
+        "events": "events match conditions",
+        "aggregatedValue": "match conditions"
+      },
+      "contextLabels": {
+        "groupedBy": "Grouped by:",
+        "havingConditions": "HAVING conditions:"
+      }
+    },
     "interval": "Check every",
     "silenceNotification": "Cooldown period",
     "multiWindow": "Compare with past",
@@ -2141,6 +2165,26 @@
       "firedTimes": "Fired {count} time(s)",
       "incidentAnalysis": "Incident Analysis",
       "noAlertActivityData": "No alert activity data"
+    },
+    "alertDetails": {
+      "alertName": "Alert Name",
+      "sqlQuery": "SQL Query",
+      "promqlQuery": "PromQL Query",
+      "conditions": "Conditions",
+      "copy": "Copy",
+      "noCondition": "No condition",
+      "noDescription": "No description",
+      "evaluationHistory": "Evaluation History",
+      "loadingHistory": "Loading history...",
+      "noHistoryAvailable": "No evaluation history available for this alert",
+      "results":"Results"
+    },
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Evaluation (s)",
+      "queryTime": "Query (ms)",
+      "error":"Error"
     }
   },
   "alert_templates": {
@@ -2818,7 +2862,8 @@
     "showLegends": "Show Legends"
   },
   "alert_list":{
-    "alert_details":"Alert Details"
+    "alert_details":"Alert Details",
+    "alert_history":"Alert History"
   },
   "sreChat": {
     "emptyMessage": "Ask me anything about your alerts and incidents",
