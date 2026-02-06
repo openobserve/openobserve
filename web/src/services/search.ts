@@ -294,6 +294,16 @@ const search = {
     const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${filter}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
     return http().get(url);
   },
+  getTraceDAG: (
+    org_identifier: string,
+    stream_name: string,
+    trace_id: string,
+    start_time: number,
+    end_time: number
+  ) => {
+    const url = `/api/${org_identifier}/${stream_name}/traces/${trace_id}/dag?start_time=${start_time}&end_time=${end_time}`;
+    return http().get(url);
+  },
   partition: ({
     org_identifier,
     query,

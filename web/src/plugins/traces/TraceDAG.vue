@@ -87,7 +87,7 @@ import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/cor
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
-import http from "@/services/http";
+import searchService from "@/services/search";
 
 // VueFlow CSS imports
 import "@vue-flow/core/dist/style.css";
@@ -345,9 +345,13 @@ export default defineComponent({
         error.value = null;
 
         const org = store.state.selectedOrganization.identifier;
-        const url = `/api/${org}/${props.streamName}/traces/${props.traceId}/dag?start_time=${props.startTime}&end_time=${props.endTime}`;
-
-        const response = await http().get(url);
+        const response = await searchService.getTraceDAG(
+          org,
+          props.streamName,
+          props.traceId,
+          props.startTime,
+          props.endTime,
+        );
         dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
