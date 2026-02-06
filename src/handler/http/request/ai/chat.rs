@@ -276,6 +276,17 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Must be done before context is moved into QueryRequest
         let agent_type = get_agent_type(&context);
 
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(|img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                    data: img.data,
+                    mime_type: img.mime_type,
+                    filename: img.filename,
+                })
+                .collect()
+        });
+
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -290,6 +301,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 Some(history)
             },
             user_token,
+            images,
         };
 
         // Query agent with headers
@@ -608,6 +620,17 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Must be done before context is moved into QueryRequest
         let agent_type = get_agent_type(&context);
 
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(|img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                    data: img.data,
+                    mime_type: img.mime_type,
+                    filename: img.filename,
+                })
+                .collect()
+        });
+
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -622,6 +645,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 Some(history)
             },
             user_token,
+            images,
         };
 
         // Report successful start to audit
