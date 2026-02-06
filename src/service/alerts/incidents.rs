@@ -128,7 +128,7 @@ pub async fn correlate_alert_to_incident(
     };
 
     // Extract labels from result row as HashMap
-    let labels: HashMap<String, String> = result_row
+    let mut labels: HashMap<String, String> = result_row
         .iter()
         .filter_map(|(k, v)| {
             let value_str = match v {
@@ -141,8 +141,35 @@ pub async fn correlate_alert_to_incident(
         })
         .collect();
 
+    // Enrich with alert condition dimensions (deterministic baseline)
+    // Handles SQL WHERE, GUI conditions, and PromQL label matchers
+    #[cfg(feature = "enterprise")]
+    {
+        let condition_dims =
+            o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
+                &alert.query_condition,
+                &org_config.semantic_field_groups,
+            );
+
+        if !condition_dims.is_empty() {
+            let before_count = labels.len();
+            for (field_name, value) in condition_dims {
+                labels.entry(field_name).or_insert(value);
+            }
+            let after_count = labels.len();
+
+            if after_count > before_count {
+                log::info!(
+                    "[incidents] Enriched alert '{}' with {} dimensions from alert conditions",
+                    alert.name,
+                    after_count - before_count
+                );
+            }
+        }
+    }
+
     log::debug!(
-        "[incidents] Alert {} result_row labels: {:?}",
+        "[incidents] Alert {} labels after condition enrichment: {:?}",
         alert.name,
         labels
     );
