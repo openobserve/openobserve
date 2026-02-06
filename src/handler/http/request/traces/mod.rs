@@ -47,6 +47,8 @@ use crate::{
     service::{search as SearchService, traces},
 };
 
+pub mod dag;
+
 /// TracesIngest
 #[utoipa::path(
     post,

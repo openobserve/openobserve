@@ -1027,7 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated logs...</div>
           </div>
@@ -1057,18 +1057,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Success State - TelemetryCorrelationDashboard -->
+          <!-- Success State - CorrelatedLogsTable -->
           <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
-            <TelemetryCorrelationDashboard
-              mode="embedded-tabs"
-              :externalActiveTab="'logs'"
-              :serviceName="correlationData.serviceName"
-              :matchedDimensions="correlationData.matchedDimensions"
-              :additionalDimensions="correlationData.additionalDimensions"
-              :logStreams="correlationData.logStreams"
-              :metricStreams="correlationData.metricStreams"
-              :traceStreams="correlationData.traceStreams"
-              :timeRange="telemetryTimeRange"
+            <CorrelatedLogsTable
+              :service-name="correlationData.serviceName"
+              :matched-dimensions="actualMatchedDimensions"
+              :additional-dimensions="{}"
+              :log-streams="correlationData.logStreams"
+              :source-stream="'incidents'"
+              :source-type="'incidents'"
+              :available-dimensions="availableDimensions"
+              :fts-fields="ftsFields"
+              :time-range="telemetryTimeRange"
+              :hide-view-related-button="true"
+              :hide-search-term-actions="false"
+              :hide-dimension-filters="false"
+              @sendToAiChat="handleSendToAiChat"
             />
           </div>
         </div>
@@ -1092,7 +1096,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
@@ -1134,6 +1138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
@@ -1157,7 +1162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
@@ -1199,6 +1204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
@@ -1236,6 +1242,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
@@ -1247,13 +1254,14 @@ export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
     IncidentRCAAnalysis,
     CustomChartRenderer,
   },
-  emits: ['close', 'status-updated'],
+  emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -1795,6 +1803,31 @@ export default defineComponent({
       );
     });
 
+    // Computed properties for CorrelatedLogsTable
+    // Extract actual field names from logStreams filters
+    // The filters contain the correct field name mappings (e.g., k8s_namespace_name)
+    // instead of semantic dimension names (e.g., k8s-namespace)
+    const actualMatchedDimensions = computed(() => {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
+        return correlationData.value?.matchedDimensions || {};
+      }
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
+    });
+
+    const availableDimensions = computed(() => {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
+        return {};
+      }
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
+    });
+
+    const ftsFields = computed(() => {
+      // FTS fields can be empty for now, as the log streams will determine this
+      return [];
+    });
+
     // Computed property for formatted RCA content
     const formattedRcaContent = computed(() => {
       const content = rcaLoading.value && rcaStreamContent.value
@@ -2069,6 +2102,10 @@ export default defineComponent({
     onBeforeUnmount(() => {
       window.removeEventListener('keydown', handleEscapeKey);
     });
+
+    const handleSendToAiChat = (value: any, append: boolean = true) => {
+      emit('sendToAiChat', value, append);
+    };
 
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
@@ -2785,6 +2822,9 @@ export default defineComponent({
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
+      actualMatchedDimensions,
+      availableDimensions,
+      ftsFields,
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
@@ -2799,6 +2839,7 @@ export default defineComponent({
       alertActivityChartData,
       refreshCorrelation,
       close,
+      handleSendToAiChat,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
