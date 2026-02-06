@@ -58,7 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleViewLogs"
             data-test="service-graph-side-panel-view-logs-btn"
             class="action-btn"
-          />
+            :disable="isAllStreamsSelected"
+          >
+            <q-tooltip v-if="isAllStreamsSelected">
+              Please select a specific stream to view logs
+            </q-tooltip>
+          </q-btn>
           <q-btn
             outline
             no-caps
@@ -67,16 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleViewTraces"
             data-test="service-graph-side-panel-view-traces-btn"
             class="action-btn"
-          />
-          <q-btn
-            outline
-            no-caps
-            size="sm"
-            label="📊 Dashboard"
-            @click="handleNavigateToDashboard"
-            data-test="service-graph-side-panel-dashboard-btn"
-            class="action-btn"
-          />
+            :disable="isAllStreamsSelected"
+          >
+            <q-tooltip v-if="isAllStreamsSelected">
+              Please select a specific stream to view traces
+            </q-tooltip>
+          </q-btn>
         </div>
 
         <!-- Metrics Section -->
@@ -269,7 +270,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['close', 'view-logs', 'view-traces', 'navigate-to-dashboard'],
+  emits: ['close', 'view-logs', 'view-traces'],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -416,6 +417,11 @@ export default defineComponent({
           icon: 'check_circle',
         };
       }
+    });
+
+    // Computed: Check if "All Streams" is selected
+    const isAllStreamsSelected = computed(() => {
+      return props.streamFilter === 'all';
     });
 
     // Helper: Get Health Status
@@ -630,12 +636,12 @@ export default defineComponent({
       downstreamServices,
       serviceMetrics,
       serviceHealth,
+      isAllStreamsSelected,
       getHealthColor,
       getHealthText,
       handleClose,
       handleViewLogs,
       handleViewTraces,
-      handleNavigateToDashboard,
       // Recent Traces
       recentTraces,
       loadingTraces,

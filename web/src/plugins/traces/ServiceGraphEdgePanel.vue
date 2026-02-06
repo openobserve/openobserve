@@ -45,32 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Content Scrollable Area -->
       <div class="panel-content">
-        <!-- Action Buttons Section -->
-        <div class="panel-section actions-section">
-          <q-btn
-            outline
-            no-caps
-            size="sm"
-            icon="timeline"
-            label="View Traces"
-            color="primary"
-            @click="handleViewTraces"
-            data-test="service-graph-edge-panel-view-traces-btn"
-            class="action-btn"
-          />
-          <q-btn
-            outline
-            no-caps
-            size="sm"
-            icon="article"
-            label="View Logs"
-            color="primary"
-            @click="handleViewLogs"
-            data-test="service-graph-edge-panel-view-logs-btn"
-            class="action-btn"
-          />
-        </div>
-
         <!-- Request Statistics Section -->
         <div
           class="panel-section stats-section"
@@ -147,12 +121,8 @@ export default defineComponent({
       type: Boolean,
       required: true,
     },
-    streamFilter: {
-      type: String,
-      required: true,
-    },
   },
-  emits: ['close', 'view-logs', 'view-traces'],
+  emits: ['close'],
   setup(props, { emit }) {
     const store = useStore();
 
@@ -370,22 +340,12 @@ export default defineComponent({
       emit('close');
     };
 
-    const handleViewLogs = () => {
-      emit('view-logs');
-    };
-
-    const handleViewTraces = () => {
-      emit('view-traces');
-    };
-
     return {
       sourceServiceName,
       targetServiceName,
       edgeStats,
       latencyDistribution,
       handleClose,
-      handleViewLogs,
-      handleViewTraces,
     };
   },
 });

@@ -332,7 +332,6 @@
                 @close="handleCloseSidePanel"
                 @view-logs="handleViewLogs"
                 @view-traces="handleViewTraces"
-                @navigate-to-dashboard="handleNavigateToDashboard"
               />
 
               <!-- Service Graph Edge Panel -->
@@ -342,10 +341,7 @@
                 :graph-data="graphData"
                 :time-range="timeRange"
                 :visible="showEdgePanel"
-                :stream-filter="streamFilter"
                 @close="handleCloseEdgePanel"
-                @view-logs="handleEdgeViewLogs"
-                @view-traces="handleEdgeViewTraces"
               />
             </div>
           </div>
@@ -409,6 +405,7 @@ import {
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
 import useStreams from "@/composables/useStreams";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -419,7 +416,8 @@ export default defineComponent({
     ServiceGraphSidePanel,
     ServiceGraphEdgePanel,
   },
-  setup() {
+  emits: ['view-traces'],
+  setup(props, { emit }) {
     const store = useStore();
     const $q = useQuasar();
     const router = useRouter();
@@ -637,6 +635,30 @@ export default defineComponent({
             name: nodeIdToReselect,
           });
         }, 500); // 500ms delay to ensure chart has fully regenerated
+      }
+    );
+
+    // Watch for stream filter changes and restore chart viewport
+    watch(
+      () => streamFilter.value,
+      async () => {
+        // Clear position cache to force recalculation for new stream data
+        graphNodePositions.value = new Map();
+
+        // Wait for chart to update with new data
+        await nextTick();
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Restore chart to default zoom/pan to fit all content
+          chart.dispatchAction({
+            type: 'restore',
+          });
+        }, 500); // Longer delay to ensure chart has recalculated positions
       }
     );
 
@@ -1068,15 +1090,27 @@ export default defineComponent({
       if (!selectedNode.value) return;
 
       const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
+      const sql = `SELECT * FROM "${streamFilter.value}" WHERE service_name = '${serviceName}' ORDER BY _timestamp DESC`;
+      const query = b64EncodeUnicode(sql);
+
+      const queryObject = {
+        stream_type: "logs",
+        stream: streamFilter.value,
+        from: timeRange.value.startTime,
+        to: timeRange.value.endTime,
+        refresh: 0,
+        sql_mode: "true",
+        query,
+        defined_schemas: "user_defined_schema",
+        org_identifier: store.state.selectedOrganization.identifier,
+        quick_mode: "false",
+        show_histogram: "true",
+        type: "service_graph_view_logs",
+      };
+
       router.push({
-        name: 'logs',
-        query: {
-          stream: streamFilter.value,
-          sql: `SELECT * FROM "${streamFilter.value}" WHERE service_name = '${serviceName}' ORDER BY _timestamp DESC`,
-          start_time: timeRange.value.startTime,
-          end_time: timeRange.value.endTime,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
+        path: "/logs",
+        query: queryObject,
       });
     };
 
@@ -1084,30 +1118,16 @@ export default defineComponent({
       if (!selectedNode.value) return;
 
       const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
-      router.push({
-        name: 'traces',
-        query: {
-          stream: streamFilter.value,
-          sql: `SELECT * FROM "${streamFilter.value}" WHERE service_name = '${serviceName}' ORDER BY start_time DESC`,
-          start_time: timeRange.value.startTime,
-          end_time: timeRange.value.endTime,
-          org_identifier: store.state.selectedOrganization.identifier,
+
+      // Emit event to parent to switch tab and apply query
+      // Parent will handle tab switching and query application
+      emit('view-traces', {
+        stream: streamFilter.value,
+        serviceName: serviceName,
+        timeRange: {
+          startTime: timeRange.value.startTime,
+          endTime: timeRange.value.endTime,
         },
-      });
-    };
-
-    const handleNavigateToDashboard = () => {
-      if (!selectedNode.value) return;
-
-      // Navigate to dashboards page
-      // In the future, this could navigate to a service-specific dashboard
-      const dashboardId = `service-${selectedNode.value.id}`;
-      router.push({
-        name: 'dashboards',
-        params: { dashboardId }
-      }).catch(() => {
-        // If dashboard doesn't exist, navigate to dashboards list
-        router.push({ name: 'dashboards' });
       });
     };
 
@@ -1118,42 +1138,6 @@ export default defineComponent({
       setTimeout(() => {
         selectedEdge.value = null;
       }, 300);
-    };
-
-    const handleEdgeViewLogs = () => {
-      if (!selectedEdge.value) return;
-
-      // Navigate to logs filtered by both source and target services
-      const sourceService = selectedEdge.value.from;
-      const targetService = selectedEdge.value.to;
-      router.push({
-        name: 'logs',
-        query: {
-          stream: streamFilter.value,
-          sql: `SELECT * FROM "${streamFilter.value}" WHERE (service_name = '${sourceService}' OR service_name = '${targetService}') ORDER BY _timestamp DESC`,
-          start_time: timeRange.value.startTime,
-          end_time: timeRange.value.endTime,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
-    const handleEdgeViewTraces = () => {
-      if (!selectedEdge.value) return;
-
-      // Navigate to traces filtered by edge (parent service -> child service)
-      const sourceService = selectedEdge.value.from;
-      const targetService = selectedEdge.value.to;
-      router.push({
-        name: 'traces',
-        query: {
-          stream: streamFilter.value,
-          sql: `SELECT * FROM "${streamFilter.value}" WHERE parent.service.name = '${sourceService}' AND service.name = '${targetService}' ORDER BY start_time DESC`,
-          start_time: timeRange.value.startTime,
-          end_time: timeRange.value.endTime,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
     };
 
     onMounted(async () => {
@@ -1198,13 +1182,10 @@ export default defineComponent({
       handleCloseSidePanel,
       handleViewLogs,
       handleViewTraces,
-      handleNavigateToDashboard,
       // Edge panel
       selectedEdge,
       showEdgePanel,
       handleCloseEdgePanel,
-      handleEdgeViewLogs,
-      handleEdgeViewTraces,
     };
   },
 });
