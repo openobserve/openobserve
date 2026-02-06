@@ -375,6 +375,7 @@ pub struct OrganizationSetting {
     pub dark_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_series_per_query: Option<usize>,
+    #[serde(default)]
     pub usage_stream_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
