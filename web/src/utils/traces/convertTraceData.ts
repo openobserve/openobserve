@@ -194,11 +194,13 @@ export const convertTraceServiceMapData = (
  * Convert service graph data (nodes/edges) to ECharts tree format
  * @param graphData - Object containing nodes and edges arrays
  * @param layoutType - Layout orientation: 'horizontal' | 'vertical' | 'radial'
+ * @param isDarkMode - Whether dark mode is active
  * @returns ECharts tree options
  */
 export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
-  layoutType: string = 'horizontal'
+  layoutType: string = 'horizontal',
+  isDarkMode: boolean = true
 ) => {
   console.log('[convertServiceGraphToTree] Called with:', {
     nodeCount: graphData.nodes.length,
@@ -268,20 +270,66 @@ export const convertServiceGraphToTree = (
     const incomingEdges = incomingEdgesMap.get(nodeId) || [];
     const connectionCount = incomingEdges.length + outgoingEdges.length;
 
-    // Determine node color based on error rate
-    let nodeColor = "#4CAF50"; // Green for healthy
-    if (errorRate > 10) nodeColor = "#F44336"; // Red
-    else if (errorRate > 5) nodeColor = "#FF9800"; // Orange
-    else if (errorRate > 1) nodeColor = "#FFC107"; // Yellow
+    // Border color based on error rate (theme-aware) - matches graph view
+    let borderColor: string;
+    if (isDarkMode) {
+      // Dark mode colors
+      borderColor = "#10b981"; // Green (healthy)
+      if (errorRate > 10) borderColor = "#ef4444"; // Red (critical)
+      else if (errorRate > 5) borderColor = "#f97316"; // Orange (warning)
+      else if (errorRate > 1) borderColor = "#fbbf24"; // Yellow (degraded)
+    } else {
+      // Light mode colors
+      borderColor = "#52c41a"; // Green (healthy)
+      if (errorRate > 10) borderColor = "#f5222d"; // Red (critical)
+      else if (errorRate > 5) borderColor = "#fa8c16"; // Orange (warning)
+      else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
+    }
+
+    // Fixed size for tree view to prevent overlapping
+    const symbolSize = 45;
 
     return {
       name: node.label || node.id,
       value: totalRequests,
-      symbolSize: Math.max(20, Math.min(60, Math.log10(totalRequests + 1) * 15)),
+      symbolSize: symbolSize,
       itemStyle: {
-        color: nodeColor,
-        borderColor: nodeColor,
-        borderWidth: 2,
+        color: isDarkMode ? '#1a1f2e' : '#ffffff',
+        borderColor: borderColor,
+        borderWidth: 4,
+        shadowBlur: 10,
+        shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)',
+        shadowOffsetX: 0,
+        shadowOffsetY: 0,
+      },
+      emphasis: {
+        scale: true,
+        scaleSize: 1.15,
+        itemStyle: {
+          shadowBlur: 20,
+          shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
+        },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: 'bold',
+        },
+      },
+      select: {
+        // Persistent selection styling - matches graph view
+        itemStyle: {
+          borderColor: borderColor,
+          borderWidth: 4,
+          shadowBlur: 25,
+          shadowColor: 'rgba(59, 130, 246, 0.6)', // Blue glow for selected
+          shadowOffsetX: 0,
+          shadowOffsetY: 0,
+        },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: 'bold',
+        },
       },
       label: {
         show: true,
@@ -326,19 +374,28 @@ export const convertServiceGraphToTree = (
   // If still no tree data, create a flat structure
   if (treeData.length === 0 && graphData.nodes.length > 0) {
     return {
+      backgroundColor: 'transparent', // Make chart background transparent to match graph view
       tooltip: { show: true, trigger: 'item', hideDelay: 0, enterable: false },
       series: [{
         type: 'tree',
         data: graphData.nodes.map((node: any) => ({
           name: node.label || node.id,
           value: 0,
-          symbolSize: 20,
-          itemStyle: { color: '#9E9E9E' },
+          symbolSize: 45,
+          itemStyle: {
+            color: isDarkMode ? '#1a1f2e' : '#ffffff',
+            borderColor: '#9E9E9E',
+            borderWidth: 4,
+            shadowBlur: 10,
+            shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)',
+          },
         })),
         layout: 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         initialTreeDepth: -1,
-        symbolSize: 20,
+        symbolSize: 45,
+        roam: true, // Enable panning and zooming
+        selectedMode: 'single', // Enable single node selection
         label: {
           position: layoutType === 'vertical' ? 'bottom' : 'right',
           verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
@@ -361,6 +418,7 @@ export const convertServiceGraphToTree = (
     : treeData;
 
   const options = {
+    backgroundColor: 'transparent', // Make chart background transparent to match graph view
     tooltip: {
       show: true,
       trigger: 'item',
@@ -376,7 +434,9 @@ export const convertServiceGraphToTree = (
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         initialTreeDepth: -1,
         symbol: 'circle',
-        symbolSize: 20,
+        symbolSize: 45,
+        roam: true, // Enable panning and zooming
+        selectedMode: 'single', // Enable single node selection
         label: {
           position: layoutType === 'vertical' ? 'top' : 'left',
           verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',

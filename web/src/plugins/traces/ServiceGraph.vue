@@ -548,7 +548,11 @@ export default defineComponent({
 
       const newOptions =
         visualizationType.value === "tree"
-          ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
+          ? convertServiceGraphToTree(
+              filteredGraphData.value,
+              layoutType.value,
+              $q.dark.isActive // Pass dark mode state
+            )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
               layoutType.value,
@@ -1007,28 +1011,43 @@ export default defineComponent({
       }
       // Check if it's a node click (for graph visualization)
       else if (params.dataType === 'node' && params.data) {
-        console.log('[ServiceGraph] Opening side panel for node:', params.data);
-        // Close edge panel when opening node panel
-        showEdgePanel.value = false;
-        selectedEdge.value = null;
+        // Check if clicking the same node - if so, close the panel
+        if (selectedNode.value && selectedNode.value.id === params.data.id) {
+          console.log('[ServiceGraph] Clicking same node, closing side panel');
+          showSidePanel.value = false;
+          selectedNode.value = null;
+        } else {
+          console.log('[ServiceGraph] Opening side panel for node:', params.data);
+          // Close edge panel when opening node panel
+          showEdgePanel.value = false;
+          selectedEdge.value = null;
 
-        selectedNode.value = params.data;
-        showSidePanel.value = true;
+          selectedNode.value = params.data;
+          showSidePanel.value = true;
+        }
       }
       // For tree visualization, check if it's a tree node
       else if (params.componentType === 'series' && params.data && params.data.name) {
-        console.log('[ServiceGraph] Opening side panel for tree node:', params.data);
-        // Close edge panel when opening node panel
-        showEdgePanel.value = false;
-        selectedEdge.value = null;
-
         // Find the actual node data from graphData
         const nodeData = graphData.value.nodes.find(
           (n: any) => n.label === params.data.name || n.id === params.data.name
         );
+
         if (nodeData) {
-          selectedNode.value = nodeData;
-          showSidePanel.value = true;
+          // Check if clicking the same node - if so, close the panel
+          if (selectedNode.value && selectedNode.value.id === nodeData.id) {
+            console.log('[ServiceGraph] Clicking same tree node, closing side panel');
+            showSidePanel.value = false;
+            selectedNode.value = null;
+          } else {
+            console.log('[ServiceGraph] Opening side panel for tree node:', params.data);
+            // Close edge panel when opening node panel
+            showEdgePanel.value = false;
+            selectedEdge.value = null;
+
+            selectedNode.value = nodeData;
+            showSidePanel.value = true;
+          }
         } else {
           console.warn('[ServiceGraph] Could not find node data for:', params.data.name);
         }
