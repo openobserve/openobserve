@@ -50,8 +50,13 @@ function createMockProps(overrides = {}) {
 
 /**
  * Finds an element by data-test attribute
+ * For dialog content, searches in the document since QDialog teleports content
  */
 function findByTestId(wrapper: VueWrapper, testId: string) {
+  const element = document.querySelector(`[data-test="${testId}"]`);
+  if (element) {
+    return wrapper.find(`[data-test="${testId}"]`);
+  }
   return wrapper.find(`[data-test="${testId}"]`);
 }
 
@@ -59,15 +64,18 @@ function findByTestId(wrapper: VueWrapper, testId: string) {
  * Checks if an element exists by data-test id
  */
 function existsByTestId(wrapper: VueWrapper, testId: string): boolean {
-  return findByTestId(wrapper, testId).exists();
+  const element = document.querySelector(`[data-test="${testId}"]`);
+  return element !== null;
 }
 
 /**
  * Clicks the cancel button
  */
 async function clickCancel(wrapper: VueWrapper) {
-  const button = findByTestId(wrapper, "custom-cancel-button");
-  await button.trigger("click");
+  const button = document.querySelector('[data-test="custom-cancel-button"]') as HTMLElement;
+  if (button) {
+    button.click();
+  }
   await flushPromises();
 }
 
@@ -75,9 +83,19 @@ async function clickCancel(wrapper: VueWrapper) {
  * Clicks the confirm button
  */
 async function clickConfirm(wrapper: VueWrapper) {
-  const button = findByTestId(wrapper, "custom-confirm-button");
-  await button.trigger("click");
+  const button = document.querySelector('[data-test="custom-confirm-button"]') as HTMLElement;
+  if (button) {
+    button.click();
+  }
   await flushPromises();
+}
+
+/**
+ * Gets text content from element (handles both wrapper and DOM elements)
+ */
+function getTextContent(testId: string): string {
+  const element = document.querySelector(`[data-test="${testId}"]`);
+  return element?.textContent || "";
 }
 
 /**
@@ -87,11 +105,16 @@ function mountComponent(props = {}, theme = "light") {
   const store = createMockStore(theme);
   const defaultProps = createMockProps(props);
 
+  // Create a div to attach the component
+  const el = document.createElement('div');
+  document.body.appendChild(el);
+
   return mount(CustomConfirmDialog, {
     props: defaultProps,
     global: {
       plugins: [store],
     },
+    attachTo: el,
   });
 }
 
@@ -143,15 +166,13 @@ describe("CustomConfirmDialog", () => {
         title: "Delete Confirmation",
       });
 
-      const title = findByTestId(wrapper, "dialog-title");
-      expect(title.text()).toBe("Delete Confirmation");
+      expect(getTextContent("dialog-title")).toBe("Delete Confirmation");
     });
 
     it("should display default title when not provided", () => {
       wrapper = mountComponent({ modelValue: true });
 
-      const title = findByTestId(wrapper, "dialog-title");
-      expect(title.text()).toBe("Confirm Action");
+      expect(getTextContent("dialog-title")).toBe("Confirm Action");
     });
 
     it("should update title when prop changes", async () => {
@@ -163,8 +184,7 @@ describe("CustomConfirmDialog", () => {
       await wrapper.setProps({ title: "Updated Title" });
       await flushPromises();
 
-      const title = findByTestId(wrapper, "dialog-title");
-      expect(title.text()).toBe("Updated Title");
+      expect(getTextContent("dialog-title")).toBe("Updated Title");
     });
   });
 
@@ -175,8 +195,7 @@ describe("CustomConfirmDialog", () => {
         message: "This action cannot be undone. Continue?",
       });
 
-      const message = findByTestId(wrapper, "dialog-message");
-      expect(message.text()).toBe("This action cannot be undone. Continue?");
+      expect(getTextContent("dialog-message")).toBe("This action cannot be undone. Continue?");
     });
 
     it("should display empty message when not provided", () => {
@@ -185,8 +204,7 @@ describe("CustomConfirmDialog", () => {
         message: "",
       });
 
-      const message = findByTestId(wrapper, "dialog-message");
-      expect(message.text()).toBe("");
+      expect(getTextContent("dialog-message")).toBe("");
     });
 
     it("should update message when prop changes", async () => {
@@ -198,8 +216,7 @@ describe("CustomConfirmDialog", () => {
       await wrapper.setProps({ message: "Updated message" });
       await flushPromises();
 
-      const message = findByTestId(wrapper, "dialog-message");
-      expect(message.text()).toBe("Updated message");
+      expect(getTextContent("dialog-message")).toBe("Updated message");
     });
 
     it("should handle long messages", () => {
@@ -209,8 +226,7 @@ describe("CustomConfirmDialog", () => {
         message: longMessage,
       });
 
-      const message = findByTestId(wrapper, "dialog-message");
-      expect(message.text()).toBe(longMessage);
+      expect(getTextContent("dialog-message")).toBe(longMessage);
     });
   });
 
@@ -222,8 +238,7 @@ describe("CustomConfirmDialog", () => {
 
     it("should display correct cancel button label", () => {
       wrapper = mountComponent({ modelValue: true });
-      const button = findByTestId(wrapper, "custom-cancel-button");
-      expect(button.text()).toBe("Cancel");
+      expect(getTextContent("custom-cancel-button")).toBe("Cancel");
     });
 
     it("should emit cancel event when clicked", async () => {
@@ -259,8 +274,7 @@ describe("CustomConfirmDialog", () => {
 
     it("should display correct confirm button label", () => {
       wrapper = mountComponent({ modelValue: true });
-      const button = findByTestId(wrapper, "custom-confirm-button");
-      expect(button.text()).toBe("Clear & Continue");
+      expect(getTextContent("custom-confirm-button")).toBe("Clear & Continue");
     });
 
     it("should emit confirm event when clicked", async () => {
@@ -322,21 +336,21 @@ describe("CustomConfirmDialog", () => {
   describe("Theme Support", () => {
     it("should apply light mode class in light theme", () => {
       wrapper = mountComponent({ modelValue: true }, "light");
-      const card = findByTestId(wrapper, "custom-confirm-card");
-      expect(card.classes()).toContain("light-mode");
+      const card = document.querySelector('[data-test="custom-confirm-card"]');
+      expect(card?.classList.contains("light-mode")).toBe(true);
     });
 
     it("should apply dark mode class in dark theme", () => {
       wrapper = mountComponent({ modelValue: true }, "dark");
-      const card = findByTestId(wrapper, "custom-confirm-card");
-      expect(card.classes()).toContain("dark-mode");
+      const card = document.querySelector('[data-test="custom-confirm-card"]');
+      expect(card?.classList.contains("dark-mode")).toBe(true);
     });
 
     it("should not have both theme classes simultaneously", () => {
       wrapper = mountComponent({ modelValue: true }, "light");
-      const card = findByTestId(wrapper, "custom-confirm-card");
-      expect(card.classes()).toContain("light-mode");
-      expect(card.classes()).not.toContain("dark-mode");
+      const card = document.querySelector('[data-test="custom-confirm-card"]');
+      expect(card?.classList.contains("light-mode")).toBe(true);
+      expect(card?.classList.contains("dark-mode")).toBe(false);
     });
   });
 
@@ -356,8 +370,7 @@ describe("CustomConfirmDialog", () => {
         title: longTitle,
       });
 
-      const title = findByTestId(wrapper, "dialog-title");
-      expect(title.text()).toBe(longTitle);
+      expect(getTextContent("dialog-title")).toBe(longTitle);
     });
 
     it("should handle title with special characters", () => {
@@ -367,8 +380,7 @@ describe("CustomConfirmDialog", () => {
         title: specialTitle,
       });
 
-      const title = findByTestId(wrapper, "dialog-title");
-      expect(title.text()).toBe(specialTitle);
+      expect(getTextContent("dialog-title")).toBe(specialTitle);
     });
 
     it("should handle message with line breaks", () => {
@@ -378,8 +390,7 @@ describe("CustomConfirmDialog", () => {
         message: multilineMessage,
       });
 
-      const message = findByTestId(wrapper, "dialog-message");
-      expect(message.text()).toContain("Line 1");
+      expect(getTextContent("dialog-message")).toContain("Line 1");
     });
 
     it("should handle rapid visibility changes", async () => {
@@ -437,8 +448,8 @@ describe("CustomConfirmDialog", () => {
       expect(existsByTestId(wrapper, "custom-confirm-dialog")).toBe(true);
 
       // Verify content
-      expect(findByTestId(wrapper, "dialog-title").text()).toBe("Delete Item");
-      expect(findByTestId(wrapper, "dialog-message").text()).toContain(
+      expect(getTextContent("dialog-title")).toBe("Delete Item");
+      expect(getTextContent("dialog-message")).toContain(
         "delete this item"
       );
 
@@ -458,7 +469,7 @@ describe("CustomConfirmDialog", () => {
       });
 
       // Verify content
-      expect(findByTestId(wrapper, "dialog-title").text()).toBe(
+      expect(getTextContent("dialog-title")).toBe(
         "Discard Changes"
       );
 

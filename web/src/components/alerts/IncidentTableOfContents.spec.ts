@@ -202,7 +202,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent();
       const icon = findByTestId(wrapper, "toc-header-icon");
       expect(icon.exists()).toBe(true);
-      expect(icon.attributes("name")).toBe("format_list_bulleted");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("format_list_bulleted");
     });
 
     it("should display header title", () => {
@@ -285,7 +286,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       const icon = findByTestId(wrapper, "toc-level1-icon-parent1");
-      expect(icon.attributes("name")).toBe("folder");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("folder");
     });
 
     it("should display article icon for items without children", () => {
@@ -293,7 +295,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       const icon = findByTestId(wrapper, "toc-level1-icon-parent2");
-      expect(icon.attributes("name")).toBe("article");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("article");
     });
 
     it("should show expand button only for items with children", () => {
@@ -365,7 +368,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const icon = findByTestId(wrapper, "toc-level2-icon-child1-1");
-      expect(icon.attributes("name")).toBe("label");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("label");
     });
 
     it("should emit scroll-to-section when clicking level 2 text", async () => {
@@ -429,7 +433,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]));
 
       const icon = findByTestId(wrapper, "toc-level3-icon-l3-1");
-      expect(icon.attributes("name")).toBe("fiber_manual_record");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("fiber_manual_record");
     });
 
     it("should emit scroll-to-section when clicking level 3 item", async () => {
@@ -469,7 +474,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, {});
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      expect(button.attributes("icon")).toBe("chevron_right");
+      const qBtn = button.findComponent({ name: "QBtn" });
+      expect(qBtn.props("icon")).toBe("chevron_right");
     });
 
     it("should show expand_more icon when expanded", () => {
@@ -477,7 +483,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      expect(button.attributes("icon")).toBe("expand_more");
+      const qBtn = button.findComponent({ name: "QBtn" });
+      expect(qBtn.props("icon")).toBe("expand_more");
     });
 
     it("should emit toggle-section when clicking expand button", async () => {
@@ -500,7 +507,7 @@ describe("IncidentTableOfContents", () => {
       const tooltip = button.findComponent({ name: "QTooltip" });
 
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.text()).toBe("Expand");
+      expect(tooltip.html()).toContain("Expand");
     });
 
     it("should show Collapse tooltip when expanded", () => {
@@ -511,7 +518,7 @@ describe("IncidentTableOfContents", () => {
       const tooltip = button.findComponent({ name: "QTooltip" });
 
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.text()).toBe("Collapse");
+      expect(tooltip.html()).toContain("Collapse");
     });
 
     it("should handle expand button on level 2 items with children", async () => {
@@ -735,7 +742,7 @@ describe("IncidentTableOfContents", () => {
 
       wrapper = mountComponent(
         toc,
-        createExpandedSections(["root1", "branch1-1", "root2", "branch2-1"])
+        createExpandedSections(["root1", "branch1-1", "branch1-2", "root2", "branch2-1"])
       );
 
       // Verify all branches are rendered

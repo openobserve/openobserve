@@ -165,7 +165,8 @@ describe("AlertsContainer", () => {
     it("should render correct icon name", () => {
       wrapper = mountComponent({ icon: "notifications" });
       const icon = findByTestId(wrapper, "container-icon");
-      expect(icon.attributes("name")).toBe("notifications");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("notifications");
     });
 
     it("should display image when provided", () => {
@@ -239,22 +240,26 @@ describe("AlertsContainer", () => {
     it("should show down arrow when collapsed", () => {
       wrapper = mountComponent({ isExpanded: false });
       const icon = findByTestId(wrapper, "expand-toggle-icon");
-      expect(icon.attributes("name")).toBe("keyboard_arrow_down");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("keyboard_arrow_down");
     });
 
     it("should show up arrow when expanded", () => {
       wrapper = mountComponent({ isExpanded: true });
       const icon = findByTestId(wrapper, "expand-toggle-icon");
-      expect(icon.attributes("name")).toBe("keyboard_arrow_up");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("keyboard_arrow_up");
     });
 
     it("should update toggle icon when expansion changes", async () => {
       wrapper = mountComponent({ isExpanded: false });
-      const icon = findByTestId(wrapper, "expand-toggle-icon");
-      expect(icon.attributes("name")).toBe("keyboard_arrow_down");
+      const iconWrapper = findByTestId(wrapper, "expand-toggle-icon");
+      let qIcon = iconWrapper.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("keyboard_arrow_down");
 
       await wrapper.setProps({ isExpanded: true });
-      expect(icon.attributes("name")).toBe("keyboard_arrow_up");
+      qIcon = iconWrapper.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("keyboard_arrow_up");
     });
 
     it("should handle multiple rapid toggles", async () => {
@@ -358,7 +363,8 @@ describe("AlertsContainer", () => {
       wrapper = mountComponent({ icon: "" });
       const icon = findByTestId(wrapper, "container-icon");
       expect(icon.exists()).toBe(true);
-      expect(icon.attributes("name")).toBe("");
+      const qIcon = icon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("");
     });
 
     it("should handle invalid image path gracefully", () => {
