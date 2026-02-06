@@ -261,10 +261,10 @@ describe("DedupSummaryCards", () => {
         })
       );
       const icon = findByTestId(wrapper, "suppression-info-icon");
-      const iconHtml = icon.html();
-      expect(iconHtml).toContain("30 suppressed");
-      expect(iconHtml).toContain("50 total");
-      expect(iconHtml).toContain("Passed: 20");
+      const tooltip = icon.findComponent({ name: "QTooltip" });
+      expect(tooltip.text()).toContain("30 suppressed");
+      expect(tooltip.text()).toContain("50 total");
+      expect(tooltip.text()).toContain("Passed: 20");
     });
   });
 
