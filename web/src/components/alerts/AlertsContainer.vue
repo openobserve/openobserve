@@ -1,7 +1,6 @@
 <template>
-    <div
-    >
-      <div class="tw:flex tw:justify-between cursor-pointer" @click="expanded = !expanded">
+    <div data-test="alerts-container">
+      <div data-test="alerts-container-header" class="tw:flex tw:justify-between cursor-pointer" @click="expanded = !expanded">
         <div class="tw:flex tw:items-start tw:justify-between full-width ">
 
           <div
@@ -10,6 +9,7 @@
           >
           <q-icon
             v-if="!image"
+            data-test="container-icon"
             :name="icon"
             size="16px"
             class="tw:mr-2   tw:rounded-full tw:px-1 tw:py-1  "
@@ -22,6 +22,7 @@
           />
           <img
             v-else
+            data-test="container-image"
             :src="image"
             class="tw:mr-2 tw:rounded-full tw:px-1 tw:py-1"
             :class="[
@@ -31,9 +32,9 @@
                 iconClass
             ]"
           />
-          <div class="tw:flex tw:flex-col tw:items-start tw:justify-start">
-           <span> {{ label }}</span>
-            <div class="tw:text-[13px] tw:h-[20px]"
+          <div data-test="container-label-wrapper" class="tw:flex tw:flex-col tw:items-start tw:justify-start">
+           <span data-test="container-label"> {{ label }}</span>
+            <div data-test="container-sublabel" class="tw:text-[13px] tw:h-[20px]"
             :class="[
               store.state.theme === 'dark'
                 ? 'tw:text-[#c6c6c6]'
@@ -46,6 +47,7 @@
 
           </div>
           <q-icon
+            data-test="expand-toggle-icon"
             :name="expanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
             class="tw:rounded-full tw:p-1 tw:mt-2"
 
@@ -58,7 +60,9 @@
           />
         </div>
       </div>
-      <slot v-if="expanded" />
+      <div v-if="expanded" data-test="container-content">
+        <slot />
+      </div>
     </div>
     
   </template>
