@@ -96,6 +96,10 @@ pub struct ListDashboardsQuery {
     /// dashboards.
     title: Option<String>,
 
+    /// The optional case-insensitive dashboard ID substring with which to filter
+    /// dashboards.
+    dashboard_id: Option<String>,
+
     /// The optional number of dashboards to retrieve. If not set then all
     /// dashboards that match the query parameters will be returned.
     ///
@@ -188,45 +192,43 @@ impl From<MetaDashboard> for DashboardResponseBody {
 
 impl ListDashboardsQuery {
     pub fn into(self, org_id: &str) -> config::meta::dashboards::ListDashboardsParams {
-        let mut query = match &self {
-            Self {
-                folder: Some(f),
-                title: Some(t),
-                ..
-            } => config::meta::dashboards::ListDashboardsParams::new(org_id)
-                .with_folder_id(f)
-                .where_title_contains(t),
-            Self {
-                folder: None,
-                title: Some(t),
-                ..
-            } => {
-                config::meta::dashboards::ListDashboardsParams::new(org_id).where_title_contains(t)
-            }
-            Self {
-                folder: Some(f),
-                title: None,
-                ..
-            } => config::meta::dashboards::ListDashboardsParams::new(org_id).with_folder_id(f),
-            Self {
-                folder: None,
-                title: None,
-                ..
-            } => {
-                // To preserve backwards-compatability when no filter parameters
-                // are given we will list the contents of the default folder.
-                config::meta::dashboards::ListDashboardsParams::new(org_id)
-                    .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
-            }
-        };
+        let mut query = config::meta::dashboards::ListDashboardsParams::new(org_id);
+
+        // Determine which filters are actually provided (non-empty)
+        let has_folder = self.folder.as_ref().is_some_and(|f| !f.is_empty());
+        let has_title = self.title.as_ref().is_some_and(|t| !t.is_empty());
+        let has_dashboard_id = self.dashboard_id.as_ref().is_some_and(|id| !id.is_empty());
+
+        // Apply folder filter only if provided and non-empty
+        if has_folder {
+            query = query.with_folder_id(self.folder.as_ref().unwrap());
+        }
+
+        // Apply title filter if provided and non-empty
+        if has_title {
+            query = query.where_title_contains(self.title.as_ref().unwrap());
+        }
+
+        // Apply dashboard_id filter if provided and non-empty
+        if has_dashboard_id {
+            query = query.where_dashboard_id_contains(self.dashboard_id.as_ref().unwrap());
+        }
+
+        // If no filter parameters are provided (or all are empty strings),
+        // default to the default folder for backwards-compatibility.
+        // When searching by title or dashboard_id, we want to search across all folders,
+        // so we don't apply the default folder in that case.
+        if !has_folder && !has_title && !has_dashboard_id {
+            query = query.with_folder_id(config::meta::folder::DEFAULT_FOLDER);
+        }
 
         // The API currently only supports using page_size to limit the output
         // to the top results. And the page_size parameter is only used when the
-        // title parameter is provided to search dashboards by title pattern.
-        // When the title parameter is not set we simply want to return all
+        // title or dashboard_id parameter is provided to search dashboards.
+        // When neither parameter is set we simply want to return all
         // dashboards that match the selected folder so we ignore the page_size
         // parameter.
-        if self.title.is_some_and(|t| !t.is_empty())
+        if (has_title || has_dashboard_id)
             && let Some(page_size) = self.page_size
         {
             query = query.paginate(page_size, 0)

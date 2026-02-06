@@ -1164,8 +1164,15 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           "",
           query,
+          query,
         );
-        if (response.config.params.title != searchQuery.value) {
+        // Check if this response is stale (user has typed something new since the request was made)
+        // We send the same query to both title and dashboardId, so check both to be safe
+        const titleMatches = response.config.params.title === searchQuery.value;
+        const dashboardIdMatches = response.config.params.dashboardId === searchQuery.value;
+
+        // If neither matches the current search query, this is a stale response
+        if (!titleMatches && !dashboardIdMatches) {
           return [];
         }
 
@@ -1391,7 +1398,10 @@ export default defineComponent({
         const filtered = [];
         terms = terms.toLowerCase();
         for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+          const name = String(rows[i]["name"] ?? "").toLowerCase();
+          const identifier = String(rows[i]["identifier"] ?? "").toLowerCase();
+
+          if (name.includes(terms) || identifier.includes(terms)) {
             filtered.push(rows[i]);
           }
         }
