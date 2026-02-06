@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
         horizontal
+        @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
           <div
@@ -45,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
+              @buildModeToggle="onBuildModeToggle"
             />
           </div>
         </template>
@@ -52,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
-            v-show="searchObj.meta.logsVisualizeToggle != 'visualize'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs' || searchObj.meta.logsVisualizeToggle == 'patterns'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -317,6 +319,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
             ></VisualizeLogsQuery>
           </div>
+          <div
+            v-if="searchObj.meta.logsVisualizeToggle == 'build'"
+            class="build-container"
+            :style="{ '--splitter-height': `${splitterModel}vh` }"
+          >
+            <BuildQueryPage
+              ref="buildQueryPageRef"
+              :searchQuery="searchObj.data.query"
+              :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
+              :selectedDateTime="selectedDateTime"
+              :isFirstToggle="isFirstBuildToggle"
+              @apply="onBuildApply"
+              @cancel="onBuildCancel"
+              @queryGenerated="onBuildQueryGenerated"
+              @customQueryModeChanged="onCustomQueryModeChanged"
+              @initialized="onBuildInitialized"
+            />
+          </div>
         </template>
       </q-splitter>
     </div>
@@ -464,6 +484,9 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     VisualizeLogsQuery: defineAsyncComponent(
       () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+    ),
+    BuildQueryPage: defineAsyncComponent(
+      () => import("@/plugins/logs/BuildQueryPage.vue"),
     ),
     SearchHistory: defineAsyncComponent(
       () => import("@/plugins/logs/SearchHistory.vue"),
@@ -663,6 +686,7 @@ export default defineComponent({
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const buildQueryPageRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
@@ -690,6 +714,10 @@ export default defineComponent({
       convertSchemaToFields,
       setFieldsBasedOnChartTypeValidation,
     } = useDashboardPanelData("logs");
+
+    // Get build page's dashboardPanelData for watching chart type/config changes
+    const { dashboardPanelData: buildDashboardPanelData } = useDashboardPanelData("build");
+
     const visualizeErrorData: any = reactive({
       errors: [],
     });
@@ -1576,10 +1604,25 @@ export default defineComponent({
     // Flag to track if this is the first time switching to visualization mode
     const isFirstVisualizationToggle = ref(true);
 
+    // Flag to track if this is the first time switching to build mode
+    // Used to restore chart type from URL only on first toggle (for shared links)
+    const isFirstBuildToggle = ref(true);
+
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         try {
+          // Reset buildModeQueryEditorDisabled when not in build mode
+          if (searchObj.meta.logsVisualizeToggle !== "build") {
+            searchObj.meta.buildModeQueryEditorDisabled = false;
+          }
+
+          // Set loading flag for build mode to prevent flicker between initialization and chart API call
+          // This will be cleared when trace IDs arrive (via watcher) or when unmounting
+          if (searchObj.meta.logsVisualizeToggle === "build") {
+            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
+          }
+
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
             // Enable quick mode automatically when switching to visualization if:
             // 1. SQL mode is disabled OR
@@ -1850,9 +1893,6 @@ export default defineComponent({
             await nextTick();
             isRestoringFromUrl.value = false;
 
-            // set fields extraction loading to false
-            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
-
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
@@ -1970,6 +2010,17 @@ export default defineComponent({
       },
     );
 
+    // Watch for build page chart type changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.type,
+      () => {
+        // Sync build data to URL parameters when chart type changes
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+    );
+
     watch(
       () => splitterModel.value,
       () => {
@@ -1996,6 +2047,33 @@ export default defineComponent({
     watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
       deep: true,
     });
+
+    // Watch for build page config changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.config,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+      { deep: true },
+    );
+
+    // Sync searchObj.data.query to build page's dashboardPanelData when in custom query mode
+    // This ensures edited queries are reflected in the panel schema immediately
+    watch(
+      () => searchObj.data.query,
+      (newQuery) => {
+        if (
+          searchObj.meta.logsVisualizeToggle === "build" &&
+          buildDashboardPanelData.data.queries[0]?.customQuery === true
+        ) {
+          buildDashboardPanelData.data.queries[
+            buildDashboardPanelData.layout.currentQueryIndex
+          ].query = newQuery;
+        }
+      },
+    );
 
     watch(
       () => [
@@ -2125,6 +2203,30 @@ export default defineComponent({
         // Extract patterns when user clicks run query in patterns mode
         await extractPatternsForCurrentQuery(clear_cache);
       }
+
+      if (searchObj.meta.logsVisualizeToggle == "build") {
+        // Run query in build mode - same approach as visualization
+        const dateTime =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod,
+              )
+            : cloneDeep(searchObj.data.datetime);
+
+        // Set datetime in build page's dashboardPanelData (same as visualization)
+        if (buildQueryPageRef.value?.dashboardPanelData) {
+          buildQueryPageRef.value.dashboardPanelData.meta.dateTime = {
+            start_time: new Date(dateTime.startTime),
+            end_time: new Date(dateTime.endTime),
+          };
+        }
+
+        // Trigger PanelEditor's runQuery
+        buildQueryPageRef.value?.runQuery(clear_cache);
+
+        // Sync build config to URL parameters
+        updateUrlQueryParams(null, buildQueryPageRef.value?.dashboardPanelData);
+      }
     };
 
     const handleChartApiError = (errorMessage: any) => {
@@ -2132,6 +2234,65 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    // Build Query Page handlers
+    const onBuildApply = (query: string) => {
+      // Apply the generated query from build page
+      searchObj.data.query = query;
+      searchObj.meta.logsVisualizeToggle = "logs";
+      handleRunQueryFn();
+    };
+
+    const onBuildCancel = () => {
+      // Cancel and return to logs view
+      searchObj.meta.logsVisualizeToggle = "logs";
+    };
+
+    const onBuildQueryGenerated = (query: string) => {
+      // Sync generated query to logs composables so user can see it in the editor
+      // Always update, including empty string when all fields are removed
+      searchObj.data.query = query;
+      searchObj.data.editorValue = query;
+    };
+
+    const onCustomQueryModeChanged = (isCustomMode: boolean) => {
+      // Disable query editor in build mode when customQuery is false (builder mode)
+      // In builder mode, query is auto-generated from fields - user shouldn't edit directly
+      searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
+    };
+
+    // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
+    const onBuildModeToggle = (isCustomMode: boolean) => {
+      // Update the panel schema's customQuery flag
+      if (buildDashboardPanelData.data.queries[0]) {
+        buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
+      }
+    };
+
+    const onBuildInitialized = () => {
+      // Mark that we've processed the first build toggle
+      // After this, chart type will always be auto-selected on tab switch
+      if (isFirstBuildToggle.value) {
+        isFirstBuildToggle.value = false;
+      }
+    };
+
+    // Selected date time for BuildQueryPage
+    const selectedDateTime = computed(() => {
+      const dateTime =
+        searchObj.data.datetime.type === "relative"
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod,
+            )
+          : cloneDeep(searchObj.data.datetime);
+
+      return {
+        start_time: new Date(dateTime.startTime),
+        end_time: new Date(dateTime.endTime),
+        valueType: searchObj.data.datetime.type,
+        relativeTimePeriod: searchObj.data.datetime.relativeTimePeriod,
+      };
+    });
 
     // [START] cancel running queries
 
@@ -2651,6 +2812,15 @@ export default defineComponent({
       getHistogramData,
       extractPatternsForCurrentQuery,
       patternsState,
+      buildQueryPageRef,
+      onBuildApply,
+      onBuildCancel,
+      onBuildQueryGenerated,
+      onCustomQueryModeChanged,
+      onBuildModeToggle,
+      onBuildInitialized,
+      selectedDateTime,
+      isFirstBuildToggle,
     };
   },
   computed: {
