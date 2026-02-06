@@ -38,7 +38,7 @@ use crate::{
 /// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     get,
-    path = "/{org_id}/{stream_name}/sessions/latest",
+    path = "/{org_id}/{stream_name}/traces/session",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetLatestSessions",
@@ -100,7 +100,7 @@ pub async fn get_latest_sessions(
     let (http_span, trace_id) = if cfg.common.tracing_search_enabled {
         let uuid_v7_trace_id = config::ider::generate_trace_id();
         let span = tracing::info_span!(
-            "/api/{org_id}/{stream_name}/sessions/latest",
+            "/api/{org_id}/{stream_name}/traces/session",
             org_id = org_id.clone(),
             stream_name = stream_name.clone(),
             trace_id = uuid_v7_trace_id.clone()
@@ -253,7 +253,7 @@ pub async fn get_latest_sessions(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/api/org/sessions/latest",
+                    "/api/org/traces/session",
                     "500",
                     &org_id,
                     stream_type.as_str(),
@@ -263,7 +263,7 @@ pub async fn get_latest_sessions(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/api/org/sessions/latest",
+                    "/api/org/traces/session",
                     "500",
                     &org_id,
                     stream_type.as_str(),
@@ -347,7 +347,7 @@ pub async fn get_latest_sessions(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/api/org/sessions/latest",
+                    "/api/org/traces/session",
                     "500",
                     &org_id,
                     stream_type.as_str(),
@@ -357,7 +357,7 @@ pub async fn get_latest_sessions(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/api/org/sessions/latest",
+                    "/api/org/traces/session",
                     "500",
                     &org_id,
                     stream_type.as_str(),
@@ -444,7 +444,7 @@ pub async fn get_latest_sessions(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/org/sessions/latest",
+            "/api/org/traces/session",
             "200",
             &org_id,
             stream_type.as_str(),
@@ -454,7 +454,7 @@ pub async fn get_latest_sessions(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/org/sessions/latest",
+            "/api/org/traces/session",
             "200",
             &org_id,
             stream_type.as_str(),
