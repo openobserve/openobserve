@@ -15,13 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tag-input-container">
-    <div class="tag-input-wrapper" :class="{ 'has-content': hasContent }">
-      <label v-if="label" class="tag-input-label">{{ label }}</label>
-      <div class="tags-and-input">
+  <div data-test="tag-input-container" class="tag-input-container">
+    <div data-test="tag-input-wrapper" class="tag-input-wrapper" :class="{ 'has-content': hasContent }">
+      <label v-if="label" data-test="tag-input-label" class="tag-input-label">{{ label }}</label>
+      <div data-test="tags-and-input" class="tags-and-input">
         <q-chip
           v-for="(tag, index) in modelValue"
           :key="index"
+          :data-test="`tag-chip-${index}`"
           removable
           @remove="removeTag(index)"
           size="12px"
@@ -30,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ tag }}
         </q-chip>
         <input
+          data-test="tag-input-field"
           ref="inputRef"
           v-model="inputValue"
           type="text"
