@@ -18,6 +18,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
+/// Image attachment for multimodal AI chat
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ImageAttachment {
+    /// Base64-encoded image data
+    pub data: String,
+    /// MIME type (image/png or image/jpeg)
+    pub mime_type: String,
+    /// Optional filename
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+}
+
 /// AI chat request for conversational interactions with the OpenObserve AI assistant.
 ///
 /// # Example
@@ -54,6 +66,9 @@ pub struct PromptRequest {
     #[serde(default)]
     #[schema(value_type = Object, example = json!({"start_time": 1768406781751488, "end_time": 1768496804185872, "stream_name": "default", "stream_type": "logs"}))]
     pub context: Map<String, Value>,
+    /// Optional image attachments for multimodal queries (max 2MB each, PNG/JPEG only)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<ImageAttachment>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
