@@ -749,7 +749,7 @@ describe("IncidentList.vue", () => {
     });
 
     it("should have correct number of columns", () => {
-      expect(wrapper.vm.columns).toHaveLength(7);
+      expect(wrapper.vm.columns).toHaveLength(8);
     });
 
     it("should have status column with correct config", () => {
