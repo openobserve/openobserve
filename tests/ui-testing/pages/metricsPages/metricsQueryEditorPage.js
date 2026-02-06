@@ -228,7 +228,7 @@ export class MetricsQueryEditorPage {
         if (!actualText.includes(query.substring(0, Math.min(10, query.length)))) {
             this.testLogger.error(`❌ Query mismatch - expected "${query}" but got "${actualText}"`);
             // Take a screenshot for debugging
-            await this.page.screenshot({ path: `query-mismatch-${Date.now()}.png` });
+            await this.page.screenshot({ path: `test-results/query-mismatch-${Date.now()}.png` });
         } else {
             this.testLogger.info('✓ Query successfully entered');
         }
@@ -407,7 +407,7 @@ export class MetricsQueryEditorPage {
         }
 
         this.testLogger.error('❌ Add query button not found with any selector');
-        await this.page.screenshot({ path: `add-button-not-found-${Date.now()}.png` });
+        await this.page.screenshot({ path: `test-results/add-button-not-found-${Date.now()}.png` });
         return false;
     }
 
