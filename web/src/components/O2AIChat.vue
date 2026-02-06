@@ -211,6 +211,25 @@
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
+      <!-- Image Preview Dialog -->
+      <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
+        <q-card class="image-preview-dialog" style="max-width: 90vw; max-height: 90vh;">
+          <q-card-section class="row items-center q-pb-none">
+            <div class="text-subtitle1">{{ previewImage?.filename }}</div>
+            <q-space />
+            <q-btn icon="close" flat round dense v-close-popup />
+          </q-card-section>
+          <q-card-section class="q-pa-md tw:flex tw:justify-center">
+            <img
+              v-if="previewImage"
+              :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+              :alt="previewImage.filename"
+              style="max-width: 100%; max-height: 80vh; object-fit: contain;"
+            />
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
@@ -371,6 +390,22 @@
                 </template>
                 <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
                 <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
+                  <!-- Display images for user messages -->
+                  <div v-if="message.role === 'user' && message.images && message.images.length > 0" class="message-images tw:flex tw:flex-wrap tw:gap-2 tw:mb-2">
+                    <div
+                      v-for="(img, imgIndex) in message.images"
+                      :key="'img-' + imgIndex"
+                      class="message-image-item"
+                    >
+                      <img
+                        :src="'data:' + img.mimeType + ';base64,' + img.data"
+                        :alt="img.filename"
+                        class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded tw:border tw:border-gray-300 tw:cursor-pointer"
+                        @click="openImagePreview(img)"
+                      />
+                      <q-tooltip>{{ img.filename }}</q-tooltip>
+                    </div>
+                  </div>
                   <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
                     <div v-if="block.type === 'code'" class="code-block">
                       <div class="code-block-header code-block-theme">
@@ -468,7 +503,49 @@
         </div>
       </div>
 
-      <div class="chat-input-wrapper tw:flex tw:flex-col q-ma-md" @click="focusInput">
+      <div
+        class="chat-input-wrapper tw:flex tw:flex-col q-ma-md"
+        @click="focusInput"
+        @dragover="handleDragOver"
+        @drop="handleDrop"
+        @paste="handlePaste"
+      >
+        <!-- Hidden file input for image upload -->
+        <input
+          ref="imageInputRef"
+          type="file"
+          accept="image/png,image/jpeg"
+          multiple
+          style="display: none;"
+          @change="handleImageSelect"
+        />
+
+        <!-- Image preview strip -->
+        <div v-if="pendingImages.length > 0" class="image-preview-strip">
+          <div
+            v-for="(img, index) in pendingImages"
+            :key="index"
+            class="image-preview-item"
+          >
+            <img
+              :src="'data:' + img.mimeType + ';base64,' + img.data"
+              :alt="img.filename"
+              class="preview-image"
+            />
+            <q-btn
+              round
+              dense
+              flat
+              size="xs"
+              class="image-remove-btn"
+              @click.stop="removeImage(index)"
+            >
+              <q-icon name="close" size="12px" color="white" />
+            </q-btn>
+            <q-tooltip>{{ img.filename }} ({{ (img.size / 1024).toFixed(0) }}KB)</q-tooltip>
+          </div>
+        </div>
+
         <q-input
           ref="chatInput"
           v-model="inputMessage"
@@ -480,39 +557,51 @@
           type="textarea"
           autogrow
           :borderless="true"
-          style="max-height: 250px; overflow-y: auto; font-size: 16px;"
           class="chat-input"
           flat
         >
         </q-input>
-        <div class="tw:flex tw:items-center tw:justify-end tw:mt-2 tw:gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
-          <!-- Debug info - remove this later -->
-          <!-- <div class="tw:text-xs tw:text-gray-500">Loading: {{ isLoading }}, Input: {{ inputMessage.length }}</div> -->
-
-          <!-- Send button - shown when not loading -->
+        <div class="tw:flex tw:items-center tw:justify-between tw:mt-2 tw:gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
+          <!-- Image upload button -->
           <q-btn
             v-if="!isLoading"
-            :disable="!inputMessage.trim()"
-            @click="sendMessage"
+            @click.stop="triggerImageUpload"
             round
             dense
             flat
-            class="tw:ml-1 send-button"
+            class="image-upload-btn"
           >
-            <q-icon name="send" size="16px" color="white" />
+            <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
+            <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
           </q-btn>
-          
-          <!-- Stop button - shown when loading/streaming -->
-          <q-btn
-            v-if="isLoading"
-            @click="cancelCurrentRequest"
-            round
-            dense
-            flat
-            class="tw:ml-1 stop-button"
-          >
-            <q-icon name="stop" size="16px" color="white" />
-          </q-btn>
+          <div v-else class="tw:w-8"></div>
+
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <!-- Send button - shown when not loading -->
+            <q-btn
+              v-if="!isLoading"
+              :disable="!inputMessage.trim() && pendingImages.length === 0"
+              @click="sendMessage"
+              round
+              dense
+              flat
+              class="tw:ml-1 send-button"
+            >
+              <q-icon name="send" size="16px" color="white" />
+            </q-btn>
+
+            <!-- Stop button - shown when loading/streaming -->
+            <q-btn
+              v-if="isLoading"
+              @click="cancelCurrentRequest"
+              round
+              dense
+              flat
+              class="tw:ml-1 stop-button"
+            >
+              <q-icon name="stop" size="16px" color="white" />
+            </q-btn>
+          </div>
         </div>
       </div>
     </div>
@@ -532,7 +621,7 @@ import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 // Add IndexedDB setup
@@ -678,6 +767,13 @@ export default defineComponent({
     // Throttle save during streaming to prevent data loss on page reload
     const lastStreamingSaveTime = ref<number>(0);
     const STREAMING_SAVE_INTERVAL = 3000; // Save at most every 3 seconds during streaming
+
+    // Pending images for current message
+    const pendingImages = ref<ImageAttachment[]>([]);
+    const imageInputRef = ref<HTMLInputElement | null>(null);
+    // Image preview dialog state
+    const showImagePreview = ref(false);
+    const previewImage = ref<ImageAttachment | null>(null);
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
@@ -1554,7 +1650,7 @@ export default defineComponent({
             firstUserMessage.content) :
           'New Chat');
 
-        // Create a serializable version of the messages (including contentBlocks)
+        // Create a serializable version of the messages (including contentBlocks and images)
         // Use JSON parse/stringify to strip Vue reactive proxies
         const serializableMessages = chatMessages.value.map(msg => {
           const serialized: any = {
@@ -1564,6 +1660,10 @@ export default defineComponent({
           if (msg.contentBlocks && msg.contentBlocks.length > 0) {
             // Deep clone to remove Vue reactivity
             serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
+          }
+          if (msg.images && msg.images.length > 0) {
+            // Deep clone images to remove Vue reactivity
+            serialized.images = JSON.parse(JSON.stringify(msg.images));
           }
           return serialized;
         });
@@ -1830,11 +1930,12 @@ export default defineComponent({
         request.onsuccess = async () => {
           const chat = request.result;
           if (chat) {
-            // Ensure messages are properly formatted (including contentBlocks)
+            // Ensure messages are properly formatted (including contentBlocks and images)
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
-              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {})
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
+              ...(msg.images ? { images: msg.images } : {})
             }));
             
             // Check if the last message is a user message without an assistant response
@@ -1874,18 +1975,27 @@ export default defineComponent({
      * Manages the complete request lifecycle from user input to streaming response
      */
     const sendMessage = async () => {
-      if (!inputMessage.value.trim() || isLoading.value) return;
+      // Allow sending with text or images (or both)
+      const hasText = inputMessage.value.trim().length > 0;
+      const hasImages = pendingImages.value.length > 0;
+      if ((!hasText && !hasImages) || isLoading.value) return;
 
       const userMessage = inputMessage.value;
-      
+      const messagesToSend = [...pendingImages.value]; // Capture images before clearing
+
       // Add to query history before clearing input
-      addToHistory(userMessage);
-      
+      if (hasText) {
+        addToHistory(userMessage);
+      }
+
+      // Push user message with images
       chatMessages.value.push({
         role: 'user',
-        content: userMessage
+        content: userMessage,
+        ...(hasImages && { images: messagesToSend })
       });
       inputMessage.value = '';
+      clearPendingImages(); // Clear pending images after capturing
       shouldAutoScroll.value = true; // Reset auto-scroll for new message
       await scrollToBottom(); // Scroll after user message
       await saveToHistory(); // Save after user message
@@ -1898,11 +2008,11 @@ export default defineComponent({
 
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
-      
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
-        
+
         let response: any;
         try {
           // Ensure session ID exists for tracking this chat session
@@ -1910,14 +2020,15 @@ export default defineComponent({
             currentSessionId.value = getUUIDv7();
           }
 
-          // Pass abort signal and session ID to enable request cancellation and session tracking
+          // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
           response = await fetchAiChat(
             chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
             currentAbortController.value.signal,
             undefined, // explicitContext
-            currentSessionId.value // sessionId for x-o2-session-id header
+            currentSessionId.value, // sessionId for x-o2-session-id header
+            hasImages ? messagesToSend : undefined // images for multimodal queries
           );
         } catch (error) {
           console.error('Error fetching AI chat:', error);
@@ -1985,6 +2096,35 @@ export default defineComponent({
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
+      } else if (e.key === 'Backspace') {
+        // Check if cursor is right after a @[filename] reference
+        const textarea = e.target as HTMLTextAreaElement;
+        const cursorPos = textarea.selectionStart;
+        const text = inputMessage.value;
+
+        // Find if cursor is at the end of a @[filename] pattern
+        const textBeforeCursor = text.substring(0, cursorPos);
+        const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
+
+        if (match) {
+          e.preventDefault();
+          const filename = match[1];
+          const refStart = cursorPos - match[0].length;
+
+          // Remove the entire @[filename] reference from text
+          inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
+
+          // Remove the associated image from pendingImages
+          const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
+          if (imageIndex !== -1) {
+            pendingImages.value.splice(imageIndex, 1);
+          }
+
+          // Set cursor position after the deletion
+          nextTick(() => {
+            textarea.selectionStart = textarea.selectionEnd = refStart;
+          });
+        }
       } else if (e.key === 'ArrowUp' && isOnFirstLine(e.target as HTMLTextAreaElement)) {
         e.preventDefault();
         navigateHistory('up');
@@ -2035,6 +2175,171 @@ export default defineComponent({
           textarea.focus();
         }
       }
+    };
+
+    // Image handling functions
+    const triggerImageUpload = () => {
+      imageInputRef.value?.click();
+    };
+
+    const handleImageSelect = async (event: Event) => {
+      const input = event.target as HTMLInputElement;
+      const files = input.files;
+      if (!files) return;
+
+      for (const file of Array.from(files)) {
+        await addImage(file);
+      }
+      // Reset input so the same file can be selected again
+      input.value = '';
+    };
+
+    const addImage = async (file: File): Promise<boolean> => {
+      // Validate file size first (before reading)
+      if (file.size > MAX_IMAGE_SIZE_BYTES) {
+        $q.notify({
+          type: 'negative',
+          message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+          position: 'top'
+        });
+        return false;
+      }
+
+      // Basic file type check for immediate feedback (backend will detect actual type)
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
+        $q.notify({
+          type: 'negative',
+          message: 'Only PNG and JPEG images are supported',
+          position: 'top'
+        });
+        return false;
+      }
+
+      // Convert to base64
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = (e.target?.result as string).split(',')[1]; // Remove data:image/...;base64, prefix
+          const imageRef = `@[${file.name}]`;
+
+          // Use file.type for display - backend will detect and correct actual mime type
+          pendingImages.value.push({
+            data: base64,
+            mimeType: file.type as 'image/png' | 'image/jpeg',
+            filename: file.name,
+            size: file.size
+          });
+
+          // Insert image reference at cursor position
+          const textarea = chatInput.value?.$el?.querySelector('textarea') as HTMLTextAreaElement | null;
+          if (textarea) {
+            const start = textarea.selectionStart || 0;
+            const end = textarea.selectionEnd || 0;
+            const text = inputMessage.value;
+            const before = text.substring(0, start);
+            const after = text.substring(end);
+
+            // Add space before if needed
+            const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+            const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+
+            const insertion = (needsSpaceBefore ? ' ' : '') + imageRef + (needsSpaceAfter ? ' ' : '');
+            inputMessage.value = before + insertion + after;
+
+            // Set cursor position after the inserted reference
+            nextTick(() => {
+              const newPos = start + insertion.length;
+              textarea.setSelectionRange(newPos, newPos);
+              textarea.focus();
+            });
+          } else {
+            // Fallback: append to end
+            const currentText = inputMessage.value;
+            const separator = currentText && !currentText.endsWith(' ') && !currentText.endsWith('\n') ? ' ' : '';
+            inputMessage.value = currentText + separator + imageRef + ' ';
+          }
+
+          resolve(true);
+        };
+        reader.onerror = () => {
+          $q.notify({
+            type: 'negative',
+            message: `Failed to read image: ${file.name}`,
+            position: 'top'
+          });
+          resolve(false);
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const removeImage = (index: number) => {
+      // Get the filename before removing
+      const image = pendingImages.value[index];
+      if (image) {
+        // Remove the image reference from the text input
+        const imageRef = `@[${image.filename}]`;
+        inputMessage.value = inputMessage.value
+          .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, 'g'), ' ')
+          .trim();
+      }
+      pendingImages.value.splice(index, 1);
+    };
+
+    // Helper to escape special regex characters
+    const escapeRegExp = (str: string) => {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
+    const clearPendingImages = () => {
+      pendingImages.value = [];
+    };
+
+    // Handle drag and drop for images
+    const handleDragOver = (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const handleDrop = async (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const files = event.dataTransfer?.files;
+      if (!files) return;
+
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('image/')) {
+          await addImage(file);
+        }
+      }
+    };
+
+    // Handle paste for images
+    const handlePaste = async (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            event.preventDefault();
+            await addImage(file);
+          }
+        }
+      }
+    };
+
+    // Open image preview dialog
+    const openImagePreview = (img: ImageAttachment) => {
+      previewImage.value = img;
+      showImagePreview.value = true;
+    };
+
+    const closeImagePreview = () => {
+      showImagePreview.value = false;
+      previewImage.value = null;
     };
 
     // Scroll input textarea to bottom to show latest appended content
@@ -2127,7 +2432,7 @@ export default defineComponent({
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
       }
-      
+
       // Load query history from localStorage
       loadQueryHistory();
     });
@@ -2150,7 +2455,7 @@ export default defineComponent({
         clearInterval(titleIntervalId);
         titleIntervalId = null;
       }
-      
+
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
       //so we need to make sure that the currentChatTimestamp is set to the correct chatId
@@ -2552,6 +2857,20 @@ export default defineComponent({
       aiGeneratedTitle,
       displayedTitle,
       isTypingTitle,
+      // Image handling
+      pendingImages,
+      imageInputRef,
+      triggerImageUpload,
+      handleImageSelect,
+      removeImage,
+      handleDragOver,
+      handleDrop,
+      handlePaste,
+      // Image preview
+      showImagePreview,
+      previewImage,
+      openImagePreview,
+      closeImagePreview,
     }
   }
 });
@@ -3107,16 +3426,94 @@ export default defineComponent({
   background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
   transition: all 0.3s ease !important;
   box-shadow: 0 4px 15px 0 rgba(245, 101, 101, 0.3) !important;
-  
+
   &:hover {
     background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
     box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
     transform: translateY(-1px) !important;
   }
-  
+
   &:active {
     transform: translateY(0) !important;
     box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
+  }
+}
+
+// Image upload button styling
+.image-upload-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// Image preview strip in input area
+.image-preview-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+
+  .image-preview-item {
+    position: relative;
+    display: inline-block;
+
+    .preview-image {
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      transition: transform 0.2s ease;
+
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
+
+    .image-remove-btn {
+      position: absolute !important;
+      top: -6px !important;
+      right: -6px !important;
+      width: 20px !important;
+      height: 20px !important;
+      min-width: 20px !important;
+      min-height: 20px !important;
+      padding: 0 !important;
+      background-color: #ef4444 !important;
+      z-index: 10;
+
+      &:hover {
+        background-color: #dc2626 !important;
+      }
+    }
+  }
+}
+
+// Images in chat messages
+.message-images {
+  .message-image-item {
+    img {
+      border-radius: 8px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+    }
+  }
+}
+
+// Image preview dialog
+.image-preview-dialog {
+  background: var(--q-dark) !important;
+
+  .q-card__section {
+    background: transparent;
   }
 }
 
