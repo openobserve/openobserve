@@ -89,8 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
-            <q-icon name="arrow_forward" size="1.25rem"
-  class="q-ml-xs" />
+            <q-icon name="arrow_forward" size="1.25rem" class="q-ml-xs" />
           </q-btn>
         </div>
       </div>
@@ -99,7 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
+import {
+  computed,
+  nextTick,
+  onActivated,
+  onMounted,
+  ref,
+  watch,
+  onUpdated,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
@@ -257,18 +264,27 @@ const checkIfRumEnabled = async () => {
   return new Promise(async (resolve) => {
     getStream("_rumdata", "logs", false)
       .then((response: any) => {
-        if (response) isRumEnabled.value = true;
+        if (response?.name === "_rumdata") isRumEnabled.value = true;
+        else isRumEnabled.value = false;
       })
       .finally(() => {
         resolve(true);
+      })
+      .catch(() => {
+        isRumEnabled.value = false;
       });
 
     getStream("_sessionreplay", "logs", false)
       .then((response: any) => {
-        if (response) isSessionReplayEnabled.value = true;
+        if (response?.name === "_sessionreplay")
+          isSessionReplayEnabled.value = true;
+        else isSessionReplayEnabled.value = false;
       })
       .finally(() => {
         resolve(true);
+      })
+      .catch(() => {
+        isSessionReplayEnabled.value = false;
       });
   });
 };
