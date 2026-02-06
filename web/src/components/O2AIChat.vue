@@ -283,6 +283,26 @@
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
+      <!-- Image Preview Dialog -->
+      <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
+        <q-card class="image-preview-dialog" style="max-width: 90vw; max-height: 90vh;">
+          <q-card-section class="row items-center q-pb-none">
+            <div class="text-subtitle1">{{ previewImage?.filename }}</div>
+            <q-space />
+            <q-btn icon="close" flat round dense v-close-popup />
+          </q-card-section>
+          <q-card-section class="q-pa-md tw:flex tw:justify-center">
+            <img
+              v-if="previewImage"
+              :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+              :alt="previewImage.filename"
+              style="max-width: 100%; max-height: 80vh; object-fit: contain;"
+            />
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+
+
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
@@ -2928,6 +2948,20 @@ export default defineComponent({
       aiGeneratedTitle,
       displayedTitle,
       isTypingTitle,
+      // Image handling
+      pendingImages,
+      imageInputRef,
+      triggerImageUpload,
+      handleImageSelect,
+      removeImage,
+      handleDragOver,
+      handleDrop,
+      handlePaste,
+      // Image preview
+      showImagePreview,
+      previewImage,
+      openImagePreview,
+      closeImagePreview,
     }
   }
 });
