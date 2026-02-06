@@ -151,14 +151,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatTimestamp(props.row.last_alert_at) }}
               </template>
               <template v-else-if="col.name === 'actions'">
-                <div class="tw:flex tw:justify-end">
+                <div class="action-buttons">
                   <q-btn
                     v-if="props.row.status === 'open'"
                     flat
                     dense
-                    round
-                    icon="check_circle_outline"
-                    color="warning"
+                    size="sm"
+                    icon="visibility"
+                    class="action-btn acknowledge-btn"
                     @click.stop="acknowledgeIncident(props.row)"
                     data-test="incident-ack-btn"
                   >
@@ -168,9 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="props.row.status !== 'resolved'"
                     flat
                     dense
-                    round
-                    icon="done_all"
-                    color="positive"
+                    size="sm"
+                    icon="task_alt"
+                    class="action-btn resolve-btn"
                     @click.stop="resolveIncident(props.row)"
                     data-test="incident-resolve-btn"
                   >
@@ -180,9 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="props.row.status === 'resolved'"
                     flat
                     dense
-                    round
-                    icon="replay"
-                    color="negative"
+                    size="sm"
+                    icon="restart_alt"
+                    class="action-btn reopen-btn"
                     @click.stop="reopenIncident(props.row)"
                     data-test="incident-reopen-btn"
                   >
@@ -1269,6 +1269,86 @@ body.body--dark {
   .badge-rose {
     background: #9f1239;
     color: #fda4af;
+  }
+}
+
+/* Action buttons styling */
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Acknowledge button - eye/visibility icon */
+.acknowledge-btn {
+  color: #d97706;
+}
+
+.acknowledge-btn:hover {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Resolve button - checkmark icon */
+.resolve-btn {
+  color: #059669;
+}
+
+.resolve-btn:hover {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Reopen button - refresh icon */
+.reopen-btn {
+  color: #ea580c;
+}
+
+.reopen-btn:hover {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+/* Dark mode adjustments for action buttons */
+body.body--dark {
+  .acknowledge-btn {
+    color: #fbbf24;
+  }
+
+  .acknowledge-btn:hover {
+    background: #78350f;
+    color: #fde68a;
+  }
+
+  .resolve-btn {
+    color: #34d399;
+  }
+
+  .resolve-btn:hover {
+    background: #065f46;
+    color: #6ee7b7;
+  }
+
+  .reopen-btn {
+    color: #fb923c;
+  }
+
+  .reopen-btn:hover {
+    background: #7c2d12;
+    color: #fdba74;
   }
 }
 </style>

@@ -2152,6 +2152,8 @@ export default defineComponent({
           message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         console.error("Failed to update title:", error);
         $q.notify({
@@ -2310,6 +2312,8 @@ export default defineComponent({
           message: `Incident status updated to ${response.data.status}`,
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         console.error("Failed to update status:", error);
         $q.notify({
@@ -2354,6 +2358,8 @@ export default defineComponent({
           message: `Incident severity updated to ${response.data.severity}`,
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         console.error("Failed to update severity:", error);
         $q.notify({
