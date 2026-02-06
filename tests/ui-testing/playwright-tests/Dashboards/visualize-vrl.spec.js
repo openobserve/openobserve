@@ -1,8 +1,8 @@
-const {
+import {
   test,
   expect,
   navigateToBase,
-} = require("../utils/enhanced-baseFixtures.js");
+} from "../utils/enhanced-baseFixtures.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
@@ -53,7 +53,7 @@ test.describe("VRL visualization support testcases", () => {
     await navigateToBase(page);
     await ingestion(page);
 
-    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"] ?? "defaultorg"}`;
     await page.goto(logsUrl);
     await page.waitForLoadState("networkidle");
 
