@@ -135,7 +135,7 @@ test.describe("VRL visualization support testcases", () => {
     expect(rowCount).toBeGreaterThan(0);
   });
 
-  test("[P1] Should restrict chart type to table only when VRL function is present", async ({
+  test("[P1] Should disable VRL editor and show warning when switching to non-table chart", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -153,27 +153,29 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.openVisualiseTab();
 
     // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
-    // The VRL field list is extracted from query results, not just from editor content
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
     // Wait for VRL fields to be processed and registered
     await page.waitForTimeout(2000);
 
-    // Try to switch to line chart
+    // Verify table panel is displayed initially
+    const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
+    await expect(tablePanel).toBeVisible({ timeout: 10000 });
+
+    // Switch to line chart (now allowed with new behavior)
     await page.locator('[data-test="selected-chart-line-item"]').click();
+    await page.waitForTimeout(1000);
 
-    // Verify error notification appears
-    const errorNotification = page.getByText(
-      "VRL functions are present. Only table chart is supported when using VRL functions."
-    );
-    await expect(errorNotification).toBeVisible({ timeout: 5000 });
+    // NEW BEHAVIOR: Verify VRL warning banner is displayed
+    const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
+    await expect(vrlWarningBanner).toBeVisible({ timeout: 5000 });
 
-    // Verify table chart is still selected
-    await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
+    // NEW BEHAVIOR: Chart switching is now allowed - line chart should be selected
+    await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
   });
 
-  test("[P1] Should show error for all non-table chart types when VRL is present", async ({
+  test("[P1] Should show VRL warning for all non-table chart types when VRL is present", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -196,22 +198,24 @@ test.describe("VRL visualization support testcases", () => {
     // Wait for VRL fields to be processed
     await page.waitForTimeout(2000);
 
-    // Test multiple chart types - all should show error
+    // Test multiple chart types - all should show VRL warning (NEW BEHAVIOR)
     const chartTypes = ["line", "bar", "area", "scatter"];
 
     for (const chartType of chartTypes) {
       await page.locator(`[data-test="selected-chart-${chartType}-item"]`).click();
+      await page.waitForTimeout(1000);
+
+      // NEW BEHAVIOR: Verify VRL warning banner is displayed
+      const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
+      const isWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
+      expect(isWarningVisible).toBe(true);
+
+      // NEW BEHAVIOR: Chart switching is now allowed - verify selected chart type changed
+      await pm.logsVisualise.verifyChartTypeSelected(page, chartType, true);
+
+      // Switch back to table for next iteration
+      await page.locator('[data-test="selected-chart-table-item"]').click();
       await page.waitForTimeout(500);
-
-      // Verify error notification appears
-      const errorNotification = page.getByText(
-        "VRL functions are present. Only table chart is supported when using VRL functions."
-      );
-      const isVisible = await errorNotification.isVisible().catch(() => false);
-      expect(isVisible).toBe(true);
-
-      // Verify table chart remains selected
-      await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
     }
   });
 
@@ -499,7 +503,7 @@ test.describe("VRL visualization support testcases", () => {
     expect(headerCount).toBeGreaterThan(0);
   });
 
-  test("[P1] Should allow table chart selection but no other chart types with VRL", async ({
+  test("[P1] Should allow table chart selection without VRL warning and show warning for other charts", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -526,31 +530,28 @@ test.describe("VRL visualization support testcases", () => {
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
-    // Click table chart - should NOT show VRL error (table is allowed)
+    // Click table chart - should NOT show VRL warning (table supports VRL)
     await page.locator('[data-test="selected-chart-table-item"]').click();
     await page.waitForTimeout(1000);
 
-    // Verify NO VRL error notification appears for table chart selection
-    const vrlErrorNotification = page.getByText(
-      "VRL functions are present. Only table chart is supported when using VRL functions."
-    );
-    let isVrlErrorVisible = await vrlErrorNotification.isVisible().catch(() => false);
-    expect(isVrlErrorVisible).toBe(false);
+    // Verify NO VRL warning appears for table chart selection
+    const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
+    let isVrlWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
+    expect(isVrlWarningVisible).toBe(false);
 
     // Verify table panel is still displayed after clicking table chart
     await expect(tablePanel).toBeVisible({ timeout: 5000 });
 
-    // Now verify that OTHER chart types DO show VRL error
-    // Try to switch to line chart - should show VRL error
+    // NEW BEHAVIOR: Switch to line chart - should show VRL warning and allow switching
     await page.locator('[data-test="selected-chart-line-item"]').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
-    // Verify VRL error notification DOES appear for line chart
-    isVrlErrorVisible = await vrlErrorNotification.isVisible().catch(() => false);
-    expect(isVrlErrorVisible).toBe(true);
+    // NEW BEHAVIOR: Verify VRL warning banner appears for line chart
+    isVrlWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
+    expect(isVrlWarningVisible).toBe(true);
 
-    // Verify table panel is STILL displayed (not switched to line chart)
-    await expect(tablePanel).toBeVisible({ timeout: 5000 });
+    // NEW BEHAVIOR: Chart switching is allowed - line chart should be selected
+    await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
   });
 
   test("[P1] Should enable dynamic columns configuration when VRL function is applied", async ({
@@ -646,7 +647,7 @@ test.describe("VRL visualization support testcases", () => {
     // Note: Chart switching may still be restricted based on other factors like SELECT *
   });
 
-  test.skip("[P1] Should show error for h-bar chart when VRL function is present", async ({
+  test("[P1] Should show VRL warning for h-bar chart when VRL function is present", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -661,27 +662,29 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
 
     await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
+
+    // Wait for VRL fields to be processed
+    await page.waitForTimeout(2000);
 
     // Try to switch to h-bar chart
     const hbarChart = page.locator('[data-test="selected-chart-h-bar-item"]');
     if (await hbarChart.isVisible().catch(() => false)) {
       await hbarChart.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
-      // Verify error notification appears
-      const errorNotification = page.getByText(
-        "VRL functions are present. Only table chart is supported when using VRL functions."
-      );
-      const isVisible = await errorNotification.isVisible().catch(() => false);
-      expect(isVisible).toBe(true);
+      // NEW BEHAVIOR: Verify VRL warning banner is displayed
+      const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
+      const isWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
+      expect(isWarningVisible).toBe(true);
 
-      // Verify table chart remains selected
-      await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
+      // NEW BEHAVIOR: Chart switching is allowed - h-bar should be selected
+      await pm.logsVisualise.verifyChartTypeSelected(page, "h-bar", true);
     }
   });
 
-  test("[P1] Should handle VRL with aggregation query and force table chart", async ({
+  test("[P1] Should handle VRL with aggregation query and show warning when switching charts", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -706,27 +709,25 @@ test.describe("VRL visualization support testcases", () => {
     // Wait for VRL fields to be processed
     await page.waitForTimeout(2000);
 
-    // Verify table is displayed with data
+    // Verify table is displayed with data initially
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
     // Verify data is displayed in table
     const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
-    const rowCount = await tableRows.count();
-    expect(rowCount).toBeGreaterThan(0);
+    await expect(tableRows).not.toHaveCount(0, { timeout: 15000 });
 
-    // Try to switch to bar chart - should show error
+    // NEW BEHAVIOR: Switch to bar chart - should show VRL warning and allow switching
     await page.locator('[data-test="selected-chart-bar-item"]').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
-    const errorNotification = page.getByText(
-      "VRL functions are present. Only table chart is supported when using VRL functions."
-    );
-    const isVisible = await errorNotification.isVisible().catch(() => false);
-    expect(isVisible).toBe(true);
+    // NEW BEHAVIOR: Verify VRL warning banner is displayed
+    const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
+    const isWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
+    expect(isWarningVisible).toBe(true);
 
-    // Verify table panel is still displayed (not switched to bar chart)
-    await expect(tablePanel).toBeVisible({ timeout: 5000 });
+    // NEW BEHAVIOR: Chart switching is allowed - bar chart should be selected
+    await pm.logsVisualise.verifyChartTypeSelected(page, "bar", true);
   });
 
   test("[P1] Should not show VRL error notification when VRL is not present", async ({
