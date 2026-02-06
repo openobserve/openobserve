@@ -178,8 +178,8 @@ describe("DedupSummaryCards", () => {
     it("should display correct tooltip content", async () => {
       wrapper = await mountComponent();
       const icon = findByTestId(wrapper, "dedup-info-icon");
-      // Verify tooltip content by checking the icon's HTML which contains the tooltip
-      expect(icon.html()).toContain("Alerts with deduplication configured");
+      const tooltip = icon.findComponent({ name: "QTooltip" });
+      expect(tooltip.text()).toContain("Alerts with deduplication configured");
     });
   });
 
