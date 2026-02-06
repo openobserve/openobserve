@@ -27,15 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-btn
               flat
-              dense
               round
-              icon="refresh"
-              color="primary"
               :loading="loading"
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
+              class="o2-secondary-button"
             >
-              <q-tooltip>Refresh</q-tooltip>
+             Refresh
             </q-btn>
             <q-input
               v-model="searchQuery"
