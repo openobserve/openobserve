@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@quasar/quasar-app-extension-testing-unit-vitest";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import { createI18n } from "vue-i18n";
 
