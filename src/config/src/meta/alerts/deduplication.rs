@@ -95,6 +95,15 @@ pub struct GlobalDeduplicationConfig {
     /// This would skip statefulset/daemonset and use deployment directly.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fqn_priority_dimensions: Vec<String>,
+
+    /// Time window for hierarchical incident upgrade (minutes)
+    /// Incidents created within this window can be upgraded from weak to strong correlation keys.
+    #[serde(default = "default_upgrade_window")]
+    pub upgrade_window_minutes: u64,
+}
+
+fn default_upgrade_window() -> u64 {
+    30
 }
 
 /// Per-alert deduplication configuration (from main branch)
@@ -300,7 +309,6 @@ impl GlobalDeduplicationConfig {
         Ok(())
     }
 
-    /// Get default configuration with common semantic groups
     pub fn default_with_presets() -> Self {
         Self {
             enabled: false,
@@ -309,6 +317,7 @@ impl GlobalDeduplicationConfig {
             alert_fingerprint_groups: vec![],
             time_window_minutes: None,
             fqn_priority_dimensions: Self::default_fqn_priority(),
+            upgrade_window_minutes: default_upgrade_window(),
         }
     }
 
@@ -468,6 +477,7 @@ mod tests {
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
             fqn_priority_dimensions: vec![],
+            upgrade_window_minutes: default_upgrade_window(),
         };
 
         assert!(config.validate().is_ok());
@@ -540,6 +550,7 @@ mod tests {
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
             fqn_priority_dimensions: vec![],
+            upgrade_window_minutes: default_upgrade_window(),
         };
 
         // Should succeed - overlaps are allowed, just logged as warnings
@@ -558,6 +569,7 @@ mod tests {
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
             fqn_priority_dimensions: vec![],
+            upgrade_window_minutes: default_upgrade_window(),
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();

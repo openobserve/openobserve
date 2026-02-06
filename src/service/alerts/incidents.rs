@@ -96,6 +96,7 @@ pub async fn correlate_alert_to_incident(
                     time_window_minutes: None,
                     alert_fingerprint_groups: vec![],
                     fqn_priority_dimensions: vec![],
+                    upgrade_window_minutes: 30,
                 }
             }
             #[cfg(not(feature = "enterprise"))]
@@ -116,6 +117,7 @@ pub async fn correlate_alert_to_incident(
                     time_window_minutes: None,
                     alert_fingerprint_groups: vec![],
                     fqn_priority_dimensions: vec![],
+                    upgrade_window_minutes: 30,
                 }
             }
             #[cfg(not(feature = "enterprise"))]
@@ -126,7 +128,7 @@ pub async fn correlate_alert_to_incident(
     };
 
     // Extract labels from result row as HashMap
-    let labels: HashMap<String, String> = result_row
+    let mut labels: HashMap<String, String> = result_row
         .iter()
         .filter_map(|(k, v)| {
             let value_str = match v {
@@ -139,8 +141,35 @@ pub async fn correlate_alert_to_incident(
         })
         .collect();
 
+    // Enrich with alert condition dimensions (deterministic baseline)
+    // Handles SQL WHERE, GUI conditions, and PromQL label matchers
+    #[cfg(feature = "enterprise")]
+    {
+        let condition_dims =
+            o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
+                &alert.query_condition,
+                &org_config.semantic_field_groups,
+            );
+
+        if !condition_dims.is_empty() {
+            let before_count = labels.len();
+            for (field_name, value) in condition_dims {
+                labels.entry(field_name).or_insert(value);
+            }
+            let after_count = labels.len();
+
+            if after_count > before_count {
+                log::info!(
+                    "[incidents] Enriched alert '{}' with {} dimensions from alert conditions",
+                    alert.name,
+                    after_count - before_count
+                );
+            }
+        }
+    }
+
     log::debug!(
-        "[incidents] Alert {} result_row labels: {:?}",
+        "[incidents] Alert {} labels after condition enrichment: {:?}",
         alert.name,
         labels
     );
@@ -211,6 +240,7 @@ pub async fn correlate_alert_to_incident(
         triggered_at,
         &correlation_result.reason.to_string(),
         &service_name,
+        org_config.upgrade_window_minutes,
     )
     .await?;
 
@@ -253,8 +283,8 @@ async fn query_service_discovery_key(
         .await
         {
             Ok(Some(response)) => {
-                // Compute correlation_key from the matched dimensions
-                let correlation_key =
+                // Compute correlation_key from the matched dimensions (hierarchical)
+                let (correlation_key, _key_type) =
                     o2_enterprise::enterprise::alerts::incidents::compute_correlation_key(
                         &response.matched_dimensions,
                         &semantic_groups,
@@ -290,7 +320,111 @@ async fn query_service_discovery_key(
     }
 }
 
+fn merge_dimensions(
+    existing: &mut HashMap<String, String>,
+    new: &HashMap<String, String>,
+    incident_id: &str,
+) -> bool {
+    let initial_count = existing.len();
+    for (key, new_value) in new {
+        use std::collections::hash_map::Entry;
+        match existing.entry(key.clone()) {
+            Entry::Vacant(e) => {
+                e.insert(new_value.clone());
+            }
+            Entry::Occupied(e) if e.get() != new_value => {
+                log::warn!(
+                    "[incidents] Dimension conflict in incident {}: {}='{}' vs '{}' - keeping existing",
+                    incident_id,
+                    key,
+                    new_value,
+                    e.get()
+                );
+            }
+            _ => {}
+        }
+    }
+    existing.len() > initial_count
+}
+
+fn spawn_topology_enrichment(
+    org_id: &str,
+    incident_id: &str,
+    service_name: &str,
+    alert_id: &str,
+    alert_name: &str,
+    triggered_at: i64,
+) {
+    let (org_id, incident_id, service_name, alert_id, alert_name) = (
+        org_id.to_string(),
+        incident_id.to_string(),
+        service_name.to_string(),
+        alert_id.to_string(),
+        alert_name.to_string(),
+    );
+
+    tokio::spawn(async move {
+        if let Err(e) = enrich_with_topology(
+            &org_id,
+            &incident_id,
+            &service_name,
+            &alert_id,
+            &alert_name,
+            triggered_at,
+        )
+        .await
+        {
+            log::debug!("[incidents] Topology enrichment failed for {incident_id}: {e}");
+        }
+    });
+}
+
+async fn find_upgradeable_incident(
+    org_id: &str,
+    new_key_type: config::meta::alerts::incidents::KeyType,
+    new_dimensions: &HashMap<String, String>,
+    age_threshold: i64,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
+    use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
+
+    let candidates = infra::table::alert_incidents::find_open_incidents_filtered(
+        org_id,
+        Some(age_threshold),
+        Some(100),
+    )
+    .await?;
+
+    for candidate in candidates {
+        let existing_key_type = KeyType::classify(&candidate.correlation_key);
+        if !existing_key_type.can_upgrade_to(new_key_type) {
+            continue;
+        }
+
+        let existing_dims: HashMap<String, String> =
+            serde_json::from_value(candidate.stable_dimensions.clone()).unwrap_or_default();
+
+        let relationship = DimensionRelationship::check(&existing_dims, new_dimensions);
+
+        match relationship {
+            DimensionRelationship::NewIsSuperset
+            | DimensionRelationship::NewIsSubset
+            | DimensionRelationship::Equal => {
+                log::info!(
+                    "[incidents] Found upgradeable incident {}: {:?}",
+                    candidate.id,
+                    relationship
+                );
+                return Ok(Some(candidate));
+            }
+            _ => continue,
+        }
+    }
+
+    Ok(None)
+}
+
 /// Find an existing open incident or create a new one
+#[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
     org_id: &str,
     correlation_key: &str,
@@ -299,70 +433,33 @@ async fn find_or_create_incident(
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
+    upgrade_window_minutes: u64,
 ) -> Result<String, anyhow::Error> {
-    // Note: trace_id is already in stable_dimensions when trace correlation is used
+    use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
-    // Try to find existing open incident
+    // STEP 1: Exact match
     if let Some(existing) =
         infra::table::alert_incidents::find_open_by_correlation_key(org_id, correlation_key).await?
     {
-        // Deserialize current dimensions
         let mut current_dims: HashMap<String, String> =
             serde_json::from_value(existing.stable_dimensions.clone()).unwrap_or_default();
 
-        // Merge: add new dimensions if key doesn't exist
-        let initial_count = current_dims.len();
-        for (key, new_value) in stable_dimensions {
-            use std::collections::hash_map::Entry;
-            match current_dims.entry(key.clone()) {
-                Entry::Vacant(e) => {
-                    // New dimension - add it
-                    e.insert(new_value.clone());
-                }
-                Entry::Occupied(e) => {
-                    // Dimension exists - check for conflict
-                    if e.get() != new_value {
-                        log::warn!(
-                            "[incidents] Dimension conflict in incident {}: {}='{}' (incoming) vs '{}' (existing) - keeping existing",
-                            existing.id,
-                            key,
-                            new_value,
-                            e.get()
-                        );
-                        // Keep existing value (first-seen wins)
-                    }
-                }
-            }
-        }
+        let dimensions_changed =
+            merge_dimensions(&mut current_dims, stable_dimensions, &existing.id);
 
-        let dimensions_changed = current_dims.len() > initial_count;
-
-        if dimensions_changed {
-            log::info!(
-                "[incidents] Incident {} dimensions expanded: {} → {} dimensions",
-                existing.id,
-                initial_count,
-                current_dims.len()
-            );
-        }
-
-        // Add alert to junction table (this also increments alert_count and updates last_alert_at)
-        let alert_id = alert.get_unique_key();
         infra::table::alert_incidents::add_alert_to_incident(
             &existing.id,
-            &alert_id,
+            &alert.get_unique_key(),
             &alert.name,
             triggered_at,
             correlation_reason,
         )
         .await?;
 
-        // Update dimensions if changed
         if dimensions_changed {
-            // Get the updated count after add_alert_to_incident
             let updated = infra::table::alert_incidents::get(org_id, &existing.id)
                 .await?
-                .ok_or_else(|| anyhow::anyhow!("Incident not found after update"))?;
+                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
 
             infra::table::alert_incidents::update_incident_metadata(
                 org_id,
@@ -374,14 +471,6 @@ async fn find_or_create_incident(
             .await?;
         }
 
-        log::debug!(
-            "[incidents] Added alert '{}' to existing incident {} (correlation_key: {}, dimensions_changed: {})",
-            alert.name,
-            existing.id,
-            correlation_key,
-            dimensions_changed
-        );
-
         #[cfg(feature = "enterprise")]
         if o2_enterprise::enterprise::common::config::get_config()
             .super_cluster
@@ -390,7 +479,7 @@ async fn find_or_create_incident(
             && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_add_alert(
                 org_id,
                 &existing.id,
-                &alert_id,
+                &alert.get_unique_key(),
                 &alert.name,
                 triggered_at,
                 correlation_reason,
@@ -400,29 +489,14 @@ async fn find_or_create_incident(
             log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
         }
 
-        // Trigger topology enrichment for this alert
-        let org_id_clone = org_id.to_string();
-        let incident_id_clone = existing.id.clone();
-        let service_name_clone = service_name.to_string();
-        let alert_id_clone = alert.get_unique_key();
-        let alert_name_clone = alert.name.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = enrich_with_topology(
-                &org_id_clone,
-                &incident_id_clone,
-                &service_name_clone,
-                &alert_id_clone,
-                &alert_name_clone,
-                triggered_at,
-            )
-            .await
-            {
-                log::debug!(
-                    "[incidents] Topology enrichment failed for incident {incident_id_clone}: {e}"
-                );
-            }
-        });
+        spawn_topology_enrichment(
+            org_id,
+            &existing.id,
+            service_name,
+            &alert.get_unique_key(),
+            &alert.name,
+            triggered_at,
+        );
 
         // Retry RCA if it's empty (failed in the past due to infra issues or errors)
         #[cfg(feature = "enterprise")]
@@ -444,7 +518,90 @@ async fn find_or_create_incident(
         return Ok(existing.id);
     }
 
-    // Create new incident
+    // STEP 2: Try hierarchical upgrade with Venn diagram matching
+    let new_key_type = KeyType::classify(correlation_key);
+
+    if new_key_type != KeyType::AlertId {
+        let age_threshold = triggered_at - (upgrade_window_minutes as i64 * 60 * 1_000_000);
+
+        if let Some(upgradeable_incident) =
+            find_upgradeable_incident(org_id, new_key_type, stable_dimensions, age_threshold)
+                .await?
+        {
+            log::info!(
+                "[incidents] Upgrading incident {} with alert '{}' (correlation_key: {} → {})",
+                upgradeable_incident.id,
+                alert.name,
+                upgradeable_incident.correlation_key,
+                correlation_key
+            );
+
+            let mut existing_dims: HashMap<String, String> =
+                serde_json::from_value(upgradeable_incident.stable_dimensions.clone())
+                    .unwrap_or_default();
+
+            let relationship = DimensionRelationship::check(&existing_dims, stable_dimensions);
+            let dimensions_changed = merge_dimensions(
+                &mut existing_dims,
+                stable_dimensions,
+                &upgradeable_incident.id,
+            );
+
+            infra::table::alert_incidents::add_alert_to_incident(
+                &upgradeable_incident.id,
+                &alert.get_unique_key(),
+                &alert.name,
+                triggered_at,
+                "hierarchical_upgrade",
+            )
+            .await?;
+
+            let updated = infra::table::alert_incidents::get(org_id, &upgradeable_incident.id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+
+            // Upgrade correlation key if new key is stronger (NewIsSuperset)
+            // Otherwise just update dimensions if they changed
+            if matches!(relationship, DimensionRelationship::NewIsSuperset) {
+                infra::table::alert_incidents::upgrade_incident_correlation(
+                    org_id,
+                    &upgradeable_incident.id,
+                    correlation_key,
+                    serde_json::to_value(&existing_dims)?,
+                    updated.alert_count,
+                    updated.last_alert_at,
+                )
+                .await?;
+            } else if dimensions_changed {
+                infra::table::alert_incidents::update_incident_metadata(
+                    org_id,
+                    &upgradeable_incident.id,
+                    updated.alert_count,
+                    updated.last_alert_at,
+                    Some(serde_json::to_value(&existing_dims)?),
+                )
+                .await?;
+            }
+
+            spawn_topology_enrichment(
+                org_id,
+                &upgradeable_incident.id,
+                service_name,
+                &alert.get_unique_key(),
+                &alert.name,
+                triggered_at,
+            );
+
+            return Ok(upgradeable_incident.id);
+        }
+    } else {
+        log::debug!(
+            "[incidents] Alert '{}' has alert_id correlation key - skipping hierarchical upgrade search",
+            alert.name
+        );
+    }
+
+    // STEP 3: Create new incident
     let severity = o2_enterprise::enterprise::alerts::incidents::determine_severity(None);
 
     let title = o2_enterprise::enterprise::alerts::incidents::generate_title(
@@ -498,29 +655,14 @@ async fn find_or_create_incident(
         log::error!("[SUPER_CLUSTER] Failed to publish incident create: {e}");
     }
 
-    // Trigger async topology enrichment for new incident
-    let org_id_clone = org_id.to_string();
-    let incident_id_clone = incident.id.clone();
-    let service_name_clone = service_name.to_string();
-    let alert_id_clone = alert.get_unique_key();
-    let alert_name_clone = alert.name.clone();
-
-    tokio::spawn(async move {
-        if let Err(e) = enrich_with_topology(
-            &org_id_clone,
-            &incident_id_clone,
-            &service_name_clone,
-            &alert_id_clone,
-            &alert_name_clone,
-            triggered_at,
-        )
-        .await
-        {
-            log::debug!(
-                "[incidents] Topology enrichment failed for incident {incident_id_clone}: {e}"
-            );
-        }
-    });
+    spawn_topology_enrichment(
+        org_id,
+        &incident.id,
+        service_name,
+        &alert.get_unique_key(),
+        &alert.name,
+        triggered_at,
+    );
 
     // Trigger immediate RCA for new incident
     #[cfg(feature = "enterprise")]
