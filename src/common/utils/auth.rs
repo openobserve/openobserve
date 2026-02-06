@@ -1018,6 +1018,7 @@ where
             || path.contains("/format_query")
             || path.contains("/prometheus/api/v1/series")
             || path.contains("/traces/latest")
+            || (path.contains("/traces/") && path.ends_with("/dag"))
             || path.contains("clusters")
             || path.contains("query_manager")
             || path.contains("/short")
