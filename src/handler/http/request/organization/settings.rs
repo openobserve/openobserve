@@ -140,6 +140,11 @@ pub async fn create(
         data.claim_parser_function = claim_parser_function;
     }
 
+    if let Some(usage_stream_enabled) = settings.usage_stream_enabled {
+        field_found = true;
+        data.usage_stream_enabled = usage_stream_enabled;
+    }
+
     if !field_found {
         return MetaHttpResponse::bad_request("No valid field found");
     }

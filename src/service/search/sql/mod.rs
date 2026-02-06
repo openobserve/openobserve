@@ -240,6 +240,9 @@ impl Sql {
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
+        if let Some(error) = histogram_interval_visitor.error {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)));
+        }
         let mut histogram_interval = if query.histogram_interval > 0 {
             Some(validate_and_adjust_histogram_interval(
                 query.histogram_interval,

@@ -2532,7 +2532,8 @@
     "sql_query": "Consulta SQL",
     "resuls": "Resultados",
     "wrapText": "Quebrar texto",
-    "delayMessage": "O histórico de pesquisa pode ser atrasado em"
+    "delayMessage": "O histórico de pesquisa pode ser atrasado em",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Agendador de tarefas de pesquisa",
@@ -2623,7 +2624,8 @@
     "analyzeButtonLabel": "Analisar",
     "refreshTooltip": "Atualize a análise com o percentil atualizado",
     "customSQLFieldsDisabled": "A seleção de campo não está disponível para consultas SQL personalizadas. As dimensões são extraídas dos resultados da sua consulta.",
-    "timeRangeSelected": "Intervalo de tempo selecionado"
+    "timeRangeSelected": "Intervalo de tempo selecionado",
+    "dimensionsSelected": "Dimensões selecionadas"
   },
   "volumeInsights": {
     "title": "Percepções",

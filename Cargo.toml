@@ -79,14 +79,14 @@ blake3 = { version = "1.8", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
-clap = { version = "4.1", default-features = false, features = [
+clap = { version = "4.5", default-features = false, features = [
     "std",
     "help",
     "usage",
     "suggestions",
     "cargo",
 ] }
-cloudevents-sdk = { version = "0.8.0", features = ["axum"] }
+cloudevents-sdk = { version = "0.9", features = ["axum"] }
 cron.workspace = true
 csv = "1.3"
 dashmap.workspace = true
@@ -114,7 +114,7 @@ log.workspace = true
 maxminddb = "0.27"
 md5.workspace = true
 memchr.workspace = true
-mimalloc = { version = "0.1.43", default-features = false, optional = true }
+mimalloc = { version = "0.1.46", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
@@ -135,7 +135,7 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
-rust-embed-for-web = "11.2.1"
+rust-embed-for-web = "11.3"
 rustls.workspace = true
 rustls-pemfile.workspace = true
 rustls-native-certs.workspace = true
@@ -210,8 +210,8 @@ tokio-stream.workspace = true
 mime = "0.3.17"
 pin-project-lite.workspace = true
 futures-core = "0.3.31"
-derive_more = { version = "2.0.1", features = ["full"] }
-brotli = "8.0.1"
+derive_more = { version = "2.0.2", features = ["full"] }
+brotli = "8.0.2"
 tokio-rustls.workspace = true
 roaring.workspace = true
 flight.workspace = true
@@ -328,7 +328,7 @@ local-ip-address = "0.6"
 hashlink = "0.10"
 hashbrown = { version = "0.16.0", features = ["serde"] }
 hex = "0.4"
-indexmap = { version = "2.7", features = ["serde"] }
+indexmap = { version = "2.8", features = ["serde"] }
 itertools = "0.14"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
@@ -384,7 +384,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "brotli",
     "deflate",
 ] }
-roaring = "0.11.2"
+roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
 rustls-pemfile = "2"
 rustls = { version = "0.23.20", default-features = false, features = [
@@ -436,21 +436,21 @@ tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
 tonic-prost = "0.14"
-tracing = "0.1.40"
-tracing-appender = "0.2.3"
+tracing = "0.1.44"
+tracing-appender = "0.2.4"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.32"
-tracing-subscriber = { version = "0.3.20", features = [
+tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
     "json",
     "registry",
 ] }
 url = "2.5"
 urlencoding = "2.1"
-utoipa = { version = "5", features = ["axum_extras", "openapi_extensions"] }
+utoipa = { version = "5.4", features = ["axum_extras", "openapi_extensions"] }
 utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
-uuid = { version = "1.18.1", features = ["v7"] }
+uuid = { version = "1.20", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.51" }
 vrl = { version = "0.28.1", features = [
     "arbitrary",

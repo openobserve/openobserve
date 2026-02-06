@@ -661,7 +661,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "AI Assistant",
+          "name": "O2 Assistant",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -1127,7 +1127,8 @@
     "analyzeButtonLabel": "Analyze",
     "refreshTooltip": "Refresh analysis with updated percentile",
     "customSQLFieldsDisabled": "Field selection is not available for custom SQL queries. Dimensions are extracted from your query results.",
-    "timeRangeSelected": "Time Range Selected"
+    "timeRangeSelected": "Time Range Selected",
+    "dimensionsSelected": "Dimensions selected"
   },
   "volumeInsights": {
     "title": "Insights",
@@ -2642,7 +2643,7 @@
     "get_history": "Get History",
     "executed_at":"Executed At",
     "sql_query":"SQL Query",
-    "resuls":"Results",
+    "results":"Results",
     "wrapText": "Wrap Text",
     "delayMessage": "Search History might be delayed by"
   },
