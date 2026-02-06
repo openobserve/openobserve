@@ -177,9 +177,7 @@ describe("DedupSummaryCards", () => {
 
     it("should display correct tooltip content", async () => {
       wrapper = await mountComponent();
-      const icon = findByTestId(wrapper, "dedup-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
-      // Tooltip text is in the default slot
+      const tooltip = findByTestId(wrapper, "dedup-info-tooltip");
       expect(tooltip.text()).toContain("Alerts with deduplication configured");
     });
   });
@@ -261,12 +259,11 @@ describe("DedupSummaryCards", () => {
           passed_total: 20,
         })
       );
-      const icon = findByTestId(wrapper, "suppression-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
-      const tooltipHtml = tooltip.html();
-      expect(tooltipHtml).toContain("30 suppressed");
-      expect(tooltipHtml).toContain("50 total");
-      expect(tooltipHtml).toContain("Passed: 20");
+      const tooltip = findByTestId(wrapper, "suppression-info-tooltip");
+      const tooltipText = tooltip.text();
+      expect(tooltipText).toContain("30 suppressed");
+      expect(tooltipText).toContain("50 total");
+      expect(tooltipText).toContain("Passed: 20");
     });
   });
 
@@ -301,8 +298,7 @@ describe("DedupSummaryCards", () => {
 
     it("should display correct tooltip content", async () => {
       wrapper = await mountComponent();
-      const icon = findByTestId(wrapper, "pending-batches-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
+      const tooltip = findByTestId(wrapper, "pending-batches-info-tooltip");
       expect(tooltip.text()).toContain("Alerts waiting to be grouped together");
     });
 
@@ -563,14 +559,10 @@ describe("DedupSummaryCards", () => {
     it("should maintain tooltip functionality across all cards", async () => {
       wrapper = await mountComponent();
 
-      // Verify all tooltip components exist
-      const dedupIcon = findByTestId(wrapper, "dedup-info-icon");
-      const suppressionIcon = findByTestId(wrapper, "suppression-info-icon");
-      const batchesIcon = findByTestId(wrapper, "pending-batches-info-icon");
-
-      const dedupTooltip = dedupIcon.findComponent({ name: "QTooltip" });
-      const suppressionTooltip = suppressionIcon.findComponent({ name: "QTooltip" });
-      const batchesTooltip = batchesIcon.findComponent({ name: "QTooltip" });
+      // Verify all tooltip components exist and have content
+      const dedupTooltip = findByTestId(wrapper, "dedup-info-tooltip");
+      const suppressionTooltip = findByTestId(wrapper, "suppression-info-tooltip");
+      const batchesTooltip = findByTestId(wrapper, "pending-batches-info-tooltip");
 
       expect(dedupTooltip.exists()).toBe(true);
       expect(suppressionTooltip.exists()).toBe(true);

@@ -504,7 +504,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, {});
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const tooltip = button.findComponent({ name: "QTooltip" });
+      const tooltip = button.find('[data-test="toc-expand-tooltip"]');
 
       expect(tooltip.exists()).toBe(true);
       expect(tooltip.text()).toContain("Expand");
@@ -515,7 +515,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const tooltip = button.findComponent({ name: "QTooltip" });
+      const tooltip = button.find('[data-test="toc-expand-tooltip"]');
 
       expect(tooltip.exists()).toBe(true);
       expect(tooltip.text()).toContain("Collapse");

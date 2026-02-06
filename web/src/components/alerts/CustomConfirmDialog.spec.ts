@@ -420,9 +420,13 @@ describe("CustomConfirmDialog", () => {
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
+      await wrapper.vm.$nextTick();
+
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
+      await wrapper.vm.$nextTick();
+
       await clickConfirm(wrapper);
 
       expect(wrapper.emitted("confirm")?.length).toBe(3);
@@ -434,10 +438,12 @@ describe("CustomConfirmDialog", () => {
       await clickCancel(wrapper);
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
+      await wrapper.vm.$nextTick();
 
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
+      await wrapper.vm.$nextTick();
 
       await clickCancel(wrapper);
 
