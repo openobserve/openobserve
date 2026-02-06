@@ -2532,7 +2532,8 @@
     "sql_query": "SQL 查询",
     "resuls": "结果",
     "wrapText": "换行文本",
-    "delayMessage": "搜索历史记录可能会延迟"
+    "delayMessage": "搜索历史记录可能会延迟",
+    "results": "结果"
   },
   "search_scheduler_job": {
     "title": "搜索任务调度器",
@@ -2623,7 +2624,8 @@
     "analyzeButtonLabel": "分析",
     "refreshTooltip": "使用更新的百分位数刷新分析",
     "customSQLFieldsDisabled": "字段选择不适用于自定义 SQL 查询。维度是从您的查询结果中提取的。",
-    "timeRangeSelected": "时间范围已选择"
+    "timeRangeSelected": "时间范围已选择",
+    "dimensionsSelected": "所选尺寸"
   },
   "volumeInsights": {
     "title": "标题",
@@ -2746,7 +2748,9 @@
         "startBeforeEnd": "开始时间必须早于结束时间",
         "endAfterStart": "结束时间必须晚于开始时间"
       }
-    }
+    },
+    "viewInTraces": "在轨迹中查看",
+    "viewInTracesTooltip": "打开包含 RED 指标仪表板和所有相关追踪记录的跟踪页面"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

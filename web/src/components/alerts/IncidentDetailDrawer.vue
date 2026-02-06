@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width: 22px;
             height: 22px;
           "
-          title="Go Back"
+          :title="t('alerts.incidents.goBack')"
           @click="close"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div class="text-h6">
-          Incident
+          {{ t('alerts.incidents.incident') }}
         </div>
         <!-- Incident name with colored indicator -->
         <input
@@ -124,14 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelTitleEdit"
           class="o2-secondary-button"
         >
-          <span>Cancel</span>
+          <span>{{ t('alerts.cancel') }}</span>
         </q-btn>
         <q-btn
           no-caps
           @click="saveTitleEdit"
           class="o2-primary-button"
         >
-          <span>Save</span>
+          <span>{{ t('alerts.save') }}</span>
         </q-btn>
       </div>
 
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button"
         >
           <span>{{ t("alerts.incidents.acknowledge") }}</span>
-          <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.markAsAcknowledgedTooltip") }}</q-tooltip>
         </q-btn>
         <q-btn
           v-if="incidentDetails.status !== 'resolved'"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button"
         >
           <span>{{ t("alerts.incidents.resolve") }}</span>
-          <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.markAsResolvedTooltip") }}</q-tooltip>
         </q-btn>
         <q-btn
           v-if="incidentDetails.status === 'resolved'"
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="refresh" size="16px" class="tw:mr-1" />
           <span>{{ t("alerts.incidents.reopen") }}</span>
-          <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip>
         </q-btn>
 
         <!-- Edit Title Button -->
@@ -188,8 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="startTitleEdit"
           class="o2-secondary-button"
         >
-          <span>Edit</span>
-          <q-tooltip :delay="500">Edit incident title</q-tooltip>
+          <span>{{ t("alerts.edit") }}</span>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.editIncidentTitleTooltip") }}</q-tooltip>
         </q-btn>
       </div>
     </div>
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-tab
             name="incidentAnalysis"
-            label="Incident Analysis"
+            :label="t('alerts.incidents.incidentAnalysis')"
           />
           <q-tab
             name="serviceGraph"
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #default>
               <div class="tw:flex tw:items-center tw:gap-1.5">
-                <span>Alert Triggers</span>
+                <span>{{ t('alerts.incidents.alertTriggers') }}</span>
                 <span class="tw:text-sm tw:opacity-70">({{ triggers.length }})</span>
               </div>
             </template>
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
                 <div :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-medium">
-                  Unique Alerts
+                  {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-blue-500/10' : 'tw:bg-blue-50'">
                   <q-icon name="notifications_active" :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'" style="font-size: 20px;" />
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Bottom: Large Number -->
               <div :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'" class="tw:text-3xl tw:font-semibold tw:leading-none">
-                {{ incidentDetails?.alerts?.length || 0 }}
+                {{ uniqueAlertsCount }}
               </div>
             </div>
 
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Header -->
                   <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3">
                     <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
-                      Incident Timeline
+                      {{ t('alerts.incidents.incidentTimeline') }}
                     </div>
                     <div
                       class="tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-medium"
@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
                           {{ incidentDetails?.first_alert_at ? formatTimestampUTC(incidentDetails.first_alert_at) : 'N/A' }}
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
-                          <span>Initial trigger</span>
+                          <span>{{ t('alerts.incidents.initialTrigger') }}</span>
                         </div>
                       </div>
                     </div>
@@ -488,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Header -->
                   <div class="tw:px-4 tw:pt-2 tw:pb-1">
                     <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
-                      Incident Details
+                      {{ t('alerts.incidents.incidentDetails') }}
                     </div>
                   </div>
 
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Incident ID -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Incident ID
+                        {{ t('alerts.incidents.incidentId') }}
                       </div>
                       <div
                         class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:font-mono tw:min-w-0"
@@ -521,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Incident Name -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Incident Name
+                        {{ t('alerts.incidents.incidentName') }}
                       </div>
                       <div
                         class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:min-w-0"
@@ -705,13 +705,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent) -->
+              <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: incidentDetails?.topology_context?.nodes?.length
+                  height: (incidentDetails?.topology_context?.nodes?.length && triggers.length > 0)
                     ? 'calc(35% - 5.6px)'
-                    : 'calc(65% - 8px)',
+                    : 'calc(65% - 2px)',
                   minHeight: 0,
                   flexShrink: 0
                 }"
@@ -760,7 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
                     class="tw:text-sm tw:italic tw:text-center tw:py-4"
                   >
-                    No dimensions available
+                    {{ t('alerts.incidents.noDimensionsAvailable') }}
                   </div>
                 </div>
               </div>
@@ -779,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
                     class="tw:text-sm tw:font-semibold"
                   >
-                    Related Alerts
+                    {{ t('alerts.incidents.relatedAlerts') }}
                   </div>
                 </div>
 
@@ -817,7 +817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
                           >
-                            Fired {{ getTriggerCountForAlert(alert.id) }} time(s)
+                            {{ t('alerts.incidents.firedTimes', { count: alert.count }) }}
                           </span>
                         </div>
                       </div>
@@ -890,12 +890,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:p-3 tw:flex-1 tw:overflow-auto">
                 <!-- No alerts available -->
                 <div v-if="!alerts || alerts.length === 0" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic">
-                  No alert details available
+                  {{ t('alerts.incidents.noAlertDetailsAvailable') }}
                 </div>
 
                 <!-- No trigger selected -->
                 <div v-else-if="selectedAlertIndex === -1" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic tw:text-center tw:mt-8">
-                  Click on a trigger in the table to view details
+                  {{ t('alerts.incidents.clickOnTriggerToViewDetails') }}
                 </div>
 
                 <!-- Alert details -->
@@ -1012,7 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Refresh Button (shown when logs data is loaded) -->
           <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.logStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">Showing correlated logs from incident timeframe</span>
+            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedLogs') }}</span>
             <q-btn
               flat
               dense
@@ -1022,7 +1022,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshCorrelation"
               :disable="correlationLoading"
             >
-              <q-tooltip>Refresh correlated data</q-tooltip>
+              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
             </q-btn>
           </div>
 
@@ -1077,7 +1077,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Refresh Button (shown when metrics data is loaded) -->
           <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.metricStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">Showing correlated metrics from incident timeframe</span>
+            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedMetrics') }}</span>
             <q-btn
               flat
               dense
@@ -1087,7 +1087,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshCorrelation"
               :disable="correlationLoading"
             >
-              <q-tooltip>Refresh correlated data</q-tooltip>
+              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
             </q-btn>
           </div>
 
@@ -1142,7 +1142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Refresh Button (shown when traces data is loaded) -->
           <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">Showing correlated traces from incident timeframe</span>
+            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
             <q-btn
               flat
               dense
@@ -1152,7 +1152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshCorrelation"
               :disable="correlationLoading"
             >
-              <q-tooltip>Refresh correlated data</q-tooltip>
+              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
             </q-btn>
           </div>
 
@@ -1387,14 +1387,51 @@ export default defineComponent({
       return triggers.value.filter(t => t.alert_id === alertId).length;
     };
 
-    // Computed: Alerts sorted by trigger count (descending)
-    const sortedAlertsByTriggerCount = computed(() => {
-      if (!alerts.value || alerts.value.length === 0) return [];
-      return [...alerts.value].sort((a, b) => {
-        const countA = getTriggerCountForAlert(a.id);
-        const countB = getTriggerCountForAlert(b.id);
-        return countB - countA; // Descending order
+    // Computed property to extract unique alerts and their fire counts from triggers
+    const uniqueAlertsMap = computed(() => {
+      if (!triggers.value || triggers.value.length === 0) {
+        return new Map<string, number>();
+      }
+
+      const alertMap = new Map<string, number>();
+
+      triggers.value.forEach(trigger => {
+        const alertId = trigger.alert_id;
+        alertMap.set(alertId, (alertMap.get(alertId) || 0) + 1);
       });
+
+      return alertMap;
+    });
+
+    // Computed property for unique alerts count
+    const uniqueAlertsCount = computed(() => {
+      return uniqueAlertsMap.value.size;
+    });
+
+    // Computed: Alerts sorted by trigger count (descending) - derived from triggers
+    const sortedAlertsByTriggerCount = computed(() => {
+      if (!triggers.value || triggers.value.length === 0) return [];
+
+      // Group triggers by alert_id to get unique alerts with their counts
+      const alertsMap = new Map<string, { id: string; name: string; count: number }>();
+
+      triggers.value.forEach(trigger => {
+        const alertId = trigger.alert_id;
+        const alertName = trigger.alert_name || 'Unknown';
+
+        if (alertsMap.has(alertId)) {
+          alertsMap.get(alertId)!.count++;
+        } else {
+          alertsMap.set(alertId, {
+            id: alertId,
+            name: alertName,
+            count: 1
+          });
+        }
+      });
+
+      // Convert map to array and sort by count (descending)
+      return Array.from(alertsMap.values()).sort((a, b) => b.count - a.count);
     });
 
     // Peak Alert Rate - find the highest concentration of alerts
@@ -1762,7 +1799,7 @@ export default defineComponent({
         return {
           chartType: "custom_chart",
           title: {
-            text: t("incidents.noAlertActivityData"),
+            text: t("alerts.incidents.noAlertActivityData"),
             left: "center",
             top: "center",
             textStyle: {
@@ -2069,7 +2106,7 @@ export default defineComponent({
 
         $q.notify({
           type: "positive",
-          message: "Incident title updated successfully",
+          message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
           timeout: 2000,
         });
       } catch (error: any) {
@@ -2703,6 +2740,8 @@ export default defineComponent({
       affectedServicesCount,
       alertFrequency,
       getTriggerCountForAlert,
+      uniqueAlertsMap,
+      uniqueAlertsCount,
       sortedAlertsByTriggerCount,
       peakAlertRate,
       peakActivity,

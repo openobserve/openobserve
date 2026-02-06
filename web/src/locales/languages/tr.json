@@ -2532,7 +2532,8 @@
     "sql_query": "SQL Sorgu",
     "resuls": "Sonuçlar",
     "wrapText": "Metni Sarma",
-    "delayMessage": "Arama Geçmişi şu şekilde gecikebilir"
+    "delayMessage": "Arama Geçmişi şu şekilde gecikebilir",
+    "results": "Sonuçlar"
   },
   "search_scheduler_job": {
     "title": "İş Zamanlayıcı Ara",
@@ -2623,7 +2624,8 @@
     "analyzeButtonLabel": "Analiz",
     "refreshTooltip": "Güncellenmiş yüzdelik ile analizi yenileyin",
     "customSQLFieldsDisabled": "Alan seçimi özel SQL sorguları için kullanılamaz. Boyutlar, sorgu sonuçlarınızdan çıkarılır.",
-    "timeRangeSelected": "Seçilen Zaman Aralığı"
+    "timeRangeSelected": "Seçilen Zaman Aralığı",
+    "dimensionsSelected": "Seçilen boyutlar"
   },
   "volumeInsights": {
     "title": "İçgörüler",
@@ -2746,7 +2748,9 @@
         "startBeforeEnd": "Başlangıç saati bitiş saatinden önce olmalıdır",
         "endAfterStart": "Bitiş saati başlangıç saatinden sonra olmalıdır"
       }
-    }
+    },
+    "viewInTraces": "İzlerde Görüntüle",
+    "viewInTracesTooltip": "RED metrikler panosu ve tüm ilişkili izlerle izleme sayfasını açın"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

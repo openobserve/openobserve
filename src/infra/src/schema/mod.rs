@@ -281,6 +281,13 @@ pub async fn get_flatten_level(org_id: &str, stream_name: &str, stream_type: Str
     get_config().limit.ingest_flatten_level
 }
 
+pub async fn get_is_llm_stream(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    if let Some(settings) = get_settings(org_id, stream_name, stream_type).await {
+        return settings.is_llm_stream;
+    }
+    false
+}
+
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;

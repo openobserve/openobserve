@@ -222,6 +222,7 @@ impl TraceListIndex {
                 index_original_data: false,
                 enable_distinct_fields: true,
                 enable_log_patterns_extraction: false,
+                is_llm_stream: false,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
