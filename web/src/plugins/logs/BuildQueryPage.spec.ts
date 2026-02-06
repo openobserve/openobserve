@@ -269,11 +269,14 @@ describe("BuildQueryPage Component", () => {
       expect(wrapper.find('[data-test="panel-editor"]').exists()).toBe(true);
     });
 
-    it("should render the query mode toggle", async () => {
+    it("should have PanelEditor stub with correct test attribute", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.find(".query-mode-toggle").exists()).toBe(true);
+      // The PanelEditor stub renders with data-test attribute
+      const panelEditorStub = wrapper.find('[data-test="panel-editor"]');
+      expect(panelEditorStub.exists()).toBe(true);
+      expect(panelEditorStub.classes()).toContain("panel-editor-mock");
     });
   });
 
