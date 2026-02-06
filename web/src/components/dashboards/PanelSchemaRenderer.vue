@@ -1086,9 +1086,9 @@ export default defineComponent({
             code: "",
           };
 
-        // Check if this is the first chunk with actual data
-        const hasData = data.value?.length > 0 &&
-                       data.value[0]?.result?.length > 0;
+        const hasData =
+          data.value?.length > 0 &&
+          (data.value[0]?.result?.length > 0 || data.value[0]?.length > 0);
 
         // Use throttled version during loading (streaming), immediate version when complete
         // This prevents excessive re-renders during PromQL data streaming

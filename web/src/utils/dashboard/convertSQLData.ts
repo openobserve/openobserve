@@ -1467,6 +1467,35 @@ export const convertSQLData = async (
     };
   };
 
+ // Build a lookup map ONCE for O(1) access during series generation
+  // Key: "breakdownValue_xAxisValue", Value: data row
+  // This prevents nested O(n²) loops in getSeriesData
+  const buildDataLookupMap = () => {
+    console.time("[PERF] buildDataLookupMap");
+    const dataMap = new Map<string, any>();
+
+    if (!breakDownKeys.length || !xAxisKeys.length) {
+      console.timeEnd("[PERF] buildDataLookupMap");
+      return dataMap;
+    }
+
+    const breakdownKey = breakDownKeys[0];
+    const xAxisKey = xAxisKeys[0];
+
+    for (const item of missingValueData) {
+      const breakdownValue = getDataValue(item, breakdownKey);
+      const xValue = getDataValue(item, xAxisKey);
+      const key = `${breakdownValue}_${xValue}`;
+      dataMap.set(key, item);
+    }
+
+    console.timeEnd("[PERF] buildDataLookupMap");
+    console.log("[PERF] dataLookupMap size:", dataMap.size, "entries");
+    return dataMap;
+  };
+
+  const dataLookupMap = buildDataLookupMap();
+
   const getSeriesData = (
     breakdownKey: string,
     yAxisKey: string,
@@ -1475,20 +1504,17 @@ export const convertSQLData = async (
     if (!(breakdownKey !== null && yAxisKey !== null && xAxisKey !== null))
       return [];
 
-    const data = missingValueData.filter(
-      (it: any) => getDataValue(it, breakdownKey) == xAxisKey,
-    );
-
-    const seriesData = options.xAxis[0].data.map(
-      (it: any) =>
-        getDataValue(
-          data.find((it2: any) => getDataValue(it2, xAxisKeys[0]) == it),
-          yAxisKey,
-        ) ?? null,
-    );
+    // Use the pre-built lookup map for O(1) access instead of O(n) filter + find
+    // xAxisKey parameter is the breakdown value passed from getSeries()
+    const seriesData = options.xAxis[0].data.map((xValue: any) => {
+      const lookupKey = `${xAxisKey}_${xValue}`;
+      const dataRow = dataLookupMap.get(lookupKey);
+      return dataRow ? (getDataValue(dataRow, yAxisKey) ?? null) : null;
+    });
 
     return seriesData;
   };
+  
   const getSeriesObj = (
     yAxisName: string,
     seriesData: Array<number> = [],
