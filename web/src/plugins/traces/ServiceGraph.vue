@@ -586,7 +586,6 @@ export default defineComponent({
         await nextTick();
 
         if (!chartRendererRef.value?.chart) {
-          console.warn('[ServiceGraph] Chart ref not available for selection');
           return;
         }
 
@@ -609,10 +608,33 @@ export default defineComponent({
             name: newId,
           });
         }
-
-        console.log('[ServiceGraph] Node selection updated via dispatchAction:', { newId, oldId });
       },
       { flush: 'post' }
+    );
+
+    // Watch for theme changes and re-apply selection
+    watch(
+      () => store.state.theme,
+      async () => {
+        // Save the current selected node ID (in case it changes during the delay)
+        const nodeIdToReselect = selectedNode.value?.id;
+
+        // Use setTimeout to wait for chart to be fully regenerated after theme change
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart || !nodeIdToReselect) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Re-apply node selection
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: nodeIdToReselect,
+          });
+        }, 500); // 500ms delay to ensure chart has fully regenerated
+      }
     );
 
     const loadServiceGraph = async () => {
