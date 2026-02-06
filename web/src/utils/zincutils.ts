@@ -17,10 +17,10 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import { useStore } from "vuex";
-import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
+import organizationService from "@/services/organizations";
 import { DateTime as _DateTime } from "luxon";
 import CronExpressionParser from "cron-parser";
 
@@ -379,8 +379,6 @@ export const getPath = () => {
 
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
-  const q = useQuasar();
-  const { getStreams } = useStreams();
   if (config.isCloud) {
     if (
       store.state.organizationData?.organizationSettings?.free_trial_expiry !=
@@ -407,15 +405,24 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     store.state.zoConfig.restricted_routes_on_empty_data == true &&
     store.state.organizationData.isDataIngested == false
   ) {
-    await getStreams("", false).then((response: any) => {
-      if (response.list.length == 0) {
+    try {
+      const response = await organizationService.get_organization_summary(
+        store.state.selectedOrganization.identifier,
+      );
+      if (response.data.streams.num_streams == 0) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });
       } else {
         store.dispatch("setIsDataIngested", true);
         next();
       }
-    });
+    } catch (error) {
+      // If the summary API call fails, allow navigation to proceed
+      // The page itself will handle the error state
+      console.warn("Failed to fetch organization summary:", error);
+      store.dispatch("setIsDataIngested", true);
+      next();
+    }
   } else {
     next();
   }
