@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleViewLogs"
             data-test="service-graph-side-panel-view-logs-btn"
             class="action-btn"
-            :disable="isAllStreamsSelected"
+            :disable="true"
           >
-            <q-tooltip v-if="isAllStreamsSelected">
-              Please select a specific stream to view logs
+            <q-tooltip>
+              View Logs is currently disabled
             </q-tooltip>
           </q-btn>
           <q-btn
