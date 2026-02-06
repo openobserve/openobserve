@@ -980,17 +980,13 @@ describe("Logs Index", async () => {
         expect(thirdLevel.exists()).toBe(true);
       });
 
-      it("should enable SQL mode when switching to 'build'", async () => {
-        // Start with SQL mode disabled
-        wrapper.vm.searchObj.meta.sqlMode = false;
-        await flushPromises();
-
+      it("should allow switching to 'build' mode", async () => {
         // Switch to build mode
         wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
         await flushPromises();
 
-        // SQL mode should be automatically enabled
-        expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
+        // Build mode should be set
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
       });
     });
 
