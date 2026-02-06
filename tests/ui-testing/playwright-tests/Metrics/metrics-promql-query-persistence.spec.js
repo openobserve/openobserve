@@ -70,12 +70,12 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Select stream type
         const streamTypeSelector = page.locator('[data-test="index-dropdown-stream_type"]');
-        if (await streamTypeSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (await streamTypeSelector.isVisible({ timeout: 3000 })) {
             await streamTypeSelector.click();
             await page.waitForTimeout(500);
 
             const metricsOption = page.getByRole('option', { name: 'metrics' }).locator('div').nth(2);
-            if (await metricsOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            if (await metricsOption.isVisible({ timeout: 3000 })) {
                 await metricsOption.click();
                 await page.waitForTimeout(1000);
                 testLogger.info('Selected stream type: metrics');
@@ -84,13 +84,13 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Select a stream name
         const streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
-        if (await streamDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (await streamDropdown.isVisible({ timeout: 3000 })) {
             await streamDropdown.click();
             await page.waitForTimeout(1000);
 
             // Get first available stream
             const firstStream = page.locator('[role="option"]').first();
-            const streamName = await firstStream.textContent().catch(() => null);
+            const streamName = await firstStream.textContent();
 
             if (streamName) {
                 await firstStream.click();
@@ -99,8 +99,8 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
                 // Verify auto-populated query exists
                 const editorElement = page.locator('.monaco-editor, .cm-content, textarea').first();
-                if (await editorElement.isVisible({ timeout: 5000 }).catch(() => false)) {
-                    const queryText = await editorElement.textContent().catch(() => '');
+                if (await editorElement.isVisible({ timeout: 5000 })) {
+                    const queryText = await editorElement.textContent();
 
                     expect(queryText.length).toBeGreaterThan(0);
                     testLogger.info(`✓ Auto-populated query found: ${queryText.substring(0, 100)}...`);

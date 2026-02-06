@@ -60,9 +60,9 @@ export class MetricsQueryEditorPage {
         for (const selector of customButtonSelectors) {
             const customButton = this.page.locator(selector).first();
 
-            if (await customButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            if (await customButton.isVisible({ timeout: 2000 })) {
                 // Check if already active
-                const classes = await customButton.getAttribute('class').catch(() => '');
+                const classes = await customButton.getAttribute('class');
                 const isActive = classes.includes('active') || classes.includes('text-primary');
 
                 if (!isActive) {
@@ -79,7 +79,7 @@ export class MetricsQueryEditorPage {
 
         // Fallback: Try to find by exact text match
         const exactCustomButton = this.page.getByRole('button', { name: 'Custom', exact: true });
-        if (await exactCustomButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await exactCustomButton.isVisible({ timeout: 2000 })) {
             await exactCustomButton.click();
             await this.page.waitForTimeout(1000);
             this.testLogger.info('✓ Switched to PromQL Custom mode (via exact match)');
@@ -106,7 +106,7 @@ export class MetricsQueryEditorPage {
 
         for (const selector of clearButtons) {
             const clearBtn = this.page.locator(selector).first();
-            if (await clearBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+            if (await clearBtn.isVisible({ timeout: 1000 })) {
                 await clearBtn.click();
                 await this.page.waitForTimeout(300);
                 this.testLogger.info('Cleared stream selection');
@@ -160,7 +160,7 @@ export class MetricsQueryEditorPage {
                 console.log('Monaco API failed:', error.message);
             }
             return false;
-        }, query).catch(() => false);
+        }, query);
 
         if (monacoSuccess) {
             await this.page.waitForTimeout(800);
@@ -182,7 +182,7 @@ export class MetricsQueryEditorPage {
         // Find and click the editor
         const editor = this.page.locator(this.monacoInputAreaSelector).first();
 
-        if (!await editor.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (!await editor.isVisible({ timeout: 3000 })) {
             this.testLogger.error('Editor not visible - cannot enter query');
             return;
         }
@@ -226,7 +226,7 @@ export class MetricsQueryEditorPage {
         if (!actualText.includes(query.substring(0, Math.min(10, query.length)))) {
             this.testLogger.error(`❌ Query mismatch - expected "${query}" but got "${actualText}"`);
             // Take a screenshot for debugging
-            await this.page.screenshot({ path: `query-mismatch-${Date.now()}.png` }).catch(() => {});
+            await this.page.screenshot({ path: `query-mismatch-${Date.now()}.png` });
         } else {
             this.testLogger.info('✓ Query successfully entered');
         }
@@ -247,7 +247,7 @@ export class MetricsQueryEditorPage {
         if (lineCount > 0) {
             let fullText = '';
             for (let i = 0; i < lineCount; i++) {
-                const lineText = await viewLines.nth(i).textContent().catch(() => '');
+                const lineText = await viewLines.nth(i).textContent();
                 fullText += lineText;
             }
             if (fullText.trim().length > 0) {
@@ -257,8 +257,8 @@ export class MetricsQueryEditorPage {
 
         // Approach 2: Try CodeMirror
         const cmContent = this.page.locator('.cm-line').first();
-        if (await cmContent.isVisible({ timeout: 1000 }).catch(() => false)) {
-            const text = await cmContent.textContent().catch(() => '');
+        if (await cmContent.isVisible({ timeout: 1000 })) {
+            const text = await cmContent.textContent();
             if (text.trim().length > 0) {
                 return text.trim();
             }
@@ -266,8 +266,8 @@ export class MetricsQueryEditorPage {
 
         // Approach 3: Try textarea value
         const textarea = this.page.locator('.monaco-editor textarea, .monaco-editor .inputarea').first();
-        if (await textarea.isVisible({ timeout: 1000 }).catch(() => false)) {
-            const text = await textarea.inputValue().catch(() => '');
+        if (await textarea.isVisible({ timeout: 1000 })) {
+            const text = await textarea.inputValue();
             if (text.trim().length > 0) {
                 return text.trim();
             }
@@ -294,7 +294,7 @@ export class MetricsQueryEditorPage {
             hasText: new RegExp(`Query ${tabNumber}|Tab ${tabNumber}`, 'i')
         }).first();
 
-        if (await tabSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (await tabSelector.isVisible({ timeout: 3000 })) {
             await tabSelector.click({ force: true });
             await this.page.waitForTimeout(1500); // Increased wait for UI to update
 
@@ -302,7 +302,7 @@ export class MetricsQueryEditorPage {
             const isActive = await tabSelector.evaluate(el => {
                 return el.classList.contains('q-tab--active') ||
                        el.getAttribute('aria-selected') === 'true';
-            }).catch(() => false);
+            });
 
             if (isActive) {
                 this.testLogger.info(`✓ Switched to tab ${tabNumber} (verified active)`);
@@ -321,7 +321,7 @@ export class MetricsQueryEditorPage {
         // Try to click the specific index (adjusting for 0-based indexing)
         if (tabNumber <= tabCount) {
             const nthTab = allTabs.nth(tabNumber - 1);
-            const tabText = await nthTab.textContent().catch(() => '');
+            const tabText = await nthTab.textContent();
             this.testLogger.info(`Clicking tab at index ${tabNumber - 1}: "${tabText}"`);
 
             await nthTab.click({ force: true });
@@ -331,7 +331,7 @@ export class MetricsQueryEditorPage {
             const isActive = await nthTab.evaluate(el => {
                 return el.classList.contains('q-tab--active') ||
                        el.getAttribute('aria-selected') === 'true';
-            }).catch(() => false);
+            });
 
             if (isActive) {
                 this.testLogger.info(`✓ Switched to tab ${tabNumber} via nth (verified active)`);
@@ -369,7 +369,7 @@ export class MetricsQueryEditorPage {
             this.testLogger.info(`Trying selector: ${selector}`);
             const addButton = this.page.locator(selector).first();
 
-            if (await addButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            if (await addButton.isVisible({ timeout: 2000 })) {
                 this.testLogger.info(`✓ Found add button with selector: ${selector}`);
                 await addButton.click({ force: true });
                 await this.page.waitForTimeout(1500);
@@ -395,7 +395,7 @@ export class MetricsQueryEditorPage {
                 return icon.textContent === 'add' || icon.getAttribute('aria-label')?.includes('add');
             }).catch(() => false);
 
-            if (hasAddIcon && await btn.isVisible().catch(() => false)) {
+            if (hasAddIcon && await btn.isVisible()) {
                 this.testLogger.info(`Found add button at index ${i}`);
                 await btn.click({ force: true });
                 await this.page.waitForTimeout(1500);
@@ -405,7 +405,7 @@ export class MetricsQueryEditorPage {
         }
 
         this.testLogger.error('❌ Add query button not found with any selector');
-        await this.page.screenshot({ path: `add-button-not-found-${Date.now()}.png` }).catch(() => {});
+        await this.page.screenshot({ path: `add-button-not-found-${Date.now()}.png` });
         return false;
     }
 
@@ -417,7 +417,7 @@ export class MetricsQueryEditorPage {
      */
     async clickRunQuery() {
         const runQueryBtn = this.page.locator(this.runQueryButtonSelector).first();
-        if (await runQueryBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await runQueryBtn.isVisible({ timeout: 2000 })) {
             await runQueryBtn.click();
             this.testLogger.info('Clicked Run Query button');
             await this.page.waitForTimeout(2000); // Wait for query execution and state update
@@ -476,6 +476,6 @@ export class MetricsQueryEditorPage {
      * @param {string} prefix - Prefix for the screenshot filename
      */
     async takeDebugScreenshot(prefix) {
-        await this.page.screenshot({ path: `${prefix}-${Date.now()}.png` }).catch(() => {});
+        await this.page.screenshot({ path: `${prefix}-${Date.now()}.png` });
     }
 }
