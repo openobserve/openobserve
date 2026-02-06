@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -558,7 +558,11 @@ pub async fn prepare_cache_response(
     }
 
     // calculate hash for the query with version (after normalizing histogram interval)
-    let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
+    let mut hash_body = vec![
+        CACHE_VERSION.to_string(),
+        origin_sql.to_string(),
+        req.query.size.to_string(),
+    ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
     }
