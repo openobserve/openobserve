@@ -254,49 +254,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-type-select"
                 ></q-select>
-                <q-select
-                  v-model="variableData.query_data.stream"
-                  :label="t('dashboard.selectIndex') + ' *'"
-                  :options="streamsFilteredOptions"
-                  input-debounce="0"
-                  behavior="menu"
-                  use-input
-                  borderless
-                  hide-bottom-space
-                  dense
-                  stack-label
-                  @filter="streamsFilterFn"
-                  @update:model-value="streamUpdated"
-                  option-value="name"
-                  option-label="name"
-                  emit-value
-                  class="showLabelOnTop col no-case"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
-                  data-test="dashboard-variable-stream-select"
-                >
-                </q-select>
+                <div class="col q-mt-sm">
+                  <div class="flex items-center q-pl-sm" style="display: flex; align-items: center; min-height: 20px; margin-bottom: 2px;">
+                    <span style="font-size: 12px; ">{{ t('dashboard.selectIndex') }} *</span>
+                    <q-icon name="info" size="xs" class="q-ml-xs" style="margin-left: 8px;">
+                      <q-tooltip style="width: 250px">
+                        Select a stream or use a variable like
+                        <span class="bg-highlight">$streamVariable</span> to
+                        dynamically choose the stream based on another variable's value.
+                      </q-tooltip>
+                    </q-icon>
+                  </div>
+                  <CommonAutoComplete
+                    v-model="variableData.query_data.stream"
+                    :items="streamOptionsWithVariables"
+                    searchRegex="(?:^|[^$])\$?(\w+)"
+                    @update:model-value="streamUpdated"
+                    :rules="[(val: any) => !!val || 'Field is required!']"
+                    data-test="dashboard-variable-stream-select"
+                    class="no-case"
+                    style="width: 100%"
+                    placeholder="Select stream or type variable"
+                  />
+                </div>
               </div>
-              <q-select
-                v-model="variableData.query_data.field"
-                :label="t('dashboard.selectField') + ' *'"
-                stack-label
-                use-input
-                borderless
-                dense
-                hide-selected
-                fill-input
-                behavior="menu"
-                input-debounce="0"
-                :options="fieldsFilteredOptions"
-                @filter="fieldsFilterFn"
-                class="showLabelOnTop no-case"
-                option-value="name"
-                option-label="name"
-                emit-value
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                data-test="dashboard-variable-field-select"
-              >
-              </q-select>
+              <div >
+                <div class="flex items-center q-pl-sm" style="display: flex; align-items: center; min-height: 20px; margin-bottom: 2px;">
+                  <span style="font-size: 12px;">{{ t('dashboard.selectField') }} *</span>
+                  <q-icon name="info" size="xs" class="q-ml-xs" style="margin-left: 8px;">
+                    <q-tooltip style="width: 250px">
+                      Select a field or use a variable like
+                      <span class="bg-highlight">$fieldVariable</span> to
+                      dynamically choose the field based on another variable's value.
+                      <br><br>
+                      <strong>Note:</strong> If stream uses a variable, field list will be empty - type field name manually.
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <CommonAutoComplete
+                  v-model="variableData.query_data.field"
+                  :items="fieldOptionsWithVariables"
+                  searchRegex="(?:^|[^$])\$?(\w+)"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  data-test="dashboard-variable-field-select"
+                  class="no-case"
+                  style="max-width: 100%; width: 100%"
+                  placeholder="Select field or type variable"
+                />
+              </div>
               <div>
                 <q-input
                   class="showLabelOnTop"
@@ -460,8 +465,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- show error if filter has cycle -->
-                <div v-show="filterCycleError" style="color: red">
-                  {{ filterCycleError }}
+                <div v-show="filterCycleError" class="cycle-error-container">
+                  <div class="flex items-center">
+                    <q-icon name="error" color="negative" size="sm" />
+                    <span class="cycle-error-text">{{ filterCycleError }}</span>
+                  </div>
+                  <div class="cycle-error-details">
+                    <strong>Variables can reference each other in:</strong>
+                    <ul>
+                      <li>Stream selection (e.g., <code>$streamVariable</code>)</li>
+                      <li>Field selection (e.g., <code>$fieldVariable</code>)</li>
+                      <li>Filter values (e.g., <code>status='$statusVariable'</code>)</li>
+                    </ul>
+                    <em>Ensure no circular dependencies exist.</em>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1428,9 +1445,9 @@ export default defineComponent({
         const hasCycle = isGraphHasCycle(variablesDependencyGraph);
         if (hasCycle) {
           // filter has cycle, so show error and return
-          filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->",
-          )} -> ${hasCycle[0]}`;
+          filterCycleError.value = `Circular dependency detected: ${hasCycle.join(
+            " → ",
+          )} → ${hasCycle[0]}`;
           return true;
         }
 
@@ -1515,11 +1532,28 @@ export default defineComponent({
     };
 
     const streamUpdated = async () => {
-      // reset field list value
-      variableData.query_data.field = "";
 
       try {
-        // if stream type and stream is exists
+        // Check if stream is a variable reference FIRST (contains $)
+        const isVariableReference = variableData.query_data.stream?.includes('$');
+        console.log("[Variable Config] Is variable reference:", isVariableReference);
+
+        if (isVariableReference) {
+          console.log("[Variable Config] ⚠️ Variable reference detected - skipping schema fetch");
+          console.log("[Variable Config] Field list will be available at runtime");
+          // Don't reset field if it already has a value (editing mode)
+          if (!variableData.query_data.field) {
+            variableData.query_data.field = "";
+          }
+          // Don't fetch schema for variable references
+          data.currentFieldsList = [];
+          return;
+        }
+
+        // Only reset field list if NOT a variable reference
+        variableData.query_data.field = "";
+
+        // if stream type and stream exists and NOT a variable
         if (
           variableData.query_data.stream &&
           variableData.query_data.stream_type
@@ -1538,9 +1572,19 @@ export default defineComponent({
           data.currentFieldsList = [];
         }
       } catch (error: any) {
-        showErrorNotification(error ?? "Failed to get stream fields", {
-          timeout: 2000,
-        });
+        console.error("[Variable Config] ❌ Error in streamUpdated:", error);
+        // Only show error if it's not a variable reference
+        const isVariableReference = variableData.query_data.stream?.includes('$');
+        console.log("[Variable Config] Error - is variable reference:", isVariableReference);
+
+        if (!isVariableReference) {
+          console.error("[Variable Config] Showing error notification");
+          showErrorNotification(error ?? "Failed to get stream fields", {
+            timeout: 2000,
+          });
+        } else {
+          console.log("[Variable Config] ✅ Suppressing error for variable reference (expected)");
+        }
       }
     };
 
@@ -1616,6 +1660,54 @@ export default defineComponent({
         label: it.name,
         value: "$" + it.name,
       }));
+    });
+
+    // Computed property: Merge stream options with available variables
+    const streamOptionsWithVariables = computed(() => {
+      console.log("[Variable Config] Computing streamOptionsWithVariables");
+
+      // Get variable options with $ prefix (already has $ in value)
+      const variableOptions = dashboardVariablesFilterItems.value.map((v: any) => ({
+        label: v.value, // Show $variableName
+        value: v.value, // Value is $variableName
+      }));
+      console.log("[Variable Config] Variable options for stream:", variableOptions);
+
+      // Get stream options
+      const streamOptions = streamsFilteredOptions.value.map((stream: any) => ({
+        label: stream.name || stream,
+        value: stream.name || stream,
+      }));
+      console.log("[Variable Config] Stream options:", streamOptions.length, "streams");
+
+      // Variables first, then streams
+      const combined = [...variableOptions, ...streamOptions];
+      console.log("[Variable Config] Total stream options:", combined.length);
+      return combined;
+    });
+
+    // Computed property: Merge field options with available variables
+    const fieldOptionsWithVariables = computed(() => {
+      console.log("[Variable Config] Computing fieldOptionsWithVariables");
+
+      // Get variable options with $ prefix (already has $ in value)
+      const variableOptions = dashboardVariablesFilterItems.value.map((v: any) => ({
+        label: v.value, // Show $variableName
+        value: v.value, // Value is $variableName
+      }));
+      console.log("[Variable Config] Variable options for field:", variableOptions);
+
+      // Get field options
+      const fieldOptions = fieldsFilteredOptions.value.map((field: any) => ({
+        label: field.name || field,
+        value: field.name || field,
+      }));
+      console.log("[Variable Config] Field options:", fieldOptions.length, "fields");
+
+      // Variables first, then fields
+      const combined = [...variableOptions, ...fieldOptions];
+      console.log("[Variable Config] Total field options:", combined.length);
+      return combined;
     });
 
     // Add new custom value to the array
@@ -1706,6 +1798,8 @@ export default defineComponent({
       filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
+      streamOptionsWithVariables,
+      fieldOptionsWithVariables,
       addCustomValue,
       removeCustomValue,
       onCheckboxClick,
@@ -1739,6 +1833,68 @@ export default defineComponent({
 
 .theme-light .bg-highlight {
   background-color: #e7e6e6;
+}
+
+.cycle-error-container {
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.cycle-error-text {
+  color: #c00;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.cycle-error-details {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+
+  ul {
+    margin: 4px 0 0 20px;
+    padding: 0;
+  }
+
+  li {
+    margin: 2px 0;
+  }
+
+  code {
+    background-color: #f5f5f5;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 11px;
+  }
+
+  strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  em {
+    display: block;
+    margin-top: 8px;
+    font-style: italic;
+  }
+}
+
+.theme-dark .cycle-error-container {
+  background-color: #3d1a1a;
+  border-color: #5a2a2a;
+}
+
+.theme-dark .cycle-error-details {
+  color: #ccc;
+
+  code {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+  }
 }
 
 .multi-select-default-value-toggle {
