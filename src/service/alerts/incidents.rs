@@ -560,7 +560,9 @@ async fn find_or_create_incident(
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
 
-            if matches!(relationship, DimensionRelationship::NewIsSuperset) || dimensions_changed {
+            // Upgrade correlation key if new key is stronger (NewIsSuperset)
+            // Otherwise just update dimensions if they changed
+            if matches!(relationship, DimensionRelationship::NewIsSuperset) {
                 infra::table::alert_incidents::upgrade_incident_correlation(
                     org_id,
                     &upgradeable_incident.id,
