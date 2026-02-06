@@ -695,17 +695,30 @@ export default defineComponent({
           return;
         }
       }
-      const dashboard = await getDashboard(
-        store,
-        route.query.dashboard,
-        route.query.folder ?? "default",
-      );
 
-      if (
-        !dashboard ||
-        typeof dashboard !== "object" ||
-        !Object.keys(dashboard).length
-      ) {
+      let dashboard;
+      try {
+        dashboard = await getDashboard(
+          store,
+          route.query.dashboard,
+          route.query.folder ?? "default",
+        );
+
+        if (
+          !dashboard ||
+          typeof dashboard !== "object" ||
+          !Object.keys(dashboard).length
+        ) {
+          showErrorNotification(
+            "Dashboard not found or has been deleted. Redirecting to dashboard list."
+          );
+          goBackToDashboardList();
+          return;
+        }
+      } catch (error: any) {
+        showErrorNotification(
+          error?.message || "Failed to load dashboard. Redirecting to dashboard list."
+        );
         goBackToDashboardList();
         return;
       }

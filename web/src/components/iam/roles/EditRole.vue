@@ -485,8 +485,22 @@ const getRoleDetails = () => {
 
       updateTableData();
     })
-    .catch(() => {
+    .catch((error) => {
       isFetchingInitialRoles.value = false;
+      q.notify({
+        message: error?.response?.status === 404
+          ? "Role not found or has been deleted. Redirecting to roles list."
+          : error?.message || "Failed to load role details. Redirecting to roles list.",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+      router.push({
+        name: "roles",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     });
 };
 
