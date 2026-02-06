@@ -14,8 +14,8 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const generateUniqueDashboardName = () => 
   "Dashboard_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now();
 
-// Use serial mode to prevent race conditions and resource contention between tests
-// This ensures stable test execution when running the full test suite
+// Configure tests to run in parallel for better performance across the suite
+// Ensure each test uses unique resources (e.g., dashboard names) to avoid race conditions
 test.describe.configure({ mode: "parallel" });
 
 // Add retries for flaky network conditions

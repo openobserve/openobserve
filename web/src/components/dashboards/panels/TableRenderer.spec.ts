@@ -1362,8 +1362,6 @@ describe("TableRenderer", () => {
     it("should handle negative rowsPerPage gracefully", () => {
       wrapper = createWrapper({ showPagination: true, rowsPerPage: -5 });
 
-      // Negative values result in showing all rows (0) due to falsy evaluation
-      // The || operator treats -5 as truthy but downstream logic handles it as 0
       expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
     });
 

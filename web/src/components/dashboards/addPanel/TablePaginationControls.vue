@@ -94,12 +94,12 @@ export default defineComponent({
       default: false,
     },
     pagination: {
-      type: Object,
+      type: Object as () => { rowsPerPage: number; page: number },
       required: true,
       default: () => ({ rowsPerPage: 0, page: 1 }),
     },
     paginationOptions: {
-      type: Array,
+      type: Array as () => number[],
       default: () => [10, 20, 50, 100, 250, 500, 1000],
     },
     totalRows: {
