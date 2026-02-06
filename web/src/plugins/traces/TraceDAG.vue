@@ -492,21 +492,21 @@ export default defineComponent({
         border-color: #2e7d32;
       }
 
-      // LLM observation type node colors
-      &.node-llm-generation { border-color: #7b1fa2; background: #f3e5f5; }
-      &.node-llm-span       { border-color: #0288d1; background: #e1f5fe; }
-      &.node-llm-tool       { border-color: #ef6c00; background: #fff3e0; }
-      &.node-llm-agent      { border-color: #2e7d32; background: #e8f5e9; }
-      &.node-llm-chain      { border-color: #00796b; background: #e0f2f1; }
-      &.node-llm-retriever  { border-color: #0097a7; background: #e0f7fa; }
-      &.node-llm-task       { border-color: #283593; background: #e8eaf6; }
-      &.node-llm-evaluator  { border-color: #4527a0; background: #ede7f6; }
-      &.node-llm-workflow   { border-color: #546e7a; background: #eceff1; }
-      &.node-llm-embedding  { border-color: #c2185b; background: #fce4ec; }
-      &.node-llm-rerank     { border-color: #5d4037; background: #efebe9; }
-      &.node-llm-guardrail  { border-color: #c62828; background: #ffebee; }
-      &.node-llm-event      { border-color: #616161; background: #f5f5f5; }
-      &.node-llm-default    { border-color: #757575; background: #fafafa; }
+      // LLM observation type node colors (consistent with llmUtils getObservationTypeColor)
+      &.node-llm-generation { border-color: #4caf50; background: #e8f5e9; }  // green
+      &.node-llm-embedding  { border-color: #2196f3; background: #e3f2fd; }  // blue
+      &.node-llm-agent      { border-color: #9c27b0; background: #f3e5f5; }  // purple
+      &.node-llm-tool       { border-color: #ff9800; background: #fff3e0; }  // orange
+      &.node-llm-chain      { border-color: #3f51b5; background: #e8eaf6; }  // indigo
+      &.node-llm-retriever  { border-color: #00bcd4; background: #e0f7fa; }  // cyan
+      &.node-llm-task       { border-color: #009688; background: #e0f2f1; }  // teal
+      &.node-llm-evaluator  { border-color: #e91e63; background: #fce4ec; }  // pink
+      &.node-llm-workflow   { border-color: #673ab7; background: #ede7f6; }  // deep-purple
+      &.node-llm-rerank     { border-color: #03a9f4; background: #e1f5fe; }  // light-blue
+      &.node-llm-guardrail  { border-color: #f44336; background: #ffebee; }  // red
+      &.node-llm-span       { border-color: #9e9e9e; background: #f5f5f5; }  // grey
+      &.node-llm-event      { border-color: #ffc107; background: #fff8e1; }  // amber
+      &.node-llm-default    { border-color: #9e9e9e; background: #fafafa; }
     }
 
     .node-operation {
@@ -521,19 +521,19 @@ export default defineComponent({
       overflow: hidden;
       text-overflow: ellipsis;
 
-      &.node-llm-text-generation { color: #7b1fa2; }
-      &.node-llm-text-span       { color: #0288d1; }
-      &.node-llm-text-tool       { color: #ef6c00; }
-      &.node-llm-text-agent      { color: #2e7d32; }
-      &.node-llm-text-chain      { color: #00796b; }
-      &.node-llm-text-retriever  { color: #0097a7; }
-      &.node-llm-text-task       { color: #283593; }
-      &.node-llm-text-evaluator  { color: #4527a0; }
-      &.node-llm-text-workflow   { color: #546e7a; }
-      &.node-llm-text-embedding  { color: #c2185b; }
-      &.node-llm-text-rerank     { color: #5d4037; }
-      &.node-llm-text-guardrail  { color: #c62828; }
-      &.node-llm-text-event      { color: #616161; }
+      &.node-llm-text-generation { color: #388e3c; }  // green-dark
+      &.node-llm-text-embedding  { color: #1976d2; }  // blue-dark
+      &.node-llm-text-agent      { color: #7b1fa2; }  // purple-dark
+      &.node-llm-text-tool       { color: #e65100; }  // orange-dark
+      &.node-llm-text-chain      { color: #283593; }  // indigo-dark
+      &.node-llm-text-retriever  { color: #00838f; }  // cyan-dark
+      &.node-llm-text-task       { color: #00796b; }  // teal-dark
+      &.node-llm-text-evaluator  { color: #c2185b; }  // pink-dark
+      &.node-llm-text-workflow   { color: #4527a0; }  // deep-purple-dark
+      &.node-llm-text-rerank     { color: #0277bd; }  // light-blue-dark
+      &.node-llm-text-guardrail  { color: #c62828; }  // red-dark
+      &.node-llm-text-span       { color: #616161; }  // grey-dark
+      &.node-llm-text-event      { color: #f57f17; }  // amber-dark
       &.node-llm-text-default    { color: #757575; }
     }
 
@@ -586,20 +586,20 @@ export default defineComponent({
           border-color: #66bb6a;
         }
 
-        // LLM observation type dark mode colors
-        &.node-llm-generation { border-color: #ce93d8; background: #2a1a2e; }
-        &.node-llm-span       { border-color: #4fc3f7; background: #1a2a3a; }
-        &.node-llm-tool       { border-color: #ffb74d; background: #2e2218; }
-        &.node-llm-agent      { border-color: #66bb6a; background: #1a2e1a; }
-        &.node-llm-chain      { border-color: #4db6ac; background: #1a2e2a; }
-        &.node-llm-retriever  { border-color: #4dd0e1; background: #1a2a2e; }
-        &.node-llm-task       { border-color: #7986cb; background: #1a1a2e; }
-        &.node-llm-evaluator  { border-color: #b39ddb; background: #221a2e; }
-        &.node-llm-workflow   { border-color: #90a4ae; background: #222628; }
-        &.node-llm-embedding  { border-color: #f48fb1; background: #2e1a22; }
-        &.node-llm-rerank     { border-color: #a1887f; background: #2a2220; }
-        &.node-llm-guardrail  { border-color: #ef5350; background: #2e1a1a; }
-        &.node-llm-event      { border-color: #9e9e9e; background: #262626; }
+        // LLM observation type dark mode colors (consistent with llmUtils)
+        &.node-llm-generation { border-color: #66bb6a; background: #1a2e1a; }  // green
+        &.node-llm-embedding  { border-color: #64b5f6; background: #1a2a3a; }  // blue
+        &.node-llm-agent      { border-color: #ce93d8; background: #2a1a2e; }  // purple
+        &.node-llm-tool       { border-color: #ffb74d; background: #2e2218; }  // orange
+        &.node-llm-chain      { border-color: #7986cb; background: #1a1a2e; }  // indigo
+        &.node-llm-retriever  { border-color: #4dd0e1; background: #1a2a2e; }  // cyan
+        &.node-llm-task       { border-color: #4db6ac; background: #1a2e2a; }  // teal
+        &.node-llm-evaluator  { border-color: #f48fb1; background: #2e1a22; }  // pink
+        &.node-llm-workflow   { border-color: #b39ddb; background: #221a2e; }  // deep-purple
+        &.node-llm-rerank     { border-color: #4fc3f7; background: #1a2a3a; }  // light-blue
+        &.node-llm-guardrail  { border-color: #ef5350; background: #2e1a1a; }  // red
+        &.node-llm-span       { border-color: #9e9e9e; background: #262626; }  // grey
+        &.node-llm-event      { border-color: #ffd54f; background: #2e2a18; }  // amber
         &.node-llm-default    { border-color: #9e9e9e; background: #262626; }
       }
 
@@ -608,20 +608,20 @@ export default defineComponent({
         font-size: 12px;
         max-width: 124px;
 
-        &.node-llm-text-generation { color: #ce93d8; }
-        &.node-llm-text-span       { color: #4fc3f7; }
-        &.node-llm-text-tool       { color: #ffb74d; }
-        &.node-llm-text-agent      { color: #66bb6a; }
-        &.node-llm-text-chain      { color: #4db6ac; }
-        &.node-llm-text-retriever  { color: #4dd0e1; }
-        &.node-llm-text-task       { color: #7986cb; }
-        &.node-llm-text-evaluator  { color: #b39ddb; }
-        &.node-llm-text-workflow   { color: #90a4ae; }
-        &.node-llm-text-embedding  { color: #f48fb1; }
-        &.node-llm-text-rerank     { color: #a1887f; }
-        &.node-llm-text-guardrail  { color: #ef5350; }
-        &.node-llm-text-event      { color: #9e9e9e; }
-        &.node-llm-text-default    { color: #9e9e9e; }
+        &.node-llm-text-generation { color: #81c784; }  // green-light
+        &.node-llm-text-embedding  { color: #90caf9; }  // blue-light
+        &.node-llm-text-agent      { color: #ce93d8; }  // purple-light
+        &.node-llm-text-tool       { color: #ffcc80; }  // orange-light
+        &.node-llm-text-chain      { color: #9fa8da; }  // indigo-light
+        &.node-llm-text-retriever  { color: #80deea; }  // cyan-light
+        &.node-llm-text-task       { color: #80cbc4; }  // teal-light
+        &.node-llm-text-evaluator  { color: #f48fb1; }  // pink-light
+        &.node-llm-text-workflow   { color: #b39ddb; }  // deep-purple-light
+        &.node-llm-text-rerank     { color: #81d4fa; }  // light-blue-light
+        &.node-llm-text-guardrail  { color: #ef9a9a; }  // red-light
+        &.node-llm-text-span       { color: #bdbdbd; }  // grey-light
+        &.node-llm-text-event      { color: #ffe082; }  // amber-light
+        &.node-llm-text-default    { color: #bdbdbd; }
       }
     }
   }
