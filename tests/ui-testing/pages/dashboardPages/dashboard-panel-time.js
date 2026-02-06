@@ -119,8 +119,12 @@ export default class DashboardPanelTime {
     await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await pickerBtn.click();
 
+    // Wait for the date picker dropdown to open
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 5000 });
+
     // Switch to absolute tab
-    await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+    await dateTimeDialog.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Click the left chevron button (if needed)
@@ -139,23 +143,37 @@ export default class DashboardPanelTime {
       .getByRole("button", { name: String(endDay) })
       .last()
       .click();
+
+    // Press Escape to close the date picker dropdown
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForTimeout(300);
+
+    // Wait for the date picker dropdown to close
+    await dateTimeDialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+    // Now click the dashboard apply button to save the panel
+    await this.page.locator('[data-test="dashboard-apply"]').click();
+    await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 
   /**
    * Set panel time in AddPanel edit mode using calendar picker (absolute time)
    * This method uses the calendar UI to select dates by clicking on day numbers
-   
+
    */
   async setPanelTimeAbsoluteByCalendar(startDay, endDay) {
-    
 
     // Click the panel time picker in AddPanel config (edit mode)
     const pickerBtn = this.page.locator('[data-test="dashboard-config-panel-time-picker"]');
     await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await pickerBtn.click();
 
+    // Wait for the date picker dropdown to open
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 5000 });
+
     // Switch to absolute tab
-    await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+    await dateTimeDialog.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Click the left chevron button (if needed)
@@ -174,12 +192,17 @@ export default class DashboardPanelTime {
       .getByRole("button", { name: String(endDay) })
       .last()
       .click();
-      // Click apply button
-      await this.page.locator('[data-test="dashboard-apply"]').click();
-      await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
-      // Ensure the time picker dropdown is fully closed before proceeding
-      await this.page.locator('.q-menu').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    // Press Escape to close the date picker dropdown
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForTimeout(300);
+
+    // Wait for the date picker dropdown to close
+    await dateTimeDialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+    // Now click the dashboard apply button to save the panel
+    await this.page.locator('[data-test="dashboard-apply"]').click();
+    await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 
   /**
@@ -204,10 +227,14 @@ export default class DashboardPanelTime {
    * @param {string} panelId - Panel ID
    */
   async clickPanelTimePicker(panelId) {
+    // Close any open menus first by clicking elsewhere
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+    await this.page.waitForTimeout(300);
+
     const pickerBtn = this.page.locator(`[data-test="panel-time-picker-${panelId}"] [data-test="date-time-btn"]`);
     await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
+    await pickerBtn.scrollIntoViewIfNeeded();
     await pickerBtn.click();
-    await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 
   /**
@@ -220,18 +247,24 @@ export default class DashboardPanelTime {
     // Click the panel time picker button
     await this.clickPanelTimePicker(panelId);
 
-    // Wait for dropdown to open (use .first() to avoid strict mode violations)
-    await this.page.locator('.q-menu').first().waitFor({ state: "visible", timeout: 5000 });
+    // Wait for the DateTime dialog to open
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 5000 });
 
-    // Select the time range within the open menu to avoid strict mode violations
-    const timeOptionLocator = this.page.locator(`.q-menu [data-test="date-time-relative-${timeRange}-btn"]`).first();
+    // Select the time range within the dialog
+    const timeOptionLocator = dateTimeDialog.locator(`[data-test="date-time-relative-${timeRange}-btn"]`);
     await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
+    await timeOptionLocator.scrollIntoViewIfNeeded();
     await timeOptionLocator.click();
 
     if (clickApply) {
-      // Click apply button
-      await this.page.locator('[data-test="date-time-apply-btn"]').click();
-      // Wait for API call and URL update
+      // Click apply button within the dialog
+      const applyBtn = dateTimeDialog.locator('[data-test="date-time-apply-btn"]');
+      await applyBtn.scrollIntoViewIfNeeded();
+      await applyBtn.click();
+
+      // Wait for dialog to close and network to settle
+      await dateTimeDialog.waitFor({ state: "hidden", timeout: 5000 });
       await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     }
   }
@@ -278,25 +311,64 @@ export default class DashboardPanelTime {
    * Click the global date time picker
    */
   async clickGlobalTimePicker() {
-    const globalPicker = this.page.locator('[data-test="dashboard-global-date-time-picker"] [data-test="date-time-btn"]');
-    await globalPicker.waitFor({ state: "visible", timeout: 10000 });
-    await globalPicker.click();
+    // Close any open menus/tooltips by pressing Escape
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.waitForTimeout(300);
+
+    // Wait for any existing dropdowns to close
+    await this.page.locator('.date-time-dialog').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await this.page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+
+    // Wait for network to settle before clicking
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Wait for dashboard to be fully loaded - check for dashboard header
+    await this.page.locator('[data-test="dashboard-name"]').waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+
+    // Find the global time picker button using the date-time-btn directly
+    // The button should be visible even if parent container has complex visibility rules
+    const globalPickerBtn = this.page.locator('[data-test="dashboard-global-date-time-picker"] [data-test="date-time-btn"]');
+
+    // First check if element exists
+    const count = await globalPickerBtn.count();
+    if (count === 0) {
+      // Try alternative selector - the date-time button in dashboard header area
+      const altBtn = this.page.locator('.date-time-container [data-test="date-time-btn"]').first();
+      await altBtn.waitFor({ state: "visible", timeout: 10000 });
+      await altBtn.scrollIntoViewIfNeeded();
+      await altBtn.click();
+      return;
+    }
+
+    await globalPickerBtn.waitFor({ state: "visible", timeout: 10000 });
+    await globalPickerBtn.scrollIntoViewIfNeeded();
+    await globalPickerBtn.click();
   }
 
   /**
-   * Change global time
+   * Change global time using relative time selection
    * @param {string} timeRange - e.g., "15-m", "1-h", "24-h"
    */
   async changeGlobalTime(timeRange) {
     await this.clickGlobalTimePicker();
 
-    // Wait for the dropdown menu to open (use .first() to avoid strict mode violations)
-    await this.page.locator('.q-menu').first().waitFor({ state: "visible", timeout: 5000 });
+    // Wait for the DateTime dialog to open
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 5000 });
 
-    // Click the time option within the open menu to avoid strict mode violations
-    await this.page.locator(`.q-menu [data-test="date-time-relative-${timeRange}-btn"]`).first().click();
-    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await this.page.locator('[data-test="date-time-apply-btn"]').click();
+    // Click the time option within the dialog
+    const timeOptionBtn = dateTimeDialog.locator(`[data-test="date-time-relative-${timeRange}-btn"]`);
+    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
+    await timeOptionBtn.scrollIntoViewIfNeeded();
+    await timeOptionBtn.click();
+
+    // Click apply button within the dialog
+    const applyBtn = dateTimeDialog.locator('[data-test="date-time-apply-btn"]');
+    await applyBtn.scrollIntoViewIfNeeded();
+    await applyBtn.click();
+
+    // Wait for dialog to close and network to settle
+    await dateTimeDialog.waitFor({ state: "hidden", timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
