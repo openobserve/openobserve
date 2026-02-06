@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesData="{}"
         searchType="UI"
         :is_ui_histogram="isUsingBackendSql"
-        style="height: 180px; width: 100%; overflow-x: hidden;"
+        style="height: 100%; width: 100%;"
       />
     </div>
   </div>

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-show="expandState.preview" class="section-content">
         <preview-alert
-          style="height: 100%; overflow: auto;"
+          style="height: 100%;"
           ref="previewAlertRef"
           :formData="formData"
           :query="previewQuery"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="expand-toggle-btn"
         />
       </div>
-      <div v-show="expandState.summary" class="section-content">
+      <div v-show="expandState.summary" class="summary-section-content">
         <alert-summary
           style="height: 100%; overflow: auto;"
           :formData="formData"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, reactive, watch, type PropType } from "vue";
+import { defineComponent, ref, computed, reactive, watch, onMounted, onUnmounted, type PropType } from "vue";
 import { useStore } from "vuex";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
@@ -214,6 +214,29 @@ export default defineComponent({
       }
     };
 
+    // Handle window resize to rerender chart
+    let resizeTimeout: ReturnType<typeof setTimeout>;
+    const handleResize = () => {
+      // Debounce resize events to avoid excessive rerenders
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (previewAlertRef.value && expandState.preview) {
+          (previewAlertRef.value as any).refreshData();
+        }
+      }, 300);
+    };
+
+    // Setup resize listener on mount
+    onMounted(() => {
+      window.addEventListener('resize', handleResize);
+    });
+
+    // Cleanup resize listener on unmount
+    onUnmounted(() => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    });
+
     // Expose the method to parent component
     expose({
       refreshData,
@@ -242,7 +265,7 @@ export default defineComponent({
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
   border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  overflow: hidden;
+  // overflow: hidden;
 
   .section-header {
     flex-shrink: 0;
@@ -259,8 +282,12 @@ export default defineComponent({
       background: rgba(0, 0, 0, 0.06);
     }
   }
-
   .section-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .summary-section-content {
     flex: 1;
     overflow: hidden;
     display: flex;
