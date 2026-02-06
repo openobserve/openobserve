@@ -226,9 +226,11 @@ describe("PrebuiltDestinationSelector", () => {
     it("should show check icon on selected card", () => {
       wrapper = mountComponent({ modelValue: "custom" });
       const customCard = findCardByType(wrapper, "custom");
-      const checkIcon = customCard.findAll('[name="check_circle"]');
+      const checkIcon = customCard.find(".check-icon");
 
-      expect(checkIcon.length).toBeGreaterThan(0);
+      expect(checkIcon.exists()).toBe(true);
+      const qIcon = checkIcon.findComponent({ name: "QIcon" });
+      expect(qIcon.props("name")).toBe("check_circle");
     });
 
     it("should not show check icon on unselected cards", () => {
