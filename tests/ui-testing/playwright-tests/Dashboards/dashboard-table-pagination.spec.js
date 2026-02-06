@@ -26,7 +26,7 @@ test.describe.configure({ retries: 1 });
  *
  * FEATURE OVERVIEW:
  * - Pagination toggle is available in the Config panel for Table chart type only
- * - When enabled, users can set "rows_per_page" to control how many rows appear per page
+ * - When enabled, users can set "table_pagination_rows_per_page" to control how many rows appear per page
  * - Works for both SQL and PromQL table charts
  * - Default: pagination is OFF, showing all rows with virtual scroll
  * - When ON: pagination controls appear at the bottom of the table
@@ -258,8 +258,8 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await expect(tableBottom).toBeVisible();
 
     // Check for "Records per page" text
-    const recordsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
-    await expect(recordsPerPageText).toBeVisible();
+    const rowsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
+    await expect(rowsPerPageText).toBeVisible();
 
     testLogger.info('Verified pagination controls are visible in table');
 
@@ -310,8 +310,8 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify "Records per page" text is NOT visible
-    const recordsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
-    await expect(recordsPerPageText).not.toBeVisible();
+    const rowsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
+    await expect(rowsPerPageText).not.toBeVisible();
 
     testLogger.info('Verified pagination controls are hidden when disabled');
 
@@ -364,7 +364,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     // Wait for panel to be saved - the panel dropdown should be visible after save
     await page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`).waitFor({ state: "visible", timeout: 30000 });
 
-    testLogger.info('Saved panel with pagination enabled and rows_per_page=50');
+    testLogger.info('Saved panel with pagination enabled and table_pagination_rows_per_page=50');
 
     // Edit the panel again
     await pm.dashboardPanelActions.selectPanelAction(panelName, "Edit");
@@ -957,9 +957,9 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify pagination controls are visible
-    const recordsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
-    await recordsPerPageText.waitFor({ state: "visible" });
-    await expect(recordsPerPageText).toBeVisible();
+    const rowsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
+    await rowsPerPageText.waitFor({ state: "visible" });
+    await expect(rowsPerPageText).toBeVisible();
 
     testLogger.info('Verified pagination works with custom SQL query table');
 
@@ -1155,8 +1155,8 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await tableBottom.waitFor({ state: "visible", timeout: 15000 });
 
     // Verify "Records per page:" text is visible (note: text includes colon)
-    const recordsPerPageText = tableBottom.locator('span.text-caption').filter({ hasText: 'Records per page' });
-    await expect(recordsPerPageText).toBeVisible({ timeout: 10000 });
+    const rowsPerPageText = tableBottom.locator('span.text-caption').filter({ hasText: 'Records per page' });
+    await expect(rowsPerPageText).toBeVisible({ timeout: 10000 });
 
     // Verify the record count display shows correct format (e.g., "1-10 of 99")
     // The pagination info is in a span with class "text-caption q-pa-sm"

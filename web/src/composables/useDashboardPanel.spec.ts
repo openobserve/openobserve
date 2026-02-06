@@ -161,16 +161,16 @@ describe("useDashboardPanel", () => {
       expect(dashboardPanelData.data.queries).toHaveLength(1);
     });
 
-    it("should initialize show_pagination as false by default", () => {
+    it("should initialize table_pagination as false by default", () => {
       const { dashboardPanelData } = useDashboardPanelData();
 
-      expect(dashboardPanelData.data.config.show_pagination).toBe(false);
+      expect(dashboardPanelData.data.config.table_pagination).toBe(false);
     });
 
-    it("should initialize rows_per_page as null by default", () => {
+    it("should initialize table_pagination_rows_per_page as null by default", () => {
       const { dashboardPanelData } = useDashboardPanelData();
 
-      expect(dashboardPanelData.data.config.rows_per_page).toBeNull();
+      expect(dashboardPanelData.data.config.table_pagination_rows_per_page).toBeNull();
     });
 
     it("should initialize pagination config alongside other table config", () => {
@@ -178,8 +178,8 @@ describe("useDashboardPanel", () => {
       const config = dashboardPanelData.data.config;
 
       // Verify pagination config exists with other table config
-      expect(config).toHaveProperty("show_pagination");
-      expect(config).toHaveProperty("rows_per_page");
+      expect(config).toHaveProperty("table_pagination");
+      expect(config).toHaveProperty("table_pagination_rows_per_page");
       expect(config).toHaveProperty("sticky_columns");
       expect(config).toHaveProperty("sticky_first_column");
       expect(config).toHaveProperty("column_order");

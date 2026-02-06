@@ -397,11 +397,11 @@ export default defineComponent({
 
     watch(
       () => [props.showPagination, props.rowsPerPage],
-      ([newShowPagination, newRowsPerPage]) => {
+      ([newShowPagination, newrowsPerPage]) => {
         // Force reset pagination when toggle or config changes
         pagination.value = {
           ...pagination.value,
-          rowsPerPage: newShowPagination ? newRowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
+          rowsPerPage: newShowPagination ? newrowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
           page: 1, // Reset to first page
         };
       },
