@@ -20,6 +20,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use reqwest::redirect::Policy;
 use rustls_pemfile::{certs, private_key};
 use x509_parser::prelude::*;
 
@@ -105,7 +106,8 @@ pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
     let cfg = config::get_config();
     let mut client_builder = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(cfg.route.timeout))
-        .pool_max_idle_per_host(cfg.route.max_connections);
+        .pool_max_idle_per_host(cfg.route.max_connections)
+        .redirect(reqwest::redirect::Policy::none());
 
     if cfg.http.tls_enabled {
         let tls_config = client_tls_config()?;
