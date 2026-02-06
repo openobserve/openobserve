@@ -70,13 +70,11 @@
             data-test="service-graph-refresh-btn"
             no-caps
             flat
-            dense
-            icon="refresh"
-            class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw:bg-[var(--o2-hover-accent)]"
+            class="o2-secondary-button"
             @click="loadServiceGraph"
             :loading="loading"
           >
-            <q-tooltip>Refresh Service Graph</q-tooltip>
+          Refresh
           </q-btn>
 
           <!-- 3. Graph/Tree view toggle -->
@@ -143,172 +141,9 @@
                 <div class="text-h6 q-mt-md text-grey-7">
                   No Service Graph Data
                 </div>
-                <div
-                  class="text-h6 text-grey-7 q-mt-lg q-mb-md"
-                  style="font-size: 1.1rem"
-                >
-                  Possible causes:
+                <div class="text-body2 text-grey-6 q-mt-sm">
+                  Try querying a longer duration
                 </div>
-                <div
-                  class="text-body1 text-grey-6"
-                  style="max-width: 800px; font-size: 0.95rem"
-                >
-                  <div
-                    class="q-pa-md q-mb-md"
-                    style="
-                      background: rgba(var(--q-primary-rgb), 0.05);
-                      border-radius: 6px;
-                    "
-                  >
-                    <div
-                      class="text-weight-medium q-mb-sm"
-                      style="font-size: 1rem"
-                    >
-                      Service graph is disabled
-                    </div>
-                    <div>
-                      Enable the feature by setting environment variable:
-                    </div>
-                    <code
-                      class="q-mt-xs"
-                      style="
-                        background: rgba(var(--q-primary-rgb), 0.1);
-                        padding: 4px 10px;
-                        border-radius: 4px;
-                        font-size: 0.9rem;
-                        color: var(--q-primary);
-                        font-weight: 600;
-                      "
-                      >O2_SERVICE_GRAPH_ENABLED=true</code
-                    >
-                  </div>
-
-                  <div
-                    class="q-pa-md q-mb-md"
-                    style="
-                      background: rgba(var(--q-primary-rgb), 0.05);
-                      border-radius: 6px;
-                    "
-                  >
-                    <div
-                      class="text-weight-medium q-mb-sm"
-                      style="font-size: 1rem"
-                    >
-                      Query time range is too small
-                    </div>
-                    <div>
-                      The daemon queries traces within a time window. If your
-                      traces are older, increase the window:
-                    </div>
-                    <code
-                      class="q-mt-xs"
-                      style="
-                        background: rgba(var(--q-primary-rgb), 0.1);
-                        padding: 4px 10px;
-                        border-radius: 4px;
-                        font-size: 0.9rem;
-                        color: var(--q-primary);
-                        font-weight: 600;
-                      "
-                      >O2_SERVICE_GRAPH_QUERY_TIME_RANGE_MINUTES=120</code
-                    >
-                    <div
-                      class="text-caption q-mt-sm"
-                      style="color: #666; font-size: 0.85rem"
-                    >
-                      (Default: 60 minutes)
-                    </div>
-                  </div>
-
-                  <div
-                    class="q-pa-md q-mb-md"
-                    style="
-                      background: rgba(var(--q-primary-rgb), 0.05);
-                      border-radius: 6px;
-                    "
-                  >
-                    <div
-                      class="text-weight-medium q-mb-sm"
-                      style="font-size: 1rem"
-                    >
-                      Only INTERNAL spans detected
-                    </div>
-                    <div>
-                      Your traces have
-                      <code
-                        style="
-                          background: rgba(var(--q-primary-rgb), 0.1);
-                          padding: 3px 7px;
-                          border-radius: 3px;
-                          font-size: 0.9rem;
-                          color: var(--q-primary);
-                          font-weight: 600;
-                        "
-                        >span_kind=1</code
-                      >
-                      (INTERNAL operations within a service).
-                    </div>
-                    <div class="q-mt-sm">
-                      To create service-to-service edges, send traces with:
-                    </div>
-                    <ul
-                      class="q-pl-md q-mt-sm q-mb-sm"
-                      style="line-height: 1.6"
-                    >
-                      <li>
-                        <strong>CLIENT spans</strong> (<code
-                          style="
-                            background: rgba(var(--q-primary-rgb), 0.1);
-                            color: var(--q-primary);
-                            font-weight: 600;
-                          "
-                          >span_kind=3</code
-                        >) with
-                        <code
-                          style="
-                            background: rgba(var(--q-primary-rgb), 0.1);
-                            color: var(--q-primary);
-                            font-weight: 600;
-                          "
-                          >peer.service</code
-                        >
-                        attribute, or
-                      </li>
-                      <li>
-                        <strong>SERVER spans</strong> (<code
-                          style="
-                            background: rgba(var(--q-primary-rgb), 0.1);
-                            color: var(--q-primary);
-                            font-weight: 600;
-                          "
-                          >span_kind=2</code
-                        >) receiving requests from other services
-                      </li>
-                    </ul>
-                    <div
-                      class="text-caption q-mt-sm"
-                      style="color: #666; font-size: 0.85rem"
-                    >
-                      Note: INTERNAL spans can be excluded by setting
-                      <code
-                        style="
-                          background: rgba(var(--q-primary-rgb), 0.1);
-                          color: var(--q-primary);
-                          font-weight: 600;
-                        "
-                        >O2_SERVICE_GRAPH_EXCLUDE_INTERNAL_SPANS=true</code
-                      >
-                    </div>
-                  </div>
-                </div>
-                <q-btn
-                  outline
-                  color="primary"
-                  label="Refresh"
-                  icon="refresh"
-                  @click="loadServiceGraph"
-                  class="q-mt-lg"
-                />
               </div>
             </div>
             <div v-else class="tw:h-full graph-with-panel-container">
