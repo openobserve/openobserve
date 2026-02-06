@@ -1131,6 +1131,15 @@ watch(
   { immediate: true }
 );
 
+// Watch for searchRequestTraceIds changes to notify parent (for cancel query functionality)
+watch(
+  searchRequestTraceIds,
+  (newTraceIds) => {
+    emit("searchRequestTraceIdsUpdated", newTraceIds);
+  },
+  { immediate: true }
+);
+
 // ============================================================================
 // Expose
 // ============================================================================

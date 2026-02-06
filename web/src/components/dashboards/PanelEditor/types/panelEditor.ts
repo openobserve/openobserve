@@ -361,6 +361,12 @@ export interface PanelEditorEmits {
    * true = custom mode (user edits query), false = builder mode (auto-generated).
    */
   (e: "customQueryModeChanged", isCustomMode: boolean): void;
+
+  /**
+   * Emitted when search request trace IDs change.
+   * Used for cancel query functionality - parent can sync these to its own loading state.
+   */
+  (e: "searchRequestTraceIdsUpdated", traceIds: string[]): void;
 }
 
 // ============================================================================

@@ -980,7 +980,7 @@ class="q-pr-sm q-pt-xs" />
                 />
               </q-btn-dropdown>
             </q-btn-group>
-            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
+            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize' || searchObj.meta.logsVisualizeToggle === 'build'">
               <div v-if="config.isEnterprise == 'true'" class="tw:flex">
                 <q-btn
                 v-if="
@@ -4109,7 +4109,7 @@ export default defineComponent({
 
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+        variablesAndPanelsDataLoadingState?.searchRequestTraceIds ?? {},
       )
         .filter((item: any) => item.length > 0)
         .flat() as string[];

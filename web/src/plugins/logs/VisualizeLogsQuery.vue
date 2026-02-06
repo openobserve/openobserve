@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :allowedChartTypes="allowedChartTypes"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
+      @searchRequestTraceIdsUpdated="handleSearchRequestTraceIdsUpdated"
     />
 
     <!-- Add to Dashboard Dialog -->
@@ -95,7 +96,7 @@ export default defineComponent({
     AddToDashboard,
     PanelEditor,
   },
-  emits: ["handleChartApiError"],
+  emits: ["handleChartApiError", "searchRequestTraceIdsUpdated"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -181,6 +182,11 @@ export default defineComponent({
       emit("handleChartApiError", errorMsg);
     };
 
+    // Forward search request trace IDs to parent for cancel query functionality
+    const handleSearchRequestTraceIdsUpdated = (traceIds: string[]) => {
+      emit("searchRequestTraceIdsUpdated", traceIds);
+    };
+
     // Provide hovered series state for child components
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
@@ -258,6 +264,7 @@ export default defineComponent({
       t,
       dashboardPanelData,
       handleChartApiError,
+      handleSearchRequestTraceIdsUpdated,
       resetAggregationFunction,
       store,
       chartData,

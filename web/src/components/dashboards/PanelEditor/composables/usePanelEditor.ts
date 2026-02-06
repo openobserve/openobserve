@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, reactive, computed, watch, provide, nextTick } from "vue";
+import { ref, reactive, computed, watch, provide, inject, nextTick } from "vue";
 import type { Ref, ComputedRef } from "vue";
 import { useStore } from "vuex";
 import { isEqual } from "lodash-es";
@@ -123,14 +123,22 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   /** Whether queries are disabled (loading) */
   const disable: Ref<boolean> = ref(false);
 
-  /** Reactive object for loading state of variables and panels */
-  const variablesAndPanelsDataLoadingState = reactive({
+  /**
+   * Reactive object for loading state of variables and panels.
+   * First try to inject from parent (e.g., Index.vue for logs page).
+   * If no parent provides it, create a new one (e.g., for dashboard AddPanel).
+   * This ensures PanelSchemaRenderer updates the correct state that SearchBar reads from.
+   */
+  const injectedLoadingState = inject<any>("variablesAndPanelsDataLoadingState", null);
+
+  const variablesAndPanelsDataLoadingState = injectedLoadingState || reactive({
     variablesData: {} as Record<string, boolean>,
     panels: {} as Record<string, boolean>,
     searchRequestTraceIds: {} as Record<string, string[]>,
   });
 
-  // Provide loading state for child components
+  // Provide loading state for child components (either injected or newly created)
+  // This ensures PanelSchemaRenderer can inject it
   provide(
     "variablesAndPanelsDataLoadingState",
     variablesAndPanelsDataLoadingState,

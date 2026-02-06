@@ -1617,6 +1617,12 @@ export default defineComponent({
             searchObj.meta.buildModeQueryEditorDisabled = false;
           }
 
+          // Set loading flag for build mode to prevent flicker between initialization and chart API call
+          // This will be cleared when trace IDs arrive (via watcher) or when unmounting
+          if (searchObj.meta.logsVisualizeToggle === "build") {
+            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
+          }
+
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
             // Enable quick mode automatically when switching to visualization if:
             // 1. SQL mode is disabled OR
@@ -1870,9 +1876,6 @@ export default defineComponent({
             // Clear the restoration flag after all operations are complete
             await nextTick();
             isRestoringFromUrl.value = false;
-
-            // set fields extraction loading to false
-            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
 
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize

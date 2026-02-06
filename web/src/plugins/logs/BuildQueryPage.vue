@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @chartApiError="handleChartApiError"
       @queryGenerated="onQueryGenerated"
       @customQueryModeChanged="onCustomQueryModeChanged"
+      @searchRequestTraceIdsUpdated="onSearchRequestTraceIdsUpdated"
     />
 
     <!-- Add to Dashboard Dialog -->
@@ -102,6 +103,8 @@ const emit = defineEmits<{
   (e: "customQueryModeChanged", isCustomMode: boolean): void;
   /** Emitted when initialization is complete */
   (e: "initialized"): void;
+  /** Emitted when search request trace IDs change (for cancel query functionality) */
+  (e: "searchRequestTraceIdsUpdated", traceIds: string[]): void;
 }>();
 
 // ============================================================================
@@ -326,6 +329,11 @@ const onQueryGenerated = (query: string) => {
 const onCustomQueryModeChanged = (isCustomMode: boolean) => {
   // Forward the custom query mode change to parent
   emit("customQueryModeChanged", isCustomMode);
+};
+
+const onSearchRequestTraceIdsUpdated = (traceIds: string[]) => {
+  // Forward search request trace IDs to parent for cancel query functionality
+  emit("searchRequestTraceIdsUpdated", traceIds);
 };
 
 // ============================================================================
