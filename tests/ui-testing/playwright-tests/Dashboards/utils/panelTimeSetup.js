@@ -241,7 +241,15 @@ export async function savePanel(page) {
 
   // Ensure any open menus/dropdowns are closed before clicking save
   // This prevents the save button from being intercepted by overlays
+  // Wait for both .q-menu and portal menus to be hidden
   await page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+
+  // Also wait for any date picker portal menus to close (they use q-portal--menu--* IDs)
+  await page.locator('[id^="q-portal--menu--"]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+
+  // Click somewhere neutral to dismiss any remaining overlays (like date picker)
+  await page.locator('[data-test="dashboard-panel-name"]').click().catch(() => {});
+  await page.waitForTimeout(200);
 
   await page.locator('[data-test="dashboard-panel-save"]').click();
   await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
