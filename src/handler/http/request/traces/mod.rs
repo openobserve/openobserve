@@ -87,12 +87,21 @@ pub async fn traces_write(
         }
     }
 
+    let cfg = get_config();
     let content_type = headers
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("application/json");
+    let org_id = if let Some(Some(v)) = headers
+        .get(&cfg.grpc.org_header_key)
+        .map(|header| header.to_str().ok())
+    {
+        v.to_string()
+    } else {
+        org_id
+    };
     let in_stream_name = headers
-        .get(&get_config().grpc.stream_header_key)
+        .get(&cfg.grpc.stream_header_key)
         .and_then(|header| header.to_str().ok());
 
     let result = if content_type.eq(CONTENT_TYPE_PROTO) {
