@@ -311,6 +311,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'o2-toggle-button-lg-light'
       "
     />
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.table_pagination"
+      :label="t('dashboard.pagination')"
+      data-test="dashboard-config-show-pagination"
+      class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-lg-dark'
+          : 'o2-toggle-button-lg-light'
+      "
+    />
+
+    <div class="space"></div>
+
+    <q-input
+      v-if="
+        dashboardPanelData.data.type == 'table' &&
+        dashboardPanelData.data.config.table_pagination
+      "
+      v-model.number="dashboardPanelData.data.config.table_pagination_rows_per_page"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      dense
+      label-slot
+      data-test="dashboard-config-rows-per-page"
+      borderless
+      hide-bottom-space
+      type="number"
+      placeholder="Auto"
+      min="1"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          {{ t('dashboard.rowsPerPage') }}
+          <div>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-rows-per-page-info"
+            />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t('dashboard.rowsPerPageTooltip') }}
+            </q-tooltip>
+          </div>
+        </div>
+      </template>
+    </q-input>
 
     <div class="space"></div>
 
