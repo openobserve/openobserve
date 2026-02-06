@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import { installQuasar } from "@quasar/quasar-app-extension-testing-unit-vitest";
 import TagInput from "./TagInput.vue";
 
 installQuasar();
@@ -186,9 +186,8 @@ describe("TagInput", () => {
       const chip0 = findByTestId(wrapper, "tag-chip-0");
       const chip1 = findByTestId(wrapper, "tag-chip-1");
 
-      // QChip text includes the remove button icon, so we check if it contains the tag text
-      expect(chip0.text()).toContain("Frontend");
-      expect(chip1.text()).toContain("Backend");
+      expect(chip0.text()).toBe("Frontend");
+      expect(chip1.text()).toBe("Backend");
     });
 
     it("should display no chips when modelValue is empty", () => {
@@ -319,11 +318,9 @@ describe("TagInput", () => {
     it("should emit update when tag is removed", async () => {
       wrapper = mountComponent({ modelValue: ["tag1", "tag2"] });
 
-      // Find the QChip component and emit the remove event
-      const chipWrapper = findByTestId(wrapper, "tag-chip-0");
-      const qChip = chipWrapper.findComponent({ name: "QChip" });
-      qChip.vm.$emit("remove");
-      await flushPromises();
+      // Simulate remove by emitting the event
+      const chip = findByTestId(wrapper, "tag-chip-0");
+      await chip.trigger("remove");
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([["tag2"]]);
@@ -332,10 +329,8 @@ describe("TagInput", () => {
     it("should remove correct tag by index", async () => {
       wrapper = mountComponent({ modelValue: ["tag1", "tag2", "tag3"] });
 
-      const chipWrapper = findByTestId(wrapper, "tag-chip-1");
-      const qChip = chipWrapper.findComponent({ name: "QChip" });
-      qChip.vm.$emit("remove");
-      await flushPromises();
+      const chip = findByTestId(wrapper, "tag-chip-1");
+      await chip.trigger("remove");
 
       expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([
         ["tag1", "tag3"],
@@ -345,10 +340,8 @@ describe("TagInput", () => {
     it("should remove last tag", async () => {
       wrapper = mountComponent({ modelValue: ["only-tag"] });
 
-      const chipWrapper = findByTestId(wrapper, "tag-chip-0");
-      const qChip = chipWrapper.findComponent({ name: "QChip" });
-      qChip.vm.$emit("remove");
-      await flushPromises();
+      const chip = findByTestId(wrapper, "tag-chip-0");
+      await chip.trigger("remove");
 
       expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([[]]);
     });
