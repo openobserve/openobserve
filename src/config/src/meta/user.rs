@@ -323,8 +323,9 @@ mod tests {
     }
 
     mod user_role_ordering {
-        use super::*;
         use std::cmp::Ordering;
+
+        use super::*;
 
         #[test]
         fn test_root_is_highest_privilege() {
@@ -354,9 +355,8 @@ mod tests {
         }
 
         #[test]
-        fn tetd::cmp::Ordering;
-
-        use super::*
+        fn test_partial_cmp_returns_correct_ordering() {
+            assert_eq!(
                 UserRole::Root.partial_cmp(&UserRole::Admin),
                 Some(Ordering::Greater)
             );
