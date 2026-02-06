@@ -1114,8 +1114,9 @@ pub async fn search_partition(
 
     // Get cache strategy for streaming aggregates (enterprise only)
     #[cfg(feature = "enterprise")]
-    let stremaing_aggs_cache_strategy = if streaming_aggs && streaming_id.is_some() {
-        let streaming_id_ref = streaming_id.as_ref().unwrap();
+    let stremaing_aggs_cache_strategy = if streaming_aggs
+        && let Some(streaming_id_ref) = streaming_id.as_deref()
+    {
         match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
             Some(strategy) => {
                 log::info!(

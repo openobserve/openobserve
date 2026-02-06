@@ -156,13 +156,13 @@ impl KeyType {
         }
     }
 
-    pub fn can_upgrade_to(&self, target: Self) -> bool {
-        match (self, target) {
-            (Self::AlertId, Self::Workload | Self::Scope) => true,
-            (Self::Workload, Self::Scope | Self::Workload) => true,
-            (Self::Scope, Self::Scope) => true,
-            _ => false,
-        }
+    pub const fn can_upgrade_to(&self, target: Self) -> bool {
+        matches!(
+            (self, target),
+            (Self::AlertId, Self::Workload | Self::Scope)
+                | (Self::Workload, Self::Scope | Self::Workload)
+                | (Self::Scope, Self::Scope)
+        )
     }
 }
 
