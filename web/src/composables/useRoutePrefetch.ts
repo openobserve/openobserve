@@ -30,11 +30,10 @@ export default function useRoutePrefetch() {
   const routeModuleMap: Record<string, () => Promise<any>> = {
     "/": () => import("@/views/HomeView.vue"),
     "/logs": () => {
-      return new Promise((resolve) => {
-        import("@/plugins/logs/Index.vue");
-        import("@/plugins/logs/SearchResult.vue");
-        resolve(true);
-      });
+      return Promise.all([
+        import("@/plugins/logs/Index.vue"),
+        import("@/plugins/logs/SearchResult.vue"),
+      ]);
     },
     "/metrics": () => import("@/plugins/metrics/Index.vue"),
     "/traces": () => import("@/plugins/traces/Index.vue"),
@@ -63,25 +62,27 @@ export default function useRoutePrefetch() {
     const moduleLoader = routeModuleMap[routePath];
 
     if (moduleLoader) {
-      try {
-        // Mark as being prefetched
-        prefetchedRoutes.value.add(routePath);
+      // Mark as being prefetched
+      prefetchedRoutes.value.add(routePath);
 
-        // Trigger the dynamic import
-        // The browser will cache this module, making subsequent navigation instant
-        await moduleLoader();
-
-        console.debug(
-          `[Prefetch] Successfully prefetched module for route: ${routePath}`,
-        );
-      } catch (error) {
-        // If prefetch fails, remove from cache so it can be retried
-        prefetchedRoutes.value.delete(routePath);
-        console.warn(
-          `[Prefetch] Failed to prefetch module for route: ${routePath}`,
-          error,
-        );
-      }
+      // Trigger the dynamic import asynchronously without blocking
+      // The browser will cache this module, making subsequent navigation instant
+      moduleLoader()
+        .then(() => {
+          // eslint-disable-next-line no-undef
+          console.debug(
+            `[Prefetch] Successfully prefetched module for route: ${routePath}`,
+          );
+        })
+        .catch((error) => {
+          // If prefetch fails, remove from cache so it can be retried
+          prefetchedRoutes.value.delete(routePath);
+          // eslint-disable-next-line no-undef
+          console.warn(
+            `[Prefetch] Failed to prefetch module for route: ${routePath}`,
+            error,
+          );
+        });
     }
   };
 
