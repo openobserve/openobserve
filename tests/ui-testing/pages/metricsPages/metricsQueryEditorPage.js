@@ -359,7 +359,7 @@ export class MetricsQueryEditorPage {
 
         // Try multiple selectors for the add query button
         const selectors = [
-            '[data-test="`dashboard-panel-query-tab-add`"]',  // Exact data-test attribute
+            '[data-test="dashboard-panel-query-tab-add"]',  // Exact data-test attribute
             'button[data-test*="panel-query-tab-add"]',        // Partial match
             'button.q-btn[icon="add"]',                        // Button with add icon
             'button.q-btn.q-btn--round.q-btn--flat',          // Round flat button (likely the add button)
@@ -393,7 +393,7 @@ export class MetricsQueryEditorPage {
 
         for (let i = 0; i < buttonCount; i++) {
             const btn = roundButtons.nth(i);
-            const hasAddIcon = await btn.locator('.q-icon').evaluate(icon => {
+            const hasAddIcon = await btn.locator('.q-icon').first().evaluate(icon => {
                 return icon.textContent === 'add' || icon.getAttribute('aria-label')?.includes('add');
             }).catch(() => false);
 
