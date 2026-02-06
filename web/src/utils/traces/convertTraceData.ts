@@ -319,9 +319,9 @@ export const convertServiceGraphToTree = (
         // Persistent selection styling - matches graph view
         itemStyle: {
           borderColor: borderColor,
-          borderWidth: 4,
-          shadowBlur: 25,
-          shadowColor: 'rgba(59, 130, 246, 0.6)', // Blue glow for selected
+          borderWidth: 5,
+          shadowBlur: 45,
+          shadowColor: 'rgba(59, 130, 246, 0.9)', // Prominent blue glow for selected
           shadowOffsetX: 0,
           shadowOffsetY: 0,
         },
@@ -680,9 +680,9 @@ export const convertServiceGraphToNetwork = (
         // Persistent selection styling
         itemStyle: {
           borderColor: borderColor, // Keep health-based border color
-          borderWidth: 4,
-          shadowBlur: 25,
-          shadowColor: 'rgba(59, 130, 246, 0.6)', // Blue glow for selected
+          borderWidth: 5,
+          shadowBlur: 45,
+          shadowColor: 'rgba(59, 130, 246, 0.9)', // Prominent blue glow for selected
           shadowOffsetX: 0,
           shadowOffsetY: 0,
         },
@@ -1012,15 +1012,7 @@ export const convertServiceGraphToNetwork = (
     ],
   };
 
-  // Extract computed positions for caching
-  const computedPositions = new Map<string, { x: number; y: number }>();
-  nodes.forEach((node: any) => {
-    if (node.x !== undefined && node.y !== undefined) {
-      computedPositions.set(node.id, { x: node.x, y: node.y });
-    }
-  });
-
-  return { options, positions: computedPositions };
+  return { options };
 };
 
 const formatNumber = (num: number) => {

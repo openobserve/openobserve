@@ -501,10 +501,6 @@ export default defineComponent({
 
     const dateTimeRef = ref<any>(null);
 
-    // Store node positions for graph view to prevent re-layout on updates
-    const graphNodePositions = ref<Map<string, { x: number; y: number }>>(
-      new Map(),
-    );
 
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
@@ -533,16 +529,16 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      // Disabled caching to ensure fresh edges with __original property
-      // Position stability maintained through graphNodePositions passed to conversion
-      // if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
-      //   console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
-      //   return {
-      //     options: lastChartOptions.value.data.options,
-      //     notMerge: false,
-      //     lazyUpdate: true
-      //   };
-      // }
+      // Use cached options if chartKey hasn't changed (prevents double rendering)
+      if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
+        console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
+        return {
+          options: lastChartOptions.value.data.options,
+          notMerge: false,
+          lazyUpdate: true,
+          silent: true,
+        };
+      }
 
       const newOptions =
         visualizationType.value === "tree"
@@ -554,22 +550,17 @@ export default defineComponent({
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
               layoutType.value,
-              graphNodePositions.value,
+              new Map(), // Empty position cache to allow free movement
               $q.dark.isActive, // Pass dark mode state
               undefined, // Don't pass selected node - we'll use dispatchAction instead
             );
 
-      // Cache the options and positions for graph view
+      // Cache the options for graph view
       if (visualizationType.value === "graph") {
         lastChartOptions.value = {
           key: chartKey.value,
           data: newOptions,
         };
-
-        // Save computed positions to cache to prevent recomputation
-        if (newOptions.positions) {
-          graphNodePositions.value = newOptions.positions;
-        }
       }
 
       return {
@@ -617,6 +608,9 @@ export default defineComponent({
     watch(
       () => store.state.theme,
       async () => {
+        // Increment chartKey to force regeneration with new theme colors
+        chartKey.value++;
+
         // Save the current selected node ID (in case it changes during the delay)
         const nodeIdToReselect = selectedNode.value?.id;
 
@@ -642,9 +636,6 @@ export default defineComponent({
     watch(
       () => streamFilter.value,
       async () => {
-        // Clear position cache to force recalculation for new stream data
-        graphNodePositions.value = new Map();
-
         // Wait for chart to update with new data
         await nextTick();
         setTimeout(() => {
@@ -966,8 +957,6 @@ export default defineComponent({
         layoutType.value = "horizontal";
       } else {
         layoutType.value = "force";
-        // Clear cached positions when switching to graph view to allow fresh layout
-        graphNodePositions.value = new Map();
       }
       // Force chart recreation when visualization type changes
       chartKey.value++;
