@@ -47,7 +47,9 @@ export const createDashboardsContextProvider = (
       const context: PageContext = {
         currentPage: 'Dashboards',
         dashboardId: route?.query?.dashboard || '',
-        organization_identifier: store?.state?.selectedOrganization?.identifier || ''
+        organization_identifier: store?.state?.selectedOrganization?.identifier || '',
+        // Current timestamp when request is fired (microseconds) for AI agent time calculations
+        request_timestamp: Date.now() * 1000,
       };
 
       // Determine user intent based on route and context
