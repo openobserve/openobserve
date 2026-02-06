@@ -185,8 +185,8 @@ async fn test_run_vrl_function(
             &[String::new()],
         );
 
-        if err.is_some() {
-            return Ok(MetaHttpResponse::bad_request(err.unwrap()));
+        if let Some(err) = err {
+            return Ok(MetaHttpResponse::bad_request(err));
         }
 
         ret_val
