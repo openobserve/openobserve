@@ -507,7 +507,7 @@ describe("IncidentTableOfContents", () => {
       const tooltip = button.findComponent({ name: "QTooltip" });
 
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.html()).toContain("Expand");
+      expect(tooltip.text()).toContain("Expand");
     });
 
     it("should show Collapse tooltip when expanded", () => {
@@ -518,7 +518,7 @@ describe("IncidentTableOfContents", () => {
       const tooltip = button.findComponent({ name: "QTooltip" });
 
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.html()).toContain("Collapse");
+      expect(tooltip.text()).toContain("Collapse");
     });
 
     it("should handle expand button on level 2 items with children", async () => {

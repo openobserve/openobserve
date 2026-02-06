@@ -101,7 +101,7 @@ function getTextContent(testId: string): string {
 /**
  * Mounts the component with default test setup
  */
-function mountComponent(props = {}, theme = "light") {
+async function mountComponent(props = {}, theme = "light") {
   const store = createMockStore(theme);
   const defaultProps = createMockProps(props);
 
@@ -109,13 +109,19 @@ function mountComponent(props = {}, theme = "light") {
   const el = document.createElement('div');
   document.body.appendChild(el);
 
-  return mount(CustomConfirmDialog, {
+  const wrapper = mount(CustomConfirmDialog, {
     props: defaultProps,
     global: {
       plugins: [store],
     },
     attachTo: el,
   });
+
+  // Wait for component to render and dialog to mount
+  await flushPromises();
+  await wrapper.vm.$nextTick();
+
+  return wrapper;
 }
 
 // ==================== TESTS ====================
@@ -128,40 +134,40 @@ describe("CustomConfirmDialog", () => {
   });
 
   describe("Component Rendering", () => {
-    it("should render the component when visible", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render the component when visible", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render dialog", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render dialog", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(existsByTestId(wrapper, "custom-confirm-dialog")).toBe(true);
     });
 
-    it("should render card", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render card", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(existsByTestId(wrapper, "custom-confirm-card")).toBe(true);
     });
 
-    it("should render header section", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render header section", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(existsByTestId(wrapper, "dialog-header")).toBe(true);
     });
 
-    it("should render content section", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render content section", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(existsByTestId(wrapper, "dialog-content")).toBe(true);
     });
 
-    it("should render actions section", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render actions section", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(existsByTestId(wrapper, "dialog-actions")).toBe(true);
     });
   });
 
   describe("Title Display", () => {
-    it("should display custom title", () => {
-      wrapper = mountComponent({
+    it("should display custom title", async () => {
+      wrapper = await mountComponent({
         modelValue: true,
         title: "Delete Confirmation",
       });
@@ -169,14 +175,14 @@ describe("CustomConfirmDialog", () => {
       expect(getTextContent("dialog-title")).toBe("Delete Confirmation");
     });
 
-    it("should display default title when not provided", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should display default title when not provided", async () => {
+      wrapper = await mountComponent({ modelValue: true });
 
       expect(getTextContent("dialog-title")).toBe("Confirm Action");
     });
 
     it("should update title when prop changes", async () => {
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         title: "Initial Title",
       });
@@ -189,8 +195,8 @@ describe("CustomConfirmDialog", () => {
   });
 
   describe("Message Display", () => {
-    it("should display custom message", () => {
-      wrapper = mountComponent({
+    it("should display custom message", async () => {
+      wrapper = await mountComponent({
         modelValue: true,
         message: "This action cannot be undone. Continue?",
       });
@@ -198,8 +204,8 @@ describe("CustomConfirmDialog", () => {
       expect(getTextContent("dialog-message")).toBe("This action cannot be undone. Continue?");
     });
 
-    it("should display empty message when not provided", () => {
-      wrapper = mountComponent({
+    it("should display empty message when not provided", async () => {
+      wrapper = await mountComponent({
         modelValue: true,
         message: "",
       });
@@ -208,7 +214,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should update message when prop changes", async () => {
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         message: "Initial message",
       });
@@ -219,9 +225,9 @@ describe("CustomConfirmDialog", () => {
       expect(getTextContent("dialog-message")).toBe("Updated message");
     });
 
-    it("should handle long messages", () => {
+    it("should handle long messages", async () => {
       const longMessage = "A".repeat(500);
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         message: longMessage,
       });
@@ -231,18 +237,18 @@ describe("CustomConfirmDialog", () => {
   });
 
   describe("Cancel Button", () => {
-    it("should render cancel button", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render cancel button", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(existsByTestId(wrapper, "custom-cancel-button")).toBe(true);
     });
 
-    it("should display correct cancel button label", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should display correct cancel button label", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(getTextContent("custom-cancel-button")).toBe("Cancel");
     });
 
     it("should emit cancel event when clicked", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
       await clickCancel(wrapper);
 
       expect(wrapper.emitted("cancel")).toBeTruthy();
@@ -250,7 +256,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should emit update:modelValue with false when clicked", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
       await clickCancel(wrapper);
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -258,7 +264,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should close dialog when cancel is clicked", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
       await clickCancel(wrapper);
 
       // Dialog should emit update to close
@@ -267,18 +273,18 @@ describe("CustomConfirmDialog", () => {
   });
 
   describe("Confirm Button", () => {
-    it("should render confirm button", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should render confirm button", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(existsByTestId(wrapper, "custom-confirm-button")).toBe(true);
     });
 
-    it("should display correct confirm button label", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should display correct confirm button label", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(getTextContent("custom-confirm-button")).toBe("Clear & Continue");
     });
 
     it("should emit confirm event when clicked", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
       await clickConfirm(wrapper);
 
       expect(wrapper.emitted("confirm")).toBeTruthy();
@@ -286,7 +292,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should emit update:modelValue with false when clicked", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
       await clickConfirm(wrapper);
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -294,7 +300,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should close dialog when confirm is clicked", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
       await clickConfirm(wrapper);
 
       // Dialog should emit update to close
@@ -303,19 +309,19 @@ describe("CustomConfirmDialog", () => {
   });
 
   describe("Dialog Visibility", () => {
-    it("should be hidden when modelValue is false", () => {
-      wrapper = mountComponent({ modelValue: false });
+    it("should be hidden when modelValue is false", async () => {
+      wrapper = await mountComponent({ modelValue: false });
       // The dialog component still mounts but QDialog handles visibility
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should be visible when modelValue is true", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should be visible when modelValue is true", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should update visibility when modelValue changes", async () => {
-      wrapper = mountComponent({ modelValue: false });
+      wrapper = await mountComponent({ modelValue: false });
 
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
@@ -324,7 +330,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should emit update:modelValue when internal visibility changes", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
 
       // Simulate internal visibility change by clicking confirm
       await clickConfirm(wrapper);
@@ -334,20 +340,20 @@ describe("CustomConfirmDialog", () => {
   });
 
   describe("Theme Support", () => {
-    it("should apply light mode class in light theme", () => {
-      wrapper = mountComponent({ modelValue: true }, "light");
+    it("should apply light mode class in light theme", async () => {
+      wrapper = await mountComponent({ modelValue: true }, "light");
       const card = document.querySelector('[data-test="custom-confirm-card"]');
       expect(card?.classList.contains("light-mode")).toBe(true);
     });
 
-    it("should apply dark mode class in dark theme", () => {
-      wrapper = mountComponent({ modelValue: true }, "dark");
+    it("should apply dark mode class in dark theme", async () => {
+      wrapper = await mountComponent({ modelValue: true }, "dark");
       const card = document.querySelector('[data-test="custom-confirm-card"]');
       expect(card?.classList.contains("dark-mode")).toBe(true);
     });
 
-    it("should not have both theme classes simultaneously", () => {
-      wrapper = mountComponent({ modelValue: true }, "light");
+    it("should not have both theme classes simultaneously", async () => {
+      wrapper = await mountComponent({ modelValue: true }, "light");
       const card = document.querySelector('[data-test="custom-confirm-card"]');
       expect(card?.classList.contains("light-mode")).toBe(true);
       expect(card?.classList.contains("dark-mode")).toBe(false);
@@ -355,17 +361,17 @@ describe("CustomConfirmDialog", () => {
   });
 
   describe("Persistent Dialog", () => {
-    it("should have persistent attribute", () => {
-      wrapper = mountComponent({ modelValue: true });
+    it("should have persistent attribute", async () => {
+      wrapper = await mountComponent({ modelValue: true });
       const dialog = wrapper.findComponent({ name: "QDialog" });
       expect(dialog.props("persistent")).toBe(true);
     });
   });
 
   describe("Edge Cases", () => {
-    it("should handle very long title", () => {
+    it("should handle very long title", async () => {
       const longTitle = "A".repeat(200);
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         title: longTitle,
       });
@@ -373,9 +379,9 @@ describe("CustomConfirmDialog", () => {
       expect(getTextContent("dialog-title")).toBe(longTitle);
     });
 
-    it("should handle title with special characters", () => {
+    it("should handle title with special characters", async () => {
       const specialTitle = "Confirm <Action> & Continue?";
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         title: specialTitle,
       });
@@ -383,9 +389,9 @@ describe("CustomConfirmDialog", () => {
       expect(getTextContent("dialog-title")).toBe(specialTitle);
     });
 
-    it("should handle message with line breaks", () => {
+    it("should handle message with line breaks", async () => {
       const multilineMessage = "Line 1\nLine 2\nLine 3";
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         message: multilineMessage,
       });
@@ -394,7 +400,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should handle rapid visibility changes", async () => {
-      wrapper = mountComponent({ modelValue: false });
+      wrapper = await mountComponent({ modelValue: false });
 
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
@@ -409,25 +415,29 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should handle multiple button clicks", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
 
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
+      await flushPromises();
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
+      await flushPromises();
       await clickConfirm(wrapper);
 
       expect(wrapper.emitted("confirm")?.length).toBe(3);
     });
 
     it("should handle alternating cancel and confirm clicks", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
 
       await clickCancel(wrapper);
       await wrapper.setProps({ modelValue: true });
+      await flushPromises();
 
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
+      await flushPromises();
 
       await clickCancel(wrapper);
 
@@ -438,7 +448,7 @@ describe("CustomConfirmDialog", () => {
 
   describe("Integration Scenarios", () => {
     it("should handle complete user workflow - confirm", async () => {
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         title: "Delete Item",
         message: "Are you sure you want to delete this item?",
@@ -462,7 +472,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should handle complete user workflow - cancel", async () => {
-      wrapper = mountComponent({
+      wrapper = await mountComponent({
         modelValue: true,
         title: "Discard Changes",
         message: "Unsaved changes will be lost. Continue?",
@@ -483,7 +493,7 @@ describe("CustomConfirmDialog", () => {
     });
 
     it("should handle v-model two-way binding", async () => {
-      wrapper = mountComponent({ modelValue: true });
+      wrapper = await mountComponent({ modelValue: true });
 
       // Dialog emits update:modelValue when closed
       await clickConfirm(wrapper);

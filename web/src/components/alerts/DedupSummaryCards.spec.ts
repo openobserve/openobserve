@@ -180,7 +180,7 @@ describe("DedupSummaryCards", () => {
       const icon = findByTestId(wrapper, "dedup-info-icon");
       const tooltip = icon.findComponent({ name: "QTooltip" });
       // Tooltip text is in the default slot
-      expect(tooltip.html()).toContain("Alerts with deduplication configured");
+      expect(tooltip.text()).toContain("Alerts with deduplication configured");
     });
   });
 
@@ -303,7 +303,7 @@ describe("DedupSummaryCards", () => {
       wrapper = await mountComponent();
       const icon = findByTestId(wrapper, "pending-batches-info-icon");
       const tooltip = icon.findComponent({ name: "QTooltip" });
-      expect(tooltip.html()).toContain("Alerts waiting to be grouped together");
+      expect(tooltip.text()).toContain("Alerts waiting to be grouped together");
     });
 
     it("should display zero when no pending batches", async () => {
@@ -576,10 +576,10 @@ describe("DedupSummaryCards", () => {
       expect(suppressionTooltip.exists()).toBe(true);
       expect(batchesTooltip.exists()).toBe(true);
 
-      // Verify tooltip content is present in HTML
-      expect(dedupTooltip.html().length).toBeGreaterThan(0);
-      expect(suppressionTooltip.html().length).toBeGreaterThan(0);
-      expect(batchesTooltip.html().length).toBeGreaterThan(0);
+      // Verify tooltip content is present
+      expect(dedupTooltip.text().length).toBeGreaterThan(0);
+      expect(suppressionTooltip.text().length).toBeGreaterThan(0);
+      expect(batchesTooltip.text().length).toBeGreaterThan(0);
     });
   });
 });
