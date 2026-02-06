@@ -80,10 +80,16 @@ const useAiChat = () => {
             // Extract agent_type from context if present (for SRE agent routing)
             const { agent_type, ...contextWithoutAgentType } = contextToUse;
 
+            // Add user's timezone to context for time display formatting
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
             // Build payload with agent_type at root level if present
             const payload: any = {
                 messages: _messages,
-                context: contextWithoutAgentType
+                context: {
+                    ...contextWithoutAgentType,
+                    user_timezone: userTimezone,
+                }
             };
 
             body = JSON.stringify(payload);
@@ -91,14 +97,17 @@ const useAiChat = () => {
             // Fallback to legacy approach - inject context into message content
             const currentMessage = _messages[_messages.length - 1];
             currentMessage.content = getFormattedContext(currentMessage, legacyContext);
-            body = model.length > 0 
-                ? JSON.stringify({ model, messages: _messages }) 
-                : JSON.stringify({ messages: _messages });
+            // Add user's timezone to context
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            body = model.length > 0
+                ? JSON.stringify({ model, messages: _messages, context: { user_timezone: userTimezone } })
+                : JSON.stringify({ messages: _messages, context: { user_timezone: userTimezone } });
         } else {
-            // No context available
-            body = model.length > 0 
-                ? JSON.stringify({ model, messages: _messages }) 
-                : JSON.stringify({ messages: _messages });
+            // No context available - still include timezone
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            body = model.length > 0
+                ? JSON.stringify({ model, messages: _messages, context: { user_timezone: userTimezone } })
+                : JSON.stringify({ messages: _messages, context: { user_timezone: userTimezone } });
         }
 
         try {
