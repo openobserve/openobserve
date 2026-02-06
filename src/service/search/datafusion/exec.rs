@@ -207,12 +207,17 @@ pub async fn merge_parquet_files(
         }
         Ok(())
     });
+
+    // Optimization: Add yield points to prevent task starvation during batch processing
     while let Some(batch) = rx.recv().await {
         new_file_meta.records += batch.num_rows() as i64;
         if let Err(e) = writer.write(&batch).await {
             log::error!("merge_parquet_files write error: {e}");
             return Err(e.into());
         }
+
+        // Let Tokio decide when to yield based on cooperative budget
+        tokio::task::coop::consume_budget().await;
     }
     task.await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
@@ -264,8 +269,10 @@ pub async fn merge_parquet_files_with_downsampling(
     let schema = physical_plan.schema();
 
     // write result to parquet file
-    let mut bufs = Vec::new();
-    let mut file_metas = Vec::new();
+    // Optimization: Pre-allocate Vecs with estimated capacity
+    // Typically 1-10 files per result set
+    let mut bufs = Vec::with_capacity(10);
+    let mut file_metas = Vec::with_capacity(10);
     let mut min_ts = 0;
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
@@ -302,6 +309,8 @@ pub async fn merge_parquet_files_with_downsampling(
         }
         Ok(())
     });
+
+    // Optimization: Add yield points to prevent task starvation during batch processing
     while let Some(batch) = rx.recv().await {
         if file_meta.max_ts == 0 {
             file_meta.max_ts = get_max_timestamp(&batch);
@@ -309,6 +318,9 @@ pub async fn merge_parquet_files_with_downsampling(
         file_meta.original_size += batch.get_array_memory_size() as i64;
         file_meta.records += batch.num_rows() as i64;
         min_ts = get_min_timestamp(&batch);
+
+        // Let Tokio decide when to yield based on cooperative budget
+        tokio::task::coop::consume_budget().await;
         if file_meta.original_size > cfg.compact.max_file_size as i64 {
             file_meta.min_ts = min_ts;
             append_metadata(&mut writer, &file_meta)?;
