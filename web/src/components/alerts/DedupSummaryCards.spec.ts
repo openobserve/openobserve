@@ -300,7 +300,8 @@ describe("DedupSummaryCards", () => {
     it("should display correct tooltip content", async () => {
       wrapper = await mountComponent();
       const icon = findByTestId(wrapper, "pending-batches-info-icon");
-      expect(icon.html()).toContain("Alerts waiting to be grouped together");
+      const tooltip = icon.findComponent({ name: "QTooltip" });
+      expect(tooltip.text()).toContain("Alerts waiting to be grouped together");
     });
 
     it("should display zero when no pending batches", async () => {
