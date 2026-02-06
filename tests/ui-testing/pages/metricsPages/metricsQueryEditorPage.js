@@ -219,16 +219,12 @@ export class MetricsQueryEditorPage {
         // Ultra-aggressive clear: try multiple methods
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
 
-        // Method 1: Select all and delete (5 times!)
-        for (let i = 0; i < 5; i++) {
+        // Clear editor content (2 iterations is sufficient)
+        for (let i = 0; i < 2; i++) {
             await this.page.keyboard.press(selectAllKey);
-            await this.page.waitForTimeout(100);
+            await this.page.waitForTimeout(50);
             await this.page.keyboard.press('Backspace');
-            await this.page.waitForTimeout(100);
-            await this.page.keyboard.press('Delete');
-            await this.page.waitForTimeout(100);
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(100);
+            await this.page.waitForTimeout(50);
         }
 
         // Method 2: Try to clear via Ctrl+A then type over
