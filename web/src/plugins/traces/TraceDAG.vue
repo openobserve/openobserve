@@ -53,13 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <Handle type="target" :position="Position.Top" class="dag-handle" />
           <div
             class="custom-node"
-            :class="{
-              'node-error': data.span_status === 'ERROR',
-              'node-ok': data.span_status === 'OK'
-            }"
+            :class="[
+              getObservationTypeClass(data.llm_observation_type),
+              {
+                'node-error': data.span_status === 'ERROR',
+                'node-ok': data.span_status === 'OK' && !data.llm_observation_type,
+              }
+            ]"
             @click="handleNodeClick(data.span_id)"
           >
-            <div class="node-operation">{{ data.operation_name }}</div>
+            <div class="node-operation" :class="getObservationTypeTextClass(data.llm_observation_type)">{{ data.operation_name }}</div>
             <q-chip
               v-if="data.span_status === 'ERROR'"
               dense
@@ -99,6 +102,7 @@ interface SpanNode {
   span_status: string;
   start_time: number;
   end_time: number;
+  llm_observation_type: string | null;
 }
 
 interface SpanEdge {
@@ -381,6 +385,26 @@ export default defineComponent({
       emit("node-click", spanId);
     };
 
+    // Known LLM observation types (from ObservationType enum)
+    const knownObservationTypes = new Set([
+      'generation', 'span', 'tool', 'agent', 'chain', 'retriever',
+      'task', 'evaluator', 'workflow', 'embedding', 'rerank', 'guardrail', 'event',
+    ]);
+
+    const getObservationTypeClass = (type: string | null): string => {
+      if (!type) return '';
+      const key = type.toLowerCase();
+      if (knownObservationTypes.has(key)) return `node-llm-${key}`;
+      return 'node-llm-default';
+    };
+
+    const getObservationTypeTextClass = (type: string | null): string => {
+      if (!type) return '';
+      const key = type.toLowerCase();
+      if (knownObservationTypes.has(key)) return `node-llm-text-${key}`;
+      return 'node-llm-text-default';
+    };
+
     // Watch for sidebar state changes and re-center the DAG
     watch(
       () => props.sidebarOpen,
@@ -403,6 +427,8 @@ export default defineComponent({
       edges,
       Position,
       handleNodeClick,
+      getObservationTypeClass,
+      getObservationTypeTextClass,
     };
   },
 });
@@ -465,6 +491,22 @@ export default defineComponent({
       &.node-ok {
         border-color: #2e7d32;
       }
+
+      // LLM observation type node colors
+      &.node-llm-generation { border-color: #7b1fa2; background: #f3e5f5; }
+      &.node-llm-span       { border-color: #0288d1; background: #e1f5fe; }
+      &.node-llm-tool       { border-color: #ef6c00; background: #fff3e0; }
+      &.node-llm-agent      { border-color: #2e7d32; background: #e8f5e9; }
+      &.node-llm-chain      { border-color: #00796b; background: #e0f2f1; }
+      &.node-llm-retriever  { border-color: #0097a7; background: #e0f7fa; }
+      &.node-llm-task       { border-color: #283593; background: #e8eaf6; }
+      &.node-llm-evaluator  { border-color: #4527a0; background: #ede7f6; }
+      &.node-llm-workflow   { border-color: #546e7a; background: #eceff1; }
+      &.node-llm-embedding  { border-color: #c2185b; background: #fce4ec; }
+      &.node-llm-rerank     { border-color: #5d4037; background: #efebe9; }
+      &.node-llm-guardrail  { border-color: #c62828; background: #ffebee; }
+      &.node-llm-event      { border-color: #616161; background: #f5f5f5; }
+      &.node-llm-default    { border-color: #757575; background: #fafafa; }
     }
 
     .node-operation {
@@ -478,6 +520,21 @@ export default defineComponent({
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+
+      &.node-llm-text-generation { color: #7b1fa2; }
+      &.node-llm-text-span       { color: #0288d1; }
+      &.node-llm-text-tool       { color: #ef6c00; }
+      &.node-llm-text-agent      { color: #2e7d32; }
+      &.node-llm-text-chain      { color: #00796b; }
+      &.node-llm-text-retriever  { color: #0097a7; }
+      &.node-llm-text-task       { color: #283593; }
+      &.node-llm-text-evaluator  { color: #4527a0; }
+      &.node-llm-text-workflow   { color: #546e7a; }
+      &.node-llm-text-embedding  { color: #c2185b; }
+      &.node-llm-text-rerank     { color: #5d4037; }
+      &.node-llm-text-guardrail  { color: #c62828; }
+      &.node-llm-text-event      { color: #616161; }
+      &.node-llm-text-default    { color: #757575; }
     }
 
     .dag-handle {
@@ -500,9 +557,17 @@ export default defineComponent({
   padding: 20px;
 }
 
-body.dark {
+.body--dark {
+  .dag-wrapper {
+    border-color: #444;
+  }
+
   .trace-dag-flow {
-    background-color: #1e1e1e;
+    background-color: #1e1e1e !important;
+
+    .vue-flow__background {
+      background-color: #1e1e1e !important;
+    }
 
     .vue-flow__node-custom {
       .custom-node {
@@ -520,12 +585,43 @@ body.dark {
         &.node-ok {
           border-color: #66bb6a;
         }
+
+        // LLM observation type dark mode colors
+        &.node-llm-generation { border-color: #ce93d8; background: #2a1a2e; }
+        &.node-llm-span       { border-color: #4fc3f7; background: #1a2a3a; }
+        &.node-llm-tool       { border-color: #ffb74d; background: #2e2218; }
+        &.node-llm-agent      { border-color: #66bb6a; background: #1a2e1a; }
+        &.node-llm-chain      { border-color: #4db6ac; background: #1a2e2a; }
+        &.node-llm-retriever  { border-color: #4dd0e1; background: #1a2a2e; }
+        &.node-llm-task       { border-color: #7986cb; background: #1a1a2e; }
+        &.node-llm-evaluator  { border-color: #b39ddb; background: #221a2e; }
+        &.node-llm-workflow   { border-color: #90a4ae; background: #222628; }
+        &.node-llm-embedding  { border-color: #f48fb1; background: #2e1a22; }
+        &.node-llm-rerank     { border-color: #a1887f; background: #2a2220; }
+        &.node-llm-guardrail  { border-color: #ef5350; background: #2e1a1a; }
+        &.node-llm-event      { border-color: #9e9e9e; background: #262626; }
+        &.node-llm-default    { border-color: #9e9e9e; background: #262626; }
       }
 
       .node-operation {
         color: #90caf9;
         font-size: 12px;
         max-width: 124px;
+
+        &.node-llm-text-generation { color: #ce93d8; }
+        &.node-llm-text-span       { color: #4fc3f7; }
+        &.node-llm-text-tool       { color: #ffb74d; }
+        &.node-llm-text-agent      { color: #66bb6a; }
+        &.node-llm-text-chain      { color: #4db6ac; }
+        &.node-llm-text-retriever  { color: #4dd0e1; }
+        &.node-llm-text-task       { color: #7986cb; }
+        &.node-llm-text-evaluator  { color: #b39ddb; }
+        &.node-llm-text-workflow   { color: #90a4ae; }
+        &.node-llm-text-embedding  { color: #f48fb1; }
+        &.node-llm-text-rerank     { color: #a1887f; }
+        &.node-llm-text-guardrail  { color: #ef5350; }
+        &.node-llm-text-event      { color: #9e9e9e; }
+        &.node-llm-text-default    { color: #9e9e9e; }
       }
     }
   }
