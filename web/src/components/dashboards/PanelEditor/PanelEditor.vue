@@ -799,6 +799,7 @@ const {
   currentPanelData,
 
   // Actions
+  initChartData,
   runQuery,
   handleChartApiError,
   handleLastTriggeredAtUpdate,
@@ -1146,6 +1147,7 @@ watch(
 
 defineExpose({
   // Actions
+  initChartData,
   runQuery,
   resetErrors,
   collapseFieldList,

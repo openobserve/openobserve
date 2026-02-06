@@ -645,8 +645,13 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     disable.value = panelsValues.some((item: any) => item === true);
   });
 
+  // Check if externalChartData has actual VALUE (not just if the ref exists)
+  // A ref is always truthy even if its value is undefined, so we must check .value
+  const hasExternalChartData = externalChartData && externalChartData.value !== undefined;
+
   // Watch external chart data (for logs mode) - sync to internal state
-  if (externalChartData) {
+  // Only set up this watcher if externalChartData actually has data
+  if (hasExternalChartData) {
     watch(
       externalChartData,
       (newData) => {
@@ -657,6 +662,24 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       { immediate: true },
     );
   }
+
+  // ---- Chart Data Initialization ----
+
+  /**
+   * Initialize chartData from dashboardPanelData.
+   * Called by parent component (e.g., AddPanel) after loading panel data in onMounted.
+   * This replaces the watcher approach and follows main branch pattern.
+   *
+   * @param data - Optional data to initialize with. If not provided, uses dashboardPanelData.data
+   */
+  const initChartData = (data?: any) => {
+    const sourceData = data ?? dashboardPanelData.data;
+    if (sourceData) {
+      chartData.value = JSON.parse(JSON.stringify(sourceData));
+    } else {
+      chartData.value = {};
+    }
+  };
 
   // ============================================================================
   // Return
@@ -690,6 +713,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     isInitialDashboardPanelData,
 
     // Actions
+    initChartData,
     runQuery,
     handleChartApiError,
     handleLastTriggeredAtUpdate,

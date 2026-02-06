@@ -461,6 +461,7 @@ export default defineComponent({
           if (editMode.value || !isInitialDashboardPanelData()) {
             // Copy the panel data to trigger chart render with initial variables
             chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+            panelEditorRef.value?.initChartData(dashboardPanelData.data);
           }
         }
         // After initial load, don't return - we still need to update URL params below
@@ -595,13 +596,14 @@ export default defineComponent({
         }
 
         await nextTick();
-        // Set chartData immediately after loading panel, regardless of variables
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        // Initialize PanelEditor's chartData after loading panel data
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
         updateDateTime(selectedDate.value);
       } else {
         editMode.value = false;
         resetDashboardPanelDataAndAddTimeField();
-        chartData.value = {};
+        // Initialize PanelEditor's chartData as empty for new panel
+        panelEditorRef.value?.initChartData({});
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);
       }
@@ -850,6 +852,7 @@ export default defineComponent({
       async () => {
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
       },
     );
     const dateTimeForVariables = ref(null);
@@ -909,6 +912,7 @@ export default defineComponent({
 
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
         updateDateTime(selectedDate.value);
@@ -1167,6 +1171,7 @@ export default defineComponent({
 
           dashboardPanelData.data.id = panelId;
           chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+          panelEditorRef.value?.initChartData(dashboardPanelData.data);
 
           // Replace "current_panel" with actual panel ID in variables before saving
           if (variablesWithCurrentPanel.value.length > 0) {
@@ -1359,6 +1364,7 @@ export default defineComponent({
 
         if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
+          panelEditorRef.value?.initChartData(newVal);
 
           window.dispatchEvent(new Event("resize"));
         }
