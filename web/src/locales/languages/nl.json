@@ -2532,7 +2532,8 @@
     "sql_query": "SQL-zoekopdracht",
     "resuls": "Resultaten",
     "wrapText": "Tekst omwikkelen",
-    "delayMessage": "De zoekgeschiedenis kan worden vertraagd door"
+    "delayMessage": "De zoekgeschiedenis kan worden vertraagd door",
+    "results": "Resultaten"
   },
   "search_scheduler_job": {
     "title": "Zoek Job Scheduler",
@@ -2623,7 +2624,8 @@
     "analyzeButtonLabel": "Analyseren",
     "refreshTooltip": "Analyse vernieuwen met bijgewerkt percentiel",
     "customSQLFieldsDisabled": "Veldselectie is niet beschikbaar voor aangepaste SQL-query's. Dimensies worden geëxtraheerd uit de resultaten van uw zoekopdracht.",
-    "timeRangeSelected": "Tijdbereik geselecteerd"
+    "timeRangeSelected": "Tijdbereik geselecteerd",
+    "dimensionsSelected": "Geselecteerde afmetingen"
   },
   "volumeInsights": {
     "title": "Inzichten",
@@ -2746,7 +2748,9 @@
         "startBeforeEnd": "De starttijd moet vóór de eindtijd liggen",
         "endAfterStart": "De eindtijd moet na de starttijd liggen"
       }
-    }
+    },
+    "viewInTraces": "Bekijk in Traces",
+    "viewInTracesTooltip": "Open de pagina met sporen met het RED-metriekendashboard en alle gerelateerde sporen"
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

@@ -102,12 +102,12 @@ pub async fn link_subscription(
         }
     };
 
-    if let Some(sub) = subscription {
-        if !sub.subscription_type.is_free_sub() {
-            return MetaHttpResponse::bad_request(
-                "Only free tier organizations can be linked to Azure Marketplace",
-            );
-        }
+    if let Some(sub) = subscription
+        && !sub.subscription_type.is_free_sub()
+    {
+        return MetaHttpResponse::bad_request(
+            "Only free tier organizations can be linked to Azure Marketplace",
+        );
     }
 
     let req_id = config::ider::generate_trace_id();

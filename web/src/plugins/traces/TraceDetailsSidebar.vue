@@ -15,17 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
-    data-test="trace-details-sidebar-header"
-  >
+  <div>
+    <div
+      class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
+      data-test="trace-details-sidebar-header"
+    >
     <div
       :title="span.operation_name"
       :style="{ width: 'calc(100% - 24px)' }"
-      class="q-pb-none ellipsis flex justify-between"
+      class="q-pb-none ellipsis flex items-center"
       data-test="trace-details-sidebar-header-operation-name"
     >
-      {{ span.operation_name }}
+      <!-- Observation Type Badge (for LLM spans) -->
+      <q-badge
+        v-if="isLLMSpan"
+        :label="span._o2_llm_observation_type"
+        :color="getObservationTypeColor(span._o2_llm_observation_type)"
+        class="q-mr-xs"
+        data-test="trace-details-sidebar-observation-badge"
+      />
+
+      <span class="ellipsis">{{ span.operation_name }}</span>
     </div>
 
     <q-btn
@@ -61,6 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="text-grey-7">Duration: </span>
         <span>{{ getDuration }}</span>
+      </div>
+
+      <div
+        v-if="getTTFT"
+        class="q-px-sm ellipsis non-selectable"
+        :title="getTTFT"
+        style="border-right: 1px solid #cccccc; font-size: 14px"
+        data-test="trace-details-sidebar-header-toolbar-ttft"
+      >
+        <span class="text-grey-7">TTFT: </span>
+        <span>{{ getTTFT }}</span>
       </div>
 
       <div
@@ -110,6 +131,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
   </div>
+
+  <!-- LLM Metrics Toolbar (conditional) -->
+  <div
+    v-if="isLLMSpan && llmMetrics"
+    class="llm-metrics-toolbar q-px-sm q-py-xs q-mb-xs"
+    style="border-top: 1px solid #cccccc; border-bottom: 1px solid #cccccc"
+    data-test="trace-details-sidebar-llm-metrics-toolbar"
+  >
+    <div class="flex items-center justify-between text-body2">
+      <div class="flex items-center flex-wrap">
+        <!-- Model -->
+        <div class="metric-item q-mr-md">
+          <span class="text-grey-7">Model: </span>
+          <span class="text-bold">{{ span._o2_llm_model_name }}</span>
+        </div>
+
+        <!-- Tokens -->
+        <div class="metric-item q-mr-md">
+          <q-icon name="arrow_upward" size="xs" class="text-blue" />
+          <span class="text-grey-7">In: </span>
+          <span>{{ llmMetrics.usage.input }}</span>
+        </div>
+        <div class="metric-item q-mr-md">
+          <q-icon name="arrow_downward" size="xs" class="text-green" />
+          <span class="text-grey-7">Out: </span>
+          <span>{{ llmMetrics.usage.output }}</span>
+        </div>
+
+        <!-- Cost -->
+        <div class="metric-item">
+          <q-icon name="attach_money" size="xs" class="text-orange" />
+          <span class="text-grey-7">Cost: </span>
+          <span class="text-bold">${{ llmMetrics.cost.total }}</span>
+        </div>
+      </div>
+
+      <!-- Provider Badge -->
+      <q-badge :label="span._o2_llm_provider_name" color="primary" />
+    </div>
+  </div>
+
   <q-tabs
     v-model="activeTab"
     dense
@@ -117,6 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="text-bold q-mx-sm span_details_tabs"
     data-test="trace-details-sidebar-tabs"
   >
+    <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
+    <q-tab
+      v-if="isLLMSpan"
+      name="preview"
+      label="Preview"
+      style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-preview"
+    />
+
     <q-tab
       name="tags"
       :label="t('common.tags')"
@@ -174,6 +245,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="activeTab"
     class="span_details_tab-panels tw:pb-[0.375rem]"
   >
+    <!-- LLM Preview Tab Panel -->
+    <q-tab-panel v-if="isLLMSpan" name="preview" class="llm-preview-panel q-pa-md">
+      <div class="llm-preview-container">
+        <!-- Input Section -->
+        <div class="q-mb-md">
+          <div class="section-label text-bold q-mb-xs flex items-center justify-between">
+            <div>Input</div>
+            <div class="flex items-center gap-xs">
+              <q-btn-toggle
+                v-model="inputViewMode"
+                dense
+                no-caps
+                size="sm"
+                toggle-color="primary"
+                :options="[
+                  { label: 'Formatted', value: 'formatted' },
+                  { label: 'JSON', value: 'json' }
+                ]"
+              />
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="content_copy"
+                @click="copyContent(span._o2_llm_input, 'input')"
+                title="Copy input"
+              >
+                <q-tooltip>Copy Input</q-tooltip>
+              </q-btn>
+            </div>
+          </div>
+          <div class="llm-content-box" :class="{ 'expanded': inputExpanded }">
+            <LLMContentRenderer
+              :content="span._o2_llm_input"
+              :observation-type="span._o2_llm_observation_type"
+              :span="span"
+              content-type="input"
+              :view-mode="inputViewMode"
+            />
+          </div>
+          <div
+            v-if="getInputCharCount() > 0"
+            class="expand-toggle q-mt-xs text-left opacity-50 cursor-pointer"
+            @click="inputExpanded = !inputExpanded"
+          >
+            {{ inputExpanded ? '...collapse' : `...expand (${getInputCharCount()} more characters)` }}
+          </div>
+        </div>
+
+        <!-- Output Section -->
+        <div>
+          <div class="section-label text-bold q-mb-xs flex items-center justify-between">
+            <div>Output</div>
+            <div class="flex items-center gap-xs">
+              <q-btn-toggle
+                v-model="outputViewMode"
+                dense
+                no-caps
+                size="sm"
+                toggle-color="primary"
+                :options="[
+                  { label: 'Formatted', value: 'formatted' },
+                  { label: 'JSON', value: 'json' }
+                ]"
+              />
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="content_copy"
+                @click="copyContent(span._o2_llm_output, 'output')"
+                title="Copy output"
+              >
+                <q-tooltip>Copy Output</q-tooltip>
+              </q-btn>
+            </div>
+          </div>
+          <div class="llm-content-box" :class="{ 'expanded': outputExpanded }">
+            <LLMContentRenderer
+              :content="span._o2_llm_output"
+              :observation-type="span._o2_llm_observation_type"
+              :span="span"
+              content-type="output"
+              :view-mode="outputViewMode"
+            />
+          </div>
+          <div
+            v-if="getOutputCharCount() > 0"
+            class="expand-toggle q-mt-xs text-left opacity-50 cursor-pointer"
+            @click="outputExpanded = !outputExpanded"
+          >
+            {{ outputExpanded ? '...collapse' : `...expand (${getOutputCharCount()} more characters)` }}
+          </div>
+        </div>
+
+        <!-- Model Parameters (collapsible) -->
+        <q-expansion-item
+          v-if="span._o2_llm_model_parameters"
+          label="Model Parameters"
+          class="q-mt-md"
+        >
+          <pre class="model-params-json q-pa-sm">{{ formatModelParams(span._o2_llm_model_parameters) }}</pre>
+        </q-expansion-item>
+      </div>
+    </q-tab-panel>
+
     <q-tab-panel name="tags">
       <q-table
         ref="qTable"
@@ -569,6 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-tab-panel>
   </q-tab-panels>
+  </div>
 </template>
 
 <script lang="ts">
@@ -587,6 +765,14 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
+import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
+import {
+  isLLMTrace,
+  parseUsageDetails,
+  parseCostDetails,
+  getObservationTypeColor,
+  formatModelParameters,
+} from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -618,6 +804,7 @@ export default defineComponent({
   },
   components: {
     LogsHighLighting,
+    LLMContentRenderer,
     CorrelatedLogsTable,
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -632,9 +819,19 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const activeTab = ref("tags");
+    // Check if this is an LLM span to set default tab
+    const isLLMSpan = computed(() => isLLMTrace(props.span));
+    const activeTab = ref(isLLMSpan.value ? "preview" : "tags");
     const tags: Ref<{ [key: string]: string }> = ref({});
     const processes: Ref<{ [key: string]: string }> = ref({});
+
+    // LLM content expand/collapse state
+    const inputExpanded = ref(false);
+    const outputExpanded = ref(false);
+
+    // LLM view mode state: 'formatted' (default) or 'json'
+    const inputViewMode = ref<'formatted' | 'json'>('formatted');
+    const outputViewMode = ref<'formatted' | 'json'>('formatted');
     const closeSidebar = () => {
       emit("close");
     };
@@ -723,6 +920,9 @@ export default defineComponent({
     const highlightedAttributes = computed(() => {
       const colors = themeColors;
       const attrs = spanDetails.value.attrs;
+      // remove llm input and output
+      delete attrs._o2_llm_input;
+      delete attrs._o2_llm_output;
       const query = props.searchQuery;
 
       const formatValue = (value: any): string => {
@@ -792,7 +992,7 @@ export default defineComponent({
     const getTagRows = computed(() => {
       return Object.entries(tags.value).map(([key, value]) => ({
         field: key,
-        value: value,
+        value: typeof value === 'string' ? value : JSON.stringify(value),
       }));
     });
 
@@ -816,13 +1016,26 @@ export default defineComponent({
     const getProcessRows = computed(() => {
       return Object.entries(processes.value).map(([key, value]) => ({
         field: key,
-        value: value,
+        value: typeof value === 'string' ? value : JSON.stringify(value),
       }));
     });
 
     const getDuration = computed(() =>
       formatTimeWithSuffix(props.span.duration),
     );
+
+    const getTTFT = computed(() => {
+      // Only calculate for LLM spans with completion_start_time
+      if (!props.span._o2_llm_completion_start_time || !props.span.start_time) {
+        return null;
+      }
+      // completion_start_time is in microseconds
+      // start_time is in nanoseconds, convert to microseconds
+      const completionStartTime = props.span._o2_llm_completion_start_time;
+      const spanStartTimeUs = props.span.start_time / 1000;
+      const ttftUs = completionStartTime - spanStartTimeUs;
+      return formatTimeWithSuffix(ttftUs);
+    });
 
     onBeforeMount(() => {
       spanDetails.value = getFormattedSpanDetails();
@@ -935,8 +1148,6 @@ export default defineComponent({
           "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
-
-      console.log("Events ----", props.span);
 
       try {
         spanDetails.events = JSON.parse(props.span.events || "[]").map(
@@ -1294,6 +1505,84 @@ export default defineComponent({
       }
     });
 
+    // LLM-related computed properties
+    const llmMetrics = computed(() => {
+      if (!isLLMSpan.value) return null;
+      const usage = parseUsageDetails(props.span);
+      const cost = parseCostDetails(props.span);
+      return {
+        usage: usage,
+        cost: cost,
+      };
+    });
+
+    // Copy LLM content to clipboard
+    const copyContent = (content: any, type: 'input' | 'output') => {
+      try {
+        // Convert content to string
+        let textToCopy = '';
+        if (typeof content === 'string') {
+          textToCopy = content;
+        } else if (content) {
+          // Pretty-print JSON objects/arrays
+          textToCopy = JSON.stringify(content, null, 2);
+        }
+
+        // Copy to clipboard
+        copyToClipboard(textToCopy)
+          .then(() => {
+            q.notify({
+              type: 'positive',
+              message: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
+              position: 'top',
+              timeout: 2000,
+            });
+          })
+          .catch(() => {
+            q.notify({
+              type: 'negative',
+              message: 'Failed to copy to clipboard',
+              position: 'top',
+              timeout: 2000,
+            });
+          });
+      } catch (error) {
+        q.notify({
+          type: 'negative',
+          message: 'Failed to copy content',
+          position: 'top',
+          timeout: 2000,
+        });
+      }
+    };
+
+    // Format model parameters for display
+    const formatModelParams = (params: any) => {
+      return formatModelParameters(params);
+    };
+
+    // Get character count for input content
+    const getInputCharCount = () => {
+      if (!props.span._o2_llm_input) return 0;
+      const content = typeof props.span._o2_llm_input === 'string'
+        ? props.span._o2_llm_input
+        : JSON.stringify(props.span._o2_llm_input);
+      // Estimate ~20 chars per line, 15 lines visible = 300 chars visible
+      const visibleChars = 1500; // rough estimate
+      return Math.max(0, content.length - visibleChars);
+    };
+
+    // Get character count for output content
+    const getOutputCharCount = () => {
+      if (!props.span._o2_llm_output) return 0;
+      const content = typeof props.span._o2_llm_output === 'string'
+        ? props.span._o2_llm_output
+        : JSON.stringify(props.span._o2_llm_output);
+      // Estimate ~20 chars per line, 15 lines visible = 300 chars visible
+      const visibleChars = 1500; // rough estimate
+      return Math.max(0, content.length - visibleChars);
+    };
+
     return {
       t,
       activeTab,
@@ -1310,6 +1599,7 @@ export default defineComponent({
       getExceptionEvents,
       exceptionEventColumns,
       getDuration,
+      getTTFT,
       viewSpanLogs,
       getStartTime,
       copySpanId,
@@ -1328,6 +1618,18 @@ export default defineComponent({
       correlationError,
       correlationProps,
       config,
+      // LLM
+      isLLMSpan,
+      llmMetrics,
+      copyContent,
+      formatModelParams,
+      getObservationTypeColor,
+      inputExpanded,
+      outputExpanded,
+      inputViewMode,
+      outputViewMode,
+      getInputCharCount,
+      getOutputCharCount,
     };
   },
 });
@@ -1339,6 +1641,7 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     width: 100%;
+    table-layout: fixed;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(0.625rem);
     border-radius: 0.5rem;
@@ -1353,6 +1656,19 @@ export default defineComponent({
     text-align: left;
     padding: 8px 12px !important;
     font-size: 13px;
+    word-break: break-word;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 600px;
+  }
+
+  td span {
+    display: inline-block;
+    width: 100%;
+    word-break: break-word;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
   }
 
   th:last-child,
@@ -1389,6 +1705,8 @@ export default defineComponent({
 .attr-text {
   font-size: 12px;
   font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .table-header {
   // text-transform: capitalize;
@@ -1508,6 +1826,56 @@ export default defineComponent({
 }
 
 .header_bg {
+}
+
+// LLM-specific styles
+.llm-metrics-toolbar {
+  .metric-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+.llm-preview-panel {
+  .section-label {
+    color: var(--o2-text-primary);
+    font-size: 14px;
+    margin-bottom: 0.5rem;
+  }
+
+  .llm-content-box {
+    border: 1px solid var(--o2-border-color);
+    border-radius: 4px;
+    padding: 0.75rem;
+    background-color: var(--o2-code-bg);
+    max-height: 300px; // ~15 lines at 20px per line
+    overflow-y: auto;
+    transition: max-height 0.3s ease;
+
+    &.expanded {
+      max-height: 800px; // Larger height when expanded
+    }
+  }
+
+  .expand-toggle {
+    font-size: 12px;
+    transition: opacity 0.2s ease;
+
+    &:hover {
+      opacity: 1 !important;
+    }
+  }
+
+  .model-params-json {
+    background-color: var(--o2-code-bg);
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 12px;
+    margin: 0;
+  }
 }
 </style>
 

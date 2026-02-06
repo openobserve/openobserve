@@ -681,21 +681,9 @@ mod tests {
         assert!(cap1 >= len1);
 
         // Values may change due to concurrent tests, but should not vary wildly
-        let len_diff = if len2 > len1 {
-            len2 - len1
-        } else {
-            len1 - len2
-        };
-        let cap_diff = if cap2 > cap1 {
-            cap2 - cap1
-        } else {
-            cap1 - cap2
-        };
-        let mem_diff = if mem2 > mem1 {
-            mem2 - mem1
-        } else {
-            mem1 - mem2
-        };
+        let len_diff = len2.abs_diff(len1);
+        let cap_diff = cap2.abs_diff(cap1);
+        let mem_diff = mem2.abs_diff(mem1);
         assert!(len_diff < 1000 || len1 == 0 || len2 == 0);
         assert!(cap_diff < 10000 || cap1 == 0 || cap2 == 0);
         assert!(mem_diff < 1000000 || mem1 == 0 || mem2 == 0);

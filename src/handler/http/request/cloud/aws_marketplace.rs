@@ -352,12 +352,12 @@ pub async fn activation_status(
     };
 
     // If customer_id is provided in query, verify it matches the org's subscription
-    if let Some(customer_id) = query.get("customer_id") {
-        if *customer_id != billing.customer_identifier {
-            MetaHttpResponse::bad_request(
-                "The provided customer_id does not match this organization's subscription",
-            );
-        }
+    if let Some(customer_id) = query.get("customer_id")
+        && *customer_id != billing.customer_identifier
+    {
+        MetaHttpResponse::bad_request(
+            "The provided customer_id does not match this organization's subscription",
+        );
     }
     // If customer_id is not provided, skip verification and proceed (it's optional)
 

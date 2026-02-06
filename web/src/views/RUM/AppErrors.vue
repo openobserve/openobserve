@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -344,7 +344,7 @@ const getErrorLogs = () => {
 
   req.query.sql = `select max(${
     store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, type, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error'${
+  }) as zo_sql_timestamp, type, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from "_rumdata" where type='error'${
     errorTrackingState.data.editorValue.length
       ? " and " + errorTrackingState.data.editorValue
       : ""

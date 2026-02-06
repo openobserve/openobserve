@@ -476,9 +476,12 @@ pub async fn search_multi(
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
+    multi_res.hits = if let Some(query_fn) = query_fn.as_ref()
+        && !multi_res.hits.is_empty()
+        && !multi_res.is_partial
+    {
         // compile vrl function & apply the same before returning the response
-        let input_fn = query_fn.unwrap().trim().to_string();
+        let input_fn = query_fn.trim().to_string();
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         let mut runtime = init_vrl_runtime();
@@ -1111,8 +1114,9 @@ pub async fn search_partition(
 
     // Get cache strategy for streaming aggregates (enterprise only)
     #[cfg(feature = "enterprise")]
-    let stremaing_aggs_cache_strategy = if streaming_aggs && streaming_id.is_some() {
-        let streaming_id_ref = streaming_id.as_ref().unwrap();
+    let stremaing_aggs_cache_strategy = if streaming_aggs
+        && let Some(streaming_id_ref) = streaming_id.as_deref()
+    {
         match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
             Some(strategy) => {
                 log::info!(
