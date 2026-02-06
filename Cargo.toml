@@ -318,7 +318,7 @@ arrow-schema = { version = "57.2.0", features = ["serde"] }
 parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
-dotenv_config = "0.2.2"
+dotenv_config = "0.2.3"
 dotenvy = "0.15.7"
 env_logger = "0.11.8"
 faststr = { version = "0.2", features = ["serde"] }

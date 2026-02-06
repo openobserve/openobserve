@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -1925,9 +1925,9 @@ export default defineComponent({
       let dummyQuery: string;
 
       if (searchText) {
-        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}" WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
       } else {
-        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}"`;
       }
 
       // Construct the filter from the query data
