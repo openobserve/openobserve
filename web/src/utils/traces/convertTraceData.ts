@@ -399,7 +399,7 @@ export const convertServiceGraphToTree = (
     ],
   };
 
-  return { options };
+  return { options, positions: null };
 };
 
 // D3-Force simulation physics parameters
@@ -562,7 +562,7 @@ export const convertServiceGraphToNetwork = (
     // Border color based on error rate (theme-aware)
     let borderColor: string;
     if (isDarkMode) {
-      // Dark mode colors (from HTML mockup)
+      // Dark mode colors
       borderColor = "#10b981"; // Green (healthy)
       if (errorRate > 10) borderColor = "#ef4444"; // Red (critical)
       else if (errorRate > 5) borderColor = "#f97316"; // Orange (warning)
@@ -588,14 +588,14 @@ export const convertServiceGraphToNetwork = (
       name: node.label || node.id,
       value: metrics.requests,
       errors: metrics.errors,
-      symbolSize: isSelected ? symbolSize * 1.1 : symbolSize, // Scale up selected node (match HTML mockup)
+      symbolSize: isSelected ? symbolSize * 1.1 : symbolSize, // Scale up selected node
       itemStyle: {
-        color: isDarkMode ? '#1a1f2e' : '#ffffff', // Dark: mockup bg-secondary, Light: white
+        color: isDarkMode ? '#1a1f2e' : '#ffffff',
         borderColor: borderColor, // Keep health-based border color
         borderWidth: 4,
         shadowBlur: isSelected ? 25 : 10, // Enhanced shadow for selected node
         shadowColor: isSelected
-          ? 'rgba(59, 130, 246, 0.6)' // Blue glow for selected (match HTML mockup)
+          ? 'rgba(59, 130, 246, 0.6)' // Blue glow for selected
           : (isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
         shadowOffsetX: 0,
         shadowOffsetY: 0,
@@ -605,7 +605,7 @@ export const convertServiceGraphToNetwork = (
       },
       emphasis: {
         scale: true,
-        scaleSize: 1.15, // Match mockup's transform: scale(1.15)
+        scaleSize: 1.15,
         itemStyle: {
           shadowBlur: 20, // Enhanced shadow on hover
           shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
@@ -617,7 +617,7 @@ export const convertServiceGraphToNetwork = (
         },
       },
       select: {
-        // Persistent selection styling (matching HTML mockup)
+        // Persistent selection styling
         itemStyle: {
           borderColor: borderColor, // Keep health-based border color
           borderWidth: 4,
@@ -866,8 +866,8 @@ export const convertServiceGraphToNetwork = (
         color: '#fff',
       },
     },
-    animation: hasPositions ? false : true, // Disable animation when using cached positions
-    animationDuration: 200, // Match mockup's transition: all 0.2s
+    animation: false, // Disable animation to prevent position jumping
+    animationDuration: 200,
     animationEasing: 'cubicOut', // Smooth easing for hover effect
     series: [
       {
@@ -883,7 +883,7 @@ export const convertServiceGraphToNetwork = (
           min: 0.4,
           max: 3,
         },
-        animationDurationUpdate: 200, // Smooth 0.2s animation on hover (matching mockup)
+        animationDurationUpdate: 200,
         animationEasingUpdate: 'cubicOut',
         label: normalizedLayoutType === 'circular' ? {
           show: true,
@@ -931,14 +931,14 @@ export const convertServiceGraphToNetwork = (
         emphasis: {
           focus: "adjacency",
           scale: true,
-          scaleSize: 1.15, // Match mockup's transform: scale(1.15)
+          scaleSize: 1.15,
           label: {
             show: true,
             fontSize: 13,
             fontWeight: 'bold',
           },
           itemStyle: {
-            shadowBlur: 20, // Enhanced shadow (mockup: --shadow-lg)
+            shadowBlur: 20,
             shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
           },
         },
@@ -952,7 +952,15 @@ export const convertServiceGraphToNetwork = (
     ],
   };
 
-  return { options };
+  // Extract computed positions for caching
+  const computedPositions = new Map<string, { x: number; y: number }>();
+  nodes.forEach((node: any) => {
+    if (node.x !== undefined && node.y !== undefined) {
+      computedPositions.set(node.id, { x: node.x, y: node.y });
+    }
+  });
+
+  return { options, positions: computedPositions };
 };
 
 const formatNumber = (num: number) => {

@@ -44,7 +44,7 @@ style="min-height: auto">
       <!-- Service Graph Tab Content -->
       <div
         v-if="activeTab === 'service-graph' && store.state.zoConfig.service_graph_enabled"
-        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-98px)] tw:overflow-hidden"
+        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
         <service-graph class="tw:h-full" />
       </div>

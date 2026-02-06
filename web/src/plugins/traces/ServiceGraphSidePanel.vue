@@ -652,19 +652,19 @@ export default defineComponent({
   position: absolute;
   right: 0;
   top: 0;
-  width: 420px; // Match mockup
+  width: 420px; 
   height: 100%;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  background: #1a1f2e; // Match mockup --bg-secondary
-  border-left: 1px solid #2d3548; // Match mockup --border-color
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); // Match mockup --shadow-lg
+  background: #1a1f2e; 
+  border-left: 1px solid #2d3548; 
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); 
   overflow: hidden;
-  animation: slideIn 0.3s ease-out; // Match mockup animation
+  animation: slideIn 0.3s ease-out; 
 }
 
-// Animation (matching mockup: lines 352-359)
+
 @keyframes slideIn {
   from {
     transform: translateX(100%);
@@ -854,29 +854,29 @@ export default defineComponent({
   }
 }
 
-// Content (matching mockup: lines 443-447)
+
 .panel-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #0f1419; // Match mockup --bg-primary
-  padding: 20px; // Match mockup exactly
+  background: #0f1419; 
+  padding: 20px; 
 
-  // Custom scrollbar (matching mockup: lines 669-684)
+  
   &::-webkit-scrollbar {
     width: 8px;
   }
 
   &::-webkit-scrollbar-track {
-    background: #1a1f2e; // Match mockup --bg-secondary
+    background: #1a1f2e; 
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #242938; // Match mockup --bg-tertiary
+    background: #242938; 
     border-radius: 4px;
 
     &:hover {
-      background: #2d3548; // Match mockup --border-color
+      background: #2d3548; 
     }
   }
 }
@@ -897,22 +897,22 @@ export default defineComponent({
   }
 }
 
-// Panel Sections (matching mockup: lines 494-503)
+
 .panel-section {
   padding: 0;
-  margin-bottom: 24px; // Match mockup exactly
+  margin-bottom: 24px; 
 
   &:last-child {
     margin-bottom: 0;
   }
 
   .section-title {
-    font-size: 14px; // Match mockup exactly
+    font-size: 14px; 
     font-weight: 600;
     text-transform: none;
     letter-spacing: 0;
-    margin-bottom: 12px; // Match mockup exactly
-    color: #e4e7eb; // Match mockup --text-primary
+    margin-bottom: 12px; 
+    color: #e4e7eb; 
   }
 }
 
@@ -920,20 +920,20 @@ export default defineComponent({
   color: #202124;
 }
 
-// Metrics Section (matching mockup: lines 449-492)
+
 .metrics-section {
   .metrics-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px; // Match mockup exactly
+    gap: 12px; 
     margin-bottom: 24px;
 
     .metric-card {
-      padding: 12px; // Match mockup exactly
-      border-radius: 8px; // Match mockup
+      padding: 12px; 
+      border-radius: 8px; 
       text-align: center;
-      background: #242938; // Match mockup --bg-tertiary
-      border: 1px solid #2d3548; // Match mockup --border-color
+      background: #242938; 
+      border: 1px solid #2d3548; 
       transition: all 0.2s ease;
 
       &:hover {
@@ -942,36 +942,36 @@ export default defineComponent({
       }
 
       .metric-label {
-        font-size: 11px; // Match mockup exactly
+        font-size: 11px; 
         font-weight: 600;
         text-transform: none; // Use proper case from template
         letter-spacing: 0;
         margin-bottom: 6px;
-        color: #9ca3af; // Match mockup --text-secondary
+        color: #9ca3af; 
       }
 
       .metric-value {
-        font-size: 20px; // Match mockup exactly
+        font-size: 20px; 
         font-weight: 700;
-        color: #e4e7eb; // Match mockup --text-primary
+        color: #e4e7eb; 
         letter-spacing: -0.01em;
         margin-bottom: 4px;
         white-space: nowrap; // Prevent wrapping to multiple lines
 
-        &.green { color: #10b981; } // Match mockup --health-green
-        &.yellow { color: #fbbf24; } // Match mockup --health-yellow
-        &.orange { color: #f97316; } // Match mockup --health-orange
-        &.red { color: #ef4444; } // Match mockup --health-red
+        &.green { color: #10b981; } 
+        &.yellow { color: #fbbf24; } 
+        &.orange { color: #f97316; } 
+        &.red { color: #ef4444; } 
 
         .metric-unit {
           font-size: 11px; // Smaller unit text
           font-weight: 500;
-          color: #9ca3af; // Match mockup --text-secondary
+          color: #9ca3af; 
           margin-left: 4px;
         }
       }
 
-      // Optional: Add sparkline effect from mockup
+      
       .metric-sparkline {
         height: 20px;
         background: linear-gradient(to right,
@@ -1013,37 +1013,37 @@ export default defineComponent({
   }
 }
 
-// Services Section (matching mockup: lines 505-531)
+
 .services-section {
   .service-list {
     display: flex;
     flex-direction: column;
-    gap: 8px; // Match mockup exactly
+    gap: 8px; 
 
     .service-list-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px; // Match mockup exactly
+      padding: 10px 12px; 
       border-radius: 6px;
-      background: #242938; // Match mockup --bg-tertiary
-      border: 1px solid #2d3548; // Match mockup --border-color
+      background: #242938; 
+      border: 1px solid #2d3548; 
       transition: all 0.2s ease;
       cursor: pointer;
 
       &:hover {
-        background: #1a1f2e; // Match mockup --bg-secondary
-        border-color: #3b82f6; // Match mockup --accent-blue
+        background: #1a1f2e; 
+        border-color: #3b82f6; 
       }
 
       .service-item-name {
-        font-size: 13px; // Match mockup exactly
+        font-size: 13px; 
         font-weight: 500;
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: #e4e7eb; // Match mockup --text-primary
+        color: #e4e7eb; 
       }
 
       .service-item-health {
@@ -1087,7 +1087,7 @@ export default defineComponent({
   .empty-state {
     text-align: left;
     padding: 0;
-    color: #9ca3af; // Match mockup --text-secondary
+    color: #9ca3af; 
     font-size: 13px;
     font-style: normal;
   }

@@ -546,12 +546,6 @@ export default defineComponent({
       //   };
       // }
 
-      console.log(
-        "[ServiceGraph] Generating new chart options, chartKey:",
-        chartKey.value,
-        "visualizationType:",
-        visualizationType.value,
-      );
       const newOptions =
         visualizationType.value === "tree"
           ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
@@ -563,12 +557,17 @@ export default defineComponent({
               undefined, // Don't pass selected node - we'll use dispatchAction instead
             );
 
-      // Cache the options with the current key for graph view
+      // Cache the options and positions for graph view
       if (visualizationType.value === "graph") {
         lastChartOptions.value = {
           key: chartKey.value,
           data: newOptions,
         };
+
+        // Save computed positions to cache to prevent recomputation
+        if (newOptions.positions) {
+          graphNodePositions.value = newOptions.positions;
+        }
       }
 
       return {
@@ -1217,7 +1216,7 @@ export default defineComponent({
 .service-graph-container {
   position: relative;
   overflow: hidden;
-  background: #0f1419 !important; // Dark background from HTML mockup (--bg-primary)
+  background: #0f1419 !important;
 }
 
 .body--light .service-graph-container {
