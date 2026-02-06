@@ -134,40 +134,26 @@ export class MetricsQueryEditorPage {
         // Try to clear any stream selection first (prevents auto-populated queries)
         await this.clearStreamSelection();
 
-        // APPROACH 1: Try Monaco API with better error handling
-        const monacoSuccess = await this.page.evaluate((queryText) => {
+        // APPROACH 1: Try Monaco API - sets the model value directly
+        // Note: This only sets the internal model state, not the rendered view
+        const modelSetSuccess = await this.page.evaluate((queryText) => {
             try {
-                // Try multiple ways to access Monaco editor
                 const editors = window.monaco?.editor?.getEditors?.();
 
                 if (editors && editors.length > 0) {
                     const editor = editors[0];
                     if (editor && typeof editor.setValue === 'function') {
                         editor.setValue(queryText);
-
-                        // Verify the value was actually set in the model before returning
-                        // This ensures Monaco's internal state is updated (not just triggered)
-                        const model = editor.getModel();
-                        if (model && model.getValue() === queryText) {
-                            return true;
-                        }
-                        // If model value doesn't match, the set failed
-                        return false;
+                        // Model set attempted - view rendering happens asynchronously
+                        return true;
                     }
                 }
 
                 // Alternative: try to find editor via DOM
                 const editorElement = document.querySelector('.monaco-editor');
                 if (editorElement && editorElement.__vscode_monaco_editor__) {
-                    const altEditor = editorElement.__vscode_monaco_editor__;
-                    altEditor.setValue(queryText);
-
-                    // Verify the value was set
-                    const model = altEditor.getModel?.();
-                    if (model && model.getValue() === queryText) {
-                        return true;
-                    }
-                    return false;
+                    editorElement.__vscode_monaco_editor__.setValue(queryText);
+                    return true;
                 }
             } catch (error) {
                 console.log('Monaco API failed:', error.message);
@@ -175,11 +161,11 @@ export class MetricsQueryEditorPage {
             return false;
         }, query);
 
-        if (monacoSuccess) {
-            this.testLogger.info('Monaco API returned success, waiting for UI to update...');
+        if (modelSetSuccess) {
+            this.testLogger.info('Monaco model set, polling for view rendering...');
 
-            // Poll for the actual UI update instead of fixed timeout
-            // Monaco trigger() is async - we need to wait for the view to reflect the change
+            // CRITICAL: Poll for actual DOM/view rendering, not model state
+            // Monaco renders asynchronously - we must verify the view-line elements
             const maxWaitTime = 3000;
             const pollInterval = 100;
             let elapsed = 0;
@@ -189,14 +175,15 @@ export class MetricsQueryEditorPage {
                 await this.page.waitForTimeout(pollInterval);
                 elapsed += pollInterval;
 
+                // getCurrentQueryText reads from DOM (.view-line elements), not model
                 verifyText = await this.getCurrentQueryText();
                 if (verifyText.includes(query.substring(0, Math.min(10, query.length)))) {
-                    this.testLogger.info(`✓ Query verified in editor after ${elapsed}ms`);
+                    this.testLogger.info(`✓ Query verified in rendered view after ${elapsed}ms`);
                     return;
                 }
             }
 
-            this.testLogger.warn(`Monaco API succeeded but query doesn't match after ${maxWaitTime}ms. Got: "${verifyText}"`);
+            this.testLogger.warn(`Monaco model set but view not rendered after ${maxWaitTime}ms. Got: "${verifyText}"`);
         }
 
         // APPROACH 2: Direct keyboard input with aggressive clearing
@@ -216,20 +203,16 @@ export class MetricsQueryEditorPage {
         await editor.click({ force: true });
         await this.page.waitForTimeout(300);
 
-        // Ultra-aggressive clear: try multiple methods
+        // Clear editor content: single select-all + backspace, then select-all to prepare for typing
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-
-        // Clear editor content (2 iterations is sufficient)
-        for (let i = 0; i < 2; i++) {
-            await this.page.keyboard.press(selectAllKey);
-            await this.page.waitForTimeout(50);
-            await this.page.keyboard.press('Backspace');
-            await this.page.waitForTimeout(50);
-        }
-
-        // Method 2: Try to clear via Ctrl+A then type over
         await this.page.keyboard.press(selectAllKey);
-        await this.page.waitForTimeout(200);
+        await this.page.waitForTimeout(100);
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(100);
+
+        // Select all again so typing will replace any remaining content
+        await this.page.keyboard.press(selectAllKey);
+        await this.page.waitForTimeout(100);
 
         // Type the new query
         await this.page.keyboard.type(query, { delay: 100 });
