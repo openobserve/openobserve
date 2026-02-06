@@ -49,7 +49,7 @@ pub struct UserOrg {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
-#[serde(rename = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum UserRole {
     Root = 0,
     Admin = 1,
@@ -253,6 +253,159 @@ impl UserType {
         match self {
             UserType::Internal => false,
             UserType::External => true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod user_role_serde {
+        use super::*;
+
+        #[test]
+        fn test_serialize_to_snake_case() {
+            assert_eq!(serde_json::to_string(&UserRole::Root).unwrap(), "\"root\"");
+            assert_eq!(
+                serde_json::to_string(&UserRole::Admin).unwrap(),
+                "\"admin\""
+            );
+            assert_eq!(
+                serde_json::to_string(&UserRole::Editor).unwrap(),
+                "\"editor\""
+            );
+            assert_eq!(
+                serde_json::to_string(&UserRole::Viewer).unwrap(),
+                "\"viewer\""
+            );
+            assert_eq!(serde_json::to_string(&UserRole::User).unwrap(), "\"user\"");
+            assert_eq!(
+                serde_json::to_string(&UserRole::ServiceAccount).unwrap(),
+                "\"service_account\""
+            );
+        }
+
+        #[test]
+        fn test_deserialize_from_snake_case() {
+            assert_eq!(
+                serde_json::from_str::<UserRole>("\"root\"").unwrap(),
+                UserRole::Root
+            );
+            assert_eq!(
+                serde_json::from_str::<UserRole>("\"admin\"").unwrap(),
+                UserRole::Admin
+            );
+            assert_eq!(
+                serde_json::from_str::<UserRole>("\"editor\"").unwrap(),
+                UserRole::Editor
+            );
+            assert_eq!(
+                serde_json::from_str::<UserRole>("\"viewer\"").unwrap(),
+                UserRole::Viewer
+            );
+            assert_eq!(
+                serde_json::from_str::<UserRole>("\"user\"").unwrap(),
+                UserRole::User
+            );
+            assert_eq!(
+                serde_json::from_str::<UserRole>("\"service_account\"").unwrap(),
+                UserRole::ServiceAccount
+            );
+        }
+
+        #[test]
+        fn test_deserialize_invalid_role_fails() {
+            assert!(serde_json::from_str::<UserRole>("\"invalid\"").is_err());
+            assert!(serde_json::from_str::<UserRole>("\"Admin\"").is_err()); // PascalCase should fail
+            assert!(serde_json::from_str::<UserRole>("\"ADMIN\"").is_err()); // UPPERCASE should fail
+        }
+    }
+
+    mod user_role_ordering {
+        use super::*;
+        use std::cmp::Ordering;
+
+        #[test]
+        fn test_root_is_highest_privilege() {
+            assert!(UserRole::Root > UserRole::Admin);
+            assert!(UserRole::Root > UserRole::Editor);
+            assert!(UserRole::Root > UserRole::Viewer);
+            assert!(UserRole::Root > UserRole::User);
+            assert!(UserRole::Root > UserRole::ServiceAccount);
+        }
+
+        #[test]
+        fn test_admin_greater_than_lower_roles() {
+            assert!(UserRole::Admin > UserRole::Editor);
+            assert!(UserRole::Admin > UserRole::Viewer);
+            assert!(UserRole::Admin > UserRole::User);
+            assert!(UserRole::Admin > UserRole::ServiceAccount);
+        }
+
+        #[test]
+        fn test_privilege_ordering_chain() {
+            // Root > Admin > Editor > Viewer > User > ServiceAccount
+            assert!(UserRole::Root > UserRole::Admin);
+            assert!(UserRole::Admin > UserRole::Editor);
+            assert!(UserRole::Editor > UserRole::Viewer);
+            assert!(UserRole::Viewer > UserRole::User);
+            assert!(UserRole::User > UserRole::ServiceAccount);
+        }
+
+        #[test]
+        fn tetd::cmp::Ordering;
+
+        use super::*
+                UserRole::Root.partial_cmp(&UserRole::Admin),
+                Some(Ordering::Greater)
+            );
+            assert_eq!(
+                UserRole::Admin.partial_cmp(&UserRole::Root),
+                Some(Ordering::Less)
+            );
+            assert_eq!(
+                UserRole::Admin.partial_cmp(&UserRole::Admin),
+                Some(Ordering::Equal)
+            );
+        }
+    }
+
+    mod user_role_display {
+        use super::*;
+
+        #[test]
+        fn test_display_output() {
+            assert_eq!(format!("{}", UserRole::Root), "root");
+            assert_eq!(format!("{}", UserRole::Admin), "admin");
+            assert_eq!(format!("{}", UserRole::Editor), "editor");
+            assert_eq!(format!("{}", UserRole::Viewer), "viewer");
+            assert_eq!(format!("{}", UserRole::User), "user");
+            assert_eq!(format!("{}", UserRole::ServiceAccount), "service_account");
+        }
+    }
+
+    mod user_role_from_str {
+        use super::*;
+
+        #[test]
+        fn test_valid_role_strings() {
+            assert_eq!(UserRole::from_str("root").unwrap(), UserRole::Root);
+            assert_eq!(UserRole::from_str("admin").unwrap(), UserRole::Admin);
+            assert_eq!(UserRole::from_str("editor").unwrap(), UserRole::Editor);
+            assert_eq!(UserRole::from_str("viewer").unwrap(), UserRole::Viewer);
+            assert_eq!(UserRole::from_str("user").unwrap(), UserRole::User);
+            assert_eq!(
+                UserRole::from_str("service_account").unwrap(),
+                UserRole::ServiceAccount
+            );
+        }
+
+        #[test]
+        fn test_invalid_string_defaults_to_admin() {
+            assert_eq!(UserRole::from_str("invalid").unwrap(), UserRole::Admin);
+            assert_eq!(UserRole::from_str("").unwrap(), UserRole::Admin);
+            assert_eq!(UserRole::from_str("Admin").unwrap(), UserRole::Admin); // case sensitive
         }
     }
 }
