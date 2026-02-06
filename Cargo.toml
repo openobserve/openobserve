@@ -426,7 +426,7 @@ tantivy-fst = "0.5"
 tempfile = "3"
 thiserror = "2.0.17"
 tiktoken-rs = "0.9.1"
-time = "0.3"
+time = "0.3.47"
 tokio = { version = "1", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = [
     "logging",
