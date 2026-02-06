@@ -631,9 +631,9 @@ describe("DetailTable Component", () => {
   it("should emit sendToAiChat and closeTable when sendToAiChat called", () => {
     const testValue = "test message";
     wrapper.vm.sendToAiChat(testValue);
-    
+
     expect(wrapper.emitted().sendToAiChat).toBeTruthy();
-    expect(wrapper.emitted().sendToAiChat[0]).toEqual([testValue]);
+    expect(wrapper.emitted().sendToAiChat[0]).toEqual([testValue, true]); // includes append parameter
     expect(wrapper.emitted().closeTable).toBeTruthy();
   });
 

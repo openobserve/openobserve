@@ -172,8 +172,8 @@ export default defineComponent({
       }
     };
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = false) => {
+      emit("sendToAiChat", value, append);
     };
 
     return {

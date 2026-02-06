@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="head q-table__title ">
       {{ headerBasedOnRoute() }}
     </div>
-    <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
+    <div v-if="isUsageRoute" class="tw-flex tw-gap-2 tw-items-center ">
       <div class="custom-usage-date-select">
           <q-select
             dense
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="logs-splitter-smooth"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
+        <div class="tw-w-full tw-pl-[0.625rem] tw-pb-[0.625rem] ">
           <div class="card-container" style="min-height: calc(100vh - 125px)">
             <q-tabs
               v-model="billingtab"
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
           <div class="card-container q-pb-md">
             <router-view title=""> </router-view>
           </div>

@@ -1246,6 +1246,7 @@ size="md" />
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
           :aiChatInputContext="aiChatInputContext"
+          :appendMode="aiChatAppendMode"
         />
       </div>
     </div>
@@ -1452,6 +1453,7 @@ const isHovered = ref(false);
 const loading = ref(false);
 
 const aiChatInputContext = ref("");
+const aiChatAppendMode = ref(true);
 
 const userDefinedFields = ref<any[]>([]);
 
@@ -2358,9 +2360,15 @@ const removeAiContextHandler = () => {
 
 // [END] O2 AI Context Handler
 
-const sendToAiChat = (value: any) => {
+const sendToAiChat = (value: any, append: boolean = true) => {
+  aiChatAppendMode.value = append;
   aiChatInputContext.value = value;
   store.dispatch("setIsAiChatEnabled", true);
+
+  // Clear context after setting to prevent accumulation
+  nextTick(() => {
+    aiChatInputContext.value = "";
+  });
 };
 
 defineExpose({
@@ -2399,6 +2407,7 @@ defineExpose({
   getBtnLogo,
   sendToAiChat,
   aiChatInputContext,
+  aiChatAppendMode,
 });
 </script>
 
