@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :pages-number="scope.pagesNumber"
               :is-first-page="scope.isFirstPage"
               :is-last-page="scope.isLastPage"
-              @update:rows-per-page="scope.setrowsPerPage"
+              @update:rows-per-page="scope.setRowsPerPage"
               @first-page="scope.firstPage"
               @prev-page="scope.prevPage"
               @next-page="scope.nextPage"
@@ -159,7 +159,7 @@ export default defineComponent({
     // Determine if legend footer should be shown
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
-      // Show legend footer in both "single" and "expanded_timeseries" modes when there are multiple series
+      // Show legend footer in both "single" and "expanded_timeseries" modes
       return (
         (tableMode === "single" || tableMode === "expanded_timeseries")
       );

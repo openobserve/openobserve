@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="row items-center">
     <!-- Records per page dropdown: only when pagination is enabled -->
     <div v-if="showPagination" class="row items-center q-gutter-sm">
-      <span class="text-caption">Records per page:</span>
+      <span class="text-caption">{{ t("dashboard.rowsPerPage") }}
+</span>
       <q-select
         :model-value="pagination.rowsPerPage"
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-
+import { useI18n } from "vue-i18n";
 export default defineComponent({
   name: "TablePaginationControls",
   props: {
@@ -127,6 +128,7 @@ export default defineComponent({
     "lastPage",
   ],
   setup(props) {
+    const { t } = useI18n();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
       if (!showPagination || pagination.rowsPerPage === 0) {
@@ -140,6 +142,7 @@ export default defineComponent({
 
     return {
       countDisplay,
+      t,
     };
   },
 });

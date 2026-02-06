@@ -6,7 +6,7 @@ const {
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
-import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
+import { waitForStreamComplete } from "../utils/streaming-helpers.js";
 const testLogger = require('../utils/test-logger.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
