@@ -1576,6 +1576,22 @@ export default defineComponent({
       // the new variables from the manager through their computed properties
     };
 
+    const isPartialData = ref(false);
+    const isPanelLoading = ref(false);
+    const isCachedDataDifferWithCurrentTimeRange = ref(false);
+
+    const handleIsPartialDataUpdate = (data: boolean) => {
+      isPartialData.value = data;
+    };
+
+    const handleLoadingStateChange = (data: boolean) => {
+      isPanelLoading.value = data;
+    };
+
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+      isCachedDataDifferWithCurrentTimeRange.value = data;
+    };
+
     return {
       t,
       updateDateTime,
