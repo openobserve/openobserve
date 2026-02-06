@@ -65,7 +65,7 @@ http-body.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
-mime_guess = "2.0.5"
+mime_guess = "2.0"
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
@@ -73,22 +73,22 @@ async-trait.workspace = true
 async-recursion.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
-bitflags = "2.9.1"
+bitflags = "2.9"
 bitvec.workspace = true
 blake3 = { version = "1.8", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
-clap = { version = "4.5.54", default-features = false, features = [
+clap = { version = "4.5", default-features = false, features = [
     "std",
     "help",
     "usage",
     "suggestions",
     "cargo",
 ] }
-cloudevents-sdk = { version = "0.9.0", features = ["axum"] }
+cloudevents-sdk = { version = "0.9", features = ["axum"] }
 cron.workspace = true
-csv = "1.3.1"
+csv = "1.3"
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
@@ -107,11 +107,11 @@ futures.workspace = true
 hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
-http-auth-basic = "0.3.6"
+http-auth-basic = "0.3"
 itertools.workspace = true
 jsonwebtoken = "10.3"
 log.workspace = true
-maxminddb = "0.27.1"
+maxminddb = "0.27"
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.46", default-features = false, optional = true }
@@ -177,7 +177,7 @@ pprof = { version = "0.14", optional = true, features = [
 tempfile.workspace = true
 tiktoken-rs.workspace = true
 tokio.workspace = true
-console-subscriber = { version = "0.4.1", optional = true }
+console-subscriber = { version = "0.4", optional = true }
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing.workspace = true
@@ -219,7 +219,7 @@ async-stream.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
-base64 = "0.22.1"
+base64 = "0.22"
 float-cmp = "0.10"
 multer = "3.1"
 rcgen = "0.14.4"
@@ -251,7 +251,7 @@ report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
-axum = { version = "0.8.8", features = ["macros", "multipart", "tracing"] }
+axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
 axum-extra = { version = "0.10", features = [
     "typed-header",
     "query",
@@ -292,8 +292,6 @@ async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.5.17"
 aws-sdk-sns = "1.61.0"
-aws-sdk-marketplacemetering = "1.61.0"
-aws-sdk-sqs = "1.61.0"
 base64 = "0.22"
 bitvec = "1.0"
 bytes = "1.11.1"
@@ -422,7 +420,7 @@ sqlx = { version = "0.8.6", features = [
 ] }
 strum = { version = "0.27", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
-sysinfo = "0.37.2"
+sysinfo = "0.37"
 tantivy = { version = "0.25", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
@@ -434,20 +432,20 @@ tokio-rustls = { version = "0.26", default-features = false, features = [
     "logging",
     "tls12",
 ] }
-tokio-util = { version = "0.7.18", features = ["compat"] }
-tokio-stream = "0.1.18"
-tonic = { version = "0.14.3", features = ["gzip", "tls-webpki-roots"] }
-tonic-prost = "0.14.3"
+tokio-util = { version = "0.7", features = ["compat"] }
+tokio-stream = "0.1"
+tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
+tonic-prost = "0.14"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.32.1"
+tracing-opentelemetry = "0.32"
 tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
     "json",
     "registry",
 ] }
-url = "2.5.8"
+url = "2.5"
 urlencoding = "2.1"
 utoipa = { version = "5.4", features = ["axum_extras", "openapi_extensions"] }
 utoipa-axum = "0.2"
@@ -461,4 +459,4 @@ vrl = { version = "0.28.1", features = [
     "test",
 ] }
 zip = "6.0.0"
-zstd = "0.13.3"
+zstd = "0.13"
