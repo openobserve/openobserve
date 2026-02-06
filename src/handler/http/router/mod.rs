@@ -84,6 +84,8 @@ pub fn cors_layer() -> CorsLayer {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
+            header::HeaderName::from_static("stream-name"),
+            header::HeaderName::from_static("organization"),
             header::HeaderName::from_static("traceparent"),
             header::HeaderName::from_static("tracestate"),
             header::HeaderName::from_static("x-openobserve-span-id"),

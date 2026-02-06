@@ -1097,7 +1097,7 @@ export default defineComponent({
       req.query.end_time = trace.to;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
+        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
       ) as string;
 
       return req;
