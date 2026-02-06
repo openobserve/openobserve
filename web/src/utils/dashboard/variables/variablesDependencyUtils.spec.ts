@@ -520,4 +520,317 @@ describe("Variables Dependency Utils", () => {
       expect(hasCycle).toBeNull();
     });
   });
+
+  describe("Dependency Detection for Stream and Field References", () => {
+    it("should detect dependencies in query_data.stream", () => {
+      const variables = [
+        {
+          name: "fieldVar",
+          type: "query_values",
+          query_data: {
+            stream: "$streamVar",
+            field: "status",
+            filter: [],
+          },
+        },
+        { name: "streamVar", type: "constant", query_data: null },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      expect(graph.fieldVar.parentVariables).toContain("streamVar");
+      expect(graph.streamVar.childVariables).toContain("fieldVar");
+    });
+
+    it("should detect dependencies in query_data.field", () => {
+      const variables = [
+        {
+          name: "dataVar",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "$fieldVar",
+            filter: [],
+          },
+        },
+        { name: "fieldVar", type: "constant", query_data: null },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      expect(graph.dataVar.parentVariables).toContain("fieldVar");
+      expect(graph.fieldVar.childVariables).toContain("dataVar");
+    });
+
+    it("should detect dependencies across stream, field, and filters", () => {
+      const variables = [
+        {
+          name: "complexVar",
+          type: "query_values",
+          query_data: {
+            stream: "$streamVar",
+            field: "$fieldVar",
+            filter: [{ value: "status='$statusVar'" }],
+          },
+        },
+        { name: "streamVar", type: "constant", query_data: null },
+        { name: "fieldVar", type: "constant", query_data: null },
+        { name: "statusVar", type: "constant", query_data: null },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      expect(graph.complexVar.parentVariables).toEqual(
+        expect.arrayContaining(["streamVar", "fieldVar", "statusVar"])
+      );
+      expect(graph.complexVar.parentVariables.length).toBe(3);
+    });
+
+    it("should not duplicate dependencies when variable referenced multiple times", () => {
+      const variables = [
+        {
+          name: "multiRefVar",
+          type: "query_values",
+          query_data: {
+            stream: "$baseVar",
+            field: "$baseVar",
+            filter: [{ value: "field='$baseVar'" }],
+          },
+        },
+        { name: "baseVar", type: "constant", query_data: null },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      // Should only appear once in parentVariables despite being referenced 3 times
+      expect(graph.multiRefVar.parentVariables).toEqual(["baseVar"]);
+      expect(graph.multiRefVar.parentVariables.length).toBe(1);
+    });
+
+    it("should handle stream with embedded variable in string", () => {
+      const variables = [
+        {
+          name: "dynamicStream",
+          type: "query_values",
+          query_data: {
+            stream: "logs_$environment",
+            field: "message",
+            filter: [],
+          },
+        },
+        { name: "environment", type: "constant", query_data: null },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      expect(graph.dynamicStream.parentVariables).toContain("environment");
+      expect(graph.environment.childVariables).toContain("dynamicStream");
+    });
+
+    it("should handle field with multiple variables", () => {
+      const variables = [
+        {
+          name: "multiFieldVar",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "$prefix_$suffix",
+            filter: [],
+          },
+        },
+        { name: "prefix", type: "constant", query_data: null },
+        { name: "suffix", type: "constant", query_data: null },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      expect(graph.multiFieldVar.parentVariables).toEqual(
+        expect.arrayContaining(["prefix", "suffix"])
+      );
+      expect(graph.multiFieldVar.parentVariables.length).toBe(2);
+    });
+
+    it("should detect circular dependency through stream references", () => {
+      const variables = [
+        {
+          name: "var1",
+          type: "query_values",
+          query_data: {
+            stream: "$var2",
+            field: "field1",
+            filter: [],
+          },
+        },
+        {
+          name: "var2",
+          type: "query_values",
+          query_data: {
+            stream: "$var1",
+            field: "field2",
+            filter: [],
+          },
+        },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+      const hasCycle = isGraphHasCycle(graph);
+
+      expect(hasCycle).not.toBeNull();
+      expect(Array.isArray(hasCycle)).toBe(true);
+      expect(hasCycle).toContain("var1");
+      expect(hasCycle).toContain("var2");
+    });
+
+    it("should detect circular dependency through field references", () => {
+      const variables = [
+        {
+          name: "var1",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "$var2",
+            filter: [],
+          },
+        },
+        {
+          name: "var2",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "$var1",
+            filter: [],
+          },
+        },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+      const hasCycle = isGraphHasCycle(graph);
+
+      expect(hasCycle).not.toBeNull();
+      expect(Array.isArray(hasCycle)).toBe(true);
+    });
+
+    it("should detect complex circular dependency across stream, field, and filter", () => {
+      const variables = [
+        {
+          name: "var1",
+          type: "query_values",
+          query_data: {
+            stream: "$var2",
+            field: "field1",
+            filter: [],
+          },
+        },
+        {
+          name: "var2",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "$var3",
+            filter: [],
+          },
+        },
+        {
+          name: "var3",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "field3",
+            filter: [{ value: "status='$var1'" }],
+          },
+        },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+      const hasCycle = isGraphHasCycle(graph);
+
+      expect(hasCycle).not.toBeNull();
+      expect(Array.isArray(hasCycle)).toBe(true);
+      // Cycle should be: var1 -> var2 -> var3 -> var1
+    });
+
+    it("should handle mixed dependency sources correctly", () => {
+      const variables = [
+        {
+          name: "root",
+          type: "constant",
+          query_data: null,
+        },
+        {
+          name: "level1Stream",
+          type: "query_values",
+          query_data: {
+            stream: "$root",
+            field: "field1",
+            filter: [],
+          },
+        },
+        {
+          name: "level1Field",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "$root",
+            filter: [],
+          },
+        },
+        {
+          name: "level1Filter",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "field3",
+            filter: [{ value: "status='$root'" }],
+          },
+        },
+        {
+          name: "level2Combined",
+          type: "query_values",
+          query_data: {
+            stream: "$level1Stream",
+            field: "$level1Field",
+            filter: [{ value: "field='$level1Filter'" }],
+          },
+        },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      // root should be parent of level1 variables
+      expect(graph.level1Stream.parentVariables).toEqual(["root"]);
+      expect(graph.level1Field.parentVariables).toEqual(["root"]);
+      expect(graph.level1Filter.parentVariables).toEqual(["root"]);
+
+      // level2Combined should depend on all level1 variables
+      expect(graph.level2Combined.parentVariables).toEqual(
+        expect.arrayContaining(["level1Stream", "level1Field", "level1Filter"])
+      );
+      expect(graph.level2Combined.parentVariables.length).toBe(3);
+
+      // root should have all level1 as children
+      expect(graph.root.childVariables).toEqual(
+        expect.arrayContaining(["level1Stream", "level1Field", "level1Filter"])
+      );
+    });
+
+    it("should be backward compatible with filter-only dependencies", () => {
+      const variables = [
+        {
+          name: "region",
+          type: "query_values",
+          query_data: {
+            stream: "logs",
+            field: "region",
+            filter: [{ value: "environment='$env'" }],
+          },
+        },
+        { name: "env", type: "constant", query_data: null },
+      ];
+
+      const graph = buildVariablesDependencyGraph(variables);
+
+      expect(graph.region.parentVariables).toContain("env");
+      expect(graph.env.childVariables).toContain("region");
+    });
+  });
 });
