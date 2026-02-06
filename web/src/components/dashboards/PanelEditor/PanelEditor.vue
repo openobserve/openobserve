@@ -195,82 +195,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Warning icons and last refreshed time -->
                   <div class="tw:flex tw:justify-end tw:mr-2 tw:items-center">
-                    <!-- Error warning -->
-                    <q-btn
-                      v-if="errorMessage"
-                      :icon="outlinedWarning"
-                      flat
-                      size="xs"
-                      padding="2px"
-                      data-test="panel-editor-error-data-inline"
-                      class="warning q-mr-xs"
-                    >
-                      <q-tooltip
-                        anchor="bottom right"
-                        self="top right"
-                        max-width="220px"
-                      >
-                        <div style="white-space: pre-wrap">
-                          {{ errorMessage }}
-                        </div>
-                      </q-tooltip>
-                    </q-btn>
-
-                    <!-- Max query range warning -->
-                    <q-btn
-                      v-if="maxQueryRangeWarning"
-                      :icon="outlinedWarning"
-                      flat
-                      size="xs"
-                      padding="2px"
-                      data-test="panel-editor-max-duration-warning-inline"
-                      class="warning q-mr-xs"
-                    >
-                      <q-tooltip
-                        anchor="bottom right"
-                        self="top right"
-                        max-width="220px"
-                      >
-                        <div style="white-space: pre-wrap">
-                          {{ maxQueryRangeWarning }}
-                        </div>
-                      </q-tooltip>
-                    </q-btn>
-
-                    <!-- Series limit warning -->
-                    <q-btn
-                      v-if="limitNumberOfSeriesWarningMessage"
-                      :icon="symOutlinedDataInfoAlert"
-                      flat
-                      size="xs"
-                      padding="2px"
-                      data-test="panel-editor-series-limit-warning-inline"
-                      class="warning q-mr-xs"
-                    >
-                      <q-tooltip
-                        anchor="bottom right"
-                        self="top right"
-                        max-width="220px"
-                      >
-                        <div style="white-space: pre-wrap">
-                          {{ limitNumberOfSeriesWarningMessage }}
-                        </div>
-                      </q-tooltip>
-                    </q-btn>
-
-                    <!-- Last refreshed time -->
-                    <span
-                      v-if="
-                        resolvedConfig.showLastRefreshedTime && lastTriggeredAt
-                      "
-                      class="lastRefreshedAt"
-                    >
-                      <span class="lastRefreshedAtIcon">&#x1F551;</span>
-                      <RelativeTime
-                        :timestamp="lastTriggeredAt"
-                        fullTimePrefix="Last Refreshed At: "
-                      />
-                    </span>
+                    <!-- Common error/warning buttons component -->
+                    <PanelErrorButtons
+                      :error="errorMessage"
+                      :maxQueryRangeWarning="maxQueryRangeWarning"
+                      :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                      :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                      :isPartialData="isPartialData"
+                      :isPanelLoading="isPanelLoading"
+                      :lastTriggeredAt="resolvedConfig.showLastRefreshedTime ? (lastTriggeredAt as any) : null"
+                      :viewOnly="false"
+                    />
 
                     <!-- Add to Dashboard button (metrics/logs/build mode) -->
                     <q-btn
@@ -324,6 +259,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
+                        @is-partial-data-update="handleIsPartialDataUpdate"
+                        @loading-state-change="handleLoadingStateChange"
+                        @is-cached-data-differ-with-current-time-range-update="handleIsCachedDataDifferWithCurrentTimeRangeUpdate"
+                        @update:initial-variable-values="handleInitialVariableValuesUpdate"
                       />
                     </div>
                   </div>
@@ -614,6 +553,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         @series-data-update="seriesDataUpdate"
+                        @show-legends="showLegendsDialog = true"
+                        @is-partial-data-update="handleIsPartialDataUpdate"
+                        @loading-state-change="handleLoadingStateChange"
+                        @is-cached-data-differ-with-current-time-range-update="handleIsCachedDataDifferWithCurrentTimeRangeUpdate"
+                        @update:initial-variable-values="handleInitialVariableValuesUpdate"
                       />
                     </template>
                   </q-splitter>
@@ -672,8 +616,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, provide, defineAsyncComponent, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
-import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 
 import type {
   PanelEditorProps,
@@ -695,7 +637,7 @@ import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(
@@ -789,6 +731,9 @@ const {
   maxQueryRangeWarning,
   limitNumberOfSeriesWarningMessage,
   errorMessage,
+  isPartialData,
+  isPanelLoading,
+  isCachedDataDifferWithCurrentTimeRange,
   searchRequestTraceIds,
   panelSchemaRendererRef,
   splitterModel,
@@ -804,6 +749,9 @@ const {
   handleChartApiError,
   handleLastTriggeredAtUpdate,
   handleLimitNumberOfSeriesWarningMessage,
+  handleIsPartialDataUpdate,
+  handleLoadingStateChange,
+  handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
   handleResultMetadataUpdate,
   metaDataValue,
   seriesDataUpdate,
@@ -1032,6 +980,10 @@ const handleDataZoom = (event: any) => {
     start: result.start.getTime(),
     end: result.end.getTime(),
   });
+};
+
+const handleInitialVariableValuesUpdate = (values: Record<string, any>) => {
+  emit("initialVariableValuesUpdated", values);
 };
 
 

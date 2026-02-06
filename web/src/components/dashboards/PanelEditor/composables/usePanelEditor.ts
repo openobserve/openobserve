@@ -118,6 +118,17 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   /** General error message */
   const errorMessage: Ref<string> = ref("");
 
+  // ---- Panel State Flags ----
+
+  /** Whether the data shown is incomplete (loading was interrupted) */
+  const isPartialData: Ref<boolean> = ref(false);
+
+  /** Whether the panel is currently loading */
+  const isPanelLoading: Ref<boolean> = ref(false);
+
+  /** Whether cached data differs from current time range */
+  const isCachedDataDifferWithCurrentTimeRange: Ref<boolean> = ref(false);
+
   // ---- Loading State ----
 
   /** Whether queries are disabled (loading) */
@@ -356,6 +367,30 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const handleLimitNumberOfSeriesWarningMessage = (message: string): void => {
     limitNumberOfSeriesWarningMessage.value = message;
+  };
+
+  /**
+   * Handle partial data update from PanelSchemaRenderer
+   * @param value - Whether data is partial (loading was interrupted)
+   */
+  const handleIsPartialDataUpdate = (value: boolean): void => {
+    isPartialData.value = value;
+  };
+
+  /**
+   * Handle loading state change from PanelSchemaRenderer
+   * @param value - Whether panel is loading
+   */
+  const handleLoadingStateChange = (value: boolean): void => {
+    isPanelLoading.value = value;
+  };
+
+  /**
+   * Handle cached data differs from current time range update
+   * @param value - Whether cached data differs from current time range
+   */
+  const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (value: boolean): void => {
+    isCachedDataDifferWithCurrentTimeRange.value = value;
   };
 
   /**
@@ -698,6 +733,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     maxQueryRangeWarning,
     limitNumberOfSeriesWarningMessage,
     errorMessage,
+    isPartialData,
+    isPanelLoading,
+    isCachedDataDifferWithCurrentTimeRange,
     disable,
     searchRequestTraceIds,
     hoveredSeriesState,
@@ -718,6 +756,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     handleChartApiError,
     handleLastTriggeredAtUpdate,
     handleLimitNumberOfSeriesWarningMessage,
+    handleIsPartialDataUpdate,
+    handleLoadingStateChange,
+    handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
     handleResultMetadataUpdate,
     metaDataValue,
     seriesDataUpdate,

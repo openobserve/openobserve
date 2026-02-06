@@ -367,6 +367,12 @@ export interface PanelEditorEmits {
    * Used for cancel query functionality - parent can sync these to its own loading state.
    */
   (e: "searchRequestTraceIdsUpdated", traceIds: string[]): void;
+
+  /**
+   * Emitted when initial variable values are parsed from URL query params.
+   * Parent can use these to initialize variables from URL.
+   */
+  (e: "initialVariableValuesUpdated", values: Record<string, any>): void;
 }
 
 // ============================================================================
