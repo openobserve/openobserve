@@ -20,7 +20,6 @@ use std::{
 };
 
 use itertools::Itertools;
-use reqwest::redirect::Policy;
 use rustls_pemfile::{certs, private_key};
 use x509_parser::prelude::*;
 
