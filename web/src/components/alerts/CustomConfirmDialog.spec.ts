@@ -421,11 +421,13 @@ describe("CustomConfirmDialog", () => {
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
+      await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
+      await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickConfirm(wrapper);
 
@@ -439,11 +441,13 @@ describe("CustomConfirmDialog", () => {
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
+      await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickConfirm(wrapper);
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
+      await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickCancel(wrapper);
 

@@ -177,8 +177,9 @@ describe("DedupSummaryCards", () => {
 
     it("should display correct tooltip content", async () => {
       wrapper = await mountComponent();
-      const tooltip = findByTestId(wrapper, "dedup-info-tooltip");
-      expect(tooltip.text()).toContain("Alerts with deduplication configured");
+      const icon = findByTestId(wrapper, "dedup-info-icon");
+      // Verify tooltip content by checking the icon's HTML which contains the tooltip
+      expect(icon.html()).toContain("Alerts with deduplication configured");
     });
   });
 
@@ -259,11 +260,11 @@ describe("DedupSummaryCards", () => {
           passed_total: 20,
         })
       );
-      const tooltip = findByTestId(wrapper, "suppression-info-tooltip");
-      const tooltipText = tooltip.text();
-      expect(tooltipText).toContain("30 suppressed");
-      expect(tooltipText).toContain("50 total");
-      expect(tooltipText).toContain("Passed: 20");
+      const icon = findByTestId(wrapper, "suppression-info-icon");
+      const iconHtml = icon.html();
+      expect(iconHtml).toContain("30 suppressed");
+      expect(iconHtml).toContain("50 total");
+      expect(iconHtml).toContain("Passed: 20");
     });
   });
 
@@ -298,8 +299,8 @@ describe("DedupSummaryCards", () => {
 
     it("should display correct tooltip content", async () => {
       wrapper = await mountComponent();
-      const tooltip = findByTestId(wrapper, "pending-batches-info-tooltip");
-      expect(tooltip.text()).toContain("Alerts waiting to be grouped together");
+      const icon = findByTestId(wrapper, "pending-batches-info-icon");
+      expect(icon.html()).toContain("Alerts waiting to be grouped together");
     });
 
     it("should display zero when no pending batches", async () => {
@@ -559,19 +560,20 @@ describe("DedupSummaryCards", () => {
     it("should maintain tooltip functionality across all cards", async () => {
       wrapper = await mountComponent();
 
-      // Verify all tooltip components exist and have content
-      const dedupTooltip = findByTestId(wrapper, "dedup-info-tooltip");
-      const suppressionTooltip = findByTestId(wrapper, "suppression-info-tooltip");
-      const batchesTooltip = findByTestId(wrapper, "pending-batches-info-tooltip");
+      // Verify all tooltip components exist and have content via icon HTML
+      const dedupIcon = findByTestId(wrapper, "dedup-info-icon");
+      const suppressionIcon = findByTestId(wrapper, "suppression-info-icon");
+      const batchesIcon = findByTestId(wrapper, "pending-batches-info-icon");
 
-      expect(dedupTooltip.exists()).toBe(true);
-      expect(suppressionTooltip.exists()).toBe(true);
-      expect(batchesTooltip.exists()).toBe(true);
+      // Check that icons contain tooltip components
+      expect(dedupIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(suppressionIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(batchesIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
 
-      // Verify tooltip content is present
-      expect(dedupTooltip.text().length).toBeGreaterThan(0);
-      expect(suppressionTooltip.text().length).toBeGreaterThan(0);
-      expect(batchesTooltip.text().length).toBeGreaterThan(0);
+      // Verify tooltip content is present in icon HTML
+      expect(dedupIcon.html().length).toBeGreaterThan(0);
+      expect(suppressionIcon.html().length).toBeGreaterThan(0);
+      expect(batchesIcon.html().length).toBeGreaterThan(0);
     });
   });
 });
