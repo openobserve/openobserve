@@ -618,7 +618,6 @@ import {
   parseCostDetails,
   isLLMTrace,
 } from "@/utils/llmUtils";
-import { parseUsageDetails, parseCostDetails } from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -650,6 +649,10 @@ export default defineComponent({
     endTimeProp: {
       type: Number,
       default: 0,
+    },
+    correlatedLogStream: {
+      type: String,
+      default: "",
     },
 
     // UI visibility controls
@@ -1018,10 +1021,26 @@ export default defineComponent({
             JSON.stringify(logStreams.value),
           );
 
-          if (!searchObj.data.traceDetails.selectedLogStreams.length)
-            searchObj.data.traceDetails.selectedLogStreams.push(
-              logStreams.value[0],
-            );
+          if (!searchObj.data.traceDetails.selectedLogStreams.length) {
+            // Check if log_stream query parameter exists (from correlation navigation)
+            const logStreamFromQuery = router.currentRoute.value.query
+              .log_stream as string;
+
+            if (
+              logStreamFromQuery &&
+              logStreams.value.includes(logStreamFromQuery)
+            ) {
+              // Auto-select the correlated log stream from query parameter
+              searchObj.data.traceDetails.selectedLogStreams.push(
+                logStreamFromQuery,
+              );
+            } else if (logStreams.value.length > 0) {
+              // Default: select the first available log stream
+              searchObj.data.traceDetails.selectedLogStreams.push(
+                logStreams.value[0],
+              );
+            }
+          }
         })
         .catch(() => Promise.reject())
         .finally(() => {});
@@ -1971,7 +1990,10 @@ export default defineComponent({
     };
 
     const redirectToSessionReplay = () => {
-      if (!firstRumSessionData.value.rum_session_id) {
+      if (
+        !firstRumSessionData.value ||
+        !firstRumSessionData.value.rum_session_id
+      ) {
         return;
       }
 
@@ -2035,6 +2057,15 @@ export default defineComponent({
         to: effectiveTimeRange.value.to.toString(),
         org_identifier: effectiveOrgIdentifier.value,
       };
+
+      // Add log_stream parameter for correlation navigation
+      // Priority: correlatedLogStream prop > query parameter
+      const logStreamToUse =
+        props.correlatedLogStream ||
+        (router.currentRoute.value.query.log_stream as string);
+      if (logStreamToUse) {
+        query.log_stream = logStreamToUse;
+      }
 
       const route = router.resolve({
         name: "traceDetails",
