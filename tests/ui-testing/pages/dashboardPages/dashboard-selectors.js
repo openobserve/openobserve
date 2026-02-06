@@ -203,7 +203,9 @@ function getPanelRefreshBtn(panelId) {
  * @returns {Object} Object with selector and filter pattern
  */
 function getMenuItemByText(text, exact = true) {
-  const pattern = exact ? new RegExp(`^${text}$`) : text;
+  // Escape regex metacharacters for safe text matching
+  const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = exact ? new RegExp(`^${escaped}$`) : new RegExp(escaped);
   return {
     selector: QUASAR.MENU_ITEM,
     filter: { hasText: pattern }
