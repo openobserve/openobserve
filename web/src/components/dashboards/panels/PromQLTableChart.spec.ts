@@ -74,8 +74,8 @@ const mockConfig = {
   wrap_table_cells: false,
   mappings: [],
   promql_table_mode: "single",
-  show_pagination: false,
-  rows_per_page: 10,
+  table_pagination: false,
+  table_pagination_rows_per_page: 10,
 };
 
 describe("PromQLTableChart", () => {
@@ -353,18 +353,18 @@ describe("PromQLTableChart", () => {
   });
 
   describe("Pagination Props to TableRenderer", () => {
-    it("should pass show_pagination to TableRenderer", () => {
+    it("should pass table_pagination to TableRenderer", () => {
       wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true },
+        config: { ...mockConfig, table_pagination: true },
       });
 
       const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
       expect(tableRenderer.props("showPagination")).toBe(true);
     });
 
-    it("should pass rows_per_page to TableRenderer", () => {
+    it("should pass table_pagination_rows_per_page to TableRenderer", () => {
       wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true, rows_per_page: 25 },
+        config: { ...mockConfig, table_pagination: true, table_pagination_rows_per_page: 25 },
       });
 
       const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
@@ -409,16 +409,16 @@ describe("PromQLTableChart", () => {
       expect(tableRenderer.props("wrapCells")).toBe(true);
     });
 
-    it("should update pagination when show_pagination changes", async () => {
+    it("should update pagination when table_pagination changes", async () => {
       wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: false },
+        config: { ...mockConfig, table_pagination: false },
       });
 
       let tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
       expect(tableRenderer.props("showPagination")).toBe(false);
 
       await wrapper.setProps({
-        config: { ...mockConfig, show_pagination: true },
+        config: { ...mockConfig, table_pagination: true },
       });
 
       tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
@@ -495,7 +495,7 @@ describe("PromQLTableChart", () => {
 
     it("should show pagination controls when pagination is enabled", async () => {
       wrapper = createWrapper({
-        config: { ...mockConfig, show_pagination: true, promql_table_mode: "single" },
+        config: { ...mockConfig, table_pagination: true, promql_table_mode: "single" },
       });
       await flushPromises();
 

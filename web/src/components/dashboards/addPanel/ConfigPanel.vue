@@ -315,8 +315,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-toggle
       v-if="dashboardPanelData.data.type == 'table'"
-      v-model="dashboardPanelData.data.config.show_pagination"
-      label="Pagination"
+      v-model="dashboardPanelData.data.config.table_pagination"
+      :label="t('dashboard.pagination')"
       data-test="dashboard-config-show-pagination"
       class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
       size="lg"
@@ -332,9 +332,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-input
       v-if="
         dashboardPanelData.data.type == 'table' &&
-        dashboardPanelData.data.config.show_pagination
+        dashboardPanelData.data.config.table_pagination
       "
-      v-model.number="dashboardPanelData.data.config.rows_per_page"
+      v-model.number="dashboardPanelData.data.config.table_pagination_rows_per_page"
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
-          Rows per page
+          {{ t('dashboard.rowsPerPage') }}
           <div>
             <q-icon
               class="q-ml-xs"
@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="bottom middle"
               max-width="250px"
             >
-              Set the default number of records to display per page
+              {{ t('dashboard.rowsPerPageTooltip') }}
             </q-tooltip>
           </div>
         </div>

@@ -1367,7 +1367,7 @@ describe("TableRenderer", () => {
       expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
     });
 
-    it("should expose setRowsPerPage function through bottom slot", () => {
+    it("should expose setrowsPerPage function through bottom slot", () => {
       wrapper = mount(TableRenderer, {
         props: {
           ...defaultProps,

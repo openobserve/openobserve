@@ -1926,7 +1926,7 @@ describe("ConfigPanel", () => {
       expect(paginationToggle.exists()).toBe(false);
     });
 
-    it("should initialize show_pagination as false by default", () => {
+    it("should initialize table_pagination as false by default", () => {
       const tableData = {
         ...mockDashboardPanelData,
         data: {
@@ -1934,14 +1934,14 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: false
+            table_pagination: false
           }
         }
       };
 
       wrapper = createWrapper({ dashboardPanelData: tableData });
 
-      expect(wrapper.vm.dashboardPanelData.data.config.show_pagination).toBe(false);
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination).toBe(false);
     });
 
     it("should toggle pagination value when clicked", async () => {
@@ -1952,7 +1952,7 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: false
+            table_pagination: false
           }
         }
       };
@@ -1960,10 +1960,10 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({ dashboardPanelData: tableData });
 
       // Set pagination to true
-      wrapper.vm.dashboardPanelData.data.config.show_pagination = true;
+      wrapper.vm.dashboardPanelData.data.config.table_pagination = true;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.dashboardPanelData.data.config.show_pagination).toBe(true);
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination).toBe(true);
     });
 
     it("should show rows per page input when pagination is enabled", () => {
@@ -1974,7 +1974,7 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: true
+            table_pagination: true
           }
         }
       };
@@ -1993,7 +1993,7 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: false
+            table_pagination: false
           }
         }
       };
@@ -2004,7 +2004,7 @@ describe("ConfigPanel", () => {
       expect(rowsPerPageInput.exists()).toBe(false);
     });
 
-    it("should update rows_per_page value when input changes", async () => {
+    it("should update table_pagination_rows_per_page value when input changes", async () => {
       const tableData = {
         ...mockDashboardPanelData,
         data: {
@@ -2012,8 +2012,8 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: true,
-            rows_per_page: 10
+            table_pagination: true,
+            table_pagination_rows_per_page: 10
           }
         }
       };
@@ -2023,7 +2023,7 @@ describe("ConfigPanel", () => {
       const rowsPerPageInput = wrapper.find('[data-test="dashboard-config-rows-per-page"]');
       if (rowsPerPageInput.exists()) {
         await rowsPerPageInput.setValue(25);
-        expect(wrapper.vm.dashboardPanelData.data.config.rows_per_page).toBe(25);
+        expect(wrapper.vm.dashboardPanelData.data.config.table_pagination_rows_per_page).toBe(25);
       }
     });
 
@@ -2035,7 +2035,7 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: true
+            table_pagination: true
           }
         }
       };
@@ -2054,19 +2054,19 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: true,
-            rows_per_page: 50
+            table_pagination: true,
+            table_pagination_rows_per_page: 50
           }
         }
       };
 
       wrapper = createWrapper({ dashboardPanelData: tableData });
 
-      expect(wrapper.vm.dashboardPanelData.data.config.show_pagination).toBe(true);
-      expect(wrapper.vm.dashboardPanelData.data.config.rows_per_page).toBe(50);
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination).toBe(true);
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination_rows_per_page).toBe(50);
     });
 
-    it("should handle rows_per_page as null when not set", () => {
+    it("should handle table_pagination_rows_per_page as null when not set", () => {
       const tableData = {
         ...mockDashboardPanelData,
         data: {
@@ -2074,15 +2074,15 @@ describe("ConfigPanel", () => {
           type: "table",
           config: {
             ...mockDashboardPanelData.data.config,
-            show_pagination: true,
-            rows_per_page: null
+            table_pagination: true,
+            table_pagination_rows_per_page: null
           }
         }
       };
 
       wrapper = createWrapper({ dashboardPanelData: tableData });
 
-      expect(wrapper.vm.dashboardPanelData.data.config.rows_per_page).toBeNull();
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination_rows_per_page).toBeNull();
     });
 
     it("should hide pagination toggle and rows per page for non-table chart types", () => {

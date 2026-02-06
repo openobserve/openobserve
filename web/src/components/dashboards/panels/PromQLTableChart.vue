@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="{ rows: filteredTableRows, columns: tableColumns }"
         :wrap-cells="config.wrap_table_cells"
         :value-mapping="config.mappings ?? []"
-        :show-pagination="config.show_pagination"
-        :rows-per-page="config.rows_per_page"
+        :show-pagination="config.table_pagination"
+        :rows-per-page="config.table_pagination_rows_per_page"
         @row-click="$emit('row-click', $event)"
       >
         <!-- Override bottom slot to add legend filter alongside native pagination -->
@@ -56,14 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <q-space />
             <TablePaginationControls
-              :show-pagination="config.show_pagination"
+              :show-pagination="config.table_pagination"
               :pagination="scope.pagination"
               :pagination-options="scope.paginationOptions"
               :total-rows="scope.totalRows"
               :pages-number="scope.pagesNumber"
               :is-first-page="scope.isFirstPage"
               :is-last-page="scope.isLastPage"
-              @update:rows-per-page="scope.setRowsPerPage"
+              @update:rows-per-page="scope.setrowsPerPage"
               @first-page="scope.firstPage"
               @prev-page="scope.prevPage"
               @next-page="scope.nextPage"

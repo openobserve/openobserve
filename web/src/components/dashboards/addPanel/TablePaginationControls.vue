@@ -99,7 +99,7 @@ export default defineComponent({
     },
     paginationOptions: {
       type: Array,
-      default: () => [10, 20, 50, 100, 0],
+      default: () => [10, 20, 50, 100, 250, 500, 1000],
     },
     totalRows: {
       type: Number,
