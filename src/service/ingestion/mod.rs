@@ -179,7 +179,7 @@ pub fn apply_vrl_fn(
                     ])
                     .inc();
                 // Log full error with record for debugging
-                log::warn!(
+                log::debug!(
                     "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
                 );
                 // Return only error message without sensitive record data
@@ -197,7 +197,7 @@ pub fn apply_vrl_fn(
                 ])
                 .inc();
             // Log full error with record for debugging
-            log::warn!(
+            log::debug!(
                 "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
             );
             // Return only error message without sensitive record data
