@@ -1213,6 +1213,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const vm = wrapper.vm as any;
       vm.activeTab = "logs";
       await nextTick();
+      await flushPromises(); // Wait for fetchCorrelatedStreams to complete
 
       // Check that CorrelatedLogsTable component is rendered
       const correlatedLogsTable = wrapper.findComponent({ name: "CorrelatedLogsTable" });
@@ -1257,6 +1258,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const vm = wrapper.vm as any;
       vm.activeTab = "logs";
       await nextTick();
+      await flushPromises(); // Wait for fetchCorrelatedStreams to complete
 
       const correlatedLogsTable = wrapper.findComponent({ name: "CorrelatedLogsTable" });
       expect(correlatedLogsTable.props("serviceName")).toBe("test-service");
@@ -1292,6 +1294,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const vm = wrapper.vm as any;
       vm.activeTab = "logs";
       await nextTick();
+      await flushPromises(); // Wait for fetchCorrelatedStreams to complete
 
       const correlatedLogsTable = wrapper.findComponent({ name: "CorrelatedLogsTable" });
       expect(correlatedLogsTable.props("hideDimensionFilters")).toBe(true);
@@ -1379,6 +1382,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const vm = wrapper.vm as any;
       vm.activeTab = "logs";
       await nextTick();
+      await flushPromises(); // Wait for fetchCorrelatedStreams to complete
 
       const correlatedLogsTable = wrapper.findComponent({ name: "CorrelatedLogsTable" });
       expect(correlatedLogsTable.props("matchedDimensions")).toEqual({
@@ -1421,6 +1425,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const vm = wrapper.vm as any;
       vm.activeTab = "logs";
       await nextTick();
+      await flushPromises(); // Wait for fetchCorrelatedStreams to complete
 
       // Check availableDimensions computed property
       expect(vm.availableDimensions).toEqual({
@@ -1454,6 +1459,11 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
+
+      // Switch to logs tab to trigger correlation data fetch
+      vm.activeTab = "logs";
+      await nextTick();
+      await flushPromises(); // Wait for fetchCorrelatedStreams to complete
 
       // Should fallback to matchedDimensions when no logStreams
       expect(vm.actualMatchedDimensions).toEqual({ service: "test-service" });
@@ -1656,15 +1666,18 @@ describe("IncidentDetailDrawer.vue", () => {
       );
 
       wrapper = await createWrapper({}, {}, "incident-1");
-      await nextTick();
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       vm.activeTab = "logs";
+      await nextTick();
+
+      // Manually set loading state
       vm.correlationLoading = true;
       await nextTick();
 
       // Check for centered loading container
-      const loadingContainer = wrapper.find('[class*="tw-items-center"][class*="tw-justify-center"][class*="tw-h-full"]');
+      const loadingContainer = wrapper.find('.tw-flex.tw-flex-col.tw-items-center.tw-justify-center');
       expect(loadingContainer.exists()).toBe(true);
     });
 
@@ -1674,14 +1687,17 @@ describe("IncidentDetailDrawer.vue", () => {
       });
 
       wrapper = await createWrapper({}, {}, "incident-1");
-      await nextTick();
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       vm.activeTab = "metrics";
+      await nextTick();
+
+      // Manually set loading state
       vm.correlationLoading = true;
       await nextTick();
 
-      const loadingContainer = wrapper.find('[class*="tw-items-center"][class*="tw-justify-center"][class*="tw-h-full"]');
+      const loadingContainer = wrapper.find('.tw-flex.tw-flex-col.tw-items-center.tw-justify-center');
       expect(loadingContainer.exists()).toBe(true);
     });
 
@@ -1691,14 +1707,17 @@ describe("IncidentDetailDrawer.vue", () => {
       });
 
       wrapper = await createWrapper({}, {}, "incident-1");
-      await nextTick();
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       vm.activeTab = "traces";
+      await nextTick();
+
+      // Manually set loading state
       vm.correlationLoading = true;
       await nextTick();
 
-      const loadingContainer = wrapper.find('[class*="tw-items-center"][class*="tw-justify-center"][class*="tw-h-full"]');
+      const loadingContainer = wrapper.find('.tw-flex.tw-flex-col.tw-items-center.tw-justify-center');
       expect(loadingContainer.exists()).toBe(true);
     });
   });
