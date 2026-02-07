@@ -23,23 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-bind="$attrs"
       :id="editorId"
     />
-    <!-- Streaming response preview card (shown while generating) -->
-    <Transition name="slide-up">
-      <div
-        v-if="isGenerating"
-        class="streaming-preview-card"
-        data-test="nl-streaming-preview"
-      >
-        <div class="streaming-preview-content">
-          <!-- Interactive loading with animated dots (text-only, no spinner) -->
-          <div class="tw:flex tw:items-center tw:justify-center">
-            <span class="generating-text">
-              {{ streamingResponse || 'Analyzing query' }}<span class="animated-dots"></span>
-            </span>
-          </div>
-        </div>
-      </div>
-    </Transition>
   </div>
 </template>
 
@@ -125,7 +108,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end"],
+  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end", "generation-success"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
@@ -375,9 +358,10 @@ export default defineComponent({
     /**
      * Handles Generate SQL button click
      * Calls AI to generate SQL and transforms editor content
+     * @param customText - Optional custom text to use instead of editor content
      */
-    const handleGenerateSQL = async () => {
-      const currentText = currentEditorText.value;
+    const handleGenerateSQL = async (customText?: string) => {
+      const currentText = customText || currentEditorText.value;
       if (!currentText.trim()) return;
 
       console.log('[NL2Q-UI] Starting SQL generation for:', currentText);
@@ -405,10 +389,35 @@ export default defineComponent({
           // Show error notification
           console.log('[NL2Q-UI] Showing error notification - query generation failed or empty');
           showErrorNotification(t('search.nlQueryGenerationFailed'));
-          return;
+          throw new Error('Query generation failed');
         }
 
-        // Transform: NL becomes comment, SQL appears below
+        // Check if this is a special action completion (dashboard/alert)
+        if (generatedSQL.startsWith('✓ DASHBOARD_CREATED:')) {
+          console.log('[NL2Q-UI] Dashboard created successfully');
+          const responseText = generatedSQL.replace('✓ DASHBOARD_CREATED:', '').trim();
+          emit("generation-success", { type: 'dashboard', message: responseText });
+          emit("nlpModeDetected", false); // Keep in NLP mode for next query
+          return; // Success without SQL
+        }
+
+        if (generatedSQL.startsWith('✓ ALERT_CREATED:')) {
+          console.log('[NL2Q-UI] Alert created successfully');
+          const responseText = generatedSQL.replace('✓ ALERT_CREATED:', '').trim();
+          emit("generation-success", { type: 'alert', message: responseText });
+          emit("nlpModeDetected", false); // Keep in NLP mode for next query
+          return; // Success without SQL
+        }
+
+        if (generatedSQL.startsWith('✓ ACTION_COMPLETED:')) {
+          console.log('[NL2Q-UI] Action completed successfully');
+          const responseText = generatedSQL.replace('✓ ACTION_COMPLETED:', '').trim();
+          emit("generation-success", { type: 'action', message: responseText });
+          emit("nlpModeDetected", false); // Keep in NLP mode for next query
+          return; // Success without SQL
+        }
+
+        // Normal SQL generation - transform and update editor
         const transformedText = transformToSQL(currentText, generatedSQL);
         console.log('[NL2Q-UI] Transformed text:', transformedText);
 
@@ -423,11 +432,15 @@ export default defineComponent({
         emit("nlpModeDetected", false);
         console.log('[NL2Q-UI] Emitted nlpModeDetected: false to turn off NLP mode');
 
+        // Emit SQL generation success
+        emit("generation-success", { type: 'sql', message: generatedSQL });
+
         console.log('[NL2Q-UI] SQL generation completed successfully');
 
       } catch (error) {
         console.error('[NL2Q-UI] Exception during SQL generation:', error);
         showErrorNotification(t('search.nlQueryGenerationFailed'));
+        throw error; // Re-throw so SearchBar can handle it
       }
     };
 
