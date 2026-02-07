@@ -48,6 +48,7 @@ use crate::{
 };
 
 pub mod dag;
+pub mod session;
 
 /// TracesIngest
 #[utoipa::path(

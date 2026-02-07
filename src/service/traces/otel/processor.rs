@@ -148,6 +148,10 @@ impl OtelIngestionProcessor {
             // recalculate input and output tokens if not present
             if let Some(v) = &input
                 && !usage.contains_key("input")
+                && matches!(
+                    obs_type,
+                    ObservationType::Generation | ObservationType::Embedding
+                )
             {
                 let prompt = v.to_string();
                 let model_name = model_name.as_ref().unwrap_or(&EMPTY_STRING);
@@ -156,6 +160,10 @@ impl OtelIngestionProcessor {
             }
             if let Some(v) = &output
                 && !usage.contains_key("output")
+                && matches!(
+                    obs_type,
+                    ObservationType::Generation | ObservationType::Embedding
+                )
             {
                 let output = v.to_string();
                 let model_name = model_name.as_ref().unwrap_or(&EMPTY_STRING);
@@ -180,7 +188,10 @@ impl OtelIngestionProcessor {
             // Calculate cost from tokens if cost is missing but we have model and usage
             if let Some(ref model_name) = model_name
                 && cost.is_empty()
-                && matches!(obs_type, ObservationType::Generation)
+                && matches!(
+                    obs_type,
+                    ObservationType::Generation | ObservationType::Embedding
+                )
             {
                 let input_tokens = usage.get("input").cloned().unwrap_or_default();
                 let output_tokens = usage.get("output").cloned().unwrap_or_default();
