@@ -692,14 +692,26 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             while let Some(chunk_result) = agent_stream.next().await {
                 match chunk_result {
                     Ok(bytes) => {
-                        yield Ok(bytes);
+                        yield Ok::<bytes::Bytes, std::io::Error>(bytes);
                     }
                     Err(e) => {
-                        yield Err(std::io::Error::other(e));
+                        log::error!(
+                            "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                             Agent stream chunk error: {e}"
+                        );
+                        let error_event = serde_json::json!({
+                            "type": "error",
+                            "error": format!("Stream interrupted: {}", e)
+                        });
+                        yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
                         break;
                     }
                 }
             }
+            log::info!(
+                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                 Agent stream ended"
+            );
         };
 
         axum::http::Response::builder()
