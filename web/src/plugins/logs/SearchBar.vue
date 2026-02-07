@@ -1318,6 +1318,33 @@ class="q-pr-sm q-pt-xs" />
               class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
               :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
             >
+              <!-- AI Input Bar (shown in NLP mode) -->
+              <div
+                v-if="searchObj.meta.nlpMode"
+                class="ai-input-bar tw:p-3"
+              >
+                <!-- Show streaming status with spinner -->
+                <div v-if="isGeneratingSQL" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
+                  <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+                  <q-spinner-dots color="primary" size="1.2em" />
+                  <span class="tw:text-sm">{{ aiInputText || 'Analyzing query...' }}</span>
+                </div>
+                <!-- Normal input when not generating -->
+                <q-input
+                  v-else
+                  v-model="aiInputText"
+                  dense
+                  borderless
+                  :placeholder="t('search.askAIPlaceholder')"
+                  class="ai-input-field"
+                  data-test="ai-input-field"
+                  @focus="handleAIBarFocus"
+                >
+                  <template v-slot:prepend>
+                    <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+                  </template>
+                </q-input>
+              </div>
               <code-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
                 data-test="logs-search-bar-query-editor"
@@ -1349,6 +1376,7 @@ class="q-pr-sm q-pt-xs" />
                 @nlpModeDetected="handleNlpModeDetected"
                 @generation-start="handleGenerationStart"
                 @generation-end="handleGenerationEnd"
+                @generation-success="handleGenerationSuccess"
               />
               <!-- Mode Toggle for Build Mode -->
               <div
@@ -2280,6 +2308,10 @@ export default defineComponent({
     // Use a local ref that will be updated via events from CodeQueryEditor
     const isGeneratingSQL = ref(false);
 
+    // AI Input Bar text (independent from editor)
+    const aiInputText = ref('');
+    const originalAiInputText = ref(''); // Store original text for failure restoration
+
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
 
@@ -2374,6 +2406,17 @@ export default defineComponent({
         if (funs.length) updateFunctionKeywords(funs);
       },
       { immediate: true, deep: true },
+    );
+
+    // Watch streaming response from CodeQueryEditor and show in AI Bar
+    watch(
+      () => queryEditorRef.value?.streamingResponse,
+      (newStreamingResponse) => {
+        if (newStreamingResponse && searchObj.meta.nlpMode) {
+          // Show streaming status in AI Bar during generation
+          aiInputText.value = newStreamingResponse;
+        }
+      }
     );
 
     // Watch SQL mode toggle - turn off NLP mode when SQL mode is enabled
@@ -4247,14 +4290,67 @@ export default defineComponent({
     };
 
     /**
-     * Handle Generate SQL Query when in NLP mode
-     * Calls the handleGenerateSQL method from CodeQueryEditor
+     * Handle generation success with response type
      */
-    const handleGenerateSQLQuery = () => {
-      // Call the exposed handleGenerateSQL method from query editor
+    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[SearchBar] Generation success:', payload.type);
+
+      if (payload.type === 'dashboard') {
+        aiInputText.value = '✓ Dashboard created successfully!';
+      } else if (payload.type === 'alert') {
+        aiInputText.value = '✓ Alert created successfully!';
+      } else if (payload.type === 'action') {
+        aiInputText.value = '✓ Action completed successfully!';
+      } else if (payload.type === 'sql') {
+        aiInputText.value = t('search.aiBarSuccessPlaceholder');
+      }
+    };
+
+    /**
+     * Handle Generate SQL Query when in NLP mode
+     * Combines AI bar text + editor text, then calls CodeQueryEditor generation
+     */
+    const handleGenerateSQLQuery = async () => {
       const queryEditor = queryEditorRef.value;
-      if (queryEditor && typeof queryEditor.handleGenerateSQL === 'function') {
-        queryEditor.handleGenerateSQL();
+      if (!queryEditor || typeof queryEditor.handleGenerateSQL !== 'function') {
+        return;
+      }
+
+      // Save original AI Bar text for failure restoration
+      originalAiInputText.value = aiInputText.value;
+
+      // Combine AI bar text (first) + editor text (second)
+      const aiBarText = aiInputText.value.trim();
+      const editorText = (searchObj.data.editorValue || '').trim();
+
+      let combinedText = '';
+      if (aiBarText && editorText) {
+        // Both have content: AI bar first, then editor
+        combinedText = `${aiBarText}\n${editorText}`;
+      } else if (aiBarText) {
+        // Only AI bar has content
+        combinedText = aiBarText;
+      } else {
+        // Only editor has content (or both empty)
+        combinedText = editorText;
+      }
+
+      // Call generation with combined text (without updating editor)
+      try {
+        await queryEditor.handleGenerateSQL(combinedText || undefined);
+        // Success is handled by handleGenerationSuccess event
+      } catch (error) {
+        // On failure: Restore original text
+        aiInputText.value = originalAiInputText.value;
+      }
+    };
+
+    /**
+     * Handle AI Bar focus - clear placeholder text if it's the success message
+     */
+    const handleAIBarFocus = () => {
+      if (aiInputText.value === t('search.aiBarSuccessPlaceholder')) {
+        aiInputText.value = '';
       }
     };
 
@@ -4889,7 +4985,10 @@ ${query}
       handleNlpModeDetected,
       handleGenerationStart,
       handleGenerationEnd,
+      handleGenerationSuccess,
       handleGenerateSQLQuery,
+      handleAIBarFocus,
+      aiInputText,
       hasSQLInNLPMode,
       handleAddToDashboard,
       handleCreateAlert,
@@ -5235,6 +5334,58 @@ ${query}
 
 .toolbar-icon-in-toggle {
   font-size: 0.9rem; // ~14.4px
+}
+
+// AI Input Bar styling
+.ai-input-bar {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-bottom: 1px solid var(--o2-border-color);
+
+  .ai-input-field {
+    :deep(.q-field__control) {
+      background: white;
+      border-radius: 8px;
+      padding: 4px 8px;
+    }
+
+    // Remove focus border
+    :deep(.q-field__control::before),
+    :deep(.q-field__control::after) {
+      border: none !important;
+    }
+
+    :deep(.q-field__prepend) {
+      padding-right: 8px;
+    }
+  }
+
+  // Streaming status display (matches O2 AI assistant style)
+  .ai-bar-streaming {
+    background: white;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--q-primary);
+
+    span {
+      color: #666;
+    }
+  }
+}
+
+.q-dark .ai-input-bar {
+  .ai-input-field {
+    :deep(.q-field__control) {
+      background: var(--q-dark);
+    }
+  }
+
+  .ai-bar-streaming {
+    background: var(--q-dark);
+
+    span {
+      color: #ccc;
+    }
+  }
 }
 
 .syntax-guide-in-menu {
