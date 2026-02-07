@@ -204,17 +204,57 @@ export class WaitHelpers {
    */
   async waitForElementHidden(selector, options = {}) {
     const { timeout = 30000, description = 'element to be hidden' } = options;
-    
+
     testLogger.wait('Element Hidden', description, { selector: selector.toString?.() || selector });
-    
+
     try {
       const locator = typeof selector === 'string' ? this.page.locator(selector) : selector;
       await locator.waitFor({ state: 'hidden', timeout });
-      
+
       testLogger.debug(`Element hidden: ${description}`);
     } catch (error) {
       testLogger.error(`Element still visible: ${description}`, { error: error.message });
       throw error;
+    }
+  }
+
+  /**
+   * Safely wait for element to be hidden (won't fail test if timeout)
+   * Use this for optional UI cleanup waits where failure is acceptable
+   * @param {string|Locator} selector - CSS selector or Playwright locator
+   * @param {Object} options - Wait options
+   * @returns {boolean} - true if element became hidden, false if timeout
+   */
+  async safeWaitForHidden(selector, options = {}) {
+    const { timeout = 5000, description = 'element to hide' } = options;
+
+    try {
+      const locator = typeof selector === 'string' ? this.page.locator(selector) : selector;
+      await locator.waitFor({ state: 'hidden', timeout });
+      testLogger.debug(`[Safe] Element hidden: ${description}`);
+      return true;
+    } catch {
+      testLogger.debug(`[Safe] Element hide timeout (acceptable): ${description}`);
+      return false;
+    }
+  }
+
+  /**
+   * Safely wait for network to be idle (won't fail test if timeout)
+   * Use this for optional network settling where failure is acceptable
+   * @param {Object} options - Wait options
+   * @returns {boolean} - true if network became idle, false if timeout
+   */
+  async safeWaitForNetworkIdle(options = {}) {
+    const { timeout = 3000, description = 'network idle' } = options;
+
+    try {
+      await this.page.waitForLoadState('networkidle', { timeout });
+      testLogger.debug(`[Safe] Network idle: ${description}`);
+      return true;
+    } catch {
+      testLogger.debug(`[Safe] Network idle timeout (acceptable): ${description}`);
+      return false;
     }
   }
 
@@ -329,7 +369,64 @@ const waitUtils = {
   }
 };
 
+/**
+ * Standalone safe wait functions (for easy import without class instantiation)
+ * These replace the anti-pattern: .catch(() => {})
+ */
+
+/**
+ * Safely wait for element to be hidden
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - CSS selector
+ * @param {Object} options - Wait options
+ * @returns {Promise<boolean>}
+ */
+async function safeWaitForHidden(page, selector, options = {}) {
+  const { timeout = 5000 } = options;
+  try {
+    await page.locator(selector).waitFor({ state: 'hidden', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safely wait for network to be idle
+ * @param {import('@playwright/test').Page} page
+ * @param {Object} options - Wait options
+ * @returns {Promise<boolean>}
+ */
+async function safeWaitForNetworkIdle(page, options = {}) {
+  const { timeout = 3000 } = options;
+  try {
+    await page.waitForLoadState('networkidle', { timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safely wait for DOM content to be loaded
+ * @param {import('@playwright/test').Page} page
+ * @param {Object} options - Wait options
+ * @returns {Promise<boolean>}
+ */
+async function safeWaitForDOMContentLoaded(page, options = {}) {
+  const { timeout = 5000 } = options;
+  try {
+    await page.waitForLoadState('domcontentloaded', { timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   WaitHelpers,
-  waitUtils
+  waitUtils,
+  safeWaitForHidden,
+  safeWaitForNetworkIdle,
+  safeWaitForDOMContentLoaded
 };

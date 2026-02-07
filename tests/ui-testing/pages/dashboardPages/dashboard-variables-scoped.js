@@ -4,11 +4,355 @@
 
 import { expect } from "@playwright/test";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import {
+  SELECTORS,
+  getVariableSelector,
+  getVariableSelectorInner,
+  getEditVariableBtn,
+  getVariableLoadingIndicator,
+  getPanelRefreshBtn,
+  getMenuItemByText,
+} from "./dashboard-selectors.js";
 
 export default class DashboardVariablesScoped {
   constructor(page) {
     this.page = page;
   }
+
+  // ==========================================
+  // Common UI Helper Methods
+  // These replace raw selectors in spec files
+  // ==========================================
+
+  /**
+   * Wait for dialog to be visible
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForDialogVisible(options = {}) {
+    const { timeout = 5000 } = options;
+    const dialog = this.page.locator(SELECTORS.DIALOG);
+    await dialog.waitFor({ state: "visible", timeout });
+    return dialog;
+  }
+
+  /**
+   * Wait for dialog to be hidden
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   * @returns {Promise<boolean>}
+   */
+  async waitForDialogHidden(options = {}) {
+    const { timeout = 10000 } = options;
+    try {
+      await this.page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Wait for dropdown menu to be visible
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForMenuVisible(options = {}) {
+    const { timeout = 5000 } = options;
+    const menu = this.page.locator(SELECTORS.MENU);
+    await menu.waitFor({ state: "visible", timeout });
+    return menu;
+  }
+
+  /**
+   * Wait for dropdown menu to be hidden
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   * @returns {Promise<boolean>}
+   */
+  async waitForMenuHidden(options = {}) {
+    const { timeout = 5000 } = options;
+    try {
+      await this.page.locator(SELECTORS.MENU).waitFor({ state: "hidden", timeout });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Change a variable's selected value by clicking the dropdown and selecting an option
+   * @param {string} variableName - Variable name/label
+   * @param {Object} options - Options
+   * @param {number} options.optionIndex - Index of option to select (default: 1 for second option)
+   * @param {boolean} options.monitorApi - Whether to monitor API calls (default: false)
+   * @param {number} options.expectedApiCalls - Expected API call count when monitoring (default: 1)
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   * @param {boolean} options.returnSelectedValue - Whether to return the selected value text (default: false)
+   * @returns {Promise<Object>} Result object with apiResult and/or selectedValue
+   */
+  async changeVariableValue(variableName, options = {}) {
+    const {
+      optionIndex = 1,
+      monitorApi = false,
+      expectedApiCalls = 1,
+      timeout = 5000,
+      returnSelectedValue = false
+    } = options;
+
+    let apiMonitor;
+    if (monitorApi) {
+      const { monitorVariableAPICalls } = await import("../../playwright-tests/utils/variable-helpers.js");
+      apiMonitor = monitorVariableAPICalls(this.page, { expectedCount: expectedApiCalls, timeout: 15000 });
+    }
+
+    // Wait for variable dropdown to be visible and ready
+    const varDropdown = this.page.getByLabel(variableName, { exact: true });
+    await varDropdown.waitFor({ state: "visible", timeout });
+
+    // Ensure network is idle before clicking
+    try {
+      await this.page.waitForLoadState('networkidle', { timeout: 3000 });
+    } catch { /* acceptable if timeout */ }
+
+    await varDropdown.click();
+
+    // Wait for dropdown menu to open
+    await this.page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout });
+
+    // Wait for options to populate with retry logic
+    const targetOption = this.page.locator(SELECTORS.OPTION).nth(optionIndex);
+    const optionTimeout = Math.max(timeout, 15000); // At least 15s for options under load
+
+    // Retry mechanism: if option not visible, reopen dropdown
+    try {
+      await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
+    } catch (e) {
+      // Option not visible - may need to wait for data to load
+      // Close and reopen dropdown to trigger fresh load
+      await this.page.keyboard.press('Escape');
+      await this.waitForMenuHidden({ timeout: 3000 });
+      await this.page.waitForTimeout(500); // Brief pause
+      await varDropdown.click();
+      await this.page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout });
+      await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
+    }
+
+    // Capture selected value text if needed
+    let selectedValue = null;
+    if (returnSelectedValue) {
+      selectedValue = await targetOption.textContent();
+      selectedValue = selectedValue?.trim() || null;
+    }
+
+    // Click the specified option
+    await targetOption.click();
+
+    // Wait for dropdown to close
+    await this.waitForMenuHidden({ timeout: 3000 });
+
+    // Build result object
+    const result = {};
+    if (selectedValue !== null) {
+      result.selectedValue = selectedValue;
+    }
+    if (apiMonitor) {
+      result.apiResult = await apiMonitor;
+    }
+
+    // Return result if we have anything to return
+    if (Object.keys(result).length > 0) {
+      return result;
+    }
+  }
+
+  /**
+   * Select a menu item by text
+   * @param {string} text - Item text to select
+   * @param {Object} options - Options
+   * @param {boolean} options.exact - Use exact match (default: true)
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   */
+  async selectMenuItem(text, options = {}) {
+    const { exact = true, timeout = 5000 } = options;
+    // Use Playwright's getByText for safe text matching (avoids regex metacharacter issues)
+    const item = this.page.locator(SELECTORS.MENU_ITEM).getByText(text, { exact });
+    await item.waitFor({ state: "visible", timeout });
+    await item.click();
+  }
+
+  /**
+   * Wait for variable selector to be visible on dashboard
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 20000)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForVariableSelectorVisible(variableName, options = {}) {
+    const { timeout = 20000 } = options;
+    const selector = this.page.locator(getVariableSelector(variableName));
+
+    // Retry pattern for variable visibility under load
+    const startTime = Date.now();
+    let lastError;
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        // Wait for network to settle before checking for variable
+        await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        await selector.waitFor({ state: "visible", timeout: 5000 });
+        return selector;
+      } catch (e) {
+        lastError = e;
+        // Wait briefly and retry
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Final attempt with remaining timeout
+    const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 5000);
+    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await selector.waitFor({ state: "visible", timeout: remainingTimeout });
+    return selector;
+  }
+
+  /**
+   * Wait for edit variable button to be visible in settings
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForEditVariableBtnVisible(variableName, options = {}) {
+    const { timeout = 10000 } = options;
+    const btn = this.page.locator(getEditVariableBtn(variableName));
+    await btn.waitFor({ state: "visible", timeout });
+    return btn;
+  }
+
+  /**
+   * Click edit variable button
+   * @param {string} variableName - Variable name
+   */
+  async clickEditVariable(variableName) {
+    const btn = await this.waitForEditVariableBtnVisible(variableName);
+    await btn.click();
+  }
+
+  /**
+   * Wait for dashboard to be ready (settings button visible)
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   */
+  async waitForDashboardReady(options = {}) {
+    const { timeout = 10000 } = options;
+    await this.page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Wait for add panel button (empty dashboard state)
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   */
+  async waitForAddPanelBtn(options = {}) {
+    const { timeout = 10000 } = options;
+    await this.page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Click dashboard refresh button
+   */
+  async clickDashboardRefresh() {
+    await this.page.locator(SELECTORS.REFRESH_BTN).click();
+  }
+
+  /**
+   * Wait for dashboard search to be visible
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   */
+  async waitForDashboardSearch(options = {}) {
+    const { timeout = 10000 } = options;
+    await this.page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Get variable dropdown inner element
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableDropdown(variableName) {
+    return this.page.locator(getVariableSelectorInner(variableName));
+  }
+
+  /**
+   * Get variable loading indicator
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableLoadingIndicator(variableName) {
+    return this.page.locator(getVariableLoadingIndicator(variableName));
+  }
+
+  /**
+   * Get first panel container
+   * @returns {import('@playwright/test').Locator}
+   */
+  getFirstPanelContainer() {
+    return this.page.locator(SELECTORS.PANEL_CONTAINER).first();
+  }
+
+  /**
+   * Get panel container by index
+   * @param {number} index - Panel index (0-based)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelContainer(index) {
+    return this.page.locator(SELECTORS.PANEL_CONTAINER).nth(index);
+  }
+
+  /**
+   * Get panel refresh button by panel ID
+   * @param {string} panelId - Panel ID
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelRefreshBtn(panelId) {
+    return this.page.locator(getPanelRefreshBtn(panelId));
+  }
+
+  /**
+   * Check if dialog is visible
+   * @returns {Promise<boolean>}
+   */
+  async isDialogVisible() {
+    try {
+      return await this.page.locator(SELECTORS.DIALOG).isVisible();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get all checked checkboxes count
+   * @returns {Promise<number>}
+   */
+  async getCheckedCheckboxesCount() {
+    return await this.page.locator(SELECTORS.CHECKBOX_CHECKED).count();
+  }
+
+  /**
+   * Click time range 6h button
+   */
+  async selectTimeRange6Hours() {
+    await this.page.locator(SELECTORS.DATE_TIME_BTN).click();
+    await this.page.locator(SELECTORS.DATE_TIME_RELATIVE_6H).click();
+  }
+
+  // ==========================================
+  // End Common UI Helper Methods
+  // ==========================================
 
   /**
    * Add a dashboard variable with scope support (Global/Tab/Panel)
@@ -243,18 +587,27 @@ export default class DashboardVariablesScoped {
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
     await saveBtn.click();
 
-    // Wait for save operation to complete by checking if either:
-    // 1. The add variable button becomes visible (stayed in settings)
-    // 2. The settings dialog closes (auto-redirect to dashboard)
-    // 3. We're back on the dashboard page
-    await Promise.race([
-      // Option 1: Variable list appears (dialog stayed open)
-      this.page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 5000 }),
-      // Option 2: Dialog closes (use multiple selectors for robustness)
-      this.page.locator('[data-test="dashboard-settings-dialog"]').or(this.page.locator('.q-dialog')).waitFor({ state: "hidden", timeout: 5000 }).catch(() => {}),
-      // Option 3: Dashboard elements become visible (fallback)
-      this.page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 5000 }).catch(() => {})
-    ]);
+    // Wait for network to settle after save (ensures API call completes)
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Wait for save operation to complete by checking one of these conditions:
+    // 1. The add variable button becomes visible (stayed in settings with variable list)
+    // 2. The edit button for this variable appears (confirms save success)
+    const addVariableBtn = this.page.locator('[data-test="dashboard-add-variable-btn"]');
+    const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
+
+    // Try to wait for success indicator
+    try {
+      await Promise.race([
+        addVariableBtn.waitFor({ state: "visible", timeout: 8000 }),
+        editBtn.waitFor({ state: "visible", timeout: 8000 })
+      ]);
+    } catch (e) {
+      // If neither indicator appears, try network idle as fallback
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      // Brief wait for DOM updates
+      await this.page.waitForTimeout(500);
+    }
   }
 
   /**
@@ -303,7 +656,7 @@ export default class DashboardVariablesScoped {
     await filterNameSelector.click();
     await filterNameSelector.fill(filterFieldName);
 
-    const filterNameOption = this.page.getByRole("option", { name: filterFieldName });
+    const filterNameOption = this.page.getByRole("option", { name: filterFieldName, exact: true });
     await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
     await filterNameOption.click();
 

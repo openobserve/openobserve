@@ -1,8 +1,8 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
-
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+const testLogger = require("../utils/test-logger.js");
 const dashboardName = `Dashboard_${Date.now()}`;
 
 test.describe.configure({ mode: "parallel" });
