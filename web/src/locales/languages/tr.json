@@ -328,7 +328,9 @@
     "generating": "Oluşturuluyor...",
     "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
     "nlQueryGenerationSuccess": "Sorgu başarıyla oluşturuldu!",
-    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz"
+    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz",
+    "askAIPlaceholder": "Yapay zekadan sorgunuzla ilgili yardım isteyin...",
+    "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?"
   },
   "menu": {
     "home": "Ana Sayfa",

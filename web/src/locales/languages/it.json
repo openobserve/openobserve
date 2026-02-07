@@ -328,7 +328,9 @@
     "generating": "Generazione...",
     "nlQueryGenerationFailed": "Generazione della query non riuscita. Per favore riprova.",
     "nlQueryGenerationSuccess": "Query generata con successo!",
-    "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream"
+    "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream",
+    "askAIPlaceholder": "Chiedi all'IA di aiutarti con la tua domanda...",
+    "aiBarSuccessPlaceholder": "Cosa vorresti fare dopo?"
   },
   "menu": {
     "home": "Home",
