@@ -23,24 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-bind="$attrs"
       :id="editorId"
     />
-    <!-- AI Icon Button -->
-    <q-btn
-      v-if="showAiIcon && !disableAi"
-      round
-      flat
-      size="sm"
-      class="ai-icon-button"
-      :class="nlpMode ? 'ai-icon-active' : ''"
-      @click="toggleNlpMode"
-      data-test="query-editor-ai-icon-btn"
-    >
-      <q-icon size="20px">
-        <img :src="aiIcon" alt="AI" class="ai-icon-img" />
-      </q-icon>
-      <q-tooltip>
-        {{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}
-      </q-tooltip>
-    </q-btn>
   </div>
 </template>
 
@@ -77,7 +59,6 @@ import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
-import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   inheritAttrs: false,
@@ -126,20 +107,8 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    showAiIcon: {
-      type: Boolean,
-      default: false,
-    },
-    disableAi: {
-      type: Boolean,
-      default: false,
-    },
-    disableAiReason: {
-      type: String,
-      default: '',
-    },
   },
-  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end", "generation-success", "toggle-nlp-mode"],
+  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end", "generation-success"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
@@ -363,11 +332,10 @@ export default defineComponent({
      */
     const checkForNaturalLanguage = debounce((text: string) => {
       currentEditorText.value = text;
-      const isNL = detectNaturalLanguage(text, props.language);
+      const isNL = detectNaturalLanguage(text);
 
       console.log('[NL2Q-Detection]', {
         text: text.substring(0, 50),
-        language: props.language,
         isNaturalLanguage: isNL,
         currentNlpMode: props.nlpMode
       });
@@ -379,7 +347,7 @@ export default defineComponent({
           console.log('[NL2Q-Detection] Natural language detected, emitting nlpModeDetected: true');
           emit("nlpModeDetected", true);
         } else {
-          console.log('[NL2Q-Detection] Query syntax detected, emitting nlpModeDetected: false');
+          console.log('[NL2Q-Detection] SQL detected, emitting nlpModeDetected: false');
           emit("nlpModeDetected", false);
         }
       } else {
@@ -389,45 +357,26 @@ export default defineComponent({
 
     /**
      * Handles Generate SQL button click
-     * Calls AI to generate query based on current language (SQL, PromQL, VRL, JavaScript)
+     * Calls AI to generate SQL and transforms editor content
      * @param customText - Optional custom text to use instead of editor content
      */
-    const handleGenerateSQL = async (customText?: string, abortSignal?: AbortSignal, sessionId?: string) => {
+    const handleGenerateSQL = async (customText?: string) => {
       const currentText = customText || currentEditorText.value;
       if (!currentText.trim()) return;
 
-      const currentLanguage = props.language?.toLowerCase() || 'sql';
-      console.log('[NL2Q-UI] Starting query generation for language:', currentLanguage, 'text:', currentText);
+      console.log('[NL2Q-UI] Starting SQL generation for:', currentText);
 
       try {
         // Get organization ID from store
         const orgId = store.state.selectedOrganization?.identifier || 'default';
         console.log('[NL2Q-UI] Organization ID:', orgId);
 
-        // Create language-appropriate prompt
-        let promptPrefix = '';
-        switch (currentLanguage) {
-          case 'promql':
-            promptPrefix = 'Generate PromQL query';
-            break;
-          case 'vrl':
-            promptPrefix = 'Generate VRL function';
-            break;
-          case 'javascript':
-            promptPrefix = 'Generate JavaScript function';
-            break;
-          case 'sql':
-          default:
-            promptPrefix = 'Generate SQL query';
-            break;
-        }
+        // Prefix the natural language text with instruction for AI
+        const prompt = `Generate SQL query : ${currentText}`;
 
-        const prompt = `${promptPrefix} : ${currentText}`;
-        console.log('[NL2Q-UI] Generated prompt:', prompt);
-
-        // Generate query from natural language
+        // Generate SQL from natural language
         console.log('[NL2Q-UI] Calling generateSQL...');
-        const generatedSQL = await generateSQL(prompt, orgId, abortSignal, sessionId);
+        const generatedSQL = await generateSQL(prompt, orgId);
         console.log('[NL2Q-UI] generateSQL returned:', {
           value: generatedSQL,
           type: typeof generatedSQL,
@@ -448,7 +397,7 @@ export default defineComponent({
           console.log('[NL2Q-UI] Dashboard created successfully');
           const responseText = generatedSQL.replace('✓ DASHBOARD_CREATED:', '').trim();
           emit("generation-success", { type: 'dashboard', message: responseText });
-          // Don't emit nlpModeDetected - keep user in current mode
+          emit("nlpModeDetected", false); // Keep in NLP mode for next query
           return; // Success without SQL
         }
 
@@ -456,7 +405,7 @@ export default defineComponent({
           console.log('[NL2Q-UI] Alert created successfully');
           const responseText = generatedSQL.replace('✓ ALERT_CREATED:', '').trim();
           emit("generation-success", { type: 'alert', message: responseText });
-          // Don't emit nlpModeDetected - keep user in current mode
+          emit("nlpModeDetected", false); // Keep in NLP mode for next query
           return; // Success without SQL
         }
 
@@ -464,12 +413,12 @@ export default defineComponent({
           console.log('[NL2Q-UI] Action completed successfully');
           const responseText = generatedSQL.replace('✓ ACTION_COMPLETED:', '').trim();
           emit("generation-success", { type: 'action', message: responseText });
-          // Don't emit nlpModeDetected - keep user in current mode
+          emit("nlpModeDetected", false); // Keep in NLP mode for next query
           return; // Success without SQL
         }
 
-        // Normal query generation - transform and update editor with language-specific comments
-        const transformedText = transformToSQL(currentText, generatedSQL, props.language);
+        // Normal SQL generation - transform and update editor
+        const transformedText = transformToSQL(currentText, generatedSQL);
         console.log('[NL2Q-UI] Transformed text:', transformedText);
 
         // Update editor value
@@ -631,12 +580,8 @@ export default defineComponent({
 
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
-          const newValue = editorObj.getValue()?.trim();
-          emit("update-query", newValue, e);
-          emit("update:query", newValue, e);
-
-          // Check for natural language after user stops typing (debounced)
-          checkForNaturalLanguage(newValue);
+          emit("update-query", editorObj.getValue()?.trim(), e);
+          emit("update:query", editorObj.getValue()?.trim(), e);
         }, props.debounceTime),
       );
 
@@ -995,18 +940,6 @@ export default defineComponent({
       }
     });
 
-    // Computed property for AI icon based on theme
-    const aiIcon = computed(() => {
-      return store.state.theme === "dark"
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg");
-    });
-
-    // Toggle NLP mode
-    const toggleNlpMode = () => {
-      emit('toggle-nlp-mode');
-    };
-
     return {
       editorRef,
       editorObj,
@@ -1025,8 +958,6 @@ export default defineComponent({
       handleGenerateSQL,
       streamingResponse,
       t,
-      aiIcon,
-      toggleNlpMode,
     };
   },
 });
@@ -1043,58 +974,6 @@ export default defineComponent({
   position: relative;
   width: 100%;
   height: 100%;
-}
-.monaco-editor,
-.monaco-diff-editor .synthetic-focus,
-.monaco-editor,
-.monaco-diff-editor [tabindex="0"]:focus,
-.monaco-editor,
-.monaco-diff-editor [tabindex="-1"]:focus,
-.monaco-editor,
-.monaco-diff-editor button:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="button"]:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="checkbox"]:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="search"]:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="text"]:focus,
-.monaco-editor,
-.monaco-diff-editor select:focus,
-.monaco-editor,
-.monaco-diff-editor textarea:focus {
-  outline-width: 0px;
-}
-
-/* AI Icon Button Styling */
-.ai-icon-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
-  background-color: var(--o2-bg-primary);
-  border: 1px solid var(--o2-border-color);
-  transition: all 0.2s ease;
-}
-
-.ai-icon-button:hover {
-  background-color: var(--o2-hover-accent);
-  border-color: var(--o2-color-primary);
-}
-
-.ai-icon-button.ai-icon-active {
-  background-color: var(--o2-color-primary-light);
-  border-color: var(--o2-color-primary);
-}
-
-.ai-icon-img {
-  width: 18px;
-  height: 18px;
-}
-
-.q-dark .ai-icon-img {
-  filter: brightness(1.2);
 }
 .monaco-editor,
 .monaco-diff-editor .synthetic-focus,
