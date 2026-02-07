@@ -877,6 +877,40 @@ pub async fn list_organizations_from_cache() -> Vec<String> {
     names.into_iter().collect::<Vec<String>>()
 }
 
+/// Get stream count for an org+type, cached to avoid per-file schema cache scans.
+///
+/// Stream counts are mostly stagnant (streams rarely added/removed), so we cache
+/// aggressively with a 5-minute TTL. This avoids the cost of iterating all schema
+/// keys on every file processed during service discovery.
+pub async fn get_stream_count_cached(org_id: &str, stream_type: StreamType) -> u64 {
+    use std::{
+        collections::HashMap as StdHashMap,
+        sync::{LazyLock, RwLock},
+        time::Instant,
+    };
+
+    static CACHE: LazyLock<RwLock<StdHashMap<String, (u64, Instant)>>> =
+        LazyLock::new(|| RwLock::new(StdHashMap::new()));
+
+    const TTL_SECS: u64 = 300; // 5 minutes
+
+    let key = format!("{org_id}/{stream_type}");
+
+    if let Ok(cache) = CACHE.read() {
+        if let Some((count, ts)) = cache.get(&key) {
+            if ts.elapsed().as_secs() < TTL_SECS {
+                return *count;
+            }
+        }
+    }
+
+    let count = list_streams_from_cache(org_id, stream_type).await.len() as u64;
+    if let Ok(mut cache) = CACHE.write() {
+        cache.insert(key, (count, Instant::now()));
+    }
+    count
+}
+
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
     let r = STREAM_SCHEMAS_LATEST.read().await;
