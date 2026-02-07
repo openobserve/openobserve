@@ -328,7 +328,9 @@
     "generating": "생성 중...",
     "nlQueryGenerationFailed": "쿼리를 생성하지 못했습니다.다시 시도해 주세요.",
     "nlQueryGenerationSuccess": "쿼리가 성공적으로 생성되었습니다!",
-    "nlpModeDisabledForVisualization": "다중 스트림으로 시각화하는 동안에는 자연어 모드를 비활성화할 수 없습니다."
+    "nlpModeDisabledForVisualization": "다중 스트림으로 시각화하는 동안에는 자연어 모드를 비활성화할 수 없습니다.",
+    "askAIPlaceholder": "AI에게 문의에 도움을 요청하세요...",
+    "aiBarSuccessPlaceholder": "다음에는 무엇을 하고 싶으세요?"
   },
   "menu": {
     "home": "홈",

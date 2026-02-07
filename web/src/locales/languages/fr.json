@@ -328,7 +328,9 @@
     "generating": "Génération de...",
     "nlQueryGenerationFailed": "Impossible de générer la requête. Veuillez réessayer.",
     "nlQueryGenerationSuccess": "Requête générée avec succès !",
-    "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux"
+    "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux",
+    "askAIPlaceholder": "Demandez à AI de l'aide pour répondre à votre requête...",
+    "aiBarSuccessPlaceholder": "Qu'aimerais-tu faire ensuite ?"
   },
   "menu": {
     "home": "Accueil",
