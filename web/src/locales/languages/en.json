@@ -236,6 +236,8 @@
     "generating": "Generating...",
     "nlQueryGenerationFailed": "Failed to generate query. Please try again.",
     "nlQueryGenerationSuccess": "Query generated successfully!",
+    "askAIPlaceholder": "Ask AI to help with your query...",
+    "aiBarSuccessPlaceholder": "What would you like to do next?",
     "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema is extremely high. Please choose the required fields carefully.",
     "regionFilterMsg": "Search Region/Cluster",
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
