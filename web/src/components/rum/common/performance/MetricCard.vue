@@ -111,7 +111,7 @@ const formattedValue = computed(() => {
 
   // Format numbers with commas
   if (typeof props.value === "number") {
-    return props.value.toLocaleString();
+    return props.value.toLocaleString("en-US");
   }
 
   return String(props.value);
