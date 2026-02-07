@@ -896,12 +896,11 @@ pub async fn get_stream_count_cached(org_id: &str, stream_type: StreamType) -> u
 
     let key = format!("{org_id}/{stream_type}");
 
-    if let Ok(cache) = CACHE.read() {
-        if let Some((count, ts)) = cache.get(&key) {
-            if ts.elapsed().as_secs() < TTL_SECS {
-                return *count;
-            }
-        }
+    if let Ok(cache) = CACHE.read()
+        && let Some((count, ts)) = cache.get(&key)
+        && ts.elapsed().as_secs() < TTL_SECS
+    {
+        return *count;
     }
 
     let count = list_streams_from_cache(org_id, stream_type).await.len() as u64;
