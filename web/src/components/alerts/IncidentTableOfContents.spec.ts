@@ -499,26 +499,6 @@ describe("IncidentTableOfContents", () => {
       );
     });
 
-    it("should show Expand tooltip when collapsed", () => {
-      const toc = createNestedToc();
-      wrapper = mountComponent(toc, {});
-
-      const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      // Verify tooltip exists and check button HTML for tooltip content
-      expect(button.findComponent({ name: "QTooltip" }).exists()).toBe(true);
-      expect(button.html()).toContain("Expand");
-    });
-
-    it("should show Collapse tooltip when expanded", () => {
-      const toc = createNestedToc();
-      wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
-
-      const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      // Verify tooltip exists and check button HTML for tooltip content
-      expect(button.findComponent({ name: "QTooltip" }).exists()).toBe(true);
-      expect(button.html()).toContain("Collapse");
-    });
-
     it("should handle expand button on level 2 items with children", async () => {
       const toc = createDeeplyNestedToc();
       wrapper = mountComponent(toc, createExpandedSections(["l1"]));

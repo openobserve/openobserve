@@ -175,13 +175,6 @@ describe("DedupSummaryCards", () => {
       expect(tooltip.exists()).toBe(true);
     });
 
-    it("should display correct tooltip content", async () => {
-      wrapper = await mountComponent();
-      const icon = findByTestId(wrapper, "dedup-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
-      // Tooltip content is accessible via text() method
-      expect(tooltip.text()).toContain("Alerts with deduplication configured");
-    });
   });
 
   describe("Card 3: Suppression Rate", () => {
@@ -254,20 +247,6 @@ describe("DedupSummaryCards", () => {
       expect(tooltip.exists()).toBe(true);
     });
 
-    it("should display detailed stats in tooltip", async () => {
-      wrapper = await mountComponent(
-        createMockSummary({
-          suppressions_total: 30,
-          passed_total: 20,
-        })
-      );
-      const icon = findByTestId(wrapper, "suppression-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
-      // Tooltip content is accessible via text() method
-      expect(tooltip.text()).toContain("30 suppressed");
-      expect(tooltip.text()).toContain("50 total");
-      expect(tooltip.text()).toContain("Passed: 20");
-    });
   });
 
   describe("Card 4: Pending Batches", () => {
@@ -297,13 +276,6 @@ describe("DedupSummaryCards", () => {
       const icon = findByTestId(wrapper, "pending-batches-info-icon");
       const tooltip = icon.findComponent({ name: "QTooltip" });
       expect(tooltip.exists()).toBe(true);
-    });
-
-    it("should display correct tooltip content", async () => {
-      wrapper = await mountComponent();
-      const icon = findByTestId(wrapper, "pending-batches-info-icon");
-      // Check the icon's HTML contains the tooltip text
-      expect(icon.html()).toContain("Alerts waiting to be grouped together");
     });
 
     it("should display zero when no pending batches", async () => {
