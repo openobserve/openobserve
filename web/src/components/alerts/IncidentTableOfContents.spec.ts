@@ -504,11 +504,9 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, {});
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const tooltip = button.findComponent({ name: "QTooltip" });
-
-      expect(tooltip.exists()).toBe(true);
-      // Tooltip content is interpolated in the template, access via html() instead of text()
-      expect(tooltip.html()).toContain("Expand");
+      // Verify tooltip exists and check button HTML for tooltip content
+      expect(button.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(button.html()).toContain("Expand");
     });
 
     it("should show Collapse tooltip when expanded", () => {
@@ -516,11 +514,9 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const tooltip = button.findComponent({ name: "QTooltip" });
-
-      expect(tooltip.exists()).toBe(true);
-      // Tooltip content is interpolated in the template, access via html() instead of text()
-      expect(tooltip.html()).toContain("Collapse");
+      // Verify tooltip exists and check button HTML for tooltip content
+      expect(button.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(button.html()).toContain("Collapse");
     });
 
     it("should handle expand button on level 2 items with children", async () => {

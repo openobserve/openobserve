@@ -72,22 +72,46 @@ function existsByTestId(wrapper: VueWrapper, testId: string): boolean {
  * Clicks the cancel button
  */
 async function clickCancel(wrapper: VueWrapper) {
-  const button = document.querySelector('[data-test="custom-cancel-button"]') as HTMLElement;
+  // Wait for button to be available and clickable
+  let button: HTMLElement | null = null;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (!button && attempts < maxAttempts) {
+    button = document.querySelector('[data-test="custom-cancel-button"]') as HTMLElement;
+    if (!button) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      attempts++;
+    }
+  }
+
   if (button) {
     button.click();
+    await flushPromises();
   }
-  await flushPromises();
 }
 
 /**
  * Clicks the confirm button
  */
 async function clickConfirm(wrapper: VueWrapper) {
-  const button = document.querySelector('[data-test="custom-confirm-button"]') as HTMLElement;
+  // Wait for button to be available and clickable
+  let button: HTMLElement | null = null;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (!button && attempts < maxAttempts) {
+    button = document.querySelector('[data-test="custom-confirm-button"]') as HTMLElement;
+    if (!button) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      attempts++;
+    }
+  }
+
   if (button) {
     button.click();
+    await flushPromises();
   }
-  await flushPromises();
 }
 
 /**

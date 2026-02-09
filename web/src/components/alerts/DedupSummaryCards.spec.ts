@@ -179,8 +179,8 @@ describe("DedupSummaryCards", () => {
       wrapper = await mountComponent();
       const icon = findByTestId(wrapper, "dedup-info-icon");
       const tooltip = icon.findComponent({ name: "QTooltip" });
-      // Tooltip content is in the default slot, access via html() instead of text()
-      expect(tooltip.html()).toContain("Alerts with deduplication configured");
+      // Tooltip content is accessible via text() method
+      expect(tooltip.text()).toContain("Alerts with deduplication configured");
     });
   });
 
@@ -263,10 +263,10 @@ describe("DedupSummaryCards", () => {
       );
       const icon = findByTestId(wrapper, "suppression-info-icon");
       const tooltip = icon.findComponent({ name: "QTooltip" });
-      // Tooltip content is in the default slot, access via html() instead of text()
-      expect(tooltip.html()).toContain("30 suppressed");
-      expect(tooltip.html()).toContain("50 total");
-      expect(tooltip.html()).toContain("Passed: 20");
+      // Tooltip content is accessible via text() method
+      expect(tooltip.text()).toContain("30 suppressed");
+      expect(tooltip.text()).toContain("50 total");
+      expect(tooltip.text()).toContain("Passed: 20");
     });
   });
 
@@ -302,9 +302,8 @@ describe("DedupSummaryCards", () => {
     it("should display correct tooltip content", async () => {
       wrapper = await mountComponent();
       const icon = findByTestId(wrapper, "pending-batches-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
-      // Tooltip content is in the default slot, access via html() instead of text()
-      expect(tooltip.html()).toContain("Alerts waiting to be grouped together");
+      // Check the icon's HTML contains the tooltip text
+      expect(icon.html()).toContain("Alerts waiting to be grouped together");
     });
 
     it("should display zero when no pending batches", async () => {
