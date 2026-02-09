@@ -27,7 +27,12 @@ import CronExpressionParser from "cron-parser";
 let moment: any;
 let momentInitialized = false;
 const organizationDataLocal: any = ref({});
-export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
+export const trialPeriodAllowedPath = [
+  "iam",
+  "users",
+  "organizations",
+  "invitations",
+];
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -409,7 +414,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       const response = await organizationService.get_organization_summary(
         store.state.selectedOrganization.identifier,
       );
-      if (response.data.streams.num_streams == 0) {
+      if (!response.data.streams.num_streams) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });
       } else {
