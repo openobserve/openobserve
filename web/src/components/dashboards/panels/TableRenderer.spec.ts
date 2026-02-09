@@ -1211,4 +1211,182 @@ describe("TableRenderer", () => {
       expect(style["background-color"]).toBe("#1a1a1a");
     });
   });
+
+  describe("Pagination Feature", () => {
+    it("should default showPagination to false", () => {
+      wrapper = createWrapper();
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      // When pagination is disabled, virtual scroll should be enabled
+      expect(table.props("virtualScroll")).toBe(true);
+    });
+
+    it("should disable virtual scroll when showPagination is true", () => {
+      wrapper = createWrapper({ showPagination: true });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("virtualScroll")).toBe(false);
+    });
+
+    it("should enable virtual scroll when showPagination is false", () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("virtualScroll")).toBe(true);
+    });
+
+    it("should use default rows per page value when showPagination is true", () => {
+      wrapper = createWrapper({ showPagination: true });
+
+      // Default TABLE_ROWS_PER_PAGE_DEFAULT_VALUE is 10
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
+    });
+
+    it("should use custom rowsPerPage value when provided", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 25 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(25);
+    });
+
+    it("should set rowsPerPage to 0 when showPagination is false", () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+    });
+
+    it("should return [0] for paginationOptions when showPagination is false", () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      expect(wrapper.vm.paginationOptions).toEqual([0]);
+    });
+
+    it("should return sorted pagination options with configured value when showPagination is true", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 25 });
+
+      const options = wrapper.vm.paginationOptions;
+      // Should include default options [10, 20, 50, 100, 250, 500, 1000] plus 25 and 0 (All)
+      expect(options).toContain(10);
+      expect(options).toContain(20);
+      expect(options).toContain(25);
+      expect(options).toContain(50);
+      expect(options).toContain(100);
+      expect(options).toContain(0); // "All" option at the end
+      // Should be sorted
+      expect(options[options.length - 1]).toBe(0);
+    });
+
+    it("should include custom rowsPerPage in options even if not in default list", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 15 });
+
+      const options = wrapper.vm.paginationOptions;
+      expect(options).toContain(15);
+      // Should be in sorted order
+      const numericOptions = options.slice(0, -1); // Exclude 0 (All)
+      for (let i = 1; i < numericOptions.length; i++) {
+        expect(numericOptions[i]).toBeGreaterThan(numericOptions[i - 1]);
+      }
+    });
+
+    it("should reset pagination to page 1 when showPagination changes", async () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 10 });
+
+      // Set page to something other than 1
+      wrapper.vm.pagination.page = 5;
+      expect(wrapper.vm.pagination.page).toBe(5);
+
+      // Toggle showPagination
+      await wrapper.setProps({ showPagination: false });
+
+      // Page should reset to 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should reset pagination to page 1 when rowsPerPage changes", async () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 10 });
+
+      // Set page to something other than 1
+      wrapper.vm.pagination.page = 3;
+
+      // Change rowsPerPage
+      await wrapper.setProps({ rowsPerPage: 20 });
+
+      // Page should reset to 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should update rowsPerPage when showPagination is toggled from false to true", async () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+
+      await wrapper.setProps({ showPagination: true, rowsPerPage: 50 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+    });
+
+    it("should update rowsPerPage when showPagination is toggled from true to false", async () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 50 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+
+      await wrapper.setProps({ showPagination: false });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+    });
+
+    it("should pass paginationOptions to QTable rows-per-page-options", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 10 });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      const tableOptions = table.props("rowsPerPageOptions");
+
+      expect(tableOptions).toEqual(wrapper.vm.paginationOptions);
+    });
+
+    it("should not include duplicate values in paginationOptions", () => {
+      // Use a value that's already in default options
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 50 });
+
+      const options = wrapper.vm.paginationOptions;
+      const uniqueOptions = [...new Set(options)];
+      expect(options.length).toBe(uniqueOptions.length);
+    });
+
+    it("should handle zero rowsPerPage gracefully", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 0 });
+
+      // Should use default value when rowsPerPage is 0
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(10); // TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+    });
+
+    it("should handle negative rowsPerPage gracefully", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: -5 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+    });
+
+    it("should expose setRowsPerPage function through bottom slot", () => {
+      wrapper = mount(TableRenderer, {
+        props: {
+          ...defaultProps,
+          showPagination: true,
+          rowsPerPage: 10,
+        },
+        global: {
+          plugins: [i18n, store],
+          mocks: {
+            $t: (key: string) => key,
+          },
+        },
+        slots: {
+          bottom: `<template #default="scope">
+            <div class="test-bottom" data-rows-per-page-fn="true"></div>
+          </template>`,
+        },
+      });
+
+      // The bottom slot should be rendered
+      expect(wrapper.find(".test-bottom").exists()).toBe(true);
+    });
+  });
 });

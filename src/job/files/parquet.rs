@@ -909,13 +909,18 @@ async fn merge_files(
                 || stream_type == StreamType::Metrics
                 || stream_type == StreamType::Traces)
         {
-            // Check if we should process this file (per-stream-type sampling)
+            // Get stream count for this type (cached, 5-min TTL — counts rarely change).
+            let stream_count =
+                crate::service::db::schema::get_stream_count_cached(&org_id, stream_type).await;
+
+            // Check if we should process this file (adaptive per-type sampling)
             let should_process =
                 o2_enterprise::enterprise::service_streams::sampler::should_process_file(
                     &org_id,
                     stream_type,
                     &stream_name,
                     &new_file_key,
+                    stream_count,
                 );
 
             if should_process {
