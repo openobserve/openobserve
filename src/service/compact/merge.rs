@@ -897,7 +897,11 @@ pub async fn merge_files(
                 || stream_type == StreamType::Metrics
                 || stream_type == StreamType::Traces)
         {
-            // Apply two-tier sampling to ensure fair processing across all streams
+            // Get stream count for this type (cached, 5-min TTL — counts rarely change).
+            let stream_count =
+                crate::service::db::schema::get_stream_count_cached(org_id, stream_type).await;
+
+            // Apply adaptive two-tier sampling with per-type rate equalization
             // Use the first file key as identifier for this merge operation
             let file_identifier = files.first().map(|f| f.as_str()).unwrap_or("unknown");
             let should_process =
@@ -906,6 +910,7 @@ pub async fn merge_files(
                     stream_type,
                     stream_name,
                     file_identifier,
+                    stream_count,
                 );
 
             if should_process {
