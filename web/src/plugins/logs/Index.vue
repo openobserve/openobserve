@@ -317,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :searchResponse="searchResponseForVisualization"
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+              :histogramQuery="storedHistogramQuery"
             ></VisualizeLogsQuery>
           </div>
           <div
@@ -1597,6 +1598,20 @@ export default defineComponent({
 
     const shouldUseHistogramQuery = ref(false);
     const shouldRefreshWithoutCache = ref(false);
+    // Store the histogram query so it persists even after searchResponse is cleared
+    const storedHistogramQuery = ref("");
+
+    // Watch for histogram query in search results and store it immediately
+    // This ensures the histogram query is saved before queryResults might be reset
+    watch(
+      () => searchObj.data.queryResults?.converted_histogram_query,
+      (newHistogramQuery) => {
+        if (newHistogramQuery) {
+          storedHistogramQuery.value = newHistogramQuery;
+        }
+      },
+      { immediate: true }
+    );
 
     // Flag to prevent unnecessary chart type changes during URL restoration
     const isRestoringFromUrl = ref(false);
@@ -1805,6 +1820,10 @@ export default defineComponent({
 
                 // assign converted_histogram_query to dashboardPanelData
                 if (searchObj.data.queryResults.converted_histogram_query) {
+                  // Store the histogram query so it persists for "Add to Dashboard"
+                  storedHistogramQuery.value =
+                    searchObj.data.queryResults.converted_histogram_query;
+
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].query =
@@ -2808,6 +2827,7 @@ export default defineComponent({
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       shouldRefreshWithoutCache,
+      storedHistogramQuery,
       clearSchemaCache,
       getHistogramData,
       extractPatternsForCurrentQuery,

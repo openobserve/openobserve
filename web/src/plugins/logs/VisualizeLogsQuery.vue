@@ -91,6 +91,11 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    histogramQuery: {
+      type: String,
+      required: false,
+      default: "",
+    },
   },
   components: {
     AddToDashboard,
@@ -216,20 +221,31 @@ export default defineComponent({
       // Get result metadata from PanelEditor if available
       const panelResultMetaData = panelEditorRef.value?.metaData?.value;
 
-      if (
-        panelResultMetaData?.[0]?.[0]?.converted_histogram_query &&
-        is_ui_histogram.value === true
-      ) {
-        dashboardPanelData.data.queries[0].query =
-          panelResultMetaData?.[0]?.[0]?.converted_histogram_query;
-      } else if (
-        // Backward compatibility - check if it's old format
-        panelResultMetaData?.[0]?.converted_histogram_query &&
-        is_ui_histogram.value === true &&
-        !Array.isArray(panelResultMetaData?.[0])
-      ) {
-        dashboardPanelData.data.queries[0].query =
-          panelResultMetaData?.[0]?.converted_histogram_query;
+      // Check for histogram query - prioritize sources in order of reliability
+      if (is_ui_histogram.value === true) {
+        // First priority: use the stored histogram query prop (most reliable - persists across state changes)
+        if (props.histogramQuery) {
+          dashboardPanelData.data.queries[0].query = props.histogramQuery;
+        } else if (searchObj.data.queryResults?.converted_histogram_query) {
+          // Fallback: check searchObj.data.queryResults
+          dashboardPanelData.data.queries[0].query =
+            searchObj.data.queryResults.converted_histogram_query;
+        } else if (props.searchResponse?.converted_histogram_query) {
+          // Fallback: check searchResponse (from logs search API)
+          dashboardPanelData.data.queries[0].query =
+            props.searchResponse.converted_histogram_query;
+        } else if (panelResultMetaData?.[0]?.[0]?.converted_histogram_query) {
+          // Fallback: check panelResultMetaData (new format)
+          dashboardPanelData.data.queries[0].query =
+            panelResultMetaData?.[0]?.[0]?.converted_histogram_query;
+        } else if (
+          // Fallback: check panelResultMetaData (old format)
+          panelResultMetaData?.[0]?.converted_histogram_query &&
+          !Array.isArray(panelResultMetaData?.[0])
+        ) {
+          dashboardPanelData.data.queries[0].query =
+            panelResultMetaData?.[0]?.converted_histogram_query;
+        }
       }
 
       const errors: any = [];
