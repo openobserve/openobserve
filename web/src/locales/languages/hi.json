@@ -121,7 +121,7 @@
     "source": "_source",
     "noResult": "कोई नतीजा नहीं",
     "syntaxGuide": "सिंटेक्स गाइड",
-    "recordsPerPage": "रिकॉर्ड प्रति पेज",
+    "rowsPerPage": "रिकॉर्ड प्रति पेज",
     "showing": "दिखा रहा है",
     "of": "का",
     "rowDetail": "स्रोत का विवरण",
@@ -647,7 +647,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "AI Assistant",
+          "name": "O2 Assistant",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -1181,6 +1181,9 @@
     "wraptext": "Wrap table cells",
     "tableTranspose": "Transpose",
     "tableDynamicColumns": "Allow Dynamic Columns",
+    "pagination": "पृष्ठांकन",
+    "rowsPerPage": "प्रति पृष्ठ पंक्तियाँ",
+    "rowsPerPageTooltip": "प्रति पृष्ठ प्रदर्शित करने के लिए रिकॉर्ड की डिफ़ॉल्ट संख्या सेट करें",
     "showBorder": "Show Axis Border",
     "labelPosition": "Value Position",
     "labelRotate": "Value Rotate",

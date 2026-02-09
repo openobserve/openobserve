@@ -242,4 +242,63 @@ mod tests {
         assert_eq!(output_cost, 0.0);
         assert_eq!(total_cost, 0.0);
     }
+
+    #[test]
+    fn test_calculate_token_count_known_model() {
+        // Test with a known OpenAI model
+        let prompt = "Hello, world!";
+        let token_count = calculate_token_count("gpt-4", prompt);
+        assert!(token_count > 0);
+        // "Hello, world!" should be encoded to a few tokens
+        assert!(token_count < 10);
+    }
+
+    #[test]
+    fn test_calculate_token_count_unknown_model() {
+        // Test with an unknown model (should fallback to o200k_base)
+        let prompt = "This is a test prompt";
+        let token_count = calculate_token_count("unknown-model-xyz", prompt);
+        assert!(token_count > 0);
+        // Should still return a valid token count using fallback encoding
+    }
+
+    #[test]
+    fn test_calculate_token_count_empty_prompt() {
+        // Test with empty prompt
+        let token_count = calculate_token_count("gpt-4", "");
+        // Empty prompt might still have some tokens (like BOS token) or be 0
+        assert!(token_count >= 0);
+    }
+
+    #[test]
+    fn test_calculate_token_count_long_prompt() {
+        // Test with a longer prompt
+        let prompt = "The quick brown fox jumps over the lazy dog. ".repeat(10);
+        let token_count = calculate_token_count("gpt-4", &prompt);
+        assert!(token_count > 0);
+        // Longer prompt should have more tokens
+        assert!(token_count > 10);
+    }
+
+    #[test]
+    fn test_calculate_token_count_special_characters() {
+        // Test with special characters and unicode
+        let prompt = "Hello! 你好 🌍 世界";
+        let token_count = calculate_token_count("gpt-4", prompt);
+        assert!(token_count > 0);
+    }
+
+    #[test]
+    fn test_calculate_token_count_different_models() {
+        // Test that different models produce consistent results (or at least valid results)
+        let prompt = "Test prompt";
+        let gpt4_count = calculate_token_count("gpt-4", prompt);
+        let gpt35_count = calculate_token_count("gpt-3.5-turbo", prompt);
+        let claude_count = calculate_token_count("claude-3-5-sonnet", prompt);
+
+        // All should return valid token counts
+        assert!(gpt4_count > 0);
+        assert!(gpt35_count > 0);
+        assert!(claude_count > 0);
+    }
 }

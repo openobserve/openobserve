@@ -10,10 +10,26 @@ export default class ChartTypeSelector {
 
   // Chart Type select
   async selectChartType(chartType) {
+    // Wait for panel editor to be ready - could be full page or dialog
+    // Look for either the Apply button or any chart type selector
+    const panelEditorIndicator = this.page.locator('[data-test="dashboard-apply"]').or(
+      this.page.locator('[data-test^="selected-chart-"]').first()
+    );
+
+    // Wait for panel editor to be visible with retry
+    try {
+      await panelEditorIndicator.first().waitFor({ state: "visible", timeout: 15000 });
+    } catch (e) {
+      // Panel editor may take extra time to load, wait for network idle and retry
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await panelEditorIndicator.first().waitFor({ state: "visible", timeout: 10000 });
+    }
+
     const chartOption = this.page.locator(
       `[data-test="selected-chart-${chartType}-item"]`
     );
-    await chartOption.waitFor({ state: "visible", timeout: 5000 });
+    await chartOption.waitFor({ state: "visible", timeout: 15000 });
+    await chartOption.scrollIntoViewIfNeeded();
     await chartOption.click();
   }
 

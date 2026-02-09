@@ -84,6 +84,8 @@ pub fn cors_layer() -> CorsLayer {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
+            header::HeaderName::from_static("stream-name"),
+            header::HeaderName::from_static("organization"),
             header::HeaderName::from_static("traceparent"),
             header::HeaderName::from_static("tracestate"),
             header::HeaderName::from_static("x-openobserve-span-id"),
@@ -569,6 +571,8 @@ pub fn service_routes() -> Router {
 
         // Traces
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
+        .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // Metrics
         .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
@@ -811,15 +815,15 @@ pub fn service_routes() -> Router {
                 post(organization::org::accept_org_invite),
             )
             .route(
-                "/{org_id}/billings/checkout",
-                post(cloud::billings::create_checkout_session),
+                "/{org_id}/billings/hosted_subscription_url",
+                get(cloud::billings::create_checkout_session),
             )
             .route(
-                "/{org_id}/billings/session",
-                post(cloud::billings::process_session_detail),
+                "/{org_id}/billings/checkout_session_detail",
+                get(cloud::billings::process_session_detail),
             )
             .route(
-                "/{org_id}/billings/subscriptions",
+                "/{org_id}/billings/list_subscription",
                 get(cloud::billings::list_subscription),
             )
             .route(
@@ -828,15 +832,18 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/billings/unsubscribe",
-                post(cloud::billings::unsubscribe),
+                get(cloud::billings::unsubscribe),
             )
             .route(
-                "/{org_id}/billings/portal",
-                post(cloud::billings::create_billing_portal_session),
+                "/{org_id}/billings/billing_portal",
+                get(cloud::billings::create_billing_portal_session),
             )
-            .route("/{org_id}/usage", get(cloud::org_usage::get_org_usage))
             .route(
-                "/{org_id}/marketing/attribution",
+                "/{org_id}/billings/data_usage/{usage_date}",
+                get(cloud::org_usage::get_org_usage),
+            )
+            .route(
+                "/{org_id}/billings/new_user_attribution",
                 post(cloud::marketing::handle_new_attribution_event),
             )
             .route(
