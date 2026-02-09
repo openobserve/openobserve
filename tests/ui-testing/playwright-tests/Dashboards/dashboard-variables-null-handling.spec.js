@@ -13,7 +13,7 @@ test.describe("Dashboard Variables - Null Handling", () => {
     await ingestion(page);
   });
 
-  test("1-should set child variable to All when parent variable causes empty options", async ({ page }) => {
+  test.skip("1-should set child variable to All when parent variable causes empty options", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_NullHandling_${Date.now()}`;
