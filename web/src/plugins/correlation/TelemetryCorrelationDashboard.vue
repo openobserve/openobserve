@@ -2055,12 +2055,15 @@ const openTraceInNewWindow = (trace) => {
   const traceStream = props.traceStreams?.[0]?.stream_name || "default";
   const logStream = props.logStreams?.[0]?.stream_name;
 
-  // Build the URL with sql_mode and just trace_id filter
   const queryParams: any = {
     stream: traceStream,
     trace_id: targetTraceId,
-    from: trace.trace_start_time - 10000000,
-    to: trace.trace_end_time + 10000000,
+    from: trace?.trace_start_time
+      ? trace.trace_start_time - 10000000
+      : props.timeRange.startTime.toString(),
+    to: trace?.trace_end_time
+      ? trace.trace_end_time + 10000000
+      : props.timeRange.endTime.toString(),
     org_identifier: org,
   };
 
