@@ -24,7 +24,9 @@ export default class DashboardVariablesScoped {
    * @param {boolean} options.showMultipleValues - Enable multi-select
    * @param {boolean} options.customValueSearch - Enable custom value search
    * @param {string} options.dependsOn - Variable name this depends on
+   * @param {string} options.dependsOnField - Field name of the variable this depends on (used in filter)
    * @param {string[]} options.dependsOnMultiple - Array of variable names for multi-dependency
+   * @param {Object} options.dependencyFieldMap - Map of {variableName: fieldName} for multi-dependency
    * @param {string} options.defaultValue - Default value for the variable
    * @param {boolean} options.hideOnDashboard - Hide variable on dashboard
    */
@@ -37,7 +39,9 @@ export default class DashboardVariablesScoped {
       showMultipleValues = false,
       customValueSearch = false,
       dependsOn = null,
+      dependsOnField = null,
       dependsOnMultiple = [],
+      dependencyFieldMap = {},
       defaultValue = null,
       hideOnDashboard = false,
     } = options;
@@ -191,13 +195,15 @@ export default class DashboardVariablesScoped {
 
     // Add dependency if specified
     if (dependsOn) {
-      await this.addDependency(dependsOn);
+      await this.addDependency(dependsOn, dependsOnField);
     }
 
     // Add multiple dependencies if specified
     if (dependsOnMultiple.length > 0) {
       for (const dep of dependsOnMultiple) {
-        await this.addDependency(dep);
+        // Use the field from dependencyFieldMap if provided, otherwise pass null
+        const depField = dependencyFieldMap[dep] || null;
+        await this.addDependency(dep, depField);
       }
     }
 
@@ -351,7 +357,7 @@ export default class DashboardVariablesScoped {
         // If clicking option failed, manually set the value with $ prefix
         await autoComplete.clear();
         await autoComplete.fill(`$${dependencyVariableName}`);
-        await this.page.keyboard.press('Escape');
+        // await this.page.keyboard.press('Escape');
       }
     } else {
       // No dropdown appeared, manually set the value with $ prefix
@@ -622,12 +628,21 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<boolean>}
    */
   async hasCircularDependencyError() {
-    const errorElement = this.page.locator('[data-test="dashboard-circular-dependency-error"]');
+    // The error is displayed as red text with the message "Variables has cycle:"
+    // Look for text containing "cycle" in red color
+    const errorElement = this.page.locator('div[style*="color: red"], div[style*="color:red"]').filter({ hasText: /cycle/i });
     try {
       await errorElement.waitFor({ state: "visible", timeout: 3000 });
       return true;
     } catch {
-      return false;
+      // Fallback: check for any text containing "Variables has cycle"
+      const fallbackError = this.page.getByText(/Variables has cycle/i);
+      try {
+        await fallbackError.waitFor({ state: "visible", timeout: 1000 });
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 
