@@ -2379,7 +2379,8 @@
     "openFields": "オープンフィールド",
     "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
     "fetchingMoreTraces": "さらにトレースを取得中...",
-    "showErrorOnly": "エラーのみ表示"
+    "showErrorOnly": "エラーのみ表示",
+    "openInTraces": "トレースで開く"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -2531,7 +2532,8 @@
     "sql_query": "SQL クエリー",
     "resuls": "結果",
     "wrapText": "テキストを折り返す",
-    "delayMessage": "検索履歴は次の理由で遅延する可能性があります"
+    "delayMessage": "検索履歴は次の理由で遅延する可能性があります",
+    "results": "結果"
   },
   "search_scheduler_job": {
     "title": "ジョブスケジューラを検索する",
@@ -2622,7 +2624,8 @@
     "analyzeButtonLabel": "分析",
     "refreshTooltip": "パーセンタイルを更新して分析を更新",
     "customSQLFieldsDisabled": "フィールド選択はカスタム SQL クエリでは使用できません。ディメンションはクエリ結果から抽出されます。",
-    "timeRangeSelected": "選択した時間範囲"
+    "timeRangeSelected": "選択した時間範囲",
+    "dimensionsSelected": "ディメンションが選択されました"
   },
   "volumeInsights": {
     "title": "インサイト",
@@ -2745,7 +2748,9 @@
         "startBeforeEnd": "開始時刻は終了時刻より前でなければなりません",
         "endAfterStart": "終了時刻は開始時刻より後である必要があります"
       }
-    }
+    },
+    "viewInTraces": "トレースで表示",
+    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

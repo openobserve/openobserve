@@ -47,6 +47,9 @@ use crate::{
     service::{search as SearchService, traces},
 };
 
+pub mod dag;
+pub mod session;
+
 /// TracesIngest
 #[utoipa::path(
     post,
@@ -87,12 +90,21 @@ pub async fn traces_write(
         }
     }
 
+    let cfg = get_config();
     let content_type = headers
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("application/json");
+    let org_id = if let Some(Some(v)) = headers
+        .get(&cfg.grpc.org_header_key)
+        .map(|header| header.to_str().ok())
+    {
+        v.to_string()
+    } else {
+        org_id
+    };
     let in_stream_name = headers
-        .get(&get_config().grpc.stream_header_key)
+        .get(&cfg.grpc.stream_header_key)
         .and_then(|header| header.to_str().ok());
 
     let result = if content_type.eq(CONTENT_TYPE_PROTO) {
@@ -188,7 +200,6 @@ pub async fn get_latest_traces(
     let user_id = &user_email.user_id;
 
     // Check permissions on stream
-
     #[cfg(feature = "enterprise")]
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
@@ -289,6 +300,9 @@ pub async fn get_latest_traces(
         StreamType::Traces,
     )
     .await;
+    let is_llm_stream =
+        infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
+            .await;
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -302,9 +316,21 @@ pub async fn get_latest_traces(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // search
-    let query_sql = format!(
-        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}"
-    );
+    let query_sql = if is_llm_stream {
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+        sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
+        sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
+        sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
+        sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
+        FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+        FROM \"{stream_name}\""
+        )
+    } else {
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM \"{stream_name}\""
+        )
+    };
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
     } else {
@@ -415,6 +441,19 @@ pub async fn get_latest_traces(
                 spans: [0, 0],
                 service_name: Vec::new(),
                 first_event: serde_json::Value::Null,
+                _o2_llm_usage_details_input: json::get_int_value(
+                    item.get("llm_usage_details_input").unwrap_or_default(),
+                ),
+                _o2_llm_usage_details_output: json::get_int_value(
+                    item.get("llm_usage_details_output").unwrap_or_default(),
+                ),
+                _o2_llm_usage_details_total: json::get_int_value(
+                    item.get("llm_usage_details_total").unwrap_or_default(),
+                ),
+                _o2_llm_cost_details_total: json::get_float_value(
+                    item.get("llm_cost_details_total").unwrap_or_default(),
+                ),
+                _o2_llm_input: item.get("llm_input").cloned(),
             },
         );
     }
@@ -426,7 +465,7 @@ pub async fn get_latest_traces(
         .collect::<Vec<String>>()
         .join("','");
     let query_sql = format!(
-        "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{trace_ids}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
+        "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
     );
     req.query.from = 0;
     req.query.size = 9999;
@@ -581,9 +620,14 @@ struct TraceResponseItem {
     spans: [u16; 2],
     service_name: Vec<TraceServiceNameItem>,
     first_event: serde_json::Value,
+    _o2_llm_usage_details_input: i64,
+    _o2_llm_usage_details_output: i64,
+    _o2_llm_usage_details_total: i64,
+    _o2_llm_cost_details_total: f64,
+    _o2_llm_input: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 struct TraceServiceNameItem {
     service_name: String,
     count: u16,

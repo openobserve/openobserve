@@ -2356,7 +2356,8 @@
     "openFields": "Campos abiertos",
     "timeRangeUpdated": "El intervalo de tiempo seleccionado no incluía este seguimiento. El intervalo de tiempo se actualizó para que coincida con la marca de tiempo del rastreo.",
     "fetchingMoreTraces": "Buscando más rastros...",
-    "showErrorOnly": "Mostrar solo error"
+    "showErrorOnly": "Mostrar solo error",
+    "openInTraces": "Abrir en Traces"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -2529,7 +2530,8 @@
     "sql_query": "Consulta SQL",
     "resuls": "Resultados",
     "wrapText": "Envolver texto",
-    "delayMessage": "Es posible que el historial de búsqueda se retrase un"
+    "delayMessage": "Es posible que el historial de búsqueda se retrase un",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Planificador de tareas de búsqueda",
@@ -2620,7 +2622,8 @@
     "analyzeButtonLabel": "Analiza",
     "refreshTooltip": "Actualice el análisis con un percentil actualizado",
     "customSQLFieldsDisabled": "La selección de campos no está disponible para las consultas SQL personalizadas. Las dimensiones se extraen de los resultados de la consulta.",
-    "timeRangeSelected": "Intervalo de tiempo seleccionado"
+    "timeRangeSelected": "Intervalo de tiempo seleccionado",
+    "dimensionsSelected": "Dimensiones seleccionadas"
   },
   "volumeInsights": {
     "title": "Perspectivas",
@@ -2743,7 +2746,9 @@
         "startBeforeEnd": "La hora de inicio debe ser anterior a la hora de finalización",
         "endAfterStart": "La hora de finalización debe ser posterior a la hora de inicio"
       }
-    }
+    },
+    "viewInTraces": "Ver en Traces",
+    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados"
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

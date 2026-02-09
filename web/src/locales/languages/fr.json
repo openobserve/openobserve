@@ -2358,7 +2358,8 @@
     "openFields": "Champs ouverts",
     "timeRangeUpdated": "La plage de temps sélectionnée n'incluait pas cette trace. La plage horaire a été mise à jour pour correspondre à l'horodatage de la trace.",
     "fetchingMoreTraces": "À la recherche de nouvelles traces...",
-    "showErrorOnly": "Afficher uniquement l'erreur"
+    "showErrorOnly": "Afficher uniquement l'erreur",
+    "openInTraces": "Ouvrir dans Traces"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -2531,7 +2532,8 @@
     "sql_query": "Requête SQL",
     "resuls": "Résultats",
     "wrapText": "Envelopper le texte",
-    "delayMessage": "L'historique des recherches peut être retardé par"
+    "delayMessage": "L'historique des recherches peut être retardé par",
+    "results": "Résultats"
   },
   "search_scheduler_job": {
     "title": "Rechercher un planificateur de tâches",
@@ -2622,7 +2624,8 @@
     "analyzeButtonLabel": "Analyser",
     "refreshTooltip": "Actualiser l'analyse avec un percentile mis à jour",
     "customSQLFieldsDisabled": "La sélection de champs n'est pas disponible pour les requêtes SQL personnalisées. Les dimensions sont extraites des résultats de votre requête.",
-    "timeRangeSelected": "Plage de temps sélectionnée"
+    "timeRangeSelected": "Plage de temps sélectionnée",
+    "dimensionsSelected": "Dimensions sélectionnées"
   },
   "volumeInsights": {
     "title": "Perspectives",
@@ -2745,7 +2748,9 @@
         "startBeforeEnd": "L'heure de début doit être antérieure à l'heure de fin",
         "endAfterStart": "L'heure de fin doit être postérieure à l'heure de début"
       }
-    }
+    },
+    "viewInTraces": "Afficher dans Traces",
+    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

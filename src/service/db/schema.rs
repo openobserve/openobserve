@@ -102,6 +102,21 @@ pub async fn update_setting(
     Ok(())
 }
 
+pub async fn set_stream_is_llm(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    is_llm_stream: bool,
+) -> Result<(), anyhow::Error> {
+    let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let mut metadata = std::collections::HashMap::with_capacity(1);
+    settings.is_llm_stream = is_llm_stream;
+    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+    update_setting(org_id, stream_name, stream_type, metadata).await
+}
+
 pub async fn delete_fields(
     org_id: &str,
     stream_name: &str,
@@ -860,6 +875,39 @@ pub async fn list_organizations_from_cache() -> Vec<String> {
         }
     }
     names.into_iter().collect::<Vec<String>>()
+}
+
+/// Get stream count for an org+type, cached to avoid per-file schema cache scans.
+///
+/// Stream counts are mostly stagnant (streams rarely added/removed), so we cache
+/// aggressively with a 5-minute TTL. This avoids the cost of iterating all schema
+/// keys on every file processed during service discovery.
+pub async fn get_stream_count_cached(org_id: &str, stream_type: StreamType) -> u64 {
+    use std::{
+        collections::HashMap as StdHashMap,
+        sync::{LazyLock, RwLock},
+        time::Instant,
+    };
+
+    static CACHE: LazyLock<RwLock<StdHashMap<String, (u64, Instant)>>> =
+        LazyLock::new(|| RwLock::new(StdHashMap::new()));
+
+    const TTL_SECS: u64 = 300; // 5 minutes
+
+    let key = format!("{org_id}/{stream_type}");
+
+    if let Ok(cache) = CACHE.read()
+        && let Some((count, ts)) = cache.get(&key)
+        && ts.elapsed().as_secs() < TTL_SECS
+    {
+        return *count;
+    }
+
+    let count = list_streams_from_cache(org_id, stream_type).await.len() as u64;
+    if let Ok(mut cache) = CACHE.write() {
+        cache.insert(key, (count, Instant::now()));
+    }
+    count
 }
 
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {

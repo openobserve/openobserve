@@ -75,12 +75,14 @@ const colorizedJson = computed((): string => {
     props.showBraces,
     props.showQuotes,
     props.queryString,
-    props.simpleMode
+    props.simpleMode,
   );
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@import "@/assets/styles/log-highlighting.css";
+
 .logs-highlight-json {
   font-family: monospace;
   font-size: 12px;

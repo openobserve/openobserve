@@ -147,6 +147,13 @@ pub async fn correlate_streams(
         let semantic_groups =
             crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
 
+        // Get the updated_at timestamp for semantic_field_groups setting
+        // This will be used for time-based FQN selection (prefer services processed after config
+        // change)
+        let semantic_groups_updated_at =
+            crate::service::db::system_settings::get_semantic_field_groups_updated_at(&org_id)
+                .await;
+
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
             &org_id,
             &req.source_stream,
@@ -154,6 +161,7 @@ pub async fn correlate_streams(
             &req.available_dimensions,
             &fqn_priority,
             &semantic_groups,
+            semantic_groups_updated_at,
         )
         .await
         {

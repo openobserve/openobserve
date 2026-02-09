@@ -171,6 +171,29 @@ describe("PanelContainer", () => {
           'RelativeTime': {
             template: '<span>relative time</span>',
             props: ['timestamp', 'fullTimePrefix']
+          },
+          'PanelErrorButtons': {
+            template: `<div>
+              <q-btn v-if="error" data-test="panel-error-data" class="warning">
+                <q-tooltip>{{ error }}</q-tooltip>
+              </q-btn>
+              <q-btn v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
+                <q-tooltip>{{ maxQueryRangeWarning }}</q-tooltip>
+              </q-btn>
+              <q-btn v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
+                <q-tooltip>{{ limitNumberOfSeriesWarningMessage }}</q-tooltip>
+              </q-btn>
+              <q-btn v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
+                <q-tooltip>The data shown is cached</q-tooltip>
+              </q-btn>
+              <q-btn v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
+                <q-tooltip>Partial data</q-tooltip>
+              </q-btn>
+              <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
+                <RelativeTime :timestamp="lastTriggeredAt" />
+              </span>
+            </div>`,
+            props: ['error', 'maxQueryRangeWarning', 'limitNumberOfSeriesWarningMessage', 'isCachedDataDifferWithCurrentTimeRange', 'isPartialData', 'isPanelLoading', 'lastTriggeredAt', 'viewOnly']
           }
         },
         mocks: {
@@ -285,13 +308,13 @@ describe("PanelContainer", () => {
       // Simulate error by calling the onError method
       await wrapper.vm.onError("Query execution failed");
 
-      expect(wrapper.find('[data-test="dashboard-panel-error-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(true);
     });
 
     it("should hide error button when no error data", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-panel-error-data"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(false);
     });
 
     it("should show error tooltip with correct message", async () => {
@@ -302,7 +325,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.onError(errorMessage);
       await wrapper.vm.$nextTick();
 
-      const errorBtn = wrapper.find('[data-test="dashboard-panel-error-data"]');
+      const errorBtn = wrapper.find('[data-test="panel-error-data"]');
       expect(errorBtn.exists()).toBe(true);
       
       const tooltip = errorBtn.find('q-tooltip');
@@ -358,13 +381,13 @@ describe("PanelContainer", () => {
       }]);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-max-duration-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(true);
     });
 
     it("should hide query range warning when no issues", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-panel-max-duration-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
     });
   });
 
@@ -1155,7 +1178,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleIsPartialDataUpdate(true);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-partial-data-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(true);
     });
 
     it("should hide partial data warning when loading", async () => {
@@ -1165,7 +1188,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleLoadingStateChange(true);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-partial-data-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
     });
 
     it("should hide partial data warning when data is complete", async () => {
@@ -1174,7 +1197,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleIsPartialDataUpdate(false);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-partial-data-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
     });
   });
 
@@ -1185,7 +1208,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleIsCachedDataDifferWithCurrentTimeRangeUpdate(true);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-is-cached-data-differ-with-current-time-range-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]').exists()).toBe(true);
     });
 
     it("should hide cached data warning when not different", async () => {
@@ -1194,7 +1217,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleIsCachedDataDifferWithCurrentTimeRangeUpdate(false);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-is-cached-data-differ-with-current-time-range-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]').exists()).toBe(false);
     });
   });
 
@@ -1206,7 +1229,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleLimitNumberOfSeriesWarningMessageUpdate(warningMessage);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-limit-number-of-series-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(true);
     });
 
     it("should hide limit series warning when no message", async () => {
@@ -1215,7 +1238,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleLimitNumberOfSeriesWarningMessageUpdate("");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-limit-number-of-series-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(false);
     });
   });
 
@@ -1396,4 +1419,4 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.errorData).toBe("");
     });
   });
-});
+});

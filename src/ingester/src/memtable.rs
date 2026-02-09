@@ -97,6 +97,7 @@ impl MemTable {
 
     pub(crate) async fn persist(
         &self,
+        id: u64,
         idx: usize,
         org_id: &str,
         stream_type: &str,
@@ -111,7 +112,7 @@ impl MemTable {
                 (org_id, stream_name.as_ref())
             };
             let (part_schema_size, partitions) = stream
-                .persist(idx, org_id, stream_type, stream_name)
+                .persist(id, idx, org_id, stream_type, stream_name)
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);

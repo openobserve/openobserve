@@ -2358,7 +2358,8 @@
     "openFields": "오픈 필드",
     "timeRangeUpdated": "선택한 시간 범위에는 이 추적이 포함되지 않았습니다.트레이스의 타임스탬프와 일치하도록 시간 범위가 업데이트되었습니다.",
     "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중...",
-    "showErrorOnly": "오류만 보기"
+    "showErrorOnly": "오류만 보기",
+    "openInTraces": "오픈 인 트레이스"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -2531,7 +2532,8 @@
     "sql_query": "SQL 쿼리",
     "resuls": "결과",
     "wrapText": "줄 바꿈 텍스트",
-    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다."
+    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다.",
+    "results": "결과"
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",
@@ -2622,7 +2624,8 @@
     "analyzeButtonLabel": "분석",
     "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
     "customSQLFieldsDisabled": "사용자 지정 SQL 쿼리에는 필드 선택을 사용할 수 없습니다.차원은 쿼리 결과에서 추출됩니다.",
-    "timeRangeSelected": "시간 범위 선택"
+    "timeRangeSelected": "시간 범위 선택",
+    "dimensionsSelected": "치수 선택"
   },
   "volumeInsights": {
     "title": "인사이트",
@@ -2745,7 +2748,9 @@
         "startBeforeEnd": "시작 시간은 종료 시간 이전이어야 합니다.",
         "endAfterStart": "종료 시간은 시작 시간 이후여야 합니다."
       }
-    }
+    },
+    "viewInTraces": "트레이스에서 보기",
+    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기"
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

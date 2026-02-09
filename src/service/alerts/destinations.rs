@@ -481,19 +481,17 @@ mod tests {
             template: template1,
             ..
         } = dest1_retrieved.module
-        {
-            if let Module::Alert {
+            && let Module::Alert {
                 template: template2,
                 ..
             } = dest2_retrieved.module
-            {
-                assert_eq!(template1, Some("prebuilt_slack".to_string()));
-                assert_eq!(template2, Some("prebuilt_slack".to_string()));
-                assert_eq!(
-                    template1, template2,
-                    "Both destinations should use the same template"
-                );
-            }
+        {
+            assert_eq!(template1, Some("prebuilt_slack".to_string()));
+            assert_eq!(template2, Some("prebuilt_slack".to_string()));
+            assert_eq!(
+                template1, template2,
+                "Both destinations should use the same template"
+            );
         }
 
         // Verify only ONE template exists

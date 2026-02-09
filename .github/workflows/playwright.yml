@@ -184,7 +184,6 @@ jobs:
                 "dashboard-filter.spec.js",
                 "dashboard-general-setting.spec.js",
                 "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
                 "dashboard-transpose.spec.js",
                 "dashboard-join.spec.js",
                 "dashboard-nested-functions.spec.js",
@@ -252,6 +251,7 @@ jobs:
               [
                 "logs-regression.spec.js",
                 "logs-regression-bugs.spec.js",
+                "logs-9754.spec.js",
                 "streams-regression.spec.js",
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
@@ -268,40 +268,21 @@ jobs:
                 "metrics-config-tabs.spec.js",
                 "metrics-visualizations.spec.js",
                 "metrics-config.spec.js",
+                "metrics-promql-query-persistence.spec.js",
                 "metrics-table-column-order.spec.js"
               ]
-          - testfolder: "Dashboards-Variables-Scoped"
+          - testfolder: "Dashboards-Variables"
             browser: "chrome"
             run_files:
               [
+                "dashboard-variables-setting.spec.js",
                 "dashboard-variables-global.spec.js",
                 "dashboard-variables-tab-level.spec.js",
                 "dashboard-variables-panel-level.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-Dependency"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-dependency.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-Refresh"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-refresh.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-URL"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-url-sync.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-Creation"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-creation-scopes.spec.js",
-                "dashboard-variables-null-handling.spec.js",
               ]
     steps:
       - name: Clone the current repo
@@ -462,7 +443,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables-Scoped"|"Dashboards-Variables-Dependency"|"Dashboards-Variables-Refresh"|"Dashboards-Variables-URL"|"Dashboards-Variables-Creation")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)

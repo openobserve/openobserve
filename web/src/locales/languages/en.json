@@ -546,7 +546,7 @@
         "features_title": "Available Enterprise Features",
         "features_subtitle": "Get a free license to unlock unlimited capabilities",
         "primary_button_text": "Get Free License",
-        "license_note": "100GB/day without license • 200GB/day with license"
+        "license_note": "50GB/day without license • 200GB/day with license"
       },
       "enterprise_with_license": {
         "hero_title": "Your Enterprise Edition",
@@ -661,7 +661,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "AI Assistant",
+          "name": "O2 Assistant",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -1127,7 +1127,8 @@
     "analyzeButtonLabel": "Analyze",
     "refreshTooltip": "Refresh analysis with updated percentile",
     "customSQLFieldsDisabled": "Field selection is not available for custom SQL queries. Dimensions are extracted from your query results.",
-    "timeRangeSelected": "Time Range Selected"
+    "timeRangeSelected": "Time Range Selected",
+    "dimensionsSelected": "Dimensions selected"
   },
   "volumeInsights": {
     "title": "Insights",
@@ -2114,7 +2115,32 @@
       "rcaInProgress": "Analyzing root cause...",
       "rcaCompleted": "Root cause analysis completed",
       "noRcaYet": "No root cause analysis available. Click 'Analyze' to start.",
-      "sreChat": "Ask SRE Assistant"
+      "sreChat": "Ask SRE Assistant",
+      "goBack": "Go Back",
+      "incident": "Incident",
+      "uniqueAlerts": "Unique Alerts",
+      "relatedAlerts": "Related Alerts",
+      "alertTriggers": "Alert Triggers",
+      "incidentTimeline": "Incident Timeline",
+      "incidentDetails": "Incident Details",
+      "incidentId": "Incident ID",
+      "incidentName": "Incident Name",
+      "initialTrigger": "Initial trigger",
+      "noDimensionsAvailable": "No dimensions available",
+      "noAlertDetailsAvailable": "No alert details available",
+      "clickOnTriggerToViewDetails": "Click on a trigger in the table to view details",
+      "refreshCorrelatedData": "Refresh correlated data",
+      "showingCorrelatedLogs": "Showing correlated logs from incident timeframe",
+      "showingCorrelatedMetrics": "Showing correlated metrics from incident timeframe",
+      "showingCorrelatedTraces": "Showing correlated traces from incident timeframe",
+      "incidentTitleUpdatedSuccess": "Incident title updated successfully",
+      "markAsAcknowledgedTooltip": "Mark incident as acknowledged and being worked on",
+      "markAsResolvedTooltip": "Mark incident as resolved and close it",
+      "reopenIncidentTooltip": "Reopen this resolved incident",
+      "editIncidentTitleTooltip": "Edit incident title",
+      "firedTimes": "Fired {count} time(s)",
+      "incidentAnalysis": "Incident Analysis",
+      "noAlertActivityData": "No alert activity data"
     }
   },
   "alert_templates": {
@@ -2476,6 +2502,7 @@
     "viewLogs": "View Logs",
     "viewRelated": "View Related",
     "backToLogs": "Back to Logs",
+    "openInTraces": "Open in Traces",
     "RedMetrics": "RED Metrics",
     "showErrorOnly": "Show Error Only",
     "loadingStream": "Loading Stream...",
@@ -2616,7 +2643,7 @@
     "get_history": "Get History",
     "executed_at":"Executed At",
     "sql_query":"SQL Query",
-    "resuls":"Results",
+    "results":"Results",
     "wrapText": "Wrap Text",
     "delayMessage": "Search History might be delayed by"
   },
@@ -2703,6 +2730,8 @@
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No correlated traces found",
     "noTracesDescription": "No traces found for service {service} in the selected time range",
+    "viewInTraces": "View in Traces",
+    "viewInTracesTooltip": "Open traces page with RED metrics dashboard and all correlated traces",
     "filters": "Filters",
     "semanticFieldGroupsTitle": "Field Mappings",
     "semanticFieldGroupsCaption": "Define field name mappings for correlation and deduplication (e.g., host, hostname, node → 'host' group)",

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="qTableRef"
       :rows="triggers"
       :columns="columns"
-      row-key="alert_id"
+      row-key="created_at"
       :pagination="pagination"
       style="height: calc(100vh - 220px)"
       flat
