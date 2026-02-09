@@ -332,12 +332,10 @@ export default defineComponent({
         sortable: false,
       },
       {
-        name: "status",
-        label: t("alerts.incidents.status"),
-        field: "status",
+        name: "title",
+        label: t("alerts.incidents.title_field"),
+        field: "title",
         align: "left" as const,
-        style: "width: 120px",
-        sortable: false,
       },
       {
         name: "severity",
@@ -348,11 +346,14 @@ export default defineComponent({
         sortable: false,
       },
       {
-        name: "title",
-        label: t("alerts.incidents.title_field"),
-        field: "title",
+        name: "status",
+        label: t("alerts.incidents.status"),
+        field: "status",
         align: "left" as const,
+        style: "width: 120px",
+        sortable: false,
       },
+
       {
         name: "dimensions",
         label: "Dimensions",
@@ -620,13 +621,13 @@ export default defineComponent({
       // Color palette using CSS classes matching schema.scss style
       const colorMap: Record<string, string> = {
         'k8s-deployment': 'badge-blue',
-        'k8s-namespace': 'badge-purple',
+        'k8s-namespace': 'badge-orange',
         'deployment': 'badge-blue',
-        'namespace': 'badge-purple',
+        'namespace': 'badge-orange',
         'env': 'badge-green',
         'environment': 'badge-green',
-        'host': 'badge-orange',
-        'hostname': 'badge-orange',
+        'host': 'badge-purple',
+        'hostname': 'badge-purple',
         'service': 'badge-cyan',
         'service_name': 'badge-cyan',
         'region': 'badge-pink',
@@ -990,23 +991,19 @@ export default defineComponent({
 }
 
 .status-open {
-  background: #fee2e2;
-  color: #dc2626;
+  border: 1px solid #dc2626;
 }
 
 .status-acknowledged {
-  background: #fef3c7;
-  color: #d97706;
+  border: 1px solid #d97706;
 }
 
 .status-resolved {
-  background: #d1fae5;
-  color: #065f46;
+  border: 1px solid #065f46;
 }
 
 .status-default {
-  background: #f3f4f6;
-  color: #6b7280;
+  border: 1px solid #6b7280;
 }
 
 /* Severity badge styling - matching schema.scss */
@@ -1020,75 +1017,61 @@ export default defineComponent({
 }
 
 .severity-p1 {
-  background: #fee2e2;
-  color: #991b1b;
+  border: 1px solid #991b1b;
 }
 
 .severity-p2 {
-  background: #fed7aa;
-  color: #c2410c;
+  border: 1px solid #c2410c;
 }
 
 .severity-p3 {
-  background: #fef3c7;
-  color: #92400e;
+  border: 1px solid #92400e;
 }
 
 .severity-p4 {
-  background: #f3f4f6;
-  color: #6b7280;
+  border: 1px solid #6b7280;
 }
 
 .severity-default {
-  background: #f3f4f6;
-  color: #6b7280;
+  border: 1px solid #6b7280;
 }
 
-/* Dark mode adjustments for status badges */
+/* Dark mode adjustments for status and severity badges - border only */
 body.body--dark {
   .status-open {
-    background: #991b1b;
-    color: #fca5a5;
+    border: 1px solid #fca5a5;
   }
 
   .status-acknowledged {
-    background: #78350f;
-    color: #fbbf24;
+    border: 1px solid #fbbf24;
   }
 
   .status-resolved {
-    background: #065f46;
-    color: #6ee7b7;
+    border: 1px solid #6ee7b7;
   }
 
   .status-default {
-    background: #374151;
-    color: #d1d5db;
+    border: 1px solid #d1d5db;
   }
 
   .severity-p1 {
-    background: #7f1d1d;
-    color: #fca5a5;
+    border: 1px solid #fca5a5;
   }
 
   .severity-p2 {
-    background: #7c2d12;
-    color: #fdba74;
+    border: 1px solid #fdba74;
   }
 
   .severity-p3 {
-    background: #78350f;
-    color: #fcd34d;
+    border: 1px solid #fcd34d;
   }
 
   .severity-p4 {
-    background: #374151;
-    color: #d1d5db;
+    border: 1px solid #d1d5db;
   }
 
   .severity-default {
-    background: #374151;
-    color: #d1d5db;
+    border: 1px solid #d1d5db;
   }
 }
 
@@ -1113,7 +1096,7 @@ body.body--dark {
   }
 }
 
-/* "+X more" badge styling */
+/* "+X more" badge styling - with background */
 .badge-more {
   background: #e5e7eb;
   color: #6b7280;
@@ -1126,147 +1109,119 @@ body.body--dark .badge-more {
   color: #d1d5db;
 }
 
-/* Color scheme matching schema.scss type badges */
+/* Color scheme matching schema.scss type badges - border only */
 .badge-blue {
-  background: #dbeafe;
-  color: #1d4ed8;
+  border: 1px solid #1d4ed8;
 }
 
 .badge-green {
-  background: #d1fae5;
-  color: #065f46;
+  border: 1px solid #065f46;
 }
 
 .badge-yellow {
-  background: #fef3c7;
-  color: #92400e;
+  border: 1px solid #92400e;
 }
 
 .badge-pink {
-  background: #fce7f3;
-  color: #9f1239;
+  border: 1px solid #9f1239;
 }
 
 .badge-purple {
-  background: #e9d5ff;
-  color: #7c3aed;
+  border: 1px solid #7c3aed;
 }
 
 .badge-orange {
-  background: #fed7aa;
-  color: #c2410c;
+  border: 1px solid #c2410c;
 }
 
 .badge-cyan {
-  background: #cffafe;
-  color: #0e7490;
+  border: 1px solid #0e7490;
 }
 
 .badge-indigo {
-  background: #e0e7ff;
-  color: #4f46e5;
+  border: 1px solid #4f46e5;
 }
 
 .badge-teal {
-  background: #ccfbf1;
-  color: #0f766e;
+  border: 1px solid #0f766e;
 }
 
 .badge-red {
-  background: #fee2e2;
-  color: #dc2626;
+  border: 1px solid #dc2626;
 }
 
 .badge-gray {
-  background: #f3f4f6;
-  color: #4b5563;
+  border: 1px solid #4b5563;
 }
 
 .badge-amber {
-  background: #fef3c7;
-  color: #d97706;
+  border: 1px solid #d97706;
 }
 
 .badge-violet {
-  background: #ede9fe;
-  color: #7c3aed;
+  border: 1px solid #7c3aed;
 }
 
 .badge-rose {
-  background: #ffe4e6;
-  color: #e11d48;
+  border: 1px solid #e11d48;
 }
 
-/* Dark mode adjustments - more muted colors */
+/* Dark mode adjustments - border only with lighter colors */
 body.body--dark {
   .badge-blue {
-    background: #1e3a8a;
-    color: #93c5fd;
+    border: 1px solid #93c5fd;
   }
 
   .badge-green {
-    background: #065f46;
-    color: #6ee7b7;
+    border: 1px solid #6ee7b7;
   }
 
   .badge-yellow {
-    background: #78350f;
-    color: #fcd34d;
+    border: 1px solid #fcd34d;
   }
 
   .badge-pink {
-    background: #831843;
-    color: #f9a8d4;
+    border: 1px solid #f9a8d4;
   }
 
   .badge-purple {
-    background: #5b21b6;
-    color: #c4b5fd;
+    border: 1px solid #c4b5fd;
   }
 
   .badge-orange {
-    background: #7c2d12;
-    color: #fdba74;
+    border: 1px solid #fdba74;
   }
 
   .badge-cyan {
-    background: #164e63;
-    color: #67e8f9;
+    border: 1px solid #67e8f9;
   }
 
   .badge-indigo {
-    background: #3730a3;
-    color: #a5b4fc;
+    border: 1px solid #a5b4fc;
   }
 
   .badge-teal {
-    background: #134e4a;
-    color: #5eead4;
+    border: 1px solid #5eead4;
   }
 
   .badge-red {
-    background: #991b1b;
-    color: #fca5a5;
+    border: 1px solid #fca5a5;
   }
 
   .badge-gray {
-    background: #374151;
-    color: #d1d5db;
+    border: 1px solid #d1d5db;
   }
 
   .badge-amber {
-    background: #78350f;
-    color: #fbbf24;
+    border: 1px solid #fbbf24;
   }
 
   .badge-violet {
-    background: #5b21b6;
-    color: #c4b5fd;
+    border: 1px solid #c4b5fd;
   }
 
   .badge-rose {
-    background: #9f1239;
-    color: #fda4af;
+    border: 1px solid #fda4af;
   }
 }
 
