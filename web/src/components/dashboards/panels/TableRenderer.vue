@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         { 'no-position-absolute': store.state.printMode },
         { 'wrap-enabled': wrapCells },
       ]"
-      virtual-scroll
+      :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
-      :rows-per-page-options="[0]"
+      :rows-per-page-options="paginationOptions"
       :virtual-scroll-sticky-size-start="48"
       dense
       :wrap-cells="wrapCells"
@@ -103,8 +103,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
-      <template v-slot:bottom="scope" v-if="$slots.bottom">
-        <slot name="bottom" v-bind="scope" />
+      <!-- If no custom slot is provided, use default pagination layout -->
+      <template v-slot:bottom="scope">
+        <!-- Custom slot provided by parent (e.g., PromQLTableChart with legend filter) -->
+        <slot
+          v-if="$slots.bottom"
+          name="bottom"
+          v-bind="{
+            ...scope,
+            setRowsPerPage: (val: number) => (pagination.rowsPerPage = val),
+            paginationOptions,
+            totalRows: (data.rows || []).length,
+          }"
+        />
+        <!-- Default pagination layout when no custom slot -->
+        <!-- This matches the design in PromQLTableChart for consistency across all pages -->
+        <div v-else class="row items-center full-width">
+          <q-space />
+          <TablePaginationControls
+            :show-pagination="showPagination"
+            :pagination="scope.pagination"
+            :pagination-options="paginationOptions"
+            :total-rows="(data.rows || []).length"
+            :pages-number="scope.pagesNumber"
+            :is-first-page="scope.isFirstPage"
+            :is-last-page="scope.isLastPage"
+            @update:rows-per-page="
+              (val: number) => (pagination.rowsPerPage = val)
+            "
+            @first-page="scope.firstPage"
+            @prev-page="scope.prevPage"
+            @next-page="scope.nextPage"
+            @last-page="scope.lastPage"
+          />
+        </div>
       </template>
     </q-table>
   </div>
@@ -114,16 +146,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useNotifications from "@/composables/useNotifications";
 import { useStickyColumns } from "@/composables/useStickyColumns";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
+import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
+import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
 export default defineComponent({
   name: "TableRenderer",
   components: {
     JsonFieldRenderer,
+    TablePaginationControls,
   },
   props: {
     data: {
@@ -140,6 +175,16 @@ export default defineComponent({
       required: false,
       type: Object,
       default: () => [],
+    },
+    showPagination: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    rowsPerPage: {
+      required: false,
+      type: Number,
+      default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
     },
   },
   emits: ["row-click"],
@@ -325,10 +370,46 @@ export default defineComponent({
         .catch(() => {});
     };
 
+    // Pagination logic
+    // Dynamic available rows options
+    const paginationOptions = computed(() => {
+      if (!props.showPagination) {
+        return [0];
+      }
+
+      const defaultOptions = [10, 20, 50, 100, 250, 500, 1000];
+      const configuredRows = props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
+
+      const options = new Set(defaultOptions);
+      if (configuredRows > 0) {
+        options.add(configuredRows);
+      }
+
+      const sorted = Array.from(options).sort((a, b) => a - b);
+      sorted.push(0);
+      return sorted;
+    });
+
+    const pagination = ref({
+      rowsPerPage: props.showPagination ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
+      page: 1,
+    });
+
+    watch(
+      () => [props.showPagination, props.rowsPerPage],
+      ([newShowPagination, newRowsPerPage]) => {
+        // Force reset pagination when toggle or config changes
+        pagination.value = {
+          ...pagination.value,
+          rowsPerPage: newShowPagination ? newRowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
+          page: 1, // Reset to first page
+        };
+      },
+    );
+
     return {
-      pagination: ref({
-        rowsPerPage: 0,
-      }),
+      pagination,
+      paginationOptions,
       downloadTableAsCSV,
       downloadTableAsJSON,
       tableRef,
@@ -402,7 +483,6 @@ export default defineComponent({
     overflow-wrap: break-word;
     white-space: normal !important;
   }
-
 }
 
 .copy-cell-td {
