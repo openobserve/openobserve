@@ -808,7 +808,7 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/member_subscription/{invite_token}",
-                post(organization::org::accept_org_invite),
+                put(organization::org::accept_org_invite),
             )
             .route(
                 "/{org_id}/billings/hosted_subscription_url",
