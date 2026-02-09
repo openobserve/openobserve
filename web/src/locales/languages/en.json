@@ -1845,7 +1845,7 @@
       "metricTypes": {
         "resultsPassedFilter": "results passed filters",
         "distinctGroupsAffected": "distinct groups are affected",
-        "metricsMatchCriteria": "metrics match criteria",
+        "metricsMatchCriteria": "series match criteria",
         "matchingLogsFound": "matching logs found",
         "groupsPassFilter": "groups pass filter criteria",
         "distinctGroups": "distinct groups found",
