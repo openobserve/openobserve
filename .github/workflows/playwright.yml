@@ -236,19 +236,20 @@ jobs:
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
               ]
-            # - testfolder: "Dashboards-Variables-Scoped"
-            #   browser: "chrome"
-            #   run_files:
-            #     [
-            #       "dashboard-variables-global.spec.js",
-            #       "dashboard-variables-tab-level.spec.js",
-            #       "dashboard-variables-panel-level.spec.js",
-            #       "dashboard-variables-dependency.spec.js",
-            #       "dashboard-variables-refresh.spec.js",
-            #       "dashboard-variables-url-sync.spec.js",
-            #       "dashboard-variables-creation-scopes.spec.js",
-            #       "dashboard-variables-null-handling.spec.js",
-            #     ]
+          - testfolder: "Dashboards-Variables"
+            browser: "chrome"
+            run_files:
+              [
+                # "dashboard-variables-setting.spec.js",
+                # "dashboard-variables-global.spec.js",
+                # "dashboard-variables-tab-level.spec.js",
+                # "dashboard-variables-panel-level.spec.js",
+                # "dashboard-variables-dependency.spec.js",
+                # "dashboard-variables-refresh.spec.js",
+                # "dashboard-variables-url-sync.spec.js",
+                # "dashboard-variables-creation-scopes.spec.js",
+                "dashboard-variables-default-values-chain.spec.js",
+              ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
