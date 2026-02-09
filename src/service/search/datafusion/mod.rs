@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,6 +17,7 @@ use std::str::FromStr;
 
 pub mod distributed_plan;
 pub mod exec;
+pub mod merge;
 pub mod optimizer;
 pub mod peak_memory_pool;
 pub mod plan;
