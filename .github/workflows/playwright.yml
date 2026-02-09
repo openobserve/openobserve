@@ -244,12 +244,12 @@ jobs:
                 "dashboard-variables-tab-level.spec.js",
                 "dashboard-variables-panel-level.spec.js",
               ]
-          # - testfolder: "Dashboards-Variables-Dependency"
-          #   browser: "chrome"
-          #   run_files:
-          #     [
-          #       "dashboard-variables-dependency.spec.js",
-          #     ]
+          - testfolder: "Dashboards-Variables-Dependency"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-variables-dependency.spec.js",
+              ]
           - testfolder: "Dashboards-Variables-Refresh"
             browser: "chrome"
             run_files:

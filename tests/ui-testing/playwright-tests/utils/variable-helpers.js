@@ -3,7 +3,7 @@
  * Provides common methods for variable API monitoring, assertions, and state validation
  */
 
-const testLogger = require('./test-logger.js');
+import testLogger from './test-logger.js';
 
 /**
  * Monitor variable values API calls and track completion
@@ -429,17 +429,3 @@ export function assertVariableAPILoading(monitorResult, expectations = {}) {
 
   testLogger.info(`Variable API assertion passed: ${monitorResult.actualCount} calls in ${monitorResult.totalDuration}ms`);
 }
-
-module.exports = {
-  monitorVariableAPICalls,
-  waitForVariableToLoad,
-  verifyVariableAPITriggered,
-  hasRefreshIndicator,
-  panelNeedsRefresh,
-  trackPanelReload,
-  verifyVariableValuePersists,
-  verifyVariableLoadSequence,
-  verifyVariablesInURL,
-  waitForAllPanelsToLoad,
-  assertVariableAPILoading
-};
