@@ -54,7 +54,10 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
+        search::datafusion::{
+            exec::TableBuilder,
+            merge::{self, MergeParquetResult},
+        },
         tantivy::create_tantivy_index,
     },
 };
@@ -545,8 +548,7 @@ async fn move_files(
                 );
                 // add to pending delete list
                 if let Err(e) =
-                    db::file_list::local::add_pending_delete(&org_id, &file.account, file_key)
-                        .await
+                    db::file_list::local::add_pending_delete(&org_id, &file.account, file_key).await
                 {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {file_key}, {e}",
@@ -755,7 +757,7 @@ async fn merge_files(
     let tables = vec![table];
 
     let start = std::time::Instant::now();
-    let merge_result = exec::merge_parquet_files(
+    let merge_result = merge::merge_parquet_files(
         stream_type,
         &stream_name,
         schema,
