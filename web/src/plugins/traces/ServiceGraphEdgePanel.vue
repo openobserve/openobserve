@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           dense
           round
-          icon="close"
+          icon="cancel"
           size="sm"
           @click="handleClose"
           data-test="service-graph-edge-panel-close-btn"
@@ -452,13 +452,6 @@ export default defineComponent({
     position: absolute;
     top: 1rem; // Adjusted from 1.5rem to match new padding
     right: 1.25rem; // Adjusted from 1.75rem to match new padding
-    transition: all 0.2s ease;
-    color: rgba(255, 255, 255, 0.7);
-
-    &:hover {
-      transform: rotate(90deg);
-      color: #ffffff;
-    }
   }
 }
 
@@ -479,13 +472,6 @@ export default defineComponent({
     background: rgba(0, 0, 0, 0.06);
   }
 
-  .close-btn {
-    color: rgba(0, 0, 0, 0.6);
-
-    &:hover {
-      color: #000000;
-    }
-  }
 }
 
 // Content

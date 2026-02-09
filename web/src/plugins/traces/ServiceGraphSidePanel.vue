@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           dense
           round
-          icon="close"
+          icon="cancel"
           size="sm"
           @click="handleClose"
           data-test="service-graph-side-panel-close-btn"
@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Action Buttons Section -->
         <div class="panel-section actions-section">
           <q-btn
+          v-if="false"
             outline
             no-caps
             size="sm"
@@ -768,15 +769,8 @@ export default defineComponent({
 
   .close-btn {
     flex-shrink: 0;
-    transition: all 0.2s ease;
-    color: #9ca3af;
     width: 24px;
     height: 24px;
-
-    &:hover {
-      background: #242938;
-      color: #e4e7eb;
-    }
   }
 }
 
@@ -813,14 +807,6 @@ export default defineComponent({
     }
   }
 
-  .close-btn {
-    color: rgba(0, 0, 0, 0.6);
-
-    &:hover {
-      background: #f5f5f5;
-      color: #000000;
-    }
-  }
 }
 
 // Actions Section (moved to content area)
