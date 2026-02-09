@@ -27,7 +27,7 @@ import CronExpressionParser from "cron-parser";
 let moment: any;
 let momentInitialized = false;
 const organizationDataLocal: any = ref({});
-export const trialPeriodAllowedPath = ["iam", "users", "organizations"];
+export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
 
 const importMoment = async () => {
   if (!momentInitialized) {
