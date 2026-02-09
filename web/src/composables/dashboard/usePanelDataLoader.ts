@@ -190,15 +190,25 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
+  // Debounced cache save to avoid multiple saves during batch processing
+  let cacheSaveTimeout: ReturnType<typeof setTimeout> | null = null;
   const saveCurrentStateToCache = async () => {
-    await savePanelCache(
-      getCacheKey(),
-      { ...toRaw(state) },
-      {
-        start_time: selectedTimeObj?.value?.start_time?.getTime(),
-        end_time: selectedTimeObj?.value?.end_time?.getTime(),
-      },
-    );
+    // Clear any pending cache save
+    if (cacheSaveTimeout) {
+      clearTimeout(cacheSaveTimeout);
+    }
+    // Debounce cache saves - wait for batch processing to complete
+    cacheSaveTimeout = setTimeout(async () => {
+      await savePanelCache(
+        getCacheKey(),
+        { ...toRaw(state) },
+        {
+          start_time: selectedTimeObj?.value?.start_time?.getTime(),
+          end_time: selectedTimeObj?.value?.end_time?.getTime(),
+        },
+      );
+      cacheSaveTimeout = null;
+    }, 50); // 50ms debounce matches the batch flush timing
   };
 
   // currently dependent variables data

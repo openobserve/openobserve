@@ -53,6 +53,56 @@ const errorOccurred = ref(false);
 
 type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result' | 'promql_response';
 
+// Message batching for performance - process multiple chunks in single render cycle
+type QueuedMessage = {
+  type: StreamResponseType | 'end';
+  traceId: string;
+  data: any;
+};
+const messageQueue: QueuedMessage[] = [];
+let flushScheduled = false;
+
+const flushMessageQueue = (onData: (traceId: string, type: StreamResponseType | 'end', data: any) => void, onError: (traceId: string, data: any) => void) => {
+  if (messageQueue.length === 0) {
+    flushScheduled = false;
+    return;
+  }
+
+  // Process all queued messages at once
+  const messagesToProcess = [...messageQueue];
+  messageQueue.length = 0;
+  flushScheduled = false;
+
+  // console.log(`[PERF] Flushing ${messagesToProcess.length} batched messages`);
+
+  for (const msg of messagesToProcess) {
+    if (msg.type === 'error') {
+      onError(msg.traceId, msg.data);
+    } else {
+      onData(msg.traceId, msg.type, msg.data);
+    }
+  }
+};
+
+const scheduleFlush = (onData: (traceId: string, type: StreamResponseType | 'end', data: any) => void, onError: (traceId: string, data: any) => void) => {
+  if (!flushScheduled) {
+    flushScheduled = true;
+    // Use requestAnimationFrame to batch updates into single render cycle
+    requestAnimationFrame(() => flushMessageQueue(onData, onError));
+  }
+};
+
+const queueMessage = (
+  type: StreamResponseType | 'end',
+  traceId: string,
+  data: any,
+  onData: (traceId: string, type: StreamResponseType | 'end', data: any) => void,
+  onError: (traceId: string, data: any) => void
+) => {
+  messageQueue.push({ type, traceId, data });
+  scheduleFlush(onData, onError);
+};
+
 const useHttpStreaming = () => {
   const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
     if (!traceMap.value[traceId]) return;
@@ -286,32 +336,24 @@ const useHttpStreaming = () => {
 
       // Set up worker for stream processing
       const worker = createStreamWorker();
-      
+
       if(worker) {
-      // Set up worker message handling
+      // Set up worker message handling with batching for better performance
         worker.onmessage = (event) => {
           const { type, traceId: eventTraceId, data } = event.data;
+          // Queue all messages to be processed in batches via requestAnimationFrame
+          // This prevents multiple render cycles when chunks arrive rapidly
           switch (type) {
             case 'search_response_metadata':
-              onData(eventTraceId, 'search_response_metadata', data);
-              break;
             case 'search_response_hits':
-              onData(eventTraceId, 'search_response_hits', data);
-              break;
             case 'pattern_extraction_result':
-              onData(eventTraceId, 'pattern_extraction_result', data);
-              break;
             case 'promql_response':
-              onData(eventTraceId, 'promql_response', data);
-              break;
             case 'progress':
-              onData(eventTraceId, 'progress', data);
+            case 'end':
+              queueMessage(type, eventTraceId, type === 'end' ? 'end' : data, onData, onError);
               break;
             case 'error':
-              onError(eventTraceId, data);
-              break;
-            case 'end':
-              onData(eventTraceId, 'end', 'end');
+              queueMessage('error', eventTraceId, data, onData, onError);
               break;
           }
         };
