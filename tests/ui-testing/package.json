@@ -3,7 +3,13 @@
   "version": "1.0.0",
   "description": "zincsearchautomationtest",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "test": "npx playwright test",
+    "test:poc": "npx playwright test --config=playwright-poc.config.js",
+    "test:poc:headed": "npx playwright test --config=playwright-poc.config.js --headed",
+    "test:poc:debug": "DEBUG=pw:api npx playwright test --config=playwright-poc.config.js",
+    "report": "npx playwright show-report playwright-results/poc-html-report"
+  },
   "author": "",
   "license": "ISC",
   "devDependencies": {
