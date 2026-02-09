@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 26] = [
+const QUERIER_ROUTES: [(&str, usize); 28] = [
     ("config", 0),         // /config
     ("summary", 2),        // /api/{org_id}/summary
     ("organizations", 1),  // /api/organizations
@@ -23,6 +23,8 @@ const QUERIER_ROUTES: [(&str, usize); 26] = [
     ("streams", 2),        // /api/{org_id}/streams/...
     ("traces/latest", 3),  // /api/{org_id}/{stream_name}/traces/latest
     ("traces/session", 3), // /api/{org_id}/{stream_name}/traces/session
+    ("traces/user", 3),    // /api/{org_id}/{stream_name}/traces/user
+    ("dag", 5),            // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
     ("clusters", 1),       // /api/clusters
     ("query_manager", 2),  // /api/{org_id}/query_manager/...
     ("_search", 2),        // /api/{org_id}/_search

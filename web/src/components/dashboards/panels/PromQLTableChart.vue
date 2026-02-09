@@ -30,11 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="{ rows: filteredTableRows, columns: tableColumns }"
         :wrap-cells="config.wrap_table_cells"
         :value-mapping="config.mappings ?? []"
+        :show-pagination="config.table_pagination"
+        :rows-per-page="config.table_pagination_rows_per_page"
         @row-click="$emit('row-click', $event)"
       >
-        <template #bottom v-if="showLegendFooter">
-          <div class="row items-center full-width" style="width: 100%">
-            <div class="row items-center q-gutter-sm q-pl-md">
+        <!-- Override bottom slot to add legend filter alongside native pagination -->
+        <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
+        <template #bottom="scope" v-if="showLegendFooter">
+          <div class="row items-center full-width">
+            <div class="row items-center q-gutter-xs">
               <q-select
                 v-model="selectedLegend"
                 :options="legendOptions"
@@ -42,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 emit-value
                 map-options
-                style="min-width: 300px; max-width: 500px"
+                style="min-width: 200px; max-width: 400px"
                 placeholder="Select series to filter"
               >
                 <template v-slot:prepend>
@@ -51,9 +55,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-select>
             </div>
             <q-space />
-            <div class="q-pr-md text-body2">
-              1-{{ filteredTableRows.length }} of {{ filteredTableRows.length }}
-            </div>
+            <TablePaginationControls
+              :show-pagination="config.table_pagination"
+              :pagination="scope.pagination"
+              :pagination-options="scope.paginationOptions"
+              :total-rows="scope.totalRows"
+              :pages-number="scope.pagesNumber"
+              :is-first-page="scope.isFirstPage"
+              :is-last-page="scope.isLastPage"
+              @update:rows-per-page="scope.setRowsPerPage"
+              @first-page="scope.firstPage"
+              @prev-page="scope.prevPage"
+              @next-page="scope.nextPage"
+              @last-page="scope.lastPage"
+            />
           </div>
         </template>
       </TableRenderer>
@@ -64,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import TableRenderer from "./TableRenderer.vue";
+import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -77,7 +93,7 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  components: { TableRenderer },
+  components: { TableRenderer, TablePaginationControls },
   setup(props) {
     const filter = ref("");
     const loading = ref(false);
@@ -143,10 +159,9 @@ export default defineComponent({
     // Determine if legend footer should be shown
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
-      // Show legend footer in both "single" and "expanded_timeseries" modes when there are multiple series
+      // Show legend footer in both "single" and "expanded_timeseries" modes
       return (
-        (tableMode === "single" || tableMode === "expanded_timeseries") &&
-        legendOptions.value.length > 1
+        (tableMode === "single" || tableMode === "expanded_timeseries")
       );
     });
 
@@ -169,6 +184,10 @@ export default defineComponent({
       );
       return filtered;
     });
+
+    // Note: paginationOptions is now provided by TableRenderer's slot
+    // and accessible via scope.paginationOptions in the template
+    // This avoids code duplication
 
     const pagination = ref({
       rowsPerPage: 0, // 0 = show all rows (like SQL table)

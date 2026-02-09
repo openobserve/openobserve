@@ -19,7 +19,9 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use crate::service::traces::otel::attributes::{GenAiAttributes, VercelAiSdkAttributes};
+use crate::service::traces::otel::attributes::{
+    GenAiAttributes, LangfuseAttributes, VercelAiSdkAttributes,
+};
 
 pub struct ProviderExtractor;
 
@@ -37,6 +39,12 @@ impl ProviderExtractor {
                 return value.as_str().map(|s| s.to_string());
             }
         }
+
+        // Langfuse metadata ls_provider
+        if let Some(value) = attributes.get(LangfuseAttributes::METADATA_LS_PROVIDER) {
+            return value.as_str().map(|s| s.to_string());
+        }
+
         None
     }
 }
@@ -84,6 +92,18 @@ mod tests {
             ("gen_ai.provider.name", json::json!("openai")),
             ("gen_ai.system", json::json!("anthropic")),
         ]);
+
+        let result = extractor.extract(&attrs);
+        assert_eq!(result, Some("openai".to_string()));
+    }
+
+    #[test]
+    fn test_extract_provider_from_langfuse_metadata_ls_provider() {
+        let extractor = ProviderExtractor;
+        let attrs = make_attributes(vec![(
+            "langfuse.observation.metadata.ls_provider",
+            json::json!("openai"),
+        )]);
 
         let result = extractor.extract(&attrs);
         assert_eq!(result, Some("openai".to_string()));
