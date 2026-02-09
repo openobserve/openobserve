@@ -325,16 +325,16 @@ arrow-json = "57.2.0"
 arrow-schema = { version = "57.2.0", features = ["serde"] }
 parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
-vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
-vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
-vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
-vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
-vortex = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b", features = [
+vortex-array = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1" }
+vortex-buffer = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1" }
+vortex-file = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1" }
+vortex-io = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1" }
+vortex-session = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1" }
+vortex = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1", features = [
     "tokio",
 ] }
-vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b" }
-vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "469e31fd4e2b27d2c5b2008bedca6bec83c10e6b", features = [
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1" }
+vortex-scan = { git = "https://github.com/openobserve/vortex", rev = "b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1", features = [
     "roaring",
 ] }
 # vortex-scan = { version = "0.58.0" }

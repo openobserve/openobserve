@@ -198,7 +198,7 @@ pub async fn merge_parquet_files(
                     let session = VortexSession::default().with_tokio();
                     let dtype = DType::from_arrow(schema.as_ref());
                     let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
-                        WriteStrategyBuilder::new()
+                        WriteStrategyBuilder::default()
                             .with_compressor(Utf8Compressor::default())
                             .build(),
                     );

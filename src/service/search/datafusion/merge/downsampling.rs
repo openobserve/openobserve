@@ -218,7 +218,7 @@ async fn write_downsampled_vortex(
             let dtype = DType::from_arrow(schema.as_ref());
 
             // Helper to create write options - need to recreate for each writer
-            let strategy = WriteStrategyBuilder::new()
+            let strategy = WriteStrategyBuilder::default()
                 .with_compressor(Utf8Compressor::default())
                 .build();
 

@@ -38,7 +38,7 @@ pub static VORTEX_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
 ///
 /// For all other data types:
 /// - Delegates to BtrBlocksCompressor for optimal encoding
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Utf8Compressor {
     /// The underlying BtrBlocks compressor for general compression
     btr_compressor: BtrBlocksCompressor,
@@ -52,9 +52,7 @@ impl Utf8Compressor {
     /// Create a new smart compressor with default settings.
     pub fn new() -> Self {
         Self {
-            btr_compressor: BtrBlocksCompressor {
-                exclude_int_dict_encoding: true,
-            },
+            btr_compressor: BtrBlocksCompressor::default(),
             zstd_level: 3,
             values_per_page: 8192,
         }
