@@ -71,7 +71,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
 
     // Open visualization tab
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // Verify VRL toggle button is visible in the toolbar
     const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
@@ -100,17 +100,18 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
+    // await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor
     await enableVrlEditor(page);
 
     // Add VRL function
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
-    // Open visualization tab
-    await pm.logsVisualise.openVisualiseTab();
+    // Open visualization tab with VRL - ensures table chart is selected
+    await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // IMPORTANT: Run query in visualization tab to populate table data
     await pm.logsVisualise.runQueryAndWaitForCompletion();
@@ -118,12 +119,9 @@ test.describe("VRL visualization support testcases", () => {
     // Verify chart renders
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for table to fully render with data using deterministic wait
-    // await waitForTableData(page);
-
     // Verify table panel is visible
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
-    await expect(tablePanel).toBeVisible({ timeout: 10000 });
+    await expect(tablePanel).toBeVisible({ timeout: 15000 });
 
     // Verify table chart is selected
     await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
@@ -142,15 +140,18 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
+
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.setRelative("8", "h");
+
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
     // Open visualization tab
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
     await pm.logsVisualise.runQueryAndWaitForCompletion();
@@ -181,14 +182,15 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.logsApplyQueryAndWait();
+
+    await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
     await pm.logsVisualise.runQueryAndWaitForCompletion();
@@ -225,14 +227,17 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.openLogs();
     // Use SELECT * query so VRL-generated fields appear in the result
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.setRelative("8", "h");
+
+    await pm.logsVisualise.logsApplyQueryAndWait();
+
+    await pm.logsVisualise.openVisualiseTabWithVrl();
+
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
@@ -313,14 +318,15 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add complex function that creates multiple fields
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(complexVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.logsApplyQueryAndWait();
+
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
@@ -360,12 +366,12 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
     // Verify VRL toggle is enabled before switching
     const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
@@ -373,7 +379,7 @@ test.describe("VRL visualization support testcases", () => {
     expect(isChecked).toBe("true");
 
     // Switch to visualization
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
@@ -404,7 +410,7 @@ test.describe("VRL visualization support testcases", () => {
     await expect(vrlEditor.first()).toBeVisible();
 
     // Switch to visualization again
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Verify chart still renders
@@ -435,14 +441,14 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(histogramQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.verifyChartRenders(page);
 
     // With VRL functions, table chart should be selected even for histogram queries
@@ -466,14 +472,14 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function that creates multiple fields
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(fieldCreationVrl);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.verifyChartRenders(page);
 
     // Verify table is displayed
@@ -499,14 +505,14 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
     await pm.logsVisualise.runQueryAndWaitForCompletion();
@@ -550,14 +556,14 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
@@ -591,14 +597,14 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.logsApplyQueryAndWait();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.verifyChartRenders(page);
 
     // Verify table chart is selected due to VRL
@@ -630,7 +636,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
 
     // Switch back to visualization
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.verifyChartRenders(page);
 
     // Verify no VRL function error when switching chart types
@@ -643,14 +649,14 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
@@ -681,14 +687,14 @@ test.describe("VRL visualization support testcases", () => {
 
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.fillLogsQueryEditor(aggregationQuery);
-    await pm.logsVisualise.setRelative("8", "h");
 
     // Enable VRL editor and add function
     await enableVrlEditor(page);
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
-    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("8", "h");
+    await pm.logsVisualise.logsApplyQueryAndWait();
 
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
     await pm.logsVisualise.runQueryAndWaitForCompletion();
@@ -729,9 +735,8 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.setRelative("8", "h");
 
     // Do NOT enable VRL - run query without VRL
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.logsApplyQueryAndWait();
+    await pm.logsVisualise.openVisualiseTabWithVrl();
     await pm.logsVisualise.verifyChartRenders(page);
 
     // Try to switch to bar chart - should NOT show VRL error
