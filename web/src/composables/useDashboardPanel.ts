@@ -143,6 +143,8 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       sticky_columns: [],
       sticky_first_column: false,
       column_order: [],
+      table_pagination: false,
+      table_pagination_rows_per_page: null,
       allow_panel_time: false,
       panel_time_mode: "individual",
       panel_time_range: null,
