@@ -67,22 +67,15 @@ export default function useRoutePrefetch() {
 
       // Trigger the dynamic import asynchronously without blocking
       // The browser will cache this module, making subsequent navigation instant
-      moduleLoader()
-        .then(() => {
-          // eslint-disable-next-line no-undef
-          console.debug(
-            `[Prefetch] Successfully prefetched module for route: ${routePath}`,
-          );
-        })
-        .catch((error) => {
-          // If prefetch fails, remove from cache so it can be retried
-          prefetchedRoutes.value.delete(routePath);
-          // eslint-disable-next-line no-undef
-          console.warn(
-            `[Prefetch] Failed to prefetch module for route: ${routePath}`,
-            error,
-          );
-        });
+      moduleLoader().catch((error) => {
+        // If prefetch fails, remove from cache so it can be retried
+        prefetchedRoutes.value.delete(routePath);
+        // eslint-disable-next-line no-undef
+        console.warn(
+          `[Prefetch] Failed to prefetch module for route: ${routePath}`,
+          error,
+        );
+      });
     }
   };
 
