@@ -122,9 +122,8 @@ pub async fn search_parquet(
                 return file;
             }
             drop(r);
-            let meta = read_metadata_from_file(&source_file.into())
-                .await
-                .unwrap_or_default();
+            let path = source_file.into();
+            let meta = read_metadata_from_file(&path).await.unwrap_or_default();
             file.meta = meta;
             file
         })
@@ -528,12 +527,7 @@ async fn get_file_list(
             let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
             // Skip count is the number of segments in the cannonicalised path before
             // <YY>/<MM>/<DD>/<HH>/<file> appear
-            let filter = create_wal_dir_datetime_filter(
-                start_time,
-                end_time,
-                "parquet".to_string(),
-                skip_count + 1,
-            );
+            let filter = create_wal_dir_datetime_filter(start_time, end_time, skip_count + 1);
 
             scan_files_filtered(&pattern, filter, None).await?
         } else {
