@@ -58,7 +58,8 @@ use super::{
     storage::file_list, udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
-    datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
+    datafusion::table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
+    index::IndexCondition,
 };
 
 pub(crate) const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
