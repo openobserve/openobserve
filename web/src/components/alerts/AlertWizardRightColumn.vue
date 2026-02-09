@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 right-column-container" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
       class="collapsible-section card-container preview-section"
@@ -238,10 +238,10 @@ export default defineComponent({
         return { flex: "0 0 auto" };
       } else if (expandState.summary) {
         // Both expanded: 50% each
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       } else {
         // Preview expanded, summary collapsed: take all space
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       }
     });
 
@@ -251,10 +251,10 @@ export default defineComponent({
         return { flex: "0 0 auto" };
       } else if (expandState.preview) {
         // Both expanded: 50% each
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       } else {
         // Summary expanded, preview collapsed: take all space
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       }
     });
 
@@ -311,6 +311,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.right-column-container {
+  overflow-y: auto;
+  overflow-x: clip;
+}
+
 .collapsible-section {
   display: flex;
   flex-direction: column;

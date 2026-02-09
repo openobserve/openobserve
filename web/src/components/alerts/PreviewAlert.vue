@@ -75,6 +75,13 @@ const getDefaultDashboardPanelData: any = () => ({
         lat: 0,
         lng: 0,
       },
+      // Custom chart options for alert preview to prevent tooltip clipping
+      custom_chart_options: {
+        tooltip: {
+          appendToBody: true,
+          confine: false,
+        },
+      },
     },
     queryType: "sql",
     queries: [
