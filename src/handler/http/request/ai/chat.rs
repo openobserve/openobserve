@@ -651,9 +651,18 @@ mod tests {
         // Create a test request with headers
         use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
         let mut headers = HeaderMap::new();
-        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("Mozilla/5.0"));
-        headers.insert(HeaderName::from_static("x-custom-header"), HeaderValue::from_static("custom-value"));
-        headers.insert(HeaderName::from_static("authorization"), HeaderValue::from_static("Bearer secret"));
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("Mozilla/5.0"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-custom-header"),
+            HeaderValue::from_static("custom-value"),
+        );
+        headers.insert(
+            HeaderName::from_static("authorization"),
+            HeaderValue::from_static("Bearer secret"),
+        );
 
         let config = "user-agent,x-custom-header";
         let result = extract_passthrough_headers(&headers, config);
@@ -672,10 +681,22 @@ mod tests {
     fn test_extract_passthrough_headers_wildcard_match() {
         use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
         let mut headers = HeaderMap::new();
-        headers.insert(HeaderName::from_static("x-forwarded-for"), HeaderValue::from_static("192.168.1.1"));
-        headers.insert(HeaderName::from_static("x-forwarded-proto"), HeaderValue::from_static("https"));
-        headers.insert(HeaderName::from_static("x-forwarded-host"), HeaderValue::from_static("example.com"));
-        headers.insert(HeaderName::from_static("x-other-header"), HeaderValue::from_static("other"));
+        headers.insert(
+            HeaderName::from_static("x-forwarded-for"),
+            HeaderValue::from_static("192.168.1.1"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-proto"),
+            HeaderValue::from_static("https"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-host"),
+            HeaderValue::from_static("example.com"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-other-header"),
+            HeaderValue::from_static("other"),
+        );
 
         let config = "x-forwarded-*";
         let result = extract_passthrough_headers(&headers, config);
@@ -698,10 +719,22 @@ mod tests {
     fn test_extract_passthrough_headers_mixed_patterns() {
         use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
         let mut headers = HeaderMap::new();
-        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("curl/7.68.0"));
-        headers.insert(HeaderName::from_static("x-forwarded-for"), HeaderValue::from_static("10.0.0.1"));
-        headers.insert(HeaderName::from_static("x-forwarded-proto"), HeaderValue::from_static("http"));
-        headers.insert(HeaderName::from_static("x-request-id"), HeaderValue::from_static("abc-123"));
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("curl/7.68.0"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-for"),
+            HeaderValue::from_static("10.0.0.1"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-proto"),
+            HeaderValue::from_static("http"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-request-id"),
+            HeaderValue::from_static("abc-123"),
+        );
 
         let config = "x-forwarded-*,user-agent,x-request-id";
         let result = extract_passthrough_headers(&headers, config);
@@ -717,7 +750,10 @@ mod tests {
     fn test_extract_passthrough_headers_empty_config() {
         use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
         let mut headers = HeaderMap::new();
-        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("test"));
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("test"),
+        );
 
         let config = "";
         let result = extract_passthrough_headers(&headers, config);
@@ -729,8 +765,14 @@ mod tests {
     fn test_extract_passthrough_headers_case_insensitive() {
         use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
         let mut headers = HeaderMap::new();
-        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("test-agent"));
-        headers.insert(HeaderName::from_static("x-forwarded-for"), HeaderValue::from_static("1.2.3.4"));
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("test-agent"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-for"),
+            HeaderValue::from_static("1.2.3.4"),
+        );
 
         let config = "User-Agent,x-forwarded-for";
         let result = extract_passthrough_headers(&headers, config);
@@ -744,8 +786,14 @@ mod tests {
     fn test_extract_passthrough_headers_whitespace_handling() {
         use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
         let mut headers = HeaderMap::new();
-        headers.insert(HeaderName::from_static("user-agent"), HeaderValue::from_static("test"));
-        headers.insert(HeaderName::from_static("x-custom"), HeaderValue::from_static("value"));
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("test"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-custom"),
+            HeaderValue::from_static("value"),
+        );
 
         let config = " user-agent , x-custom , ";
         let result = extract_passthrough_headers(&headers, config);
