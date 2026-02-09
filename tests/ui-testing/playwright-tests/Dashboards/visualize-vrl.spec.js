@@ -30,7 +30,7 @@ const complexVrlFunction = `.vrl_status = "processed"
 .vrl_flag = true`;
 
 // SQL queries
-const selectAllQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
+const selectAllQuery = `SELECT * FROM "${STREAM_NAME}"`;
 
 const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "${STREAM_NAME}" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
 
