@@ -116,9 +116,10 @@ pub async fn set_stream_is_llm(
     if is_llm_stream && !settings.defined_schema_fields.is_empty() {
         // Check the actual schema to find which LLM fields are missing
         let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
-        let missing_fields: Vec<Field> = llm_schema_fields()
-            .into_iter()
+        let missing_fields: Vec<Field> = LLM_SCHEMA_FIELDS
+            .iter()
             .filter(|f| !schema_cache.contains_field(f.name()))
+            .cloned()
             .collect();
 
         if !missing_fields.is_empty() {
@@ -128,7 +129,7 @@ pub async fn set_stream_is_llm(
 
         // Add to defined_schema_fields only if not already present
         let mut uds_updated = false;
-        for field in llm_schema_fields() {
+        for field in LLM_SCHEMA_FIELDS.iter() {
             if !settings
                 .defined_schema_fields
                 .contains(&field.name().to_string())
@@ -151,7 +152,7 @@ pub async fn set_stream_is_llm(
 
 /// Returns the Arrow schema fields for LLM streams, matching fields used by
 /// the traces handler APIs (mod.rs, session.rs, user.rs, dag.rs).
-fn llm_schema_fields() -> Vec<Field> {
+static LLM_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock::new(|| {
     vec![
         // String fields
         Field::new("_o2_llm_observation_type", DataType::Utf8, true),
@@ -171,7 +172,7 @@ fn llm_schema_fields() -> Vec<Field> {
         Field::new("_o2_llm_cost_details_output", DataType::Float64, true),
         Field::new("_o2_llm_cost_details_total", DataType::Float64, true),
     ]
-}
+});
 
 pub async fn delete_fields(
     org_id: &str,
