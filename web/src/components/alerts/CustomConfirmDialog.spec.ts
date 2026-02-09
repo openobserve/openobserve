@@ -418,19 +418,22 @@ describe("CustomConfirmDialog", () => {
       wrapper = await mountComponent({ modelValue: true });
 
       await clickConfirm(wrapper);
+      expect(wrapper.emitted("confirm")?.length).toBe(1);
+
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
       await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickConfirm(wrapper);
+      expect(wrapper.emitted("confirm")?.length).toBe(2);
+
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
       await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickConfirm(wrapper);
-
       expect(wrapper.emitted("confirm")?.length).toBe(3);
     });
 
@@ -438,19 +441,22 @@ describe("CustomConfirmDialog", () => {
       wrapper = await mountComponent({ modelValue: true });
 
       await clickCancel(wrapper);
+      expect(wrapper.emitted("cancel")?.length).toBe(1);
+
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
       await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickConfirm(wrapper);
+      expect(wrapper.emitted("confirm")?.length).toBe(1);
+
       await wrapper.setProps({ modelValue: true });
       await flushPromises();
       await wrapper.vm.$nextTick();
       await flushPromises(); // Additional flush to ensure dialog is fully rendered
 
       await clickCancel(wrapper);
-
       expect(wrapper.emitted("cancel")?.length).toBe(2);
       expect(wrapper.emitted("confirm")?.length).toBe(1);
     });
