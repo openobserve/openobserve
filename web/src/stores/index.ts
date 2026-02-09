@@ -21,6 +21,7 @@ import {
 } from "../utils/zincutils";
 import streams from "./streams";
 import logs from "./logs";
+import incidents from "./incidents";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -469,6 +470,7 @@ export default createStore({
   },
   modules: {
     streams,
-    logs
+    logs,
+    incidents
   },
 });

@@ -125,7 +125,7 @@
     "source": "_소스",
     "noResult": "결과 없음",
     "syntaxGuide": "구문 가이드",
-    "recordsPerPage": "페이지당 레코드",
+    "rowsPerPage": "페이지당 레코드",
     "showing": "표시",
     "of": "의",
     "rowDetail": "소스 세부 정보",
@@ -1179,6 +1179,9 @@
     "wraptext": "랩 테이블 셀",
     "tableTranspose": "전치",
     "tableDynamicColumns": "동적 열 허용",
+    "pagination": "페이지네이션",
+    "rowsPerPage": "페이지당 행 수",
+    "rowsPerPageTooltip": "페이지당 표시할 기본 레코드 수를 설정합니다",
     "showBorder": "축 테두리 표시",
     "currencyDollar": "통화 - 달러 ($)",
     "currencyEuro": "통화 - 유로 (€)",
@@ -2532,7 +2535,8 @@
     "sql_query": "SQL 쿼리",
     "resuls": "결과",
     "wrapText": "줄 바꿈 텍스트",
-    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다."
+    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다.",
+    "results": "결과"
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",
@@ -2623,7 +2627,8 @@
     "analyzeButtonLabel": "분석",
     "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
     "customSQLFieldsDisabled": "사용자 지정 SQL 쿼리에는 필드 선택을 사용할 수 없습니다.차원은 쿼리 결과에서 추출됩니다.",
-    "timeRangeSelected": "시간 범위 선택"
+    "timeRangeSelected": "시간 범위 선택",
+    "dimensionsSelected": "치수 선택"
   },
   "volumeInsights": {
     "title": "인사이트",
@@ -2746,7 +2751,9 @@
         "startBeforeEnd": "시작 시간은 종료 시간 이전이어야 합니다.",
         "endAfterStart": "종료 시간은 시작 시간 이후여야 합니다."
       }
-    }
+    },
+    "viewInTraces": "트레이스에서 보기",
+    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기"
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

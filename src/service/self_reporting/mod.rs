@@ -46,6 +46,7 @@ mod ingestion;
 mod queues;
 pub mod search;
 mod triggers_schema;
+mod usage_schema;
 
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;
@@ -309,6 +310,7 @@ pub async fn publish_error(error_data: ErrorData) {
     let error_source = match &error_data.error_source {
         config::meta::self_reporting::error::ErrorSource::Alert => "Alert",
         config::meta::self_reporting::error::ErrorSource::Dashboard => "Dashboard",
+        config::meta::self_reporting::error::ErrorSource::Function(_) => "Function",
         config::meta::self_reporting::error::ErrorSource::Ingestion => "Ingestion",
         config::meta::self_reporting::error::ErrorSource::Pipeline(_) => "Pipeline",
         config::meta::self_reporting::error::ErrorSource::Search => "Search",

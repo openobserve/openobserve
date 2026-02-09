@@ -78,7 +78,7 @@ describe('License.vue', () => {
       limits: {
         Ingestion: {
           typ: 'PerDayCount',
-          value: 100,
+          value: 50,
         },
       },
     },
@@ -292,7 +292,7 @@ describe('License.vue', () => {
 
     it('should display usage information section', () => {
       expect(wrapper.text()).toContain('Usage Information');
-      expect(wrapper.text()).toContain('100 GB of data ingestion per day');
+      expect(wrapper.text()).toContain('50 GB of data ingestion per day');
     });
 
     it('should calculate ingestion usage percentage correctly', () => {
@@ -300,7 +300,7 @@ describe('License.vue', () => {
     });
 
     it('should display ingestion limit', () => {
-      expect(wrapper.text()).toContain('100 GB of data ingestion per day');
+      expect(wrapper.text()).toContain('50 GB of data ingestion per day');
     });
 
     it('should display ingestion type', () => {

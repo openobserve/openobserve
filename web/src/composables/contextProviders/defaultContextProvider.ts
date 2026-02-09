@@ -42,16 +42,19 @@ export const createDefaultContextProvider = (
       
       return {
         currentPage: currentRoute?.meta?.title || 'unknown',
-        
+
         // Current route information
         routeName: currentRoute?.name || 'unknown',
         routePath: currentRoute?.path || '/',
         routeFullPath: currentRoute?.fullPath || '/',
         routeParams: currentRoute?.params || {},
         routeQuery: currentRoute?.query || {},
-        
+
         // Organization context
-        organization_identifier: store?.state?.selectedOrganization?.identifier || ''
+        organization_identifier: store?.state?.selectedOrganization?.identifier || '',
+
+        // Current timestamp when request is fired (microseconds) for AI agent time calculations
+        request_timestamp: Date.now() * 1000,
       };
     }
   };

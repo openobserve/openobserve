@@ -368,12 +368,12 @@ describe('useAiChat', () => {
     it('should make API call with correct URL and body when model is provided', async () => {
       const mockResponse = { ok: true, json: vi.fn() };
       mockFetch.mockResolvedValue(mockResponse);
-      
+
       const model = 'gpt-4';
       const orgId = 'test-org';
-      
+
       const result = await aiChatComposable.fetchAiChat(mockMessages, model, orgId);
-      
+
       expect(mockFetch).toHaveBeenCalledWith(
         `http://localhost:5080/api/test-org/ai/chat_stream`,
         expect.objectContaining({
@@ -383,27 +383,34 @@ describe('useAiChat', () => {
             'Content-Type': 'application/json',
             'traceparent': expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
           }),
-          body: JSON.stringify({ model, messages: mockMessages })
         })
       );
+      // Verify body includes model, messages, and context with user_timezone
+      const callArgs = mockFetch.mock.calls[0][1];
+      const requestBody = JSON.parse(callArgs.body);
+      expect(requestBody.model).toBe(model);
+      expect(requestBody.messages).toEqual(mockMessages);
+      expect(requestBody.context).toBeDefined();
+      expect(requestBody.context.user_timezone).toBeDefined();
       expect(result).toBe(mockResponse);
     });
 
     it('should make API call without model when model is empty string', async () => {
       const mockResponse = { ok: true, json: vi.fn() };
       mockFetch.mockResolvedValue(mockResponse);
-      
+
       const model = '';
       const orgId = 'test-org';
-      
+
       await aiChatComposable.fetchAiChat(mockMessages, model, orgId);
-      
-      expect(mockFetch).toHaveBeenCalledWith(
-        `http://localhost:5080/api/test-org/ai/chat_stream`,
-        expect.objectContaining({
-          body: JSON.stringify({ messages: mockMessages })
-        })
-      );
+
+      // Verify body includes messages and context with user_timezone but no model
+      const callArgs = mockFetch.mock.calls[0][1];
+      const requestBody = JSON.parse(callArgs.body);
+      expect(requestBody.model).toBeUndefined();
+      expect(requestBody.messages).toEqual(mockMessages);
+      expect(requestBody.context).toBeDefined();
+      expect(requestBody.context.user_timezone).toBeDefined();
     });
 
     it('should not mutate original messages array', async () => {

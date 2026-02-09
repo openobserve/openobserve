@@ -134,7 +134,7 @@ export default defineComponent({
       { name: 'Sensitive Data Redaction', price: '$0.15 / GB' , is_parent: true},
       
       { name: 'Incident Management', price: '$0 during preview' , is_parent: true},
-      { name: 'AI Assistant', price: '$0 during preview' , is_parent: true},
+      { name: 'O2 Assistant', price: '$0 during preview' , is_parent: true},
       { name: 'AI SRE Agent', price: '$0 during preview' , is_parent: true},
       { name: 'Audit Trail', price: '2% of monthly spend' , is_parent: true},
       { name: 'Retention', price: '' , is_parent: true},

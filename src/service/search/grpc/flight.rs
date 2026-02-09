@@ -196,7 +196,7 @@ pub async fn search(
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
-        stream,
+        stream: stream.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
         time_range: (req.search_info.start_time, req.search_info.end_time),
@@ -411,7 +411,7 @@ pub async fn search(
         // get the enrichment table from db
         let enrichment_table = EnrichTable::new(
             &org_id,
-            &stream_name,
+            &stream,
             empty_exec.full_schema().clone(),
             query_params.time_range,
         );

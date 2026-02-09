@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -63,7 +63,10 @@ use super::worker::{MergeBatch, MergeSender};
 use crate::service::{
     db, file_list,
     schema::generate_schema_for_defined_schema_fields,
-    search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
+    search::datafusion::{
+        exec::TableBuilder,
+        merge::{self, MergeParquetResult},
+    },
     tantivy::create_tantivy_index,
 };
 
@@ -155,8 +158,7 @@ pub async fn generate_job_by_stream(
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMPACTOR] add file_list_jobs failed: {}",
-            e
+            "[COMPACTOR] add file_list_jobs failed: {e}"
         ));
     }
 
@@ -252,8 +254,7 @@ pub async fn generate_old_data_job_by_stream(
         let column = hour.split('/').collect::<Vec<_>>();
         if column.len() != 4 {
             return Err(anyhow::anyhow!(
-                "Unexpected hour format in {}, Expected format YYYY/MM/DD/HH",
-                hour
+                "Unexpected hour format in {hour}, Expected format YYYY/MM/DD/HH",
             ));
         }
         let offset = DateTime::parse_from_rfc3339(&format!(
@@ -267,8 +268,7 @@ pub async fn generate_old_data_job_by_stream(
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
-                "[COMPACTOR] add file_list_jobs for old data failed: {}",
-                e
+                "[COMPACTOR] add file_list_jobs for old data failed: {e}"
             ));
         }
     }
@@ -296,8 +296,8 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!(
-            "/compact/downsampling/{}/{}/{}/{}/{}",
-            org_id, stream_type, stream_name, rule.0, rule.1
+            "/compact/downsampling/{org_id}/{stream_type}/{stream_name}/{}/{}",
+            rule.0, rule.1
         );
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
@@ -366,8 +366,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // generate downsampling job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[DOWNSAMPLING] add file_list_jobs failed: {}",
-            e
+            "[DOWNSAMPLING] add file_list_jobs failed: {e}"
         ));
     }
 
@@ -443,15 +442,10 @@ pub async fn merge_by_stream(
     let files =
         file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
             .await
-            .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        date_start,
-        date_end,
+        "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
         files.len(),
     );
 
@@ -857,7 +851,7 @@ pub async fn merge_files(
         let new_file_meta = new_file_meta.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
-                exec::merge_parquet_files(
+                merge::merge_parquet_files(
                     stream_type,
                     &stream_name,
                     latest_schema,
@@ -897,7 +891,11 @@ pub async fn merge_files(
                 || stream_type == StreamType::Metrics
                 || stream_type == StreamType::Traces)
         {
-            // Apply two-tier sampling to ensure fair processing across all streams
+            // Get stream count for this type (cached, 5-min TTL — counts rarely change).
+            let stream_count =
+                crate::service::db::schema::get_stream_count_cached(org_id, stream_type).await;
+
+            // Apply adaptive two-tier sampling with per-type rate equalization
             // Use the first file key as identifier for this merge operation
             let file_identifier = files.first().map(|f| f.as_str()).unwrap_or("unknown");
             let should_process =
@@ -906,6 +904,7 @@ pub async fn merge_files(
                     stream_type,
                     stream_name,
                     file_identifier,
+                    stream_count,
                 );
 
             if should_process {
@@ -916,8 +915,7 @@ pub async fn merge_files(
                         .await
                 {
                     log::warn!(
-                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {}",
-                        e
+                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {e}",
                     );
                 }
             }
@@ -1066,10 +1064,7 @@ async fn generate_inverted_index(
     .await
     .map_err(|e| {
         anyhow::anyhow!(
-            "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
-            new_file_key,
-            e,
-            retain_file_list
+            "create_tantivy_index_on_compactor for file: {new_file_key}, error: {e}, need delete files: {retain_file_list:?}",
         )
     })?;
     new_file_meta.index_size = index_size as i64;
@@ -1356,11 +1351,11 @@ async fn process_service_streams_from_parquet(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    parquet_result: &exec::MergeParquetResult,
+    parquet_result: &MergeParquetResult,
 ) -> Result<(), anyhow::Error> {
     let parquet_bytes = match parquet_result {
-        exec::MergeParquetResult::Single(buf) => buf,
-        exec::MergeParquetResult::Multiple { bufs, .. } => {
+        MergeParquetResult::Single(buf) => buf,
+        MergeParquetResult::Multiple { bufs, .. } => {
             // For multiple files, process each one
             for buf in bufs {
                 process_single_parquet_buffer(org_id, stream_name, stream_type, buf).await?;

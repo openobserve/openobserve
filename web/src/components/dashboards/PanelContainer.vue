@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
   >
-    <div :class="{ 'drag-allow': !viewOnly }">
+    <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
       <q-bar
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
         dense
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-panel-bar"
       >
         <q-icon
-          v-if="!viewOnly"
+          v-if="!viewOnly && !simplifiedPanelView"
           name="drag_indicator"
           data-test="dashboard-panel-drag"
         />
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-space />
         <q-icon
           v-if="
-            !viewOnly && isCurrentlyHoveredPanel && props.data.description != ''
+            !viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel && props.data.description != ''
           "
           name="info_outline"
           style="cursor: pointer"
@@ -55,7 +55,7 @@ self="top right" max-width="220px">
           </q-tooltip>
         </q-icon>
         <q-btn
-          v-if="!viewOnly && isCurrentlyHoveredPanel"
+          v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
           icon="fullscreen"
           flat
           size="sm"
@@ -81,99 +81,18 @@ self="top right" max-width="220px">
           </q-tooltip>
         </q-btn>
         <!-- show error here -->
+        <PanelErrorButtons
+          :error="errorData"
+          :maxQueryRangeWarning="maxQueryRangeWarning"
+          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+          :isPartialData="isPartialData"
+          :isPanelLoading="isPanelLoading"
+          :lastTriggeredAt="lastTriggeredAt"
+          :viewOnly="viewOnly"
+        />
         <q-btn
-          v-if="errorData"
-          :key="errorData"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-error-data"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ errorData }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="maxQueryRangeWarning"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-max-duration-warning"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ maxQueryRangeWarning }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="limitNumberOfSeriesWarningMessage"
-          :icon="symOutlinedDataInfoAlert"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-limit-number-of-series-warning"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right" self="top right">
-            <div style="white-space: pre-wrap">
-              {{ limitNumberOfSeriesWarningMessage }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="isCachedDataDifferWithCurrentTimeRange"
-          :icon="outlinedRunningWithErrors"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-is-cached-data-differ-with-current-time-range-warning"
-        >
-          <q-tooltip anchor="bottom right" self="top right">
-            <div style="white-space: pre-wrap">
-              The data shown is cached and is different from the selected time
-              range.
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="isPartialData && !isPanelLoading"
-          :icon="symOutlinedClockLoader20"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-partial-data-warning"
-          class="warning"
-        >
-          <q-tooltip anchor="bottom right" self="top right">
-            <div style="white-space: pre-wrap">
-              The data shown is incomplete because the loading was interrupted.
-              Refresh to load complete data.
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
-          <span class="lastRefreshedAtIcon"
-            >🕑
-            <q-tooltip anchor="bottom right" self="top right">
-              Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" />
-            </q-tooltip>
-          </span>
-          <RelativeTime
-            :timestamp="lastTriggeredAt"
-            fullTimePrefix="Last Refreshed At: "
-          />
-        </span>
-        <q-btn
-          v-if="!viewOnly"
+          v-if="!viewOnly && !simplifiedPanelView"
           icon="refresh"
           flat
           size="sm"
@@ -192,16 +111,31 @@ self="top right" max-width="220px">
             }}
           </q-tooltip>
         </q-btn>
+        <!-- Direct delete icon (shown when simplifiedPanelView is true) -->
+        <q-btn
+          v-if="!viewOnly && simplifiedPanelView"
+          icon="close"
+          flat
+          dense
+          size="sm"
+          padding="xs"
+          @click="onPanelModifyClick('DeletePanel')"
+          :title="t('panel.deletePanel')"
+          :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
+        />
+
+        <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
         <q-btn-dropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
           dense
           flat
           label=""
           no-caps
-          v-if="!viewOnly"
+          v-if="!viewOnly && !simplifiedPanelView"
         >
           <q-list dense>
             <q-item
+              v-if="!simplifiedPanelView"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('EditPanel')"
@@ -215,6 +149,7 @@ self="top right" max-width="220px">
               </q-item-section>
             </q-item>
             <q-item
+              v-if="!simplifiedPanelView"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('EditLayout')"
@@ -228,6 +163,7 @@ self="top right" max-width="220px">
               </q-item-section>
             </q-item>
             <q-item
+              v-if="!simplifiedPanelView"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('DuplicatePanel')"
@@ -255,7 +191,7 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               v-close-popup="true"
               @click="showViewPanel = true"
             >
@@ -269,7 +205,7 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               v-close-popup="true"
               @click="
                 PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
@@ -285,7 +221,7 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               v-close-popup="true"
               @click="
                 PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
@@ -301,7 +237,7 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               :disable="props.data.queryType != 'sql'"
               v-close-popup="true"
               @click="onLogPanel"
@@ -315,7 +251,7 @@ self="top right" max-width="220px">
               </q-item-section>
             </q-item>
             <q-item
-              v-if="config.isEnterprise === 'true'"
+              v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('Refresh')"
@@ -329,6 +265,7 @@ self="top right" max-width="220px">
               </q-item-section>
             </q-item>
             <q-item
+              v-if="!simplifiedPanelView"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('MovePanel')"
@@ -343,7 +280,7 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               v-close-popup="true"
               @click="onPanelModifyClick('CreateAlert')"
             >
@@ -477,6 +414,9 @@ import { useI18n } from "vue-i18n";
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
 });
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 
 export default defineComponent({
   name: "PanelContainer",
@@ -513,6 +453,7 @@ export default defineComponent({
     "folderName",
     "allowAlertCreation",
     "panelVariablesConfig",
+    "simplifiedPanelView",
     "shouldRefreshWithoutCache",
     "showLegendsButton",
   ],
@@ -522,6 +463,7 @@ export default defineComponent({
     ConfirmDialog,
     SinglePanelMove,
     RelativeTime,
+    PanelErrorButtons,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
@@ -1082,26 +1024,5 @@ export default defineComponent({
 
 .warning {
   color: var(--q-warning);
-}
-
-.lastRefreshedAt {
-  font-size: smaller;
-  margin-left: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  &::after {
-    content: "";
-  }
-
-  &::before {
-    content: "";
-  }
-
-  & .lastRefreshedAtIcon {
-    font-size: smaller;
-    margin-right: 2px;
-  }
 }
 </style>

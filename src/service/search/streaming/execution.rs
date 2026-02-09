@@ -218,15 +218,17 @@ pub async fn do_partitioned_search(
         }
 
         // add top k values for values search
-        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+        if req.search_type == Some(SearchEventType::Values)
+            && let Some(values_ctx) = values_ctx.as_ref()
+        {
             let search_stream_span = tracing::info_span!(
                 "src::service::search::stream_execution::do_partitioned_search::get_top_k_values",
                 org_id = %org_id,
             );
             let instant = Instant::now();
-            let field = values_ctx.as_ref().unwrap().field.clone();
-            let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-            let no_count = values_ctx.as_ref().unwrap().no_count;
+            let field = values_ctx.field.clone();
+            let top_k = values_ctx.top_k.unwrap_or(10);
+            let no_count = values_ctx.no_count;
             let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
                 get_top_k_values(&search_res.hits, &field, top_k, no_count)
             })

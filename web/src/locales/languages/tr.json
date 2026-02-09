@@ -125,7 +125,7 @@
     "source": "_kaynak",
     "noResult": "Sonuç Yok",
     "syntaxGuide": "Sözdizimi kılavuzu",
-    "recordsPerPage": "Sayfa başına kayıtlar",
+    "rowsPerPage": "Sayfa başına kayıtlar",
     "showing": "Gösterme",
     "of": "dan",
     "rowDetail": "Kaynak Ayrıntıları",
@@ -1179,6 +1179,9 @@
     "wraptext": "Tablo Hücrelerini Sarın",
     "tableTranspose": "Aktarma",
     "tableDynamicColumns": "Dinamik Sütunlara İzin Ver",
+    "pagination": "Sayfalama",
+    "rowsPerPage": "Sayfa başına satır",
+    "rowsPerPageTooltip": "Sayfa başına görüntülenecek varsayılan kayıt sayısını ayarlayın",
     "showBorder": "Eksen Kenarlığını Göster",
     "currencyDollar": "Para birimi - Dolar ($)",
     "currencyEuro": "Para birimi - Euro (€)",
@@ -2532,7 +2535,8 @@
     "sql_query": "SQL Sorgu",
     "resuls": "Sonuçlar",
     "wrapText": "Metni Sarma",
-    "delayMessage": "Arama Geçmişi şu şekilde gecikebilir"
+    "delayMessage": "Arama Geçmişi şu şekilde gecikebilir",
+    "results": "Sonuçlar"
   },
   "search_scheduler_job": {
     "title": "İş Zamanlayıcı Ara",
@@ -2623,7 +2627,8 @@
     "analyzeButtonLabel": "Analiz",
     "refreshTooltip": "Güncellenmiş yüzdelik ile analizi yenileyin",
     "customSQLFieldsDisabled": "Alan seçimi özel SQL sorguları için kullanılamaz. Boyutlar, sorgu sonuçlarınızdan çıkarılır.",
-    "timeRangeSelected": "Seçilen Zaman Aralığı"
+    "timeRangeSelected": "Seçilen Zaman Aralığı",
+    "dimensionsSelected": "Seçilen boyutlar"
   },
   "volumeInsights": {
     "title": "İçgörüler",
@@ -2746,7 +2751,9 @@
         "startBeforeEnd": "Başlangıç saati bitiş saatinden önce olmalıdır",
         "endAfterStart": "Bitiş saati başlangıç saatinden sonra olmalıdır"
       }
-    }
+    },
+    "viewInTraces": "İzlerde Görüntüle",
+    "viewInTracesTooltip": "RED metrikler panosu ve tüm ilişkili izlerle izleme sayfasını açın"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

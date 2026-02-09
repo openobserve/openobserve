@@ -125,7 +125,7 @@
     "source": "_fonte",
     "noResult": "Nessun risultato",
     "syntaxGuide": "Guida alla sintassi",
-    "recordsPerPage": "Record per pagina",
+    "rowsPerPage": "Record per pagina",
     "showing": "Mostrando",
     "of": "di",
     "rowDetail": "Dettagli della fonte",
@@ -1179,6 +1179,9 @@
     "wraptext": "Avvolgi le celle della tabella",
     "tableTranspose": "Trasporre",
     "tableDynamicColumns": "Consenti colonne dinamiche",
+    "pagination": "Paginazione",
+    "rowsPerPage": "Righe per pagina",
+    "rowsPerPageTooltip": "Imposta il numero predefinito di record da visualizzare per pagina",
     "showBorder": "Mostra bordo dell'asse",
     "currencyDollar": "Valuta - Dollaro ($)",
     "currencyEuro": "Valuta - Euro (€)",
@@ -2530,7 +2533,8 @@
     "sql_query": "Interrogazione SQL",
     "resuls": "Risultati",
     "wrapText": "Avvolgi testo",
-    "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata"
+    "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata",
+    "results": "Risultati"
   },
   "search_scheduler_job": {
     "title": "Cerca Job Scheduler",
@@ -2621,7 +2625,8 @@
     "analyzeButtonLabel": "Analizza",
     "refreshTooltip": "Aggiorna l'analisi con il percentile aggiornato",
     "customSQLFieldsDisabled": "La selezione dei campi non è disponibile per le query SQL personalizzate. Le dimensioni vengono estratte dai risultati della query.",
-    "timeRangeSelected": "Intervallo di tempo selezionato"
+    "timeRangeSelected": "Intervallo di tempo selezionato",
+    "dimensionsSelected": "Dimensioni selezionate"
   },
   "volumeInsights": {
     "title": "Approfondimenti",
@@ -2744,7 +2749,9 @@
         "startBeforeEnd": "L'ora di inizio deve essere precedente all'ora di fine",
         "endAfterStart": "L'ora di fine deve essere successiva all'ora di inizio"
       }
-    }
+    },
+    "viewInTraces": "Visualizza in Tracce",
+    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

@@ -206,18 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <div class="tw:flex tw:justify-end tw:mr-2">
-                      <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-                        <span class="lastRefreshedAtIcon">🕑</span
-                        ><RelativeTime
-                          :timestamp="lastTriggeredAt"
-                          fullTimePrefix="Last Refreshed At: "
-                        />
-                      </span>
-                    </div>
                     <div class="col tw:relative" >
                       <div
-                        class="tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[40px]"
+                        class="tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[54px]"
                       >
                         <PanelSchemaRenderer
                           v-if="chartData"
@@ -241,11 +232,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @show-legends="showLegendsDialog = true"
                           ref="panelSchemaRendererRef"
                           searchType="ui"
+                          @is-partial-data-update="handleIsPartialDataUpdate"
+                          @loading-state-change="handleLoadingStateChange"
+                          @is-cached-data-differ-with-current-time-range-update="
+                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                          "
+                          @limit-number-of-series-warning-message-update="
+                            handleLimitNumberOfSeriesWarningMessage
+                          "
                         />
                       </div>
                       <div
-                        class="flex justify-end q-pr-sm q-mb-md q-pt-xs"
-                        style="position: absolute; top: 4px; right: 0px"
+                        class="flex column items-end q-pr-lg q-mb-md q-pt-xs tw:gap-1"
+                        style="position: absolute; top: 0px; right: -13px"
                       >
                         <q-btn
                           size="md"
@@ -257,6 +256,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :title="t('search.addToDashboard')"
                           >{{ t("search.addToDashboard") }}</q-btn
                         >
+                        <PanelErrorButtons
+                        :error="errorMessage"
+                        :maxQueryRangeWarning="maxQueryRangeWarning"
+                        :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                        :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                        :isPartialData="isPartialData"
+                        :isPanelLoading="isPanelLoading"
+                        :lastTriggeredAt="lastTriggeredAt"
+                        :viewOnly="false"
+                      />
                       </div>
                     </div>
                     <DashboardErrorsComponent
@@ -406,6 +415,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       <template #after>
+                        <div class="flex justify-end q-mr-sm">
+                          <PanelErrorButtons
+                            :error="errorMessage"
+                            :maxQueryRangeWarning="maxQueryRangeWarning"
+                            :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                            :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                            :isPartialData="isPartialData"
+                            :isPanelLoading="isPanelLoading"
+                          />
+                        </div>
                         <PanelSchemaRenderer
                           v-if="chartData"
                           @metadata-update="metaDataValue"
@@ -423,6 +442,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @series-data-update="seriesDataUpdate"
                           @show-legends="showLegendsDialog = true"
                           searchType="ui"
+                          @is-partial-data-update="handleIsPartialDataUpdate"
+                          @loading-state-change="handleLoadingStateChange"
+                          @is-cached-data-differ-with-current-time-range-update="
+                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                          "
+                          @limit-number-of-series-warning-message-update="
+                            handleLimitNumberOfSeriesWarningMessage
+                          "
                         />
                       </template>
                     </q-splitter>
@@ -512,6 +539,9 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
@@ -563,6 +593,7 @@ export default defineComponent({
     AutoRefreshInterval,
     CustomChartEditor,
     ShowLegendsPopup,
+    PanelErrorButtons,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -1176,6 +1207,31 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = computed(() => {
+        return errorData.errors.join("\n");
+      });
+    const isPartialData = ref(false);
+    const isPanelLoading = ref(false);
+    const isCachedDataDifferWithCurrentTimeRange = ref(false);
+
+    const handleIsPartialDataUpdate = (data: boolean) => {
+      isPartialData.value = data;
+    };
+
+    const handleLoadingStateChange = (data: boolean) => {
+      isPanelLoading.value = data;
+    };
+
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+      isCachedDataDifferWithCurrentTimeRange.value = data;
+    };
+
+    const handleLimitNumberOfSeriesWarningMessage = (data: string) => {
+      limitNumberOfSeriesWarningMessage.value = data;
+    };
+
     const currentPanelData = computed(() => {
       const rendererData = panelSchemaRendererRef.value?.panelData || {};
       return {
@@ -1222,6 +1278,16 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      handleLoadingStateChange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
+      handleLimitNumberOfSeriesWarningMessage,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      isPartialData,
+      isPanelLoading,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsPartialDataUpdate,
     };
   },
 });

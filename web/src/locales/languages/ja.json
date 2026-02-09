@@ -126,7 +126,7 @@
     "source": "ソース",
     "noResult": "結果なし",
     "syntaxGuide": "シンタックスガイド",
-    "recordsPerPage": "1 ページあたりのレコード数",
+    "rowsPerPage": "1 ページあたりのレコード数",
     "showing": "表示中",
     "of": "の",
     "rowDetail": "ソース詳細",
@@ -1197,6 +1197,9 @@
     "wraptext": "ラップテーブルセル",
     "tableTranspose": "トランスポーズ",
     "tableDynamicColumns": "動的列を許可",
+    "pagination": "ページネーション",
+    "rowsPerPage": "ページあたりの行数",
+    "rowsPerPageTooltip": "ページごとに表示するレコードのデフォルト数を設定します",
     "showBorder": "軸境界を表示",
     "currencyDollar": "通貨-ドル ($)",
     "currencyEuro": "通貨-ユーロ (€)",
@@ -2532,7 +2535,8 @@
     "sql_query": "SQL クエリー",
     "resuls": "結果",
     "wrapText": "テキストを折り返す",
-    "delayMessage": "検索履歴は次の理由で遅延する可能性があります"
+    "delayMessage": "検索履歴は次の理由で遅延する可能性があります",
+    "results": "結果"
   },
   "search_scheduler_job": {
     "title": "ジョブスケジューラを検索する",
@@ -2623,7 +2627,8 @@
     "analyzeButtonLabel": "分析",
     "refreshTooltip": "パーセンタイルを更新して分析を更新",
     "customSQLFieldsDisabled": "フィールド選択はカスタム SQL クエリでは使用できません。ディメンションはクエリ結果から抽出されます。",
-    "timeRangeSelected": "選択した時間範囲"
+    "timeRangeSelected": "選択した時間範囲",
+    "dimensionsSelected": "ディメンションが選択されました"
   },
   "volumeInsights": {
     "title": "インサイト",
@@ -2746,7 +2751,9 @@
         "startBeforeEnd": "開始時刻は終了時刻より前でなければなりません",
         "endAfterStart": "終了時刻は開始時刻より後である必要があります"
       }
-    }
+    },
+    "viewInTraces": "トレースで表示",
+    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

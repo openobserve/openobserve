@@ -116,6 +116,7 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
         return Ok(Utc.timestamp_nanos(v * 1000));
     }
 
+    let s = s.trim_matches('"');
     let ret = if s.contains(' ') && s.len() == 19 {
         let fmt = "%Y-%m-%d %H:%M:%S";
         NaiveDateTime::parse_from_str(s, fmt)?.and_utc()

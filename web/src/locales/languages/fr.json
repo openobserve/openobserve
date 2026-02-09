@@ -125,7 +125,7 @@
     "source": "_source",
     "noResult": "Aucun résultat",
     "syntaxGuide": "Guide de syntaxe",
-    "recordsPerPage": "Enregistrements par page",
+    "rowsPerPage": "Enregistrements par page",
     "showing": "Montrant",
     "of": "de",
     "rowDetail": "Détails de la source",
@@ -1179,6 +1179,9 @@
     "wraptext": "Envelopper les cellules du tableau",
     "tableTranspose": "Transposer",
     "tableDynamicColumns": "Autoriser les colonnes dynamiques",
+    "pagination": "Pagination",
+    "rowsPerPage": "Lignes par page",
+    "rowsPerPageTooltip": "Définir le nombre par défaut d'enregistrements à afficher par page",
     "showBorder": "Afficher la bordure de l'axe",
     "currencyDollar": "Devise - Dollar ($)",
     "currencyEuro": "Devise - Euro (€)",
@@ -2532,7 +2535,8 @@
     "sql_query": "Requête SQL",
     "resuls": "Résultats",
     "wrapText": "Envelopper le texte",
-    "delayMessage": "L'historique des recherches peut être retardé par"
+    "delayMessage": "L'historique des recherches peut être retardé par",
+    "results": "Résultats"
   },
   "search_scheduler_job": {
     "title": "Rechercher un planificateur de tâches",
@@ -2623,7 +2627,8 @@
     "analyzeButtonLabel": "Analyser",
     "refreshTooltip": "Actualiser l'analyse avec un percentile mis à jour",
     "customSQLFieldsDisabled": "La sélection de champs n'est pas disponible pour les requêtes SQL personnalisées. Les dimensions sont extraites des résultats de votre requête.",
-    "timeRangeSelected": "Plage de temps sélectionnée"
+    "timeRangeSelected": "Plage de temps sélectionnée",
+    "dimensionsSelected": "Dimensions sélectionnées"
   },
   "volumeInsights": {
     "title": "Perspectives",
@@ -2746,7 +2751,9 @@
         "startBeforeEnd": "L'heure de début doit être antérieure à l'heure de fin",
         "endAfterStart": "L'heure de fin doit être postérieure à l'heure de début"
       }
-    }
+    },
+    "viewInTraces": "Afficher dans Traces",
+    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

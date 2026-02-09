@@ -1905,4 +1905,207 @@ describe("ConfigPanel", () => {
       expect(wrapper.vm).toBeDefined();
     });
   });
+
+  describe("Table Pagination Configuration", () => {
+    it("should show pagination toggle for table panels", () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: { ...mockDashboardPanelData.data, type: "table" }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      const paginationToggle = wrapper.find('[data-test="dashboard-config-show-pagination"]');
+      expect(paginationToggle.exists()).toBe(true);
+    });
+
+    it("should hide pagination toggle for non-table panels", () => {
+      wrapper = createWrapper(); // Default is line chart
+
+      const paginationToggle = wrapper.find('[data-test="dashboard-config-show-pagination"]');
+      expect(paginationToggle.exists()).toBe(false);
+    });
+
+    it("should initialize table_pagination as false by default", () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: false
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination).toBe(false);
+    });
+
+    it("should toggle pagination value when clicked", async () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: false
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      // Set pagination to true
+      wrapper.vm.dashboardPanelData.data.config.table_pagination = true;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination).toBe(true);
+    });
+
+    it("should show rows per page input when pagination is enabled", () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: true
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      const rowsPerPageInput = wrapper.find('[data-test="dashboard-config-rows-per-page"]');
+      expect(rowsPerPageInput.exists()).toBe(true);
+    });
+
+    it("should hide rows per page input when pagination is disabled", () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: false
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      const rowsPerPageInput = wrapper.find('[data-test="dashboard-config-rows-per-page"]');
+      expect(rowsPerPageInput.exists()).toBe(false);
+    });
+
+    it("should update table_pagination_rows_per_page value when input changes", async () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: true,
+            table_pagination_rows_per_page: 10
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      const rowsPerPageInput = wrapper.find('[data-test="dashboard-config-rows-per-page"]');
+      if (rowsPerPageInput.exists()) {
+        await rowsPerPageInput.setValue(25);
+        expect(wrapper.vm.dashboardPanelData.data.config.table_pagination_rows_per_page).toBe(25);
+      }
+    });
+
+    it("should show rows per page info tooltip", () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: true
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      const infoIcon = wrapper.find('[data-test="dashboard-config-rows-per-page-info"]');
+      expect(infoIcon.exists()).toBe(true);
+    });
+
+    it("should persist pagination settings", async () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: true,
+            table_pagination_rows_per_page: 50
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination).toBe(true);
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination_rows_per_page).toBe(50);
+    });
+
+    it("should handle table_pagination_rows_per_page as null when not set", () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "table",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            table_pagination: true,
+            table_pagination_rows_per_page: null
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination_rows_per_page).toBeNull();
+    });
+
+    it("should hide pagination toggle and rows per page for non-table chart types", () => {
+      const nonTableTypes = ['line', 'bar', 'area', 'pie', 'gauge'];
+
+      nonTableTypes.forEach(type => {
+        const panelData = {
+          ...mockDashboardPanelData,
+          data: { ...mockDashboardPanelData.data, type }
+        };
+
+        wrapper = createWrapper({ dashboardPanelData: panelData });
+
+        const paginationToggle = wrapper.find('[data-test="dashboard-config-show-pagination"]');
+        const rowsPerPageInput = wrapper.find('[data-test="dashboard-config-rows-per-page"]');
+
+        expect(paginationToggle.exists()).toBe(false);
+        expect(rowsPerPageInput.exists()).toBe(false);
+
+        if (wrapper) {
+          wrapper.unmount();
+        }
+      });
+    });
+  });
 });

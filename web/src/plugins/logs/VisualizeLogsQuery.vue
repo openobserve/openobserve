@@ -149,10 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       style="
                         flex: 1;
-                        min-height: calc(100% - 36px);
-                        height: calc(100% - 36px);
+                        min-height: calc(100% - 54px);
+                        height: calc(100% - 54px);
                         width: 100%;
-                        margin-top: 36px;
+                        margin-top: 54px;
                       "
                     >
                       <PanelSchemaRenderer
@@ -177,71 +177,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
+                        @is-partial-data-update="handleIsPartialDataUpdate"
+                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                        @loading-state-change="handleLoadingStateChange"
+                        @is-cached-data-differ-with-current-time-range-update="
+                          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                        "
                         ref="panelSchemaRendererRef"
                       />
                     </div>
                     <div
-                      class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
+                      class="flex column items-end q-pr-lg q-mb-md q-pt-xs tw:gap-1"
                       style="position: absolute; top: 0px; right: -13px"
                     >
-                      <!-- Error/Warning tooltips -->
-                      <q-btn
-                        v-if="errorMessage"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-error-data"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ errorMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="maxQueryRangeWarning"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-max-duration-warning"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ maxQueryRangeWarning }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="limitNumberOfSeriesWarningMessage"
-                        :icon="symOutlinedDataInfoAlert"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-limit-number-of-series-warning"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ limitNumberOfSeriesWarningMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
                       <q-btn
                         size="md"
                         class="no-border"
@@ -254,6 +202,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="errorData?.errors?.length > 0"
                         >{{ t("search.addToDashboard") }}</q-btn
                       >
+                       <!-- Error/Warning tooltips -->
+                      <PanelErrorButtons
+                          :error="errorMessage"
+                          :maxQueryRangeWarning="maxQueryRangeWarning"
+                          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                          :isPartialData="isPartialData"
+                          :isPanelLoading="isPanelLoading"
+                          :lastTriggeredAt="lastTriggeredAt"
+                           :viewOnly="false"
+                      />
                     </div>
                   </div>
                   <DashboardErrorsComponent
@@ -417,6 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
+                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
                       />
                     </template>
                   </q-splitter>
@@ -514,6 +474,9 @@ const AddToDashboard = defineAsyncComponent(() => {
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
 });
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 
 export default defineComponent({
   name: "VisualizeLogsQuery",
@@ -554,6 +517,7 @@ export default defineComponent({
     AddToDashboard,
     CustomChartEditor,
     ShowLegendsPopup,
+    PanelErrorButtons,
   },
   emits: ["handleChartApiError"],
   setup(props, { emit }) {
@@ -593,6 +557,12 @@ export default defineComponent({
     const chartData = ref(visualizeChartData.value);
 
     const showAddToDashboardDialog = ref(false);
+
+     // to store and show when the panel was last loaded
+    const lastTriggeredAt = ref(null);
+    const handleLastTriggeredAtUpdate = (data: any) => {
+      lastTriggeredAt.value = data;
+    };
 
     watch(
       () => visualizeChartData.value,
@@ -651,20 +621,6 @@ export default defineComponent({
           "Select * query is not supported for visualization.",
         );
         // Prevent the change by not updating the type
-        return;
-      }
-
-      // Check if VRL functions are present and trying to switch to non-table chart
-      if (
-        dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0 &&
-        newType !== "table"
-      ) {
-        showErrorNotification(
-          "VRL functions are present. Only table chart is supported when using VRL functions.",
-        );
-        // Force table chart type
-        dashboardPanelData.data.type = "table";
-        resetAggregationFunction();
         return;
       }
 
@@ -980,6 +936,22 @@ export default defineComponent({
       };
     });
 
+    const isPartialData = ref(false);
+    const isPanelLoading = ref(false);
+    const isCachedDataDifferWithCurrentTimeRange = ref(false);
+
+    const handleIsPartialDataUpdate = (data: boolean) => {
+      isPartialData.value = data;
+    };
+
+    const handleLoadingStateChange = (data: boolean) => {
+      isPanelLoading.value = data;
+    };
+
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+      isCachedDataDifferWithCurrentTimeRange.value = data;
+    };
+
     return {
       t,
       layoutSplitterUpdated,
@@ -1017,6 +989,14 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      isPartialData,
+      lastTriggeredAt,
+      handleLastTriggeredAtUpdate,
+      isPanelLoading,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsPartialDataUpdate,
+      handleLoadingStateChange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
     };
   },
 });

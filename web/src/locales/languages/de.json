@@ -125,7 +125,7 @@
     "source": "_Quelle",
     "noResult": "Kein Ergebnis",
     "syntaxGuide": "Leitfaden zur Syntax",
-    "recordsPerPage": "Datensätze pro Seite",
+    "rowsPerPage": "Datensätze pro Seite",
     "showing": "Wird angezeigt",
     "of": "von",
     "rowDetail": "Angaben zur Quelle",
@@ -1179,6 +1179,9 @@
     "wraptext": "Tabellenzellen umwickeln",
     "tableTranspose": "Transponieren",
     "tableDynamicColumns": "Dynamische Spalten zulassen",
+    "pagination": "Paginierung",
+    "rowsPerPage": "Zeilen pro Seite",
+    "rowsPerPageTooltip": "Legen Sie die Standardanzahl der pro Seite anzuzeigenden Datensätze fest",
     "showBorder": "Achsenrand anzeigen",
     "currencyDollar": "Währung — Dollar ($)",
     "currencyEuro": "Währung - Euro (€)",
@@ -2532,7 +2535,8 @@
     "sql_query": "SQL-Abfrage",
     "resuls": "Ergebnisse",
     "wrapText": "Text umbrechen",
-    "delayMessage": "Der Suchverlauf könnte sich verzögern um"
+    "delayMessage": "Der Suchverlauf könnte sich verzögern um",
+    "results": "Ergebnisse"
   },
   "search_scheduler_job": {
     "title": "Job Scheduler durchsuchen",
@@ -2623,7 +2627,8 @@
     "analyzeButtonLabel": "Analysieren",
     "refreshTooltip": "Analyse mit aktualisiertem Perzentil aktualisieren",
     "customSQLFieldsDisabled": "Die Feldauswahl ist für benutzerdefinierte SQL-Abfragen nicht verfügbar. Dimensionen werden aus Ihren Abfrageergebnissen extrahiert.",
-    "timeRangeSelected": "Ausgewählter Zeitbereich"
+    "timeRangeSelected": "Ausgewählter Zeitbereich",
+    "dimensionsSelected": "Ausgewählte Abmessungen"
   },
   "volumeInsights": {
     "title": "Einblicke",
@@ -2746,7 +2751,9 @@
         "startBeforeEnd": "Die Startzeit muss vor der Endzeit liegen",
         "endAfterStart": "Die Endzeit muss nach der Startzeit liegen"
       }
-    }
+    },
+    "viewInTraces": "In Traces ansehen",
+    "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

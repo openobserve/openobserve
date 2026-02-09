@@ -1187,7 +1187,7 @@ class="q-pr-sm q-pt-xs" />
                           ? 'empty-function'
                           : ''
                       "
-                      :readOnly="false"
+                      :readOnly="isVrlEditorDisabled"
                       @keydown="handleKeyDown"
                       language="vrl"
                       @focus="
@@ -1197,6 +1197,33 @@ class="q-pr-sm q-pt-xs" />
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
                     />
+                    <!-- VRL disabled warning for non-table charts -->
+                    <div
+                      v-if="isVrlEditorDisabled"
+                      class="tw:absolute tw:bottom-0 tw:w-full"
+                      :style="{
+                        marginTop: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor:
+                          store.state.theme == 'dark'
+                            ? 'rgba(255, 255, 255, 0.1)'
+                            : 'rgba(0, 0, 0, 0.1)',
+                      }"
+                      data-test="vrl-editor-disabled-warning"
+                    >
+                      <q-icon
+                        name="warning"
+                        color="warning"
+                        size="20px"
+                        class="q-mx-sm"
+                      />
+                      <span
+                        class="text-negative q-pa-sm"
+                        style="font-weight: 600; font-size: 14px"
+                        >VRL function is only supported for table chart.</span
+                      >
+                    </div>
                   </div>
                 </div>
               </template>
@@ -2028,6 +2055,14 @@ export default defineComponent({
       if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
 
       return searchObj.data.transformType === "function";
+    });
+
+    // Check if VRL editor should be disabled (in visualize mode with non-table chart)
+    const isVrlEditorDisabled = computed(() => {
+      return (
+        searchObj.meta.logsVisualizeToggle === "visualize" &&
+        dashboardPanelData.data.type !== "table"
+      );
     });
 
     watch(
@@ -4365,6 +4400,7 @@ export default defineComponent({
       actionEditorQuery,
       isActionsEnabled,
       showFunctionEditor,
+      isVrlEditorDisabled,
       closeSocketWithError,
       histogram_svg,
       visualizeIcon,

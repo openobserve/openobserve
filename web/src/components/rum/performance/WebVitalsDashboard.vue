@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :currentTimeObj="dateTime"
         searchType="RUM"
         @variablesManagerReady="onVariablesManagerReady"
+        @updated:data-zoom="onDataZoom"
       />
     </div>
     <div
@@ -105,7 +106,7 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  emits: ["variablesManagerReady"],
+  emits: ["variablesManagerReady", "update:dateTime"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
@@ -128,6 +129,12 @@ export default defineComponent({
     // Variables manager event handler - pass through to parent
     const onVariablesManagerReady = (manager: any) => {
       emit("variablesManagerReady", manager);
+    };
+
+    // Handle data zoom from chart interactions
+    const onDataZoom = (event: any) => {
+      // Update the dateTime prop to trigger parent to update time range
+      emit("update:dateTime", event);
     };
 
     onMounted(async () => {
@@ -255,6 +262,7 @@ export default defineComponent({
       viewOnly,
       eventLog,
       onVariablesManagerReady,
+      onDataZoom,
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,

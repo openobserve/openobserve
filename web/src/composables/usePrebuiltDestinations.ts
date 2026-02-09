@@ -522,8 +522,7 @@ export function usePrebuiltDestinations() {
       console.error('Failed to create prebuilt destination:', error);
       $q.notify({
         type: 'negative',
-        message: t('alerts.destinations.saveError'),
-        caption: error.message
+        message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
     } finally {
@@ -634,8 +633,7 @@ export function usePrebuiltDestinations() {
       console.error('Failed to update prebuilt destination:', error);
       $q.notify({
         type: 'negative',
-        message: t('alerts.destinations.saveError'),
-        caption: error.message
+        message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
     } finally {
@@ -727,8 +725,7 @@ export function usePrebuiltDestinations() {
       console.error('Failed to convert destination:', error);
       $q.notify({
         type: 'negative',
-        message: t('alerts.prebuilt.conversionError'),
-        caption: error.message
+        message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
     } finally {

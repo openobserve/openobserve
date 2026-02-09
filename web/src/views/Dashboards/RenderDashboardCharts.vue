@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dashboardName="dashboardName"
             :folderName="folderName"
             :showLegendsButton="showLegendsButton"
+            :simplifiedPanelView="simplifiedPanelView"
             @updated:data-zoom="$emit('updated:data-zoom', $event)"
             @onMovePanel="onMovePanel"
             @refreshPanelRequest="refreshPanelRequest"
@@ -185,6 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :folderName="folderName"
                   :allowAlertCreation="allowAlertCreation"
                   :showLegendsButton="showLegendsButton"
+                  :simplifiedPanelView="simplifiedPanelView"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
                   @onMovePanel="onMovePanel"
                   @refreshPanelRequest="refreshPanelRequest"
@@ -347,6 +349,10 @@ export default defineComponent({
       default: false,
     },
     showLegendsButton: {
+      type: Boolean,
+      default: false,
+    },
+    simplifiedPanelView: {
       type: Boolean,
       default: false,
     },
@@ -734,14 +740,14 @@ export default defineComponent({
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving
             handle: ".drag-allow", // Only allow dragging from specific handle
           },
           resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable resizing unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable resizing unless view-only or saving
           },
-          disableResize: props.viewOnly || saveDashboardData.isLoading.value, // Disable resize in view-only
-          disableDrag: props.viewOnly || saveDashboardData.isLoading.value, // Disable drag in view-only
+          disableResize: props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable resize in view-only
+          disableDrag: props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance

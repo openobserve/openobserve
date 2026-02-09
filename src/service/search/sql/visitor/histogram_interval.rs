@@ -23,6 +23,7 @@ pub struct HistogramIntervalVisitor {
     pub is_histogram: bool,
     pub interval: Option<i64>,
     time_range: Option<(i64, i64)>,
+    pub error: Option<String>,
 }
 
 impl HistogramIntervalVisitor {
@@ -31,6 +32,7 @@ impl HistogramIntervalVisitor {
             is_histogram: false,
             interval: None,
             time_range,
+            error: None,
         }
     }
 }
@@ -49,10 +51,15 @@ impl VisitorMut for HistogramIntervalVisitor {
                 let _ = args.next();
                 // second is interval
                 let interval = if let Some(interval) = args.next() {
-                    interval
+                    let v = interval
                         .to_string()
                         .trim_matches(|v| v == '\'' || v == '"')
-                        .to_string()
+                        .to_string();
+                    if v.parse::<i64>().is_ok() {
+                        self.error = Some(format!("Invalid histogram interval: {v}"));
+                        return ControlFlow::Break(());
+                    }
+                    v
                 } else {
                     generate_histogram_interval(self.time_range).to_string()
                 };

@@ -123,6 +123,7 @@ pub async fn get_semantic_groups(org_id: &str) -> Result<Vec<SemanticFieldGroup>
                 alert_fingerprint_groups: vec![],
                 time_window_minutes: None,
                 fqn_priority_dimensions: GlobalDeduplicationConfig::default_fqn_priority(),
+                upgrade_window_minutes: 30,
             };
 
             // Try to save, but don't fail if it doesn't work
@@ -162,6 +163,7 @@ pub async fn initialize_semantic_groups(org_id: &str) -> Result<(), anyhow::Erro
         alert_fingerprint_groups: vec![],
         time_window_minutes: None,
         fqn_priority_dimensions: GlobalDeduplicationConfig::default_fqn_priority(),
+        upgrade_window_minutes: 30,
     };
 
     set_deduplication_config(org_id, &config).await?;

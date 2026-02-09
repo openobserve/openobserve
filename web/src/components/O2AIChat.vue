@@ -9,34 +9,43 @@
             <q-avatar size="24px">
               <img :src="o2AiTitleLogo" />
             </q-avatar>
-            <div class="tw:flex tw:items-center">
-              <span class="tw:mr-[5.5px]">O2 Assistant
-              </span>
-              <span class="o2-ai-beta-text"
-              >Beta</span>
-            </div>
 
-          </div>
-
-          <div>
-            <q-btn flat round dense icon="add" @click="addNewChat" />
-            <q-btn flat round dense icon="history" @click="loadHistory">
+            <q-btn
+              flat
+              dense
+              no-caps
+              class="chat-title-dropdown"
+              @click="loadHistory"
+            >
+              <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
+                <span class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block">
+                  {{ displayedTitle || 'New Chat' }}
+                  <q-tooltip
+                    v-if="displayedTitle && displayedTitle.length > 25"
+                    :delay="500"
+                    anchor="bottom middle"
+                    self="top middle"
+                    :offset="[0, 8]"
+                  >
+                    {{ displayedTitle }}
+                  </q-tooltip>
+                </span>
+                <q-icon name="arrow_drop_down" size="20px" class="tw:flex-shrink-0" />
+              </div>
               <q-menu>
-                <!-- here we will show the history menu -->
-                 <!-- and also the search functionality to search the history  -->
+                <!-- History menu with search -->
                 <div class="history-menu-container">
                   <div class="search-history-bar-sticky">
                     <q-input
                       v-model="historySearchTerm"
                       placeholder="Search chat history"
                       dense
-                    filled
-                    borderless
-                      class="tw:mb-2"
+                      borderless
+                      class="tw:mt-1"
                     >
-                    <template #prepend>
-                    <q-icon name="search" />
-                  </template>
+                      <template #prepend>
+                        <q-icon name="search" />
+                      </template>
                     </q-input>
                   </div>
                   <div class="history-list-container">
@@ -49,11 +58,25 @@
                         v-close-popup
                         @click="loadChat(chat.id)"
                         dense
+                        class="history-item"
                       >
                         <q-item-section>
-                          <div class="row items-center justify-between">
-                            <div class="col-8 ellipsis">{{ chat.title }}</div>
-                            <div class="col-4 text-right text-grey-7 text-caption">{{ formatTime(chat.timestamp) }}</div>
+                          <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
+                            <div class="tw:flex-1 tw:overflow-hidden">
+                              <div class="tw:text-[13px] tw:truncate">{{ chat.title }}</div>
+                              <div class="tw:text-[11px] tw:text-gray-500">{{ formatTime(chat.timestamp) }}</div>
+                            </div>
+                            <q-btn
+                              flat
+                              round
+                              dense
+                              size="xs"
+                              icon="delete"
+                              class="delete-history-btn"
+                              @click.stop="deleteChat(chat.id)"
+                            >
+                              <q-tooltip :delay="500">Delete chat</q-tooltip>
+                            </q-btn>
                           </div>
                         </q-item-section>
                       </q-item>
@@ -64,15 +87,44 @@
                       </q-item>
                     </q-list>
                   </div>
+
+                  <!-- Clear all conversations button -->
+                  <div v-if="filteredChatHistory.length > 0" class="clear-all-container">
+                    <q-separator />
+                    <q-btn
+                      flat
+                      no-caps
+                      class="clear-all-btn"
+                      icon="delete_sweep"
+                      label="Clear all conversations"
+                      @click.stop="clearAllConversations"
+                    />
+                  </div>
                 </div>
               </q-menu>
             </q-btn>
-            <q-btn flat round dense icon="close" @click="$emit('close')" />
+          </div>
+
+          <div>
+            <!-- Edit title button -->
+            <q-btn
+              v-if="currentChatId"
+              flat
+              round
+              dense
+              size="md"
+              icon="edit"
+              @click.stop="openEditTitleDialog"
+            >
+              <q-tooltip :delay="500">Edit title</q-tooltip>
+            </q-btn>
+            <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
+            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
       </div>
       <q-separator class="tw:bg-[#DBDBDB]" />
-      
+
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
         <q-card style="width: 350px; max-width: 100vw; height: 100vh;">
@@ -106,12 +158,68 @@
         </q-card>
       </q-dialog>
 
+      <!-- Edit Title Dialog -->
+      <q-dialog v-model="showEditTitleDialog">
+        <q-card style="min-width: 350px">
+          <q-card-section>
+            <div class="text-h6">Edit Chat Title</div>
+          </q-card-section>
+
+          <q-card-section class="q-pt-none">
+            <q-input
+              v-model="editingTitle"
+              dense
+              borderless
+              autofocus
+              @keyup.enter="saveEditedTitle"
+              placeholder="Enter chat title"
+            />
+          </q-card-section>
+
+          <q-card-actions align="right" class="q-px-md q-pb-md">
+            <q-btn
+              label="Cancel"
+              class="o2-secondary-button"
+              no-caps
+              v-close-popup
+            />
+            <q-btn
+              label="Save"
+              class="o2-primary-button q-ml-sm"
+              no-caps
+              @click="saveEditedTitle"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
+
+      <!-- Delete Chat Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showDeleteChatConfirmDialog"
+        title="Delete Chat"
+        message="Are you sure you want to delete this chat? This action cannot be undone."
+        @update:ok="confirmDeleteChat"
+        @update:cancel="showDeleteChatConfirmDialog = false"
+      />
+
+      <!-- Clear All Conversations Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showClearAllConfirmDialog"
+        title="Clear All Conversations"
+        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        @update:ok="confirmClearAllConversations"
+        @update:cancel="showClearAllConfirmDialog = false"
+      />
+
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
             <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
               <img :src="o2AiTitleLogo" />
-              <span class="tw:text-[14px] tw:font-[600] tw:text-center">AI native  observability</span>
+              <div class="tw:relative tw:inline-block">
+                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
+                <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+              </div>
             </div>
           </div>
           <div v-for="(message, index) in processedMessages" 
@@ -314,9 +422,11 @@
             </div>
           </div>
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
-          <div v-if="isLoading && !activeToolCall" id="loading-indicator" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
-            <q-spinner-dots color="primary" size="2em" />
-            <span>{{ currentAnalyzingMessage }}</span>
+          <div v-if="isLoading && !activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+            <div class="tool-call-content">
+              <q-spinner-dots color="primary" size="1.5em" />
+              <span class="tool-call-message">{{ currentAnalyzingMessage }}</span>
+            </div>
           </div>
         </div>
         
@@ -339,6 +449,25 @@
           </q-btn>
         </div>
       </div>
+
+      <!-- Fixed loading indicator above input - only shown when scrolled up -->
+      <div
+        v-if="(isLoading || activeToolCall) && showScrollToBottom"
+        class="fixed-analyzing-indicator"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+      >
+        <!-- Show tool call if active -->
+        <div v-if="activeToolCall" class="analyzing-content">
+          <q-spinner-dots color="primary" size="1.5em" />
+          <span class="analyzing-message">{{ activeToolCall.message }}</span>
+        </div>
+        <!-- Show analyzing message if loading but no active tool call -->
+        <div v-else-if="isLoading" class="analyzing-content">
+          <q-spinner-dots color="primary" size="1.5em" />
+          <span class="analyzing-message">{{ currentAnalyzingMessage }}</span>
+        </div>
+      </div>
+
       <div class="chat-input-wrapper tw:flex tw:flex-col q-ma-md" @click="focusInput">
         <q-input
           ref="chatInput"
@@ -404,6 +533,7 @@ import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -466,6 +596,9 @@ function renderMarkdown(content: any) {
 
 export default defineComponent({
   name: 'O2AIChat',
+  components: {
+    ConfirmDialog,
+  },
   props: {
     isOpen: {
       type: Boolean,
@@ -508,6 +641,23 @@ export default defineComponent({
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
 
+    // Edit title state
+    const showEditTitleDialog = ref(false);
+    const editingTitle = ref('');
+
+    // Clear all confirmation state
+    const showClearAllConfirmDialog = ref(false);
+
+    // Delete individual chat confirmation state
+    const showDeleteChatConfirmDialog = ref(false);
+    const chatToDelete = ref<number | null>(null);
+
+    // AI-generated chat title state
+    const aiGeneratedTitle = ref<string | null>(null);
+    const displayedTitle = ref<string>('');
+    const isTypingTitle = ref(false);
+    const titleAnimationId = ref<number>(0); // Used to cancel stale animations
+
     // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
 
@@ -519,6 +669,11 @@ export default defineComponent({
 
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
+
+    // Typewriter animation state for LLM responses
+    const displayedStreamingContent = ref('');
+    const typewriterAnimationId = ref<number | null>(null);
+    const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
 
     // Throttle save during streaming to prevent data loss on page reload
     const lastStreamingSaveTime = ref<number>(0);
@@ -568,6 +723,120 @@ export default defineComponent({
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
       }
+    };
+
+    // Interval ID for title animation
+    let titleIntervalId: ReturnType<typeof setInterval> | null = null;
+
+    /**
+     * Animate title with typewriter effect
+     * Characters appear one by one from left to right
+     * Uses setInterval for reliable timing with Vue reactivity
+     */
+    const animateTitle = (title: string) => {
+      // Clear any existing animation
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
+
+      // Increment animation ID to track this animation
+      const currentAnimationId = ++titleAnimationId.value;
+
+      isTypingTitle.value = true;
+      displayedTitle.value = '';
+      let charIndex = 0;
+
+      titleIntervalId = setInterval(() => {
+        // Check if this animation was superseded
+        if (titleAnimationId.value !== currentAnimationId) {
+          if (titleIntervalId) {
+            clearInterval(titleIntervalId);
+            titleIntervalId = null;
+          }
+          return;
+        }
+
+        if (charIndex < title.length) {
+          displayedTitle.value = title.slice(0, charIndex + 1);
+          charIndex++;
+        } else {
+          // Animation complete
+          if (titleIntervalId) {
+            clearInterval(titleIntervalId);
+            titleIntervalId = null;
+          }
+          isTypingTitle.value = false;
+        }
+      }, 30); // 30ms per character
+    };
+
+    /**
+     * Reset title state for new chat
+     */
+    const resetTitleState = () => {
+      // Cancel any ongoing animation
+      titleAnimationId.value++;
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
+      aiGeneratedTitle.value = null;
+      displayedTitle.value = '';
+      isTypingTitle.value = false;
+    };
+
+    /**
+     * Reset typewriter animation state
+     */
+    const resetTypewriterState = () => {
+      displayedStreamingContent.value = '';
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+    };
+
+    /**
+     * Animate text reveal with typewriter effect
+     * Skips animation for code blocks (reveals them instantly)
+     */
+    const animateStreamingText = () => {
+      const target = currentTextSegment.value;
+      const current = displayedStreamingContent.value;
+
+      if (current.length >= target.length) {
+        // Caught up, stop animation
+        if (typewriterAnimationId.value) {
+          cancelAnimationFrame(typewriterAnimationId.value);
+          typewriterAnimationId.value = null;
+        }
+        return;
+      }
+
+      // Check if we're at the start of a code block - if so, skip to end of code block
+      const remaining = target.slice(current.length);
+      const codeBlockStart = remaining.match(/^```[\w]*/);
+
+      if (codeBlockStart) {
+        // Find the closing ``` and reveal entire code block instantly
+        const codeBlockEnd = remaining.indexOf('```', codeBlockStart[0].length);
+        if (codeBlockEnd !== -1) {
+          const endPos = codeBlockEnd + 3;
+          displayedStreamingContent.value = target.slice(0, current.length + endPos);
+        } else {
+          // Code block not complete yet, reveal opening and wait
+          displayedStreamingContent.value = target.slice(0, current.length + codeBlockStart[0].length);
+        }
+      } else {
+        // Regular text - reveal one character
+        displayedStreamingContent.value = target.slice(0, current.length + 1);
+      }
+
+      // Schedule next frame
+      typewriterAnimationId.value = requestAnimationFrame(() => {
+        setTimeout(animateStreamingText, TYPEWRITER_SPEED);
+      });
     };
 
     // Query history functionality
@@ -690,6 +959,13 @@ export default defineComponent({
         activeToolCall.value = null;
         stopAnalyzingRotation();
 
+        // Immediately show all buffered text (like ChatGPT's "Stop generating")
+        displayedStreamingContent.value = currentTextSegment.value;
+        if (typewriterAnimationId.value) {
+          cancelAnimationFrame(typewriterAnimationId.value);
+          typewriterAnimationId.value = null;
+        }
+
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -698,15 +974,23 @@ export default defineComponent({
               // Remove empty assistant message that was added for streaming
               chatMessages.value.pop();
             } else if (currentStreamingMessage.value) {
+              // Update final text in contentBlocks to show all buffered content
+              if (lastMessage.contentBlocks) {
+                const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                if (lastBlock && lastBlock.type === 'text') {
+                  lastBlock.text = currentTextSegment.value;
+                }
+              }
               // Keep partial content but indicate it was cancelled
               lastMessage.content += '\n\n_[Response stopped by user]_';
             }
           }
         }
-        
+
         // Reset streaming state
         currentStreamingMessage.value = '';
         currentTextSegment.value = '';
+        displayedStreamingContent.value = '';
 
         // Save the current state including cancellation
         await saveToHistory();
@@ -784,6 +1068,13 @@ export default defineComponent({
                 try {
                   const data = JSON.parse(jsonStr);
 
+                  // Handle title events - AI-generated chat title from first message
+                  if (data && data.type === 'title') {
+                    aiGeneratedTitle.value = data.title;
+                    animateTitle(data.title);
+                    continue;
+                  }
+
                   // Handle tool_call events - show spinner indicator, don't add to chat yet
                   if (data && data.type === 'tool_call') {
                     // If there's already an active tool call, complete it first
@@ -814,6 +1105,71 @@ export default defineComponent({
                     currentTextSegment.value = '';
                     await scrollToBottom();
                     continue;
+                  }
+
+                  // Handle error events - display error message to user
+                  if (data && data.type === 'error') {
+                    // Complete any active tool call first
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
+
+                    // Format error message with suggestion if available
+                    // Handle case where error/message might be an object instead of string
+                    const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                    const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+
+                    let errorMessage = `Error: ${errorText}`;
+                    if (data.suggestion) {
+                      errorMessage += `\n\n${data.suggestion}`;
+                    }
+
+                    // Get or create assistant message for error (reuse lastMessage)
+                    lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (!lastMessage || lastMessage.role !== 'assistant') {
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: errorMessage,
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                      });
+                      pendingToolCalls.value = [];
+                    } else {
+                      // Append error to existing message
+                      if (lastMessage.content) {
+                        lastMessage.content += '\n\n' + errorMessage;
+                      } else {
+                        lastMessage.content = errorMessage;
+                      }
+                      if (!lastMessage.contentBlocks) {
+                        lastMessage.contentBlocks = [];
+                      }
+                      lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                      // Clear pending tool calls to avoid leaking into later messages
+                      pendingToolCalls.value = [];
+                    }
+
+                    // Reset streaming state
+                    currentTextSegment.value = '';
+
+                    // Save error message to history
+                    await saveToHistory();
+                    await scrollToBottom();
+
+                    // Stop processing further as error occurred
+                    return;
                   }
 
                   // Handle complete events - complete any active tool call
@@ -879,14 +1235,20 @@ export default defineComponent({
                     currentStreamingMessage.value += content;
                     currentTextSegment.value += content;
 
+                    // Start typewriter animation if not already running
+                    if (!typewriterAnimationId.value) {
+                      animateStreamingText();
+                    }
+
                     // Get or create assistant message
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (!lastMessage || lastMessage.role !== 'assistant') {
                       // Create new assistant message with pending tool calls + text
+                      // Use displayedStreamingContent for animated display
                       chatMessages.value.push({
                         role: 'assistant',
                         content: currentStreamingMessage.value,
-                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: displayedStreamingContent.value }]
                       });
                       pendingToolCalls.value = []; // Clear pending
                       // Save immediately when assistant message is first created to prevent data loss on reload
@@ -903,11 +1265,11 @@ export default defineComponent({
                       // Find the last text block and update it, or create new one
                       const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                       if (lastBlock && lastBlock.type === 'text') {
-                        // Append to existing text block (same segment)
-                        lastBlock.text = currentTextSegment.value;
+                        // Append to existing text block (same segment) - use animated content for display
+                        lastBlock.text = displayedStreamingContent.value;
                       } else {
                         // Add new text block (after tool call - new segment)
-                        lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                        lastMessage.contentBlocks.push({ type: 'text', text: displayedStreamingContent.value });
                       }
                       // Throttled save during streaming to preserve progress
                       await throttledStreamingSave();
@@ -938,6 +1300,13 @@ export default defineComponent({
 
                 const data = JSON.parse(jsonStr);
 
+                // Handle title events - AI-generated chat title from first message
+                if (data && data.type === 'title') {
+                  aiGeneratedTitle.value = data.title;
+                  animateTitle(data.title);
+                  continue;
+                }
+
                 // Handle tool_call events - show spinner, don't add to chat yet
                 if (data && data.type === 'tool_call') {
                   // If there's already an active tool call, complete it first
@@ -967,6 +1336,71 @@ export default defineComponent({
                   // Reset text segment for next text block
                   currentTextSegment.value = '';
                   continue;
+                }
+
+                // Handle error events - display error message to user
+                if (data && data.type === 'error') {
+                  // Complete any active tool call first
+                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
+
+                  // Format error message with suggestion if available
+                  // Handle case where error/message might be an object instead of string
+                  const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                  const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+
+                  let errorMessage = `Error: ${errorText}`;
+                  if (data.suggestion) {
+                    errorMessage += `\n\n${data.suggestion}`;
+                  }
+
+                  // Get or create assistant message for error (reuse lastMessage)
+                  lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (!lastMessage || lastMessage.role !== 'assistant') {
+                    chatMessages.value.push({
+                      role: 'assistant',
+                      content: errorMessage,
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                    });
+                    pendingToolCalls.value = [];
+                  } else {
+                    // Append error to existing message
+                    if (lastMessage.content) {
+                      lastMessage.content += '\n\n' + errorMessage;
+                    } else {
+                      lastMessage.content = errorMessage;
+                    }
+                    if (!lastMessage.contentBlocks) {
+                      lastMessage.contentBlocks = [];
+                    }
+                    lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                    // Clear pending tool calls to avoid leaking into later messages
+                    pendingToolCalls.value = [];
+                  }
+
+                  // Reset streaming state
+                  currentTextSegment.value = '';
+
+                  // Save error message to history
+                  await saveToHistory();
+                  await scrollToBottom();
+
+                  // Stop processing further as error occurred
+                  return;
                 }
 
                 // Handle complete events - complete any active tool call
@@ -1029,13 +1463,19 @@ export default defineComponent({
                   currentStreamingMessage.value += content;
                   currentTextSegment.value += content;
 
+                  // Start typewriter animation if not already running
+                  if (!typewriterAnimationId.value) {
+                    animateStreamingText();
+                  }
+
                   let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
                     // Create new assistant message with pending tool calls + text
+                    // Use displayedStreamingContent for animated display
                     chatMessages.value.push({
                       role: 'assistant',
                       content: currentStreamingMessage.value,
-                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: displayedStreamingContent.value }]
                     });
                     pendingToolCalls.value = []; // Clear pending
                     // Save immediately when assistant message is first created
@@ -1048,9 +1488,10 @@ export default defineComponent({
                     }
                     const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                     if (lastBlock && lastBlock.type === 'text') {
-                      lastBlock.text = currentTextSegment.value;
+                      // Use animated content for display
+                      lastBlock.text = displayedStreamingContent.value;
                     } else {
-                      lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                      lastMessage.contentBlocks.push({ type: 'text', text: displayedStreamingContent.value });
                     }
                     // Throttled save during streaming
                     await throttledStreamingSave();
@@ -1068,6 +1509,20 @@ export default defineComponent({
 
         // If we completed a message, save to history
         if (messageComplete) {
+          // Immediately show all remaining text and stop typewriter animation
+          displayedStreamingContent.value = currentTextSegment.value;
+          if (typewriterAnimationId.value) {
+            cancelAnimationFrame(typewriterAnimationId.value);
+            typewriterAnimationId.value = null;
+          }
+          // Update final text in contentBlocks
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+            if (lastBlock && lastBlock.type === 'text') {
+              lastBlock.text = currentTextSegment.value;
+            }
+          }
           await saveToHistory();
         }
       } catch (error) {
@@ -1091,13 +1546,13 @@ export default defineComponent({
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const DbIndexStore = transaction.objectStore(STORE_NAME);
 
-        // Generate a title from the first user message
+        // Prefer AI-generated title, fallback to truncated first user message
         const firstUserMessage = chatMessages.value.find(msg => msg.role === 'user');
-        const title = firstUserMessage ? 
-          (firstUserMessage.content.length > 40 ? 
-            firstUserMessage.content.substring(0, 40) + '...' : 
-            firstUserMessage.content) : 
-          'New Chat';
+        const title = aiGeneratedTitle.value || (firstUserMessage ?
+          (firstUserMessage.content.length > 40 ?
+            firstUserMessage.content.substring(0, 40) + '...' :
+            firstUserMessage.content) :
+          'New Chat');
 
         // Create a serializable version of the messages (including contentBlocks)
         // Use JSON parse/stringify to strip Vue reactive proxies
@@ -1226,6 +1681,8 @@ export default defineComponent({
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
+      resetTitleState(); // Clear AI-generated title for new chat
+      resetTypewriterState(); // Clear typewriter animation state for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
@@ -1233,6 +1690,129 @@ export default defineComponent({
     const openHistory = async () => {
       showHistory.value = true;
       await loadHistory();
+    };
+
+    const openEditTitleDialog = () => {
+      editingTitle.value = displayedTitle.value || '';
+      showEditTitleDialog.value = true;
+    };
+
+    const saveEditedTitle = async () => {
+      if (!currentChatId.value || !editingTitle.value.trim()) {
+        showEditTitleDialog.value = false;
+        return;
+      }
+
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(currentChatId.value);
+
+        request.onsuccess = () => {
+          const chat = request.result;
+          if (chat) {
+            // Update the title
+            chat.title = editingTitle.value.trim();
+            const updateRequest = store.put(chat);
+
+            updateRequest.onsuccess = () => {
+              // Update the displayed title
+              displayedTitle.value = editingTitle.value.trim();
+              aiGeneratedTitle.value = editingTitle.value.trim();
+
+              // Reload history to reflect changes
+              loadHistory();
+
+              showEditTitleDialog.value = false;
+            };
+
+            updateRequest.onerror = () => {
+              console.error('Error updating chat title:', updateRequest.error);
+              showEditTitleDialog.value = false;
+            };
+          }
+        };
+
+        request.onerror = () => {
+          console.error('Error retrieving chat for edit:', request.error);
+          showEditTitleDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error updating chat title:', error);
+        showEditTitleDialog.value = false;
+      }
+    };
+
+    const deleteChat = (chatId: number) => {
+      chatToDelete.value = chatId;
+      showDeleteChatConfirmDialog.value = true;
+    };
+
+    const confirmDeleteChat = async () => {
+      if (!chatToDelete.value) return;
+
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const deleteRequest = store.delete(chatToDelete.value);
+
+        deleteRequest.onsuccess = () => {
+          // If the deleted chat is the current one, reset to new chat
+          if (currentChatId.value === chatToDelete.value) {
+            addNewChat();
+          }
+
+          // Reload history to reflect changes
+          loadHistory();
+
+          // Reset state
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
+
+        deleteRequest.onerror = () => {
+          console.error('Error deleting chat:', deleteRequest.error);
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error deleting chat:', error);
+        chatToDelete.value = null;
+        showDeleteChatConfirmDialog.value = false;
+      }
+    };
+
+    const clearAllConversations = () => {
+      showClearAllConfirmDialog.value = true;
+    };
+
+    const confirmClearAllConversations = async () => {
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const clearRequest = store.clear();
+
+        clearRequest.onsuccess = () => {
+          // Reset to new chat
+          addNewChat();
+
+          // Clear the chat history array
+          chatHistory.value = [];
+
+          showClearAllConfirmDialog.value = false;
+        };
+
+        clearRequest.onerror = () => {
+          console.error('Error clearing all conversations:', clearRequest.error);
+          showClearAllConfirmDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error clearing all conversations:', error);
+        showClearAllConfirmDialog.value = false;
+      }
     };
 
     const loadChat = async (chatId: number) => {
@@ -1265,13 +1845,18 @@ export default defineComponent({
             currentSessionId.value = chat.sessionId || null; // Restore session ID from history
             showHistory.value = false;
             shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
-            
+
+            // Load title from history (no animation for existing chats)
+            displayedTitle.value = chat.title || '';
+            aiGeneratedTitle.value = chat.title || null;
+            isTypingTitle.value = false;
+
             if(chatId !== store.state.currentChatTimestamp) {
               store.dispatch('setCurrentChatTimestamp', chatId);
               store.dispatch('setChatUpdated', true);
             }
-            
-            
+
+
             // Scroll to bottom after loading chat
             await nextTick(() => {
               scrollToBottom();
@@ -1308,6 +1893,7 @@ export default defineComponent({
       isLoading.value = true;
       currentStreamingMessage.value = '';
       currentTextSegment.value = '';
+      resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
       // Create new AbortController for this request - enables cancellation via Stop button
@@ -1552,6 +2138,18 @@ export default defineComponent({
         currentAbortController.value.abort();
         currentAbortController.value = null;
       }
+
+      // Clean up typewriter animation to prevent memory leaks
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+
+      // Clean up title animation interval
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
       
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
@@ -1565,7 +2163,7 @@ export default defineComponent({
         addNewChat();
       }
     })
-    //this watch is added to make sure that the chat gets updated 
+    //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
       watch(chatUpdated, (newChatUpdated: boolean) => {
         if (newChatUpdated && store.state.currentChatTimestamp) {
@@ -1576,6 +2174,19 @@ export default defineComponent({
         }
         store.dispatch('setChatUpdated', false);
       });
+
+    // Watch for typewriter animation updates to refresh the displayed text
+    watch(displayedStreamingContent, (newContent) => {
+      if (!isLoading.value) return;
+
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+        if (lastBlock && lastBlock.type === 'text') {
+          lastBlock.text = newContent;
+        }
+      }
+    });
 
     const copyToClipboard = async (text: string) => {
       try {
@@ -1883,9 +2494,21 @@ export default defineComponent({
       selectCapability,
       showHistory,
       chatHistory,
+      currentChatId,
       addNewChat,
       openHistory,
       loadChat,
+      showEditTitleDialog,
+      editingTitle,
+      openEditTitleDialog,
+      saveEditedTitle,
+      deleteChat,
+      confirmDeleteChat,
+      showDeleteChatConfirmDialog,
+      chatToDelete,
+      clearAllConversations,
+      showClearAllConfirmDialog,
+      confirmClearAllConversations,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -1925,6 +2548,10 @@ export default defineComponent({
       formatToolCallMessage,
       formatTimestamp,
       formatContextValue,
+      // AI-generated title
+      aiGeneratedTitle,
+      displayedTitle,
+      isTypingTitle,
     }
   }
 });
@@ -1933,44 +2560,20 @@ export default defineComponent({
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - 50px);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  
-  // Light mode gradient - more sophisticated
-  &.light-mode {
-    background: rgba(255,255,255,0.7);
-    background-size: 400% 400%;
-    animation: subtleShift 20s ease-in-out infinite;
-  }
-  
-  // Dark mode gradient - more sophisticated
-  &.dark-mode {
-    background: rgba(0,0,0,0.7);
-    background-size: 400% 400%;
-    animation: subtleShift 25s ease-in-out infinite;
-  }
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 
   .chat-content-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
-    
-    // Light mode gradient - more sophisticated
-    &.light-mode {
-      background: transparent;
-      background-size: 400% 400%;
-      animation: subtleShift 20s ease-in-out infinite;
-    }
-    
-    // Dark mode gradient - more sophisticated
-    &.dark-mode {
-      background: transparent;
-      background-size: 400% 400%;
-      animation: subtleShift 25s ease-in-out infinite;
-    }
+    background: transparent;
   }
 
 
@@ -1988,6 +2591,69 @@ export default defineComponent({
     .chat-title {
       font-weight: bold;
     }
+
+    .chat-title-dropdown {
+      padding: 6px 12px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+      max-width: 210px;
+      height: 32px;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+
+      &:hover {
+        background-color: var(--q-hover-color);
+      }
+
+      span {
+        color: var(--q-primary-text);
+      }
+
+      .chat-title-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+      }
+    }
+  }
+
+  // Chat session title with typewriter animation
+  .chat-session-title {
+    padding: 8px 16px;
+    font-size: 14px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--q-separator-color);
+
+    &.light-mode {
+      color: #1a202c;
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.08), transparent);
+    }
+
+    &.dark-mode {
+      color: #e2e8f0;
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.15), transparent);
+    }
+
+    .title-text {
+      font-weight: 600;
+    }
+
+    .typing-cursor {
+      animation: blink 0.7s infinite;
+      margin-left: 2px;
+      font-weight: 400;
+    }
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
   }
 
   .chat-content {
@@ -2021,6 +2687,88 @@ export default defineComponent({
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  // Fixed analyzing indicator above input
+  .fixed-analyzing-indicator {
+    padding: 12px 16px;
+    margin: 0 16px 8px 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeInSlide 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    &.light-mode {
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+      border: 1px solid #d0d8e8;
+    }
+
+    &.dark-mode {
+      background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+      border: 1px solid #3a3f55;
+    }
+
+    .analyzing-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .analyzing-message {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--q-primary);
+    }
+
+    .tool-call-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .tool-call-context-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .context-query-inline {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.05);
+      max-width: 500px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .context-tag-inline {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(var(--q-primary-rgb), 0.1);
+      color: var(--q-primary);
+      font-weight: 500;
+    }
+  }
+
+  @keyframes fadeInSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .chat-input-wrapper {
@@ -2421,9 +3169,10 @@ export default defineComponent({
 
 .history-menu-container {
   position: relative;
-  max-height: 400px;
+  max-height: 450px;
   display: flex;
   flex-direction: column;
+  width: 300px;
 }
 
 .search-history-bar-sticky {
@@ -2433,11 +3182,44 @@ export default defineComponent({
   background: var(--q-page-background);
   padding: 8px;
   border-bottom: 1px solid var(--q-separator-color);
+  flex-shrink: 0;
 }
 
 .history-list-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 350px;
+}
+
+.history-item {
+  position: relative;
+
+  .delete-history-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  &:hover .delete-history-btn {
+    opacity: 1;
+  }
+}
+
+.clear-all-container {
+  background: var(--q-page-background);
+  padding: 8px;
+  border-top: 1px solid var(--q-separator-color);
+  flex-shrink: 0;
+
+  .clear-all-btn {
+    width: 100%;
+    color: var(--q-negative);
+    font-size: 13px;
+
+    &:hover {
+      background-color: rgba(var(--q-negative-rgb), 0.1);
+    }
+  }
 }
 
 // Scroll to bottom button styling
@@ -2523,24 +3305,6 @@ export default defineComponent({
   }
 }
 
-// Subtle gradient animation
-@keyframes subtleShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  25% {
-    background-position: 100% 50%;
-  }
-  50% {
-    background-position: 100% 100%;
-  }
-  75% {
-    background-position: 0% 100%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
 
 // Tool call indicator styling
 .tool-call-indicator {
@@ -2563,7 +3327,7 @@ export default defineComponent({
 
   .tool-call-content {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     width: 100%;
   }

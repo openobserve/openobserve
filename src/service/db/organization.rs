@@ -140,6 +140,33 @@ pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool,
     Ok(toggle_ingestion_logs)
 }
 
+/// Get the usage stream enabled setting for an org
+/// If the setting is not found, return false (disabled by default)
+/// This allows orgs to opt-in to querying usage stream data
+pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, Error> {
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+        return Ok(v.usage_stream_enabled);
+    }
+
+    // Try to get settings from DB, but use default if not found
+    let settings: OrganizationSetting = match db::get(&key).await {
+        Ok(settings) => json::from_slice(&settings)?,
+        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
+            OrganizationSetting::default()
+        }
+        Err(e) => return Err(e),
+    };
+    let usage_stream_enabled = settings.usage_stream_enabled;
+
+    // Cache the org setting (even if it's default)
+    ORGANIZATION_SETTING
+        .write()
+        .await
+        .insert(key.to_string(), settings);
+    Ok(usage_stream_enabled)
+}
+
 /// Cache the existing org settings in the beginning
 pub async fn org_settings_cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;

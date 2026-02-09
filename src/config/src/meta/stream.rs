@@ -889,6 +889,8 @@ pub struct StreamSettings {
     pub enable_distinct_fields: bool,
     #[serde(default)]
     pub enable_log_patterns_extraction: bool,
+    #[serde(default)]
+    pub is_llm_stream: bool,
 }
 
 impl Default for StreamSettings {
@@ -912,6 +914,7 @@ impl Default for StreamSettings {
             index_all_values: false,
             enable_distinct_fields: true,
             enable_log_patterns_extraction: false,
+            is_llm_stream: false,
         }
     }
 }
@@ -965,6 +968,7 @@ impl Serialize for StreamSettings {
                 state.skip_field("flatten_level")?;
             }
         }
+        state.serialize_field("is_llm_stream", &self.is_llm_stream)?;
         state.end()
     }
 }
@@ -1110,6 +1114,10 @@ impl From<&str> for StreamSettings {
             .get("enable_log_patterns_extraction")
             .and_then(Value::as_bool)
             .unwrap_or_default();
+        let is_llm_stream = settings
+            .get("is_llm_stream")
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         Self {
             partition_time_level,
             partition_keys,
@@ -1129,6 +1137,7 @@ impl From<&str> for StreamSettings {
             index_all_values,
             enable_distinct_fields,
             enable_log_patterns_extraction,
+            is_llm_stream,
         }
     }
 }

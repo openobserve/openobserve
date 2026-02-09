@@ -1056,17 +1056,25 @@ export default defineComponent({
 
         // Always set correlation props, even if metrics array is empty
         // This prevents re-fetching when switching between tabs
+        //
+        // Use logStreams[0].filters as matchedDimensions — these contain
+        // the correct field names for the log stream (e.g., k8s_namespace_name)
+        // instead of semantic IDs (k8s-namespace). Same fix as 9127b6172.
+        const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
+        const actualMatchedDimensions = Object.keys(logFilters).length > 0
+          ? logFilters
+          : result.correlationData.matched_dimensions;
+
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
-          matchedDimensions: result.correlationData.matched_dimensions,
-          additionalDimensions:
-            result.correlationData.additional_dimensions || {},
+          matchedDimensions: actualMatchedDimensions,
+          additionalDimensions: {},
           metricStreams: result.correlationData.related_streams.metrics || [],
           logStreams: result.correlationData.related_streams.logs || [],
           traceStreams: result.correlationData.related_streams.traces || [],
           sourceStream: searchObj.data.stream.selectedStream[0],
           sourceType: "logs",
-          availableDimensions: context.fields, // Actual field names from the log record
+          availableDimensions: logFilters, // Actual field names from the log stream filters
           ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
           timeRange: {
             startTime: startTimeMicros,

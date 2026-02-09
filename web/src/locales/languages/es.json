@@ -125,7 +125,7 @@
     "source": "Fuente",
     "noResult": "Sin resultados",
     "syntaxGuide": "Guía de sintaxis",
-    "recordsPerPage": "Registros por página",
+    "rowsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "de",
     "rowDetail": "Detalles de la fila",
@@ -1179,6 +1179,9 @@
     "wraptext": "Ajustar texto en celdas",
     "tableTranspose": "Transponer",
     "tableDynamicColumns": "Permitir columnas dinámicas",
+    "pagination": "Paginación",
+    "rowsPerPage": "Filas por página",
+    "rowsPerPageTooltip": "Establezca el número predeterminado de registros para mostrar por página",
     "showBorder": "Mostrar borde del eje",
     "currencyDollar": "Moneda - Dólar ($)",
     "currencyEuro": "Moneda - Euro (€)",
@@ -2530,7 +2533,8 @@
     "sql_query": "Consulta SQL",
     "resuls": "Resultados",
     "wrapText": "Envolver texto",
-    "delayMessage": "Es posible que el historial de búsqueda se retrase un"
+    "delayMessage": "Es posible que el historial de búsqueda se retrase un",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Planificador de tareas de búsqueda",
@@ -2621,7 +2625,8 @@
     "analyzeButtonLabel": "Analiza",
     "refreshTooltip": "Actualice el análisis con un percentil actualizado",
     "customSQLFieldsDisabled": "La selección de campos no está disponible para las consultas SQL personalizadas. Las dimensiones se extraen de los resultados de la consulta.",
-    "timeRangeSelected": "Intervalo de tiempo seleccionado"
+    "timeRangeSelected": "Intervalo de tiempo seleccionado",
+    "dimensionsSelected": "Dimensiones seleccionadas"
   },
   "volumeInsights": {
     "title": "Perspectivas",
@@ -2744,7 +2749,9 @@
         "startBeforeEnd": "La hora de inicio debe ser anterior a la hora de finalización",
         "endAfterStart": "La hora de finalización debe ser posterior a la hora de inicio"
       }
-    }
+    },
+    "viewInTraces": "Ver en Traces",
+    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados"
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

@@ -550,6 +550,7 @@ low,72,L4"""
             FROM "{self.STREAM_NAME}" AS a
             LEFT JOIN enrich.{self.enrichment_table_name} AS b
             ON a.kubernetes_namespace_name = b.namespace_name
+            WHERE a.kubernetes_namespace_name IS NOT NULL
             LIMIT 5
         """
 

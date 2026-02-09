@@ -35,6 +35,7 @@ pub struct ErrorData {
 pub enum ErrorSource {
     Alert,
     Dashboard,
+    Function(FunctionError),
     Ingestion,
     Pipeline(PipelineError),
     SsoClaimParser(SsoClaimParserError),
@@ -51,6 +52,11 @@ impl Serialize for ErrorSource {
         match self {
             ErrorSource::Alert => state.serialize_field("error_source", &"alert")?,
             ErrorSource::Dashboard => state.serialize_field("error_source", &"dashboard")?,
+            ErrorSource::Function(fe) => {
+                state.serialize_field("error_source", &"function")?;
+                state.serialize_field("function_name", &fe.function_name)?;
+                state.serialize_field("error", &fe.error.truncate_utf8(PIPELINE_ERROR_MAX_SIZE))?;
+            }
             ErrorSource::Ingestion => state.serialize_field("error_source", &"ingestion")?,
             ErrorSource::Search => state.serialize_field("error_source", &"search")?,
             ErrorSource::Other => state.serialize_field("error_source", &"other")?,
@@ -145,6 +151,27 @@ impl NodeErrors {
     pub fn add_error(&mut self, error: String) {
         self.error_count += 1;
         self.errors.insert(error);
+    }
+}
+
+/// Function Error
+///
+/// Captures errors from function deserialization or execution.
+/// This error type is reported to _meta/errors stream for monitoring and debugging.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FunctionError {
+    /// Name of the function that failed
+    pub function_name: String,
+    /// Detailed error message
+    pub error: String,
+}
+
+impl FunctionError {
+    pub fn new(function_name: String, error: String) -> Self {
+        Self {
+            function_name,
+            error,
+        }
     }
 }
 

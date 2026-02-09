@@ -2758,7 +2758,7 @@ async fn handle_backfill_triggers(
 
                 let error_msg = e.to_string();
                 // Store the ingestion error
-                ingestion_error = Some(error_msg.clone());
+                // ingestion_error = Some(error_msg.clone());
 
                 // Increment retries
                 let new_retries = trigger.retries + 1;

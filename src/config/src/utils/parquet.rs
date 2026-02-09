@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -116,7 +116,7 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.splitn(9, '/').collect::<Vec<&str>>();
     if columns.len() < 9 {
-        return Err(anyhow::anyhow!("[file_list] Invalid file path: {}", key));
+        return Err(anyhow::anyhow!("[file_list] Invalid file path: {key}"));
     }
     // let _ = columns[0].to_string(); // files/
     let stream_key = format!("{}/{}/{}", columns[1], columns[2], columns[3]);
@@ -468,5 +468,20 @@ mod tests {
         let (min_ts, max_ts) = parse_time_range_from_filename(filename);
         assert_eq!(min_ts, 0);
         assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_parse_time_range_backwards_compatible() {
+        // Test that parse_time_range_from_filename still works with new format
+        let new_format = "1000.2000.12345.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(new_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+
+        // Test with old format
+        let old_format = "1000.2000.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(old_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
     }
 }

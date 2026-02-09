@@ -15,23 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="isVisible" persistent>
+  <q-dialog data-test="custom-confirm-dialog" v-model="isVisible" persistent>
     <q-card
+      data-test="custom-confirm-card"
       class="custom-confirm-dialog"
       :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <!-- Header -->
-      <q-card-section class="dialog-header tw:pb-3">
-        <div class="dialog-title">{{ title }}</div>
+      <q-card-section data-test="dialog-header" class="dialog-header tw:pb-3">
+        <div data-test="dialog-title" class="dialog-title">{{ title }}</div>
       </q-card-section>
 
       <!-- Content -->
-      <q-card-section class="dialog-content tw:py-4">
-        <div class="message-text">{{ message }}</div>
+      <q-card-section data-test="dialog-content" class="dialog-content tw:py-4">
+        <div data-test="dialog-message" class="message-text">{{ message }}</div>
       </q-card-section>
 
       <!-- Actions -->
-      <q-card-actions class="dialog-actions tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:pb-4">
+      <q-card-actions data-test="dialog-actions" class="dialog-actions tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:pb-4">
         <q-btn
           data-test="custom-cancel-button"
           label="Cancel"

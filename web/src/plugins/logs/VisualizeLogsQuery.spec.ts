@@ -1522,10 +1522,11 @@ describe("VisualizeLogsQuery Component", () => {
 
   /**
    * VRL Visualization Support Tests - handleChartTypeChange
-   * PR Reference: https://github.com/openobserve/openobserve/pull/9295
+   * PR Reference: https://github.com/openobserve/openobserve/pull/10343
    *
-   * Tests for the VRL function validation added to handleChartTypeChange.
-   * When VRL functions are present, only table chart type is allowed.
+   * Tests for the updated handleChartTypeChange behavior.
+   * VRL functions no longer block chart type switching - switching is allowed
+   * and VRL editor becomes disabled (readOnly) for non-table charts instead.
    */
   describe("VRL Visualization Support - handleChartTypeChange", () => {
     it("should allow switching to table when VRL functions are present", () => {
@@ -1542,22 +1543,22 @@ describe("VisualizeLogsQuery Component", () => {
       }
     });
 
-    it("should prevent switching to line chart when VRL functions are present", () => {
+    it("should allow switching to line chart when VRL functions are present", () => {
       // Set VRL function fields
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "vrl_output", type: "Utf8" },
       ];
       wrapper.vm.dashboardPanelData.data.type = "table";
 
-      // Simulate handleChartTypeChange to line (should be prevented)
+      // Simulate handleChartTypeChange to line (now allowed)
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         wrapper.vm.handleChartTypeChange("line");
-        // Should force back to table
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+        // Should be line - no longer forced back to table
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("line");
       }
     });
 
-    it("should prevent switching to bar chart when VRL functions are present", () => {
+    it("should allow switching to bar chart when VRL functions are present", () => {
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "derived", type: "Int64" },
       ];
@@ -1565,11 +1566,11 @@ describe("VisualizeLogsQuery Component", () => {
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         wrapper.vm.handleChartTypeChange("bar");
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
       }
     });
 
-    it("should prevent switching to area chart when VRL functions are present", () => {
+    it("should allow switching to area chart when VRL functions are present", () => {
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "computed", type: "Float64" },
       ];
@@ -1577,11 +1578,11 @@ describe("VisualizeLogsQuery Component", () => {
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         wrapper.vm.handleChartTypeChange("area");
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("area");
       }
     });
 
-    it("should prevent switching to scatter chart when VRL functions are present", () => {
+    it("should allow switching to scatter chart when VRL functions are present", () => {
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "extracted", type: "Utf8" },
       ];
@@ -1589,11 +1590,11 @@ describe("VisualizeLogsQuery Component", () => {
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         wrapper.vm.handleChartTypeChange("scatter");
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("scatter");
       }
     });
 
-    it("should prevent switching to h-bar chart when VRL functions are present", () => {
+    it("should allow switching to h-bar chart when VRL functions are present", () => {
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "parsed_json", type: "Utf8" },
       ];
@@ -1601,7 +1602,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         wrapper.vm.handleChartTypeChange("h-bar");
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("h-bar");
       }
     });
 
@@ -1634,7 +1635,7 @@ describe("VisualizeLogsQuery Component", () => {
       expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(true);
     });
 
-    it("should handle multiple VRL derived fields", () => {
+    it("should allow switching with multiple VRL derived fields", () => {
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "field1", type: "Utf8" },
         { name: "field2", type: "Int64" },
@@ -1644,8 +1645,23 @@ describe("VisualizeLogsQuery Component", () => {
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         wrapper.vm.handleChartTypeChange("line");
-        // Should still be table due to VRL functions
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
+        // Now allowed - can switch to any chart type
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe("line");
+      }
+    });
+
+    it("should not block any chart type when VRL functions are present", () => {
+      wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+        { name: "vrl_field", type: "Utf8" },
+      ];
+
+      const chartTypes = ["table", "line", "bar", "area", "scatter", "h-bar"];
+
+      if (typeof wrapper.vm.handleChartTypeChange === "function") {
+        chartTypes.forEach((chartType) => {
+          wrapper.vm.handleChartTypeChange(chartType);
+          expect(wrapper.vm.dashboardPanelData.data.type).toBe(chartType);
+        });
       }
     });
   });

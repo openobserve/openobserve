@@ -1996,6 +1996,26 @@ export class LogsPage {
     }
 
     /**
+     * Gets the text content from the log detail JSON view
+     * @returns {Promise<string>} The text content of the JSON detail view
+     */
+    async getLogDetailJsonContentText() {
+        const content = await this.page.locator(this.logDetailJsonContent).textContent();
+        testLogger.info('Retrieved log detail JSON content');
+        return content;
+    }
+
+    /**
+     * Gets the count of highlighted elements in the logs table
+     * @returns {Promise<number>} The count of highlighted elements
+     */
+    async getHighlightedElementsCount() {
+        const count = await this.page.locator('.log-highlighted').count();
+        testLogger.info(`Found ${count} highlighted elements`);
+        return count;
+    }
+
+    /**
      * Verifies the wrap toggle is visible when Table tab is selected
      * @returns {Promise<void>}
      */

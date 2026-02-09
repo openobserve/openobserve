@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :pagination="{ rowsPerPage }"
                     :rows-per-page-options="[]"
                     class="org-table"
-                    style="width: 470px"
+                    style="width: 470px; min-height: 420px; height: 420px;"
                   >
                     <!-- Search input for filtering organizations -->
                     <template #top>

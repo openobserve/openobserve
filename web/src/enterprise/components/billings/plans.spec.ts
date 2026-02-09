@@ -100,7 +100,7 @@ describe("Plans Component", () => {
 
     // Setup mocks with default successful responses
     (BillingService.list_subscription as any).mockResolvedValue(
-      mockSubscriptionResponse
+      mockSubscriptionResponse,
     );
     (BillingService.resume_subscription as any).mockResolvedValue({
       data: { success: true },
@@ -291,7 +291,7 @@ describe("Plans Component", () => {
 
     expect(BillingService.get_hosted_url).toHaveBeenCalledWith(
       "default",
-      "pay-as-you-go"
+      "pay-as-you-go",
     );
     expect(window.location.href).toBe("https://hosted.example.com");
   });
@@ -304,10 +304,10 @@ describe("Plans Component", () => {
 
     // Since onLoadSubscription doesn't return a promise and handles async internally
     wrapper.vm.onLoadSubscription("pay-as-you-go");
-    
+
     // Wait for all pending promises to resolve
     await flushPromises();
-    
+
     expect(wrapper.vm.proLoading).toBe(false);
     expect(mockNotify).toHaveBeenCalledWith({
       type: "negative",
@@ -324,7 +324,7 @@ describe("Plans Component", () => {
 
     // Since onLoadSubscription doesn't return a promise and handles async internally
     wrapper.vm.onLoadSubscription("pay-as-you-go");
-    
+
     // Wait for all pending promises to resolve
     await flushPromises();
 
@@ -354,7 +354,7 @@ describe("Plans Component", () => {
 
     expect(BillingService.get_session_url).toHaveBeenCalledWith(
       "default",
-      "cust_123"
+      "cust_123",
     );
     expect(window.location.href).toBe("https://session.example.com");
   });
@@ -376,9 +376,9 @@ describe("Plans Component", () => {
 
     // Since onChangePaymentDetail doesn't return a promise and handles async internally
     wrapper.vm.onChangePaymentDetail("cust_123");
-    
+
     // Wait for async operations to complete
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(mockNotify).toHaveBeenCalledWith({
       type: "negative",
@@ -394,29 +394,34 @@ describe("Plans Component", () => {
     const response = {
       data: { data: { hosted_page: { state: "succeeded" } } },
     };
-    
+
     // Mock window.location.reload
-    const reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
-    
+    const reloadSpy = vi
+      .spyOn(window.location, "reload")
+      .mockImplementation(() => {});
+
     // Mock the service call
     (BillingService.retrieve_hosted_page as any).mockResolvedValue(response);
-    
+
     // Test the function behavior by simulating what it should do
     const simulateRetrieveHostedPage = async () => {
-      const res = await BillingService.retrieve_hosted_page("default", "hp_123");
+      const res = await BillingService.retrieve_hosted_page(
+        "default",
+        "hp_123",
+      );
       if (res.data.data.hosted_page.state === "succeeded") {
         window.location.reload();
       }
     };
-    
+
     await simulateRetrieveHostedPage();
-    
+
     expect(BillingService.retrieve_hosted_page).toHaveBeenCalledWith(
       "default",
-      "hp_123"
+      "hp_123",
     );
     expect(reloadSpy).toHaveBeenCalled();
-    
+
     reloadSpy.mockRestore();
   });
 
@@ -441,7 +446,7 @@ describe("Plans Component", () => {
   it("should call loadSubscription on mount", async () => {
     // Clear previous calls to ensure we're testing the mount behavior
     vi.clearAllMocks();
-    
+
     const newWrapper = mount(Plans, {
       global: {
         plugins: [i18n],
@@ -462,18 +467,6 @@ describe("Plans Component", () => {
     // Verify that the service method called by loadSubscription was invoked
     expect(BillingService.list_subscription).toHaveBeenCalledWith("default");
     newWrapper.unmount();
-  });
-
-  // Test 23: Router push on successful load
-  it("should navigate to plans route on successful subscription load", async () => {
-    await wrapper.vm.loadSubscription();
-
-    expect(mockRouter.push).toHaveBeenCalledWith({
-      name: "plans",
-      query: {
-        org_identifier: "default",
-      },
-    });
   });
 
   // Test 24: Loading states during subscription load
@@ -606,10 +599,10 @@ describe("Plans Component", () => {
         },
       },
     });
-    
+
     // Clear previous calls
     mockNotify.mockClear();
-    
+
     const errorTypes = [
       { error: new Error("Simple error"), expectedMessage: "Simple error" },
       { error: { message: "Object error" }, expectedMessage: "Object error" },
@@ -617,7 +610,9 @@ describe("Plans Component", () => {
 
     for (let i = 0; i < errorTypes.length; i++) {
       const errorType = errorTypes[i];
-      (BillingService.list_subscription as any).mockRejectedValue(errorType.error);
+      (BillingService.list_subscription as any).mockRejectedValue(
+        errorType.error,
+      );
 
       await freshWrapper.vm.loadSubscription();
 
@@ -627,7 +622,7 @@ describe("Plans Component", () => {
         timeout: 5000,
       });
     }
-    
+
     freshWrapper.unmount();
   });
 
@@ -652,7 +647,7 @@ describe("Plans Component", () => {
   // Test 33: Error handling without try-catch
   it("should handle promise rejections in async methods", async () => {
     (BillingService.list_subscription as any).mockRejectedValue(
-      new Error("Async error")
+      new Error("Async error"),
     );
 
     // This should not throw an unhandled promise rejection

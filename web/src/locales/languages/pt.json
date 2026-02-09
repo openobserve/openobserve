@@ -125,7 +125,7 @@
     "source": "_fonte",
     "noResult": "Sem resultado",
     "syntaxGuide": "Guia de sintaxe",
-    "recordsPerPage": "Registros por página",
+    "rowsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "do",
     "rowDetail": "Detalhes da fonte",
@@ -1179,6 +1179,9 @@
     "wraptext": "Envolva as células da tabela",
     "tableTranspose": "Transpor",
     "tableDynamicColumns": "Permitir colunas dinâmicas",
+    "pagination": "Paginação",
+    "rowsPerPage": "Linhas por página",
+    "rowsPerPageTooltip": "Defina o número padrão de registros a serem exibidos por página",
     "showBorder": "Mostrar borda do eixo",
     "currencyDollar": "Moeda - Dólar ($)",
     "currencyEuro": "Moeda - Euro (€)",
@@ -2532,7 +2535,8 @@
     "sql_query": "Consulta SQL",
     "resuls": "Resultados",
     "wrapText": "Quebrar texto",
-    "delayMessage": "O histórico de pesquisa pode ser atrasado em"
+    "delayMessage": "O histórico de pesquisa pode ser atrasado em",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Agendador de tarefas de pesquisa",
@@ -2623,7 +2627,8 @@
     "analyzeButtonLabel": "Analisar",
     "refreshTooltip": "Atualize a análise com o percentil atualizado",
     "customSQLFieldsDisabled": "A seleção de campo não está disponível para consultas SQL personalizadas. As dimensões são extraídas dos resultados da sua consulta.",
-    "timeRangeSelected": "Intervalo de tempo selecionado"
+    "timeRangeSelected": "Intervalo de tempo selecionado",
+    "dimensionsSelected": "Dimensões selecionadas"
   },
   "volumeInsights": {
     "title": "Percepções",
@@ -2746,7 +2751,9 @@
         "startBeforeEnd": "A hora de início deve ser antes da hora de término",
         "endAfterStart": "A hora de término deve ser após a hora de início"
       }
-    }
+    },
+    "viewInTraces": "Exibir em traços",
+    "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

@@ -202,7 +202,7 @@
                           size="18px"
                           class="tw:flex-shrink-0"
                         />
-                        <span v-html="t('about.license_allows_ingestion', { limit: !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? licenseData?.license?.limits?.Ingestion?.value : '100' })"></span>
+                        <span v-html="t('about.license_allows_ingestion', { limit: !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? licenseData?.license?.limits?.Ingestion?.value : '50' })"></span>
                       </div>
 
                       <!-- Line 2: Exceeded Status -->

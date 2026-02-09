@@ -279,6 +279,55 @@ const store = createStore({
         },
       },
     },
+    incidents: {
+      namespaced: true,
+      state: {
+        incidents: {},
+        pageBeforeSearch: 1,
+        isInitialized: false
+      },
+      getters: {
+        getIncidents(state: any) {
+          return state.incidents;
+        },
+        getPageBeforeSearch(state: any) {
+          return state.pageBeforeSearch;
+        },
+        getIsInitialized(state: any) {
+          return state.isInitialized;
+        },
+      },
+      mutations: {
+        setIncidents(state: any, incidents: any) {
+          state.incidents = incidents;
+        },
+        setPageBeforeSearch(state: any, page: number) {
+          state.pageBeforeSearch = page;
+        },
+        setIsInitialized(state: any, isInitialized: boolean) {
+          state.isInitialized = isInitialized;
+        },
+        resetIncidents(state: any) {
+          state.incidents = {};
+          state.pageBeforeSearch = 1;
+          state.isInitialized = false;
+        },
+      },
+      actions: {
+        setIncidents(context: any, incidents: any) {
+          context.commit('setIncidents', incidents);
+        },
+        setPageBeforeSearch(context: any, page: number) {
+          context.commit('setPageBeforeSearch', page);
+        },
+        setIsInitialized(context: any, isInitialized: boolean) {
+          context.commit('setIsInitialized', isInitialized);
+        },
+        resetIncidents(context: any) {
+          context.commit('resetIncidents');
+        },
+      },
+    },
   },
   actions: {
     login(context, payload) {
