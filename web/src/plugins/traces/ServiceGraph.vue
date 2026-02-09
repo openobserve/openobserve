@@ -41,6 +41,7 @@
             placeholder="Search services..."
             debounce="300"
             @update:model-value="applyFilters"
+            clearable
           >
             <template #prepend>
               <q-icon class="o2-search-input-icon" name="search" />
@@ -364,8 +365,15 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
+      // Don't use cache if filters are active (search or connection type)
+      const hasActiveFilters = searchFilter.value?.trim() || connectionTypeFilter.value !== "all";
+
       // Use cached options if chartKey hasn't changed (prevents double rendering)
-      if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
+      // BUT only if no filters are active
+      if (visualizationType.value === "graph" &&
+          lastChartOptions.value &&
+          chartKey.value === lastChartOptions.value.key &&
+          !hasActiveFilters) {
         console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
         return {
           options: lastChartOptions.value.data.options,
@@ -391,11 +399,15 @@ export default defineComponent({
             );
 
       // Cache the options for graph view
-      if (visualizationType.value === "graph") {
+      // BUT only if no filters are active (to avoid caching filtered states)
+      if (visualizationType.value === "graph" && !hasActiveFilters) {
         lastChartOptions.value = {
           key: chartKey.value,
           data: newOptions,
         };
+      } else if (hasActiveFilters) {
+        // Clear cache when filtering to ensure fresh render on filter removal
+        lastChartOptions.value = null;
       }
 
       return {
@@ -740,8 +752,9 @@ export default defineComponent({
       let edges = [...graphData.value.edges];
 
       // Filter by search
-      if (searchFilter.value) {
-        const search = searchFilter.value.toLowerCase();
+      const trimmedSearch = searchFilter.value?.trim();
+      if (trimmedSearch) {
+        const search = trimmedSearch.toLowerCase();
         const matchingNodeIds = new Set(
           nodes
             .filter((n) => n.label.toLowerCase().includes(search))
