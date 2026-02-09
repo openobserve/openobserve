@@ -94,8 +94,10 @@ describe("IncidentList.vue", () => {
     // Reset incidents store state
     store.state.incidents = {
       incidents: {},
+      cachedData: [],
       pageBeforeSearch: 1,
-      isInitialized: false
+      isInitialized: false,
+      shouldRefresh: false
     };
 
     // Default mock implementation
@@ -590,23 +592,23 @@ describe("IncidentList.vue", () => {
     });
 
     it("should return correct color for open status", () => {
-      expect(wrapper.vm.getStatusColor("open")).toBe("negative");
+      expect(wrapper.vm.getStatusColorClass("open")).toBe("status-open");
     });
 
     it("should return correct color for acknowledged status", () => {
-      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("warning");
+      expect(wrapper.vm.getStatusColorClass("acknowledged")).toBe("status-acknowledged");
     });
 
     it("should return correct color for resolved status", () => {
-      expect(wrapper.vm.getStatusColor("resolved")).toBe("positive");
+      expect(wrapper.vm.getStatusColorClass("resolved")).toBe("status-resolved");
     });
 
     it("should return grey for unknown status", () => {
-      expect(wrapper.vm.getStatusColor("unknown")).toBe("grey");
+      expect(wrapper.vm.getStatusColorClass("unknown")).toBe("status-default");
     });
 
     it("should handle empty status", () => {
-      expect(wrapper.vm.getStatusColor("")).toBe("grey");
+      expect(wrapper.vm.getStatusColorClass("")).toBe("status-default");
     });
   });
 
@@ -644,23 +646,23 @@ describe("IncidentList.vue", () => {
     });
 
     it("should return correct color for P1 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P1")).toBe("red-10");
+      expect(wrapper.vm.getSeverityColorClass("P1")).toBe("severity-p1");
     });
 
     it("should return correct color for P2 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P2")).toBe("orange-8");
+      expect(wrapper.vm.getSeverityColorClass("P2")).toBe("severity-p2");
     });
 
     it("should return correct color for P3 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P3")).toBe("amber-8");
+      expect(wrapper.vm.getSeverityColorClass("P3")).toBe("severity-p3");
     });
 
     it("should return correct color for P4 severity", () => {
-      expect(wrapper.vm.getSeverityColor("P4")).toBe("grey-7");
+      expect(wrapper.vm.getSeverityColorClass("P4")).toBe("severity-p4");
     });
 
     it("should return grey for unknown severity", () => {
-      expect(wrapper.vm.getSeverityColor("unknown")).toBe("grey");
+      expect(wrapper.vm.getSeverityColorClass("unknown")).toBe("severity-default");
     });
   });
 
@@ -749,7 +751,7 @@ describe("IncidentList.vue", () => {
     });
 
     it("should have correct number of columns", () => {
-      expect(wrapper.vm.columns).toHaveLength(7);
+      expect(wrapper.vm.columns).toHaveLength(8);
     });
 
     it("should have status column with correct config", () => {
@@ -924,8 +926,10 @@ describe("IncidentList.vue", () => {
       // Reset incidents store state
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
     });
 
@@ -1037,8 +1041,10 @@ describe("IncidentList.vue", () => {
     beforeEach(async () => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
 
       (incidentsService.list as any).mockResolvedValue({
@@ -1142,8 +1148,10 @@ describe("IncidentList.vue", () => {
     beforeEach(async () => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
 
       (incidentsService.list as any).mockResolvedValue({
@@ -1206,8 +1214,10 @@ describe("IncidentList.vue", () => {
     beforeEach(() => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
     });
 
@@ -1271,8 +1281,10 @@ describe("IncidentList.vue", () => {
     beforeEach(() => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
 
       (incidentsService.list as any).mockResolvedValue({
@@ -1331,8 +1343,10 @@ describe("IncidentList.vue", () => {
     beforeEach(() => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
 
       (incidentsService.list as any).mockResolvedValue({
@@ -1426,8 +1440,10 @@ describe("IncidentList.vue", () => {
     beforeEach(() => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
     });
 
@@ -1534,8 +1550,10 @@ describe("IncidentList.vue", () => {
     beforeEach(() => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
     });
 
@@ -1621,8 +1639,10 @@ describe("IncidentList.vue", () => {
     beforeEach(() => {
       store.state.incidents = {
         incidents: {},
+        cachedData: [],
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
+        shouldRefresh: false
       };
     });
 
