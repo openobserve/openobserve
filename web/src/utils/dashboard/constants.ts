@@ -5,3 +5,5 @@ export const CUSTOM_VALUE = "::_o2_custom";
 
 // add panel general constants
 export const MAX_FIELD_LABEL_CHARS = 50;
+
+export const TABLE_ROWS_PER_PAGE_DEFAULT_VALUE = 10;

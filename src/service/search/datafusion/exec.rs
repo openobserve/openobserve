@@ -55,8 +55,7 @@ use vortex_io::session::RuntimeSessionExt;
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
-    storage::file_list, table_provider::uniontable::NewUnionTable,
-    udf::transform_udf::get_all_transform,
+    storage::file_list, udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
     datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
