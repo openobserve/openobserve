@@ -17,12 +17,17 @@ export default {
   namespaced: true,
   state: {
     incidents: {},
+    cachedData: [], // Cache the actual incidents data
     pageBeforeSearch: 1, // Track page number before search starts (for smart restoration)
-    isInitialized: false
+    isInitialized: false,
+    shouldRefresh: false // Flag to indicate when data should be refreshed (e.g., after updates)
   },
   getters: {
     getIncidents(state: any) {
       return state.incidents;
+    },
+    getCachedData(state: any) {
+      return state.cachedData;
     },
     getPageBeforeSearch(state: any) {
       return state.pageBeforeSearch;
@@ -30,10 +35,16 @@ export default {
     getIsInitialized(state: any) {
       return state.isInitialized;
     },
+    getShouldRefresh(state: any) {
+      return state.shouldRefresh;
+    },
   },
   mutations: {
     setIncidents(state: any, incidents: any) {
       state.incidents = incidents;
+    },
+    setCachedData(state: any, data: any[]) {
+      state.cachedData = data;
     },
     setPageBeforeSearch(state: any, page: number) {
       state.pageBeforeSearch = page;
@@ -41,21 +52,32 @@ export default {
     setIsInitialized(state: any, isInitialized: boolean) {
       state.isInitialized = isInitialized;
     },
+    setShouldRefresh(state: any, shouldRefresh: boolean) {
+      state.shouldRefresh = shouldRefresh;
+    },
     resetIncidents(state: any) {
       state.incidents = {};
+      state.cachedData = [];
       state.pageBeforeSearch = 1;
       state.isInitialized = false;
+      state.shouldRefresh = false;
     },
   },
   actions: {
     setIncidents(context: any, incidents: any) {
       context.commit('setIncidents', incidents);
     },
+    setCachedData(context: any, data: any[]) {
+      context.commit('setCachedData', data);
+    },
     setPageBeforeSearch(context: any, page: number) {
       context.commit('setPageBeforeSearch', page);
     },
     setIsInitialized(context: any, isInitialized: boolean) {
       context.commit('setIsInitialized', isInitialized);
+    },
+    setShouldRefresh(context: any, shouldRefresh: boolean) {
+      context.commit('setShouldRefresh', shouldRefresh);
     },
     resetIncidents(context: any) {
       context.commit('resetIncidents');
