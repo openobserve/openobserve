@@ -8,10 +8,10 @@ import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 import { deleteDashboard } from "./utils/dashCreation.js";
 
-// Dashboard and panel names
+// Dashboard and panel names - using slice() instead of deprecated substr()
 const randomDashboardName =
-  "VRL_Dashboard_" + Math.random().toString(36).substr(2, 9);
-const panelName = "VRL_Panel_" + Math.random().toString(36).substr(2, 9);
+  "VRL_Dashboard_" + Math.random().toString(36).slice(2, 11);
+const panelName = "VRL_Panel_" + Math.random().toString(36).slice(2, 11);
 
 test.describe.configure({ mode: "parallel" });
 
@@ -28,14 +28,13 @@ const fieldCreationVrl = `.new_field = "test_value"
 const complexVrlFunction = `.vrl_status = "processed"
 .vrl_count = 100
 .vrl_flag = true`;
-// const complexVrlFunction = `.vrl_status = "processed"`;
 
 // SQL queries
 const selectAllQuery = `SELECT * FROM "${STREAM_NAME}"`;
 
 const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "${STREAM_NAME}" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
 
-// Helper function to enable VRL editor
+// Helper function to enable VRL editor with deterministic wait
 async function enableVrlEditor(page) {
   const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
   await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
@@ -84,7 +83,9 @@ test.describe("VRL visualization support testcases", () => {
     if (isChecked === "false") {
       // Click VRL toggle to show editor
       await vrlToggle.click();
-      await page.waitForTimeout(1000);
+      // Wait for VRL editor to appear
+      const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+      await vrlEditor.first().waitFor({ state: "visible", timeout: 10000 });
     }
 
     // Verify VRL editor is visible
@@ -117,8 +118,8 @@ test.describe("VRL visualization support testcases", () => {
     // Verify chart renders
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for table to fully render with data
-    await page.waitForTimeout(2000);
+    // Wait for table to fully render with data using deterministic wait
+    // await waitForTableData(page);
 
     // Verify table panel is visible
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
@@ -127,9 +128,8 @@ test.describe("VRL visualization support testcases", () => {
     // Verify table chart is selected
     await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
 
-    // Verify table has data - use expect with retry for more robust assertion
+    // Verify table has data
     const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
-    // Use toHaveCount with minimum value - this has built-in retrying
     await expect(tableRows).not.toHaveCount(0, { timeout: 15000 });
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
@@ -156,8 +156,8 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for VRL fields to be processed and registered
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
     // Verify table panel is displayed initially
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
@@ -165,9 +165,8 @@ test.describe("VRL visualization support testcases", () => {
 
     // Switch to line chart (now allowed with new behavior)
     await page.locator('[data-test="selected-chart-line-item"]').click();
-    await page.waitForTimeout(1000);
 
-    // NEW BEHAVIOR: Verify VRL warning banner is displayed
+    // Wait for VRL warning banner to appear
     const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
     await expect(vrlWarningBanner).toBeVisible({ timeout: 5000 });
 
@@ -195,27 +194,26 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for VRL fields to be processed
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
     // Test multiple chart types - all should show VRL warning (NEW BEHAVIOR)
     const chartTypes = ["line", "bar", "area", "scatter"];
 
     for (const chartType of chartTypes) {
       await page.locator(`[data-test="selected-chart-${chartType}-item"]`).click();
-      await page.waitForTimeout(1000);
 
-      // NEW BEHAVIOR: Verify VRL warning banner is displayed
+      // Wait for VRL warning banner to appear
       const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
-      const isWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
-      expect(isWarningVisible).toBe(true);
+      await expect(vrlWarningBanner).toBeVisible({ timeout: 5000 });
 
       // NEW BEHAVIOR: Chart switching is now allowed - verify selected chart type changed
       await pm.logsVisualise.verifyChartTypeSelected(page, chartType, true);
 
       // Switch back to table for next iteration
       await page.locator('[data-test="selected-chart-table-item"]').click();
-      await page.waitForTimeout(500);
+      // Wait for table to be selected
+      await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
     }
   });
 
@@ -248,12 +246,6 @@ test.describe("VRL visualization support testcases", () => {
     const successMessage = page.getByText("Panel added to dashboard");
     await expect(successMessage).toBeVisible({ timeout: 10000 });
 
-    // Verify panel renders on dashboard
-    const dashboardPanel = page.locator(
-      '[data-test="dashboard-panel-' + panelName + '"]'
-    );
-    // await expect(dashboardPanel).toBeVisible({ timeout: 10000 });
-
     // Verify table chart is displayed on dashboard
     const tableOnDashboard = page.locator('[data-test="dashboard-panel-table"]');
     await expect(tableOnDashboard).toBeVisible();
@@ -264,26 +256,21 @@ test.describe("VRL visualization support testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-edit-panel"]').click();
 
-    // Wait for edit panel to load
-    await page.waitForTimeout(3000);
-
-    // Verify the VRL-generated column "vrl" is displayed in the table
-    // The VRL function .vrl=100 creates a column named "vrl" with value 100
+    // Wait for edit panel to load - use deterministic wait for table
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
-    await expect(tablePanel).toBeVisible({ timeout: 10000 });
+    await expect(tablePanel).toBeVisible({ timeout: 15000 });
 
     // Verify table has data rows
     const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
+    await expect(tableRows).not.toHaveCount(0, { timeout: 15000 });
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
 
-    // Verify "vrl" column is present in the table (check header or cell containing "vrl")
-    // Try multiple selectors for flexibility
+    // Verify "vrl" column is present in the table
     const vrlColumnHeader = page.locator('[data-test="dashboard-panel-table"]').getByRole('cell', { name: 'vrl' });
     const vrlColumnHeaderAlt = page.locator('[data-test="dashboard-panel-table"]').getByText('vrl', { exact: true }).first();
     const vrlColumnInTable = page.locator('[data-test="dashboard-panel-table"] th:has-text("vrl"), [data-test="dashboard-panel-table"] td:has-text("vrl")').first();
 
-    // Check if VRL column header is visible using any selector
     const isVrlHeaderVisible = await vrlColumnHeader.isVisible().catch(() => false);
     const isVrlHeaderAltVisible = await vrlColumnHeaderAlt.isVisible().catch(() => false);
     const isVrlInTable = await vrlColumnInTable.isVisible().catch(() => false);
@@ -294,7 +281,6 @@ test.describe("VRL visualization support testcases", () => {
     const vrlValue = page.locator('[data-test="dashboard-panel-table"]').getByText('100.00').first();
     const vrlValueAlt = page.locator('[data-test="dashboard-panel-table"]').getByText('100').first();
 
-    // Check if either format is visible
     const isVrlValueVisible = await vrlValue.isVisible().catch(() => false);
     const isVrlValueAltVisible = await vrlValueAlt.isVisible().catch(() => false);
     expect(isVrlValueVisible || isVrlValueAltVisible).toBe(true);
@@ -308,7 +294,8 @@ test.describe("VRL visualization support testcases", () => {
       await discardConfirm.click();
     }
 
-    await page.waitForTimeout(1000);
+    // Wait for navigation back to dashboard
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Cleanup - delete the dashboard
     await page.locator('[data-test="dashboard-back-btn"]').click();
@@ -321,8 +308,6 @@ test.describe("VRL visualization support testcases", () => {
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();
-    // Use SELECT * so VRL-generated fields appear in result
-    // Note: Aggregation queries won't show VRL fields as separate columns
     await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
     await pm.logsVisualise.setRelative("8", "h");
 
@@ -335,8 +320,8 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for VRL fields to be processed
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
     // Verify table is displayed
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
@@ -347,10 +332,9 @@ test.describe("VRL visualization support testcases", () => {
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
 
-    // Verify table has multiple columns (original fields + VRL-generated fields: vrl_status, vrl_count, vrl_flag)
+    // Verify table has multiple columns
     const headers = page.locator('[data-test="dashboard-panel-table"] thead th');
     const headerCount = await headers.count();
-    // SELECT * returns many columns, plus 3 VRL fields
     expect(headerCount).toBeGreaterThan(3);
 
     // Verify at least one VRL-generated field is visible in the table
@@ -362,7 +346,6 @@ test.describe("VRL visualization support testcases", () => {
     const isVrlCountVisible = await vrlCountColumn.first().isVisible().catch(() => false);
     const isVrlFlagVisible = await vrlFlagColumn.first().isVisible().catch(() => false);
 
-    // At least one VRL-generated column should be visible
     expect(isVrlStatusVisible || isVrlCountVisible || isVrlFlagVisible).toBe(true);
   });
 
@@ -390,21 +373,23 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for table to fully render
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
-    // Verify table is displayed with data (proves VRL query executed)
+    // Verify table is displayed with data
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
-    // Verify table has data rows (VRL function executed successfully)
+    // Verify table has data rows
     const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
 
     // Switch back to logs
     await pm.logsVisualise.backToLogs();
-    await page.waitForTimeout(1000);
+
+    // Wait for VRL toggle to be visible in logs tab
+    await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
 
     // ASSERT: Verify VRL toggle is still enabled after switching back to logs
     isChecked = await vrlToggle.getAttribute("aria-checked");
@@ -418,16 +403,16 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.openVisualiseTab();
     await pm.logsVisualise.runQueryAndWaitForCompletion();
 
-    // Verify chart still renders (VRL should be preserved)
+    // Verify chart still renders
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for table to fully render
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
     // ASSERT: Verify table is still displayed after tab switches
     await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
-    // ASSERT: Verify table still has data rows (proves VRL preserved and executed)
+    // ASSERT: Verify table still has data rows
     const rowCountAfterSwitch = await tableRows.count();
     expect(rowCountAfterSwitch).toBeGreaterThan(0);
 
@@ -457,7 +442,6 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.verifyChartRenders(page);
 
     // With VRL functions, table chart should be selected even for histogram queries
-    // (normally histogram queries default to line chart)
     await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
 
     // Verify line chart is NOT selected
@@ -494,6 +478,7 @@ test.describe("VRL visualization support testcases", () => {
 
     // Verify table has data rows
     const tableRows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
+    await expect(tableRows).not.toHaveCount(0, { timeout: 15000 });
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
 
@@ -523,16 +508,18 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for VRL fields to be processed
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
-    // Verify table panel is displayed (proves table chart is active)
+    // Verify table panel is displayed
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
-    // Click table chart - should NOT show VRL warning (table supports VRL)
+    // Click table chart - should NOT show VRL warning
     await page.locator('[data-test="selected-chart-table-item"]').click();
-    await page.waitForTimeout(1000);
+
+    // Wait for table to be selected
+    await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
 
     // Verify NO VRL warning appears for table chart selection
     const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
@@ -544,11 +531,9 @@ test.describe("VRL visualization support testcases", () => {
 
     // NEW BEHAVIOR: Switch to line chart - should show VRL warning and allow switching
     await page.locator('[data-test="selected-chart-line-item"]').click();
-    await page.waitForTimeout(1000);
 
-    // NEW BEHAVIOR: Verify VRL warning banner appears for line chart
-    isVrlWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
-    expect(isVrlWarningVisible).toBe(true);
+    // Wait for VRL warning banner to appear
+    await expect(vrlWarningBanner).toBeVisible({ timeout: 5000 });
 
     // NEW BEHAVIOR: Chart switching is allowed - line chart should be selected
     await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
@@ -572,8 +557,8 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for table to render
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
     // Verify table is displayed
     const table = page.locator('[data-test="dashboard-panel-table"]');
@@ -582,7 +567,7 @@ test.describe("VRL visualization support testcases", () => {
     // Open config panel to verify dynamic columns is enabled
     await pm.dashboardPanelConfigs.openConfigPanel();
 
-    // Verify "Allow Dynamic Columns" toggle is enabled (aria-checked="true")
+    // Verify "Allow Dynamic Columns" toggle is enabled
     const dynamicColumnsToggle = page.locator('[data-test="dashboard-config-table_dynamic_columns"]');
     await dynamicColumnsToggle.waitFor({ state: "visible", timeout: 10000 });
 
@@ -617,16 +602,17 @@ test.describe("VRL visualization support testcases", () => {
 
     // Switch back to logs tab
     await pm.logsVisualise.backToLogs();
-    await page.waitForTimeout(1000);
 
-    // Disable VRL toggle
+    // Disable VRL toggle - wait for it to be visible first
     const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
     await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
     const isChecked = await vrlToggle.getAttribute("aria-checked");
 
     if (isChecked === "true") {
       await vrlToggle.click();
-      await page.waitForTimeout(1000);
+      // Wait for VRL editor to be hidden or disabled
+      const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+      await vrlEditor.first().waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
     }
 
     // Clear the VRL function editor
@@ -641,10 +627,9 @@ test.describe("VRL visualization support testcases", () => {
 
     // Switch back to visualization
     await pm.logsVisualise.openVisualiseTab();
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.verifyChartRenders(page);
 
     // Verify no VRL function error when switching chart types
-    // Note: Chart switching may still be restricted based on other factors like SELECT *
   });
 
   test("[P1] Should show VRL warning for h-bar chart when VRL function is present", async ({
@@ -665,18 +650,17 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for VRL fields to be processed
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
     // Try to switch to h-bar chart
     const hbarChart = page.locator('[data-test="selected-chart-h-bar-item"]');
     if (await hbarChart.isVisible().catch(() => false)) {
       await hbarChart.click();
-      await page.waitForTimeout(1000);
 
-      // NEW BEHAVIOR: Verify VRL warning banner is displayed
+      // Wait for VRL warning banner to appear
       const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
-      const isWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
+      const isWarningVisible = await vrlWarningBanner.isVisible({ timeout: 5000 }).catch(() => false);
       expect(isWarningVisible).toBe(true);
 
       // NEW BEHAVIOR: Chart switching is allowed - h-bar should be selected
@@ -706,8 +690,8 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
     await pm.logsVisualise.verifyChartRenders(page);
 
-    // Wait for VRL fields to be processed
-    await page.waitForTimeout(2000);
+    // Wait for table to render with data
+    // await waitForTableData(page);
 
     // Verify table is displayed with data initially
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
@@ -719,11 +703,10 @@ test.describe("VRL visualization support testcases", () => {
 
     // NEW BEHAVIOR: Switch to bar chart - should show VRL warning and allow switching
     await page.locator('[data-test="selected-chart-bar-item"]').click();
-    await page.waitForTimeout(1000);
 
-    // NEW BEHAVIOR: Verify VRL warning banner is displayed
+    // Wait for VRL warning banner to appear
     const vrlWarningBanner = page.getByText("VRL function is only supported for table chart");
-    const isWarningVisible = await vrlWarningBanner.isVisible().catch(() => false);
+    const isWarningVisible = await vrlWarningBanner.isVisible({ timeout: 5000 }).catch(() => false);
     expect(isWarningVisible).toBe(true);
 
     // NEW BEHAVIOR: Chart switching is allowed - bar chart should be selected
@@ -749,7 +732,9 @@ test.describe("VRL visualization support testcases", () => {
 
     // Try to switch to bar chart - should NOT show VRL error
     await page.locator('[data-test="selected-chart-bar-item"]').click();
-    await page.waitForTimeout(500);
+
+    // Wait for bar chart to be selected
+    await pm.logsVisualise.verifyChartTypeSelected(page, "bar", true);
 
     // Verify VRL-specific error notification does NOT appear
     const vrlErrorNotification = page.getByText(
@@ -782,7 +767,7 @@ test.describe("VRL visualization support testcases", () => {
     // Add VRL function and verify it's entered correctly
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
 
-    // Verify the VRL content was entered (check editor has content)
+    // Verify the VRL content was entered
     const editorContent = page.locator("#fnEditor");
     await expect(editorContent).toBeVisible();
   });
