@@ -201,7 +201,7 @@ describe("TablePaginationControls", () => {
         totalRows: 0,
       });
 
-      expect(wrapper.text()).toContain("1-0 of 0");
+      expect(wrapper.text()).toContain("0 of 0");
     });
 
     it("should handle single page with fewer rows than rowsPerPage", () => {

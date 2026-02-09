@@ -131,6 +131,7 @@ export default defineComponent({
     const { t } = useI18n();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
+      if (totalRows === 0) return "0 of 0";
       if (!showPagination || pagination.rowsPerPage === 0) {
         return `1-${totalRows} of ${totalRows}`;
       }
