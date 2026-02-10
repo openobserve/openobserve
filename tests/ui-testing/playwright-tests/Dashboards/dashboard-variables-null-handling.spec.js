@@ -134,11 +134,11 @@ test.describe("Dashboard Variables - Null Handling", () => {
     // .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
     // .click();
 
+  // Verify the query is displayed in the Query Inspector (Executed Query section)
   await expect(
-    page.getByRole("cell", {
-      name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_pod_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_pod_name = \'_o2_all_\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
-      exact: true,
-    })
+    page.locator('.inspector-query-editor').filter({
+      hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_pod_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_pod_name = \'_o2_all_\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+    }).last()
   ).toBeVisible();
 
     // Close Query Inspector dialog
