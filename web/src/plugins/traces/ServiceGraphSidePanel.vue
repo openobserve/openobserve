@@ -246,6 +246,7 @@ import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
 import searchService from '@/services/search';
+import { escapeSingleQuotes } from '@/utils/zincutils';
 
 export default defineComponent({
   name: 'ServiceGraphSidePanel',
@@ -508,7 +509,9 @@ export default defineComponent({
     // Build filter for trace query
     const buildTraceFilter = (): string => {
       if (!props.selectedNode) return '';
-      return `service_name = '${props.selectedNode.name || props.selectedNode.label || props.selectedNode.id}'`;
+      const serviceName = props.selectedNode.name || props.selectedNode.label || props.selectedNode.id;
+      const escapedServiceName = escapeSingleQuotes(serviceName);
+      return `service_name = '${escapedServiceName}'`;
     };
 
     // Fetch Recent Traces

@@ -242,7 +242,7 @@ import {
 } from "@/utils/traces/convertTraceData";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -924,7 +924,9 @@ export default defineComponent({
       if (!selectedNode.value) return;
 
       const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
-      const sql = `SELECT * FROM "${streamFilter.value}" WHERE service_name = '${serviceName}' ORDER BY _timestamp DESC`;
+      const escapedServiceName = escapeSingleQuotes(serviceName);
+      const escapedStream = escapeSingleQuotes(streamFilter.value);
+      const sql = `SELECT * FROM "${escapedStream}" WHERE service_name = '${escapedServiceName}' ORDER BY _timestamp DESC`;
       const query = b64EncodeUnicode(sql);
 
       const queryObject = {

@@ -208,6 +208,7 @@ import {
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
+  escapeSingleQuotes,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -1389,7 +1390,8 @@ const handleServiceGraphViewTraces = (data: any) => {
 
   // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
   if (data.serviceName) {
-    const filterQuery = `service_name = '${data.serviceName}'`;
+    const escapedServiceName = escapeSingleQuotes(data.serviceName);
+    const filterQuery = `service_name = '${escapedServiceName}'`;
     searchObj.data.editorValue = filterQuery;
     searchObj.data.query = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
