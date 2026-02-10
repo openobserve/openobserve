@@ -277,8 +277,8 @@ import {
   outlinedDelete,
   outlinedAccountTree,
 } from "@quasar/extras/material-icons-outlined";
-import useLogs from "@/composables/useLogs";
 import { useReo } from "@/services/reodotdev_analytics";
+import searchState from "@/composables/useLogs/searchState";
 
 export default defineComponent({
   name: "functionList",
@@ -309,7 +309,7 @@ export default defineComponent({
     const confirmForceDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
     const selectedFunctions = ref<any[]>([]);
-    const { searchObj } = useLogs();
+    const { searchObj } = searchState();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
     const filterQuery = ref("");
@@ -402,7 +402,7 @@ export default defineComponent({
           console.error("Error while pulling function", err);
 
           dismiss();
-          if (err.response.status != 403) {
+          if (err?.response?.status && err?.response?.status != 403) {
             $q.notify({
               type: "negative",
               message: "Error while pulling function.",
