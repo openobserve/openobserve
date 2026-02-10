@@ -37,7 +37,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
-    cache, file_list,
+    cache, cluster, file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
@@ -66,12 +66,9 @@ use {
 };
 
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            user::{AuthTokens, AuthTokensExt},
-        },
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        user::{AuthTokens, AuthTokensExt},
     },
     service::{
         db,
@@ -1067,7 +1064,7 @@ async fn enable_node(
             }
         }
     }
-    match cluster::update_local_node(&node).await {
+    match crate::common::infra::cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }

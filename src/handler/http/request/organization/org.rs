@@ -36,7 +36,6 @@ use {
 
 use crate::{
     common::{
-        infra::cluster,
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
@@ -916,7 +915,7 @@ async fn get_local_nodes() -> NodeListResponse {
     let mut response = NodeListResponse::new();
 
     // Get all nodes from cache if available
-    if let Some(nodes) = cluster::get_cached_nodes(|_| true).await {
+    if let Some(nodes) = infra::cluster::get_cached_nodes(|_| true).await {
         for node in nodes {
             response.add_node(node.clone(), node.get_region(), node.get_cluster());
         }

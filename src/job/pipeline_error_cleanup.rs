@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
+use infra::cluster::get_cached_online_ingester_nodes;
 
-use crate::{common::infra::cluster, service::db};
+use crate::service::db;
 
 /// Runs the periodic pipeline error cleanup job.
 ///
@@ -41,7 +42,7 @@ pub fn run() {
             log::debug!("[PIPELINE_ERROR_CLEANUP] Job kicked off");
 
             // Leader election: only the ingester with the smallest UUID runs cleanup
-            let is_leader = match cluster::get_cached_online_ingester_nodes().await {
+            let is_leader = match get_cached_online_ingester_nodes().await {
                 Some(mut nodes) => {
                     if nodes.is_empty() {
                         log::warn!("[PIPELINE_ERROR_CLEANUP] No online ingester nodes found");
