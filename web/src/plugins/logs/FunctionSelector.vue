@@ -36,11 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="12px"
       icon="save"
       :icon-right="iconRight"
-      :title="t('search.functionPlaceholder')"
       split
       class="saved-views-dropdown btn-function el-border"
       @click="fnSavedFunctionDialog"
     >
+      <q-tooltip :delay="0">
+        {{ selectedFunctionTooltip }}
+      </q-tooltip>
       <q-list data-test="logs-search-saved-function-list">
         <!-- Search Input -->
         <div>
@@ -141,6 +143,13 @@ const filteredFunctionOptions = computed(() => {
   return props.functionOptions.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
   );
+});
+
+const selectedFunctionTooltip = computed(() => {
+  if (searchObj.data.selectedFunction?.name) {
+    return `${t("search.functionLabel")}: ${searchObj.data.selectedFunction.name}`;
+  }
+  return t("search.functionPlaceholder");
 });
 
 const applyFunction = (

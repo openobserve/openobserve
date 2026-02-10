@@ -32,8 +32,9 @@
 
   :deep(.btn-function) {
     transition: all 0.2s ease;
-    padding-right: 0.5rem; // 8px
-    // margin-right: 0.125rem; // 2px
+    padding-right: 0.375rem; // 6px
+    padding-left: 0.375rem; // 6px
+    min-width: auto;
 
     &:hover {
       background-color: var(--o2-hover-accent);
@@ -41,18 +42,24 @@
 
     .q-btn__content {
       .q-icon {
-        font-size: 1.125rem; // 18px
+        font-size: 1rem; // 16px
+        margin: 0;
       }
     }
   }
 
   :deep(.q-btn-dropdown__arrow-container) {
     transition: all 0.2s ease;
-    padding-left: 0.5rem; // 8px
-    margin-left: 0.125rem; // 2px
+    padding-left: 0.375rem; // 6px
+    padding-right: 0.375rem; // 6px
+    margin-left: 0;
 
     &:hover {
       background-color: var(--o2-hover-accent);
+    }
+
+    .q-icon {
+      font-size: 0.875rem; // 14px
     }
   }
 }
