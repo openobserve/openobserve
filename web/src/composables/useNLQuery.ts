@@ -300,9 +300,11 @@ export function useNLQuery() {
       const decoder = new TextDecoder();
       let generatedQuery = '';
       let chunkCount = 0;
-      const toolCalls: Array<{tool: string, message: string}> = [];
+      const toolCalls: Array<{tool: string, message: string, success?: boolean}> = [];
+      const toolResults: Array<{tool: string, success: boolean, message: string}> = [];
       let hasError = false;
       let errorMessage = '';
+      let lastMessageContent = ''; // Track latest message events for dashboard URLs
 
       console.log('[NL2Q] Starting to read streaming response...');
 
@@ -326,14 +328,42 @@ export function useNLQuery() {
               const data = JSON.parse(line.substring(6));
 
               // Handle different event types
-              if (data.type === 'tool_call') {
+              if (data.type === 'status') {
+                // Status event (processing, etc.)
+                console.log('[NL2Q] Status:', data.message);
+                streamingResponse.value = data.message || 'Processing...';
+              } else if (data.type === 'message') {
+                // Message event (AI planning/explanation text)
+                console.log('[NL2Q] Message:', data.content?.substring(0, 100));
+                lastMessageContent = data.content || '';
+                streamingResponse.value = data.content?.substring(0, 100) || 'Processing...';
+              } else if (data.type === 'tool_call') {
                 // Track tool execution (dashboard/alert creation)
                 console.log('[NL2Q] Tool call:', data.tool, '-', data.message);
                 toolCalls.push({
                   tool: data.tool || 'unknown',
-                  message: data.message || ''
+                  message: data.message || '',
+                  success: undefined // Will be updated by tool_result
                 });
                 streamingResponse.value = data.message || `Executing ${data.tool}...`;
+              } else if (data.type === 'tool_result') {
+                // Tool execution result
+                console.log('[NL2Q] Tool result:', data.tool, '- Success:', data.success);
+                toolResults.push({
+                  tool: data.tool || 'unknown',
+                  success: data.success || false,
+                  message: data.message || ''
+                });
+
+                // Update corresponding tool call with success status
+                const lastToolCall = toolCalls[toolCalls.length - 1];
+                if (lastToolCall) {
+                  lastToolCall.success = data.success;
+                }
+
+                if (!data.success) {
+                  streamingResponse.value = `Tool failed: ${data.message}`;
+                }
               } else if (data.type === 'error') {
                 // Error event
                 console.error('[NL2Q] Error event:', data.error || data.message);
@@ -353,6 +383,8 @@ export function useNLQuery() {
                       generatedQuery = lastMessage.content;
                       console.log('[NL2Q] Using content from completion history');
                     }
+                    // Also update lastMessageContent for URL extraction
+                    lastMessageContent = lastMessage.content;
                   }
                 }
               } else if (data.type === 'title') {
@@ -403,33 +435,52 @@ export function useNLQuery() {
       if (toolCalls.length > 0) {
         console.log('[NL2Q] Tool calls detected but no SQL found:', toolCalls);
 
-        // Check for dashboard creation
-        const dashboardTool = toolCalls.find(tc =>
-          tc.tool === 'create_dashboard' ||
-          tc.tool.includes('dashboard') ||
-          rawResponse.toLowerCase().includes('dashboard') && rawResponse.includes('created')
-        );
+        // Use lastMessageContent if available (has formatted response with URLs)
+        const responseToReturn = lastMessageContent || rawResponse;
+
+        // Check for successful dashboard creation (case-insensitive)
+        const dashboardTool = toolCalls.find(tc => {
+          const toolLower = tc.tool.toLowerCase();
+          return (
+            (toolLower === 'createdashboard' ||
+             toolLower === 'create_dashboard' ||
+             toolLower.includes('dashboard')) &&
+            tc.success !== false // Only if not explicitly failed
+          );
+        });
 
         if (dashboardTool) {
           console.log('[NL2Q] Dashboard created successfully');
-          return '✓ DASHBOARD_CREATED: ' + rawResponse;
+          return '✓ DASHBOARD_CREATED: ' + responseToReturn;
         }
 
-        // Check for alert creation
-        const alertTool = toolCalls.find(tc =>
-          tc.tool === 'create_alert' ||
-          tc.tool.includes('alert') ||
-          rawResponse.toLowerCase().includes('alert') && rawResponse.includes('created')
-        );
+        // Check for successful alert creation (case-insensitive)
+        const alertTool = toolCalls.find(tc => {
+          const toolLower = tc.tool.toLowerCase();
+          return (
+            (toolLower === 'createalert' ||
+             toolLower === 'create_alert' ||
+             toolLower.includes('alert')) &&
+            tc.success !== false
+          );
+        });
 
         if (alertTool) {
           console.log('[NL2Q] Alert created successfully');
-          return '✓ ALERT_CREATED: ' + rawResponse;
+          return '✓ ALERT_CREATED: ' + responseToReturn;
         }
 
-        // Other tool execution that didn't produce SQL
-        console.log('[NL2Q] Tool execution completed without SQL');
-        return '✓ ACTION_COMPLETED: ' + rawResponse;
+        // Check if any tool succeeded
+        const hasSuccessfulTool = toolCalls.some(tc => tc.success === true);
+
+        if (hasSuccessfulTool) {
+          console.log('[NL2Q] Tool execution completed successfully');
+          return '✓ ACTION_COMPLETED: ' + responseToReturn;
+        }
+
+        // All tools failed
+        console.warn('[NL2Q] All tool executions failed');
+        return null;
       }
 
       // Only if SQL extraction failed, check if AI is asking questions
