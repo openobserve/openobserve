@@ -1217,19 +1217,17 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                :title="searchObj.meta.nlpMode ? t('search.generateQueryTooltip') : t('search.runQuery')"
-                class="q-pa-none tw:h-[30px]  element-box-shadow"
+                :title="(searchObj.meta.nlpMode || isNaturalLanguageDetected) ? t('search.askAITooltip') : t('search.runQuery')"
+                class="q-pa-none tw:h-[30px] element-box-shadow"
                 :class="[
-                  searchObj.meta.nlpMode ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
-                  searchObj.meta.nlpMode
-                    ? 'search-button-normal-border-radius'
-                    : config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius'
+                  (searchObj.meta.nlpMode || isNaturalLanguageDetected) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
                 ]"
-                :color="searchObj.meta.nlpMode ? 'primary' : undefined"
+                :color="(searchObj.meta.nlpMode || isNaturalLanguageDetected) ? 'primary' : undefined"
                 no-caps
-                @click="searchObj.meta.nlpMode ? handleGenerateSQLQuery() : handleRunQueryFn()"
+                @click="(searchObj.meta.nlpMode || isNaturalLanguageDetected) ? handleGenerateSQLQuery() : handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
@@ -1237,25 +1235,26 @@ class="q-pr-sm q-pt-xs" />
                   (searchObj.meta.nlpMode && isGeneratingSQL)
                 "
                 >
-                {{ searchObj.meta.nlpMode ? t("search.generateQuery") : t("search.runQuery") }}
+                {{ (searchObj.meta.nlpMode || isNaturalLanguageDetected) ? t("search.askAI") : t("search.runQuery") }}
               </q-btn>
-               <q-separator class="tw:h-[29px] tw:w-[1px]" />
+              <!-- Dropdown shown in both modes for visual consistency -->
+              <q-separator v-if="config.isEnterprise == 'true'" class="tw:h-[29px] tw:w-[1px]" />
               <q-btn-dropdown
                 v-if="config.isEnterprise == 'true'"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
-                searchObj.meta.nlpMode ? 'o2-ai-dropdown-button' : '',
-                !searchObj.meta.nlpMode && config.isEnterprise == 'true' &&
+                (searchObj.meta.nlpMode || isNaturalLanguageDetected) ? 'o2-ai-dropdown-button' : '',
+                !(searchObj.meta.nlpMode || isNaturalLanguageDetected) && config.isEnterprise == 'true' &&
                     (!!searchObj.data.searchRequestTraceIds.length ||
                       !!searchObj.data.searchWebSocketTraceIds.length) &&
                     (searchObj.loading == true ||
-                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : !searchObj.meta.nlpMode ? 'o2-color-primary' : '',
+                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : !(searchObj.meta.nlpMode || isNaturalLanguageDetected) ? 'o2-color-primary' : '',
                 config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
                 ]"
-               unelevated dense >
+              unelevated dense >
                   <!-- SQL Mode: Refresh option -->
-                  <template v-if="!searchObj.meta.nlpMode">
+                  <template v-if="!(searchObj.meta.nlpMode || isNaturalLanguageDetected)">
                     <q-btn
                       data-test="logs-search-bar-refresh-btn"
                       data-cy="search-bar-refresh-button"
@@ -1275,25 +1274,13 @@ class="q-pr-sm q-pt-xs" />
                       {{ t("search.refreshCacheAndRunQuery") }}
                     </q-btn>
                   </template>
-
-                  <!-- NLP Mode: AI actions menu -->
+                  <!-- NLP Mode: Empty menu (for visual consistency) -->
                   <template v-else>
-                    <!-- Only show menu when SQL is detected -->
-                    <template v-if="hasSQLInNLPMode">
-                      <q-list class="tw:min-w-[140px]">
-                        <q-item clickable v-close-popup @click="handleAddToDashboard" data-test="nlp-dropdown-add-to-dashboard-3" class="tw:py-2">
-                          <q-item-section>
-                            <q-item-label class="tw:text-sm">Add to Dashboard</q-item-label>
-                          </q-item-section>
-                        </q-item>
-                        <q-separator />
-                        <q-item clickable v-close-popup @click="handleCreateAlert" data-test="nlp-dropdown-create-alert-3" class="tw:py-2">
-                          <q-item-section>
-                            <q-item-label class="tw:text-sm">Create Alert</q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </q-list>
-                    </template>
+                    <q-list class="tw:min-w-[140px] tw:p-2">
+                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
+                        No additional options
+                      </q-item-label>
+                    </q-list>
                   </template>
               </q-btn-dropdown>
             </div>
@@ -1318,9 +1305,9 @@ class="q-pr-sm q-pt-xs" />
               class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
               :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
             >
-              <!-- AI Input Bar (shown in NLP mode) -->
+              <!-- AI Input Bar (shown in NLP mode OR after first AI interaction in non-NLP mode) -->
               <div
-                v-if="searchObj.meta.nlpMode"
+                v-if="searchObj.meta.nlpMode || (searchObj.meta.sqlMode && hasInteractedWithAI)"
                 class="ai-input-bar tw:p-3"
               >
                 <!-- Show streaming status with spinner -->
@@ -2308,6 +2295,8 @@ export default defineComponent({
     // AI Input Bar text (independent from editor)
     const aiInputText = ref('');
     const originalAiInputText = ref(''); // Store original text for failure restoration
+    const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
+    const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
 
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
@@ -2424,6 +2413,9 @@ export default defineComponent({
         if (newSqlMode === true && oldSqlMode === false) {
           console.log('[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)');
           searchObj.meta.nlpMode = false;
+          // Reset flags when switching to SQL mode
+          hasInteractedWithAI.value = false;
+          isNaturalLanguageDetected.value = false;
         }
       }
     );
@@ -2433,16 +2425,25 @@ export default defineComponent({
     watch(
       () => searchObj.meta.nlpMode,
       (newNlpMode, oldNlpMode) => {
-        // Only act when NLP mode is turned ON (not when turning off)
         if (newNlpMode === true && oldNlpMode === false) {
+          // NLP mode turned ON
           console.log('[NL2Q-Handler] NLP mode manually enabled, turning off SQL mode (mutually exclusive)');
           searchObj.meta.sqlMode = false;
+          // Reset detection flag when manually switching to NLP mode
+          isNaturalLanguageDetected.value = false;
 
           // CRITICAL: User manually toggled NLP mode ON
           // We need to prevent the next auto-detection from turning it back OFF
           // The existing text in editor might be SQL, which would trigger auto-detection
           // and emit nlpModeDetected:false, turning NLP mode back OFF
           // So we don't emit auto-detection events when nlpMode prop is already true
+        } else if (newNlpMode === false && oldNlpMode === true) {
+          // NLP mode turned OFF - default to SQL mode
+          console.log('[NL2Q-Handler] NLP mode disabled, switching to SQL mode');
+          searchObj.meta.sqlMode = true;
+          // Reset flags
+          isNaturalLanguageDetected.value = false;
+          hasInteractedWithAI.value = false;
         }
       }
     );
@@ -4223,36 +4224,33 @@ export default defineComponent({
     };
 
     /**
-     * Auto-toggle NLP mode when natural language is detected
+     * Handle natural language detection from CodeQueryEditor
      *
-     * IMPORTANT: This handler receives events from CodeQueryEditor's auto-detection.
-     * CodeQueryEditor only emits these events when nlpMode is FALSE (not manually toggled).
-     * So we can safely apply the detected state here.
+     * IMPORTANT: This no longer switches modes automatically!
+     * It only tracks detection state to change button text.
+     * User must manually toggle NLP mode or AI bar only appears after first AI interaction.
      */
     const handleNlpModeDetected = (isDetected: boolean) => {
       console.log('[NL2Q-Handler] ===== HANDLER CALLED =====');
       console.log('[NL2Q-Handler] handleNlpModeDetected called', {
         isDetected,
         aiEnabled: store.state.zoConfig.ai_enabled,
-        currentNlpMode: searchObj.meta.nlpMode
+        currentNlpMode: searchObj.meta.nlpMode,
+        manuallyToggled: searchObj.meta.nlpMode,
+        currentDetectionFlag: isNaturalLanguageDetected.value
       });
 
-      // Only respond to auto-detection if AI is enabled
-      if (store.state.zoConfig.ai_enabled) {
-        if (isDetected) {
-          console.log('[NL2Q-Handler] Setting nlpMode to true (natural language detected)');
-          searchObj.meta.nlpMode = true;
-          // NLP mode and SQL mode are mutually exclusive - turn off SQL mode
-          if (searchObj.meta.sqlMode) {
-            console.log('[NL2Q-Handler] Turning off SQL mode (mutually exclusive with NLP)');
-            searchObj.meta.sqlMode = false;
-          }
-        } else {
-          console.log('[NL2Q-Handler] Setting nlpMode to false (SQL detected or not NL)');
-          searchObj.meta.nlpMode = false;
-        }
+      // Only respond to auto-detection if AI is enabled AND user hasn't manually set NLP mode
+      if (store.state.zoConfig.ai_enabled && !searchObj.meta.nlpMode) {
+        // Update detection flag (for button text) but DON'T switch modes
+        const oldValue = isNaturalLanguageDetected.value;
+        isNaturalLanguageDetected.value = isDetected;
+        console.log('[NL2Q-Handler] Detection flag updated:', oldValue, '→', isDetected);
+        console.log('[NL2Q-Handler] Natural language detection:', isDetected ? 'YES (button → Ask AI)' : 'NO (button → Run Query)');
+      } else if (searchObj.meta.nlpMode) {
+        console.log('[NL2Q-Handler] NLP mode manually enabled, ignoring auto-detection');
       } else {
-        console.log('[NL2Q-Handler] AI not enabled, not changing nlpMode');
+        console.log('[NL2Q-Handler] AI not enabled, not tracking detection');
       }
     };
 
@@ -4278,6 +4276,11 @@ export default defineComponent({
     const handleGenerationSuccess = (payload: {type: string, message: string}) => {
       console.log('[SearchBar] Generation success:', payload.type);
 
+      // Mark that user has interacted with AI (for showing AI bar in non-NLP mode)
+      if (!searchObj.meta.nlpMode) {
+        hasInteractedWithAI.value = true;
+      }
+
       if (payload.type === 'dashboard') {
         aiInputText.value = '✓ Dashboard created successfully!';
       } else if (payload.type === 'alert') {
@@ -4290,13 +4293,23 @@ export default defineComponent({
     };
 
     /**
-     * Handle Generate SQL Query when in NLP mode
+     * Handle Generate SQL Query when in NLP mode OR when NL detected
      * Combines AI bar text + editor text, then calls CodeQueryEditor generation
      */
     const handleGenerateSQLQuery = async () => {
       const queryEditor = queryEditorRef.value;
       if (!queryEditor || typeof queryEditor.handleGenerateSQL !== 'function') {
         return;
+      }
+
+      // If NL was detected but not in NLP mode, switch to NLP mode now
+      // This shows the AI bar for streaming updates
+      if (isNaturalLanguageDetected.value && !searchObj.meta.nlpMode) {
+        console.log('[NL2Q] User clicked Ask AI with NL detected, switching to NLP mode');
+        searchObj.meta.nlpMode = true;
+        searchObj.meta.sqlMode = false;
+        // Clear detection flag since we're now in NLP mode
+        isNaturalLanguageDetected.value = false;
       }
 
       // Save original AI Bar text for failure restoration
@@ -4976,6 +4989,8 @@ ${query}
       handleAddToDashboard,
       handleCreateAlert,
       isGeneratingSQL,
+      isNaturalLanguageDetected,
+      hasInteractedWithAI,
       getColumnNames,
       getSearchObj,
       toggleHistogram,
