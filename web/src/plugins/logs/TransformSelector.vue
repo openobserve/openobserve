@@ -44,12 +44,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="functionModel"
         size="12px"
         :icon="transformIcon"
-        :label="transformsLabel"
         no-caps
         class="btn-function no-case q-pl-sm q-pr-none no-border no-outline tw:border-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
       >
+        <q-tooltip :delay="0">
+          {{ transformsLabel }}
+        </q-tooltip>
         <q-list data-test="logs-search-saved-function-list">
           <!-- Search Input -->
           <div
