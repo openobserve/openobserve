@@ -495,46 +495,6 @@ class="field_list" no-hover>
 
               <q-separator />
 
-              <!-- Wrap Content Toggle -->
-              <q-item
-                clickable
-                @click="
-                  searchObj.meta.toggleSourceWrap =
-                    !searchObj.meta.toggleSourceWrap
-                "
-                data-test="logs-search-bar-wrap-table-content-toggle-btn"
-                class="q-pa-sm saved-view-item"
-              >
-                <q-item-section>
-                  <q-item-label class="tw:flex tw:items-center">
-                    <div
-                      style="
-                        width: 28px;
-                        display: flex;
-                        align-items: center;
-                        margin-right: 12px;
-                      "
-                    >
-                      <q-toggle
-                        v-model="searchObj.meta.toggleSourceWrap"
-                        size="xs"
-                        flat
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
-                        class="o2-toggle-button-xs"
-                        @click.stop
-                      />
-                    </div>
-                    {{ t("search.wrapContent") }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
               <!-- Quick Mode Toggle -->
               <q-item
                 clickable
@@ -658,35 +618,6 @@ alt="Quick Mode" class="toolbar-icon" />
       </div>
 
       <div class="float-right col-auto">
-        <!-- this is moved to dropdown if ai chat is enabled -->
-        <div
-          v-if="!store.state.isAiChatEnabled"
-          class="toolbar-toggle-container float-left"
-        >
-          <q-toggle
-            data-test="logs-search-bar-wrap-table-content-toggle-btn"
-            v-model="searchObj.meta.toggleSourceWrap"
-            class="o2-toggle-button-xs element-box-shadow"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-            :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
-          >
-            <q-icon name="wrap_text" class="toolbar-icon-in-toggle" />
-            <q-tooltip>
-              {{
-                searchObj.meta.logsVisualizeToggle === "visualize"
-                  ? t("search.notSupportedForVisualization")
-                  : t("search.messageWrapContent")
-              }}
-            </q-tooltip>
-          </q-toggle>
-        </div>
-
         <transform-selector
           v-if="isActionsEnabled"
           :function-options="functionOptions"
