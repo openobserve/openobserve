@@ -1445,17 +1445,26 @@ export default defineComponent({
             rawSpanDimensions,
           );
 
+          // Use filters from logStreams[0] as matchedDimensions — these contain
+          // the correct field names for the log stream (e.g., k8s_namespace_name)
+          // instead of semantic IDs (k8s-namespace) or trace field names
+          // (service_k8s_namespace_name). Same fix as 9127b6172 for incidents.
+          const logFilters = correlationData.related_streams.logs?.[0]?.filters || {};
+          const actualMatchedDimensions = Object.keys(logFilters).length > 0
+            ? logFilters
+            : correlationData.matched_dimensions;
+
           correlationProps.value = {
             serviceName: correlationData.service_name,
-            matchedDimensions: correlationData.matched_dimensions,
-            additionalDimensions: correlationData.additional_dimensions || {},
+            matchedDimensions: actualMatchedDimensions,
+            additionalDimensions: {},
             metricStreams: correlationData.related_streams.metrics,
             logStreams: correlationData.related_streams.logs,
             traceStreams: correlationData.related_streams.traces,
             sourceStream: props.streamName,
             sourceType: "traces",
-            // Use raw span attributes as availableDimensions for log query filters
-            availableDimensions: rawSpanDimensions,
+            // Use log stream filters as availableDimensions for field name resolution
+            availableDimensions: logFilters,
             ftsFields: [],
             timeRange: {
               startTime: spanStartUs - bufferUs,

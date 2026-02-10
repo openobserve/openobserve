@@ -454,6 +454,109 @@ pub async fn update_incident_metadata(
     Ok(())
 }
 
+/// Find open incidents with optional filters (general-purpose function)
+///
+/// A flexible function for finding open incidents with various filters.
+/// Used for both hierarchical upgrade matching and RCA processing.
+///
+/// # Parameters
+/// - `org_id`: Organization ID (REQUIRED for multi-tenancy security)
+/// - `created_after`: Optional timestamp filter - only incidents created after this time (for
+///   time-window queries)
+/// - `limit`: Optional result limit (None = return all, Some(n) = limit to n results)
+///
+/// # Returns
+/// Open (non-resolved) incidents ordered by most recent first (by created_at)
+///
+/// # Examples
+/// ```
+/// // Hierarchical upgrade: Find incidents created in last 5 minutes
+/// let threshold = now - (5 * 60 * 1_000_000);
+/// let candidates = find_open_incidents_filtered(org_id, Some(threshold), Some(100)).await?;
+///
+/// // RCA: Get all open incidents for an org
+/// let all_open = find_open_incidents_filtered(org_id, None, None).await?;
+/// ```
+pub async fn find_open_incidents_filtered(
+    org_id: &str,
+    created_after: Option<i64>,
+    limit: Option<u64>,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let mut query = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .order_by_desc(alert_incidents::Column::CreatedAt);
+
+    // Apply time filter if provided (for hierarchical upgrade time window)
+    if let Some(threshold) = created_after {
+        query = query.filter(alert_incidents::Column::CreatedAt.gte(threshold));
+    }
+
+    // Apply limit if provided (for performance)
+    if let Some(lim) = limit {
+        query = query.limit(lim);
+    }
+
+    query
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Upgrade incident correlation key and dimensions during hierarchical upgrade
+///
+/// This function is called when an incident is upgraded from a weaker correlation key
+/// (e.g., alert_id or WORKLOAD) to a stronger one (e.g., SCOPE).
+///
+/// Atomically updates:
+/// - correlation_key: The new stronger key
+/// - stable_dimensions: Merged/refined dimensions
+/// - alert_count: Current count (after alert was added)
+/// - last_alert_at: Latest alert timestamp
+pub async fn upgrade_incident_correlation(
+    org_id: &str,
+    id: &str,
+    new_correlation_key: &str,
+    new_stable_dimensions: serde_json::Value,
+    alert_count: i32,
+    last_alert_at: i64,
+) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let incident = get(org_id, id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    let mut active: alert_incidents::ActiveModel = incident.into();
+
+    // Upgrade correlation key
+    active.correlation_key = Set(new_correlation_key.to_string());
+
+    // Upgrade dimensions
+    active.stable_dimensions = Set(new_stable_dimensions);
+
+    // Update metadata
+    active.alert_count = Set(alert_count);
+    active.last_alert_at = Set(last_alert_at);
+    active.updated_at = Set(now);
+
+    active
+        .update(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    log::info!(
+        "[DB::alert_incidents] Upgraded incident {} correlation_key to {}",
+        id,
+        new_correlation_key
+    );
+
+    Ok(())
+}
+
 /// Auto-resolve stale incidents that haven't received new alerts
 ///
 /// Returns the number of incidents resolved
@@ -484,20 +587,6 @@ pub async fn auto_resolve_stale(stale_threshold_micros: i64) -> Result<u64, erro
     }
 
     Ok(count)
-}
-
-/// Get all open incidents for RCA processing (ordered by newest first)
-///
-/// Note: This function is used by enterprise-only RCA job in alert_manager.
-pub async fn get_open_incidents_for_rca() -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::Status.eq("open"))
-        .order_by_desc(alert_incidents::Column::LastAlertAt)
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
 #[cfg(test)]
