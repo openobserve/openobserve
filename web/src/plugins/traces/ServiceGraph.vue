@@ -55,12 +55,12 @@
           <date-time
             ref="dateTimeRef"
             auto-apply
-            :default-type="timeRange.type"
+            :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
-              startTime: timeRange.startTime,
-              endTime: timeRange.endTime,
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
             }"
-            :default-relative-time="timeRange.relativeTimePeriod"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="service-graph-date-time-picker"
             class="tw:h-[2rem]"
             @on:date-change="updateTimeRange"
@@ -162,7 +162,7 @@
                 v-if="selectedNode"
                 :selected-node="selectedNode"
                 :graph-data="graphData"
-                :time-range="timeRange"
+                :time-range="searchObj.data.datetime"
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
                 @close="handleCloseSidePanel"
@@ -175,7 +175,7 @@
                 v-if="selectedEdge"
                 :selected-edge="selectedEdge"
                 :graph-data="graphData"
-                :time-range="timeRange"
+                :time-range="searchObj.data.datetime"
                 :visible="showEdgePanel"
                 @close="handleCloseEdgePanel"
               />
@@ -241,6 +241,7 @@ import {
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
 import useStreams from "@/composables/useStreams";
+import useTraces from "@/composables/useTraces";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -258,6 +259,7 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
     const { getStreams } = useStreams();
+    const { searchObj } = useTraces();
 
     const loading = ref(false);
     const error = ref<string | null>(null);
@@ -327,13 +329,8 @@ export default defineComponent({
 
     const stats = ref<any>(null);
 
-    // Time range state - default to last 15 minutes
-    const timeRange = ref({
-      type: "relative",
-      relativeTimePeriod: "15m",
-      startTime: Date.now() * 1000 - 15 * 60 * 1000000, // 15 minutes ago in microseconds
-      endTime: Date.now() * 1000, // Now in microseconds
-    });
+    // Use shared datetime from searchObj instead of local timeRange
+    // searchObj.data.datetime is managed by useTraces composable and shared across tabs
 
     const dateTimeRef = ref<any>(null);
 
@@ -522,8 +519,8 @@ export default defineComponent({
           );
           const allStreamsResponse =
             await serviceGraphService.getCurrentTopology(orgId, {
-              startTime: timeRange.value.startTime,
-              endTime: timeRange.value.endTime,
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
             });
           if (
             allStreamsResponse.data.availableStreams &&
@@ -540,8 +537,8 @@ export default defineComponent({
             streamFilter.value && streamFilter.value !== "all"
               ? streamFilter.value
               : undefined,
-          startTime: timeRange.value.startTime,
-          endTime: timeRange.value.endTime,
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
         });
 
         // Convert API response to expected format
@@ -817,11 +814,11 @@ export default defineComponent({
     };
 
     const updateTimeRange = (value: any) => {
-      timeRange.value = {
+      searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
         relativeTimePeriod:
-          value.relativeTimePeriod || timeRange.value.relativeTimePeriod,
+          value.relativeTimePeriod || searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
       };
       // Reload service graph with new time range
@@ -933,8 +930,8 @@ export default defineComponent({
       const queryObject = {
         stream_type: "logs",
         stream: streamFilter.value,
-        from: timeRange.value.startTime,
-        to: timeRange.value.endTime,
+        from: searchObj.data.datetime.startTime,
+        to: searchObj.data.datetime.endTime,
         refresh: 0,
         sql_mode: "true",
         query,
@@ -962,8 +959,8 @@ export default defineComponent({
         stream: streamFilter.value,
         serviceName: serviceName,
         timeRange: {
-          startTime: timeRange.value.startTime,
-          endTime: timeRange.value.endTime,
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
         },
       });
     };
@@ -1002,7 +999,7 @@ export default defineComponent({
       chartData,
       chartKey,
       chartRendererRef,
-      timeRange,
+      searchObj,
       dateTimeRef,
       loadServiceGraph,
       formatNumber,
