@@ -848,7 +848,14 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef, hoveredSeriesState, handleNativeContextMenu };
+    return {
+      chartRef,
+      hoveredSeriesState,
+      handleNativeContextMenu,
+      get chart() {
+        return chart;
+      }
+    };
   },
 });
 </script>

@@ -47,6 +47,51 @@ export default class LogsVisualise {
   async openVisualiseTab() {
     // Open Visualise Tab
     await this.page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    // Wait for visualization tab to be fully loaded
+    // Check for chart selector OR error message (in case of query errors)
+    const chartSelector = this.page.locator('[data-test="selected-chart-table-item"], [data-test="selected-chart-bar-item"], [data-test="selected-chart-line-item"]').first();
+    const errorIndicator = this.page.locator('[data-test="dashboard-error"], .q-notification, .q-banner');
+
+    // Wait for either chart selectors or error indicator to appear
+    await Promise.race([
+      chartSelector.waitFor({ state: "visible", timeout: 10000 }).catch(() => {}),
+      errorIndicator.first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {}),
+      this.page.waitForTimeout(3000) // Fallback timeout if neither appears quickly
+    ]);
+
+    // Small buffer to ensure UI is stable
+    await this.page.waitForTimeout(500);
+  }
+
+  // Open visualise tab and ensure table chart is selected when VRL is present
+  async openVisualiseTabWithVrl() {
+    await this.openVisualiseTab();
+
+    // When VRL is present, ensure table chart is selected
+    // Check if VRL warning is shown (indicating VRL is active but wrong chart selected)
+    const vrlWarning = this.page.getByText("VRL function is only supported for table chart");
+    const isVrlWarningVisible = await vrlWarning.isVisible().catch(() => false);
+
+    if (isVrlWarningVisible) {
+      // VRL is present but table chart not selected - click table chart
+      const tableChartBtn = this.page.locator('[data-test="selected-chart-table-item"]');
+      await tableChartBtn.click();
+      await this.page.waitForTimeout(300);
+    }
+
+    // Also check if table chart is already selected
+    const tableChart = this.page.locator('[data-test="selected-chart-table-item"]');
+    const tableChartParent = tableChart.locator('..');
+    const isTableSelected = await tableChartParent.evaluate(el =>
+      el.classList.contains('bg-grey-3') || el.classList.contains('bg-grey-5')
+    ).catch(() => false);
+
+    if (!isTableSelected) {
+      // Table not selected, click to select it
+      await tableChart.click();
+      await this.page.waitForTimeout(300);
+    }
   }
 
   //Apply: Logs
@@ -54,6 +99,44 @@ export default class LogsVisualise {
     await this.page
       .locator('[data-test="logs-search-bar-refresh-btn"]')
       .click();
+  }
+
+  // Wait for logs query to fully complete (similar to waitForChartToRender for dashboard)
+  async waitForLogsQueryToComplete(timeout = 30000) {
+    const runBtn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+
+    // Wait for button to be visible first
+    await runBtn.waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for query execution to complete by checking button state
+    // When query is running, the button may change to cancel or show loading state
+    // When complete, the Run query button should be enabled and visible again
+    await this.page.waitForFunction(
+      () => {
+        const btn = document.querySelector('[data-test="logs-search-bar-refresh-btn"]');
+        if (!btn) return false;
+
+        // Check if button is not disabled and contains "Run query" text
+        const isEnabled = !btn.disabled && !btn.classList.contains('disabled');
+        const hasRunQueryText = btn.textContent?.includes('Run query');
+
+        // Also check that no loading indicator is present
+        const hasLoadingClass = btn.classList.contains('q-btn--loading') ||
+                                btn.querySelector('.q-spinner') !== null;
+
+        return isEnabled && hasRunQueryText && !hasLoadingClass;
+      },
+      { timeout }
+    );
+
+    // Small buffer to ensure UI is stable after query completes
+    await this.page.waitForTimeout(300);
+  }
+
+  // Apply logs query and wait for completion
+  async logsApplyQueryAndWait(timeout = 30000) {
+    await this.logsApplyQueryButton();
+    await this.waitForLogsQueryToComplete(timeout);
   }
 
   //set relative time selection

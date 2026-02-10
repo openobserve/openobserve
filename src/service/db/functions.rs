@@ -49,7 +49,7 @@ pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), a
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
     let val = db::get(&format!("/function/{org_id}/{name}")).await?;
-    Ok(json::from_slice(&val).unwrap())
+    Ok(json::from_slice(&val)?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
@@ -68,7 +68,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
     Ok(db::list(&format!("/function/{org_id}/"))
         .await?
         .values()
-        .map(|val| json::from_slice(val).unwrap())
+        .filter_map(|val| json::from_slice(val).ok())
         .collect())
 }
 

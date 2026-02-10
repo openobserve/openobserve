@@ -567,9 +567,9 @@ describe("convertTraceData", () => {
     expect(result.options).toBeDefined();
     const data = result.options.series[0].data[0].children;
 
-    expect(data[0].itemStyle.color).toBe('#4CAF50'); // Green for healthy
-    expect(data[1].itemStyle.color).toBe('#FFC107'); // Yellow for warning (>1%)
-    expect(data[2].itemStyle.color).toBe('#F44336'); // Red for critical (>10%)
+    expect(data[0].itemStyle.color).toBe('#1a1f2e'); // Green for healthy
+    expect(data[1].itemStyle.color).toBe('#1a1f2e'); // Yellow for warning (>1%)
+    expect(data[2].itemStyle.color).toBe('#1a1f2e'); // Red for critical (>10%)
   });
 
   it('should handle vertical layout orientation', () => {

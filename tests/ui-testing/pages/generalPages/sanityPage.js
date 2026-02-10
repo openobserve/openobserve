@@ -410,14 +410,11 @@ export class SanityPage {
         await this.page.getByLabel(this.nameLabel.label).fill(uniqueFunctionName);
         
         await this.page.locator(this.vrlFunctionEditor).click();
-        await this.page.locator(this.vrlEditorContent).fill("sanity=1");
-        await this.page.locator(this.vrlFunctionEditor).getByText("sanity=").click();
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).fill(".sanity=1");
-        
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Control+A');
+        await this.page.keyboard.type('.sanity=1');
+        await this.page.waitForTimeout(500);
+
         await this.page.getByRole(this.saveButton.role, { name: this.saveButton.name }).click();
 
         await this.page.getByPlaceholder("Search Function").click();

@@ -44,9 +44,9 @@ style="min-height: auto">
       <!-- Service Graph Tab Content -->
       <div
         v-if="activeTab === 'service-graph' && store.state.zoConfig.service_graph_enabled"
-        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-98px)] tw:overflow-hidden"
+        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
-        <service-graph class="tw:h-full" />
+        <service-graph class="tw:h-full" @view-traces="handleServiceGraphViewTraces" />
       </div>
 
       <!-- Search Tab Content -->
@@ -208,6 +208,7 @@ import {
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
+  escapeSingleQuotes,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -1373,6 +1374,44 @@ watch(moveSplitter, () => {
 //     immediate: false,
 //   },
 // );
+
+// Handler for service graph view traces event
+const handleServiceGraphViewTraces = (data: any) => {
+  // Switch to search tab
+  activeTab.value = 'search';
+
+  // Set the selected stream in dropdown
+  if (data.stream) {
+    searchObj.data.stream.selectedStream = {
+      label: data.stream,
+      value: data.stream,
+    };
+  }
+
+  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
+  if (data.serviceName) {
+    const escapedServiceName = escapeSingleQuotes(data.serviceName);
+    const filterQuery = `service_name = '${escapedServiceName}'`;
+    searchObj.data.editorValue = filterQuery;
+    searchObj.data.query = filterQuery;
+    searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+  }
+
+  // Set the time range
+  if (data.timeRange) {
+    searchObj.data.datetime = {
+      startTime: data.timeRange.startTime,
+      endTime: data.timeRange.endTime,
+      relativeTimePeriod: null,
+      type: "absolute",
+    };
+  }
+
+  // Run the query
+  nextTick(() => {
+    runQueryFn();
+  });
+};
 
 watch(updateSelectedColumns, () => {
   searchObj.meta.resultGrid.manualRemoveFields = true;

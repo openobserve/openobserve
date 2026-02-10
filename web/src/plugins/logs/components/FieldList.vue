@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ props.row.name }} ({{
               showOnlyInterestingFields
                 ? interestingExpandedGroupRowsFieldCount[props.row.group]
-              : expandGroupRowsFieldCount[props.row.group]
+                : expandGroupRowsFieldCount[props.row.group]
             }})
           </div>
           <q-icon
@@ -245,7 +245,7 @@ const fieldListRef = ref<HTMLElement | null>(null);
 // Methods
 const scrollToTop = () => {
   if (fieldListRef.value) {
-    const scrollContainer = fieldListRef.value.querySelector(
+    const scrollContainer = fieldListRef?.value?.$el?.querySelector(
       ".q-table__middle.scroll",
     );
     if (scrollContainer) {

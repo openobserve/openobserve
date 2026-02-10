@@ -387,13 +387,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align="left"
               narrow-indicator
             >
-              <q-tab name="timeline" label="Timeline" data-test="trace-details-timeline-tab" />
+              <q-tab
+                name="timeline"
+                label="Timeline"
+                data-test="trace-details-timeline-tab"
+              />
               <q-tab name="dag" label="DAG" data-test="trace-details-dag-tab" />
             </q-tabs>
             <q-separator v-if="hasLLMSpans" />
 
             <!-- Timeline View - show when no LLM spans OR when timeline tab is active -->
-            <div v-if="!hasLLMSpans || activeTab === 'timeline'" style="display: flex; flex-direction: column; flex: 1; min-height: 0">
+            <div
+              v-if="!hasLLMSpans || activeTab === 'timeline'"
+              style="
+                display: flex;
+                flex-direction: column;
+                flex: 1;
+                min-height: 0;
+              "
+            >
               <trace-header
                 data-test="trace-details-header"
                 :baseTracePosition="baseTracePosition"
@@ -401,79 +413,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @resize-start="startResize"
               />
               <div style="display: flex; flex: 1; min-height: 0">
-              <div class="relative-position trace-content-scroll">
-                <div
-                  class="trace-tree-container"
-                  data-test="trace-details-tree-container"
-                >
-                  <div class="position-relative">
-                    <div
-                      :style="{
-                        width: '1px',
-                        left: `${leftWidth}px`,
-                        backgroundColor:
-                          store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
-                        zIndex: 999,
-                        top: '-28px',
-                        height: `${spanPositionList.length * spanDimensions.height + 28}px`,
-                        cursor: 'col-resize',
-                      }"
-                      class="absolute resize"
-                      @mousedown="startResize"
-                    />
-                    <trace-tree
-                      data-test="trace-details-tree"
-                      :collapseMapping="collapseMapping"
-                      :spans="spanPositionList"
-                      :baseTracePosition="baseTracePosition"
-                      :spanDimensions="spanDimensions"
-                      :spanMap="spanMap"
-                      :leftWidth="leftWidth"
-                      ref="traceTreeRef"
-                      :search-query="searchQuery"
-                      :spanList="spanList"
-                      :selectedSpanId="selectedSpanId"
-                      @toggle-collapse="toggleSpanCollapse"
-                      @select-span="updateSelectedSpan"
-                      @update-current-index="handleIndexUpdate"
-                      @search-result="handleSearchResult"
-                    />
+                <div class="relative-position trace-content-scroll">
+                  <div
+                    class="trace-tree-container"
+                    data-test="trace-details-tree-container"
+                  >
+                    <div class="position-relative">
+                      <div
+                        :style="{
+                          width: '1px',
+                          left: `${leftWidth}px`,
+                          backgroundColor:
+                            store.state.theme === 'dark'
+                              ? '#3c3c3c'
+                              : '#ececec',
+                          zIndex: 999,
+                          top: '-28px',
+                          height: `${spanPositionList.length * spanDimensions.height + 28}px`,
+                          cursor: 'col-resize',
+                        }"
+                        class="absolute resize"
+                        @mousedown="startResize"
+                      />
+                      <trace-tree
+                        data-test="trace-details-tree"
+                        :collapseMapping="collapseMapping"
+                        :spans="spanPositionList"
+                        :baseTracePosition="baseTracePosition"
+                        :spanDimensions="spanDimensions"
+                        :spanMap="spanMap"
+                        :leftWidth="leftWidth"
+                        ref="traceTreeRef"
+                        :search-query="searchQuery"
+                        :spanList="spanList"
+                        :selectedSpanId="selectedSpanId"
+                        @toggle-collapse="toggleSpanCollapse"
+                        @select-span="updateSelectedSpan"
+                        @update-current-index="handleIndexUpdate"
+                        @search-result="handleSearchResult"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <q-separator
-                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                vertical
-              />
-              <div
-                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="histogram-sidebar-inner"
-                :class="isTimelineExpanded ? '' : 'full'"
-                :style="{ flex: `0 0 ${sidebarWidth}`, maxWidth: sidebarWidth }"
-              >
-                <trace-details-sidebar
-                  data-test="trace-details-sidebar"
-                  :span="spanMap[selectedSpanId as string]"
-                  :baseTracePosition="baseTracePosition"
-                  :search-query="searchQuery"
-                  :stream-name="currentTraceStreamName"
-                  :service-streams-enabled="serviceStreamsEnabled"
-                  :parent-mode="mode"
-                  @view-logs="redirectToLogs"
-                  @close="closeSidebar"
-                  @open-trace="openTraceLink"
+                <q-separator
+                  v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                  vertical
                 />
+                <div
+                  v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                  class="histogram-sidebar-inner"
+                  :class="isTimelineExpanded ? '' : 'full'"
+                  :style="{
+                    flex: `0 0 ${sidebarWidth}`,
+                    maxWidth: sidebarWidth,
+                  }"
+                >
+                  <trace-details-sidebar
+                    data-test="trace-details-sidebar"
+                    :span="spanMap[selectedSpanId as string]"
+                    :baseTracePosition="baseTracePosition"
+                    :search-query="searchQuery"
+                    :stream-name="currentTraceStreamName"
+                    :service-streams-enabled="serviceStreamsEnabled"
+                    :parent-mode="mode"
+                    @view-logs="redirectToLogs"
+                    @close="closeSidebar"
+                    @open-trace="openTraceLink"
+                  />
+                </div>
               </div>
-            </div>
             </div>
 
             <!-- DAG View - only for LLM traces -->
-            <div v-if="hasLLMSpans && activeTab === 'dag'" style="display: flex; flex: 1; min-height: 0;">
+            <div
+              v-if="hasLLMSpans && activeTab === 'dag'"
+              style="display: flex; flex: 1; min-height: 0"
+            >
               <div
                 class="dag-left-panel"
                 :style="{
-                  width: isSidebarOpen && (selectedSpanId || showTraceDetails) ? `${dagLeftWidth}%` : '100%',
-                  minWidth: '200px'
+                  width:
+                    isSidebarOpen && (selectedSpanId || showTraceDetails)
+                      ? `${dagLeftWidth}%`
+                      : '100%',
+                  minWidth: '200px',
                 }"
               >
                 <TraceDAG
@@ -482,7 +505,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :streamName="currentTraceStreamName || 'default'"
                   :startTime="effectiveTimeRange.from || 0"
                   :endTime="effectiveTimeRange.to || 0"
-                  :sidebarOpen="isSidebarOpen && (!!selectedSpanId || showTraceDetails)"
+                  :sidebarOpen="
+                    isSidebarOpen && (!!selectedSpanId || showTraceDetails)
+                  "
                   @node-click="handleDAGNodeClick"
                 />
               </div>
@@ -499,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="dag-right-panel"
                 :style="{
                   width: `${100 - dagLeftWidth}%`,
-                  minWidth: '300px'
+                  minWidth: '300px',
                 }"
               >
                 <trace-details-sidebar
@@ -625,6 +650,10 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    correlatedLogStream: {
+      type: String,
+      default: "",
+    },
 
     // UI visibility controls
     showBackButton: {
@@ -680,7 +709,6 @@ export default defineComponent({
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
     const activeTab = ref("timeline");
-
 
     const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
@@ -764,7 +792,7 @@ export default defineComponent({
     // Calculate sidebar width based on leftWidth
     // Sidebar should take ~84% of the remaining space after left panel
     const sidebarWidth = computed(() => {
-      if (!parentContainer.value) return '84%';
+      if (!parentContainer.value) return "84%";
       const containerWidth = parentContainer.value.clientWidth || 1200;
       const remainingWidth = containerWidth - leftWidth.value;
       const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
@@ -993,10 +1021,29 @@ export default defineComponent({
             JSON.stringify(logStreams.value),
           );
 
-          if (!searchObj.data.traceDetails.selectedLogStreams.length)
-            searchObj.data.traceDetails.selectedLogStreams.push(
-              logStreams.value[0],
-            );
+          if (!searchObj.data.traceDetails.selectedLogStreams.length) {
+            // Check if log_stream query parameter exists (from correlation navigation)
+            const logStreamQueryValue =
+              router.currentRoute.value.query.log_stream;
+            const logStreamFromQuery = Array.isArray(logStreamQueryValue)
+              ? logStreamQueryValue[0]
+              : logStreamQueryValue;
+
+            if (
+              logStreamFromQuery &&
+              logStreams.value.includes(logStreamFromQuery)
+            ) {
+              // Auto-select the correlated log stream from query parameter
+              searchObj.data.traceDetails.selectedLogStreams.push(
+                logStreamFromQuery,
+              );
+            } else if (logStreams.value.length > 0) {
+              // Default: select the first available log stream
+              searchObj.data.traceDetails.selectedLogStreams.push(
+                logStreams.value[0],
+              );
+            }
+          }
         })
         .catch(() => Promise.reject())
         .finally(() => {});
@@ -1675,7 +1722,7 @@ export default defineComponent({
       // Parse usage details from split fields
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
-      
+
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
@@ -1946,7 +1993,10 @@ export default defineComponent({
     };
 
     const redirectToSessionReplay = () => {
-      if (!firstRumSessionData.value.rum_session_id) {
+      if (
+        !firstRumSessionData.value ||
+        !firstRumSessionData.value.rum_session_id
+      ) {
         return;
       }
 
@@ -2011,10 +2061,23 @@ export default defineComponent({
         org_identifier: effectiveOrgIdentifier.value,
       };
 
-      router.push({
-        name: "traces",
+      // Add log_stream parameter for correlation navigation
+      // Priority: correlatedLogStream prop > query parameter
+      const logStreamQueryValue = router.currentRoute.value.query.log_stream;
+      const logStreamFromQuery = Array.isArray(logStreamQueryValue)
+        ? logStreamQueryValue[0]
+        : logStreamQueryValue;
+      const logStreamToUse = props.correlatedLogStream || logStreamFromQuery;
+      if (logStreamToUse) {
+        query.log_stream = logStreamToUse;
+      }
+
+      const route = router.resolve({
+        name: "traceDetails",
         query,
       });
+
+      window.open(route.href, "_blank");
     };
 
     const routeToTracesList = () => {
