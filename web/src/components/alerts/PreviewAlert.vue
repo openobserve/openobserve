@@ -210,13 +210,13 @@ const store = useStore();
 // because histogram is needed for aggregated queries
 const shouldUseHistogram = computed(() => {
   // SQL mode with aggregations: dont use histogram
-  if (props.selectedTab === "sql") {
-    const parsedSQL = fnParsedSQL(props.query);
-    if (parsedSQL && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null)) {
-      return false;
-    }
-    return true;
-  }
+  // if (props.selectedTab === "sql") {
+  //   const parsedSQL = fnParsedSQL(props.query);
+  //   if (parsedSQL && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null)) {
+  //     return false;
+  //   }
+  //   return true;
+  // }
 
   // Custom mode with aggregations: never use histogram
   if (props.selectedTab === "custom" && props.isAggregationEnabled) {
@@ -400,12 +400,12 @@ const fetchQuerySchema = async () => {
 
     // For SQL queries without aggregation, use zo_sql_key for x and zo_sql_num for y
     const parsedSQL = fnParsedSQL(props.query);
-    const hasAgg = parsedSQL && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
-    if (props.selectedTab === "sql" && !hasAgg) {
-      dashboardPanelData.data.queries[0].fields.x = [{ label: 'zo_sql_key', alias: 'zo_sql_key', column: 'zo_sql_key' }];
-      dashboardPanelData.data.queries[0].fields.y = [{ label: 'zo_sql_num', alias: 'zo_sql_num', column: 'zo_sql_num', aggregationFunction: 'count' }];
-      dashboardPanelData.data.queries[0].fields.breakdown = [];
-    }
+    // const hasAgg = parsedSQL && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
+    // if (props.selectedTab === "sql" && !hasAgg) {
+    //   dashboardPanelData.data.queries[0].fields.x = [{ label: 'zo_sql_key', alias: 'zo_sql_key', column: 'zo_sql_key' }];
+    //   dashboardPanelData.data.queries[0].fields.y = [{ label: 'zo_sql_num', alias: 'zo_sql_num', column: 'zo_sql_num', aggregationFunction: 'count' }];
+    //   dashboardPanelData.data.queries[0].fields.breakdown = [];
+    // }
 
     // Ensure filter is always an object
     if (!dashboardPanelData.data.queries[0].fields.filter || Array.isArray(dashboardPanelData.data.queries[0].fields.filter)) {
