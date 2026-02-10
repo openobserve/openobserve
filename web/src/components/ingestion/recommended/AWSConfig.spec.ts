@@ -41,6 +41,19 @@ vi.mock('../../../aws-exports', () => ({
   }
 }));
 
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRoute: vi.fn(() => ({
+    query: {},
+    path: '/aws',
+    name: 'AWSConfig'
+  })),
+  useRouter: vi.fn(() => ({
+    push: vi.fn(),
+    replace: vi.fn()
+  }))
+}));
+
 // Mock CopyContent component to avoid its dependencies
 vi.mock('@/components/CopyContent.vue', () => ({
   default: {
@@ -50,11 +63,19 @@ vi.mock('@/components/CopyContent.vue', () => ({
   }
 }));
 
-// Mock AWSIntegrationGrid component
-vi.mock('./AWSIntegrationGrid.vue', () => ({
+// Mock AWS component dependencies
+vi.mock('./AWSQuickSetup.vue', () => ({
   default: {
-    name: 'AWSIntegrationGrid',
-    template: '<div class="aws-integration-grid-mock">AWS Integration Grid</div>'
+    name: 'AWSQuickSetup',
+    template: '<div class="aws-quick-setup-mock">AWS Quick Setup</div>'
+  }
+}));
+
+vi.mock('./AWSIndividualServices.vue', () => ({
+  default: {
+    name: 'AWSIndividualServices',
+    props: ['initialSearch'],
+    template: '<div class="aws-individual-services-mock">AWS Individual Services</div>'
   }
 }));
 
@@ -237,10 +258,11 @@ describe("AWSConfig", () => {
     expect(content).toContain('Access Key: [BASIC_PASSCODE]');
   });
 
-  // Test 15: AWSIntegrationGrid component integration
+  // Test 15: AWSQuickSetup component integration (replaces AWSIntegrationGrid)
   it("should render AWSIntegrationGrid component", () => {
-    const grid = wrapper.findComponent({ name: 'AWSIntegrationGrid' });
-    expect(grid.exists()).toBe(true);
+    // Component now uses AWSQuickSetup and AWSIndividualServices instead of AWSIntegrationGrid
+    const quickSetup = wrapper.findComponent({ name: 'AWSQuickSetup' });
+    expect(quickSetup.exists()).toBe(true);
   });
 
   // Test 16: Template section heading
@@ -254,12 +276,12 @@ describe("AWSConfig", () => {
   it("should display integration description", () => {
     const description = wrapper.find('p');
     expect(description.exists()).toBe(true);
-    expect(description.text()).toContain('Quick setup for AWS services');
+    expect(description.text()).toContain('Set up AWS monitoring in one click');
   });
 
   // Test 18: Integration section structure
   it("should have correct integration section structure", () => {
-    expect(wrapper.find('.tw\\:mt-6').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:mt-8').exists()).toBe(true);
     expect(wrapper.find('.tw\\:mb-4').exists()).toBe(true);
   });
 
@@ -278,7 +300,7 @@ describe("AWSConfig", () => {
   // Test 21: Template structure
   it("should have correct template structure", () => {
     expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-    expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
+    expect(wrapper.find('.aws-config-page').exists()).toBe(true);
   });
 
   // Test 22: getImageURL function exposure
@@ -440,9 +462,9 @@ describe("AWSConfig", () => {
     expect(copyComponent.exists()).toBe(true);
     expect(copyComponent.props('content')).toBe(content);
 
-    // Verify integration grid component
-    const gridComponent = wrapper.findComponent({ name: 'AWSIntegrationGrid' });
-    expect(gridComponent.exists()).toBe(true);
+    // Verify quick setup component (replaces integration grid)
+    const quickSetupComponent = wrapper.findComponent({ name: 'AWSQuickSetup' });
+    expect(quickSetupComponent.exists()).toBe(true);
 
     // Verify template structure
     expect(wrapper.find('.q-ma-md').exists()).toBe(true);
