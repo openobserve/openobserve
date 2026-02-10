@@ -495,4 +495,18 @@ export default defineComponent({
     opacity: 1;
   }
 }
+
+.table-wrapper {
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+@media print {
+  .table-wrapper {
+    overflow: hidden !important;
+    max-height: 100% !important;
+    page-break-inside: avoid;
+  }
+}
 </style>
