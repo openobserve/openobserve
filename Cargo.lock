@@ -2883,8 +2883,7 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 [[package]]
 name = "datafusion"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d12ee9fdc6cdb5898c7691bb994f0ba606c4acc93a2258d78bb9f26ff8158bb3"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "arrow-schema",
@@ -2938,8 +2937,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "462dc9ef45e5d688aeaae49a7e310587e81b6016b9d03bace5626ad0043e5a9e"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -2963,8 +2961,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog-listing"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b96dbf1d728fc321817b744eb5080cdd75312faa6980b338817f68f3caa4208"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -2986,8 +2983,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3237a6ff0d2149af4631290074289cae548c9863c885d821315d54c6673a074a"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -3010,8 +3006,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common-runtime"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70b5e34026af55a1bfccb1ef0a763cf1f64e77c696ffcf5a128a278c31236528"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "futures",
  "log",
@@ -3021,8 +3016,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b2a6be734cc3785e18bbf2a7f2b22537f6b9fb960d79617775a51568c281842"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-compression",
@@ -3056,8 +3050,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-arrow"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1739b9b07c9236389e09c74f770e88aff7055250774e9def7d3f4f56b3dcc7be"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "arrow-ipc",
@@ -3080,8 +3073,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-csv"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c73bc54b518bbba7c7650299d07d58730293cfba4356f6f428cc94c20b7600"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3103,8 +3095,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-json"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37812c8494c698c4d889374ecfabbff780f1f26d9ec095dd1bddfc2a8ca12559"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3125,8 +3116,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-parquet"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2210937ecd9f0e824c397e73f4b5385c97cd1aff43ab2b5836fcfd2d321523fb"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3155,14 +3145,12 @@ dependencies = [
 [[package]]
 name = "datafusion-doc"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c825f969126bc2ef6a6a02d94b3c07abff871acf4d6dd759ce1255edb7923ce"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 
 [[package]]
 name = "datafusion-execution"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa03ef05a2c2f90dd6c743e3e111078e322f4b395d20d4b4d431a245d79521ae"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3182,8 +3170,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef33934c1f98ee695cc51192cc5f9ed3a8febee84fdbcd9131bf9d3a9a78276f"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3205,8 +3192,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr-common"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "000c98206e3dd47d2939a94b6c67af4bfa6732dd668ac4fafdbde408fd9134ea"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3218,8 +3204,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "379b01418ab95ca947014066248c22139fe9af9289354de10b445bd000d5d276"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "arrow-buffer",
@@ -3249,8 +3234,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd00d5454ba4c3f8ebbd04bd6a6a9dc7ced7c56d883f70f2076c188be8459e4c"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -3270,8 +3254,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate-common"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aec06b380729a87210a4e11f555ec2d729a328142253f8d557b87593622ecc9f"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -3283,8 +3266,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-json"
 version = "0.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3ce789cf93834ff0303811ce4080a5c349311fad52e3924ad26f933f59189f3"
+source = "git+https://github.com/openobserve/datafusion-functions-json?rev=f53f08cddf467d3d492425f0e50f98f6a300d2f5#f53f08cddf467d3d492425f0e50f98f6a300d2f5"
 dependencies = [
  "datafusion",
  "jiter",
@@ -3295,8 +3277,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-nested"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "904f48d45e0f1eb7d0eb5c0f80f2b5c6046a85454364a6b16a2e0b46f62e7dff"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "arrow-ord",
@@ -3318,8 +3299,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-table"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9a0d20e2b887e11bee24f7734d780a2588b925796ac741c3118dd06d5aa77f0"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3334,8 +3314,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3414b0a07e39b6979fe3a69c7aa79a9f1369f1d5c8e52146e66058be1b285ee"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3352,8 +3331,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window-common"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bf2feae63cd4754e31add64ce75cae07d015bce4bb41cd09872f93add32523a"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "datafusion-common",
  "datafusion-physical-expr-common",
@@ -3362,8 +3340,7 @@ dependencies = [
 [[package]]
 name = "datafusion-macros"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4fe888aeb6a095c4bcbe8ac1874c4b9a4c7ffa2ba849db7922683ba20875aaf"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "datafusion-doc",
  "quote",
@@ -3373,8 +3350,7 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a6527c063ae305c11be397a86d8193936f4b84d137fe40bd706dfc178cf733c"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "chrono",
@@ -3393,8 +3369,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bb028323dd4efd049dd8a78d78fe81b2b969447b39c51424167f973ac5811d9"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -3417,8 +3392,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-adapter"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78fe0826aef7eab6b4b61533d811234a7a9e5e458331ebbf94152a51fc8ab433"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3432,8 +3406,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-common"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfccd388620734c661bd8b7ca93c44cdd59fecc9b550eea416a78ffcbb29475f"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -3449,8 +3422,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-optimizer"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bde5fa10e73259a03b705d5fddc136516814ab5f441b939525618a4070f5a059"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3468,8 +3440,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-plan"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e1098760fb29127c24cc9ade3277051dc73c9ed0ac0131bd7bcd742e0ad7470"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -3498,9 +3469,8 @@ dependencies = [
 
 [[package]]
 name = "datafusion-proto"
-version = "52.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0a96a57f60a53041c6d275dc46313bbe34f07ed51c4cea3557b321d4f3da7e0"
+version = "52.1.0"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "chrono",
@@ -3525,9 +3495,8 @@ dependencies = [
 
 [[package]]
 name = "datafusion-proto-common"
-version = "52.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f4c54f4a47608d2ef5af2fbaca9975cac9e48b93acf41b2ccf584405a3da5e"
+version = "52.1.0"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3537,8 +3506,7 @@ dependencies = [
 [[package]]
 name = "datafusion-pruning"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64d0fef4201777b52951edec086c21a5b246f3c82621569ddb4a26f488bc38a9"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3554,8 +3522,7 @@ dependencies = [
 [[package]]
 name = "datafusion-session"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f71f1e39e8f2acbf1c63b0e93756c2e970a64729dab70ac789587d6237c4fde0"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "async-trait",
  "datafusion-common",
@@ -3568,8 +3535,7 @@ dependencies = [
 [[package]]
 name = "datafusion-sql"
 version = "52.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f44693cfcaeb7a9f12d71d1c576c3a6dc025a12cef209375fa2d16fb3b5670ee"
+source = "git+https://github.com/openobserve/datafusion?rev=a9b568263f6f24ab9bb711893dc23fd7960f94eb#a9b568263f6f24ab9bb711893dc23fd7960f94eb"
 dependencies = [
  "arrow",
  "bigdecimal",
@@ -11729,7 +11695,7 @@ dependencies = [
 [[package]]
 name = "vortex"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "vortex-alp",
  "vortex-array",
@@ -11767,7 +11733,7 @@ dependencies = [
 [[package]]
 name = "vortex-alp"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -11787,7 +11753,7 @@ dependencies = [
 [[package]]
 name = "vortex-array"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arcref",
  "arrow-arith",
@@ -11838,7 +11804,7 @@ dependencies = [
 [[package]]
 name = "vortex-btrblocks"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "enum-iterator",
  "getrandom 0.3.4",
@@ -11868,7 +11834,7 @@ dependencies = [
 [[package]]
 name = "vortex-buffer"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-buffer",
  "bitvec",
@@ -11881,7 +11847,7 @@ dependencies = [
 [[package]]
 name = "vortex-bytebool"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "num-traits",
  "vortex-array",
@@ -11896,7 +11862,7 @@ dependencies = [
 [[package]]
 name = "vortex-compute"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -11917,7 +11883,7 @@ dependencies = [
 [[package]]
 name = "vortex-cuda-macros"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -11927,7 +11893,7 @@ dependencies = [
 [[package]]
 name = "vortex-datafusion"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-schema",
  "async-trait",
@@ -11958,7 +11924,7 @@ dependencies = [
 [[package]]
 name = "vortex-datetime-parts"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
@@ -11974,7 +11940,7 @@ dependencies = [
 [[package]]
 name = "vortex-decimal-byte-parts"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
@@ -11990,7 +11956,7 @@ dependencies = [
 [[package]]
 name = "vortex-dtype"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arcref",
  "arrow-buffer",
@@ -12016,7 +11982,7 @@ dependencies = [
 [[package]]
 name = "vortex-error"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-schema",
  "flatbuffers",
@@ -12030,7 +11996,7 @@ dependencies = [
 [[package]]
 name = "vortex-fastlanes"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrayref",
  "fastlanes",
@@ -12051,7 +12017,7 @@ dependencies = [
 [[package]]
 name = "vortex-file"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "async-trait",
  "bytes",
@@ -12096,7 +12062,7 @@ dependencies = [
 [[package]]
 name = "vortex-flatbuffers"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "flatbuffers",
  "vortex-buffer",
@@ -12106,7 +12072,7 @@ dependencies = [
 [[package]]
 name = "vortex-fsst"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "fsst-rs",
  "num-traits",
@@ -12123,7 +12089,7 @@ dependencies = [
 [[package]]
 name = "vortex-io"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "async-compat",
  "async-fs",
@@ -12153,7 +12119,7 @@ dependencies = [
 [[package]]
 name = "vortex-ipc"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "bytes",
  "flatbuffers",
@@ -12171,7 +12137,7 @@ dependencies = [
 [[package]]
 name = "vortex-layout"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arcref",
  "async-stream",
@@ -12214,7 +12180,7 @@ dependencies = [
 [[package]]
 name = "vortex-mask"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-buffer",
  "itertools 0.14.0",
@@ -12225,7 +12191,7 @@ dependencies = [
 [[package]]
 name = "vortex-metrics"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "getrandom 0.3.4",
  "parking_lot 0.12.5",
@@ -12236,7 +12202,7 @@ dependencies = [
 [[package]]
 name = "vortex-pco"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "pco",
  "prost 0.14.1",
@@ -12252,7 +12218,7 @@ dependencies = [
 [[package]]
 name = "vortex-proto"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "prost 0.14.1",
  "prost-types 0.14.1",
@@ -12261,7 +12227,7 @@ dependencies = [
 [[package]]
 name = "vortex-runend"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-array",
  "itertools 0.14.0",
@@ -12279,7 +12245,7 @@ dependencies = [
 [[package]]
 name = "vortex-scalar"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-array",
  "bytes",
@@ -12299,7 +12265,7 @@ dependencies = [
 [[package]]
 name = "vortex-scan"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -12325,7 +12291,7 @@ dependencies = [
 [[package]]
 name = "vortex-sequence"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
@@ -12343,7 +12309,7 @@ dependencies = [
 [[package]]
 name = "vortex-session"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "arcref",
  "dashmap",
@@ -12355,7 +12321,7 @@ dependencies = [
 [[package]]
 name = "vortex-sparse"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -12372,7 +12338,7 @@ dependencies = [
 [[package]]
 name = "vortex-utils"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "dashmap",
  "hashbrown 0.16.1",
@@ -12382,7 +12348,7 @@ dependencies = [
 [[package]]
 name = "vortex-vector"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "num-traits",
  "paste",
@@ -12396,7 +12362,7 @@ dependencies = [
 [[package]]
 name = "vortex-zigzag"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "vortex-array",
  "vortex-buffer",
@@ -12411,7 +12377,7 @@ dependencies = [
 [[package]]
 name = "vortex-zstd"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1#b0760ba4e15d77c5fd1079f8e99d4e14c0000ea1"
+source = "git+https://github.com/openobserve/vortex?rev=5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38#5404eeda3e673ecfe54a2fbfe22f0c2eada2bf38"
 dependencies = [
  "itertools 0.14.0",
  "prost 0.14.1",
