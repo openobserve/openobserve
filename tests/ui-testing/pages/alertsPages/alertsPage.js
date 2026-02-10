@@ -592,10 +592,10 @@ export class AlertsPage {
 
     async verifyAlertCounts() {
         const scheduledColumn = this.page.locator(this.locators.scheduledColumnLocator).first();
-        const scheduledAlertsCount = await scheduledColumn.locator(this.locators.resultsCountLocator).textContent();
+        const scheduledAlertsCount = await scheduledColumn.locator(this.locators.resultsCountLocator).textContent() || '0';
 
         const realTimeColumn = this.page.locator(this.locators.realTimeColumnLocator).first();
-        const realTimeAlertsCount = await realTimeColumn.locator(this.locators.resultsCountLocator).textContent();
+        const realTimeAlertsCount = await realTimeColumn.locator(this.locators.resultsCountLocator).textContent() || '0';
 
         return { scheduledAlertsCount, realTimeAlertsCount };
     }
@@ -1217,7 +1217,7 @@ export class AlertsPage {
     async getIncidentDetailTitleText() {
         const titleEl = this.page.locator(this.locators.incidentDetailTitle);
         await titleEl.waitFor({ state: 'visible', timeout: 10000 });
-        const text = await titleEl.textContent();
+        const text = await titleEl.textContent() || '';
         testLogger.info('Incident detail title', { text });
         return text.trim();
     }
@@ -1283,7 +1283,7 @@ export class AlertsPage {
         const count = await nameElements.count();
         const names = [];
         for (let i = 0; i < count; i++) {
-            const text = await nameElements.nth(i).textContent();
+            const text = await nameElements.nth(i).textContent() || '';
             names.push(text.trim());
         }
         testLogger.info('Alert names from triggers table', { names });
@@ -1323,7 +1323,7 @@ export class AlertsPage {
         const count = await badges.count();
         const texts = [];
         for (let i = 0; i < count; i++) {
-            const text = await badges.nth(i).textContent();
+            const text = await badges.nth(i).textContent() || '';
             texts.push(text.trim());
         }
         testLogger.info('Correlation badge texts', { texts });
@@ -1354,8 +1354,8 @@ export class AlertsPage {
         const count = await items.count();
         const alerts = [];
         for (let i = 0; i < count; i++) {
-            const name = await items.nth(i).locator(this.locators.relatedAlertName).textContent().catch(() => '');
-            const countText = await items.nth(i).locator(this.locators.relatedAlertCountText).textContent().catch(() => '');
+            const name = await items.nth(i).locator(this.locators.relatedAlertName).textContent().catch(() => '') || '';
+            const countText = await items.nth(i).locator(this.locators.relatedAlertCountText).textContent().catch(() => '') || '';
             alerts.push({ name: name.trim(), countText: countText.trim() });
         }
         testLogger.info('Related alerts', { count, alerts });
@@ -1390,7 +1390,7 @@ export class AlertsPage {
         await badge.first().waitFor({ state: 'visible', timeout: 10000 });
         // Get just the span with the severity value (first span inside the inner div)
         const severitySpan = badge.first().locator('div span').first();
-        const severity = await severitySpan.textContent();
+        const severity = await severitySpan.textContent() || '';
         testLogger.info('Severity badge text', { severity: severity.trim() });
         return severity.trim();
     }

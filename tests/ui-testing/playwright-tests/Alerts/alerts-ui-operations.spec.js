@@ -1,4 +1,4 @@
-const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
@@ -242,8 +242,6 @@ test.describe("Alerts UI Operations", () => {
 // ============================================================================
 // Alerts & Incidents Page Navigation Tests
 // ============================================================================
-
-const { navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 
 test.describe("Alerts & Incidents Page Navigation", { tag: '@enterprise' }, () => {
     test.describe.configure({ mode: 'parallel' });

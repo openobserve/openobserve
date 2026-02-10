@@ -318,7 +318,9 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
     testLogger.info('Polling for incidents to appear...', { maxWaitMs });
 
     await page.goto(incidentsUrl);
-    await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch((e) => {
+        testLogger.warn('Initial page load did not reach domcontentloaded, continuing', { error: e.message });
+    });
 
     const startTime = Date.now();
     const pollInterval = 15000; // 15 seconds between polls
@@ -338,7 +340,9 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
 
         testLogger.info(`No incidents yet, waiting... (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`);
         await page.waitForTimeout(pollInterval);
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch((e) => {
+            testLogger.warn('Page reload timeout during polling, continuing', { error: e.message });
+        });
     }
 
     testLogger.warn('Timed out waiting for incidents');
@@ -429,7 +433,9 @@ async function resolveTestIncidents(page) {
             if (!incidentId) continue;
 
             // Acknowledge first (if still open), then resolve
-            await apiCall(page, 'PUT', `/api/v2/${org}/incidents/${incidentId}/acknowledge`).catch(() => {});
+            await apiCall(page, 'PUT', `/api/v2/${org}/incidents/${incidentId}/acknowledge`).catch((e) => {
+                testLogger.info('Acknowledge call failed (may already be acknowledged)', { error: e.message });
+            });
             const resolveResp = await apiCall(page, 'PUT', `/api/v2/${org}/incidents/${incidentId}/resolve`);
             if (resolveResp.status === 200) {
                 resolved++;
