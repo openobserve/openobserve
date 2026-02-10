@@ -1023,8 +1023,11 @@ export default defineComponent({
 
           if (!searchObj.data.traceDetails.selectedLogStreams.length) {
             // Check if log_stream query parameter exists (from correlation navigation)
-            const logStreamFromQuery = router.currentRoute.value.query
-              .log_stream as string;
+            const logStreamQueryValue =
+              router.currentRoute.value.query.log_stream;
+            const logStreamFromQuery = Array.isArray(logStreamQueryValue)
+              ? logStreamQueryValue[0]
+              : logStreamQueryValue;
 
             if (
               logStreamFromQuery &&
@@ -2060,9 +2063,11 @@ export default defineComponent({
 
       // Add log_stream parameter for correlation navigation
       // Priority: correlatedLogStream prop > query parameter
-      const logStreamToUse =
-        props.correlatedLogStream ||
-        (router.currentRoute.value.query.log_stream as string);
+      const logStreamQueryValue = router.currentRoute.value.query.log_stream;
+      const logStreamFromQuery = Array.isArray(logStreamQueryValue)
+        ? logStreamQueryValue[0]
+        : logStreamQueryValue;
+      const logStreamToUse = props.correlatedLogStream || logStreamFromQuery;
       if (logStreamToUse) {
         query.log_stream = logStreamToUse;
       }
