@@ -156,16 +156,40 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to acquire lock for openFGA");
 
     // check again, if ofga model is already updated by other node
-    let mut existing_meta = db::ofga::get_ofga_model().await?;
+    let mut existing_meta = match db::ofga::get_ofga_model().await {
+        Ok(meta) => meta,
+        Err(e) => {
+            log::error!("[OFGA] Error getting OFGA model from local: {e}");
+            dist_lock::unlock(&locker)
+                .await
+                .expect("Failed to release lock");
+            return Err(e);
+        }
+    };
     if get_o2_config().super_cluster.enabled {
         // Compare super cluster model and local meta model
-        let meta_in_super = get_model().await?;
+        let meta_in_super = match get_model().await {
+            Ok(meta) => meta,
+            Err(e) => {
+                log::error!("[OFGA:SuperCluster] Error getting OFGA model from super cluster: {e}");
+                dist_lock::unlock(&locker)
+                    .await
+                    .expect("Failed to release lock");
+                return Err(e);
+            }
+        };
         match (meta_in_super, &existing_meta) {
             (Some(model), None) => {
                 // set to local
                 existing_meta = Some(model.clone());
                 migrate_native_objects = false;
-                db::ofga::set_ofga_model_to_db(model).await?;
+                if let Err(e) = db::ofga::set_ofga_model_to_db(model).await {
+                    log::error!("[OFGA] Error setting OFGA model to local db: {e}");
+                    dist_lock::unlock(&locker)
+                        .await
+                        .expect("Failed to release lock");
+                    return Err(e);
+                }
             }
             (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
             {
@@ -178,7 +202,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     // update version in local
                     existing_meta = Some(model.clone());
                     migrate_native_objects = false;
-                    db::ofga::set_ofga_model_to_db(model).await?;
+                    if let Err(e) = db::ofga::set_ofga_model_to_db(model).await {
+                        log::error!("[OFGA] Error setting OFGA model to local db: {e}");
+                        dist_lock::unlock(&locker)
+                            .await
+                            .expect("Failed to release lock");
+                        return Err(e);
+                    }
                 }
                 _ => {}
             },
@@ -195,13 +225,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
             if get_o2_config().super_cluster.enabled {
                 // Set the model version in the super cluster, only version and store_id is
                 // important
-                set_model(Some(OFGAModel {
+                if let Err(e) = set_model(Some(OFGAModel {
                     version: latest_model_version,
                     store_id,
                     model_id: "".to_string(),
                     model: None,
                 }))
-                .await?;
+                .await
+                {
+                    log::error!(
+                        "[OFGA:SuperCluster] Error setting OFGA model to super cluster: {e}"
+                    );
+                    dist_lock::unlock(&locker)
+                        .await
+                        .expect("Failed to release lock");
+                    return Err(e);
+                }
             }
 
             if matched {
