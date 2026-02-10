@@ -151,38 +151,45 @@ export function useLogsHighlighter() {
 
       // Yield control back to event loop with tracked timeout
       // This prevents blocking the UI thread
-      await new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          // Remove from pending list when executed
-          const index = pendingTimeouts.indexOf(timeoutId);
-          if (index > -1) {
-            pendingTimeouts.splice(index, 1);
-          }
+      // For small datasets (<10 records), skip delay for instant rendering
+      // For larger datasets, use small delay to prevent UI blocking
+      const shouldDelay = hits.length >= 10 && chunkIndex < chunks.length - 1;
+      const delayMs = shouldDelay ? 10 : 0; // Reduced from 50ms to 10ms, skip for small datasets
 
-          // Check if aborted before resolving
-          if (signal.aborted) {
+      if (delayMs > 0) {
+        await new Promise<void>((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            // Remove from pending list when executed
+            const index = pendingTimeouts.indexOf(timeoutId);
+            if (index > -1) {
+              pendingTimeouts.splice(index, 1);
+            }
+
+            // Check if aborted before resolving
+            if (signal.aborted) {
+              reject(new Error("Processing aborted"));
+            } else {
+              resolve();
+            }
+          }, delayMs);
+
+          // Track this timeout for cleanup
+          pendingTimeouts.push(timeoutId);
+
+          // Handle abort signal
+          signal.addEventListener("abort", () => {
+            clearTimeout(timeoutId);
+            const index = pendingTimeouts.indexOf(timeoutId);
+            if (index > -1) {
+              pendingTimeouts.splice(index, 1);
+            }
             reject(new Error("Processing aborted"));
-          } else {
-            resolve();
-          }
-        }, 50);
-
-        // Track this timeout for cleanup
-        pendingTimeouts.push(timeoutId);
-
-        // Handle abort signal
-        signal.addEventListener("abort", () => {
-          clearTimeout(timeoutId);
-          const index = pendingTimeouts.indexOf(timeoutId);
-          if (index > -1) {
-            pendingTimeouts.splice(index, 1);
-          }
-          reject(new Error("Processing aborted"));
+          });
+        }).catch(() => {
+          // Silently handle abort errors
+          // Processing was intentionally cancelled
         });
-      }).catch(() => {
-        // Silently handle abort errors
-        // Processing was intentionally cancelled
-      });
+      }
     }
     return processedResults.value;
   }
@@ -218,6 +225,99 @@ export function useLogsHighlighter() {
   };
 
   /**
+   * Estimates the size of data without expensive JSON.stringify
+   * Used to determine if content should be truncated or skip highlighting
+   * Optimized for large objects with many fields
+   */
+  const estimateSize = (data: any): number => {
+    if (data === null || data === undefined) return 0;
+
+    // For strings, use length directly
+    if (typeof data === "string") return data.length;
+
+    // For primitives, use string representation
+    if (typeof data !== "object") return String(data).length;
+
+    // For objects/arrays, estimate based on key count and depth
+    try {
+      const keys = Object.keys(data);
+      if (keys.length === 0) return 2; // "{}" or "[]"
+
+      // For very large objects (50+ fields), sample more aggressively
+      const sampleSize =
+        keys.length > 50 ? Math.min(10, keys.length) : Math.min(5, keys.length);
+      let totalSize = 0;
+
+      // Sample values to estimate
+      for (let i = 0; i < sampleSize; i++) {
+        const key = keys[i];
+        const value = data[key];
+
+        // Add key size (with quotes and colon)
+        totalSize += key.length + 4; // "key":
+
+        if (typeof value === "string") {
+          totalSize += value.length + 2; // Add quotes
+        } else if (typeof value === "object" && value !== null) {
+          // For nested objects/arrays, recurse to maintain performance
+          if (Array.isArray(value)) {
+            // Recursively estimate array size to avoid expensive JSON.stringify
+            totalSize += estimateSize(value);
+          } else {
+            // Recursively estimate nested object size
+            totalSize += estimateSize(value);
+          }
+        } else {
+          totalSize += String(value).length;
+        }
+      }
+
+      // Extrapolate to all keys
+      const avgFieldSize = totalSize / sampleSize;
+      const estimate = avgFieldSize * keys.length;
+
+      // Add overhead for braces, commas, etc (10% buffer)
+      return Math.ceil(estimate * 1.1);
+    } catch (error) {
+      return 1000; // Default safe estimate
+    }
+  };
+
+  /**
+   * Truncates large content to prevent memory/performance issues
+   * Always returns a string representation for consistency
+   */
+  const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
+    if (typeof data === "string") {
+      if (data.length > maxSize) {
+        return (
+          data.substring(0, maxSize) +
+          `... [truncated, original size: ${data.length} chars]`
+        );
+      }
+      return data;
+    }
+
+    if (typeof data === "object" && data !== null) {
+      try {
+        const jsonStr = JSON.stringify(data);
+        if (jsonStr.length > maxSize) {
+          return (
+            jsonStr.substring(0, maxSize) +
+            `... [truncated, original size: ${jsonStr.length} chars]`
+          );
+        }
+        return jsonStr;
+      } catch (error) {
+        return "[Object too large to display]";
+      }
+    }
+
+    // For primitives (numbers, booleans, null), convert to string
+    return String(data);
+  };
+
+  /**
    * Main colorization logic with integrated highlighting
    */
   const colorizedJson = ({
@@ -237,17 +337,31 @@ export function useLogsHighlighter() {
       return "";
     }
 
+    // Estimate size and skip highlighting for large content (>50KB)
+    const estimatedSize = estimateSize(data);
+    const skipHighlighting = estimatedSize > 50000;
+
+    // Truncate very large content (>50KB) to prevent memory issues
+    if (estimatedSize > 50000) {
+      const truncatedStr = truncateLargeContent(data, 50000);
+      // After truncation, skip highlighting and use simple display
+      return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
+    }
+
+    // If skipping highlighting, use basic colorization without search highlighting
+    const effectiveQueryString = skipHighlighting ? "" : queryString;
+
     // Simple mode: only highlighting, no semantic colorization
     if (simpleMode) {
       const textStr = String(data);
-      return simpleHighlight(textStr, queryString);
+      return simpleHighlight(textStr, effectiveQueryString);
     }
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
       return processTextWithHighlights(
         data,
-        queryString,
+        effectiveQueryString,
         currentColors.value,
         showQuotes,
       );
@@ -263,14 +377,14 @@ export function useLogsHighlighter() {
           return createStyledSpan(
             dataStr,
             currentColors.value.timestamp,
-            queryString,
+            effectiveQueryString,
             false,
           );
         } else {
           return createStyledSpan(
             dataStr,
             currentColors.value.numberValue,
-            queryString,
+            effectiveQueryString,
             showQuotes,
           );
         }
@@ -278,20 +392,20 @@ export function useLogsHighlighter() {
         return createStyledSpan(
           String(data),
           currentColors.value.booleanValue,
-          queryString,
+          effectiveQueryString,
           showQuotes,
         );
       } else if (data === null) {
         return createStyledSpan(
           "null",
           currentColors.value.nullValue,
-          queryString,
+          effectiveQueryString,
           showQuotes,
         );
       } else {
         return processTextWithHighlights(
           dataStr,
-          queryString,
+          effectiveQueryString,
           currentColors.value,
           showQuotes,
         );
@@ -305,7 +419,7 @@ export function useLogsHighlighter() {
         data,
         showBraces,
         showQuotes,
-        queryString,
+        effectiveQueryString,
       );
     } catch (error) {
       return escapeHtml(JSON.stringify(data));
@@ -360,7 +474,12 @@ export function useLogsHighlighter() {
     // 3xx: Redirection (300-308)
     // 4xx: Client Error (400-431, 451)
     // 5xx: Server Error (500-511)
-    if (/^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(trimmed)) return "status-code";
+    if (
+      /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(
+        trimmed,
+      )
+    )
+      return "status-code";
 
     // UUIDs
     if (
@@ -489,16 +608,11 @@ export function useLogsHighlighter() {
 
       // Add opening quote for key if needed: "level" vs level
       if (showQuotes) {
-        keyContent += '"';
+        keyContent += `<span class="log-key">"${escapeHtml(key)}"</span>`;
+      } else {
+        keyContent += `<span class="log-key">${escapeHtml(key)}</span>`;
       }
 
-      // Process key content WITHOUT highlighting - keys should never be highlighted
-      keyContent += `${escapeHtml(key)}`;
-
-      // Add closing quote for key if needed
-      if (showQuotes) {
-        keyContent += '"';
-      }
       parts.push(keyContent);
       parts.push('<span class="log-separator">:</span>'); // Colon separator
 
@@ -610,12 +724,25 @@ export function useLogsHighlighter() {
     showQuotes: boolean = false,
     queryString: string = "",
     simpleMode: boolean = false,
+    disableTruncation: boolean = false, // Set true for expanded/detail views to show complete data
   ): string {
     if (data === null || data === undefined) {
       return "";
     }
 
     const currentColors = getThemeColors(isDarkTheme);
+
+    // Apply truncation logic for list views (not expanded/detail views)
+    if (!disableTruncation && typeof data === "object" && data !== null) {
+      const estimatedSize = estimateSize(data);
+
+      // Truncate very large content (>50KB) to prevent UI freeze in list view
+      if (estimatedSize > 50000) {
+        const truncatedStr = truncateLargeContent(data, 50000);
+        // After truncation, skip highlighting and use simple display
+        return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
+      }
+    }
 
     // Simple mode: only highlighting, no semantic colorization
     if (simpleMode) {
@@ -690,6 +817,102 @@ export function useLogsHighlighter() {
     } catch (error) {
       return escapeHtml(JSON.stringify(data));
     }
+  }
+
+  /**
+   * Progressive rendering for very large logs in expanded/detail views
+   * Renders field-by-field to avoid UI freeze
+   * Returns a ref that updates incrementally
+   */
+  async function colorizeJsonProgressive(
+    data: any,
+    isDarkTheme: boolean,
+    showBraces: boolean = true,
+    showQuotes: boolean = false,
+    queryString: string = "",
+    onChunk?: (html: string) => void, // Callback for each chunk
+  ): Promise<string> {
+    if (data === null || data === undefined) {
+      return "";
+    }
+
+    // For non-objects, use regular colorization
+    if (typeof data !== "object") {
+      return colorizeJson(
+        data,
+        isDarkTheme,
+        showBraces,
+        showQuotes,
+        queryString,
+        false,
+        true,
+      );
+    }
+
+    const currentColors = getThemeColors(isDarkTheme);
+    const keys = Object.keys(data);
+    let result = showBraces ? "{" : "";
+
+    // Process fields in chunks of 10 to avoid blocking
+    const chunkSize = 10;
+    for (let i = 0; i < keys.length; i += chunkSize) {
+      const chunkKeys = keys.slice(i, Math.min(i + chunkSize, keys.length));
+      let chunkHtml = "";
+
+      for (const key of chunkKeys) {
+        const value = data[key];
+
+        // Add key
+        chunkHtml += `<span style="color: ${currentColors.key}">${showQuotes ? '"' : ""}${escapeHtml(key)}${showQuotes ? '"' : ""}</span>: `;
+
+        // Add value (truncate individual fields if >100KB)
+        let processedValue = value;
+        if (typeof value === "string" && value.length > 100000) {
+          processedValue =
+            value.substring(0, 100000) +
+            `... [field truncated, ${value.length} chars]`;
+        } else if (typeof value === "object" && value !== null) {
+          const valueStr = JSON.stringify(value);
+          if (valueStr.length > 100000) {
+            processedValue =
+              valueStr.substring(0, 100000) +
+              `... [field truncated, ${valueStr.length} chars]`;
+          }
+        }
+
+        // Colorize the value (without highlighting for performance)
+        const colorizedValue = colorizeJson(
+          processedValue,
+          isDarkTheme,
+          showBraces,
+          showQuotes,
+          "",
+          false,
+          true,
+        );
+        chunkHtml += colorizedValue;
+
+        // Add comma if not last
+        if (key !== keys[keys.length - 1]) {
+          chunkHtml += ", ";
+        }
+      }
+
+      result += chunkHtml;
+
+      // Call callback with current result if provided
+      if (onChunk) {
+        onChunk(result + (showBraces ? "}" : ""));
+      }
+
+      // Yield to event loop every chunk
+      if (i + chunkSize < keys.length) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    result += showBraces ? "}" : "";
+    return result;
   }
 
   return {
