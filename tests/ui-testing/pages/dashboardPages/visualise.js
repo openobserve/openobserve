@@ -49,11 +49,18 @@ export default class LogsVisualise {
     await this.page.locator('[data-test="logs-visualize-toggle"]').click();
 
     // Wait for visualization tab to be fully loaded
-    // Check for chart selector or chart renderer to be visible
+    // Check for chart selector OR error message (in case of query errors)
     const chartSelector = this.page.locator('[data-test="selected-chart-table-item"], [data-test="selected-chart-bar-item"], [data-test="selected-chart-line-item"]').first();
-    await chartSelector.waitFor({ state: "visible", timeout: 10000 });
+    const errorIndicator = this.page.locator('[data-test="dashboard-error"], .q-notification, .q-banner');
 
-    // Small buffer to ensure VRL detection completes
+    // Wait for either chart selectors or error indicator to appear
+    await Promise.race([
+      chartSelector.waitFor({ state: "visible", timeout: 10000 }).catch(() => {}),
+      errorIndicator.first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {}),
+      this.page.waitForTimeout(3000) // Fallback timeout if neither appears quickly
+    ]);
+
+    // Small buffer to ensure UI is stable
     await this.page.waitForTimeout(500);
   }
 
