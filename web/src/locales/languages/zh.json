@@ -2146,7 +2146,7 @@
       "groupsLabel": "组",
       "noMatchingGroups": "没有匹配的组",
       "fqnFormulaTitle": "标识公式",
-      "fqnFormulaTooltip": "显示服务标识将如何计算。范围维度（蓝色）使用 '/' 连接。第一个非空工作负载维度（绿色）成为服务名称。",
+      "fqnFormulaTooltip": "显示服务标识将如何计算。范围维度 使用 '/' 连接。第一个非空工作负载维度 成为服务名称。",
       "scopeDimension": "范围维度",
       "workloadDimension": "工作负载维度",
       "noFormulaConfigured": "未配置标识公式。请在上方添加维度。",
