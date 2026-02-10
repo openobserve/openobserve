@@ -31,7 +31,7 @@ use o2_openfga::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
         get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
     },
-    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS, OFGAModel},
 };
 
 use crate::{
@@ -45,6 +45,12 @@ use crate::{
 pub async fn init() -> Result<(), anyhow::Error> {
     use o2_openfga::get_all_init_tuples;
 
+    // this is not supposed to be processed by every node
+    // only one region (in super cluster) and only one node (in that region)
+    // should move forward with this. This is because, openfga db is supposed
+    // to be shared across all regions. Hence, since the db is common for all,
+    // we don't need all node to do same changes again and again to the same db.
+
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
     let mut need_pipeline_migration = false;
@@ -57,7 +63,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_re_pattern_permission_migration = false;
     let mut need_license_permission_migration = false;
 
-    let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
+    let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
             Ok(None) | Err(_) => {
@@ -65,48 +71,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 None
             }
         };
-
-    // sync with super cluster
-    if get_o2_config().super_cluster.enabled {
-        let meta_in_super = get_model().await?;
-        match (meta_in_super, &existing_meta) {
-            (None, Some(existing_model)) => {
-                // set to super cluster
-                set_model(Some(existing_model.clone())).await?;
-            }
-            (Some(model), None) => {
-                // set to local
-                existing_meta = Some(model.clone());
-                migrate_native_objects = false;
-                db::ofga::set_ofga_model_to_db(model).await?;
-            }
-            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
-            {
-                Ordering::Less => {
-                    log::info!(
-                        "[OFGA:SuperCluster] model version changed: {} -> {}",
-                        existing_model.version,
-                        model.version
-                    );
-                    // update version in super cluster
-                    set_model(Some(existing_model.clone())).await?;
-                }
-                Ordering::Greater => {
-                    log::info!(
-                        "[OFGA:SuperCluster] model version changed: {} -> {}",
-                        existing_model.version,
-                        model.version
-                    );
-                    // update version in local
-                    existing_meta = Some(model.clone());
-                    migrate_native_objects = false;
-                    db::ofga::set_ofga_model_to_db(model).await?;
-                }
-                Ordering::Equal => {}
-            },
-            _ => {}
-        }
-    }
 
     let meta = o2_openfga::model::read_ofga_model().await;
     get_all_init_tuples(&mut init_tuples).await;
@@ -190,12 +154,64 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/ofga/model/", 0)
         .await
         .expect("Failed to acquire lock for openFGA");
+
+    // check again, if ofga model is already updated by other node
+    let mut existing_meta = db::ofga::get_ofga_model().await?;
+    if get_o2_config().super_cluster.enabled {
+        // Compare super cluster model and local meta model
+        let meta_in_super = get_model().await?;
+        match (meta_in_super, &existing_meta) {
+            (Some(model), None) => {
+                // set to local
+                existing_meta = Some(model.clone());
+                migrate_native_objects = false;
+                db::ofga::set_ofga_model_to_db(model).await?;
+            }
+            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
+            {
+                Ordering::Greater => {
+                    log::info!(
+                        "[OFGA:SuperCluster] model version changed: {} -> {}, needs to update local",
+                        existing_model.version,
+                        model.version
+                    );
+                    // update version in local
+                    existing_meta = Some(model.clone());
+                    migrate_native_objects = false;
+                    db::ofga::set_ofga_model_to_db(model).await?;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
     match db::ofga::set_ofga_model(existing_meta).await {
-        Ok(store_id) => {
+        Ok((store_id, latest_model_version, matched)) => {
             if store_id.is_empty() {
                 log::error!("[OFGA:Local] OFGA store id is empty");
             }
-            o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id);
+            o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id.clone());
+
+            if get_o2_config().super_cluster.enabled {
+                // Set the model version in the super cluster, only version and store_id is
+                // important
+                set_model(Some(OFGAModel {
+                    version: latest_model_version,
+                    store_id,
+                    model_id: "".to_string(),
+                    model: None,
+                }))
+                .await?;
+            }
+
+            if matched {
+                // No further openfga init required, as the meta table version was already updated
+                // by some other node. Hence simply unlock and return from here.
+                dist_lock::unlock(&locker)
+                    .await
+                    .expect("Failed to release lock");
+                return Ok(());
+            }
 
             #[cfg(feature = "cloud")]
             if !is_ofga_migrations_done().await.unwrap() {
