@@ -350,8 +350,6 @@ pub async fn run_datafusion(
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
 
-    println!("\nschema: {:?}\n", sql.schemas);
-
     let is_complete_cache_hit = Arc::new(Mutex::new(false));
     let ctx = SearchContextBuilder::new()
         .target_partitions(cfg.limit.cpu_num)
@@ -674,8 +672,6 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
             .clone()
             .with_metadata(Default::default());
         let stream_name = stream.to_quoted_string();
-        println!("\nstream_name: {:?}\n", stream_name);
-        println!("\nschema: {:?}\n", schema);
         let table = Arc::new(
             NewEmptyTable::new(&stream_name, Arc::new(schema))
                 .with_partitions(ctx.state().config().target_partitions())
