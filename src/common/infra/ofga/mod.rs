@@ -175,7 +175,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 dist_lock::unlock(&locker)
                     .await
                     .expect("Failed to release lock");
-                return Err(e);
+                return Err(e.into());
             }
         };
         match (meta_in_super, &existing_meta) {
@@ -191,27 +191,25 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     return Err(e);
                 }
             }
-            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
+            (Some(model), Some(existing_model))
+                if model.version.cmp(&existing_model.version) == Ordering::Greater =>
             {
-                Ordering::Greater => {
-                    log::info!(
-                        "[OFGA:SuperCluster] model version changed: {} -> {}, needs to update local",
-                        existing_model.version,
-                        model.version
-                    );
-                    // update version in local
-                    existing_meta = Some(model.clone());
-                    migrate_native_objects = false;
-                    if let Err(e) = db::ofga::set_ofga_model_to_db(model).await {
-                        log::error!("[OFGA] Error setting OFGA model to local db: {e}");
-                        dist_lock::unlock(&locker)
-                            .await
-                            .expect("Failed to release lock");
-                        return Err(e);
-                    }
+                log::info!(
+                    "[OFGA:SuperCluster] model version changed: {} -> {}, needs to update local",
+                    existing_model.version,
+                    model.version
+                );
+                // update version in local
+                existing_meta = Some(model.clone());
+                migrate_native_objects = false;
+                if let Err(e) = db::ofga::set_ofga_model_to_db(model).await {
+                    log::error!("[OFGA] Error setting OFGA model to local db: {e}");
+                    dist_lock::unlock(&locker)
+                        .await
+                        .expect("Failed to release lock");
+                    return Err(e);
                 }
-                _ => {}
-            },
+            }
             _ => {}
         }
     }
@@ -239,7 +237,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     dist_lock::unlock(&locker)
                         .await
                         .expect("Failed to release lock");
-                    return Err(e);
+                    return Err(e.into());
                 }
             }
 
