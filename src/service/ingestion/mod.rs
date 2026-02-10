@@ -617,13 +617,9 @@ pub fn refactor_map(
             } else {
                 has_elements = true;
             }
-            non_schema_map.write_all(b"\"").unwrap();
-            non_schema_map.write_all(key.as_bytes()).unwrap();
-            non_schema_map.write_all(b"\":\"").unwrap();
-            non_schema_map
-                .write_all(pickup_string_value(value).as_bytes())
-                .unwrap();
-            non_schema_map.write_all(b"\"").unwrap();
+            serde_json::to_writer(&mut non_schema_map, &key).unwrap();
+            non_schema_map.write_all(b":").unwrap();
+            serde_json::to_writer(&mut non_schema_map, &pickup_string_value(value)).unwrap();
         }
     }
     non_schema_map.write_all(b"}").unwrap();
@@ -648,6 +644,7 @@ mod tests {
     fn test_format_partition_key() {
         assert_eq!(format_partition_key("default/olympics"), "defaultolympics");
     }
+
     #[test]
     fn test_get_write_partition_key() {
         let mut local_val = Map::new();
@@ -684,6 +681,7 @@ mod tests {
             "1970/01/01/00/default"
         );
     }
+
     #[test]
     fn test_get_write_partition_key_no_partition_keys_no_local_val() {
         assert_eq!(
@@ -697,6 +695,7 @@ mod tests {
             "1970/01/01/00/default"
         );
     }
+
     #[tokio::test]
     async fn test_get_stream_partition_keys() {
         let mut meta = HashMap::new();
@@ -717,6 +716,292 @@ mod tests {
                 StreamPartition::new("country"),
                 StreamPartition::new("sport")
             ]
+        );
+    }
+
+    #[test]
+    fn test_refactor_map() {
+        let mut original_map = Map::new();
+        original_map.insert(
+            "event_log_appid".to_string(),
+            Value::String("app1".to_string()),
+        );
+        original_map.insert(
+            "event_log_service".to_string(),
+            Value::String("service1".to_string()),
+        );
+        original_map.insert(
+            "log".to_string(),
+            Value::String("this is Hello".to_string()),
+        );
+        original_map.insert(
+            "message".to_string(),
+            Value::String("this is datafusion".to_string()),
+        );
+        original_map.insert(
+            "user".to_string(),
+            Value::String("user@example.com".to_string()),
+        );
+        original_map.insert(
+            "event_zarr".to_string(),
+            Value::String("[{\"field1\":\"val1\"}]".to_string()),
+        );
+
+        let defined_schema_keys: HashSet<String> = ["log", "message", "user"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        let result = refactor_map(original_map, &defined_schema_keys);
+
+        // Schema keys should be preserved as-is
+        assert_eq!(
+            result.get("log").unwrap(),
+            &Value::String("this is Hello".to_string())
+        );
+        assert_eq!(
+            result.get("message").unwrap(),
+            &Value::String("this is datafusion".to_string())
+        );
+        assert_eq!(
+            result.get("user").unwrap(),
+            &Value::String("user@example.com".to_string())
+        );
+
+        // Non-schema keys should be packed into the _all column as valid JSON
+        let column_all = config::get_config().common.column_all.to_string();
+        let all_value = result.get(&column_all).unwrap().as_str().unwrap();
+        let all_parsed: Map<String, Value> = serde_json::from_str(all_value).unwrap();
+        assert_eq!(
+            all_parsed.get("event_log_appid").unwrap(),
+            &Value::String("app1".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("event_log_service").unwrap(),
+            &Value::String("service1".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("event_zarr").unwrap(),
+            &Value::String("[{\"field1\":\"val1\"}]".to_string())
+        );
+
+        // Should not contain schema keys in _all
+        assert!(all_parsed.get("log").is_none());
+        assert!(all_parsed.get("message").is_none());
+        assert!(all_parsed.get("user").is_none());
+    }
+
+    #[test]
+    fn test_refactor_map_empty_input() {
+        let original_map = Map::new();
+        let defined_schema_keys: HashSet<String> = ["log"].iter().map(|s| s.to_string()).collect();
+
+        let result = refactor_map(original_map, &defined_schema_keys);
+
+        assert!(result.is_empty());
+        let column_all = config::get_config().common.column_all.to_string();
+        assert!(result.get(&column_all).is_none());
+    }
+
+    #[test]
+    fn test_refactor_map_all_keys_in_schema() {
+        let mut original_map = Map::new();
+        original_map.insert("log".to_string(), Value::String("hello".to_string()));
+        original_map.insert("message".to_string(), Value::String("world".to_string()));
+
+        let defined_schema_keys: HashSet<String> =
+            ["log", "message"].iter().map(|s| s.to_string()).collect();
+
+        let result = refactor_map(original_map, &defined_schema_keys);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            result.get("log").unwrap(),
+            &Value::String("hello".to_string())
+        );
+        assert_eq!(
+            result.get("message").unwrap(),
+            &Value::String("world".to_string())
+        );
+        // No _all column when all keys are in schema
+        let column_all = config::get_config().common.column_all.to_string();
+        assert!(result.get(&column_all).is_none());
+    }
+
+    #[test]
+    fn test_refactor_map_no_keys_in_schema() {
+        let mut original_map = Map::new();
+        original_map.insert("extra1".to_string(), Value::String("val1".to_string()));
+        original_map.insert("extra2".to_string(), Value::String("val2".to_string()));
+
+        let defined_schema_keys: HashSet<String> =
+            ["log", "message"].iter().map(|s| s.to_string()).collect();
+
+        let result = refactor_map(original_map, &defined_schema_keys);
+
+        // No schema keys present, so only _all
+        assert!(result.get("log").is_none());
+        assert!(result.get("message").is_none());
+        let column_all = config::get_config().common.column_all.to_string();
+        let all_value = result.get(&column_all).unwrap().as_str().unwrap();
+        let all_parsed: Map<String, Value> = serde_json::from_str(all_value).unwrap();
+        assert_eq!(
+            all_parsed.get("extra1").unwrap(),
+            &Value::String("val1".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("extra2").unwrap(),
+            &Value::String("val2".to_string())
+        );
+    }
+
+    #[test]
+    fn test_refactor_map_non_string_value_types() {
+        let mut original_map = Map::new();
+        original_map.insert("schema_key".to_string(), Value::String("kept".to_string()));
+        original_map.insert(
+            "num_val".to_string(),
+            Value::Number(serde_json::Number::from(42)),
+        );
+        original_map.insert("bool_val".to_string(), Value::Bool(true));
+        original_map.insert("null_val".to_string(), Value::Null);
+        original_map.insert(
+            "array_val".to_string(),
+            Value::Array(vec![
+                Value::String("a".to_string()),
+                Value::Number(1.into()),
+            ]),
+        );
+        original_map.insert(
+            "obj_val".to_string(),
+            Value::Object({
+                let mut m = Map::new();
+                m.insert("nested".to_string(), Value::String("inner".to_string()));
+                m
+            }),
+        );
+
+        let defined_schema_keys: HashSet<String> =
+            ["schema_key"].iter().map(|s| s.to_string()).collect();
+
+        let result = refactor_map(original_map, &defined_schema_keys);
+
+        assert_eq!(
+            result.get("schema_key").unwrap(),
+            &Value::String("kept".to_string())
+        );
+
+        let column_all = config::get_config().common.column_all.to_string();
+        let all_value = result.get(&column_all).unwrap().as_str().unwrap();
+        let all_parsed: Map<String, Value> = serde_json::from_str(all_value).unwrap();
+
+        // pickup_string_value converts all types to strings
+        assert_eq!(
+            all_parsed.get("num_val").unwrap(),
+            &Value::String("42".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("bool_val").unwrap(),
+            &Value::String("true".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("null_val").unwrap(),
+            &Value::String("null".to_string())
+        );
+        // Array and Object go through val.to_string() -> serde_json compact format
+        assert_eq!(
+            all_parsed.get("array_val").unwrap(),
+            &Value::String("[\"a\",1]".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("obj_val").unwrap(),
+            &Value::String("{\"nested\":\"inner\"}".to_string())
+        );
+    }
+
+    #[test]
+    fn test_refactor_map_special_chars_in_values() {
+        let mut original_map = Map::new();
+        original_map.insert(
+            "backslash".to_string(),
+            Value::String("path\\to\\file".to_string()),
+        );
+        original_map.insert(
+            "newline".to_string(),
+            Value::String("line1\nline2".to_string()),
+        );
+        original_map.insert("tab".to_string(), Value::String("col1\tcol2".to_string()));
+        original_map.insert(
+            "quotes".to_string(),
+            Value::String(r#"say "hello""#.to_string()),
+        );
+        original_map.insert("mixed".to_string(), Value::String("a\"b\\c\nd".to_string()));
+
+        let defined_schema_keys: HashSet<String> = HashSet::new();
+
+        let result = refactor_map(original_map, &defined_schema_keys);
+
+        let column_all = config::get_config().common.column_all.to_string();
+        let all_value = result.get(&column_all).unwrap().as_str().unwrap();
+        // Must be valid JSON
+        let all_parsed: Map<String, Value> = serde_json::from_str(all_value).unwrap();
+        assert_eq!(
+            all_parsed.get("backslash").unwrap(),
+            &Value::String("path\\to\\file".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("newline").unwrap(),
+            &Value::String("line1\nline2".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("tab").unwrap(),
+            &Value::String("col1\tcol2".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("quotes").unwrap(),
+            &Value::String(r#"say "hello""#.to_string())
+        );
+        assert_eq!(
+            all_parsed.get("mixed").unwrap(),
+            &Value::String("a\"b\\c\nd".to_string())
+        );
+    }
+
+    #[test]
+    fn test_refactor_map_special_chars_in_keys() {
+        let mut original_map = Map::new();
+        original_map.insert(
+            "key\"with\"quotes".to_string(),
+            Value::String("val1".to_string()),
+        );
+        original_map.insert(
+            "key\\with\\backslash".to_string(),
+            Value::String("val2".to_string()),
+        );
+        original_map.insert(
+            "key\nwith\nnewline".to_string(),
+            Value::String("val3".to_string()),
+        );
+
+        let defined_schema_keys: HashSet<String> = HashSet::new();
+
+        let result = refactor_map(original_map, &defined_schema_keys);
+
+        let column_all = config::get_config().common.column_all.to_string();
+        let all_value = result.get(&column_all).unwrap().as_str().unwrap();
+        // Must be valid JSON despite special chars in keys
+        let all_parsed: Map<String, Value> = serde_json::from_str(all_value).unwrap();
+        assert_eq!(
+            all_parsed.get("key\"with\"quotes").unwrap(),
+            &Value::String("val1".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("key\\with\\backslash").unwrap(),
+            &Value::String("val2".to_string())
+        );
+        assert_eq!(
+            all_parsed.get("key\nwith\nnewline").unwrap(),
+            &Value::String("val3".to_string())
         );
     }
 
