@@ -330,7 +330,9 @@
     "nlQueryGenerationSuccess": "クエリは正常に生成されました!",
     "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません",
     "askAIPlaceholder": "AIに問い合わせて...",
-    "aiBarSuccessPlaceholder": "次は何をしたいですか？"
+    "aiBarSuccessPlaceholder": "次は何をしたいですか？",
+    "askAI": "AI に聞く",
+    "askAITooltip": "AIに問い合わせを依頼する"
   },
   "menu": {
     "home": "ホーム",

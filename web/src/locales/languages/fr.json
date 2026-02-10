@@ -330,7 +330,9 @@
     "nlQueryGenerationSuccess": "Requête générée avec succès !",
     "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux",
     "askAIPlaceholder": "Demandez à AI de l'aide pour répondre à votre requête...",
-    "aiBarSuccessPlaceholder": "Qu'aimerais-tu faire ensuite ?"
+    "aiBarSuccessPlaceholder": "Qu'aimerais-tu faire ensuite ?",
+    "askAI": "Demandez à AI",
+    "askAITooltip": "Demandez à AI de l'aide pour votre requête"
   },
   "menu": {
     "home": "Accueil",
