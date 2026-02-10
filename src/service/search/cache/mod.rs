@@ -1064,7 +1064,7 @@ pub fn apply_vrl_to_response(
         match program {
             Some(program) => {
                 if apply_over_hits {
-                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -1074,6 +1074,9 @@ pub fn apply_vrl_to_response(
                         org_id,
                         &[stream_name.to_string()],
                     );
+                    if let Some(e) = err {
+                        log::error!("Error applying vrl function: {e}");
+                    }
                     ret_val
                         .as_array()
                         .unwrap()
@@ -1084,11 +1087,12 @@ pub fn apply_vrl_to_response(
                         })
                         .collect()
                 } else {
-                    local_res
+                    let mut error = "".to_string();
+                    let res = local_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -1098,10 +1102,17 @@ pub fn apply_vrl_to_response(
                                 org_id,
                                 &[stream_name.to_string()],
                             );
+                            if let Some(e) = err {
+                                error = e;
+                            }
                             (!ret_val.is_null())
                                 .then_some(config::utils::flatten::flatten(ret_val).unwrap())
                         })
-                        .collect()
+                        .collect();
+                    if !error.is_empty() {
+                        log::error!("Error applying vrl function: {error}");
+                    }
+                    res
                 }
             }
             None => local_res.hits,
