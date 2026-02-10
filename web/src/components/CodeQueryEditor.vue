@@ -397,7 +397,7 @@ export default defineComponent({
           console.log('[NL2Q-UI] Dashboard created successfully');
           const responseText = generatedSQL.replace('✓ DASHBOARD_CREATED:', '').trim();
           emit("generation-success", { type: 'dashboard', message: responseText });
-          emit("nlpModeDetected", false); // Keep in NLP mode for next query
+          // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
@@ -405,7 +405,7 @@ export default defineComponent({
           console.log('[NL2Q-UI] Alert created successfully');
           const responseText = generatedSQL.replace('✓ ALERT_CREATED:', '').trim();
           emit("generation-success", { type: 'alert', message: responseText });
-          emit("nlpModeDetected", false); // Keep in NLP mode for next query
+          // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
@@ -413,7 +413,7 @@ export default defineComponent({
           console.log('[NL2Q-UI] Action completed successfully');
           const responseText = generatedSQL.replace('✓ ACTION_COMPLETED:', '').trim();
           emit("generation-success", { type: 'action', message: responseText });
-          emit("nlpModeDetected", false); // Keep in NLP mode for next query
+          // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
