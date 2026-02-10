@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-font-medium">Service:</span>
                 <span :class="store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'" class="tw-ml-1 tw-font-mono">{{ incidentDetails.topology_context.service }}</span>
               </div>
-              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw-text-xs tw-mb-2">
+              <div v-if="incidentDetails.topology_context.upstream_services?.length" class="tw-text-xs tw-mb-2">
                 <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-font-medium">{{ t("alerts.incidents.upstreamServices") }}:</span>
                 <span class="tw-ml-1">
                   <q-badge
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </span>
               </div>
-              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw-text-xs">
+              <div v-if="incidentDetails.topology_context.downstream_services?.length" class="tw-text-xs">
                 <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-font-medium">{{ t("alerts.incidents.downstreamServices") }}:</span>
                 <span class="tw-ml-1">
                   <q-badge

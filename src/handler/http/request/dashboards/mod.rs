@@ -101,7 +101,11 @@ impl From<DashboardError> for HttpResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
+        ("x-o2-mcp" = json!({
+            "description": "Create a dashboard with visualization panels. LAYOUT: 192-column grid with {x, y, w, h, i} where x=column(0-191), y=row, w=width, h=height, i=panel_id. Common widths: full=192, half=96, third=64. PANEL QUERIES: Each panel query needs 'fields' with x/y/z arrays populated EVEN when customQuery=true. AXIS RULES: x=dimension/time field, y=metric field(s), z=only for heatmaps(color intensity)/stacked-charts(breakdown field)/geo-maps(value). For most charts (line/area/bar/pie), leave z=[]. Use SELECT aliases as column values. Example: 'SELECT histogram(_timestamp) as ts, COUNT(*) as cnt' needs x=[{label:'ts',alias:'ts',column:'ts',aggregationFunction:null}], y=[{label:'cnt',alias:'cnt',column:'cnt',aggregationFunction:null}], z=[].",
+            "category": "dashboards"
+        }))
     )
 )]
 #[post("/{org_id}/dashboards")]
