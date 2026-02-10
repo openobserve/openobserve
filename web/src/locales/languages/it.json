@@ -330,7 +330,9 @@
     "nlQueryGenerationSuccess": "Query generata con successo!",
     "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream",
     "askAIPlaceholder": "Chiedi all'IA di aiutarti con la tua domanda...",
-    "aiBarSuccessPlaceholder": "Cosa vorresti fare dopo?"
+    "aiBarSuccessPlaceholder": "Cosa vorresti fare dopo?",
+    "askAI": "Chiedi all'AI",
+    "askAITooltip": "Chiedi all'IA di aiutarti con la tua richiesta"
   },
   "menu": {
     "home": "Home",

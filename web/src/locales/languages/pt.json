@@ -330,7 +330,9 @@
     "nlQueryGenerationSuccess": "Consulta gerada com sucesso!",
     "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos",
     "askAIPlaceholder": "Peça ajuda à IA com sua consulta...",
-    "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?"
+    "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?",
+    "askAI": "Pergunte à IA",
+    "askAITooltip": "Peça ajuda à IA com sua consulta"
   },
   "menu": {
     "home": "Início",
