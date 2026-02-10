@@ -330,7 +330,9 @@
     "nlQueryGenerationSuccess": "Zoekopdracht succesvol gegenereerd!",
     "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams",
     "askAIPlaceholder": "Vraag AI om hulp bij je vraag...",
-    "aiBarSuccessPlaceholder": "Wat zou je hierna willen doen?"
+    "aiBarSuccessPlaceholder": "Wat zou je hierna willen doen?",
+    "askAI": "Vraag het aan AI",
+    "askAITooltip": "Vraag AI om hulp bij je vraag"
   },
   "menu": {
     "home": "Home",
