@@ -1030,9 +1030,11 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
-    // Focus on the editor and enter a simple PromQL query
+    // Focus on the editor and enter a simple PromQL query using keyboard.type for reliable Monaco input
     await queryEditor.locator('.monaco-editor').click();
-    await queryEditor.locator('.inputarea').fill('up');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('up');
+    await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
 
     // Apply
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1118,9 +1120,11 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
-    // Focus on the editor and enter a PromQL query
+    // Focus on the editor and enter a PromQL query using keyboard.type for reliable Monaco input
     await queryEditor.locator('.monaco-editor').click();
-    await queryEditor.locator('.inputarea').fill('up');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('up');
+    await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
 
     // Apply
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1140,18 +1144,27 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Wait for the table to have data rows first (PromQL query needs time to execute)
+    // Wait for the table to render with data rows
+    // Quasar's q-table with hide-no-data does NOT render .q-table__bottom when rows are empty
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await tablePanel.waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for table rows to appear (ensures data is loaded)
+    // Wait for table rows - if first attempt returns no data, re-apply to retry the query
     const tableRows = tablePanel.locator('tbody tr, .q-table__grid-content .q-card');
-    await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).catch(() => {
-      testLogger.warn('No table rows found - PromQL query may not have returned data');
-    });
+    let hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
+
+    if (!hasRows) {
+      testLogger.warn('No table rows on first attempt - re-applying query to retry');
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.dashboardPanelActions.waitForChartToRender();
+      hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
+    }
+
+    // Data is required for pagination to render - fail clearly if still no data
+    expect(hasRows, 'PromQL query "up" must return data rows for pagination test - check metrics ingestion').toBe(true);
 
     // Wait for the table bottom container which holds all pagination controls
-    const tableBottom = page.locator('.q-table__bottom');
+    const tableBottom = tablePanel.locator('.q-table__bottom');
     await tableBottom.waitFor({ state: "visible", timeout: 15000 });
 
     // Verify "Records per page:" text is visible (note: text includes colon)
