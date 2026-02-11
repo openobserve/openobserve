@@ -105,6 +105,37 @@ const getConfig = async () => {
             propagatorTypes: ["openobserve", "tracecontext"],
           },
         ],
+        beforeSend: (event) => {
+          // Filter out specific errors before sending to RUM
+          if (event.type === "error") {
+            const errorMessage = event.error?.message || "";
+            const errorStack = event.error?.stack || "";
+
+            // List of error patterns to ignore
+            const ignoredErrorPatterns = [/ResizeObserver loop/i];
+
+            // Check if error matches any ignored pattern
+            const shouldIgnore = ignoredErrorPatterns.some(
+              (pattern) =>
+                pattern.test(errorMessage) || pattern.test(errorStack),
+            );
+
+            if (shouldIgnore) {
+              return false; // Don't send this error
+            }
+
+            // Ignore errors from specific URLs (e.g., browser extensions)
+            const errorSource = event.error?.source || "";
+            const ignoredSources = ["chrome-extension://", "moz-extension://"];
+
+            if (ignoredSources.some((source) => errorSource.includes(source))) {
+              return false;
+            }
+          }
+
+          // Allow all other events to be sent
+          return true;
+        },
       });
 
       openobserveLogs.init({
@@ -117,6 +148,53 @@ const getConfig = async () => {
         forwardErrorsToLogs: true,
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
+        beforeSend: (log) => {
+          // Filter out specific logs before sending
+          const logMessage = log.message || "";
+          const logStatus = log.status || "";
+
+          // List of log patterns to ignore
+          const ignoredLogPatterns = [/ResizeObserver loop/i];
+
+          // Check if log matches any ignored pattern
+          const shouldIgnore = ignoredLogPatterns.some((pattern) =>
+            pattern.test(logMessage),
+          );
+
+          if (shouldIgnore) {
+            return false; // Don't send this log
+          }
+
+          // Filter by log level - ignore debug logs in production
+          if (
+            options.env === "production" &&
+            (logStatus === "debug" || log.level === "debug")
+          ) {
+            return false;
+          }
+
+          // Ignore logs from browser extensions
+          const logContext = log.context || {};
+          const logUrl = logContext.url || "";
+          if (
+            logUrl.includes("chrome-extension://") ||
+            logUrl.includes("moz-extension://")
+          ) {
+            return false;
+          }
+
+          // Filter sensitive information
+          if (log.message) {
+            // Remove tokens from log messages
+            log.message = log.message
+              .replace(/token=[^&\s]+/gi, "token=REDACTED")
+              .replace(/password=[^&\s]+/gi, "password=REDACTED")
+              .replace(/apiKey=[^&\s]+/gi, "apiKey=REDACTED");
+          }
+
+          // Allow all other logs to be sent
+          return true;
+        },
       });
 
       // Don't start session replay automatically - it will be started after login
