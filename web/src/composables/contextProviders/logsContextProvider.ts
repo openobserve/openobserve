@@ -181,19 +181,21 @@ export const createLogsContextProvider = (
           // Stream information
           selectedStreams: streams || [],
           streamType: streamType,
-          
+
           // Interesting fields organized by stream name (using actual structure)
           interestingFields: extractInterestingFieldsByStream(
             searchObj?.data?.stream?.selectedInterestingStreamFields || []
           ),
-          
+
           // Time range (conditional based on type)
           timeRange: buildTimeRangeContext(searchObj.data.datetime),
-          
+
           // Current organization
           organization_identifier: store?.state?.selectedOrganization?.identifier || '',
           quickMode: searchObj?.meta?.quickMode || false,
-          
+
+          // Current timestamp when request is fired (microseconds) for AI agent time calculations
+          request_timestamp: Date.now() * 1000,
         };
       } catch (error) {
         console.error('Error generating logs context:', error);

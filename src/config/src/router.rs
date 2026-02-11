@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 25] = [
+const QUERIER_ROUTES: [(&str, usize); 28] = [
     ("config", 0),         // /config
     ("summary", 2),        // /api/{org_id}/summary
     ("organizations", 1),  // /api/organizations
@@ -22,6 +22,9 @@ const QUERIER_ROUTES: [(&str, usize); 25] = [
     ("schema", 3),         // /api/{org_id}/streams/{stream_name}/schema
     ("streams", 2),        // /api/{org_id}/streams/...
     ("traces/latest", 3),  // /api/{org_id}/{stream_name}/traces/latest
+    ("traces/session", 3), // /api/{org_id}/{stream_name}/traces/session
+    ("traces/user", 3),    // /api/{org_id}/{stream_name}/traces/user
+    ("dag", 5),            // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
     ("clusters", 1),       // /api/clusters
     ("query_manager", 2),  // /api/{org_id}/query_manager/...
     ("_search", 2),        // /api/{org_id}/_search
@@ -44,11 +47,14 @@ const QUERIER_ROUTES: [(&str, usize); 25] = [
                                                * values */
     ("service_streams", 2), // /api/{org_id}/service_streams/...
 ];
-const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
+const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
     "/_search_partition",
     "/_search_stream",
     "/_values_stream",
+    "/_search_multi_stream",
+    "/_search_partition_multi",
+    "/_search_multi",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query_exemplars",
 ];
@@ -93,9 +99,16 @@ pub fn is_querier_route(path: &str) -> bool {
 }
 
 #[inline]
+/// Uses `ends_with`, hence path must end with the QUERIER_ROUTES_BY_BODY routes
 pub fn is_querier_route_by_body(path: &str) -> bool {
-    let path = remove_base_uri(path);
-    QUERIER_ROUTES_BY_BODY.iter().any(|x| path.contains(x))
+    let path = extract_path_without_query(remove_base_uri(path));
+    QUERIER_ROUTES_BY_BODY.iter().any(|x| path.ends_with(x))
+}
+
+/// Extracts the path without query string.
+pub fn extract_path_without_query(path: &str) -> &str {
+    let query_start = path.find('?').unwrap_or(path.len());
+    &path[..query_start]
 }
 
 #[inline]
@@ -148,6 +161,7 @@ mod tests {
     #[test]
     fn test_is_querier_route_by_body() {
         assert!(is_querier_route_by_body("/_search"));
+        assert!(is_querier_route_by_body("/_search?foo=bar"));
         assert!(is_querier_route_by_body("/_search_stream"));
         assert!(is_querier_route_by_body("/_values_stream"));
         assert!(is_querier_route_by_body("/prometheus/api/v1/query_range"));
@@ -156,7 +170,17 @@ mod tests {
         ));
 
         assert!(!is_querier_route_by_body("/other_route"));
-        assert!(is_querier_route_by_body("/_search_other"));
+        assert!(!is_querier_route_by_body("/_search_other"));
+    }
+
+    #[test]
+    fn test_extract_path_without_query() {
+        assert_eq!(extract_path_without_query("/api/test?foo=bar"), "/api/test");
+        assert_eq!(extract_path_without_query("/api/test"), "/api/test");
+        assert_eq!(
+            extract_path_without_query("/api/test?foo=bar&baz=qux"),
+            "/api/test"
+        );
     }
 
     #[test]

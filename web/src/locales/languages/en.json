@@ -58,6 +58,8 @@
     "goHome": "Go home",
     "name": "Name",
     "add": "Add",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
     "details": "Details",
     "tags": "Tags",
     "process": "Process",
@@ -132,7 +134,7 @@
     "source": "_source",
     "noResult": "No results found.",
     "syntaxGuide": "Syntax guide",
-    "recordsPerPage": "Records per page",
+    "rowsPerPage": "Records per page",
     "showing": "Showing",
     "of": "of",
     "rowDetail": "Source Details",
@@ -544,7 +546,7 @@
         "features_title": "Available Enterprise Features",
         "features_subtitle": "Get a free license to unlock unlimited capabilities",
         "primary_button_text": "Get Free License",
-        "license_note": "100GB/day without license • 200GB/day with license"
+        "license_note": "50GB/day without license • 200GB/day with license"
       },
       "enterprise_with_license": {
         "hero_title": "Your Enterprise Edition",
@@ -659,7 +661,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "AI Assistant",
+          "name": "O2 Assistant",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -691,7 +693,7 @@
           "note": "Automated detection and correlation"
         },
         "service_maps": {
-          "name": "Service Maps",
+          "name": "Service Graph",
           "note": "Visualize service dependencies"
         }
       },
@@ -1125,7 +1127,8 @@
     "analyzeButtonLabel": "Analyze",
     "refreshTooltip": "Refresh analysis with updated percentile",
     "customSQLFieldsDisabled": "Field selection is not available for custom SQL queries. Dimensions are extracted from your query results.",
-    "timeRangeSelected": "Time Range Selected"
+    "timeRangeSelected": "Time Range Selected",
+    "dimensionsSelected": "Dimensions selected"
   },
   "volumeInsights": {
     "title": "Insights",
@@ -1133,6 +1136,8 @@
     "analyzeButton": "Rate Analysis",
     "analyzeTooltip": "Analyze trace rate patterns across dimensions",
     "analyzeTooltipLogs": "Analyze dimension distribution for current time range",
+    "analyzeTooltipTraces": "Analyze trace dimensions for rate, latency, and error patterns",
+    "insightsButtonLabel": "Insights",
     "rateLabel": "Rate:",
     "timeRangeLabel": "Time Range:"
   },
@@ -1322,6 +1327,9 @@
     "wraptext": "Wrap table cells",
     "tableTranspose": "Transpose",
     "tableDynamicColumns": "Allow Dynamic Columns",
+    "pagination": "Pagination",
+    "rowsPerPage": "Records per page",
+    "rowsPerPageTooltip": "Set the default number of records to display per page",
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
@@ -2097,8 +2105,15 @@
       "severityP3": "P3 - Medium",
       "severityP4": "P4 - Low",
       "correlationServiceDiscovery": "Service Discovery",
-      "correlationManualExtraction": "Manual Extraction",
-      "correlationTemporal": "Temporal",
+      "correlationTraceBased": "Trace Based",
+      "correlationScopeMatch": "Scope Match",
+      "correlationWorkloadMatch": "Workload Match",
+      "correlationServiceDiscoveryTooltip": "Correlated using pre-computed service identity from service discovery",
+      "correlationTraceBasedTooltip": "Correlated via shared distributed trace ID across services",
+      "correlationScopeMatchTooltip": "Correlated by matching environment scope (cluster, region, namespace)",
+      "correlationWorkloadMatchTooltip": "Correlated by matching workload identity (service, deployment)",
+      "correlationAlertId": "Alert ID",
+      "correlationAlertIdTooltip": "No matching dimensions found — isolated by alert ID",
       "filterByStatus": "Filter by status",
       "allStatuses": "All Statuses",
       "loading": "Loading incidents...",
@@ -2110,7 +2125,32 @@
       "rcaInProgress": "Analyzing root cause...",
       "rcaCompleted": "Root cause analysis completed",
       "noRcaYet": "No root cause analysis available. Click 'Analyze' to start.",
-      "sreChat": "Ask SRE Assistant"
+      "sreChat": "Ask SRE Assistant",
+      "goBack": "Go Back",
+      "incident": "Incident",
+      "uniqueAlerts": "Unique Alerts",
+      "relatedAlerts": "Related Alerts",
+      "alertTriggers": "Alert Triggers",
+      "incidentTimeline": "Incident Timeline",
+      "incidentDetails": "Incident Details",
+      "incidentId": "Incident ID",
+      "incidentName": "Incident Name",
+      "initialTrigger": "Initial trigger",
+      "noDimensionsAvailable": "No dimensions available",
+      "noAlertDetailsAvailable": "No alert details available",
+      "clickOnTriggerToViewDetails": "Click on a trigger in the table to view details",
+      "refreshCorrelatedData": "Refresh correlated data",
+      "showingCorrelatedLogs": "Showing correlated logs from incident timeframe",
+      "showingCorrelatedMetrics": "Showing correlated metrics from incident timeframe",
+      "showingCorrelatedTraces": "Showing correlated traces from incident timeframe",
+      "incidentTitleUpdatedSuccess": "Incident title updated successfully",
+      "markAsAcknowledgedTooltip": "Mark incident as acknowledged and being worked on",
+      "markAsResolvedTooltip": "Mark incident as resolved and close it",
+      "reopenIncidentTooltip": "Reopen this resolved incident",
+      "editIncidentTitleTooltip": "Edit incident title",
+      "firedTimes": "Fired {count} time(s)",
+      "incidentAnalysis": "Incident Analysis",
+      "noAlertActivityData": "No alert activity data"
     }
   },
   "alert_templates": {
@@ -2158,7 +2198,11 @@
     "preview": "Preview",
     "test": "Test",
     "saved": "Destination saved successfully",
-    "saveError": "Failed to save destination"
+    "saveError": "Failed to save destination",
+    "customWebhook": "Custom (Webhook)",
+    "customEmail": "Custom (Email)",
+    "customAction": "Custom (Action)",
+    "custom": "Custom"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
@@ -2367,7 +2411,7 @@
       "correlationLabel": "Correlation:",
       "correlationDescription": "Services with the same identity are correlated, even if they have different {field} names.",
       "fqnPriorityTitle": "Identity Priority Dimensions",
-      "fqnPriorityTooltip": "Defines which dimensions are used to derive the Service Identity. Scope dimensions (blue) are concatenated. The first workload dimension (green) with a value determines the service name.",
+      "fqnPriorityTooltip": "Defines which dimensions are used to derive the Service Identity. Scope dimensions are concatenated. The first workload dimension (green) with a value determines the service name.",
       "fqnPriorityDescription": "Drag to reorder. Scope dimensions are concatenated, first non-null workload dimension wins.",
       "resetToDefaults": "Reset to defaults",
       "noDimensionsConfigured": "No dimensions configured. Click \"Reset to Defaults\" or add dimensions below.",
@@ -2390,6 +2434,8 @@
       "fqnPrioritySaved": "Identity priority configuration saved successfully",
       "semanticMappingsSaved": "Semantic field mappings saved successfully",
       "configSaveFailed": "Failed to save settings",
+      "duplicateIdsError": "Duplicate group IDs found: {ids}. Please ensure each group has a unique ID.",
+      "emptyIdError": " category has empty groups names. Please ensure all groups have valid names.",
       "correlationSettingsSaved": "Correlation settings saved successfully.",
       "logs": "Logs",
       "traces": "Traces",
@@ -2466,7 +2512,9 @@
     "viewLogs": "View Logs",
     "viewRelated": "View Related",
     "backToLogs": "Back to Logs",
+    "openInTraces": "Open in Traces",
     "RedMetrics": "RED Metrics",
+    "showErrorOnly": "Show Error Only",
     "loadingStream": "Loading Stream...",
     "noTracesFound": "Result not found.",
     "configureFullTextSearch": "to configure a full text search field to the stream.",
@@ -2605,7 +2653,7 @@
     "get_history": "Get History",
     "executed_at":"Executed At",
     "sql_query":"SQL Query",
-    "resuls":"Results",
+    "results":"Results",
     "wrapText": "Wrap Text",
     "delayMessage": "Search History might be delayed by"
   },
@@ -2621,11 +2669,9 @@
     "metricsTooltip": "Select metric streams to display",
     "selectMetrics": "Select Metric Streams",
     "correlatedLogs": "Logs",
-    "correlatedLogsV2": "Logs V2",
     "correlatedMetrics": "Metrics",
     "correlatedTraces": "Traces",
     "clickToLoadLogs": "Click to load correlated logs",
-    "clickToLoadLogsV2": "Click to load correlated logs (V2)",
     "clickToLoadMetrics": "Click to load correlated metrics",
     "clickToLoadTraces": "Click to load correlated traces",
     "logs": {
@@ -2694,6 +2740,7 @@
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No correlated traces found",
     "noTracesDescription": "No traces found for service {service} in the selected time range",
+    "viewInTraces": "View in Traces",
     "filters": "Filters",
     "semanticFieldGroupsTitle": "Field Mappings",
     "semanticFieldGroupsCaption": "Define field name mappings for correlation and deduplication (e.g., host, hostname, node → 'host' group)",

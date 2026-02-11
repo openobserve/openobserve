@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Prebuilt Destination Form (for alerts only) -->
-        <!-- Show for: create mode with destination_type selected OR edit mode (while loading) -->
-        <div v-if="isAlerts && (isPrebuiltDestination || isUpdatingDestination)" class="col-12">
+        <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
+        <div v-if="isAlerts && (isPrebuiltDestination || (isUpdatingDestination && formData.destination_type !== 'custom'))" class="col-12">
           <!-- Name Field for Create Mode -->
           <div v-if="!destination" class="col-12 q-pb-md">
             <q-input
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <PrebuiltDestinationForm
             v-if="formData.destination_type && formData.destination_type !== 'custom'"
-            :key="`${formData.destination_type}-${isUpdatingDestination}-${Object.keys(prebuiltCredentials).length}`"
+            :key="`${formData.destination_type}-${isUpdatingDestination}`"
             v-model="prebuiltCredentials"
             :destination-type="formData.destination_type"
             :hide-actions="true"
@@ -136,8 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('alert_destinations.additional_settings') }}
             </div>
 
-            <!-- Custom Headers -->
-            <div class="q-py-sm">
+            <!-- Custom Headers (hidden for email destinations) -->
+            <div v-if="formData.destination_type !== 'email'" class="q-py-sm">
               <div class="text-subtitle2 q-pb-xs">
                 {{ t('alert_destinations.custom_headers') }}
               </div>
@@ -222,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- Legacy tabs for non-alert destinations -->
-        <div v-if="!isAlerts" class="col-12 q-pb-md">
+        <!-- Tabs for non-alert destinations OR custom alert destinations -->
+        <div v-if="!isAlerts || (isAlerts && formData.destination_type === 'custom')" class="col-12 q-pb-md">
          <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
           <app-tabs
             data-test="add-destination-tabs"
@@ -280,27 +280,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-select
               data-test="add-destination-template-select"
               v-model="formData.template"
-              :label="t('alert_destinations.template')"
+              :label="t('alert_destinations.template') + ' *'"
               :options="getFormattedTemplates"
               class="showLabelOnTop no-case"
               stack-label
               borderless
               hide-bottom-space
               dense
-              clearable
               tabindex="0"
+              :rules="[(val: any) => !!val || 'Template is required!']"
             >
-              <template v-slot:hint>
-                <span class="text-caption text-grey-7">
-                  Optional - can be set at alert level instead
-                </span>
-              </template>
             </q-select>
           </div>
         </div>
 
         <template
-          v-if="((isAlerts && formData.destination_type === 'custom') || isAlerts == false)"
+          v-if="((isAlerts && formData.destination_type === 'custom' && formData.type === 'http') || (!isAlerts && formData.type === 'http'))"
         >
           <div class="col-6 q-py-xs">
             <q-input
@@ -471,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="flex justify-between q-px-lg q-py-lg full-width">
       <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-      <div v-if="isAlerts && (isPrebuiltDestination || isUpdatingDestination)" class="flex items-center tw:gap-2">
+      <div v-if="isAlerts && (isPrebuiltDestination || (isUpdatingDestination && formData.destination_type !== 'custom'))" class="flex items-center tw:gap-2">
         <q-btn
           data-test="destination-preview-button"
           :label="t('alert_destinations.preview')"
@@ -615,7 +610,8 @@ const {
   updateDestination,
   generatePreview,
   isTestInProgress,
-  lastTestResult
+  lastTestResult,
+  detectPrebuiltType
 } = usePrebuiltDestinations();
 
 // Prebuilt destinations state
@@ -638,6 +634,51 @@ const apiHeaders: Ref<
 > = ref([{ key: "", value: "", uuid: getUUID() }]);
 
 const tabs = computed(() => {
+  // In edit mode for custom destinations, only show the tab for the current type
+  if (isUpdatingDestination.value && formData.value.destination_type === 'custom') {
+    const currentType = formData.value.type;
+
+    // Only return the tab matching the current destination type
+    if (currentType === "http") {
+      return [{
+        label: t("alerts.webhook"),
+        value: "http",
+        style: {
+          width: "fit-content",
+          padding: "4px 14px",
+          background: "#5960B2",
+          border: "none !important",
+          color: "#ffffff !important",
+        },
+      }];
+    } else if (currentType === "email") {
+      return [{
+        label: t("alerts.email"),
+        value: "email",
+        style: {
+          width: "fit-content",
+          padding: "4px 14px",
+          background: "#5960B2",
+          border: "none !important",
+          color: "#ffffff !important",
+        },
+      }];
+    } else if (currentType === "action") {
+      return [{
+        label: t("alerts.action"),
+        value: "action",
+        style: {
+          width: "fit-content",
+          padding: "4px 14px",
+          background: "#5960B2",
+          border: "none !important",
+          color: "#ffffff !important",
+        },
+      }];
+    }
+  }
+
+  // In create mode, show all tabs
   let tabs = [
     {
       label: t("alerts.webhook"),
@@ -765,62 +806,63 @@ const setupDestinationData = () => {
     formData.value.action_id = props.destination.action_id || "";
 
     // Set destination_type for prebuilt destinations in edit mode
-    if (props.destination.template?.includes('prebuilt')) {
+    // Parse metadata if it's a string
+    let parsedMetadata: any = null;
+    if (props.destination.metadata) {
+      try {
+        parsedMetadata = typeof props.destination.metadata === 'string'
+          ? JSON.parse(props.destination.metadata)
+          : props.destination.metadata;
+      } catch (e) {
+        console.error('Failed to parse destination metadata:', e);
+      }
+    }
+
+    // Priority 1: Check metadata.prebuilt_type (most reliable for prebuilt destinations)
+    if (parsedMetadata?.prebuilt_type) {
+      formData.value.destination_type = parsedMetadata.prebuilt_type;
+    }
+    // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
+    // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
+    else if (props.destination.template?.startsWith('system-prebuilt-')) {
+      const templateType = props.destination.template.replace('system-prebuilt-', '');
+      // Only treat as prebuilt if structure matches the type
+      if (templateType === 'email' && props.destination.type === 'email' && props.destination.emails) {
+        formData.value.destination_type = 'email';
+      } else if (props.destination.type === 'http' && props.destination.url) {
+        // Check if URL matches known prebuilt patterns
+        const detectedType = detectPrebuiltType(props.destination);
+        if (detectedType) {
+          formData.value.destination_type = detectedType;
+        } else {
+          // Has system template but URL doesn't match prebuilt patterns - it's custom
+          formData.value.destination_type = 'custom';
+        }
+      } else {
+        formData.value.destination_type = 'custom';
+      }
+    }
+    // Priority 3: Check if template starts with 'prebuilt_' (user templates)
+    else if (props.destination.template?.startsWith('prebuilt_')) {
+      formData.value.destination_type = props.destination.template.replace('prebuilt_', '');
+    }
+    // Priority 4: Check if template includes 'prebuilt' (legacy format)
+    else if (props.destination.template?.includes('prebuilt')) {
       const parts = props.destination.template.split('-');
-      const typeId = parts[parts.length - 1]; // system-prebuilt-discord -> discord
-      formData.value.destination_type = typeId;
-    } else {
-      // Fallback: Template missing or doesn't include 'prebuilt' - detect from other fields
-
-      // FALLBACK: Detect destination type from URL patterns or metadata
-      let detectedType: string | null = null;
-
-      // Check URL patterns
-      if (props.destination.url) {
-        try {
-          const parsedUrl = new URL(props.destination.url);
-          const hostname = parsedUrl.hostname.toLowerCase();
-
-          if (hostname === 'hooks.slack.com' || hostname.endsWith('.hooks.slack.com')) {
-            detectedType = 'slack';
-          } else if ((hostname === 'discord.com' || hostname.endsWith('.discord.com')) && parsedUrl.pathname.startsWith('/api/webhooks')) {
-            detectedType = 'discord';
-          } else if (hostname === 'outlook.office.com' || hostname.endsWith('.outlook.office.com') || hostname === 'webhook.office.com' || hostname.endsWith('.webhook.office.com')) {
-            detectedType = 'msteams';
-          } else if (hostname === 'service-now.com' || hostname.endsWith('.service-now.com')) {
-            detectedType = 'servicenow';
-          } else if (hostname === 'events.pagerduty.com' || hostname.endsWith('.events.pagerduty.com')) {
-            detectedType = 'pagerduty';
-          } else if (hostname === 'api.opsgenie.com' || hostname === 'api.eu.opsgenie.com') {
-            detectedType = 'opsgenie';
-          }
-        } catch {
-          // Invalid URL, detectedType remains null
-        }
-      }
-
-      // Check for email type
-      if (!detectedType && props.destination.emails && Array.isArray(props.destination.emails) && props.destination.emails.length > 0) {
-        detectedType = 'email';
-      }
-
-      // Check headers for PagerDuty or Opsgenie
-      if (!detectedType && props.destination.headers) {
-        if (props.destination.headers['X-Routing-Key']) {
-          detectedType = 'pagerduty';
-        } else if (props.destination.headers['Authorization']?.startsWith('GenieKey ')) {
-          detectedType = 'opsgenie';
-        }
-      }
-
-      // If we detected a type, set it
+      formData.value.destination_type = parts[parts.length - 1];
+    }
+    // Priority 5: Fallback to URL-based detection (for destinations created before metadata was added)
+    else if (props.destination.url) {
+      const detectedType = detectPrebuiltType(props.destination);
       if (detectedType) {
         formData.value.destination_type = detectedType;
       } else {
-        // No prebuilt type detected - default to 'custom' for edit mode
-        // This handles destinations created before prebuilt types or generic webhook destinations
         formData.value.destination_type = 'custom';
       }
+    }
+    // Priority 6: No indicators - this is a custom destination
+    else {
+      formData.value.destination_type = 'custom';
     }
 
     // Continue with credential restoration if we have a destination_type
@@ -988,11 +1030,27 @@ const handleTestDestination = async () => {
 };
 
 // Show template preview
-const showPreview = () => {
+const showPreview = async () => {
   if (!isPrebuiltDestination.value) return;
 
-  previewContent.value = generatePreview(formData.value.destination_type);
-  showPreviewModal.value = true;
+  try {
+    // Clear previous content
+    previewContent.value = '';
+
+    // Fetch and generate preview
+    const preview = await generatePreview(formData.value.destination_type, prebuiltCredentials.value);
+    previewContent.value = preview;
+
+    // Only show modal after content is ready
+    showPreviewModal.value = true;
+  } catch (error) {
+    console.error('Failed to generate preview:', error);
+    q.notify({
+      type: 'negative',
+      message: 'Failed to generate preview',
+      timeout: 2000
+    });
+  }
 };
 
 // Save prebuilt or custom destination

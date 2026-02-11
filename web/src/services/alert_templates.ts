@@ -47,6 +47,9 @@ const template = {
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/alerts/templates/bulk`, { data });
   },
+  get_system_templates: ({ org_identifier }: any) => {
+    return http().get(`/api/${org_identifier}/alerts/templates/system/prebuilt`);
+  },
 };
 
 export default template;

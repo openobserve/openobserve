@@ -1,230 +1,295 @@
 <template>
-    <q-card flat class="tw:h-full">
-      <q-card-section class="tw:p-[0.375rem] tw:h-full card-container">
-        <!-- Top row with search and control buttons -->
-        <div class="row items-center q-col-gutter-sm q-mb-md">
-          <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
-            <!-- Stream selector - always show, populated once streams are discovered -->
-            <q-select
-              v-model="streamFilter"
-              :options="availableStreams.length > 0
-                ? [{ label: 'All Streams', value: 'all' }, ...availableStreams.map(s => ({ label: s, value: s }))]
-                : [{ label: 'All Streams', value: 'all' }]"
-              dense
-              outlined
-              emit-value
-              map-options
-              class="tw:w-[180px] tw:flex-shrink-0"
-              @update:model-value="onStreamFilterChange"
-              :disable="availableStreams.length === 0"
-            >
-              <template #prepend>
-                <q-icon name="storage" size="xs" />
-              </template>
-              <q-tooltip v-if="availableStreams.length === 0">
-                No streams detected. Ensure service graph metrics include stream_name labels.
-              </q-tooltip>
-            </q-select>
+  <q-card flat class="tw:h-full">
+    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container service-graph-container">
+      <!-- Top row with search and control buttons -->
+      <div class="row items-center q-col-gutter-sm q-mb-md">
+        <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
+          <!-- Stream selector - always show, populated once streams are discovered -->
+          <q-select
+            v-model="streamFilter"
+            :options="
+              availableStreams.length > 0
+                ? [
+                    { label: 'All Streams', value: 'all' },
+                    ...availableStreams.map((s) => ({ label: s, value: s })),
+                  ]
+                : [{ label: 'All Streams', value: 'all' }]
+            "
+            dense
+            borderless
+            emit-value
+            map-options
+            class="tw:w-[180px] tw:flex-shrink-0"
+            @update:model-value="onStreamFilterChange"
+            :disable="availableStreams.length === 0"
+          >
+            <template #prepend>
+              <q-icon name="storage" size="xs" />
+            </template>
+            <q-tooltip v-if="availableStreams.length === 0">
+              No streams detected. Ensure service graph metrics include
+              stream_name labels.
+            </q-tooltip>
+          </q-select>
 
-            <!-- Search input -->
-            <q-input
-              v-model="searchFilter"
-              borderless
-              dense
-              class="no-border tw:h-[36px] tw:flex-grow"
-              placeholder="Search services..."
-              debounce="300"
-              @update:model-value="applyFilters"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
-          </div>
-          <div class="col-12 col-md-7 tw:flex tw:justify-end tw:items-center tw:gap-[0.75rem]">
-            <!-- 1. Refresh button -->
-            <q-btn
-              data-test="service-graph-refresh-btn"
-              no-caps
-              flat
-              dense
-              icon="refresh"
-              class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw:bg-[var(--o2-hover-accent)]"
-              @click="loadServiceGraph"
-              :loading="loading"
-            >
-              <q-tooltip>Refresh Service Graph</q-tooltip>
-            </q-btn>
-
-            <!-- 2. Graph/Tree view toggle buttons -->
-            <q-btn-toggle
-              v-model="visualizationType"
-              toggle-color="primary"
-              :options="[
-                { label: 'Graph View', value: 'graph', icon: 'hub' },
-                { label: 'Tree View', value: 'tree', icon: 'account_tree' }
-              ]"
-              dense
-              no-caps
-              @update:model-value="setVisualizationType"
-            />
-
-            <!-- 3. Layout dropdown -->
-            <q-select
-              v-model="layoutType"
-              :options="layoutOptions"
-              dense
-              filled
-              class="tw:w-[160px]"
-              emit-value
-              map-options
-              @update:model-value="setLayout"
-            />
-          </div>
+          <!-- Search input -->
+          <q-input
+            v-model="searchFilter"
+            borderless
+            dense
+            class="no-border tw:h-[36px]"
+            placeholder="Search services..."
+            debounce="300"
+            @update:model-value="applyFilters"
+            clearable
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" name="search" />
+            </template>
+          </q-input>
         </div>
+        <div
+          class="col-12 col-md-7 tw:flex tw:justify-end tw:items-center tw:gap-[0.75rem]"
+        >
+          <!-- 1. Time range selector -->
+          <date-time
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="searchObj.data.datetime.type"
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+            data-test="service-graph-date-time-picker"
+            class="tw:h-[2rem]"
+            @on:date-change="updateTimeRange"
+          />
 
-        <!-- Graph Visualization -->
-        <q-card flat bordered class="graph-card tw:h-[calc(100%-4rem)]">
-          <q-card-section class="q-pa-none tw:h-full" style="height: 100%;">
+          <!-- 2. Refresh button -->
+          <q-btn
+            data-test="service-graph-refresh-btn"
+            no-caps
+            flat
+            class="o2-secondary-button"
+            @click="loadServiceGraph"
+            :loading="loading"
+          >
+          Refresh
+          </q-btn>
+
+          <!-- 3. Graph/Tree view toggle -->
+          <div class="app-tabs-container tw:h-[36px]">
+            <app-tabs
+              data-test="service-graph-view-tabs"
+              class="tabs-selection-container"
+              :tabs="visualizationTabs"
+              v-model:active-tab="visualizationType"
+              @update:active-tab="setVisualizationType"
+            />
+          </div>
+
+          <!-- 4. Layout dropdown -->
+          <q-select
+            v-model="layoutType"
+            :options="layoutOptions"
+            dense
+            borderless
+            class="tw:w-[160px]"
+            emit-value
+            map-options
+            @update:model-value="setLayout"
+          />
+        </div>
+      </div>
+
+      <!-- Graph Visualization -->
+      <q-card flat bordered class="graph-card tw:h-[calc(100%-4rem)]">
+        <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
+          <div class="graph-container tw:h-full tw:bg-[var(--o2-bg)]">
+            <div v-if="loading" class="flex flex-center tw:h-full">
+              <div class="text-center tw:flex tw:flex-col tw:items-center">
+                <q-spinner-hourglass color="primary" size="4em" />
+                <div class="text-subtitle1 q-mt-md text-grey-7">
+                  Loading service graph...
+                </div>
+              </div>
+            </div>
             <div
-              class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
+              v-else-if="error"
+              class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
-              <div v-if="loading" class="flex flex-center tw:h-full">
-                <div class="text-center tw:flex tw:flex-col tw:items-center">
-                  <q-spinner-hourglass color="primary" size="4em" />
-                  <div class="text-subtitle1 q-mt-md text-grey-7">Loading service graph...</div>
+              <div>
+                <q-icon name="error_outline" size="4em" color="negative" />
+                <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
+                  {{ error }}
                 </div>
-              </div>
-              <div
-                v-else-if="error"
-                class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
-              >
-                <div>
-                  <q-icon name="error_outline" size="4em" color="negative" />
-                  <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">{{ error }}</div>
-                  <q-btn
-                    outline
-                    color="primary"
-                    label="Retry"
-                    @click="loadServiceGraph"
-                    class="q-mt-md"
-                  />
-                </div>
-              </div>
-              <div
-                v-else-if="!graphData.nodes.length"
-                class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
-              >
-                <div>
-                  <q-icon name="hub" size="5em" color="grey-4" />
-                  <div class="text-h6 q-mt-md text-grey-7">No Service Graph Data</div>
-                  <div class="text-h6 text-grey-7 q-mt-lg q-mb-md" style="font-size: 1.1rem">Possible causes:</div>
-                  <div class="text-body1 text-grey-6" style="max-width: 800px; font-size: 0.95rem">
-                    <div class="q-pa-md q-mb-md" style="background: rgba(var(--q-primary-rgb), 0.05); border-radius: 6px">
-                      <div class="text-weight-medium q-mb-sm" style="font-size: 1rem">Service graph is disabled</div>
-                      <div>Enable the feature by setting environment variable:</div>
-                      <code class="q-mt-xs" style="background: rgba(var(--q-primary-rgb), 0.1); padding: 4px 10px; border-radius: 4px; font-size: 0.9rem; color: var(--q-primary); font-weight: 600">O2_SERVICE_GRAPH_ENABLED=true</code>
-                    </div>
-
-                    <div class="q-pa-md q-mb-md" style="background: rgba(var(--q-primary-rgb), 0.05); border-radius: 6px">
-                      <div class="text-weight-medium q-mb-sm" style="font-size: 1rem">Query time range is too small</div>
-                      <div>The daemon queries traces within a time window. If your traces are older, increase the window:</div>
-                      <code class="q-mt-xs" style="background: rgba(var(--q-primary-rgb), 0.1); padding: 4px 10px; border-radius: 4px; font-size: 0.9rem; color: var(--q-primary); font-weight: 600">O2_SERVICE_GRAPH_QUERY_TIME_RANGE_MINUTES=120</code>
-                      <div class="text-caption q-mt-sm" style="color: #666; font-size: 0.85rem">(Default: 60 minutes)</div>
-                    </div>
-
-                    <div class="q-pa-md q-mb-md" style="background: rgba(var(--q-primary-rgb), 0.05); border-radius: 6px">
-                      <div class="text-weight-medium q-mb-sm" style="font-size: 1rem">Only INTERNAL spans detected</div>
-                      <div>Your traces have <code style="background: rgba(var(--q-primary-rgb), 0.1); padding: 3px 7px; border-radius: 3px; font-size: 0.9rem; color: var(--q-primary); font-weight: 600">span_kind=1</code> (INTERNAL operations within a service).</div>
-                      <div class="q-mt-sm">To create service-to-service edges, send traces with:</div>
-                      <ul class="q-pl-md q-mt-sm q-mb-sm" style="line-height: 1.6">
-                        <li><strong>CLIENT spans</strong> (<code style="background: rgba(var(--q-primary-rgb), 0.1); color: var(--q-primary); font-weight: 600">span_kind=3</code>) with <code style="background: rgba(var(--q-primary-rgb), 0.1); color: var(--q-primary); font-weight: 600">peer.service</code> attribute, or</li>
-                        <li><strong>SERVER spans</strong> (<code style="background: rgba(var(--q-primary-rgb), 0.1); color: var(--q-primary); font-weight: 600">span_kind=2</code>) receiving requests from other services</li>
-                      </ul>
-                      <div class="text-caption q-mt-sm" style="color: #666; font-size: 0.85rem">
-                        Note: INTERNAL spans can be excluded by setting <code style="background: rgba(var(--q-primary-rgb), 0.1); color: var(--q-primary); font-weight: 600">O2_SERVICE_GRAPH_EXCLUDE_INTERNAL_SPANS=true</code>
-                      </div>
-                    </div>
-                  </div>
-                  <q-btn
-                    outline
-                    color="primary"
-                    label="Refresh"
-                    icon="refresh"
-                    @click="loadServiceGraph"
-                    class="q-mt-lg"
-                  />
-                </div>
-              </div>
-              <div v-else class="tw:h-full">
-                <ChartRenderer
-                  ref="chartRendererRef"
-                  data-test="service-graph-chart"
-                  :data="chartData"
-                  :key="chartKey"
-                  class="tw:h-full"
+                <q-btn
+                  outline
+                  color="primary"
+                  label="Retry"
+                  @click="loadServiceGraph"
+                  class="q-mt-md"
                 />
               </div>
             </div>
-          </q-card-section>
-        </q-card>
-      </q-card-section>
-    </q-card>
+            <div
+              v-else-if="!graphData.nodes.length"
+              class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
+            >
+              <div>
+                <q-icon name="hub" size="5em" color="grey-4" />
+                <div class="text-h6 q-mt-md text-grey-7">
+                  No Service Graph Data
+                </div>
+                <div class="text-body2 text-grey-6 q-mt-sm">
+                  Try querying a longer duration
+                </div>
+              </div>
+            </div>
+            <div v-else class="tw:h-full graph-with-panel-container">
+              <ChartRenderer
+                ref="chartRendererRef"
+                data-test="service-graph-chart"
+                :data="chartData"
+                :key="chartKey"
+                class="tw:h-full"
+                @click="handleNodeClick"
+              />
 
-    <!-- Enhanced Settings Dialog -->
-    <q-dialog v-model="showSettings">
-      <q-card style="min-width: 450px">
-        <q-card-section>
-          <div class="text-h6">Service Graph Settings</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section>
-          <div class="q-gutter-md">
-            <div class="text-caption text-grey-7">
-              Stream-based topology - all data persisted to storage
-              <q-tooltip>Service graph uses stream-only architecture with zero in-memory state</q-tooltip>
+              <!-- Service Graph Side Panel -->
+              <ServiceGraphSidePanel
+                v-if="selectedNode"
+                :selected-node="selectedNode"
+                :graph-data="graphData"
+                :time-range="searchObj.data.datetime"
+                :visible="showSidePanel"
+                :stream-filter="streamFilter"
+                @close="handleCloseSidePanel"
+                @view-logs="handleViewLogs"
+                @view-traces="handleViewTraces"
+              />
+
+              <!-- Service Graph Edge Panel -->
+              <ServiceGraphEdgePanel
+                v-if="selectedEdge"
+                :selected-edge="selectedEdge"
+                :graph-data="graphData"
+                :time-range="searchObj.data.datetime"
+                :visible="showEdgePanel"
+                @close="handleCloseEdgePanel"
+              />
             </div>
           </div>
         </q-card-section>
-        <q-separator />
-        <q-card-actions align="right">
-          <q-btn flat dense no-caps label="Close" color="primary" v-close-popup class="o2-secondary-button tw:h-[2rem]" />
-          <q-btn label="Reset" @click="resetSettings" class="o2-primary-button tw:h-[2rem]" />
-        </q-card-actions>
       </q-card>
-    </q-dialog>
+    </q-card-section>
+  </q-card>
+
+  <!-- Enhanced Settings Dialog -->
+  <q-dialog v-model="showSettings">
+    <q-card style="min-width: 450px">
+      <q-card-section>
+        <div class="text-h6">Service Graph Settings</div>
+      </q-card-section>
+      <q-separator />
+      <q-card-section>
+        <div class="q-gutter-md">
+          <div class="text-caption text-grey-7">
+            Stream-based topology - all data persisted to storage
+            <q-tooltip
+              >Service graph uses stream-only architecture with zero in-memory
+              state</q-tooltip
+            >
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator />
+      <q-card-actions align="right">
+        <q-btn
+          flat
+          dense
+          no-caps
+          label="Close"
+          color="primary"
+          v-close-popup
+          class="o2-secondary-button tw:h-[2rem]"
+        />
+        <q-btn
+          label="Reset"
+          @click="resetSettings"
+          class="o2-primary-button tw:h-[2rem]"
+        />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import { convertServiceGraphToTree, convertServiceGraphToNetwork } from "@/utils/traces/convertTraceData";
+import DateTime from "@/components/DateTime.vue";
+import ServiceGraphSidePanel from "./ServiceGraphSidePanel.vue";
+import ServiceGraphEdgePanel from "./ServiceGraphEdgePanel.vue";
+import {
+  convertServiceGraphToTree,
+  convertServiceGraphToNetwork,
+} from "@/utils/traces/convertTraceData";
+import useStreams from "@/composables/useStreams";
+import useTraces from "@/composables/useTraces";
+import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "ServiceGraph",
   components: {
     AppTabs,
     ChartRenderer,
+    DateTime,
+    ServiceGraphSidePanel,
+    ServiceGraphEdgePanel,
   },
-  setup() {
+  emits: ['view-traces'],
+  setup(props, { emit }) {
     const store = useStore();
+    const $q = useQuasar();
+    const router = useRouter();
+    const { getStreams } = useStreams();
+    const { searchObj } = useTraces();
 
     const loading = ref(false);
     const error = ref<string | null>(null);
     const showSettings = ref(false);
     const lastUpdated = ref("");
 
+    // Side panel state
+    const selectedNode = ref<any>(null);
+    const showSidePanel = ref(false);
+
+    // Edge panel state
+    const selectedEdge = ref<any>(null);
+    const showEdgePanel = ref(false);
+
     // Persist visualization type in localStorage
-    const storedVisualizationType = localStorage.getItem('serviceGraph_visualizationType');
+    const storedVisualizationType = localStorage.getItem(
+      "serviceGraph_visualizationType",
+    );
     const visualizationType = ref<"tree" | "graph">(
-      (storedVisualizationType as "tree" | "graph") || "graph"
+      (storedVisualizationType as "tree" | "graph") || "graph",
     );
 
+    // Visualization tabs configuration
+    const visualizationTabs = [
+      { label: "Graph View", value: "graph" },
+      { label: "Tree View", value: "tree" },
+    ];
+
     // Initialize layout type based on visualization type
-    const storedLayoutType = localStorage.getItem('serviceGraph_layoutType');
+    const storedLayoutType = localStorage.getItem("serviceGraph_layoutType");
     let defaultLayoutType = "force";
     if (visualizationType.value === "tree") {
       defaultLayoutType = "horizontal";
@@ -236,17 +301,19 @@ export default defineComponent({
     const connectionTypeFilter = ref("all");
 
     // Stream filter
-    const storedStreamFilter = localStorage.getItem('serviceGraph_streamFilter');
+    const storedStreamFilter = localStorage.getItem(
+      "serviceGraph_streamFilter",
+    );
     const streamFilter = ref(storedStreamFilter || "all");
     const availableStreams = ref<string[]>([]);
 
     // Connection type tabs configuration
     const connectionTypeTabs = [
-      { label: 'All', value: 'all' },
-      { label: 'Standard', value: 'standard' },
-      { label: 'Database', value: 'database' },
-      { label: 'Messaging', value: 'messaging' },
-      { label: 'Virtual', value: 'virtual' },
+      { label: "All", value: "all" },
+      { label: "Standard", value: "standard" },
+      { label: "Database", value: "database" },
+      { label: "Messaging", value: "messaging" },
+      { label: "Virtual", value: "virtual" },
     ];
 
     const graphData = ref<any>({
@@ -262,8 +329,11 @@ export default defineComponent({
 
     const stats = ref<any>(null);
 
-    // Store node positions for graph view to prevent re-layout on updates
-    const graphNodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
+    // Use shared datetime from searchObj instead of local timeRange
+    // searchObj.data.datetime is managed by useTraces composable and shared across tabs
+
+    const dateTimeRef = ref<any>(null);
+
 
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
@@ -275,14 +345,14 @@ export default defineComponent({
     const layoutOptions = computed(() => {
       if (visualizationType.value === "tree") {
         return [
-          { label: 'Horizontal', value: 'horizontal' },
-          { label: 'Vertical', value: 'vertical' },
-          { label: 'Radial', value: 'radial' }
+          { label: "Horizontal", value: "horizontal" },
+          { label: "Vertical", value: "vertical" },
+          { label: "Radial", value: "radial" },
         ];
       } else {
         return [
-          { label: 'Force Directed', value: 'force' },
-          { label: 'Circular', value: 'circular' }
+          { label: "Force Directed", value: "force" },
+          { label: "Circular", value: "circular" },
         ];
       }
     });
@@ -292,39 +362,140 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      // Disabled caching to ensure fresh edges with __original property
-      // Position stability maintained through graphNodePositions passed to conversion
-      // if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
-      //   console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
-      //   return {
-      //     options: lastChartOptions.value.data.options,
-      //     notMerge: false,
-      //     lazyUpdate: true
-      //   };
-      // }
+      // Don't use cache if filters are active (search or connection type)
+      const hasActiveFilters = searchFilter.value?.trim() || connectionTypeFilter.value !== "all";
 
-      console.log('[ServiceGraph] Generating new chart options, chartKey:', chartKey.value, 'visualizationType:', visualizationType.value);
-      const newOptions = visualizationType.value === "tree"
-        ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
-        : convertServiceGraphToNetwork(
-            filteredGraphData.value,
-            layoutType.value,
-            graphNodePositions.value
-          );
+      // Use cached options if chartKey hasn't changed (prevents double rendering)
+      // BUT only if no filters are active
+      if (visualizationType.value === "graph" &&
+          lastChartOptions.value &&
+          chartKey.value === lastChartOptions.value.key &&
+          !hasActiveFilters) {
+        console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
+        return {
+          options: lastChartOptions.value.data.options,
+          notMerge: false,
+          lazyUpdate: true,
+          silent: true,
+        };
+      }
 
-      // Cache the options with the current key for graph view
-      if (visualizationType.value === "graph") {
+      const newOptions =
+        visualizationType.value === "tree"
+          ? convertServiceGraphToTree(
+              filteredGraphData.value,
+              layoutType.value,
+              $q.dark.isActive // Pass dark mode state
+            )
+          : convertServiceGraphToNetwork(
+              filteredGraphData.value,
+              layoutType.value,
+              new Map(), // Empty position cache to allow free movement
+              $q.dark.isActive, // Pass dark mode state
+              undefined, // Don't pass selected node - we'll use dispatchAction instead
+            );
+
+      // Cache the options for graph view
+      // BUT only if no filters are active (to avoid caching filtered states)
+      if (visualizationType.value === "graph" && !hasActiveFilters) {
         lastChartOptions.value = {
           key: chartKey.value,
-          data: newOptions
+          data: newOptions,
         };
+      } else if (hasActiveFilters) {
+        // Clear cache when filtering to ensure fresh render on filter removal
+        lastChartOptions.value = null;
       }
 
       return {
         ...newOptions,
-        notMerge: visualizationType.value === "graph" ? false : true // Merge for graph, replace for tree
+        notMerge: visualizationType.value === "graph" ? false : true, // Merge for graph, replace for tree
+        lazyUpdate: true, // Prevent viewport reset when only styles change
+        silent: true, // Disable animations during update to prevent position jumps
       };
     });
+
+    // Use ECharts select action to persistently highlight selected node
+    watch(
+      () => selectedNode.value?.id,
+      async (newId, oldId) => {
+        await nextTick();
+
+        if (!chartRendererRef.value?.chart) {
+          return;
+        }
+
+        const chart = chartRendererRef.value.chart;
+
+        // Unselect the old node (if any)
+        if (oldId) {
+          chart.dispatchAction({
+            type: 'unselect',
+            seriesIndex: 0,
+            name: oldId,
+          });
+        }
+
+        // Select the new node (if any)
+        if (newId) {
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: newId,
+          });
+        }
+      },
+      { flush: 'post' }
+    );
+
+    // Watch for theme changes and re-apply selection
+    watch(
+      () => store.state.theme,
+      async () => {
+        // Increment chartKey to force regeneration with new theme colors
+        chartKey.value++;
+
+        // Save the current selected node ID (in case it changes during the delay)
+        const nodeIdToReselect = selectedNode.value?.id;
+
+        // Use setTimeout to wait for chart to be fully regenerated after theme change
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart || !nodeIdToReselect) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Re-apply node selection
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: nodeIdToReselect,
+          });
+        }, 500); // 500ms delay to ensure chart has fully regenerated
+      }
+    );
+
+    // Watch for stream filter changes and restore chart viewport
+    watch(
+      () => streamFilter.value,
+      async () => {
+        // Wait for chart to update with new data
+        await nextTick();
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Restore chart to default zoom/pan to fit all content
+          chart.dispatchAction({
+            type: 'restore',
+          });
+        }, 500); // Longer delay to ensure chart has recalculated positions
+      }
+    );
 
     const loadServiceGraph = async () => {
       loading.value = true;
@@ -339,20 +510,36 @@ export default defineComponent({
 
         // If a specific stream is selected but we don't have available streams yet,
         // first fetch all streams to populate the dropdown
-        if (availableStreams.value.length === 0 && streamFilter.value !== "all") {
-          console.log('[ServiceGraph] Fetching all streams first to populate dropdown');
-          const allStreamsResponse = await serviceGraphService.getCurrentTopology(orgId, undefined);
-          if (allStreamsResponse.data.availableStreams && allStreamsResponse.data.availableStreams.length > 0) {
+        if (
+          availableStreams.value.length === 0 &&
+          streamFilter.value !== "all"
+        ) {
+          console.log(
+            "[ServiceGraph] Fetching all streams first to populate dropdown",
+          );
+          const allStreamsResponse =
+            await serviceGraphService.getCurrentTopology(orgId, {
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            });
+          if (
+            allStreamsResponse.data.availableStreams &&
+            allStreamsResponse.data.availableStreams.length > 0
+          ) {
             availableStreams.value = allStreamsResponse.data.availableStreams;
           }
         }
 
         // Stream-only implementation - no store stats needed
-        // Use JSON topology endpoint
-        const response = await serviceGraphService.getCurrentTopology(
-          orgId,
-          streamFilter.value && streamFilter.value !== "all" ? streamFilter.value : undefined
-        );
+        // Use JSON topology endpoint with time range
+        const response = await serviceGraphService.getCurrentTopology(orgId, {
+          streamName:
+            streamFilter.value && streamFilter.value !== "all"
+              ? streamFilter.value
+              : undefined,
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
+        });
 
         // Convert API response to expected format
         const rawData = response.data;
@@ -372,9 +559,16 @@ export default defineComponent({
         const edges = (rawData.edges || [])
           .filter((edge: any) => {
             // Filter out edges with missing endpoints
-            const hasValidEndpoints = edge.from && edge.to && nodeIds.has(edge.from) && nodeIds.has(edge.to);
+            const hasValidEndpoints =
+              edge.from &&
+              edge.to &&
+              nodeIds.has(edge.from) &&
+              nodeIds.has(edge.to);
             if (!hasValidEndpoints) {
-              console.warn('[ServiceGraph] Skipping edge with invalid endpoints:', edge);
+              console.warn(
+                "[ServiceGraph] Skipping edge with invalid endpoints:",
+                edge,
+              );
             }
             return hasValidEndpoints;
           })
@@ -397,39 +591,23 @@ export default defineComponent({
           availableStreams: rawData.availableStreams || [],
         };
 
-        // Update availableStreams ref for the stream selector dropdown
-        // IMPORTANT: Only update availableStreams when fetching "all" streams to maintain complete list
-        if (streamFilter.value === "all") {
-          // Use availableStreams from API, or fallback to extracting from edges
-          if (rawData.availableStreams && rawData.availableStreams.length > 0) {
-            availableStreams.value = rawData.availableStreams;
-          } else {
-            // Fallback: extract stream names from edge stream_name property if API didn't provide them
-            const streamSet = new Set<string>();
-            edges.forEach((edge: any) => {
-              // If edges have stream_name property, collect them
-              if (edge.stream_name) {
-                streamSet.add(edge.stream_name);
-              }
-            });
-            availableStreams.value = Array.from(streamSet).sort();
-          }
-        }
-
-        console.log('[ServiceGraph] Loaded topology:', graphData.value);
-        console.log('[ServiceGraph] Available streams:', availableStreams.value);
-        console.log('[ServiceGraph] Active stream filter:', streamFilter.value);
-
         // Calculate stats
-        const totalRequests = graphData.value.edges.reduce((sum: number, e: any) => sum + e.total_requests, 0);
-        const totalErrors = graphData.value.edges.reduce((sum: number, e: any) => sum + e.failed_requests, 0);
+        const totalRequests = graphData.value.edges.reduce(
+          (sum: number, e: any) => sum + e.total_requests,
+          0,
+        );
+        const totalErrors = graphData.value.edges.reduce(
+          (sum: number, e: any) => sum + e.failed_requests,
+          0,
+        );
 
         stats.value = {
           services: graphData.value.nodes.length,
           connections: graphData.value.edges.length,
           totalRequests,
           totalErrors,
-          errorRate: totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0,
+          errorRate:
+            totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0,
         };
 
         lastUpdated.value = new Date().toLocaleTimeString();
@@ -441,17 +619,23 @@ export default defineComponent({
 
         // Provide detailed error messages based on error type
         if (err.message === "Request timeout") {
-          error.value = "Request timed out. The service graph may be processing large amounts of data. Please try again.";
+          error.value =
+            "Request timed out. The service graph may be processing large amounts of data. Please try again.";
         } else if (err.response?.status === 404) {
-          error.value = "Service Graph API endpoint not found. Ensure you're running enterprise version of OpenObserve.";
+          error.value =
+            "Service Graph API endpoint not found. Ensure you're running enterprise version of OpenObserve.";
         } else if (err.response?.status === 403) {
-          error.value = "Access denied. You may not have permission to view the service graph for this organization.";
+          error.value =
+            "Access denied. You may not have permission to view the service graph for this organization.";
         } else if (err.response?.status === 500) {
           error.value = "Server error occurred. Check server logs for details.";
         } else if (err.message === "Network Error" || !navigator.onLine) {
           error.value = "Network error. Please check your internet connection.";
         } else {
-          error.value = err.response?.data?.message || err.message || "Failed to load service graph data. Please check server logs.";
+          error.value =
+            err.response?.data?.message ||
+            err.message ||
+            "Failed to load service graph data. Please check server logs.";
         }
       } finally {
         loading.value = false;
@@ -554,7 +738,7 @@ export default defineComponent({
 
     const onStreamFilterChange = (stream: string) => {
       streamFilter.value = stream;
-      localStorage.setItem('serviceGraph_streamFilter', stream);
+      localStorage.setItem("serviceGraph_streamFilter", stream);
 
       // Reload service graph with new stream filter
       loadServiceGraph();
@@ -565,26 +749,37 @@ export default defineComponent({
       let edges = [...graphData.value.edges];
 
       // Filter by search
-      if (searchFilter.value) {
-        const search = searchFilter.value.toLowerCase();
+      const trimmedSearch = searchFilter.value?.trim();
+      if (trimmedSearch) {
+        const search = trimmedSearch.toLowerCase();
         const matchingNodeIds = new Set(
-          nodes.filter(n => n.label.toLowerCase().includes(search)).map(n => n.id)
+          nodes
+            .filter((n) => n.label.toLowerCase().includes(search))
+            .map((n) => n.id),
         );
 
-        edges = edges.filter(e =>
-          matchingNodeIds.has(e.from) || matchingNodeIds.has(e.to)
+        edges = edges.filter(
+          (e) => matchingNodeIds.has(e.from) || matchingNodeIds.has(e.to),
         );
 
-        const usedNodeIds = new Set([...edges.map(e => e.from), ...edges.map(e => e.to)]);
-        nodes = nodes.filter(n => usedNodeIds.has(n.id));
+        const usedNodeIds = new Set([
+          ...edges.map((e) => e.from),
+          ...edges.map((e) => e.to),
+        ]);
+        nodes = nodes.filter((n) => usedNodeIds.has(n.id));
       }
 
       // Filter by connection type
       if (connectionTypeFilter.value !== "all") {
-        edges = edges.filter(e => e.connection_type === connectionTypeFilter.value);
+        edges = edges.filter(
+          (e) => e.connection_type === connectionTypeFilter.value,
+        );
 
-        const usedNodeIds = new Set([...edges.map(e => e.from), ...edges.map(e => e.to)]);
-        nodes = nodes.filter(n => usedNodeIds.has(n.id));
+        const usedNodeIds = new Set([
+          ...edges.map((e) => e.from),
+          ...edges.map((e) => e.to),
+        ]);
+        nodes = nodes.filter((n) => usedNodeIds.has(n.id));
       }
 
       filteredGraphData.value = { nodes, edges };
@@ -593,7 +788,7 @@ export default defineComponent({
     const setLayout = (type: string) => {
       layoutType.value = type;
       // Persist layout type to localStorage
-      localStorage.setItem('serviceGraph_layoutType', type);
+      localStorage.setItem("serviceGraph_layoutType", type);
       // Force chart recreation when layout changes
       chartKey.value++;
     };
@@ -601,14 +796,12 @@ export default defineComponent({
     const setVisualizationType = (type: "tree" | "graph") => {
       visualizationType.value = type;
       // Persist visualization type to localStorage
-      localStorage.setItem('serviceGraph_visualizationType', type);
+      localStorage.setItem("serviceGraph_visualizationType", type);
       // Set default layout for each visualization type
       if (type === "tree") {
         layoutType.value = "horizontal";
       } else {
         layoutType.value = "force";
-        // Clear cached positions when switching to graph view to allow fresh layout
-        graphNodePositions.value = new Map();
       }
       // Force chart recreation when visualization type changes
       chartKey.value++;
@@ -620,7 +813,171 @@ export default defineComponent({
       return num.toString();
     };
 
-    onMounted(() => {
+    const updateTimeRange = (value: any) => {
+      searchObj.data.datetime = {
+        startTime: value.startTime,
+        endTime: value.endTime,
+        relativeTimePeriod:
+          value.relativeTimePeriod || searchObj.data.datetime.relativeTimePeriod,
+        type: value.relativeTimePeriod ? "relative" : "absolute",
+      };
+      // Reload service graph with new time range
+      loadServiceGraph();
+    };
+
+    // Load trace streams using the same method as the Traces search page
+    const loadTraceStreams = async () => {
+      try {
+        const res = await getStreams("traces", false, false);
+        if (res?.list?.length > 0) {
+          availableStreams.value = res.list.map((stream: any) => stream.name);
+        }
+      } catch (e) {
+        console.error("Error loading trace streams:", e);
+      }
+    };
+
+    // Settings handler
+    const resetSettings = () => {
+      // Reset to default settings if needed
+      showSettings.value = false;
+    };
+
+    // Side Panel Handlers
+    const handleNodeClick = (params: any) => {
+      console.log('[ServiceGraph] Click event:', params);
+
+      // Check if it's an edge click (for graph visualization)
+      if (params.dataType === 'edge' && params.data) {
+        console.log('[ServiceGraph] Opening edge panel for edge:', params.data);
+        // Close node panel when opening edge panel
+        showSidePanel.value = false;
+        selectedNode.value = null;
+
+        // Find the full edge data from graphData
+        const edgeData = graphData.value.edges.find(
+          (e: any) => e.from === params.data.source && e.to === params.data.target
+        );
+        if (edgeData) {
+          selectedEdge.value = edgeData;
+          showEdgePanel.value = true;
+        } else {
+          console.warn('[ServiceGraph] Could not find edge data for:', params.data.source, '->', params.data.target);
+        }
+      }
+      // Check if it's a node click (for graph visualization)
+      else if (params.dataType === 'node' && params.data) {
+        // Check if clicking the same node - if so, close the panel
+        if (selectedNode.value && selectedNode.value.id === params.data.id) {
+          console.log('[ServiceGraph] Clicking same node, closing side panel');
+          showSidePanel.value = false;
+          selectedNode.value = null;
+        } else {
+          console.log('[ServiceGraph] Opening side panel for node:', params.data);
+          // Close edge panel when opening node panel
+          showEdgePanel.value = false;
+          selectedEdge.value = null;
+
+          selectedNode.value = params.data;
+          showSidePanel.value = true;
+        }
+      }
+      // For tree visualization, check if it's a tree node
+      else if (params.componentType === 'series' && params.data && params.data.name) {
+        // Find the actual node data from graphData
+        const nodeData = graphData.value.nodes.find(
+          (n: any) => n.label === params.data.name || n.id === params.data.name
+        );
+
+        if (nodeData) {
+          // Check if clicking the same node - if so, close the panel
+          if (selectedNode.value && selectedNode.value.id === nodeData.id) {
+            console.log('[ServiceGraph] Clicking same tree node, closing side panel');
+            showSidePanel.value = false;
+            selectedNode.value = null;
+          } else {
+            console.log('[ServiceGraph] Opening side panel for tree node:', params.data);
+            // Close edge panel when opening node panel
+            showEdgePanel.value = false;
+            selectedEdge.value = null;
+
+            selectedNode.value = nodeData;
+            showSidePanel.value = true;
+          }
+        } else {
+          console.warn('[ServiceGraph] Could not find node data for:', params.data.name);
+        }
+      } else {
+        console.log('[ServiceGraph] Click not on a node or edge, ignoring');
+      }
+    };
+
+    const handleCloseSidePanel = () => {
+      showSidePanel.value = false;
+      // Don't clear selectedNode immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedNode.value = null;
+      }, 300);
+    };
+
+    const handleViewLogs = () => {
+      if (!selectedNode.value) return;
+
+      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
+      const escapedServiceName = escapeSingleQuotes(serviceName);
+      const escapedStream = escapeSingleQuotes(streamFilter.value);
+      const sql = `SELECT * FROM "${escapedStream}" WHERE service_name = '${escapedServiceName}' ORDER BY _timestamp DESC`;
+      const query = b64EncodeUnicode(sql);
+
+      const queryObject = {
+        stream_type: "logs",
+        stream: streamFilter.value,
+        from: searchObj.data.datetime.startTime,
+        to: searchObj.data.datetime.endTime,
+        refresh: 0,
+        sql_mode: "true",
+        query,
+        defined_schemas: "user_defined_schema",
+        org_identifier: store.state.selectedOrganization.identifier,
+        quick_mode: "false",
+        show_histogram: "true",
+        type: "service_graph_view_logs",
+      };
+
+      router.push({
+        path: "/logs",
+        query: queryObject,
+      });
+    };
+
+    const handleViewTraces = () => {
+      if (!selectedNode.value) return;
+
+      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
+
+      // Emit event to parent to switch tab and apply query
+      // Parent will handle tab switching and query application
+      emit('view-traces', {
+        stream: streamFilter.value,
+        serviceName: serviceName,
+        timeRange: {
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
+        },
+      });
+    };
+
+    // Edge Panel Handlers
+    const handleCloseEdgePanel = () => {
+      showEdgePanel.value = false;
+      // Don't clear selectedEdge immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedEdge.value = null;
+      }, 300);
+    };
+
+    onMounted(async () => {
+      await loadTraceStreams();
       loadServiceGraph();
     });
 
@@ -638,17 +995,33 @@ export default defineComponent({
       connectionTypeFilter,
       connectionTypeTabs,
       visualizationType,
+      visualizationTabs,
       layoutType,
       layoutOptions,
       chartData,
       chartKey,
       chartRendererRef,
+      searchObj,
+      dateTimeRef,
       loadServiceGraph,
       formatNumber,
       applyFilters,
       onStreamFilterChange,
       setLayout,
       setVisualizationType,
+      updateTimeRange,
+      resetSettings,
+      // Side panel
+      selectedNode,
+      showSidePanel,
+      handleNodeClick,
+      handleCloseSidePanel,
+      handleViewLogs,
+      handleViewTraces,
+      // Edge panel
+      selectedEdge,
+      showEdgePanel,
+      handleCloseEdgePanel,
     };
   },
 });
@@ -676,11 +1049,26 @@ export default defineComponent({
   overflow: hidden;
 }
 
+.service-graph-container {
+  position: relative;
+  overflow: hidden;
+  background: #0f1419 !important;
+}
+
+.body--light .service-graph-container {
+  background: #ffffff !important; // White background for light mode
+}
+
+.graph-with-panel-container {
+  position: relative;
+  overflow: visible;
+}
+
 code {
   background: #f0f0f0;
   padding: 2px 6px;
   border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 0.9em;
 }
 </style>

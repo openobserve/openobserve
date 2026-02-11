@@ -158,6 +158,18 @@ const getGroupDetails = () => {
     })
     .catch((err) => {
       console.log(err);
+      q.notify({
+        message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+      router.push({
+        name: "groups",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     });
 };
 

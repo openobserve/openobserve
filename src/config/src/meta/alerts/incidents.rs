@@ -92,18 +92,24 @@ impl std::str::FromStr for IncidentSeverity {
 pub enum CorrelationReason {
     /// Correlation key from Service Discovery
     ServiceDiscovery,
-    /// Fallback: extracted stable dimensions from alert labels
-    ManualExtraction,
-    /// Temporal proximity (future use)
-    Temporal,
+    /// Correlated via shared distributed trace ID
+    TraceBased,
+    /// Correlated by matching environment scope dimensions (cluster, region, namespace)
+    ScopeMatch,
+    /// Correlated by matching workload identity dimensions (service, deployment)
+    WorkloadMatch,
+    /// Fallback: no dimensions found, isolated by alert ID
+    AlertId,
 }
 
 impl std::fmt::Display for CorrelationReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ServiceDiscovery => write!(f, "service_discovery"),
-            Self::ManualExtraction => write!(f, "manual_extraction"),
-            Self::Temporal => write!(f, "temporal"),
+            Self::TraceBased => write!(f, "trace_based"),
+            Self::ScopeMatch => write!(f, "scope_match"),
+            Self::WorkloadMatch => write!(f, "workload_match"),
+            Self::AlertId => write!(f, "alert_id"),
         }
     }
 }
@@ -114,10 +120,145 @@ impl TryFrom<&str> for CorrelationReason {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "service_discovery" => Ok(Self::ServiceDiscovery),
-            "manual_extraction" => Ok(Self::ManualExtraction),
-            "temporal" => Ok(Self::Temporal),
+            "trace_based" => Ok(Self::TraceBased),
+            "scope_match" => Ok(Self::ScopeMatch),
+            "workload_match" => Ok(Self::WorkloadMatch),
+            "alert_id" => Ok(Self::AlertId),
             unmatched => Err(format!("'{unmatched}' is not a valid CorrelationReason")),
         }
+    }
+}
+
+/// Classification of correlation key strength for hierarchical upgrade logic
+///
+/// Hierarchy: AlertId (weakest) → Workload → Scope (strongest)
+/// Upgrades only move UP the hierarchy, never down.
+///
+/// Key format: `[KIND]:[key]` where KIND is SCOPE, WORKLOAD, SD, TRACE, or ALERT.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyType {
+    /// Weakest: No stable dimensions found, isolated by alert ID
+    /// Format: ALERT:<alert_unique_key>
+    AlertId,
+    /// Medium: Correlation by workload dimensions (deployment, statefulset, service)
+    /// Format: WORKLOAD:<hash>
+    Workload,
+    /// Strongest: Correlation by scope dimensions (cluster, namespace, region, environment)
+    /// Format: SCOPE:<hash>
+    Scope,
+}
+
+impl KeyType {
+    pub fn classify(correlation_key: &str) -> Self {
+        if correlation_key.starts_with("SCOPE:")
+            || correlation_key.starts_with("SD:")
+            || correlation_key.starts_with("TRACE:")
+        {
+            Self::Scope
+        } else if correlation_key.starts_with("WORKLOAD:") {
+            Self::Workload
+        } else {
+            // ALERT: prefix or unknown format — treat as weakest
+            Self::AlertId
+        }
+    }
+
+    pub const fn can_upgrade_to(&self, target: Self) -> bool {
+        matches!(
+            (self, target),
+            (Self::AlertId, Self::Workload | Self::Scope)
+                | (Self::Workload, Self::Scope | Self::Workload)
+                | (Self::Scope, Self::Scope)
+        )
+    }
+}
+
+impl std::fmt::Display for KeyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlertId => write!(f, "alert_id"),
+            Self::Workload => write!(f, "workload"),
+            Self::Scope => write!(f, "scope"),
+        }
+    }
+}
+
+/// Dimension relationship for Venn diagram subset/superset matching
+///
+/// Used to determine if an incoming alert's dimensions are compatible
+/// with an existing incident's dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DimensionRelationship {
+    /// New alert has MORE specific dimensions (superset)
+    /// Example: existing={ns:prod}, new={ns:prod, cluster:us-east}
+    /// Action: UPGRADE incident dimensions
+    NewIsSuperset,
+
+    /// New alert has LESS specific dimensions (subset)
+    /// Example: existing={ns:prod, cluster:us-east}, new={ns:prod}
+    /// Action: ADD alert, keep existing dimensions
+    NewIsSubset,
+
+    /// Same dimensions (all keys and values match)
+    /// Example: existing={ns:prod}, new={ns:prod}
+    /// Action: ADD alert to incident
+    Equal,
+
+    /// Some dimensions match, some don't (ambiguous)
+    /// Example: existing={ns:prod, db:postgres}, new={ns:prod, db:mysql}
+    /// Action: CREATE separate incident
+    PartialOverlap,
+
+    /// Same keys but DIFFERENT values (conflicting)
+    /// Example: existing={region:us-east}, new={region:us-west}
+    /// Action: CREATE separate incident (incompatible)
+    Incompatible,
+}
+
+impl DimensionRelationship {
+    pub fn check(
+        existing_dims: &HashMap<String, String>,
+        new_dims: &HashMap<String, String>,
+    ) -> Self {
+        if existing_dims.is_empty() && new_dims.is_empty() {
+            return Self::Equal;
+        }
+        if new_dims.is_empty() {
+            return Self::PartialOverlap;
+        }
+        if existing_dims.is_empty() {
+            return Self::NewIsSuperset;
+        }
+
+        for (key, existing_value) in existing_dims {
+            if let Some(new_value) = new_dims.get(key)
+                && new_value != existing_value
+            {
+                return Self::Incompatible;
+            }
+        }
+
+        let all_existing_in_new = existing_dims
+            .iter()
+            .all(|(k, v)| new_dims.get(k) == Some(v));
+        if all_existing_in_new {
+            return if new_dims.len() > existing_dims.len() {
+                Self::NewIsSuperset
+            } else {
+                Self::Equal
+            };
+        }
+
+        let all_new_in_existing = new_dims
+            .iter()
+            .all(|(k, v)| existing_dims.get(k) == Some(v));
+        if all_new_in_existing {
+            return Self::NewIsSubset;
+        }
+
+        Self::PartialOverlap
     }
 }
 
@@ -260,6 +401,10 @@ pub struct IncidentCorrelationConfig {
     #[serde(default)]
     pub auto_resolve_after_minutes: Option<i64>,
 
+    /// Time window for hierarchical incident upgrade (minutes)
+    #[serde(default = "default_upgrade_window")]
+    pub upgrade_window_minutes: u64,
+
     /// Default severity for new incidents
     #[serde(default)]
     pub default_severity: IncidentSeverity,
@@ -275,6 +420,7 @@ impl Default for IncidentCorrelationConfig {
             use_service_graph: true,
             root_cause_detection: true,
             auto_resolve_after_minutes: None,
+            upgrade_window_minutes: default_upgrade_window(),
             default_severity: IncidentSeverity::default(),
         }
     }
@@ -299,6 +445,10 @@ fn default_time_window() -> u64 {
 
 fn default_min_alerts() -> u32 {
     1
+}
+
+fn default_upgrade_window() -> u64 {
+    30
 }
 
 fn default_true() -> bool {
@@ -443,11 +593,12 @@ mod tests {
             CorrelationReason::ServiceDiscovery.to_string(),
             "service_discovery"
         );
+        assert_eq!(CorrelationReason::TraceBased.to_string(), "trace_based");
+        assert_eq!(CorrelationReason::ScopeMatch.to_string(), "scope_match");
         assert_eq!(
-            CorrelationReason::ManualExtraction.to_string(),
-            "manual_extraction"
+            CorrelationReason::WorkloadMatch.to_string(),
+            "workload_match"
         );
-        assert_eq!(CorrelationReason::Temporal.to_string(), "temporal");
     }
 
     #[test]
@@ -482,12 +633,9 @@ mod tests {
         );
         assert_ne!(
             CorrelationReason::ServiceDiscovery,
-            CorrelationReason::ManualExtraction
+            CorrelationReason::ScopeMatch
         );
-        assert_ne!(
-            CorrelationReason::ManualExtraction,
-            CorrelationReason::Temporal
-        );
+        assert_ne!(CorrelationReason::ScopeMatch, CorrelationReason::TraceBased);
     }
 
     #[test]
@@ -561,5 +709,195 @@ mod tests {
 
         let deserialized: CorrelationReason = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized, CorrelationReason::ServiceDiscovery);
+    }
+
+    // ========== KeyType Tests ==========
+
+    #[test]
+    fn test_key_type_classify_scope() {
+        let key = "SCOPE:abc123def456";
+        assert_eq!(KeyType::classify(key), KeyType::Scope);
+    }
+
+    #[test]
+    fn test_key_type_classify_workload() {
+        let key = "WORKLOAD:xyz789";
+        assert_eq!(KeyType::classify(key), KeyType::Workload);
+    }
+
+    #[test]
+    fn test_key_type_classify_alert_id() {
+        let key = "ALERT:2QxZj9K0d6XYz8wN3sF5pL4mT7v";
+        assert_eq!(KeyType::classify(key), KeyType::AlertId);
+    }
+
+    #[test]
+    fn test_key_type_classify_trace() {
+        let key = "TRACE:4bf92f3577b34da6a3ce929d0e0e4736";
+        assert_eq!(KeyType::classify(key), KeyType::Scope);
+    }
+
+    #[test]
+    fn test_key_type_classify_sd() {
+        let key = "SD:abc123def456789012345678901234567890123456789012345678901234";
+        assert_eq!(KeyType::classify(key), KeyType::Scope);
+    }
+
+    #[test]
+    fn test_key_type_classify_unknown() {
+        // Unknown format — treat as weakest
+        let key = "some_random_string";
+        assert_eq!(KeyType::classify(key), KeyType::AlertId);
+    }
+
+    #[test]
+    fn test_key_type_can_upgrade_alert_id_to_workload() {
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Workload));
+    }
+
+    #[test]
+    fn test_key_type_can_upgrade_alert_id_to_scope() {
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Scope));
+    }
+
+    #[test]
+    fn test_key_type_can_upgrade_workload_to_scope() {
+        assert!(KeyType::Workload.can_upgrade_to(KeyType::Scope));
+    }
+
+    #[test]
+    fn test_key_type_can_upgrade_same_level_workload() {
+        // Same level upgrades allowed (dimension refinement)
+        assert!(KeyType::Workload.can_upgrade_to(KeyType::Workload));
+    }
+
+    #[test]
+    fn test_key_type_can_upgrade_same_level_scope() {
+        // Same level upgrades allowed (dimension refinement)
+        assert!(KeyType::Scope.can_upgrade_to(KeyType::Scope));
+    }
+
+    #[test]
+    fn test_key_type_cannot_downgrade_scope_to_workload() {
+        assert!(!KeyType::Scope.can_upgrade_to(KeyType::Workload));
+    }
+
+    #[test]
+    fn test_key_type_cannot_downgrade_scope_to_alert_id() {
+        assert!(!KeyType::Scope.can_upgrade_to(KeyType::AlertId));
+    }
+
+    #[test]
+    fn test_key_type_cannot_downgrade_workload_to_alert_id() {
+        assert!(!KeyType::Workload.can_upgrade_to(KeyType::AlertId));
+    }
+
+    // ========== DimensionRelationship Tests ==========
+
+    #[test]
+    fn test_dimension_relationship_superset() {
+        let existing = HashMap::from([("namespace".to_string(), "prod".to_string())]);
+        let new = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]);
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        assert_eq!(rel, DimensionRelationship::NewIsSuperset);
+    }
+
+    #[test]
+    fn test_dimension_relationship_subset() {
+        let existing = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]);
+        let new = HashMap::from([("namespace".to_string(), "prod".to_string())]);
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        assert_eq!(rel, DimensionRelationship::NewIsSubset);
+    }
+
+    #[test]
+    fn test_dimension_relationship_equal() {
+        let existing = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]);
+        let new = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]);
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        assert_eq!(rel, DimensionRelationship::Equal);
+    }
+
+    #[test]
+    fn test_dimension_relationship_incompatible() {
+        let existing = HashMap::from([("region".to_string(), "us-east".to_string())]);
+        let new = HashMap::from([("region".to_string(), "us-west".to_string())]);
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        assert_eq!(rel, DimensionRelationship::Incompatible);
+    }
+
+    #[test]
+    fn test_dimension_relationship_incompatible_multiple_keys() {
+        let existing = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("region".to_string(), "us-east".to_string()),
+        ]);
+        let new = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("region".to_string(), "us-west".to_string()), // Conflict!
+        ]);
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        assert_eq!(rel, DimensionRelationship::Incompatible);
+    }
+
+    #[test]
+    fn test_dimension_relationship_partial_overlap() {
+        let existing = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("database".to_string(), "postgres".to_string()),
+        ]);
+        let new = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("cache".to_string(), "redis".to_string()), // Different key
+        ]);
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        assert_eq!(rel, DimensionRelationship::PartialOverlap);
+    }
+
+    #[test]
+    fn test_dimension_relationship_empty_existing() {
+        let existing = HashMap::new();
+        let new = HashMap::from([("namespace".to_string(), "prod".to_string())]);
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        // New has more keys, all existing keys (0) match -> Superset
+        assert_eq!(rel, DimensionRelationship::NewIsSuperset);
+    }
+
+    #[test]
+    fn test_dimension_relationship_empty_new() {
+        let existing = HashMap::from([("namespace".to_string(), "prod".to_string())]);
+        let new = HashMap::new();
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        // Empty dimensions should not match any incident (create new incident with alert_id key)
+        assert_eq!(rel, DimensionRelationship::PartialOverlap);
+    }
+
+    #[test]
+    fn test_dimension_relationship_both_empty() {
+        let existing = HashMap::new();
+        let new = HashMap::new();
+
+        let rel = DimensionRelationship::check(&existing, &new);
+        assert_eq!(rel, DimensionRelationship::Equal);
     }
 }

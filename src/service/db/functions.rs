@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,20 +15,28 @@
 
 use std::sync::Arc;
 
-use config::{meta::function::Transform, utils::json};
+use chrono::Utc;
+use config::{
+    meta::{
+        function::Transform,
+        self_reporting::error::{ErrorData, ErrorSource, FunctionError},
+        stream::StreamParams,
+    },
+    utils::json,
+};
 
-use crate::{common::infra::config::QUERY_FUNCTIONS, service::db};
+use crate::{
+    common::infra::config::QUERY_FUNCTIONS,
+    service::{db, self_reporting::publish_error},
+};
 
-pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
-    match db::put(
-        &key,
-        json::to_vec(js_func).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await
-    {
+    let val = json::to_vec(func_val)?;
+    if val.is_empty() {
+        return Err(anyhow::anyhow!("Function value is empty"));
+    }
+    match db::put(&key, val.into(), db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error saving function: {e}");
@@ -41,7 +49,7 @@ pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), an
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
     let val = db::get(&format!("/function/{org_id}/{name}")).await?;
-    Ok(json::from_slice(&val).unwrap())
+    Ok(json::from_slice(&val)?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
@@ -60,7 +68,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
     Ok(db::list(&format!("/function/{org_id}/"))
         .await?
         .values()
-        .map(|val| json::from_slice(val).unwrap())
+        .filter_map(|val| json::from_slice(val).ok())
         .collect())
 }
 
@@ -111,7 +119,29 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Transform = json::from_slice(&item_value).unwrap();
+        let json_val: Transform = match json::from_slice(&item_value) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error deserializing function {item_key}: {e}");
+                // Extract org_id and function_name from item_key (format: org_id/function_name)
+                let mut parts = item_key.splitn(2, '/');
+                let org_id = parts.next().unwrap_or_default();
+                let function_name = parts.next().unwrap_or(item_key);
+                publish_error(ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: StreamParams {
+                        org_id: org_id.to_string().into(),
+                        ..Default::default()
+                    },
+                    error_source: ErrorSource::Function(FunctionError::new(
+                        function_name.to_string(),
+                        format!("Error deserializing function: {e}"),
+                    )),
+                })
+                .await;
+                continue;
+            }
+        };
         QUERY_FUNCTIONS.insert(item_key.to_string(), json_val);
     }
     log::info!("Functions Cached");

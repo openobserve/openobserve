@@ -18,7 +18,7 @@ use std::{
     time::Duration,
 };
 
-use arrow_schema::{Field, Schema};
+use arrow_schema::{DataType, Field, Schema};
 use bytes::Bytes;
 use config::{
     cluster::LOCAL_NODE_ID,
@@ -101,6 +101,78 @@ pub async fn update_setting(
 
     Ok(())
 }
+
+pub async fn set_stream_is_llm(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    is_llm_stream: bool,
+) -> Result<(), anyhow::Error> {
+    let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    settings.is_llm_stream = is_llm_stream;
+
+    if is_llm_stream && !settings.defined_schema_fields.is_empty() {
+        // Check the actual schema to find which LLM fields are missing
+        let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
+        let missing_fields: Vec<Field> = LLM_SCHEMA_FIELDS
+            .iter()
+            .filter(|f| !schema_cache.contains_field(f.name()))
+            .cloned()
+            .collect();
+
+        if !missing_fields.is_empty() {
+            let llm_schema = Schema::new(missing_fields);
+            merge(org_id, stream_name, stream_type, &llm_schema, None).await?;
+        }
+
+        // Add to defined_schema_fields only if not already present
+        let mut uds_updated = false;
+        for field in LLM_SCHEMA_FIELDS.iter() {
+            if !settings
+                .defined_schema_fields
+                .contains(&field.name().to_string())
+            {
+                settings
+                    .defined_schema_fields
+                    .push(field.name().to_string());
+                uds_updated = true;
+            }
+        }
+        if uds_updated {
+            settings.defined_schema_fields.sort();
+        }
+    }
+
+    let mut metadata = std::collections::HashMap::with_capacity(1);
+    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+    update_setting(org_id, stream_name, stream_type, metadata).await
+}
+
+/// Returns the Arrow schema fields for LLM streams, matching fields used by
+/// the traces handler APIs (mod.rs, session.rs, user.rs, dag.rs).
+static LLM_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock::new(|| {
+    vec![
+        // String fields
+        Field::new("_o2_llm_observation_type", DataType::Utf8, true),
+        Field::new("_o2_llm_model_name", DataType::Utf8, true),
+        Field::new("_o2_llm_provider_name", DataType::Utf8, true),
+        Field::new("_o2_llm_input", DataType::Utf8, true),
+        Field::new("_o2_llm_output", DataType::Utf8, true),
+        Field::new("_o2_llm_user_id", DataType::Utf8, true),
+        Field::new("_o2_llm_session_id", DataType::Utf8, true),
+        // Integer fields
+        Field::new("_o2_llm_usage_details_input", DataType::Int64, true),
+        Field::new("_o2_llm_usage_details_output", DataType::Int64, true),
+        Field::new("_o2_llm_usage_details_total", DataType::Int64, true),
+        Field::new("_o2_llm_completion_start_time", DataType::Int64, true),
+        // Float fields
+        Field::new("_o2_llm_cost_details_input", DataType::Float64, true),
+        Field::new("_o2_llm_cost_details_output", DataType::Float64, true),
+        Field::new("_o2_llm_cost_details_total", DataType::Float64, true),
+    ]
+});
 
 pub async fn delete_fields(
     org_id: &str,
@@ -860,6 +932,39 @@ pub async fn list_organizations_from_cache() -> Vec<String> {
         }
     }
     names.into_iter().collect::<Vec<String>>()
+}
+
+/// Get stream count for an org+type, cached to avoid per-file schema cache scans.
+///
+/// Stream counts are mostly stagnant (streams rarely added/removed), so we cache
+/// aggressively with a 5-minute TTL. This avoids the cost of iterating all schema
+/// keys on every file processed during service discovery.
+pub async fn get_stream_count_cached(org_id: &str, stream_type: StreamType) -> u64 {
+    use std::{
+        collections::HashMap as StdHashMap,
+        sync::{LazyLock, RwLock},
+        time::Instant,
+    };
+
+    static CACHE: LazyLock<RwLock<StdHashMap<String, (u64, Instant)>>> =
+        LazyLock::new(|| RwLock::new(StdHashMap::new()));
+
+    const TTL_SECS: u64 = 300; // 5 minutes
+
+    let key = format!("{org_id}/{stream_type}");
+
+    if let Ok(cache) = CACHE.read()
+        && let Some((count, ts)) = cache.get(&key)
+        && ts.elapsed().as_secs() < TTL_SECS
+    {
+        return *count;
+    }
+
+    let count = list_streams_from_cache(org_id, stream_type).await.len() as u64;
+    if let Ok(mut cache) = CACHE.write() {
+        cache.insert(key, (count, Instant::now()));
+    }
+    count
 }
 
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {

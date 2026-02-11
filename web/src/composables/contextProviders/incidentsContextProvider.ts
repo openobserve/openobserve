@@ -50,6 +50,8 @@ export const createIncidentsContextProvider = (
         alert_count: incidentData?.alert_count,
         first_alert_at: incidentData?.first_alert_at,
         last_alert_at: incidentData?.last_alert_at,
+        // Current timestamp when request is fired (microseconds) for AI agent time calculations
+        request_timestamp: Date.now() * 1000,
       };
 
       return context;

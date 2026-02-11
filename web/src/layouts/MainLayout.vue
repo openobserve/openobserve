@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="col-auto"
         v-show="store.state.isAiChatEnabled && isLoading"
-        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
+        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;"
         :class="
           store.state.theme == 'dark'
             ? 'dark-mode-chat-container'
@@ -100,10 +100,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <O2AIChat
-          :header-height="82.5"
+          :header-height="42.5"
           :is-open="store.state.isAiChatEnabled"
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
+          :appendMode="aiChatAppendMode"
         />
       </div>
     </div>
@@ -315,6 +316,7 @@ export default defineComponent({
     );
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
+    const aiChatAppendMode = ref(true);
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
 
@@ -1062,15 +1064,22 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (value: any) => {
+    const sendToAiChat = (value: any, append: boolean = true) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
-      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
-      //so to force trigger we do this
+
+      // Set the append mode
+      aiChatAppendMode.value = append;
+
+      // Always clear and set to trigger the watcher in O2AIChat
       aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
+        // Clear it after another tick so it doesn't accumulate in parent
+        nextTick(() => {
+          aiChatInputContext.value = "";
+        });
       });
     };
 
@@ -1134,6 +1143,7 @@ export default defineComponent({
       removeFirstTimeLogin,
       sendToAiChat,
       aiChatInputContext,
+      aiChatAppendMode,
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
@@ -1592,12 +1602,8 @@ body.ai-chat-open {
   color: white;
 }
 .dark-mode-chat-container {
-  border-left: 1.5px solid #232323ff;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 .light-mode-chat-container {
-  border-left: 1.5px solid #f7f7f7;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 
 .ai-btn-active {

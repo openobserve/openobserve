@@ -19,7 +19,7 @@ import { PrebuiltConfig } from './types';
  * Uses PagerDuty Events API v2 for incident creation
  */
 export const pagerdutyTemplate = {
-  name: 'system-prebuilt-pagerduty',
+  name: 'prebuilt_pagerduty',
   body: JSON.stringify({
     "routing_key": "{integration_key}",
     "event_action": "trigger",
@@ -53,7 +53,7 @@ export const pagerdutyTemplate = {
 };
 
 export const pagerdutyConfig: PrebuiltConfig = {
-  templateName: 'system-prebuilt-pagerduty',
+  templateName: 'prebuilt_pagerduty',
   templateBody: pagerdutyTemplate.body,
   headers: {
     'Content-Type': 'application/json'

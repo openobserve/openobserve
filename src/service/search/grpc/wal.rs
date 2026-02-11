@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,9 @@ use config::{
     utils::{
         async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
         file::is_exists,
-        parquet::{parse_time_range_from_filename, read_metadata_from_file},
+        parquet::{
+            get_memtable_id_from_file_name, parse_time_range_from_filename, read_metadata_from_file,
+        },
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
@@ -44,7 +46,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::unwrap_partition_time_level,
 };
-use ingester::{WAL_PARQUET_METADATA, get_memtable_id_from_file_name};
+use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -120,9 +122,8 @@ pub async fn search_parquet(
                 return file;
             }
             drop(r);
-            let meta = read_metadata_from_file(&source_file.into())
-                .await
-                .unwrap_or_default();
+            let path = source_file.into();
+            let meta = read_metadata_from_file(&path).await.unwrap_or_default();
             file.meta = meta;
             file
         })
@@ -526,12 +527,7 @@ async fn get_file_list(
             let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
             // Skip count is the number of segments in the cannonicalised path before
             // <YY>/<MM>/<DD>/<HH>/<file> appear
-            let filter = create_wal_dir_datetime_filter(
-                start_time,
-                end_time,
-                "parquet".to_string(),
-                skip_count + 1,
-            );
+            let filter = create_wal_dir_datetime_filter(start_time, end_time, skip_count + 1);
 
             scan_files_filtered(&pattern, filter, None).await?
         } else {

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -116,7 +116,7 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.splitn(9, '/').collect::<Vec<&str>>();
     if columns.len() < 9 {
-        return Err(anyhow::anyhow!("[file_list] Invalid file path: {}", key));
+        return Err(anyhow::anyhow!("[file_list] Invalid file path: {key}"));
     }
     // let _ = columns[0].to_string(); // files/
     let stream_key = format!("{}/{}/{}", columns[1], columns[2], columns[3]);
@@ -206,14 +206,29 @@ pub async fn read_metadata_from_file(path: &PathBuf) -> Result<FileMeta, anyhow:
     Ok(meta)
 }
 
-pub fn generate_filename_with_time_range(min_ts: i64, max_ts: i64) -> String {
+pub fn generate_filename_with_time_range(min_ts: i64, max_ts: i64, id: u64) -> String {
     format!(
-        "{}.{}.{}{}",
+        "{}.{}.{}_{}{}",
         min_ts,
         max_ts,
         ider::generate(),
+        id,
         FILE_EXT_PARQUET
     )
+}
+
+pub fn get_memtable_id_from_file_name(file_name: &str) -> u64 {
+    // Remove extension by finding the last dot and taking everything before it
+    // If no dot exists, use the entire filename
+    let stem = file_name
+        .rfind('.')
+        .map(|pos| &file_name[..pos])
+        .unwrap_or(file_name);
+    // Get the part after the last underscore
+    stem.rsplit('_')
+        .next()
+        .and_then(|id_str| id_str.parse::<u64>().ok())
+        .unwrap_or_default()
 }
 
 pub fn parse_time_range_from_filename(mut name: &str) -> (i64, i64) {
@@ -257,6 +272,91 @@ mod tests {
         .unwrap();
 
         (schema, batch)
+    }
+
+    #[test]
+    fn test_get_memtable_id_simple() {
+        // Simple case with single underscore
+        let file_name = "file_1234567890.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 1234567890);
+    }
+
+    #[test]
+    fn test_get_memtable_id_multiple_underscores() {
+        // Multiple underscores - should get the last one
+        let file_name = "prefix_middle_suffix_9876543210.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 9876543210);
+    }
+
+    #[test]
+    fn test_get_memtable_id_complex_real_world() {
+        // Real-world complex case from the issue
+        let file_name =
+            "1765538190188506.1765538190416169.7405204004302487552_1765538214467130.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 1765538214467130);
+    }
+
+    #[test]
+    fn test_get_memtable_id_multiple_dots_and_underscores() {
+        // Multiple dots and underscores
+        let file_name = "a.b.c_d.e.f_12345.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 12345);
+    }
+
+    #[test]
+    fn test_get_memtable_id_no_extension() {
+        // No extension
+        let file_name = "file_555666777";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 555666777);
+    }
+
+    #[test]
+    fn test_get_memtable_id_no_underscore() {
+        // No underscore - should return 0
+        let file_name = "file.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
+    }
+
+    #[test]
+    fn test_get_memtable_id_invalid_number() {
+        // Invalid number after underscore - should return 0
+        let file_name = "file_notanumber.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
+    }
+
+    #[test]
+    fn test_get_memtable_id_empty_string() {
+        // Empty string
+        assert_eq!(get_memtable_id_from_file_name(""), 0);
+    }
+
+    #[test]
+    fn test_get_memtable_id_only_underscore() {
+        // Only underscore
+        let file_name = "_123456.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 123456);
+    }
+
+    #[test]
+    fn test_get_memtable_id_multiple_extensions() {
+        // Multiple extensions (e.g., .tar.gz style)
+        // Based on add_memtable_id_to_file_name, the ID is added before the extension
+        let file_name = "file.tar_999888777.gz";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 999888777);
+    }
+
+    #[test]
+    fn test_get_memtable_id_max_u64() {
+        // Test with max u64 value
+        let file_name = "file_18446744073709551615.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), u64::MAX);
+    }
+
+    #[test]
+    fn test_get_memtable_id_zero() {
+        // Test with zero
+        let file_name = "file_0.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
     }
 
     #[tokio::test]
@@ -340,9 +440,10 @@ mod tests {
 
     #[test]
     fn test_generate_filename_with_time_range() {
-        let filename = generate_filename_with_time_range(1000, 2000);
+        let filename = generate_filename_with_time_range(1000, 2000, 1);
         assert!(filename.ends_with(FILE_EXT_PARQUET));
         assert!(filename.starts_with("1000.2000."));
+        assert!(filename.contains("_1.parquet"));
     }
 
     #[test]
@@ -367,5 +468,20 @@ mod tests {
         let (min_ts, max_ts) = parse_time_range_from_filename(filename);
         assert_eq!(min_ts, 0);
         assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_parse_time_range_backwards_compatible() {
+        // Test that parse_time_range_from_filename still works with new format
+        let new_format = "1000.2000.12345.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(new_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+
+        // Test with old format
+        let old_format = "1000.2000.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(old_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
     }
 }

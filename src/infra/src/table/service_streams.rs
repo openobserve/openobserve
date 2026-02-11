@@ -451,9 +451,196 @@ pub async fn count(org_id: &str) -> Result<u64, errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// List services with scope dimension conflict filtering (SQL optimization)
+///
+/// Filters at SQL level by excluding services with conflicting scope dimensions.
+/// Only scope dimensions (k8s-cluster, k8s-namespace) are checked in SQL.
+/// All other filtering (workload, unstable) happens in-memory.
+///
+/// SQL: WHERE org_id = ? AND NOT (scope conflicts)
+/// Logic: Include service if scope dimension is missing OR matches
+///
+/// This reduces dataset loaded from DB (20k → 2-3k) while preserving
+/// all services needed for FQN discovery.
+pub async fn list_with_scope_filter(
+    org_id: &str,
+    scope_filters: &std::collections::HashMap<String, String>,
+) -> Result<Vec<ServiceRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let backend = client.get_database_backend();
+
+    if scope_filters.is_empty() {
+        return list(org_id).await;
+    }
+
+    let (sql, params) = build_scope_conflict_sql(org_id, scope_filters, backend);
+
+    let records = Entity::find()
+        .from_raw_sql(sea_orm::Statement::from_sql_and_values(
+            backend, sql, params,
+        ))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records
+        .into_iter()
+        .map(|r| ServiceRecord {
+            org_id: r.org_id,
+            service_key: r.service_key,
+            correlation_key: r.correlation_key,
+            service_name: r.service_name,
+            dimensions: r.dimensions,
+            streams: r.streams,
+            first_seen: r.first_seen,
+            last_seen: r.last_seen,
+            metadata: r.metadata,
+        })
+        .collect())
+}
+
+fn build_scope_conflict_sql(
+    org_id: &str,
+    scope_filters: &std::collections::HashMap<String, String>,
+    backend: sea_orm::DatabaseBackend,
+) -> (String, Vec<sea_orm::Value>) {
+    let mut params: Vec<sea_orm::Value> = vec![org_id.into()];
+
+    let conflict_checks = match backend {
+        sea_orm::DatabaseBackend::Postgres => {
+            let mut checks = Vec::new();
+            for (key, value) in scope_filters {
+                params.push(value.clone().into());
+                let param_idx = params.len();
+                checks.push(format!(
+                    "(jsonb_exists(dimensions::jsonb, '{key}') AND (dimensions::jsonb->>'{key}') != ${param_idx})"
+                ));
+            }
+            checks
+        }
+        sea_orm::DatabaseBackend::Sqlite => {
+            let mut checks = Vec::new();
+            for (key, value) in scope_filters {
+                params.push(value.clone().into());
+                checks.push(format!(
+                    "(json_extract(dimensions, '$.{key}') IS NOT NULL AND json_extract(dimensions, '$.{key}') != ?)"
+                ));
+            }
+            checks
+        }
+        sea_orm::DatabaseBackend::MySql => {
+            let mut checks = Vec::new();
+            for (key, value) in scope_filters {
+                params.push(value.clone().into());
+                checks.push(format!(
+                    "(JSON_EXTRACT(dimensions, '$.{key}') IS NOT NULL AND JSON_EXTRACT(dimensions, '$.{key}') != ?)"
+                ));
+            }
+            checks
+        }
+    };
+
+    let where_clause = if conflict_checks.is_empty() {
+        match backend {
+            sea_orm::DatabaseBackend::Postgres => "org_id = $1".to_string(),
+            _ => "org_id = ?".to_string(),
+        }
+    } else {
+        let org_condition = match backend {
+            sea_orm::DatabaseBackend::Postgres => "org_id = $1",
+            _ => "org_id = ?",
+        };
+        format!(
+            "{} AND NOT ({})",
+            org_condition,
+            conflict_checks.join(" OR ")
+        )
+    };
+
+    let sql = format!(
+        "SELECT id, org_id, service_key, correlation_key, service_name, \
+         dimensions, streams, first_seen, last_seen, metadata \
+         FROM service_streams WHERE {}",
+        where_clause
+    );
+
+    (sql, params)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_build_scope_conflict_sql_postgres_single_dimension() {
+        let mut scope_filters = std::collections::HashMap::new();
+        scope_filters.insert("k8s-cluster".to_string(), "production".to_string());
+
+        let (sql, params) = super::build_scope_conflict_sql(
+            "test_org",
+            &scope_filters,
+            sea_orm::DatabaseBackend::Postgres,
+        );
+
+        assert!(sql.contains("org_id = $1"));
+        assert!(sql.contains("AND NOT"));
+        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-cluster')"));
+        assert!(sql.contains("dimensions::jsonb->>'k8s-cluster'") && sql.contains("!= $2"));
+        assert_eq!(params.len(), 2); // org_id + cluster value
+    }
+
+    #[test]
+    fn test_build_scope_conflict_sql_postgres_multiple_dimensions() {
+        let mut scope_filters = std::collections::HashMap::new();
+        scope_filters.insert("k8s-cluster".to_string(), "production".to_string());
+        scope_filters.insert("k8s-namespace".to_string(), "api".to_string());
+
+        let (sql, params) = super::build_scope_conflict_sql(
+            "test_org",
+            &scope_filters,
+            sea_orm::DatabaseBackend::Postgres,
+        );
+
+        assert!(sql.contains("org_id = $1"));
+        assert!(sql.contains("AND NOT"));
+        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-cluster')"));
+        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-namespace')"));
+        assert!(sql.contains(" OR ")); // Multiple conflict checks OR'd together
+        assert_eq!(params.len(), 3); // org_id + 2 dimension values
+    }
+
+    #[test]
+    fn test_build_scope_conflict_sql_sqlite() {
+        let mut scope_filters = std::collections::HashMap::new();
+        scope_filters.insert("k8s-cluster".to_string(), "production".to_string());
+
+        let (sql, params) = super::build_scope_conflict_sql(
+            "test_org",
+            &scope_filters,
+            sea_orm::DatabaseBackend::Sqlite,
+        );
+
+        assert!(sql.contains("org_id = ?"));
+        assert!(sql.contains("AND NOT"));
+        assert!(sql.contains("json_extract(dimensions, '$.k8s-cluster') IS NOT NULL"));
+        assert!(sql.contains("json_extract(dimensions, '$.k8s-cluster') != ?"));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_build_scope_conflict_sql_empty_filters() {
+        let scope_filters = std::collections::HashMap::new();
+
+        let (sql, params) = super::build_scope_conflict_sql(
+            "test_org",
+            &scope_filters,
+            sea_orm::DatabaseBackend::Postgres,
+        );
+
+        assert!(sql.contains("org_id = $1"));
+        assert!(!sql.contains("AND NOT")); // No conflict checks
+        assert_eq!(params.len(), 1); // Only org_id
+    }
 
     #[test]
     fn test_merge_streams_json_empty() {

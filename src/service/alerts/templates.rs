@@ -101,3 +101,89 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     remove_ownership(org_id, "templates", Authz::new(name)).await;
     Ok(())
 }
+
+/// Ensures system prebuilt templates exist in the database.
+/// Creates templates in DEFAULT_ORG if they don't exist.
+/// Uses distributed lock to prevent race conditions in distributed mode.
+pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
+    use config::prebuilt_loader::get_prebuilt_template;
+    use infra::dist_lock;
+
+    let lock_key = "/system/templates/init";
+
+    // Acquire distributed lock to ensure only one instance initializes templates
+    let locker = dist_lock::lock(lock_key, 0).await?;
+
+    let prebuilt_types = vec![
+        "slack",
+        "msteams",
+        "pagerduty",
+        "discord",
+        "webhook",
+        "opsgenie",
+        "servicenow",
+        "email",
+    ];
+
+    let mut created_count = 0;
+    let mut skipped_count = 0;
+
+    for prebuilt_type in prebuilt_types {
+        if let Some(mut template) = get_prebuilt_template(prebuilt_type) {
+            // Set org_id to DEFAULT_ORG for global visibility
+            template.org_id = DEFAULT_ORG.to_string();
+
+            // Check if template already exists
+            match db::alerts::templates::get(DEFAULT_ORG, &template.name).await {
+                Ok(_) => {
+                    // Template already exists, skip
+                    skipped_count += 1;
+                    log::debug!(
+                        "[TEMPLATES] System template '{}' already exists in {}",
+                        template.name,
+                        DEFAULT_ORG
+                    );
+                }
+                Err(TemplateError::NotFound) => {
+                    // Template doesn't exist, create it
+                    match db::alerts::templates::set(template.clone()).await {
+                        Ok(_) => {
+                            created_count += 1;
+                            log::info!(
+                                "[TEMPLATES] Created system template '{}' in {}",
+                                template.name,
+                                DEFAULT_ORG
+                            );
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[TEMPLATES] Failed to create system template '{}': {}",
+                                template.name,
+                                e
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "[TEMPLATES] Error checking system template '{}': {}",
+                        template.name,
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    // Release the lock
+    dist_lock::unlock(&locker).await?;
+    drop(locker);
+
+    log::info!(
+        "[TEMPLATES] System templates initialization complete: {} created, {} already existed",
+        created_count,
+        skipped_count
+    );
+
+    Ok(())
+}

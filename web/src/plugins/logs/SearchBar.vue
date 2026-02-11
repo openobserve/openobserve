@@ -479,6 +479,7 @@ class="field_list" no-hover>
                         v-model="searchObj.meta.showHistogram"
                         size="xs"
                         flat
+                        class="o2-toggle-button-xs"
                         :class="
                           store.state.theme === 'dark'
                             ? 'o2-toggle-button-xs-dark'
@@ -523,6 +524,7 @@ class="field_list" no-hover>
                             ? 'o2-toggle-button-xs-dark'
                             : 'o2-toggle-button-xs-light'
                         "
+                        class="o2-toggle-button-xs"
                         @click.stop
                       />
                     </div>
@@ -562,6 +564,7 @@ class="field_list" no-hover>
                             ? 'o2-toggle-button-xs-dark'
                             : 'o2-toggle-button-xs-light'
                         "
+                        class="o2-toggle-button-xs"
                         @click.stop="handleQuickMode"
                       />
                     </div>
@@ -1184,7 +1187,7 @@ class="q-pr-sm q-pt-xs" />
                           ? 'empty-function'
                           : ''
                       "
-                      :readOnly="false"
+                      :readOnly="isVrlEditorDisabled"
                       @keydown="handleKeyDown"
                       language="vrl"
                       @focus="
@@ -1194,6 +1197,33 @@ class="q-pr-sm q-pt-xs" />
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
                     />
+                    <!-- VRL disabled warning for non-table charts -->
+                    <div
+                      v-if="isVrlEditorDisabled"
+                      class="tw:absolute tw:bottom-0 tw:w-full"
+                      :style="{
+                        marginTop: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor:
+                          store.state.theme == 'dark'
+                            ? 'rgba(255, 255, 255, 0.1)'
+                            : 'rgba(0, 0, 0, 0.1)',
+                      }"
+                      data-test="vrl-editor-disabled-warning"
+                    >
+                      <q-icon
+                        name="warning"
+                        color="warning"
+                        size="20px"
+                        class="q-mx-sm"
+                      />
+                      <span
+                        class="text-negative q-pa-sm"
+                        style="font-weight: 600; font-size: 14px"
+                        >VRL function is only supported for table chart.</span
+                      >
+                    </div>
                   </div>
                 </div>
               </template>
@@ -2025,6 +2055,14 @@ export default defineComponent({
       if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
 
       return searchObj.data.transformType === "function";
+    });
+
+    // Check if VRL editor should be disabled (in visualize mode with non-table chart)
+    const isVrlEditorDisabled = computed(() => {
+      return (
+        searchObj.meta.logsVisualizeToggle === "visualize" &&
+        dashboardPanelData.data.type !== "table"
+      );
     });
 
     watch(
@@ -4020,6 +4058,12 @@ export default defineComponent({
               ? "0.375rem solid var(--o2-card-bg)"
               : "0.375rem solid var(--o2-card-bg)"
             : "none",
+        // Conditional width when focused (expand-on-focus active)
+        width: isFocused.value
+          ? store.state.isAiChatEnabled
+            ? "calc(75% - 104px)" // AI chat enabled: 75% minus nav width
+            : "calc(100% - 104px)" // AI chat disabled: full width minus nav
+          : undefined,
       };
     });
     const editorWidthToggleFunction = computed(() => {
@@ -4356,6 +4400,7 @@ export default defineComponent({
       actionEditorQuery,
       isActionsEnabled,
       showFunctionEditor,
+      isVrlEditorDisabled,
       closeSocketWithError,
       histogram_svg,
       visualizeIcon,
@@ -4606,7 +4651,7 @@ export default defineComponent({
   position: fixed !important;
   height: calc(100vh - 12.5rem) !important;
   z-index: 20 !important;
-  width: calc(100% - 104px);
+  /* Width is now handled dynamically via backgroundColorStyle computed property */
 }
 
 .file-type label {

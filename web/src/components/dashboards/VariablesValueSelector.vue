@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -995,9 +995,15 @@ export default defineComponent({
         const oldValue = oldVariablesData[v.name];
         const currentValue = v.value;
 
+        // Check if variable has custom or "all" default selection configured
+        const hasCustomOrAllDefault =
+          v.selectAllValueForMultiSelect === "custom" ||
+          v.selectAllValueForMultiSelect === "all";
+
         // CRITICAL FIX: If manager has reset a variable's value to null/empty array,
         // we MUST clear oldVariablesData immediately, otherwise the old value will be
         // restored when API response arrives
+        // HOWEVER: If variable has custom/all default, set it to that value instead
         const managerHasResetValue =
           (currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0)) &&
           oldValue !== undefined &&
@@ -1005,8 +1011,56 @@ export default defineComponent({
           (!Array.isArray(oldValue) || oldValue.length > 0);
 
         if (managerHasResetValue) {
-          // Manager reset this variable - clear oldVariablesData so it gets fresh value from API
-          oldVariablesData[v.name] = undefined;
+          // Manager reset this variable
+          if (hasCustomOrAllDefault) {
+            // Variable has custom/all default - set it to the configured value
+            if (v.selectAllValueForMultiSelect === "custom" && v.customMultiSelectValue?.length > 0) {
+              const customValue = v.multiSelect
+                ? v.customMultiSelectValue
+                : v.customMultiSelectValue[0];
+              oldVariablesData[v.name] = customValue;
+              v.value = customValue;
+              // Mark as partially loaded so child variables know this variable is ready
+              v.isVariablePartialLoaded = true;
+              v.isLoading = false;
+              v.isVariableLoadingPending = false;
+
+              // Notify manager that this variable is loaded so it can trigger children
+              if (useManager && manager) {
+                const variableKey = getVariableKey(
+                  v.name,
+                  v.scope || "global",
+                  v.tabId,
+                  v.panelId,
+                );
+                manager.onVariablePartiallyLoaded(variableKey);
+              }
+            } else if (v.selectAllValueForMultiSelect === "all") {
+              const allValue = v.multiSelect
+                ? [SELECT_ALL_VALUE]
+                : SELECT_ALL_VALUE;
+              oldVariablesData[v.name] = allValue;
+              v.value = allValue;
+              // Mark as partially loaded so child variables know this variable is ready
+              v.isVariablePartialLoaded = true;
+              v.isLoading = false;
+              v.isVariableLoadingPending = false;
+
+              // Notify manager that this variable is loaded so it can trigger children
+              if (useManager && manager) {
+                const variableKey = getVariableKey(
+                  v.name,
+                  v.scope || "global",
+                  v.tabId,
+                  v.panelId,
+                );
+                manager.onVariablePartiallyLoaded(variableKey);
+              }
+            }
+          } else {
+            // No custom/all default - clear oldVariablesData so it gets fresh value from API
+            oldVariablesData[v.name] = undefined;
+          }
           return; // Skip further processing for this variable
         }
 
@@ -1024,11 +1078,6 @@ export default defineComponent({
         // Check if this is a child variable
         const isChildVariable =
           variablesDependencyGraph[v.name]?.parentVariables?.length > 0;
-
-        // Check if variable has custom or "all" default selection configured
-        const hasCustomOrAllDefault =
-          v.selectAllValueForMultiSelect === "custom" ||
-          v.selectAllValueForMultiSelect === "all";
 
         // If currently reset AND variable is marked as pending (about to load)
         // OR if options are empty (was reset), then clear oldVariablesData
@@ -1757,6 +1806,46 @@ export default defineComponent({
             variableObject.selectAllValueForMultiSelect === "custom" ||
             variableObject.selectAllValueForMultiSelect === "all";
 
+          // IMPORTANT: Before loading, check if variable has custom or "all" default
+          // and if its value is empty/null, set it to the default value
+          // This applies to both initial load and subsequent loads (e.g., when parent changes)
+          if (hasCustomOrAllDefault && !searchText) {
+            const currentValueIsEmpty =
+              variableObject.value === null ||
+              variableObject.value === undefined ||
+              (Array.isArray(variableObject.value) &&
+                variableObject.value.length === 0);
+
+            if (currentValueIsEmpty) {
+              variableLog(
+                variableObject.name,
+                `Variable has no value but has custom/all default - setting default value before load`,
+              );
+
+              // Set the default value based on configuration
+              if (
+                variableObject.selectAllValueForMultiSelect === "custom" &&
+                variableObject.customMultiSelectValue?.length > 0
+              ) {
+                variableObject.value = variableObject.multiSelect
+                  ? variableObject.customMultiSelectValue
+                  : variableObject.customMultiSelectValue[0];
+              } else if (variableObject.selectAllValueForMultiSelect === "all") {
+                variableObject.value = variableObject.multiSelect
+                  ? [SELECT_ALL_VALUE]
+                  : SELECT_ALL_VALUE;
+              }
+
+              // Update oldVariablesData to track this value
+              oldVariablesData[variableObject.name] = variableObject.value;
+
+              variableLog(
+                variableObject.name,
+                `Set default value to: ${JSON.stringify(variableObject.value)}`,
+              );
+            }
+          }
+
           // for initial loading check if the value is already available,
           // do not load the values
           if (isInitialLoad && !searchText) {
@@ -1925,9 +2014,9 @@ export default defineComponent({
       let dummyQuery: string;
 
       if (searchText) {
-        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}" WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
       } else {
-        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}"`;
       }
 
       // Construct the filter from the query data
