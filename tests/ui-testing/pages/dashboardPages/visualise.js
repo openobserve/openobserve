@@ -123,7 +123,7 @@ export default class LogsVisualise {
   //stream index list
   async streamIndexList() {
     await this.page
-      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
+      .locator('[data-test="panel-editor-field-list-collapsed-icon"]')
       .click();
   }
   //logs: Select stream
