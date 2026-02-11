@@ -1467,6 +1467,35 @@ export const convertSQLData = async (
     };
   };
 
+  // Build a lookup map ONCE for O(1) access during series generation
+  // Key: "breakdownValue_xAxisValue", Value: data row
+  // This prevents nested O(n┬▓) loops in getSeriesData
+  const buildDataLookupMap = () => {
+    const dataMap = new Map<string, any>();
+
+    if (!breakDownKeys.length || !xAxisKeys.length) {
+      return dataMap;
+    }
+
+    const breakdownKey = breakDownKeys[0];
+    const xAxisKey = xAxisKeys[0];
+
+    for (const item of missingValueData) {
+      const breakdownValue = getDataValue(item, breakdownKey);
+      const xValue = getDataValue(item, xAxisKey);
+      const key = `${breakdownValue}_${xValue}`;
+
+      // Only set if NOT already present (keeps FIRST occurrence, matching original .find() behavior)
+      if (!dataMap.has(key)) {
+        dataMap.set(key, item);
+      }
+    }
+
+    return dataMap;
+  };
+
+  const dataLookupMap = buildDataLookupMap();
+
   const getSeriesData = (
     breakdownKey: string,
     yAxisKey: string,
@@ -1475,17 +1504,13 @@ export const convertSQLData = async (
     if (!(breakdownKey !== null && yAxisKey !== null && xAxisKey !== null))
       return [];
 
-    const data = missingValueData.filter(
-      (it: any) => getDataValue(it, breakdownKey) == xAxisKey,
-    );
-
-    const seriesData = options.xAxis[0].data.map(
-      (it: any) =>
-        getDataValue(
-          data.find((it2: any) => getDataValue(it2, xAxisKeys[0]) == it),
-          yAxisKey,
-        ) ?? null,
-    );
+    // Use the pre-built lookup map for O(1) access instead of O(n) filter + find
+    // xAxisKey parameter is the breakdown value passed from getSeries()
+    const seriesData = options.xAxis[0].data.map((xValue: any) => {
+      const lookupKey = `${xAxisKey}_${xValue}`;
+      const dataRow = dataLookupMap.get(lookupKey);
+      return dataRow ? (getDataValue(dataRow, yAxisKey) ?? null) : null;
+    });
 
     return seriesData;
   };
@@ -2136,21 +2161,30 @@ export const convertSQLData = async (
       ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
-      const zValues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
-        // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = searchQueryData[0].filter(
-          (it: any) => getDataValue(it, key1) == first,
-        );
+      // Build lookup map ONE TIME - O(n) instead of nested O(n┬▓)
+      const heatmapLookupMap = new Map<string, any>();
 
-        return xAxisZerothPositionUniqueValue.map((zero: any) => {
-          return (
-            getDataValue(
-              data.find((it: any) => getDataValue(it, key0) == zero),
-              yAxisKey0,
-            ) || "-"
-          );
-        });
+      searchQueryData[0].forEach((row: any) => {
+        const yAxisValue = getDataValue(row, key1);
+        const xAxisValue = getDataValue(row, key0);
+        const compositeKey = `${yAxisValue}||${xAxisValue}`;
+
+        // Only set if NOT already present (keeps FIRST occurrence, matching original nested .find() behavior)
+        if (!heatmapLookupMap.has(compositeKey)) {
+          heatmapLookupMap.set(compositeKey, row);
+        }
       });
+
+      // Use map for instant O(1) lookups
+      const zValues: any = xAxisFirstPositionUniqueValue.map(
+        (yAxisValue: any) => {
+          return xAxisZerothPositionUniqueValue.map((xAxisValue: any) => {
+            const compositeKey = `${yAxisValue}||${xAxisValue}`;
+            const dataRow = heatmapLookupMap.get(compositeKey);
+            return dataRow ? getDataValue(dataRow, yAxisKey0) || "-" : "-";
+          });
+        },
+      );
 
       (options.visualMap = {
         min: 0,
