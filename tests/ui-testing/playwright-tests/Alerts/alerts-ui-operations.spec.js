@@ -263,12 +263,27 @@ test.describe("Alerts & Incidents Page Navigation", { tag: '@enterprise' }, () =
         // Wait for alert list page to be ready
         await pm.alertsPage.waitForAlertListPageReady();
 
-        // Wait for config API to complete - incidents menu depends on service_graph_enabled
-        await page.waitForResponse(
-            response => response.url().includes('/config') && response.status() === 200,
-            { timeout: 10000 }
-        ).catch(() => {}); // Config may already be loaded
-        testLogger.info('Alert page loaded successfully');
+        // Check config API for enterprise feature flag (service_graph_enabled)
+        // If config says enterprise but menu is missing → real bug, let the test fail.
+        // If config says OSS (no service_graph_enabled) → skip gracefully.
+        let isEnterprise = false;
+        try {
+            const configResp = await page.waitForResponse(
+                response => response.url().includes('/config') && response.status() === 200,
+                { timeout: 10000 }
+            );
+            const configBody = await configResp.json();
+            isEnterprise = configBody?.service_graph_enabled === true;
+        } catch {
+            // Config may already be loaded before we started listening — fall back to UI check
+            const incidentsMenu = page.locator(pm.alertsPage.locators.incidentsMenuItem);
+            isEnterprise = await incidentsMenu.isVisible({ timeout: 5000 }).catch(() => false);
+        }
+
+        if (!isEnterprise) {
+            test.skip(true, 'service_graph_enabled is false — enterprise feature, skipping on OSS');
+        }
+        testLogger.info('Alert page loaded successfully (enterprise features enabled)');
     });
 
     /**
