@@ -272,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("correlation.logs.noDataDetails") }}
           </p>
           <q-btn
+            v-if="!props.hideResetFiltersButton"
             class="o2-secondary-button"
             :label="t('correlation.logs.resetFilters')"
             outline
