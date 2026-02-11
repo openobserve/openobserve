@@ -1252,15 +1252,25 @@ export default defineComponent({
 
               // if stream type and stream is exists
               if (variableData?.query_data?.stream) {
-                // get schema of that field using getstream
-                const fieldWithSchema: any = await getStream(
-                  variableData?.query_data?.stream,
-                  variableData.query_data.stream_type,
-                  true,
-                );
+                // Check if stream is a variable reference (contains $)
+                const isVariableReference = variableData.query_data.stream?.includes('$');
+                console.log("[Variable Config Init] Stream:", variableData.query_data.stream, "Is variable reference:", isVariableReference);
 
-                // assign the schema
-                data.currentFieldsList = fieldWithSchema?.schema ?? [];
+                if (isVariableReference) {
+                  // Don't fetch schema for variable references - field list will be empty
+                  console.log("[Variable Config Init] ⚠️ Variable reference detected - skipping schema fetch");
+                  data.currentFieldsList = [];
+                } else {
+                  // get schema of that field using getstream (only for real streams)
+                  const fieldWithSchema: any = await getStream(
+                    variableData?.query_data?.stream,
+                    variableData.query_data.stream_type,
+                    true,
+                  );
+
+                  // assign the schema
+                  data.currentFieldsList = fieldWithSchema?.schema ?? [];
+                }
               } else {
                 // reset field list array
                 data.currentFieldsList = [];
@@ -1271,9 +1281,20 @@ export default defineComponent({
               data.currentFieldsList = [];
             }
           } catch (error: any) {
-            showErrorNotification(error ?? "Failed to get stream fields", {
-              timeout: 2000,
-            });
+            // Check if the error is for a variable reference (should be suppressed)
+            const isVariableReference = variableData?.query_data?.stream?.includes('$');
+            console.error("[Variable Config Init] Error loading stream/fields:", error);
+            console.log("[Variable Config Init] Is variable reference:", isVariableReference);
+
+            if (!isVariableReference) {
+              // Only show error if it's NOT a variable reference
+              console.error("[Variable Config Init] Showing error notification");
+              showErrorNotification(error ?? "Failed to get stream fields", {
+                timeout: 2000,
+              });
+            } else {
+              console.log("[Variable Config Init] ✅ Suppressing error for variable reference (expected)");
+            }
           }
         }
       },
@@ -1680,8 +1701,29 @@ export default defineComponent({
       }));
       console.log("[Variable Config] Stream options:", streamOptions.length, "streams");
 
-      // Variables first, then streams
-      const combined = [...variableOptions, ...streamOptions];
+      // Build combined list with section separators
+      const combined = [];
+
+      // Add variables section if there are any variables
+      if (variableOptions.length > 0) {
+        combined.push({
+          label: '── Variables ──',
+          value: null,
+          disable: true,
+        });
+        combined.push(...variableOptions);
+      }
+
+      // Add streams section if there are any streams
+      if (streamOptions.length > 0) {
+        combined.push({
+          label: '── Streams ──',
+          value: null,
+          disable: true,
+        });
+        combined.push(...streamOptions);
+      }
+
       console.log("[Variable Config] Total stream options:", combined.length);
       return combined;
     });
@@ -1704,8 +1746,29 @@ export default defineComponent({
       }));
       console.log("[Variable Config] Field options:", fieldOptions.length, "fields");
 
-      // Variables first, then fields
-      const combined = [...variableOptions, ...fieldOptions];
+      // Build combined list with section separators
+      const combined = [];
+
+      // Add variables section if there are any variables
+      if (variableOptions.length > 0) {
+        combined.push({
+          label: '── Variables ──',
+          value: null,
+          disable: true,
+        });
+        combined.push(...variableOptions);
+      }
+
+      // Add fields section if there are any fields
+      if (fieldOptions.length > 0) {
+        combined.push({
+          label: '── Fields ──',
+          value: null,
+          disable: true,
+        });
+        combined.push(...fieldOptions);
+      }
+
       console.log("[Variable Config] Total field options:", combined.length);
       return combined;
     });
