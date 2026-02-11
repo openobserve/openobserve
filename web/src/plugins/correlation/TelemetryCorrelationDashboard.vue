@@ -361,6 +361,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :span-list-prop="traceSpanList"
               :start-time-prop="computedTraceStartTime"
               :end-time-prop="computedTraceEndTime"
+              :correlated-log-stream="
+                logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+              "
               :show-back-button="false"
               :show-timeline="false"
               :show-log-stream-selector="false"
@@ -407,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-xs"
                   >
                     <q-tooltip>
-                      {{ t("correlation.viewInTracesTooltip") }}
+                      {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
                   </q-btn>
                   <q-chip dense color="primary" text-color="white">
@@ -711,6 +714,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :span-list-prop="traceSpanList"
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
+            :correlated-log-stream="
+              logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+            "
             :show-back-button="false"
             :show-timeline="false"
             :show-log-stream-selector="false"
@@ -760,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                 >
                   <q-tooltip>
-                    {{ t("correlation.viewInTracesTooltip") }}
+                    {{ t("correlation.viewInTraces") }}
                   </q-tooltip>
                 </q-btn>
               </div>
@@ -1998,55 +2004,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
 };
 
 /**
- * Get service field names from the "service" semantic group
- * Falls back to common field names if semantic groups not loaded yet
- */
-const getServiceFieldNames = (): string[] => {
-  // Try to find the "service" semantic group
-  const serviceGroup = semanticGroups.value.find(
-    (group) => group.id === "service" || group.id?.toLowerCase() === "service",
-  );
-
-  if (serviceGroup && serviceGroup.fields.length > 0) {
-    return serviceGroup.fields;
-  }
-
-  // Fallback to common service field names if semantic groups not loaded
-  return [
-    "service_name",
-    "service",
-    "svc",
-    "app",
-    "application",
-    "app_name",
-    "attributes_service_name",
-    "resource_service_name",
-    "resource_attributes_service_name",
-    "service_service_name",
-    "job",
-  ];
-};
-
-/**
- * Find the service field name and value from StreamInfo filters
- * Uses semantic groups to get the list of possible service field names
- */
-const findServiceFilter = (
-  filters: Record<string, string> | undefined,
-): { fieldName: string; value: string } | null => {
-  if (!filters) return null;
-
-  const serviceFieldNames = getServiceFieldNames();
-  for (const fieldName of serviceFieldNames) {
-    if (filters[fieldName]) {
-      return { fieldName, value: filters[fieldName] };
-    }
-  }
-  return null;
-};
-
-/**
- * Fetch traces via dimension-based correlation (service name match)
+ * Fetch traces via dimension-based correlation
  */
 const fetchTracesByDimensions = async () => {
   if (!props.traceStreams?.length) {
@@ -2056,36 +2014,15 @@ const fetchTracesByDimensions = async () => {
   const traceStreamInfo = props.traceStreams[0];
   const streamName = traceStreamInfo.stream_name;
 
-  // Build filter using the service field from the trace stream's filters
-  // This uses the exact field name from the trace data (e.g., 'service_name', 'service', etc.)
+  // Build filter using ALL filters from the trace stream's filters
+  // This uses all the filters coming from the correlation API
   const filterParts: string[] = [];
 
-  // Find the service field from StreamInfo filters (using semantic group field names)
-  const serviceFilter = findServiceFilter(traceStreamInfo.filters);
-  if (serviceFilter) {
-    filterParts.push(`${serviceFilter.fieldName}='${serviceFilter.value}'`);
-  }
-
-  // Fallback: if no service field in filters, try activeDimensions
-  if (filterParts.length === 0) {
-    const serviceFieldNames = getServiceFieldNames();
-    for (const fieldName of serviceFieldNames) {
-      const normalizedKey = fieldName.replace(/-/g, "_");
-      if (activeDimensions.value[fieldName]) {
-        filterParts.push(`${fieldName}='${activeDimensions.value[fieldName]}'`);
-        break;
-      } else if (activeDimensions.value[normalizedKey]) {
-        filterParts.push(
-          `${normalizedKey}='${activeDimensions.value[normalizedKey]}'`,
-        );
-        break;
-      }
+  // Use all filters from traceStreamInfo.filters
+  if (traceStreamInfo.filters) {
+    for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
+      filterParts.push(`${fieldName}='${value}'`);
     }
-  }
-
-  // Last resort: use the service name from props (FQN) with default field name
-  if (filterParts.length === 0 && props.serviceName) {
-    filterParts.push(`service_name='${props.serviceName}'`);
   }
 
   const filter = filterParts.join(" AND ");
@@ -2116,17 +2053,28 @@ const openTraceInNewWindow = (trace) => {
 
   const org = store.state.selectedOrganization.identifier;
   const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+  const logStream = props.logStreams?.[0]?.stream_name;
 
-  // Build the URL with sql_mode and just trace_id filter
+  const queryParams: any = {
+    stream: traceStream,
+    trace_id: targetTraceId,
+    from: trace?.trace_start_time
+      ? trace.trace_start_time - 10000000
+      : props.timeRange.startTime.toString(),
+    to: trace?.trace_end_time
+      ? trace.trace_end_time + 10000000
+      : props.timeRange.endTime.toString(),
+    org_identifier: org,
+  };
+
+  // Add log_stream parameter if available for auto-selection in trace details
+  if (logStream) {
+    queryParams.log_stream = logStream;
+  }
+
   const route = router.resolve({
     name: "traceDetails",
-    query: {
-      stream: traceStream,
-      trace_id: targetTraceId,
-      from: trace.trace_start_time - 10000000,
-      to: trace.trace_end_time + 10000000,
-      org_identifier: org,
-    },
+    query: queryParams,
   });
 
   // Open in new window/tab
@@ -2140,8 +2088,17 @@ const openTracesPage = () => {
   const org = store.state.selectedOrganization.identifier;
   const traceStream = props.traceStreams?.[0]?.stream_name || "default";
 
-  // Build filter query for service_name
-  const filterQuery = `service_name='${props.serviceName}'`;
+  // Build filter query using all filters from trace stream
+  const filterParts: string[] = [];
+  const traceStreamInfo = props.traceStreams?.[0];
+
+  if (traceStreamInfo?.filters) {
+    for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
+      filterParts.push(`${fieldName}='${value}'`);
+    }
+  }
+
+  const filterQuery = filterParts.join(" AND ");
 
   // Build the URL to open traces page with filters
   const route = router.resolve({

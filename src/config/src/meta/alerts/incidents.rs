@@ -92,21 +92,24 @@ impl std::str::FromStr for IncidentSeverity {
 pub enum CorrelationReason {
     /// Correlation key from Service Discovery
     ServiceDiscovery,
-    /// Fallback: extracted stable dimensions from alert labels
-    ManualExtraction,
-    /// Temporal proximity (future use)
-    Temporal,
-    /// Hierarchical upgrade from weaker to stronger key
-    HierarchicalUpgrade,
+    /// Correlated via shared distributed trace ID
+    TraceBased,
+    /// Correlated by matching environment scope dimensions (cluster, region, namespace)
+    ScopeMatch,
+    /// Correlated by matching workload identity dimensions (service, deployment)
+    WorkloadMatch,
+    /// Fallback: no dimensions found, isolated by alert ID
+    AlertId,
 }
 
 impl std::fmt::Display for CorrelationReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ServiceDiscovery => write!(f, "service_discovery"),
-            Self::ManualExtraction => write!(f, "manual_extraction"),
-            Self::Temporal => write!(f, "temporal"),
-            Self::HierarchicalUpgrade => write!(f, "hierarchical_upgrade"),
+            Self::TraceBased => write!(f, "trace_based"),
+            Self::ScopeMatch => write!(f, "scope_match"),
+            Self::WorkloadMatch => write!(f, "workload_match"),
+            Self::AlertId => write!(f, "alert_id"),
         }
     }
 }
@@ -117,9 +120,10 @@ impl TryFrom<&str> for CorrelationReason {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "service_discovery" => Ok(Self::ServiceDiscovery),
-            "manual_extraction" => Ok(Self::ManualExtraction),
-            "temporal" => Ok(Self::Temporal),
-            "hierarchical_upgrade" => Ok(Self::HierarchicalUpgrade),
+            "trace_based" => Ok(Self::TraceBased),
+            "scope_match" => Ok(Self::ScopeMatch),
+            "workload_match" => Ok(Self::WorkloadMatch),
+            "alert_id" => Ok(Self::AlertId),
             unmatched => Err(format!("'{unmatched}' is not a valid CorrelationReason")),
         }
     }
@@ -129,11 +133,13 @@ impl TryFrom<&str> for CorrelationReason {
 ///
 /// Hierarchy: AlertId (weakest) → Workload → Scope (strongest)
 /// Upgrades only move UP the hierarchy, never down.
+///
+/// Key format: `[KIND]:[key]` where KIND is SCOPE, WORKLOAD, SD, TRACE, or ALERT.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum KeyType {
-    /// Weakest: Correlation by alert_id only (no stable dimensions)
-    /// Format: alert_id_<uuid>
+    /// Weakest: No stable dimensions found, isolated by alert ID
+    /// Format: ALERT:<alert_unique_key>
     AlertId,
     /// Medium: Correlation by workload dimensions (deployment, statefulset, service)
     /// Format: WORKLOAD:<hash>
@@ -145,14 +151,16 @@ pub enum KeyType {
 
 impl KeyType {
     pub fn classify(correlation_key: &str) -> Self {
-        if correlation_key.starts_with("SCOPE:") {
+        if correlation_key.starts_with("SCOPE:")
+            || correlation_key.starts_with("SD:")
+            || correlation_key.starts_with("TRACE:")
+        {
             Self::Scope
         } else if correlation_key.starts_with("WORKLOAD:") {
             Self::Workload
-        } else if correlation_key.starts_with("alert_id_") {
-            Self::AlertId
         } else {
-            Self::Scope
+            // ALERT: prefix or unknown format — treat as weakest
+            Self::AlertId
         }
     }
 
@@ -585,11 +593,12 @@ mod tests {
             CorrelationReason::ServiceDiscovery.to_string(),
             "service_discovery"
         );
+        assert_eq!(CorrelationReason::TraceBased.to_string(), "trace_based");
+        assert_eq!(CorrelationReason::ScopeMatch.to_string(), "scope_match");
         assert_eq!(
-            CorrelationReason::ManualExtraction.to_string(),
-            "manual_extraction"
+            CorrelationReason::WorkloadMatch.to_string(),
+            "workload_match"
         );
-        assert_eq!(CorrelationReason::Temporal.to_string(), "temporal");
     }
 
     #[test]
@@ -624,12 +633,9 @@ mod tests {
         );
         assert_ne!(
             CorrelationReason::ServiceDiscovery,
-            CorrelationReason::ManualExtraction
+            CorrelationReason::ScopeMatch
         );
-        assert_ne!(
-            CorrelationReason::ManualExtraction,
-            CorrelationReason::Temporal
-        );
+        assert_ne!(CorrelationReason::ScopeMatch, CorrelationReason::TraceBased);
     }
 
     #[test]
@@ -721,15 +727,27 @@ mod tests {
 
     #[test]
     fn test_key_type_classify_alert_id() {
-        let key = "alert_id_2QxZj9K0d6XYz8wN3sF5pL4mT7v";
+        let key = "ALERT:2QxZj9K0d6XYz8wN3sF5pL4mT7v";
         assert_eq!(KeyType::classify(key), KeyType::AlertId);
     }
 
     #[test]
-    fn test_key_type_classify_legacy() {
-        // Legacy format (blake3 hash with no prefix) - treat as Scope
-        let key = "abc123def456789012345678901234567890123456789012345678901234";
+    fn test_key_type_classify_trace() {
+        let key = "TRACE:4bf92f3577b34da6a3ce929d0e0e4736";
         assert_eq!(KeyType::classify(key), KeyType::Scope);
+    }
+
+    #[test]
+    fn test_key_type_classify_sd() {
+        let key = "SD:abc123def456789012345678901234567890123456789012345678901234";
+        assert_eq!(KeyType::classify(key), KeyType::Scope);
+    }
+
+    #[test]
+    fn test_key_type_classify_unknown() {
+        // Unknown format — treat as weakest
+        let key = "some_random_string";
+        assert_eq!(KeyType::classify(key), KeyType::AlertId);
     }
 
     #[test]
