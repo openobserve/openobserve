@@ -332,10 +332,11 @@ export default defineComponent({
      */
     const checkForNaturalLanguage = debounce((text: string) => {
       currentEditorText.value = text;
-      const isNL = detectNaturalLanguage(text);
+      const isNL = detectNaturalLanguage(text, props.language);
 
       console.log('[NL2Q-Detection]', {
         text: text.substring(0, 50),
+        language: props.language,
         isNaturalLanguage: isNL,
         currentNlpMode: props.nlpMode
       });
@@ -347,7 +348,7 @@ export default defineComponent({
           console.log('[NL2Q-Detection] Natural language detected, emitting nlpModeDetected: true');
           emit("nlpModeDetected", true);
         } else {
-          console.log('[NL2Q-Detection] SQL detected, emitting nlpModeDetected: false');
+          console.log('[NL2Q-Detection] Query syntax detected, emitting nlpModeDetected: false');
           emit("nlpModeDetected", false);
         }
       } else {
@@ -357,24 +358,43 @@ export default defineComponent({
 
     /**
      * Handles Generate SQL button click
-     * Calls AI to generate SQL and transforms editor content
+     * Calls AI to generate query based on current language (SQL, PromQL, VRL, JavaScript)
      * @param customText - Optional custom text to use instead of editor content
      */
     const handleGenerateSQL = async (customText?: string) => {
       const currentText = customText || currentEditorText.value;
       if (!currentText.trim()) return;
 
-      console.log('[NL2Q-UI] Starting SQL generation for:', currentText);
+      const currentLanguage = props.language?.toLowerCase() || 'sql';
+      console.log('[NL2Q-UI] Starting query generation for language:', currentLanguage, 'text:', currentText);
 
       try {
         // Get organization ID from store
         const orgId = store.state.selectedOrganization?.identifier || 'default';
         console.log('[NL2Q-UI] Organization ID:', orgId);
 
-        // Prefix the natural language text with instruction for AI
-        const prompt = `Generate SQL query : ${currentText}`;
+        // Create language-appropriate prompt
+        let promptPrefix = '';
+        switch (currentLanguage) {
+          case 'promql':
+            promptPrefix = 'Generate PromQL query';
+            break;
+          case 'vrl':
+            promptPrefix = 'Generate VRL function';
+            break;
+          case 'javascript':
+            promptPrefix = 'Generate JavaScript function';
+            break;
+          case 'sql':
+          default:
+            promptPrefix = 'Generate SQL query';
+            break;
+        }
 
-        // Generate SQL from natural language
+        const prompt = `${promptPrefix} : ${currentText}`;
+        console.log('[NL2Q-UI] Generated prompt:', prompt);
+
+        // Generate query from natural language
         console.log('[NL2Q-UI] Calling generateSQL...');
         const generatedSQL = await generateSQL(prompt, orgId);
         console.log('[NL2Q-UI] generateSQL returned:', {
@@ -417,8 +437,8 @@ export default defineComponent({
           return; // Success without SQL
         }
 
-        // Normal SQL generation - transform and update editor
-        const transformedText = transformToSQL(currentText, generatedSQL);
+        // Normal query generation - transform and update editor with language-specific comments
+        const transformedText = transformToSQL(currentText, generatedSQL, props.language);
         console.log('[NL2Q-UI] Transformed text:', transformedText);
 
         // Update editor value
