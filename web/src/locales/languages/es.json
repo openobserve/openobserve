@@ -125,7 +125,7 @@
     "source": "Fuente",
     "noResult": "Sin resultados",
     "syntaxGuide": "Guía de sintaxis",
-    "rowsPerPage": "Registros por página",
+    "recordsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "de",
     "rowDetail": "Detalles de la fila",
