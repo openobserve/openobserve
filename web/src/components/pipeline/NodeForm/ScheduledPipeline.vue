@@ -1080,23 +1080,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mt-1"
                     />
                   </span>
-                  <query-editor
+                  <UnifiedQueryEditor
                     v-show="expandState.query"
                     data-test="scheduled-pipeline-sql-editor"
                     ref="pipelineEditorRef"
-                    editor-id="pipeline-query-editor"
-                    :debounceTime="300"
-                    class="monaco-editor"
-                    v-model:query="query"
+                    :languages="tab === 'promql' ? ['promql'] : ['sql']"
+                    :default-language="tab === 'promql' ? 'promql' : 'sql'"
+                    :query="query"
                     :class="
                       query == '' && queryEditorPlaceholderFlag
                         ? 'empty-query'
                         : ''
                     "
                     @update:query="updateQueryValue"
-                    @focus="focusQueryEditor"
-                    @blur="onBlurQueryEditor"
-                    style="height: calc(100vh - 190px) !important"
+                    editor-height="calc(100vh - 190px)"
                   />
                 </div>
 
@@ -1307,9 +1304,11 @@ import config from "../../../aws-exports";
 import useAiChat from "@/composables/useAiChat";
 import { onBeforeUnmount } from "vue";
 import { debounce } from "lodash-es";
+import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
+import { contextRegistry } from "@/composables/contextProviders";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
+const UnifiedQueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -1553,12 +1552,59 @@ watch(
   },
 );
 
+// Watch for stream name changes and update context provider
+watch(selectedStreamName, (newStreamName) => {
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    newStreamName,
+    selectedStreamType.value,
+    tab.value
+  );
+  contextRegistry.register('pipelines', contextProvider);
+});
+
+// Watch for stream type changes and update context provider
+watch(selectedStreamType, (newStreamType) => {
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    selectedStreamName.value,
+    newStreamType,
+    tab.value
+  );
+  contextRegistry.register('pipelines', contextProvider);
+});
+
+// Watch for query type changes and update context provider
+watch(tab, (newTab) => {
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    selectedStreamName.value,
+    selectedStreamType.value,
+    newTab
+  );
+  contextRegistry.register('pipelines', contextProvider);
+});
+
 onBeforeMount(async () => {
   await importSqlParser();
 });
 
 onMounted(async () => {
   await getStreamList();
+
+  // Initialize context provider for AI queries
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    selectedStreamName.value,
+    selectedStreamType.value,
+    tab.value
+  );
+  contextRegistry.register('pipelines', contextProvider);
+  contextRegistry.setActive('pipelines');
 
   setTimeout(() => {
     if (tab.value === "sql" && query.value != "") {

@@ -35,7 +35,9 @@ import type { ContextProvider, PageContext } from './types';
 export const createAlertsContextProvider = (
   formData: any,
   store: any,
-  isUpdated: boolean
+  isUpdated: boolean,
+  streamName?: string,
+  streamType?: string
 ): ContextProvider => {
   return {
     getContext(): PageContext {
@@ -48,6 +50,9 @@ export const createAlertsContextProvider = (
         user_intent: isUpdated ? 'edit existing alert' : 'create new alert',
         // Current timestamp when request is fired (microseconds) for AI agent time calculations
         request_timestamp: Date.now() * 1000,
+        // Stream information for AI query generation
+        selectedStreams: streamName ? [streamName] : ['default'],
+        streamType: streamType || 'logs',
       };
     }
   };
