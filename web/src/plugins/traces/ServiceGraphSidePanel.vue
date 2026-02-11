@@ -65,20 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               View Logs is currently disabled
             </q-tooltip>
           </q-btn>
-          <q-btn
-            outline
-            no-caps
-            size="sm"
-            label="🔍 View Traces"
-            @click="handleViewTraces"
-            data-test="service-graph-side-panel-view-traces-btn"
-            class="action-btn"
-            :disable="isAllStreamsSelected"
-          >
-            <q-tooltip v-if="isAllStreamsSelected">
-              Please select a specific stream to view traces
-            </q-tooltip>
-          </q-btn>
         </div>
 
         <!-- Metrics Section -->
@@ -86,48 +72,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="panel-section metrics-section"
           data-test="service-graph-side-panel-metrics"
         >
-          <div class="section-title">Metrics</div>
-
-          <!-- Request Rate Card (Full Width) -->
-          <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
-            <div class="metric-header">
-              <span class="metric-label">Total Requests:</span>
-              <span class="metric-value-large">
-                {{ serviceMetrics.requestRateValue }}
-                <span class="metric-unit">req/min</span>
-              </span>
-            </div>
-            <div class="metric-breakdown">
-              <div class="breakdown-item breakdown-incoming">
-                <div class="breakdown-icon-wrapper incoming">
-                  <q-icon name="arrow_downward" size="16px" />
-                </div>
-                <div class="breakdown-content">
-                  <span class="breakdown-label">Incoming</span>
-                  <span class="breakdown-value">{{ formatNumber(serviceMetrics.incomingRequests) }}</span>
-                </div>
-              </div>
-              <div class="breakdown-item breakdown-outgoing">
-                <div class="breakdown-icon-wrapper outgoing">
-                  <q-icon name="arrow_upward" size="16px" />
-                </div>
-                <div class="breakdown-content">
-                  <span class="breakdown-label">Outgoing</span>
-                  <span class="breakdown-value">{{ formatNumber(serviceMetrics.outgoingRequests) }}</span>
-                </div>
-              </div>
-            </div>
+          <div class="section-header">
+            <div class="section-title">Metrics</div>
+            <q-btn
+              unelevated
+              no-caps
+              size="sm"
+              label="View Traces"
+              @click="handleViewTraces"
+              data-test="service-graph-side-panel-view-traces-btn"
+              class="view-traces-btn"
+              :disable="isAllStreamsSelected"
+            >
+              <q-tooltip v-if="isAllStreamsSelected">
+                Please select a specific stream to view traces
+              </q-tooltip>
+            </q-btn>
           </div>
 
-          <!-- Error Rate and P95 Latency (Two Columns) -->
-          <div class="metrics-grid-bottom">
-            <div class="metric-card" data-test="service-graph-side-panel-error-rate">
-              <div class="metric-label">Error Rate</div>
-              <div class="metric-value">{{ serviceMetrics.errorRate }}</div>
+          <!-- Request Rate Card (Full Width - Combined Metrics) -->
+          <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
+            <div class="metric-single-line">
+              <div class="metric-total">
+                <span class="total-label">Total:</span>
+                <span class="total-value">{{ serviceMetrics.requestRateValue }}</span>
+                <span class="total-unit">req/min</span>
+                <q-tooltip>Total Requests (all requests for this service)</q-tooltip>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-inline incoming">
+                <q-icon name="arrow_forward" size="12px" />
+                <span class="inline-value">{{ formatNumber(serviceMetrics.incomingRequests) }}</span>
+                <q-tooltip>Incoming Requests (requests coming into this service)</q-tooltip>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-inline outgoing">
+                <span class="inline-value">{{ formatNumber(serviceMetrics.outgoingRequests) }}</span>
+                <q-icon name="arrow_forward" size="12px" />
+                <q-tooltip>Outgoing Requests (requests going out from this service)</q-tooltip>
+              </div>
             </div>
-            <div class="metric-card" data-test="service-graph-side-panel-p95-latency">
-              <div class="metric-label">P95 Latency</div>
-              <div class="metric-value">{{ serviceMetrics.p95Latency }}</div>
+
+            <!-- Horizontal Divider -->
+            <div class="metric-horizontal-divider"></div>
+
+            <!-- Error Rate and P95 Latency (Bottom Row) -->
+            <div class="metric-bottom-row">
+              <div class="metric-inline-item error-rate-card" :class="getErrorRateClass()" data-test="service-graph-side-panel-error-rate">
+                <q-icon name="error_outline" size="14px" />
+                <span class="metric-label">Error Rate:</span>
+                <span class="metric-value">{{ serviceMetrics.errorRate }}</span>
+              </div>
+              <div class="metric-row-divider"></div>
+              <div class="metric-inline-item latency-card" :class="getLatencyClass()" data-test="service-graph-side-panel-p95-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P95 Latency:</span>
+                <span class="metric-value">{{ serviceMetrics.p95Latency }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -679,6 +680,35 @@ export default defineComponent({
       }
     };
 
+    // Get color class for error rate card
+    const getErrorRateClass = (): string => {
+      const errorRateStr = serviceMetrics.value.errorRate;
+      if (errorRateStr === 'N/A') return 'status-unknown';
+
+      const errorRate = parseFloat(errorRateStr);
+      if (errorRate < 1) return 'status-healthy';
+      if (errorRate < 5) return 'status-warning';
+      return 'status-critical';
+    };
+
+    // Get color class for latency card
+    const getLatencyClass = (): string => {
+      const latencyStr = serviceMetrics.value.p95Latency;
+      if (latencyStr === 'N/A') return 'status-unknown';
+
+      // Parse latency value (could be "125ms" or "1.5s")
+      let latencyMs = 0;
+      if (latencyStr.endsWith('ms')) {
+        latencyMs = parseFloat(latencyStr);
+      } else if (latencyStr.endsWith('s')) {
+        latencyMs = parseFloat(latencyStr) * 1000;
+      }
+
+      if (latencyMs < 100) return 'status-healthy';
+      if (latencyMs < 500) return 'status-warning';
+      return 'status-critical';
+    };
+
     return {
       upstreamServices,
       downstreamServices,
@@ -688,6 +718,8 @@ export default defineComponent({
       getHealthColor,
       getHealthText,
       formatNumber,
+      getErrorRateClass,
+      getLatencyClass,
       handleClose,
       handleViewLogs,
       handleViewTraces,
@@ -757,7 +789,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid #2d3548;
   background: #1a1f2e;
   flex-shrink: 0;
@@ -862,11 +894,11 @@ export default defineComponent({
   display: flex;
   gap: 8px;
   padding: 0;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
 
   .action-btn {
-    flex: 1;
+    width: 35%;
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 500;
@@ -880,6 +912,23 @@ export default defineComponent({
       border-color: #3b82f6;
       transform: translateY(-1px);
     }
+
+  }
+}
+
+.view-traces-btn {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+  border-radius: 4px;
+  padding: 0px 12px;
+  min-width: 90px;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
   }
 }
 
@@ -899,8 +948,8 @@ export default defineComponent({
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #0f1419; 
-  padding: 20px; 
+  background: #0f1419;
+  padding: 0px 12px 8px 12px; 
 
   
   &::-webkit-scrollbar {
@@ -940,19 +989,25 @@ export default defineComponent({
 
 .panel-section {
   padding: 0;
-  margin-bottom: 24px; 
+  margin-bottom: 12px;
 
   &:last-child {
     margin-bottom: 0;
   }
 
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
   .section-title {
-    font-size: 14px; 
+    font-size: 14px;
     font-weight: 600;
     text-transform: none;
     letter-spacing: 0;
-    margin-bottom: 12px; 
-    color: #e4e7eb; 
+    color: #e4e7eb;
   }
 }
 
@@ -962,184 +1017,214 @@ export default defineComponent({
 
 
 .metrics-section {
-  // Full-width card for total requests
+  // Full-width card for total requests (single line)
   .metric-card-full {
-    padding: 20px;
-    border-radius: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
     background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
     border: 1px solid #374151;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
     &:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(99, 102, 241, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.3);
       border-color: rgba(99, 102, 241, 0.4);
     }
 
-    .metric-header {
+    .metric-single-line {
       display: flex;
-      align-items: baseline;
-      gap: 8px;
-      margin-bottom: 16px;
-      padding: 12px;
-      border-radius: 6px;
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
-      border: 1px solid rgba(99, 102, 241, 0.15);
-    }
-
-    .metric-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: #a5b4fc;
-    }
-
-    .metric-value-large {
-      font-size: 20px;
-      font-weight: 800;
-      color: #e0e7ff;
-      letter-spacing: -0.02em;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-
-      .metric-unit {
-        font-size: 12px;
-        font-weight: 500;
-        color: #a5b4fc;
-        margin-left: 4px;
-      }
-    }
-
-    .metric-breakdown {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      align-items: center;
       gap: 12px;
-      padding-top: 16px;
-      border-top: 1px solid #2d3548;
 
-      .breakdown-item {
+      .metric-total {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+        border: 1px solid rgba(99, 102, 241, 0.15);
+
+        .total-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #a5b4fc;
+        }
+
+        .total-value {
+          font-size: 16px;
+          font-weight: 800;
+          color: #e0e7ff;
+          letter-spacing: -0.02em;
+        }
+
+        .total-unit {
+          font-size: 10px;
+          font-weight: 500;
+          color: #a5b4fc;
+        }
+      }
+
+      .metric-divider {
+        width: 1px;
+        height: 20px;
+        background: #374151;
+      }
+
+      .metric-inline {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 12px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        gap: 5px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        flex: 1;
+
+        &.incoming {
+          color: #a5b4fc;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.02));
+          border: 1px solid rgba(99, 102, 241, 0.15);
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+          }
+        }
+
+        &.outgoing {
+          color: #a5b4fc;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.02));
+          border: 1px solid rgba(99, 102, 241, 0.15);
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+          }
+        }
+
+        .inline-value {
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+      }
+    }
+
+    // Horizontal divider between top and bottom rows
+    .metric-horizontal-divider {
+      width: 100%;
+      height: 1px;
+      background: #374151;
+      margin: 10px 0 8px 0;
+    }
+
+    // Bottom row for error rate and p95 latency
+    .metric-bottom-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .metric-inline-item {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-radius: 4px;
         transition: all 0.2s ease;
 
-        &:hover {
-          background: rgba(255, 255, 255, 0.04);
-          border-color: rgba(255, 255, 255, 0.1);
-          transform: translateY(-1px);
-        }
+        // Status-based styling
+        &.status-healthy {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02));
+          border: 1px solid rgba(16, 185, 129, 0.15);
 
-        .breakdown-icon-wrapper {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
-          flex-shrink: 0;
-          transition: all 0.2s ease;
-
-          &.incoming {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+          .q-icon {
             color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.2);
           }
 
-          &.outgoing {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
-            color: #3b82f6;
-            border: 1px solid rgba(59, 130, 246, 0.2);
+          .metric-value {
+            color: #10b981;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.15);
           }
         }
 
-        .breakdown-content {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          flex: 1;
+        &.status-warning {
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.02));
+          border: 1px solid rgba(251, 191, 36, 0.15);
 
-          .breakdown-label {
-            font-size: 10px;
-            font-weight: 600;
+          .q-icon {
+            color: #fbbf24;
+          }
+
+          .metric-value {
+            color: #fbbf24;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.04));
+            box-shadow: 0 0 6px rgba(251, 191, 36, 0.15);
+          }
+        }
+
+        &.status-critical {
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02));
+          border: 1px solid rgba(239, 68, 68, 0.15);
+
+          .q-icon {
+            color: #ef4444;
+          }
+
+          .metric-value {
+            color: #ef4444;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.04));
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.15);
+          }
+        }
+
+        &.status-unknown {
+          background: linear-gradient(135deg, rgba(107, 114, 128, 0.08), rgba(107, 114, 128, 0.02));
+          border: 1px solid rgba(107, 114, 128, 0.15);
+
+          .q-icon {
+            color: #6b7280;
+          }
+
+          .metric-value {
             color: #9ca3af;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          }
-
-          .breakdown-value {
-            font-size: 18px;
-            font-weight: 700;
-            color: #e4e7eb;
-            letter-spacing: -0.01em;
           }
         }
 
-        &.breakdown-incoming:hover .breakdown-icon-wrapper.incoming {
-          background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(16, 185, 129, 0.1));
-          box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
-        }
-
-        &.breakdown-outgoing:hover .breakdown-icon-wrapper.outgoing {
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.1));
-          box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
-        }
-      }
-    }
-  }
-
-  // Bottom grid for error rate and p95 latency
-  .metrics-grid-bottom {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-
-    .metric-card {
-      padding: 12px;
-      border-radius: 8px;
-      text-align: center;
-      background: #242938;
-      border: 1px solid #2d3548;
-      transition: all 0.2s ease;
-
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-      }
-
-      .metric-label {
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: none;
-        letter-spacing: 0;
-        margin-bottom: 6px;
-        color: #9ca3af;
-      }
-
-      .metric-value {
-        font-size: 20px;
-        font-weight: 700;
-        color: #e4e7eb;
-        letter-spacing: -0.01em;
-        white-space: nowrap;
-
-        &.green { color: #10b981; }
-        &.yellow { color: #fbbf24; }
-        &.orange { color: #f97316; }
-        &.red { color: #ef4444; }
-
-        .metric-unit {
+        .metric-label {
           font-size: 11px;
-          font-weight: 500;
+          font-weight: 600;
           color: #9ca3af;
-          margin-left: 4px;
+          white-space: nowrap;
         }
+
+        .metric-value {
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+      }
+
+      .metric-row-divider {
+        width: 1px;
+        height: 20px;
+        background: #374151;
       }
     }
   }
+
 }
 
 .body--light .metrics-section {
@@ -1149,149 +1234,212 @@ export default defineComponent({
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
     &:hover {
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(99, 102, 241, 0.2);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(99, 102, 241, 0.2);
       border-color: rgba(99, 102, 241, 0.3);
     }
 
-    .metric-header {
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.03));
-      border-color: rgba(99, 102, 241, 0.2);
+    .metric-single-line {
+      .metric-total {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.03));
+        border-color: rgba(99, 102, 241, 0.2);
 
-      .metric-label {
-        color: #6366f1;
-      }
+        .total-label {
+          color: #6366f1;
+        }
 
-      .metric-value-large {
-        color: #4338ca;
+        .total-value {
+          color: #4338ca;
+        }
 
-        .metric-unit {
+        .total-unit {
           color: #6366f1;
         }
       }
-    }
 
-    .metric-breakdown {
-      border-top-color: #e0e0e0;
+      .metric-divider {
+        background: #d1d5db;
+      }
 
-      .breakdown-item {
-        background: rgba(0, 0, 0, 0.02);
-        border-color: rgba(0, 0, 0, 0.08);
+      .metric-inline {
+        &.incoming {
+          color: #6366f1;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+          border-color: rgba(99, 102, 241, 0.2);
 
-        &:hover {
-          background: rgba(0, 0, 0, 0.04);
-          border-color: rgba(0, 0, 0, 0.12);
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(99, 102, 241, 0.04));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
+          }
         }
 
-        .breakdown-icon-wrapper {
-          &.incoming {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
+        &.outgoing {
+          color: #6366f1;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+          border-color: rgba(99, 102, 241, 0.2);
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(99, 102, 241, 0.04));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
+          }
+        }
+      }
+    }
+
+    .metric-horizontal-divider {
+      background: #d1d5db;
+    }
+
+    .metric-bottom-row {
+      .metric-inline-item {
+        &.status-healthy {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.01));
+          border-color: rgba(16, 185, 129, 0.2);
+
+          .q-icon {
             color: #059669;
-            border-color: rgba(16, 185, 129, 0.25);
           }
 
-          &.outgoing {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
-            color: #2563eb;
-            border-color: rgba(59, 130, 246, 0.25);
-          }
-        }
-
-        .breakdown-content {
-          .breakdown-label {
-            color: rgba(0, 0, 0, 0.6);
+          .metric-value {
+            color: #059669;
           }
 
-          .breakdown-value {
-            color: #202124;
+          &:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.03));
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.12);
           }
         }
 
-        &.breakdown-incoming:hover .breakdown-icon-wrapper.incoming {
-          background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.08));
-          box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+        &.status-warning {
+          background: linear-gradient(135deg, rgba(217, 119, 6, 0.06), rgba(217, 119, 6, 0.01));
+          border-color: rgba(217, 119, 6, 0.2);
+
+          .q-icon {
+            color: #d97706;
+          }
+
+          .metric-value {
+            color: #d97706;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(217, 119, 6, 0.1), rgba(217, 119, 6, 0.03));
+            box-shadow: 0 0 6px rgba(217, 119, 6, 0.12);
+          }
         }
 
-        &.breakdown-outgoing:hover .breakdown-icon-wrapper.outgoing {
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.08));
-          box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+        &.status-critical {
+          background: linear-gradient(135deg, rgba(220, 38, 38, 0.06), rgba(220, 38, 38, 0.01));
+          border-color: rgba(220, 38, 38, 0.2);
+
+          .q-icon {
+            color: #dc2626;
+          }
+
+          .metric-value {
+            color: #dc2626;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(220, 38, 38, 0.03));
+            box-shadow: 0 0 6px rgba(220, 38, 38, 0.12);
+          }
         }
+
+        &.status-unknown {
+          background: linear-gradient(135deg, rgba(107, 114, 128, 0.06), rgba(107, 114, 128, 0.01));
+          border-color: rgba(107, 114, 128, 0.2);
+
+          .q-icon {
+            color: #6b7280;
+          }
+
+          .metric-value {
+            color: #6b7280;
+          }
+        }
+
+        .metric-label {
+          color: rgba(0, 0, 0, 0.6);
+        }
+      }
+
+      .metric-row-divider {
+        background: #d1d5db;
       }
     }
   }
 
-  .metrics-grid-bottom .metric-card {
-    background: #ffffff;
-    border-color: #e0e0e0;
-
-    &:hover {
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .metric-label {
-      color: rgba(0, 0, 0, 0.6);
-    }
-
-    .metric-value {
-      color: #202124;
-
-      &.green { color: #059669; }
-      &.yellow { color: #d97706; }
-      &.orange { color: #ea580c; }
-      &.red { color: #dc2626; }
-
-      .metric-unit {
-        color: rgba(0, 0, 0, 0.6);
-      }
-    }
-  }
 }
 
 
 .services-section {
+  .section-title {
+    margin-bottom: 8px;
+  }
+
   .service-list {
     display: flex;
     flex-direction: column;
-    gap: 8px; 
+    padding: 4px 12px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
+    border: 1px solid #374151;
+    gap: 0;
+    max-height: 200px;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    }
 
     .service-list-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px; 
-      border-radius: 6px;
-      background: #242938; 
-      border: 1px solid #2d3548; 
-      transition: all 0.2s ease;
-      cursor: pointer;
+      padding: 8px 0;
+      border-bottom: 1px solid #2d3548;
 
-      &:hover {
-        background: #1a1f2e; 
-        border-color: #3b82f6; 
+      &:last-child {
+        border-bottom: none;
       }
 
       .service-item-name {
-        font-size: 13px; 
+        font-size: 13px;
         font-weight: 500;
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: #e4e7eb; 
+        color: #e4e7eb;
       }
 
       .service-item-health {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 11px;
         font-weight: 600;
         flex-shrink: 0;
 
         &::before {
           content: '●';
-          font-size: 12px;
+          font-size: 10px;
         }
 
         &.healthy {
@@ -1320,45 +1468,56 @@ export default defineComponent({
   .empty-state {
     text-align: left;
     padding: 0;
-    color: #9ca3af; 
+    color: #9ca3af;
     font-size: 13px;
     font-style: normal;
   }
 }
 
 .body--light .services-section {
-  .service-list .service-list-item {
-    background: #ffffff;
-    border-color: #e0e0e0;
+  .service-list {
+    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+    border-color: #d1d5db;
 
-    &:hover {
-      background: #f8f9fa;
-      border-color: #3b82f6;
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
     }
 
-    .service-item-name {
-      color: #202124;
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.3);
+      }
     }
 
-    .service-item-health {
-      &.healthy {
-        background: rgba(16, 185, 129, 0.08);
-        color: #059669;
+    .service-list-item {
+      border-color: #e5e7eb;
+
+      .service-item-name {
+        color: #202124;
       }
 
-      &.degraded {
-        background: rgba(251, 191, 36, 0.08);
-        color: #d97706;
-      }
+      .service-item-health {
+        &.healthy {
+          background: rgba(16, 185, 129, 0.08);
+          color: #059669;
+        }
 
-      &.critical {
-        background: rgba(239, 68, 68, 0.08);
-        color: #dc2626;
-      }
+        &.degraded {
+          background: rgba(251, 191, 36, 0.08);
+          color: #d97706;
+        }
 
-      &.warning {
-        background: rgba(249, 115, 22, 0.08);
-        color: #ea580c;
+        &.critical {
+          background: rgba(239, 68, 68, 0.08);
+          color: #dc2626;
+        }
+
+        &.warning {
+          background: rgba(249, 115, 22, 0.08);
+          color: #ea580c;
+        }
       }
     }
   }
