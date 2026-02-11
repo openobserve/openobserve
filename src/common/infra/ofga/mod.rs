@@ -74,80 +74,23 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     let meta = o2_openfga::model::read_ofga_model().await;
     get_all_init_tuples(&mut init_tuples).await;
-    if let Some(existing_model) = &existing_meta {
-        if meta.version == existing_model.version {
-            log::info!("[OFGA:Local] model already exists & no changes required");
-            if !init_tuples.is_empty() {
-                match update_tuples(init_tuples, vec![]).await {
-                    Ok(_) => {
-                        log::info!("[OFGA:Local] Data migrated to openfga");
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Error writing init ofga tuples to the openfga during migration: {e}"
-                        );
-                    }
+    if let Some(existing_model) = &existing_meta
+        && meta.version == existing_model.version
+    {
+        log::info!("[OFGA:Local] model already exists & no changes required");
+        if !init_tuples.is_empty() {
+            match update_tuples(init_tuples, vec![]).await {
+                Ok(_) => {
+                    log::info!("[OFGA:Local] Data migrated to openfga");
+                }
+                Err(e) => {
+                    log::error!(
+                        "Error writing init ofga tuples to the openfga during migration: {e}"
+                    );
                 }
             }
-            return Ok(());
         }
-
-        log::info!(
-            "[OFGA:Local] model version changed: {} -> {}",
-            existing_model.version,
-            meta.version
-        );
-
-        // Check if ofga migration of index streams are needed
-        let meta_version = version_compare::Version::from(&meta.version).unwrap();
-        let existing_model_version =
-            version_compare::Version::from(&existing_model.version).unwrap();
-        let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
-        let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
-        let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
-        let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
-        let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
-        let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
-        let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
-        let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
-        let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
-        let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
-        let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
-        let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
-        let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
-
-        if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
-            need_pipeline_migration = true;
-        }
-        if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
-            need_cipher_keys_migration = true;
-        }
-        if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
-            need_action_scripts_migration = true;
-        }
-        if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
-            log::info!("[OFGA:Local] Alert folders migration needed");
-            need_alert_folders_migration = true;
-        }
-
-        if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
-            log::info!("[OFGA:Local] Ratelimit migration needed");
-            need_ratelimit_migration = true;
-            need_service_accounts_migration = true;
-        }
-        if meta_version > v0_0_17 && existing_model_version < v0_0_18 {
-            log::info!("[OFGA:Local] AI chat permissions migration needed");
-            need_ai_chat_permissions_migration = true;
-        }
-        if existing_model_version < v0_0_20 {
-            log::info!("[OFGA:Local] re_patterns permissions migration needed");
-            need_re_pattern_permission_migration = true;
-        }
-
-        if existing_model_version < v0_0_21 {
-            log::info!("[OFGA:Local] license permissions migration needed");
-            need_license_permission_migration = true;
-        }
+        return Ok(());
     }
 
     // 1. create a cluster lock
@@ -159,11 +102,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut existing_meta = match db::ofga::get_ofga_model().await {
         Ok(meta) => meta,
         Err(e) => {
-            log::error!("[OFGA] Error getting OFGA model from local: {e}");
-            dist_lock::unlock(&locker)
-                .await
-                .expect("Failed to release lock");
-            return Err(e);
+            log::warn!("[OFGA] Error getting OFGA model from local: {e}");
+            None
         }
     };
     if get_o2_config().super_cluster.enabled {
@@ -179,8 +119,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
         };
         match (meta_in_super, &existing_meta) {
+            // Do not set model to super cluster here, we are doing that anyway after saving the
+            // model in the local. This is to set the latest model version and store id
+            // on super cluster only after the local save is done (the ofga table is
+            // already updated)
             (Some(model), None) => {
                 // set to local
+                log::info!(
+                    "[OFGA:SuperCluster] local model is empty, got model from super cluster with version: {}",
+                    model.version
+                );
                 existing_meta = Some(model.clone());
                 migrate_native_objects = false;
                 if let Err(e) = db::ofga::set_ofga_model_to_db(model).await {
@@ -213,6 +161,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
             _ => {}
         }
     }
+
+    let existing_model_version = existing_meta
+        .as_ref()
+        .map(|existing_meta_model| existing_meta_model.version.clone());
+
     match db::ofga::set_ofga_model(existing_meta).await {
         Ok((store_id, latest_model_version, matched)) => {
             if store_id.is_empty() {
@@ -224,7 +177,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 // Set the model version in the super cluster, only version and store_id is
                 // important
                 if let Err(e) = set_model(Some(OFGAModel {
-                    version: latest_model_version,
+                    version: latest_model_version.clone(),
                     store_id,
                     model_id: "".to_string(),
                     model: None,
@@ -258,6 +211,64 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     .await
                     .expect("Failed to release lock");
                 return Ok(());
+            }
+
+            if let Some(existing_model_version) = existing_model_version {
+                log::info!(
+                    "[OFGA:Local] model version changed: {} -> {}",
+                    existing_model_version,
+                    latest_model_version
+                );
+                // Check if ofga migration of index streams are needed
+                let meta_version = version_compare::Version::from(&latest_model_version).unwrap();
+                let existing_model_version =
+                    version_compare::Version::from(&existing_model_version).unwrap();
+                let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
+                let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
+                let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
+                let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
+                let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
+                let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
+                let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
+                let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
+                let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
+                let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
+                let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
+                let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
+                let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
+
+                if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
+                    need_pipeline_migration = true;
+                }
+                if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
+                    need_cipher_keys_migration = true;
+                }
+                if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
+                    need_action_scripts_migration = true;
+                }
+                if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
+                    log::info!("[OFGA:Local] Alert folders migration needed");
+                    need_alert_folders_migration = true;
+                }
+
+                if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
+                    log::info!("[OFGA:Local] Ratelimit migration needed");
+                    need_ratelimit_migration = true;
+                    need_service_accounts_migration = true;
+                }
+                if meta_version > v0_0_17 && existing_model_version < v0_0_18 {
+                    log::info!("[OFGA:Local] AI chat permissions migration needed");
+                    need_ai_chat_permissions_migration = true;
+                }
+                if existing_model_version < v0_0_20 {
+                    log::info!("[OFGA:Local] re_patterns permissions migration needed");
+                    need_re_pattern_permission_migration = true;
+                }
+
+                if existing_model_version < v0_0_21 {
+                    log::info!("[OFGA:Local] license permissions migration needed");
+                    need_license_permission_migration = true;
+                }
             }
 
             let mut tuples = vec![];
