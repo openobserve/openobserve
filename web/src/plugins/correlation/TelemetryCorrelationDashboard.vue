@@ -133,66 +133,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Logs Tab Panel -->
         <q-tab-panel name="logs" class="tw:p-0">
-          <!-- Refresh Button -->
-          <div
-            v-if="logsDashboardData"
-            class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-          >
-            <q-btn
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadDashboard"
-              :loading="loading"
-              size="sm"
-            />
-          </div>
-
-          <!-- Loading State -->
-          <div
-            v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
-              {{ t("correlation.loadingLogs") }}
-            </div>
-          </div>
-
-          <!-- Logs Dashboard -->
-          <RenderDashboardCharts
-            v-else-if="logsDashboardData"
-            :key="logsDashboardRenderKey"
-            :dashboardData="logsDashboardData"
-            :currentTimeObj="currentTimeObj"
-            :viewOnly="true"
-            :allowAlertCreation="false"
-            searchType="dashboards"
+          <CorrelatedLogsTable
+            :service-name="props.serviceName"
+            :matched-dimensions="activeDimensions"
+            :additional-dimensions="props.additionalDimensions"
+            :available-dimensions="props.availableDimensions"
+            :log-streams="props.logStreams || []"
+            :source-stream="props.sourceStream || ''"
+            :source-type="props.sourceType || ''"
+            :time-range="props.timeRange"
+            :fts-fields="props.ftsFields || []"
+            :hide-dimension-filters="true"
+            :hide-view-related-button="true"
+            :hide-search-term-actions="false"
           />
-
-          <!-- No Logs State -->
-          <div
-            v-else
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="article"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{ t("correlation.service", { service: serviceName }) }}
-            </div>
-          </div>
         </q-tab-panel>
 
         <!-- Metrics Tab Panel -->
@@ -503,63 +457,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       animated
       class="correlation-content tw:flex-1 tw:overflow-auto"
     >
-      <div v-if="activeTab == 'logs'" class="tw:p-0">
-        <!-- Refresh Button -->
-        <div
-          v-if="logsDashboardData"
-          class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
-        >
-          <q-btn
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadDashboard"
-            :loading="loading"
-            size="sm"
-          />
-        </div>
-
-        <!-- Loading State -->
-        <div
-          v-if="loading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
-          <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
-            {{ t("correlation.loadingLogs") }}
-          </div>
-        </div>
-
-        <!-- Logs Dashboard -->
-        <RenderDashboardCharts
-          v-else-if="logsDashboardData"
-          :key="logsDashboardRenderKey"
-          :dashboardData="logsDashboardData"
-          :currentTimeObj="currentTimeObj"
-          :viewOnly="true"
-          :allowAlertCreation="false"
-          searchType="dashboards"
+      <div v-if="activeTab == 'logs'" class="tw:p-0 tw:h-full">
+        <CorrelatedLogsTable
+          :service-name="props.serviceName"
+          :matched-dimensions="activeDimensions"
+          :additional-dimensions="props.additionalDimensions"
+          :available-dimensions="props.availableDimensions"
+          :log-streams="props.logStreams || []"
+          :source-stream="props.sourceStream || ''"
+          :source-type="props.sourceType || ''"
+          :time-range="props.timeRange"
+          :fts-fields="props.ftsFields || []"
+          :hide-dimension-filters="true"
+          :hide-view-related-button="true"
+          :hide-search-term-actions="false"
         />
-
-        <!-- No Logs State -->
-        <div
-          v-else
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <q-icon
-            name="article"
-            size="3.75rem"
-            color="grey-6"
-            class="tw:mb-4"
-          />
-          <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-            {{ t("correlation.service", { service: serviceName }) }}
-          </div>
-        </div>
       </div>
 
       <div v-if="activeTab == 'metrics'" class="tw:h-full">
@@ -922,6 +834,7 @@ import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.v
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TraceBlock from "@/plugins/traces/TraceBlock.vue";
+import CorrelatedLogsTable from "./CorrelatedLogsTable.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -962,7 +875,7 @@ const { showErrorNotification } = useNotifications();
 const store = useStore();
 const router = useRouter();
 const { t } = useI18n();
-const { generateDashboard, generateLogsDashboard } =
+const { generateDashboard } =
   useMetricsCorrelationDashboard();
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 const { formatTracesMetaData } = useTraces();
@@ -970,10 +883,10 @@ const { formatTracesMetaData } = useTraces();
 // Check if embedded tabs mode
 const isEmbeddedTabs = computed(() => props.mode === "embedded-tabs");
 
-// Provide selectedTabId for RenderDashboardCharts to use
+// Provide selectedTabId for RenderDashboardCharts to use (metrics tab only)
 const selectedTabId = computed(() => {
-  // Map our activeTab to dashboard tab IDs
-  return activeTab.value === "logs" ? "logs" : "metrics";
+  // Map our activeTab to dashboard tab IDs (metrics only, logs uses CorrelatedLogsTable)
+  return "metrics";
 });
 provide("selectedTabId", selectedTabId);
 
@@ -981,10 +894,8 @@ const isOpen = ref(true);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const dashboardData = ref<any>(null);
-const logsDashboardData = ref<any>(null);
 const dashboardRenderKey = ref(0);
 const initialLoadCompleted = ref(false); // Track if initial load has completed to avoid duplicate loadDashboard calls
-const logsDashboardRenderKey = ref(0);
 const dashboardChartsRef = ref<any>(null);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
@@ -1458,23 +1369,8 @@ const loadDashboard = async () => {
       // console.log("[TelemetryCorrelationDashboard] No metric streams selected, skipping metrics dashboard");
     }
 
-    // Generate logs dashboard JSON
-    // If we have correlated log streams from API, use those
-    // Otherwise, if coming from logs page, use the source stream with matched dimensions
-    const shouldGenerateLogsDashboard =
-      (props.logStreams && props.logStreams.length > 0) ||
-      (props.sourceType === "logs" && props.sourceStream);
-
-    if (shouldGenerateLogsDashboard) {
-      const logsDashboard = generateLogsDashboard(
-        props.logStreams || [],
-        config,
-      );
-      logsDashboardData.value = logsDashboard;
-      logsDashboardRenderKey.value++;
-    } else {
-      // console.log("[TelemetryCorrelationDashboard] No log streams and not from logs page");
-    }
+    // Note: Logs are now handled by CorrelatedLogsTable component
+    // which manages its own data fetching and rendering
   } catch (err: any) {
     // console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
     error.value = err.message || t("correlation.failedToLoad");
