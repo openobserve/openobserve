@@ -1935,6 +1935,56 @@
       "evaluationTime": "评估",
       "queryTime": "查询 (ms)",
       "error": "错误"
+    },
+    "back": "返回",
+    "continue": "继续",
+    "wouldTrigger": "会触发",
+    "wouldNotTrigger": "不会触发",
+    "queryBuilder": "生成器",
+    "groupByHelp": {
+      "description": "按特定字段对聚合数据进行分组，为每个唯一值创建单独的警报。",
+      "example": "示例：按 “主机名” 分组以获取每台服务器的单独警报，或按 “status_code” 分组以分别跟踪错误。"
+    },
+    "conditions": {
+      "condition": "状况",
+      "conditionGroup": "条件组",
+      "addConditionTooltip": "向该组添加新条件",
+      "addConditionGroupTooltip": "添加嵌套条件组（最大深度：2）",
+      "maxDepthReachedTooltip": "已达到最大嵌套深度"
+    },
+    "compareWithPast": {
+      "alertSetFor": "警报设置为",
+      "currentWindow": "当前窗口",
+      "cycle": "周期",
+      "cycleTooltip": "将结果与上一个周期的相同时间进行比较。",
+      "runningFor": "在每 {频率} 的间隔内运行 {period}",
+      "currentWindowCannotBeDeleted": "无法删除当前窗口",
+      "comparingWith": "与之比较",
+      "referenceWindow": "参考窗口",
+      "timeFrame": "时间框架",
+      "timeFrameTooltip": "您的查询的时间范围。",
+      "comparingText": "将当前窗口查询结果与先前 {offset} 的查询结果进行比较。",
+      "addComparisonWindow": "添加比较窗口",
+      "goToConditions": "转到条件",
+      "goToConditionsTooltip": "单击 “转到条件” 以验证所选比较窗口的事件"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron 时间表",
+      "addNewDestination": "添加新目的地",
+      "cooldownTooltip": "如果警报触发，则应等待多长时间才能发送另一条通知。例如，如果警报在下午 4:00 触发，静音通知设置为 10 分钟，则即使警报在 1 分钟后仍然存在，它也要等到下午 4:10 才会发送其他通知。这是为了避免向用户发送垃圾通知。",
+      "thresholdTooltip": "根据事件数或聚合值定义何时触发警报。示例：如果设置为 “> 100”，则当事件数超过 100 个时会触发警报。",
+      "periodTooltip": "查询应运行的时间段。例如 10 分钟意味着无论何时运行查询，都将使用最后 10 分钟的数据。",
+      "frequencyTooltipMinutes": "任务应多久执行一次。例如每 5 分钟一次。",
+      "frequencyTooltipCron": "标准 UNIX cron 格式，有 5 个由空格分隔的字段：[0-59 分钟] [小时 0-23] [本月第 1-31 天] [第 1-12 个月或 1 月至 12 月] [周日 0-7 或 '1L-7L'，0 和 7 表示星期日]。",
+      "timezoneWarning": "警告：显示的时区是近似值。手动验证并选择正确的时区。",
+      "destinationsTooltip": "选择一个或多个目的地发送警报通知。",
+      "templateTooltip": "可选：选择一个模板用于此警报中的所有目的地。模板允许您自定义警报消息的格式。如果未选中，则每个目的地都将使用其自己的配置模板。"
+    },
+    "advanced": {
+      "addVariable": "添加变量",
+      "variablesTooltip": "变量用于将数据从警报传递到目标。",
+      "rowTemplateTooltip": "行模板用于格式化警报消息。",
+      "templateType": "模板类型："
     }
   },
   "alert_templates": {

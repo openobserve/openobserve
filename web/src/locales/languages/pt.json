@@ -1935,6 +1935,56 @@
       "evaluationTime": "Avaliação (ões)",
       "queryTime": "Consulta (ms)",
       "error": "Erro"
+    },
+    "back": "Voltar",
+    "continue": "Continuar",
+    "wouldTrigger": "DESENCADEARIA",
+    "wouldNotTrigger": "NÃO ACIONARIA",
+    "queryBuilder": "Construtor",
+    "groupByHelp": {
+      "description": "Agrupe os dados agregados por campos específicos para criar alertas separados para cada valor exclusivo.",
+      "example": "Exemplo: agrupe por “nome de host” para receber alertas individuais por servidor ou por “status_code” para rastrear erros separadamente."
+    },
+    "conditions": {
+      "condition": "Condição",
+      "conditionGroup": "Grupo de condições",
+      "addConditionTooltip": "Adicionar uma nova condição a este grupo",
+      "addConditionGroupTooltip": "Adicionar um grupo de condições aninhado (profundidade máxima: 2)",
+      "maxDepthReachedTooltip": "Profundidade máxima de aninhamento alcançada"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Alerta definido para",
+      "currentWindow": "Janela atual",
+      "cycle": "Ciclo",
+      "cycleTooltip": "Compare os resultados com o mesmo horário no ciclo anterior.",
+      "runningFor": "Executando por {período} no intervalo de cada {frequência}",
+      "currentWindowCannotBeDeleted": "A janela atual não pode ser excluída",
+      "comparingWith": "Comparando com",
+      "referenceWindow": "Janela de referência",
+      "timeFrame": "Período de tempo",
+      "timeFrameTooltip": "Intervalo de tempo para sua consulta.",
+      "comparingText": "Comparando o resultado da consulta da janela atual com o resultado da consulta do {offset} anterior.",
+      "addComparisonWindow": "Adicionar janela de comparação",
+      "goToConditions": "Vá para Condições",
+      "goToConditionsTooltip": "Clique em “Ir para as condições” para verificar os eventos nas janelas de comparação selecionadas"
+    },
+    "alertSettings": {
+      "cronSchedule": "Programação Cron",
+      "addNewDestination": "Adicionar novo destino",
+      "cooldownTooltip": "Se o alerta for acionado, quanto tempo ele deve esperar antes de enviar outra notificação. Por exemplo, se o alerta for acionado às 16h e a notificação de silêncio estiver definida para 10 minutos, ele não enviará outra notificação até as 16h10, mesmo que o alerta ainda esteja após 1 minuto. Isso é para evitar enviar spam ao usuário com notificações.",
+      "thresholdTooltip": "Define quando o alerta deve ser acionado com base na contagem de eventos ou no valor agregado. Exemplo: Se definido como “> 100\", o alerta é acionado quando a contagem excede 100 eventos.",
+      "periodTooltip": "Período durante o qual a consulta deve ser executada. Por exemplo, 10 minutos significa que sempre que a consulta for executada, ela usará os últimos 10 minutos de dados.",
+      "frequencyTooltipMinutes": "Com que frequência a tarefa deve ser executada. Por exemplo, a cada 5 minutos.",
+      "frequencyTooltipCron": "Formato cron padrão do UNIX com 5 campos separados por espaço: [Minuto 0-59] [Hora 0-23] [Dia do mês 1-31] [Mês 1-12 ou JAN-DEZ] [Dia da semana 0-7 ou '1L-7L', 0 e 7 para domingo].",
+      "timezoneWarning": "Aviso: O fuso horário exibido é aproximado. Verifique e selecione o fuso horário correto manualmente.",
+      "destinationsTooltip": "Selecione um ou mais destinos para enviar notificações de alerta.",
+      "templateTooltip": "Opcional: selecione um modelo para usar em todos os destinos neste alerta. Os modelos permitem que você personalize o formato das mensagens de alerta. Se não for selecionado, cada destino usará seu próprio modelo configurado."
+    },
+    "advanced": {
+      "addVariable": "Adicionar variável",
+      "variablesTooltip": "As variáveis são usadas para passar dados do alerta para o destino.",
+      "rowTemplateTooltip": "O modelo de linha é usado para formatar a mensagem de alerta.",
+      "templateType": "Tipo de modelo:"
     }
   },
   "alert_templates": {
