@@ -2934,5 +2934,9 @@
     "invalidFormat": "Ungültiges Format",
     "mustBeGreaterThan": "Muss größer als {value} sein",
     "mustBeLessThan": "Muss kleiner als {value} sein"
+  },
+  "nlMode": {
+    "toggle": "Modus für natürliche Sprache",
+    "noAdditionalOptions": "Keine zusätzlichen Optionen"
   }
 }

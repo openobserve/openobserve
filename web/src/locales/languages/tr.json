@@ -2934,5 +2934,9 @@
     "invalidFormat": "Geçersiz biçim",
     "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
     "mustBeLessThan": "{value} 'den küçük olmalıdır"
+  },
+  "nlMode": {
+    "toggle": "Doğal Dil Modu",
+    "noAdditionalOptions": "Ek seçenek yok"
   }
 }

@@ -2934,5 +2934,9 @@
     "invalidFormat": "格式无效",
     "mustBeGreaterThan": "必须大于 {值}",
     "mustBeLessThan": "必须小于 {值}"
+  },
+  "nlMode": {
+    "toggle": "自然语言模式",
+    "noAdditionalOptions": "没有其他选项"
   }
 }

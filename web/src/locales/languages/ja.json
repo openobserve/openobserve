@@ -2934,5 +2934,9 @@
     "invalidFormat": "形式が無効です",
     "mustBeGreaterThan": "{value} より大きくなければなりません",
     "mustBeLessThan": "{value} より小さくなければなりません"
+  },
+  "nlMode": {
+    "toggle": "自然言語モード",
+    "noAdditionalOptions": "追加オプションなし"
   }
 }

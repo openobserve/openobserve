@@ -2934,5 +2934,9 @@
     "invalidFormat": "잘못된 형식",
     "mustBeGreaterThan": "{value} 보다 커야 합니다.",
     "mustBeLessThan": "{value} 보다 작아야 합니다."
+  },
+  "nlMode": {
+    "toggle": "자연어 모드",
+    "noAdditionalOptions": "추가 옵션 없음"
   }
 }
