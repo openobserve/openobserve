@@ -34,11 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="localTab !== 'custom'"
           data-test="step2-view-editor-btn"
           label="View Editor"
-          icon="edit"
           size="sm"
-          class="text-bold add-variable no-border q-py-sm"
-          color="primary"
-          style="border-radius: 4px; text-transform: capitalize; color: #fff !important; font-size: 12px; min-width: 130px;"
+          class="o2-secondary-button q-py-sm"
           @click="viewSqlEditor = true"
         />
       </div>

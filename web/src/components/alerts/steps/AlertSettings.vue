@@ -59,10 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   margin-left: 0 !important;
                   height: 36px;
                 "
-                :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'bg-grey-10'
+                    ? 'bg-grey-9'
                     : 'bg-grey-2'
                 "
                 class="flex justify-center items-center"
@@ -93,9 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="input-border"
                 bg-color="input-bg"
                 class="showLabelOnTop no-case destinations-select-field"
-                :class="
-                  store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
-                "
                 filled
                 dense
                 multiple
@@ -306,8 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
-                :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+               
+                :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
                 class="flex justify-center items-center"
               >
                 {{ t("alerts.minutes") }}
@@ -407,8 +403,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                  :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
-                  :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                 
+                  :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
                   class="flex justify-center items-center"
                 >
                   {{ t("alerts.minutes") }}
@@ -488,7 +484,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div ref="silenceFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
               <div
                 style="width: 87px; margin-left: 0 !important"
-                class="silence-notification-input"
               >
                 <q-input
                   v-model.number="formData.trigger_condition.silence"
@@ -496,7 +491,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   borderless
                   min="0"
-                  style="background: none"
                   debounce="300"
                   @update:model-value="emitTriggerUpdate"
                 />
@@ -507,10 +501,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   margin-left: 0 !important;
                   height: 36px;
                 "
-                :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
+               
                 :class="
                   store.state.theme === 'dark'
-                    ? 'bg-grey-10'
+                    ? 'bg-grey-9'
                     : 'bg-grey-2'
                 "
                 class="flex justify-center items-center"
@@ -596,8 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-select>
               <q-btn
                 icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                class=" q-ml-xs"
                 padding="xs"
                 unelevated
                 size="sm"
@@ -674,8 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-select>
               <q-btn
                 icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                class="q-ml-xs"
                 padding="xs"
                 unelevated
                 size="sm"

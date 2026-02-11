@@ -429,13 +429,13 @@ export default defineComponent({
 }
 
 .dark-mode-multi-window .reference-window-container {
-  background-color: #111111;
-  border: 1px solid #343939;
+  background-color: var(--o2-card-bg, #212121);
+  border: 1px solid var(--o2-border-color, #343434);
 }
 
 .light-mode-multi-window .reference-window-container {
-  background-color: #ffffff;
-  border: 1px solid #e0e0e0;
+  background-color: var(--o2-card-bg, #ffffff);
+  border: 1px solid var(--o2-border-color, #e6e6e6);
 }
 
 .reference-window-container {
@@ -444,13 +444,13 @@ export default defineComponent({
 }
 
 .dark-mode-multi-window .multi-window-container {
-  background-color: #111111;
-  border: 1px solid #343939;
+  background-color: var(--o2-card-bg, #212121);
+  border: 1px solid var(--o2-border-color, #343434);
 }
 
 .light-mode-multi-window .multi-window-container {
-  background-color: #ffffff;
-  border: 1px solid #e0e0e0;
+  background-color: var(--o2-card-bg, #ffffff);
+  border: 1px solid var(--o2-border-color, #e6e6e6);
 }
 
 .multi-window-container {

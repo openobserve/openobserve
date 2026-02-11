@@ -344,7 +344,7 @@ export default defineComponent({
 
   .section-header {
     flex-shrink: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
     transition: all 0.2s ease;
     border-radius: 0.375rem 0.375rem 0 0;
     user-select: none;
