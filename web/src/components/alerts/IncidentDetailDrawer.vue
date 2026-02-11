@@ -790,6 +790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="(alert, index) in sortedAlertsByTriggerCount"
                       :key="alert.id"
                       class="tw:py-2.5 tw:border-b"
+                      data-test="related-alert-item"
                       :style="{
                         borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
                       }"
@@ -809,11 +810,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-tooltip v-if="alert.name.length > 30">
                             {{ alert.name }}
                           </q-tooltip>
-                          <span class="tw:font-medium tw:truncate tw:block">
+                          <span class="tw:font-medium tw:truncate tw:block" data-test="related-alert-name">
                             {{ alert.name.length > 30 ? alert.name.substring(0, 30) + '...' : alert.name }}
                           </span>
                         </div>
-                        <div class="tw:flex-shrink-0" style="width: 120px;">
+                        <div class="tw:flex-shrink-0" data-test="related-alert-count" style="width: 120px;">
                           <span
                             :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
                           >

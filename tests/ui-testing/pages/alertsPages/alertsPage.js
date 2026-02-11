@@ -176,9 +176,9 @@ export class AlertsPage {
 
             // Incident detail — Overview tab locators
             relatedAlertsContainer: '.o2-incident-card-bg',
-            relatedAlertItem: '[class*="tw:py-2"]',
-            relatedAlertName: '.tw\\:truncate',
-            relatedAlertCountText: '[style*="width: 120px"]',
+            relatedAlertItem: '[data-test="related-alert-item"]',
+            relatedAlertName: '[data-test="related-alert-name"]',
+            relatedAlertCountText: '[data-test="related-alert-count"]',
             severityBadge: '.q-badge',
 
             // Incident detail — tab selectors (Quasar q-tab)

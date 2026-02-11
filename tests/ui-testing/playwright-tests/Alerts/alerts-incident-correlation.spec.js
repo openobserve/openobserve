@@ -324,18 +324,23 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
 
     const startTime = Date.now();
     const pollInterval = 15000; // 15 seconds between polls
+    let lastIngestTime = 0; // Track last re-ingestion time
 
     while (Date.now() - startTime < maxWaitMs) {
         // Check for incident rows
-        const rowCount = await page.locator(INCIDENT_ROW_SELECTOR).count().catch(() => 0);
+        const rowCount = await page.locator(INCIDENT_ROW_SELECTOR).count().catch((e) => {
+            testLogger.warn('Failed to count incident rows', { error: e.message });
+            return 0;
+        });
         if (rowCount > 0) {
             testLogger.info(`Found ${rowCount} incident(s) after ${Math.round((Date.now() - startTime) / 1000)}s`);
             return true;
         }
 
-        // Also re-ingest data to keep it within the alert lookback window
-        if ((Date.now() - startTime) % 60000 < pollInterval) {
+        // Re-ingest data every 60s to keep it within the alert lookback window
+        if (Date.now() - lastIngestTime >= 60000) {
             await ingestTestData(page);
+            lastIngestTime = Date.now();
         }
 
         testLogger.info(`No incidents yet, waiting... (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`);
