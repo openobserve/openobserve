@@ -24,6 +24,9 @@ installQuasar({
   plugins: [Notify],
 });
 
+// Create a mock router instance that persists across tests
+const mockRouterPush = vi.fn();
+
 // Mock dependencies
 vi.mock("@/services/search", () => ({
   default: {
@@ -33,7 +36,7 @@ vi.mock("@/services/search", () => ({
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockRouterPush,
   }),
 }));
 
@@ -221,6 +224,7 @@ describe("ServiceGraphSidePanel.vue", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRouterPush.mockClear();
     // Mock clipboard API
     Object.assign(navigator, {
       clipboard: {
@@ -635,6 +639,150 @@ describe("ServiceGraphSidePanel.vue", () => {
 
       // The method should be callable without errors
       expect(wrapper.vm.handleTraceClick).toBeTruthy();
+    });
+
+    it("should navigate to trace details with correct query parameters", () => {
+      wrapper = createWrapper();
+
+      const mockTrace = {
+        traceId: "test-trace-12345",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "traceDetails",
+        query: {
+          trace_id: "test-trace-12345",
+          stream: "default",
+          org_identifier: "test-org",
+          from: mockTimeRange.startTime,
+          to: mockTimeRange.endTime,
+        },
+      });
+    });
+
+    it("should include time range parameters in navigation", () => {
+      const customTimeRange = {
+        startTime: 1609459200000, // 2021-01-01 00:00:00
+        endTime: 1609545600000,   // 2021-01-02 00:00:00
+      };
+
+      wrapper = createWrapper({
+        timeRange: customTimeRange,
+      });
+
+      const mockTrace = {
+        traceId: "trace-abc123",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            from: customTimeRange.startTime,
+            to: customTimeRange.endTime,
+          }),
+        })
+      );
+    });
+
+    it("should use stream filter from props", () => {
+      wrapper = createWrapper({
+        streamFilter: "custom-stream",
+      });
+
+      const mockTrace = {
+        traceId: "trace-xyz789",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            stream: "custom-stream",
+          }),
+        })
+      );
+    });
+
+    it("should use default stream when streamFilter is empty", () => {
+      wrapper = createWrapper({
+        streamFilter: "",
+      });
+
+      const mockTrace = {
+        traceId: "trace-def456",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            stream: "default",
+          }),
+        })
+      );
+    });
+
+    it("should include org identifier from store", () => {
+      wrapper = createWrapper();
+
+      const mockTrace = {
+        traceId: "trace-org123",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            org_identifier: "test-org",
+          }),
+        })
+      );
+    });
+
+    it("should handle different org identifiers", () => {
+      wrapper = createWrapper({}, {
+        selectedOrganization: {
+          identifier: "different-org",
+        },
+      });
+
+      const mockTrace = {
+        traceId: "trace-different",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            org_identifier: "different-org",
+          }),
+        })
+      );
+    });
+
+    it("should navigate when trace is clicked in UI", async () => {
+      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
+
+      wrapper = createWrapper({ visible: true, streamFilter: "default" });
+      await flushPromises();
+      await nextTick();
+
+      const traceItems = wrapper.findAll('[data-test="service-graph-side-panel-trace-item"]');
+      expect(traceItems.length).toBeGreaterThan(0);
+
+      // Click on the trace ID
+      const traceId = traceItems[0].find(".trace-id");
+      await traceId.trigger("click");
+
+      expect(mockRouterPush).toHaveBeenCalled();
     });
   });
 

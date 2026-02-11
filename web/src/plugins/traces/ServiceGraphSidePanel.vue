@@ -646,6 +646,8 @@ export default defineComponent({
           trace_id: trace.traceId,
           stream: props.streamFilter || 'default',
           org_identifier: store.state.selectedOrganization.identifier,
+          from: props.timeRange.startTime,
+          to: props.timeRange.endTime,
         }
       });
     };
