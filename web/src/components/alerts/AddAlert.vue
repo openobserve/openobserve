@@ -33,11 +33,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
-          {{ t("alerts.updateTitle") }}: {{ formData.name }}
-        </div>
-        <div v-else class="text-h6" data-test="add-alert-title">
-          {{ t("alerts.addTitle") }}
+        <div class="text-h6 tw:flex tw:items-center" data-test="add-alert-title">
+          <template v-if="beingUpdated">
+            {{ t("alerts.updateTitle") }}:
+            <span
+              :class="[
+                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
+                store.state.theme === 'dark'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50'
+              ]"
+            >
+              {{ formData.name }}
+              <q-tooltip v-if="formData?.name?.length > 25" class="tw:text-sm">
+                {{ formData.name }}
+              </q-tooltip>
+            </span>
+          </template>
+          <template v-else>
+            {{ t("alerts.addTitle") }}
+          </template>
         </div>
         </div>
         <div class="flex items-center tw:gap-2">

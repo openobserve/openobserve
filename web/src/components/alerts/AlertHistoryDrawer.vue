@@ -317,7 +317,7 @@ const historyTableColumns = [
     name: 'status',
     label: t('alerts.historyTable.status'),
     field: 'status',
-    align: 'center' as const,
+    align: 'left' as const,
     sortable: true
   },
   {
