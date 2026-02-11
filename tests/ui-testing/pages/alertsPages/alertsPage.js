@@ -26,6 +26,8 @@ export class AlertsPage {
     constructor(page) {
         this.page = page;
         this.commonActions = new CommonActions(page);
+        // NOTE: Reset per construction is sufficient — AlertsPage is instantiated fresh
+        // per test via PageManager, so this value resets to 0 for each test automatically.
         this._lifecycleRowIndex = 0;
 
         this.locators = this._initializeLocators();
@@ -1162,9 +1164,15 @@ export class AlertsPage {
      * Wait for incident status update notification
      */
     async waitForStatusUpdateNotification() {
-        // The notification text varies, but we can check for the success notification
-        await this.page.waitForTimeout(2000);
-        testLogger.info('Waited for status update');
+        // Wait for Quasar success notification to appear, with fixed timeout fallback
+        const notification = this.page.locator('.q-notification__message');
+        try {
+            await notification.first().waitFor({ state: 'visible', timeout: 5000 });
+            testLogger.info('Status update notification appeared');
+        } catch {
+            // Notification may have already disappeared or not rendered — proceed
+            testLogger.info('Notification not captured (may have auto-dismissed), continuing');
+        }
     }
 
     /**

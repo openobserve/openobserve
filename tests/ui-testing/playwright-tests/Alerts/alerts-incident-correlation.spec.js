@@ -33,8 +33,8 @@ const PageManager = require('../../pages/page-manager.js');
 // TEST DATA CONFIGURATION
 // ============================================================================
 
-// Unique 5-char alphanumeric run ID — isolates this run's alerts/incidents
-const RUN_ID = Math.random().toString(36).substring(2, 7);
+// Unique run ID (timestamp + random) — avoids collisions even in parallel execution
+const RUN_ID = Date.now().toString(36).slice(-4) + Math.random().toString(36).substring(2, 5);
 
 const STREAM_NAME = 'e2e_incident_corr'; // Shared stream, persists across runs
 const TEMPLATE_NAME = `e2e_incid_${RUN_ID}_tmpl`;
@@ -105,6 +105,9 @@ const ALERTS = [
 // SETUP HELPER FUNCTIONS
 // ============================================================================
 
+// NOTE: Base64 encoding runs in Node (server-side), then the token is passed to
+// page.evaluate for browser-side fetch. This is acceptable in E2E tests — the
+// credentials are already in env vars and the browser has full auth state from user.json.
 function getAuthToken() {
     return Buffer.from(
         `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
@@ -342,7 +345,9 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
             return true;
         }
 
-        // Re-ingest data every 60s to keep it within the alert lookback window
+        // NOTE: Re-ingestion is intentional — alerts have a lookback window and data
+        // must stay fresh or alerts won't fire. This is not data bloat; the stream
+        // is shared and persists across runs regardless.
         if (Date.now() - lastIngestTime >= 60000) {
             await ingestTestData(page);
             lastIngestTime = Date.now();
@@ -539,18 +544,24 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
             await page.goto(`${baseUrl}?org_identifier=${org}`);
             await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-            // Step 1: Resolve incidents (can't be deleted, so resolve is our cleanup)
-            await resolveTestIncidents(page);
+            // Each cleanup step runs independently so one failure doesn't block the rest
+            const steps = [
+                ['Resolve incidents', () => resolveTestIncidents(page)],
+                ['Delete alerts', () => cleanupAlerts(page, setupFolderId)],
+                ['Delete folder', () => cleanupFolder(page, setupFolderId)],
+                ['Delete destination', () => cleanupDestination(page)],
+                ['Delete template', () => cleanupTemplate(page)],
+            ];
 
-            // Step 2: Delete alerts, then folder, then destination, then template
-            await cleanupAlerts(page, setupFolderId);
-            await cleanupFolder(page, setupFolderId);
-            await cleanupDestination(page);
-            await cleanupTemplate(page);
+            for (const [name, fn] of steps) {
+                try {
+                    await fn();
+                } catch (err) {
+                    testLogger.warn(`Cleanup step "${name}" failed (non-fatal)`, { error: err.message });
+                }
+            }
 
             testLogger.info(`=== CLEANUP COMPLETE (run ${RUN_ID}, stream data preserved) ===`);
-        } catch (err) {
-            testLogger.warn('Cleanup encountered errors (non-fatal)', { error: err.message });
         } finally {
             await page.close();
             await context.close();
