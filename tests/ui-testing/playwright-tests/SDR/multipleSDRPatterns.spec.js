@@ -244,7 +244,6 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     testLogger.info('✓ All patterns unlinked from field');
 
     // Now delete each pattern (only our test's patterns with unique suffix)
-    let deletedCount = 0;
     for (const patternName of allTestPatterns) {
       testLogger.info(`Checking and deleting pattern: ${patternName}`);
 
@@ -256,7 +255,6 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
         const deleteResult = await pm.sdrPatternsPage.deletePatternByName(patternName);
 
         if (deleteResult.success) {
-          deletedCount++;
           testLogger.info(`✓ Pattern ${patternName} deleted successfully`);
         } else if (deleteResult.reason === 'in_use') {
           testLogger.warn(`Pattern ${patternName} still in use. Unlinking and retrying...`);
@@ -269,20 +267,20 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
           await pm.sdrPatternsPage.navigateToRegexPatterns();
           const retryDelete = await pm.sdrPatternsPage.deletePatternByName(patternName);
           if (retryDelete.success) {
-            deletedCount++;
             testLogger.info(`✓ Pattern ${patternName} deleted after unlinking`);
           } else {
             testLogger.warn(`⚠ Could not delete pattern ${patternName}, may need manual cleanup`);
           }
         }
       } else {
-        deletedCount++;
-        testLogger.info(`✓ Pattern ${patternName} does not exist, no cleanup needed`);
+        testLogger.info(`✓ Pattern ${patternName} already absent, no cleanup needed`);
       }
-    }
 
-    // Verify all patterns were handled
-    expect(deletedCount).toBe(allTestPatterns.length);
+      // Verify pattern is gone regardless of which path was taken
+      await pm.sdrPatternsPage.navigateToRegexPatterns();
+      const stillExists = await pm.sdrPatternsPage.checkPatternExists(patternName);
+      expect(stillExists, `Pattern ${patternName} should have been deleted`).toBeFalsy();
+    }
     testLogger.info('=== END CLEANUP COMPLETE ===');
   });
 });

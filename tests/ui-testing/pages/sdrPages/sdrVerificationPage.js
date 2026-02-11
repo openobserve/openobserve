@@ -112,7 +112,7 @@ export class SDRVerificationPage {
 
     expect(logText, 'No logs found in the stream after multiple retries').not.toBeNull();
 
-    testLogger.info(`Latest log text (first 300 chars): ${logText.substring(0, 300)}...`);
+    testLogger.info(`Latest log text (first 300 chars): ${logText?.substring(0, 300)}...`);
 
     // Check if field exists in the log
     const fieldAsJsonKey = `"${fieldName}":`;
