@@ -1100,7 +1100,6 @@ body.body--dark {
 .badge-more {
   background: #e5e7eb;
   color: #6b7280;
-  cursor: help;
   font-weight: 500;
 }
 
