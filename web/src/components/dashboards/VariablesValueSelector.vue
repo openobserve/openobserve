@@ -2063,12 +2063,19 @@ export default defineComponent({
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
 
+      // Resolve variable references in stream and field names for SQL query
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
+      console.log(`[Variable Resolution SQL] Stream: "${variableObject.query_data.stream}" → "${resolvedStream}"`);
+      console.log(`[Variable Resolution SQL] Field: "${variableObject.query_data.field}" → "${resolvedField}"`);
+
       let dummyQuery: string;
 
       if (searchText) {
-        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}" WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}" WHERE str_match(${resolvedField}, '${escapeSingleQuotes(searchText.trim())}')`;
       } else {
-        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}"`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}"`;
       }
 
       // Construct the filter from the query data
@@ -2154,16 +2161,23 @@ export default defineComponent({
       variableObject: any,
       queryContext: string,
     ) => {
+      // Resolve variable references in stream and field names
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
+      console.log(`[Variable Resolution REST] Stream: "${variableObject.query_data.stream}" → "${resolvedStream}"`);
+      console.log(`[Variable Resolution REST] Field: "${variableObject.query_data.field}" → "${resolvedField}"`);
+
       const payload = {
         org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
-        stream_name: variableObject.query_data.stream, // Name of the stream
+        stream_name: resolvedStream, // Resolved stream name
         start_time: new Date(
           props.selectedTimeDate?.start_time?.toISOString(),
         ).getTime(), // Start time in milliseconds
         end_time: new Date(
           props.selectedTimeDate?.end_time?.toISOString(),
         ).getTime(), // End time in milliseconds
-        fields: [variableObject.query_data.field], // Fields to fetch
+        fields: [resolvedField], // Resolved field name
         size: variableObject.query_data.max_record_size || 10, // Maximum number of records
         type: variableObject.query_data.stream_type, // Type of the stream
         query_context: queryContext, // Encoded query context
