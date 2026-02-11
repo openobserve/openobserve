@@ -26,6 +26,7 @@ export class AlertsPage {
     constructor(page) {
         this.page = page;
         this.commonActions = new CommonActions(page);
+        this._lifecycleRowIndex = 0;
 
         this.locators = this._initializeLocators();
 

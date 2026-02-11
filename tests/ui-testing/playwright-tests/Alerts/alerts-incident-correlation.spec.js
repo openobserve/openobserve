@@ -128,7 +128,7 @@ async function apiCall(page, method, path, body = null) {
         };
         if (body) opts.body = JSON.stringify(body);
         const resp = await fetch(url, opts);
-        return { status: resp.status, data: await resp.json().catch(() => ({})) };
+        return { status: resp.status, data: await resp.json().catch((e) => { console.warn('JSON parse error:', e.message); return null; }) };
     }, { url: `${baseUrl}${path}`, method, authToken, body });
 }
 
@@ -328,10 +328,13 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
 
     while (Date.now() - startTime < maxWaitMs) {
         // Check for incident rows
-        const rowCount = await page.locator(INCIDENT_ROW_SELECTOR).count().catch((e) => {
-            testLogger.warn('Failed to count incident rows', { error: e.message });
-            return 0;
-        });
+        let rowCount = 0;
+        try {
+            rowCount = await page.locator(INCIDENT_ROW_SELECTOR).count();
+        } catch (e) {
+            testLogger.warn('DOM error counting incident rows (not zero incidents)', { error: e.message });
+            continue;
+        }
         if (rowCount > 0) {
             testLogger.info(`Found ${rowCount} incident(s) after ${Math.round((Date.now() - startTime) / 1000)}s`);
             return true;
@@ -439,7 +442,7 @@ async function resolveTestIncidents(page) {
 
             // Acknowledge first (if still open), then resolve
             await apiCall(page, 'PUT', `/api/v2/${org}/incidents/${incidentId}/acknowledge`).catch((e) => {
-                testLogger.info('Acknowledge call failed (may already be acknowledged)', { error: e.message });
+                testLogger.warn('Acknowledge call failed (may already be acknowledged)', { error: e.message });
             });
             const resolveResp = await apiCall(page, 'PUT', `/api/v2/${org}/incidents/${incidentId}/resolve`);
             if (resolveResp.status === 200) {
