@@ -126,7 +126,7 @@
     "source": "ソース",
     "noResult": "結果なし",
     "syntaxGuide": "シンタックスガイド",
-    "rowsPerPage": "1 ページあたりのレコード数",
+    "recordsPerPage": "1 ページあたりのレコード数",
     "showing": "表示中",
     "of": "の",
     "rowDetail": "ソース詳細",

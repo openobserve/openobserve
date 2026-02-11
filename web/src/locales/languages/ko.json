@@ -125,7 +125,7 @@
     "source": "_소스",
     "noResult": "결과 없음",
     "syntaxGuide": "구문 가이드",
-    "rowsPerPage": "페이지당 레코드",
+    "recordsPerPage": "페이지당 레코드",
     "showing": "표시",
     "of": "의",
     "rowDetail": "소스 세부 정보",
