@@ -1010,6 +1010,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs Tab Content -->
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <!-- Refresh Button (shown when logs data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.logStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedLogs') }}</span>
+            <q-btn
+              flat
+              dense
+              size="sm"
+              icon="refresh"
+              color="primary"
+              @click="refreshCorrelation"
+              :disable="correlationLoading"
+            >
+              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
+            </q-btn>
+          </div>
+
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
@@ -1043,20 +1059,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Success State - TelemetryCorrelationDashboard -->
           <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
-            <CorrelatedLogsTable
-              :service-name="correlationData.serviceName"
-              :matched-dimensions="actualMatchedDimensions"
-              :additional-dimensions="{}"
-              :log-streams="correlationData.logStreams"
-              :source-stream="'incidents'"
-              :source-type="'incidents'"
-              :available-dimensions="availableDimensions"
-              :fts-fields="ftsFields"
-              :time-range="telemetryTimeRange"
-              :hide-view-related-button="true"
-              :hide-search-term-actions="true"
-              :hide-dimension-filters="true"
-              @sendToAiChat="handleSendToAiChat"
+            <TelemetryCorrelationDashboard
+              mode="embedded-tabs"
+              :externalActiveTab="'logs'"
+              :serviceName="correlationData.serviceName"
+              :matchedDimensions="correlationData.matchedDimensions"
+              :additionalDimensions="correlationData.additionalDimensions"
+              :logStreams="correlationData.logStreams"
+              :metricStreams="correlationData.metricStreams"
+              :traceStreams="correlationData.traceStreams"
+              :timeRange="telemetryTimeRange"
             />
           </div>
         </div>
