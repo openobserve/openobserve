@@ -430,7 +430,7 @@ test.describe("Logs Query Builder - Query Mode Detection", () => {
         // Subquery should trigger Custom SQL mode
         await page.waitForTimeout(2000);
 
-        testLogger.info('Custom mode for subquery - PASSED');
+        // testLogger.info('Custom mode for subquery - PASSED');
     });
 });
 
