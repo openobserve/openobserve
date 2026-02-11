@@ -16,6 +16,7 @@
 import { ref } from "vue";
 import useAiChat from "@/composables/useAiChat";
 import useSuggestions from "@/composables/useSuggestions";
+import { parsePromQlQuery } from "@/utils/query/promQLUtils";
 
 /**
  * Composable for Natural Language to SQL Query transformation
@@ -62,44 +63,118 @@ export function useNLQuery() {
   };
 
   /**
-   * Detects if the given text is natural language (not SQL)
+   * Detects if the given text is natural language (not SQL/PromQL/VRL/JS)
    *
    * @param text - The text to analyze
-   * @returns true if text is natural language, false if it's SQL or empty
+   * @param language - Current editor language (sql, promql, vrl, javascript)
+   * @returns true if text is natural language, false if it's valid query syntax
    *
    * Detection logic:
    * - Returns false for empty/whitespace text
-   * - Returns false if starts with SQL keywords (SELECT, FROM, WHERE, etc.)
-   * - Returns false if starts with SQL comment (--)
-   * - Returns false if contains quick mode functions (extracted from useSuggestions)
-   * - Returns false if contains field comparison operators
+   * - Returns false if matches language-specific syntax patterns
    * - Returns true otherwise (natural language)
-   *
-   * Note on SQL keywords:
-   * - This list represents common SQL statement keywords used for initial detection
-   * - The codebase uses node-sql-parser (logsUtils.ts) for full SQL parsing when needed
-   * - There's no centralized SQL keyword utility to reuse - this is the standard pattern
-   * - The keyword list here is intentionally minimal and focused on detection needs
    */
-  const detectNaturalLanguage = (text: string): boolean => {
+  const detectNaturalLanguage = (text: string, language: string = 'sql'): boolean => {
     const trimmed = text.trim();
 
     // Empty text is not natural language
     if (!trimmed) return false;
 
-    // SQL keywords that indicate SQL query (not natural language)
-    // Note: Searched codebase for reusable SQL keyword utilities but none exist.
-    // This minimal set is sufficient for natural language detection.
+    const lang = language.toLowerCase();
+
+    // PromQL detection
+    if (lang === 'promql') {
+      // Strategy 1: Try parsing as PromQL using the parser
+      // If the parser can extract a metric name or labels, it's valid PromQL
+      try {
+        const parsed = parsePromQlQuery(trimmed);
+        if (parsed.metricName || parsed.label.hasLabels) {
+          // Successfully parsed as PromQL with metric name or labels
+          return false;
+        }
+      } catch (e) {
+        // Parser failed, continue with pattern matching
+      }
+
+      // Strategy 2: Pattern-based detection for queries parser might not fully handle
+
+      // Check for PromQL aggregation operators at start
+      const promqlAggregations = /^(sum|min|max|avg|group|stddev|stdvar|count|count_values|bottomk|topk|quantile)\s*\(/i;
+      if (promqlAggregations.test(trimmed)) {
+        return false;
+      }
+
+      // Check for PromQL metric selectors with curly braces: metric_name{label="value"}
+      const metricSelector = /[a-zA-Z_:][a-zA-Z0-9_:]*\s*\{[^}]*\}/;
+      if (metricSelector.test(trimmed)) {
+        return false;
+      }
+
+      // Check for PromQL range selectors: [5m], [1h], etc.
+      const rangeSelector = /\[[0-9]+[smhdwy]\]/;
+      if (rangeSelector.test(trimmed)) {
+        return false;
+      }
+
+      // Check for PromQL functions
+      const promqlFunctions = /\b(rate|increase|delta|idelta|irate|avg_over_time|min_over_time|max_over_time|sum_over_time|count_over_time|quantile_over_time|stddev_over_time|stdvar_over_time|histogram_quantile|label_join|label_replace|abs|ceil|floor|round|sqrt|exp|ln|log2|log10|clamp|clamp_max|clamp_min|sort|sort_desc|time|timestamp|vector|scalar|changes|deriv|predict_linear|holt_winters|resets)\s*\(/i;
+      if (promqlFunctions.test(trimmed)) {
+        return false;
+      }
+
+      // Check for PromQL aggregation modifiers (by, without)
+      const aggregationModifiers = /\b(by|without)\s*\(/i;
+      if (aggregationModifiers.test(trimmed)) {
+        return false;
+      }
+
+      // Check for simple metric names (without selectors) - common PromQL pattern
+      // Examples: cpu_usage, http_requests_total
+      const simpleMetric = /^[a-zA-Z_:][a-zA-Z0-9_:]*$/;
+      if (simpleMetric.test(trimmed)) {
+        return false;
+      }
+
+      // Check for parentheses wrapping expressions (common in PromQL)
+      // Examples: (metric_name), (avg(metric))
+      const wrappedExpression = /^\(.+\)$/;
+      if (wrappedExpression.test(trimmed)) {
+        // Check if content inside looks like PromQL
+        const innerContent = trimmed.slice(1, -1).trim();
+        // Recursively check inner content
+        if (innerContent) {
+          const isInnerNL = detectNaturalLanguage(innerContent, lang);
+          if (!isInnerNL) {
+            return false; // Inner content is PromQL, so outer is also PromQL
+          }
+        }
+      }
+    }
+
+    // VRL detection
+    if (lang === 'vrl') {
+      const vrlPatterns = /(\.|=\s|,\s*\{|\}|->|\.parse_|\.to_)/;
+      if (vrlPatterns.test(trimmed)) {
+        return false;
+      }
+    }
+
+    // JavaScript detection
+    if (lang === 'javascript' || lang === 'js') {
+      const jsPatterns = /^(function|const|let|var|class|if|for|while|return|=>|\{|\})/i;
+      if (jsPatterns.test(trimmed)) {
+        return false;
+      }
+    }
+
+    // SQL detection (applies to all languages as fallback)
     const sqlKeywords = [
       'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE',
       'CREATE', 'ALTER', 'DROP', 'JOIN', 'INNER', 'LEFT', 'RIGHT',
       'OUTER', 'UNION', 'GROUP', 'ORDER', 'HAVING', 'LIMIT'
     ];
 
-    // Get first word (case-insensitive)
     const firstWord = trimmed.split(/\s+/)[0].toUpperCase();
-
-    // If starts with SQL keyword, it's SQL (not NL)
     if (sqlKeywords.includes(firstWord)) {
       return false;
     }
@@ -110,34 +185,31 @@ export function useNLQuery() {
     }
 
     // Quick mode detection: Check for quick mode query patterns
-    // Reuse function names from autocomplete suggestions to avoid duplication
     const quickModeFunctions = getQuickModeFunctionNames();
 
     const lowerText = trimmed.toLowerCase();
     for (const func of quickModeFunctions) {
       if (lowerText.includes(`${func}(`)) {
-        return false; // This is a quick mode function query
+        return false;
       }
     }
 
     // Check for field comparison operators (=, !=, >, <, >=, <=, <>)
-    // These indicate quick mode field comparisons like: status_code = 500
     const comparisonOperators = /[a-zA-Z_][a-zA-Z0-9_]*\s*(=|!=|>|<|>=|<=|<>)\s*.+/;
     if (comparisonOperators.test(trimmed)) {
-      return false; // This is a quick mode field comparison
+      return false;
     }
 
     // Check for boolean operators (and, or, not) which are common in quick mode
-    // Examples: "status_code = 500 and endpoint = 'abc'"
     const hasBooleanOps = /\b(and|or|not)\b/i.test(trimmed);
     if (hasBooleanOps && comparisonOperators.test(trimmed)) {
-      return false; // This is a quick mode compound expression
+      return false;
     }
 
     // Check for SQL operators like LIKE, IN, BETWEEN (case-insensitive)
     const sqlOperators = /\b(like|in|not in|between|is null|is not null)\b/i;
     if (sqlOperators.test(trimmed)) {
-      return false; // This is a SQL operator pattern
+      return false;
     }
 
     // Otherwise, it's natural language
@@ -156,20 +228,38 @@ export function useNLQuery() {
    * - Filters out explanatory text before/after SQL
    */
   const extractSQLFromResponse = (response: string): string | null => {
-    // Strategy 1: Extract from markdown SQL code block
-    const sqlCodeBlockMatch = response.match(/```sql\s+([\s\S]+?)```/i);
-    if (sqlCodeBlockMatch && sqlCodeBlockMatch[1]) {
-      return sqlCodeBlockMatch[1].trim();
+    // Strategy 1: Extract from markdown code blocks (SQL, PromQL, VRL, JavaScript)
+    // Try language-specific code blocks first
+    const codeBlockPatterns = [
+      /```sql\s+([\s\S]+?)```/i,
+      /```promql\s+([\s\S]+?)```/i,
+      /```vrl\s+([\s\S]+?)```/i,
+      /```javascript\s+([\s\S]+?)```/i,
+      /```js\s+([\s\S]+?)```/i,
+    ];
+
+    for (const pattern of codeBlockPatterns) {
+      const match = response.match(pattern);
+      if (match && match[1]) {
+        const extracted = match[1].trim();
+        console.log('[NL2Q] Extracted query from code block:', extracted);
+        return extracted;
+      }
     }
 
-    // Strategy 2: Extract from generic code block
-    const genericCodeBlockMatch = response.match(/```\s+(SELECT[\s\S]+?)```/i);
+    // Strategy 2: Extract from generic code block (no language specified)
+    // This handles cases like ```\navg(metric_name)\n```
+    const genericCodeBlockMatch = response.match(/```\s*\n?([\s\S]+?)\n?```/);
     if (genericCodeBlockMatch && genericCodeBlockMatch[1]) {
-      return genericCodeBlockMatch[1].trim();
+      const extracted = genericCodeBlockMatch[1].trim();
+      console.log('[NL2Q] Extracted query from generic code block:', extracted);
+      return extracted;
     }
 
     // Strategy 3: Find SQL statement by keywords (SELECT, WITH, etc.)
-    // Look for lines starting with SQL keywords
+    // NOTE: This strategy is SQL-specific and won't work for PromQL/VRL/JavaScript
+    // It's a fallback for cases where the AI doesn't use code blocks
+    // For non-SQL languages, we rely on Strategies 1 & 2 (code blocks)
     const sqlKeywords = ['SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'CREATE'];
     const lines = response.split('\n');
 
@@ -514,33 +604,45 @@ export function useNLQuery() {
   };
 
   /**
-   * Transforms editor content by converting natural language to SQL comments
-   * and appending the generated SQL query
+   * Transforms editor content by converting natural language to language-specific comments
+   * and appending the generated query
    *
    * @param originalNL - Original natural language text from editor
-   * @param generatedSQL - Generated SQL query from AI
-   * @returns Transformed text with NL as comments and SQL below
+   * @param generatedQuery - Generated query from AI
+   * @param language - Query language (sql, promql, vrl, javascript)
+   * @returns Transformed text with NL as comments and query below
    *
    * Example:
    * ```typescript
    * const transformed = transformToSQL(
    *   'show errors from last hour',
-   *   'SELECT * FROM logs WHERE level = \'error\''
+   *   'SELECT * FROM logs WHERE level = \'error\'',
+   *   'sql'
    * );
    * // Returns:
    * // -- show errors from last hour
    * // SELECT * FROM logs WHERE level = 'error'
    * ```
    */
-  const transformToSQL = (originalNL: string, generatedSQL: string): string => {
-    // Convert each line of natural language to SQL comment
+  const transformToSQL = (originalNL: string, generatedQuery: string, language: string = 'sql'): string => {
+    // Determine comment prefix based on language
+    let commentPrefix = '--'; // Default: SQL
+    const lang = language.toLowerCase();
+
+    if (lang === 'promql') {
+      commentPrefix = '#'; // PromQL uses # for comments
+    } else if (lang === 'vrl' || lang === 'javascript' || lang === 'js') {
+      commentPrefix = '//'; // VRL and JavaScript use // for comments
+    }
+
+    // Convert each line of natural language to language-specific comment
     const commentedNL = originalNL
       .split('\n')
-      .map(line => `-- ${line}`)
+      .map(line => `${commentPrefix} ${line}`)
       .join('\n');
 
-    // Return commented NL + blank line + generated SQL
-    return `${commentedNL}\n${generatedSQL}`;
+    // Return commented NL + blank line + generated query
+    return `${commentedNL}\n${generatedQuery}`;
   };
 
   return {
