@@ -41,7 +41,7 @@ export const useSearchResponseHandler = () => {
   const { getHistogramTitle, generateHistogramData, resetHistogramWithError } =
     useHistogram();
 
-  const { refreshPagination, sortResponseDebounced } = useSearchPagination();
+  const { refreshPagination, sortResponse } = useSearchPagination();
 
   const { clearCache } = useLogsHighlighter();
 
@@ -209,8 +209,7 @@ export const useSearchResponseHandler = () => {
       searchObj.data.queryResults.hasOwnProperty("order_by_metadata") &&
       searchObj.data.queryResults.order_by_metadata.length > 0
     ) {
-      // Use debounced sort for streaming to avoid excessive sorting on rapid chunks
-      sortResponseDebounced(
+      sortResponse(
         searchObj.data.queryResults.hits,
         store.state.zoConfig.timestamp_column,
         searchObj.data.queryResults.order_by_metadata,

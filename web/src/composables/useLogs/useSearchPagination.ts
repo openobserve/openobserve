@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
-import { debounce } from "quasar";
 
 // Sorting types and interfaces
 interface OrderByField {
@@ -330,9 +329,6 @@ export const useSearchPagination = () => {
     });
   }
 
-  // Debounced version for streaming scenarios (300ms delay)
-  const sortResponseDebounced = debounce(sortResponse, 300);
-
   return {
     refreshPagination,
     updateResult,
@@ -346,7 +342,6 @@ export const useSearchPagination = () => {
     getCurrentPageData,
     getAggsTotal,
     sortResponse,
-    sortResponseDebounced,
   };
 };
 
