@@ -1990,6 +1990,8 @@
       "minutes": "minutes",
       "hour": "hour",
       "hours": "hours",
+      "configuringRealTime": "Configuring a real-time alert for",
+      "configuringScheduled": "Configuring a scheduled alert for",
       "plainEnglish": {
         "realTime": "Alert me immediately when matching events occur in real-time",
         "eventsPlural": "events",
@@ -2003,9 +2005,7 @@
         "period": "period",
         "alertMeWhen": "Alert me when",
         "butNoMoreThan": ", but no more than once every",
-        "defaultConditions": "Alert me when the configured conditions are met",
-        "configuringRealTime": "Configuring a real-time alert for",
-        "configuringScheduled": "Configuring a scheduled alert for"
+        "defaultConditions": "Alert me when the configured conditions are met"
       }
     },
     "correlation": {

@@ -312,10 +312,10 @@ function generatePlainEnglishSummary(formData: any, destinations: any[], isRealT
     const streamType = formData.stream_type || 'logs';
     const streamName = formData.stream_name;
     if (isRealTime) {
-      const configuringText = t('alerts.summary.plainEnglish.configuringRealTime') || 'Configuring a real-time alert for';
+      const configuringText = t('alerts.summary.configuringRealTime') || 'Configuring a real-time alert for';
       return `${configuringText} ${streamType} stream "${streamName}"`;
     } else {
-      const configuringText = t('alerts.summary.plainEnglish.configuringScheduled') || 'Configuring a scheduled alert for';
+      const configuringText = t('alerts.summary.configuringScheduled') || 'Configuring a scheduled alert for';
       return `${configuringText} ${streamType} stream "${streamName}"`;
     }
   }
