@@ -134,7 +134,7 @@
     "source": "_source",
     "noResult": "No results found.",
     "syntaxGuide": "Syntax guide",
-    "rowsPerPage": "Records per page",
+    "recordsPerPage": "Records per page",
     "showing": "Showing",
     "of": "of",
     "rowDetail": "Source Details",
