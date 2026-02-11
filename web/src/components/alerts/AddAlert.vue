@@ -358,8 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Wizard Navigation Buttons -->
           <q-btn
             flat
-            label="Back"
-            icon="arrow_back"
+            :label="t('alerts.back')"
             class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="wizardStep === 1"
@@ -368,8 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             flat
-            label="Continue"
-            icon-right="arrow_forward"
+            :label="t('alerts.continue')"
             class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="isLastStep"

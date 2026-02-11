@@ -107,8 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <q-tooltip anchor="center right" self="center left" max-width="300px">
                     <span style="font-size: 14px">
-                      Group the aggregated data by specific fields to create separate alerts for each unique value.<br />
-                      Example: Group by "hostname" to get individual alerts per server, or by "status_code" to track errors separately.
+                      {{ t('alerts.groupByHelp.description') }}<br />
+                      {{ t('alerts.groupByHelp.example') }}
                     </span>
                   </q-tooltip>
                 </q-icon>
@@ -541,7 +541,7 @@ export default defineComponent({
       if (props.isRealTime === "true") {
         return [
           {
-            label: "Builder",
+            label: t('alerts.queryBuilder'),
             value: "custom",
           },
         ];
@@ -551,7 +551,7 @@ export default defineComponent({
       if (props.streamType === "metrics") {
         return [
           {
-            label: "Builder",
+            label: t('alerts.queryBuilder'),
             value: "custom",
           },
           {

@@ -32,10 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">
-                  If the alert triggers then how long should it wait before sending another notification.<br />
-                  e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send
-                  another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user
-                  with notifications.
+                  {{ t('alerts.alertSettings.cooldownTooltip') }}
                 </span>
               </q-tooltip>
             </q-icon>
@@ -152,9 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-btn
                 data-test="create-destination-btn"
-                label="Add New Destination"
-                class="text-bold no-border q-ml-sm"
-                color="primary"
+                :label="t('alerts.alertSettings.addNewDestination')"
+                class="o2-secondary-button q-ml-sm"
                 no-caps
                 @click="routeToCreateDestination"
               />
@@ -184,8 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">
-                  Defines when the alert should trigger based on the event count or aggregated value.<br />
-                  Example: If set to "> 100", the alert triggers when the count exceeds 100 events.
+                  {{ t('alerts.alertSettings.thresholdTooltip') }}
                 </span>
               </q-tooltip>
             </q-icon>
@@ -290,8 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">
-                  Period for which the query should run.<br />
-                  e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data.
+                  {{ t('alerts.alertSettings.periodTooltip') }}
                 </span>
               </q-tooltip>
             </q-icon>
@@ -341,14 +335,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="auto">
                 <span style="font-size: 14px" v-if="formData.trigger_condition.frequency_type === 'minutes'">
-                  How often the task should be executed.<br />
-                  e.g., 2 minutes means that the task will run every 2 minutes.
+                  {{ t('alerts.alertSettings.frequencyTooltipMinutes') }}
                 </span>
                 <span style="font-size: 14px" v-else>
-                  Pattern: * * * * * * means every second.
-                  <br />
-                  Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                  [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                  {{ t('alerts.alertSettings.frequencyTooltipCron') }}
                 </span>
               </q-tooltip>
             </q-icon>
@@ -365,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   max-width="auto"
                   class="tw:text-[14px]"
                 >
-                  Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.
+                  {{ t('alerts.alertSettings.timezoneWarning') }}
                 </q-tooltip>
               </q-icon>
             </template>
@@ -386,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleFrequencyTypeChange('minutes')"
               />
               <q-btn
-                label="Cron Schedule"
+                :label="t('alerts.alertSettings.cronSchedule')"
                 :outline="formData.trigger_condition.frequency_type === 'minutes'"
                 :unelevated="formData.trigger_condition.frequency_type === 'cron'"
                 :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
@@ -489,10 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">
-                  If the alert triggers then how long should it wait before sending another notification.<br />
-                  e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send
-                  another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user
-                  with notifications.
+                  {{ t('alerts.alertSettings.cooldownTooltip') }}
                 </span>
               </q-tooltip>
             </q-icon>
@@ -552,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">Select one or more destinations to send alert notifications.</span>
+                <span style="font-size: 14px">{{ t('alerts.alertSettings.destinationsTooltip') }}</span>
               </q-tooltip>
             </q-icon>
           </div>
@@ -622,9 +609,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-btn
                 data-test="create-destination-btn"
-                label="Add New Destination"
-                class="text-bold no-border q-ml-sm"
-                color="primary"
+                :label="t('alerts.alertSettings.addNewDestination')"
+                class="o2-secondary-button q-ml-sm"
                 no-caps
                 @click="routeToCreateDestination"
               />
@@ -651,9 +637,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">
-                  Optional: Select a template to use for all destinations in this alert.
-                  This overrides any templates configured on individual destinations.
-                  If not selected, each destination will use its own configured template.
+                  {{ t('alerts.alertSettings.templateTooltip') }}
                 </span>
               </q-tooltip>
             </q-icon>
