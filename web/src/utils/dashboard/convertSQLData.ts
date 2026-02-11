@@ -1483,7 +1483,7 @@ export const convertSQLData = async (
     for (const item of missingValueData) {
       const breakdownValue = getDataValue(item, breakdownKey);
       const xValue = getDataValue(item, xAxisKey);
-      const key = `${breakdownValue}_${xValue}`;
+      const key = `${breakdownValue}||${xValue}`;
 
       // Only set if NOT already present (keeps FIRST occurrence, matching original .find() behavior)
       if (!dataMap.has(key)) {
@@ -1507,7 +1507,7 @@ export const convertSQLData = async (
     // Use the pre-built lookup map for O(1) access instead of O(n) filter + find
     // xAxisKey parameter is the breakdown value passed from getSeries()
     const seriesData = options.xAxis[0].data.map((xValue: any) => {
-      const lookupKey = `${xAxisKey}_${xValue}`;
+      const lookupKey = `${xAxisKey}||${xValue}`;
       const dataRow = dataLookupMap.get(lookupKey);
       return dataRow ? (getDataValue(dataRow, yAxisKey) ?? null) : null;
     });
