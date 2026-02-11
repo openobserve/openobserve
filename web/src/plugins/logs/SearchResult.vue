@@ -1060,10 +1060,12 @@ export default defineComponent({
         // Use logStreams[0].filters as matchedDimensions — these contain
         // the correct field names for the log stream (e.g., k8s_namespace_name)
         // instead of semantic IDs (k8s-namespace). Same fix as 9127b6172.
-        const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
-        const actualMatchedDimensions = Object.keys(logFilters).length > 0
-          ? logFilters
-          : result.correlationData.matched_dimensions;
+        const logFilters =
+          result.correlationData.related_streams.logs?.[0]?.filters || {};
+        const actualMatchedDimensions =
+          Object.keys(logFilters).length > 0
+            ? logFilters
+            : result.correlationData.matched_dimensions;
 
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
@@ -1074,7 +1076,8 @@ export default defineComponent({
           traceStreams: result.correlationData.related_streams.traces || [],
           sourceStream: searchObj.data.stream.selectedStream[0],
           sourceType: "logs",
-          availableDimensions: logFilters, // Actual field names from the log stream filters
+          // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
+          availableDimensions: { ...logFilters, ...context.fields },
           ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
           timeRange: {
             startTime: startTimeMicros,

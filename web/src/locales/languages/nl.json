@@ -125,7 +125,7 @@
     "source": "_bron",
     "noResult": "Geen resultaat",
     "syntaxGuide": "Handleiding voor syntaxis",
-    "rowsPerPage": "Records per pagina",
+    "recordsPerPage": "Records per pagina",
     "showing": "bewijs",
     "of": "van",
     "rowDetail": "Details van de bron",

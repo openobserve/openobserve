@@ -125,7 +125,7 @@
     "source": "源数据",
     "noResult": "没有结果",
     "syntaxGuide": "语法提示",
-    "rowsPerPage": "每页条数",
+    "recordsPerPage": "每页条数",
     "showing": "显示",
     "of": "的",
     "rowDetail": "详情",

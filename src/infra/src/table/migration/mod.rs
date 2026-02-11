@@ -93,6 +93,7 @@ mod m20260113_000001_add_alert_template;
 mod m20260116_000001_add_enabled_to_backfill_jobs;
 mod m20260119_000001_add_stat_interval_to_ratelimit;
 mod m20260131_000001_add_unique_constraint_templates_org_name;
+mod m20260212_000001_widen_incident_correlation_key;
 
 pub struct Migrator;
 
@@ -175,6 +176,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260116_000001_add_enabled_to_backfill_jobs::Migration),
             Box::new(m20260119_000001_add_stat_interval_to_ratelimit::Migration),
             Box::new(m20260131_000001_add_unique_constraint_templates_org_name::Migration),
+            Box::new(m20260212_000001_widen_incident_correlation_key::Migration),
         ]
     }
 }

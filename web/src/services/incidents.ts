@@ -66,7 +66,7 @@ export interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "manual_extraction" | "temporal";
+  correlation_reason: "service_discovery" | "trace_based" | "scope_match" | "workload_match" | "alert_id";
   created_at: number;
 }
 

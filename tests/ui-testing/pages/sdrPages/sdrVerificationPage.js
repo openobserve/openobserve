@@ -1,3 +1,4 @@
+const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class SDRVerificationPage {
@@ -26,30 +27,50 @@ export class SDRVerificationPage {
     testLogger.info('Navigated to Logs (fast - no VRL wait)');
   }
 
-  async getLatestLogText() {
-    // Try primary locator first
-    let logTableCell = this.page.locator(this.logTableColumnSource);
-    let logCount = await logTableCell.count();
+  /**
+   * Wait for the loading indicator to disappear.
+   * @param {number} timeout - Max milliseconds to wait (default 15000)
+   */
+  async waitForLoadingToDisappear(timeout = 15000) {
+    const loadingIndicator = this.page.getByText('Loading...').first();
+    await loadingIndicator.waitFor({ state: 'hidden', timeout }).catch(() => {
+      testLogger.info(`Loading indicator still visible after ${timeout}ms`);
+    });
+  }
 
-    // Fallback to tbody tr if primary locator returns 0
-    if (logCount === 0) {
-      logTableCell = this.page.locator(this.logTableBodyRows);
-      logCount = await logTableCell.count();
+  /**
+   * Get log entry count and the matching locator.
+   * Tries the source column first, falls back to tbody rows.
+   * @returns {{ locator: import('@playwright/test').Locator, count: number }}
+   */
+  async getLogEntries() {
+    let locator = this.page.locator(this.logTableColumnSource);
+    let count = await locator.count();
+
+    if (count === 0) {
+      locator = this.page.locator(this.logTableBodyRows);
+      count = await locator.count();
     }
 
-    testLogger.info(`Found ${logCount} log entries in the UI`);
+    return { locator, count };
+  }
 
-    if (logCount === 0) {
+  async getLatestLogText() {
+    const { locator, count } = await this.getLogEntries();
+
+    testLogger.info(`Found ${count} log entries in the UI`);
+
+    if (count === 0) {
       return null;
     }
 
     // Get the first log entry (most recent)
-    const logText = await logTableCell.nth(0).textContent();
+    const logText = await locator.nth(0).textContent();
     return logText;
   }
 
   /**
-   * Verify a single field in the latest log entry
+   * Verify a single field in the latest log entry with retry logic for CI.
    * @param {Object} logsPage - The logsPage instance from PageManager
    * @param {string} streamName - Name of the stream
    * @param {string} fieldName - Name of the field to verify
@@ -64,22 +85,34 @@ export class SDRVerificationPage {
     await this.navigateToLogsQuick();
     await logsPage.selectStream(streamName);
 
-    // Small wait for stream to be selected and query to be ready
-    await this.page.waitForTimeout(1000);
+    // Retry loop: wait for logs to appear after ingestion (CI can be slow to index)
+    const maxRetries = 5;
+    let logText = null;
 
-    await logsPage.clickRefreshButton();
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await this.page.waitForTimeout(1000);
+      await logsPage.clickRefreshButton();
+      await this.waitForLoadingToDisappear(15000);
+      await this.page.waitForTimeout(2000);
 
-    // Wait for logs to be fetched and displayed after refresh
-    await this.page.waitForTimeout(2000);
+      logText = await this.getLatestLogText();
 
-    // Get the latest log text
-    const logText = await this.getLatestLogText();
+      testLogger.info(`Attempt ${attempt}/${maxRetries}: ${logText ? 'Log entry found' : 'No logs found'}`);
 
-    if (!logText) {
-      throw new Error('No logs found in the stream');
+      if (logText) {
+        break;
+      }
+
+      if (attempt < maxRetries) {
+        const waitTime = attempt * 3000;
+        testLogger.info(`No logs found yet, waiting ${waitTime / 1000}s before retry...`);
+        await this.page.waitForTimeout(waitTime);
+      }
     }
 
-    testLogger.info(`Latest log text (first 300 chars): ${logText.substring(0, 300)}...`);
+    expect(logText, 'No logs found in the stream after multiple retries').not.toBeNull();
+
+    testLogger.info(`Latest log text (first 300 chars): ${logText?.substring(0, 300)}...`);
 
     // Check if field exists in the log
     const fieldAsJsonKey = `"${fieldName}":`;
@@ -88,32 +121,17 @@ export class SDRVerificationPage {
 
     if (shouldBeDropped) {
       // Field should NOT be present at all
-      if (fieldFound) {
-        testLogger.error(`Field ${fieldName} should have been DROPPED but was found in log!`);
-        throw new Error(`Field ${fieldName} was not dropped - still present in logs`);
-      }
+      expect(fieldFound, `Field ${fieldName} should have been DROPPED but was found in log`).toBe(false);
       testLogger.info(`✓ Field ${fieldName} is correctly DROPPED (not present)`);
     } else if (shouldBeRedacted) {
       // Field should be present with [REDACTED]
-      if (!fieldFound) {
-        testLogger.error(`Field ${fieldName} should be present but was not found in log!`);
-        throw new Error(`Field ${fieldName} not found in log`);
-      }
-      if (!logText.includes('[REDACTED]')) {
-        testLogger.error(`Field ${fieldName} should be REDACTED but [REDACTED] marker not found!`);
-        throw new Error(`Field ${fieldName} was not redacted`);
-      }
+      expect(fieldFound, `Field ${fieldName} should be present but was not found in log`).toBe(true);
+      expect(logText, `Field ${fieldName} should be REDACTED but [REDACTED] marker not found`).toContain('[REDACTED]');
       testLogger.info(`✓ Field ${fieldName} is correctly REDACTED`);
     } else {
       // Field should be visible with actual value
-      if (!fieldFound) {
-        testLogger.error(`Field ${fieldName} should be visible but was not found in log!`);
-        throw new Error(`Field ${fieldName} not found in log`);
-      }
-      if (logText.includes('[REDACTED]')) {
-        testLogger.error(`Field ${fieldName} should be visible but is REDACTED!`);
-        throw new Error(`Field ${fieldName} is unexpectedly redacted`);
-      }
+      expect(fieldFound, `Field ${fieldName} should be visible but was not found in log`).toBe(true);
+      expect(logText, `Field ${fieldName} should be visible but is REDACTED`).not.toContain('[REDACTED]');
       testLogger.info(`✓ Field ${fieldName} is visible with actual value (as expected)`);
     }
   }

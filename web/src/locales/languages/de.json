@@ -125,7 +125,7 @@
     "source": "_Quelle",
     "noResult": "Kein Ergebnis",
     "syntaxGuide": "Leitfaden zur Syntax",
-    "rowsPerPage": "Datensätze pro Seite",
+    "recordsPerPage": "Datensätze pro Seite",
     "showing": "Wird angezeigt",
     "of": "von",
     "rowDetail": "Angaben zur Quelle",

@@ -22,7 +22,6 @@ use std::collections::HashMap;
 use config::{
     meta::alerts::{
         alert::Alert,
-        deduplication::GlobalDeduplicationConfig,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
             IncidentTopology, IncidentWithAlerts,
@@ -79,52 +78,16 @@ pub async fn correlate_alert_to_incident(
     _service_name_hint: Option<&str>,
     trace_id: Option<&str>,
 ) -> Result<Option<(String, String)>, anyhow::Error> {
-    // Get org-level deduplication config for semantic groups
-    let org_config = match super::org_config::get_deduplication_config(&alert.org_id).await {
-        Ok(Some(config)) if config.enabled => config,
-        Ok(Some(_)) | Ok(None) => {
-            // No org config or disabled - use enterprise default semantic groups
-            #[cfg(feature = "enterprise")]
-            {
-                GlobalDeduplicationConfig {
-                    enabled: false,
-                    alert_dedup_enabled: false,
-                    semantic_field_groups:
-                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
-                        ),
-                    time_window_minutes: None,
-                    alert_fingerprint_groups: vec![],
-                    fqn_priority_dimensions: vec![],
-                    upgrade_window_minutes: 30,
-                }
-            }
-            #[cfg(not(feature = "enterprise"))]
-            {
-                GlobalDeduplicationConfig::default()
-            }
-        }
-        Err(e) => {
-            log::warn!("Failed to fetch org config for incident correlation: {e}, using defaults",);
-            #[cfg(feature = "enterprise")]
-            {
-                GlobalDeduplicationConfig {
-                    enabled: false,
-                    alert_dedup_enabled: false,
-                    semantic_field_groups:
-                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
-                        ),
-                    time_window_minutes: None,
-                    alert_fingerprint_groups: vec![],
-                    fqn_priority_dimensions: vec![],
-                    upgrade_window_minutes: 30,
-                }
-            }
-            #[cfg(not(feature = "enterprise"))]
-            {
-                GlobalDeduplicationConfig::default()
-            }
-        }
-    };
+    // Semantic groups from system_settings — the single source of truth,
+    // configured via /settings/v2/semantic_field_groups API.
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+
+    let upgrade_window_minutes =
+        match super::org_config::get_deduplication_config(&alert.org_id).await {
+            Ok(Some(config)) => config.upgrade_window_minutes,
+            _ => 30,
+        };
 
     // Extract labels from result row as HashMap
     let mut labels: HashMap<String, String> = result_row
@@ -147,7 +110,7 @@ pub async fn correlate_alert_to_incident(
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
-                &org_config.semantic_field_groups,
+                &semantic_groups,
             );
 
         if !condition_dims.is_empty() {
@@ -186,7 +149,7 @@ pub async fn correlate_alert_to_incident(
             .as_ref()
             .map(|r| r.correlation_key.as_str()),
         trace_id,
-        &org_config,
+        &semantic_groups,
     );
 
     // BUGFIX: If stable_dimensions is empty, use alert_id as correlation_key
@@ -198,7 +161,7 @@ pub async fn correlate_alert_to_incident(
             "[incidents] Alert {} has no stable dimensions - using alert_id as correlation_key to prevent incorrect grouping",
             alert.name
         );
-        correlation_result.correlation_key = alert_id;
+        correlation_result.correlation_key = format!("ALERT:{alert_id}");
     }
 
     // Guarantee service_name extraction
@@ -239,7 +202,7 @@ pub async fn correlate_alert_to_incident(
         triggered_at,
         &correlation_result.reason.to_string(),
         &service_name,
-        org_config.upgrade_window_minutes,
+        upgrade_window_minutes,
     )
     .await?;
 
@@ -551,7 +514,7 @@ async fn find_or_create_incident(
                 &alert.get_unique_key(),
                 &alert.name,
                 triggered_at,
-                "hierarchical_upgrade",
+                correlation_reason,
             )
             .await?;
 
@@ -748,7 +711,7 @@ pub async fn get_incident_with_alerts(
                 .correlation_reason
                 .as_ref()
                 .and_then(|r| CorrelationReason::try_from(r.as_str()).ok())
-                .unwrap_or(CorrelationReason::ManualExtraction),
+                .unwrap_or(CorrelationReason::AlertId),
             created_at: a.created_at,
         })
         .collect();

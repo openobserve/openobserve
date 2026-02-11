@@ -125,7 +125,7 @@
     "source": "_kaynak",
     "noResult": "Sonuç Yok",
     "syntaxGuide": "Sözdizimi kılavuzu",
-    "rowsPerPage": "Sayfa başına kayıtlar",
+    "recordsPerPage": "Sayfa başına kayıtlar",
     "showing": "Gösterme",
     "of": "dan",
     "rowDetail": "Kaynak Ayrıntıları",

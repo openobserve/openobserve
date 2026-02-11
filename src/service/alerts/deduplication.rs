@@ -31,15 +31,19 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 /// Calculate fingerprint for an alert result row
 ///
 /// Delegates to enterprise implementation.
-/// With org_config provided, uses semantic dimensions for cross-alert deduplication.
 pub fn calculate_fingerprint(
     alert: &Alert,
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
+    semantic_groups: &[config::meta::correlation::SemanticFieldGroup],
 ) -> String {
     o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
-        alert, result_row, config, org_config,
+        alert,
+        result_row,
+        config,
+        org_config,
+        semantic_groups,
     )
 }
 
@@ -164,25 +168,25 @@ pub async fn apply_deduplication(
         _ => return Ok(result_rows), // Deduplication disabled, return all rows
     };
 
-    // Fetch org-level config for semantic groups
+    // Get semantic groups from system_settings — the single source of truth
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+
+    // Get org-level dedup config for cross-alert settings (alert_dedup_enabled, fingerprint_groups)
     let org_config = match super::org_config::get_deduplication_config(&alert.org_id).await {
         Ok(Some(config)) if config.enabled => Some(config),
-        Ok(Some(_)) => {
-            // Org config exists but disabled - still allow per-alert dedup
-            None
-        }
-        Ok(None) => None, // No org config
-        Err(e) => {
-            log::warn!(
-                "Failed to fetch org dedup config for {}: {}, proceeding without semantic groups",
-                alert.org_id,
-                e
-            );
-            None
-        }
+        _ => None,
     };
 
-    apply_deduplication_impl(db, alert, result_rows, dedup_config, org_config.as_ref()).await
+    apply_deduplication_impl(
+        db,
+        alert,
+        result_rows,
+        dedup_config,
+        org_config.as_ref(),
+        &semantic_groups,
+    )
+    .await
 }
 
 /// Enterprise implementation of apply_deduplication
@@ -192,6 +196,7 @@ async fn apply_deduplication_impl(
     result_rows: Vec<Map<String, Value>>,
     dedup_config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
+    semantic_groups: &[config::meta::correlation::SemanticFieldGroup],
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
@@ -206,7 +211,8 @@ async fn apply_deduplication_impl(
     let mut deduplicated_rows = Vec::new();
 
     for row in result_rows {
-        let fingerprint = calculate_fingerprint(alert, &row, dedup_config, org_config);
+        let fingerprint =
+            calculate_fingerprint(alert, &row, dedup_config, org_config, semantic_groups);
 
         // Check if this fingerprint exists and is within time window
         let should_send = match get_dedup_state(db, &fingerprint).await? {

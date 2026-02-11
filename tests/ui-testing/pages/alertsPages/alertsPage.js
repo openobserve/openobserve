@@ -26,6 +26,9 @@ export class AlertsPage {
     constructor(page) {
         this.page = page;
         this.commonActions = new CommonActions(page);
+        // NOTE: Reset per construction is sufficient — AlertsPage is instantiated fresh
+        // per test via PageManager, so this value resets to 0 for each test automatically.
+        this._lifecycleRowIndex = 0;
 
         this.locators = this._initializeLocators();
 
@@ -156,6 +159,52 @@ export class AlertsPage {
             incidentReopenButton: '[data-test="incident-reopen-btn"]',
             incidentDetailTitle: '[data-test="incident-detail-title"]',
             incidentDetailCloseButton: '[data-test="incident-detail-close-btn"]',
+
+            // Incident detail page locators
+            incidentDetailPage: '[data-test="incident-detail-page"]',
+            incidentDetailBackButton: '[data-test="incident-detail-back-btn"]',
+            incidentRefreshButton: '[data-test="incident-refresh-btn"]',
+            incidentsListTitle: '[data-test="incidents-list-title"]',
+
+            // Alert triggers table locators (inside incident detail)
+            alertTriggersTable: '[data-test="alert-triggers-table"]',
+            triggersQTable: '[data-test="triggers-qtable"]',
+            noTriggersMessage: '[data-test="no-triggers-message"]',
+            alertNameCell: '[data-test="alert-name-cell"]',
+            alertNameText: '[data-test="alert-name-text"]',
+            firedAtCell: '[data-test="fired-at-cell"]',
+            firedAtTimestamp: '[data-test="fired-at-timestamp"]',
+            correlationReasonCell: '[data-test="correlation-reason-cell"]',
+            correlationReasonBadge: '[data-test="correlation-reason-badge"]',
+
+            // Incident detail — Overview tab locators
+            relatedAlertsContainer: '.o2-incident-card-bg',
+            relatedAlertItem: '[class*="tw:py-2"]',
+            relatedAlertName: '.tw\\:truncate',
+            relatedAlertCountText: '[style*="width: 120px"]',
+            severityBadge: '.q-badge',
+
+            // Incident detail — tab selectors (Quasar q-tab)
+            serviceGraphTab: '.q-tab[name="serviceGraph"]',
+            logsTab: '.q-tab[name="logs"]',
+            metricsTab: '.q-tab[name="metrics"]',
+            tracesTab: '.q-tab[name="traces"]',
+
+            // Incident detail — Service Graph content
+            serviceGraphContainer: '.incident-service-graph',
+
+            // Telemetry tab state selectors
+            loadingSpinner: '.q-spinner-hourglass',
+
+            // RCA Analysis locators (inside incident detail)
+            rcaAnalysisContainer: '[data-test="rca-analysis-container"]',
+            triggerRcaButton: '[data-test="trigger-rca-btn"]',
+            rcaStreamContent: '[data-test="rca-stream-content"]',
+            rcaExistingContent: '[data-test="rca-existing-content"]',
+            rcaEmptyState: '[data-test="rca-empty-state"]',
+
+            // Table of contents locators (inside incident detail)
+            tocContainer: '[data-test="toc-container"]',
 
             // Import button
             alertImportButton: '[data-test="alert-import"]',
@@ -546,10 +595,10 @@ export class AlertsPage {
 
     async verifyAlertCounts() {
         const scheduledColumn = this.page.locator(this.locators.scheduledColumnLocator).first();
-        const scheduledAlertsCount = await scheduledColumn.locator(this.locators.resultsCountLocator).textContent();
+        const scheduledAlertsCount = await scheduledColumn.locator(this.locators.resultsCountLocator).textContent() || '0';
 
         const realTimeColumn = this.page.locator(this.locators.realTimeColumnLocator).first();
-        const realTimeAlertsCount = await realTimeColumn.locator(this.locators.resultsCountLocator).textContent();
+        const realTimeAlertsCount = await realTimeColumn.locator(this.locators.resultsCountLocator).textContent() || '0';
 
         return { scheduledAlertsCount, realTimeAlertsCount };
     }
@@ -884,6 +933,37 @@ export class AlertsPage {
     }
 
     /**
+     * Verify incident search input is visible
+     */
+    async expectIncidentSearchInputVisible() {
+        await expect(this.page.locator(this.locators.incidentSearchInput)).toBeVisible({ timeout: 5000 });
+        testLogger.info('Incident search input visible');
+    }
+
+    /**
+     * Clear the incident search input and wait for results to refresh
+     */
+    async clearIncidentSearchInput() {
+        testLogger.info('Clearing incident search input');
+        const searchInput = this.page.locator(this.locators.incidentSearchInput);
+        await searchInput.clear();
+        await this.page.waitForTimeout(1500);
+        testLogger.info('Cleared incident search input');
+    }
+
+    /**
+     * Fill incident search with a query and wait for debounced results
+     * @param {string} query - Search query to type
+     */
+    async fillIncidentSearch(query) {
+        testLogger.info('Filling incident search', { query });
+        const searchInput = this.page.locator(this.locators.incidentSearchInput);
+        await searchInput.fill(query);
+        await this.page.waitForTimeout(1500);
+        testLogger.info('Filled incident search');
+    }
+
+    /**
      * Verify incident list table is visible
      */
     async expectIncidentListTableVisible() {
@@ -921,81 +1001,105 @@ export class AlertsPage {
     }
 
     /**
-     * Click acknowledge button on first incident with "open" status
+     * Click acknowledge button on first open incident.
+     * Stores the row index so subsequent lifecycle checks target the same row.
      */
     async clickAcknowledgeOnFirstOpenIncident() {
         testLogger.info('Clicking acknowledge button on first open incident');
-        const ackButton = this.page.locator(this.locators.incidentAckButton).first();
-        await ackButton.waitFor({ state: 'visible', timeout: 10000 });
-        await ackButton.click();
-        await this.page.waitForTimeout(1000); // Wait for status update
+        // Find first row that has the ack button (status === 'open')
+        const rowsWithAck = this.page.locator(`${this.locators.incidentRow}:has(${this.locators.incidentAckButton})`);
+        await rowsWithAck.first().waitFor({ state: 'visible', timeout: 10000 });
+
+        // Determine the index of this row among all incident rows
+        const allRows = this.page.locator(this.locators.incidentRow);
+        const allCount = await allRows.count();
+        let targetIndex = 0;
+        for (let i = 0; i < allCount; i++) {
+            const hasAck = await allRows.nth(i).locator(this.locators.incidentAckButton).count();
+            if (hasAck > 0) { targetIndex = i; break; }
+        }
+        this._lifecycleRowIndex = targetIndex;
+        testLogger.info(`Target lifecycle row index: ${targetIndex}`);
+
+        await allRows.nth(targetIndex).locator(this.locators.incidentAckButton).click();
+        await this.page.waitForTimeout(1000);
         testLogger.info('Clicked acknowledge button');
     }
 
     /**
-     * Click resolve button on first incident
+     * Get the lifecycle target row (same row tracked through state transitions)
+     */
+    _getLifecycleRow() {
+        const idx = this._lifecycleRowIndex ?? 0;
+        return this.page.locator(this.locators.incidentRow).nth(idx);
+    }
+
+    /**
+     * Click resolve button on the lifecycle target row
      */
     async clickResolveOnFirstIncident() {
         testLogger.info('Clicking resolve button on first incident');
-        const resolveButton = this.page.locator(this.locators.incidentResolveButton).first();
+        const row = this._getLifecycleRow();
+        const resolveButton = row.locator(this.locators.incidentResolveButton);
         await resolveButton.waitFor({ state: 'visible', timeout: 10000 });
         await resolveButton.click();
-        await this.page.waitForTimeout(1000); // Wait for status update
+        await this.page.waitForTimeout(1000);
         testLogger.info('Clicked resolve button');
     }
 
     /**
-     * Click reopen button on first resolved incident
+     * Click reopen button on the lifecycle target row
      */
     async clickReopenOnFirstResolvedIncident() {
         testLogger.info('Clicking reopen button on first resolved incident');
-        const reopenButton = this.page.locator(this.locators.incidentReopenButton).first();
+        const row = this._getLifecycleRow();
+        const reopenButton = row.locator(this.locators.incidentReopenButton);
         await reopenButton.waitFor({ state: 'visible', timeout: 10000 });
         await reopenButton.click();
-        await this.page.waitForTimeout(1000); // Wait for status update
+        await this.page.waitForTimeout(1000);
         testLogger.info('Clicked reopen button');
     }
 
     /**
-     * Verify acknowledge button is visible on first incident
+     * Verify acknowledge button is visible on the lifecycle target row
      */
     async expectAcknowledgeButtonVisible() {
-        await expect(this.page.locator(this.locators.incidentAckButton).first()).toBeVisible({ timeout: 5000 });
+        await expect(this._getLifecycleRow().locator(this.locators.incidentAckButton)).toBeVisible({ timeout: 5000 });
     }
 
     /**
-     * Verify acknowledge button is hidden (not visible)
+     * Verify acknowledge button is hidden on the lifecycle target row
      */
     async expectAcknowledgeButtonHidden() {
-        await expect(this.page.locator(this.locators.incidentAckButton).first()).not.toBeVisible({ timeout: 5000 });
+        await expect(this._getLifecycleRow().locator(this.locators.incidentAckButton)).not.toBeVisible({ timeout: 5000 });
     }
 
     /**
-     * Verify resolve button is visible on first incident
+     * Verify resolve button is visible on the lifecycle target row
      */
     async expectResolveButtonVisible() {
-        await expect(this.page.locator(this.locators.incidentResolveButton).first()).toBeVisible({ timeout: 5000 });
+        await expect(this._getLifecycleRow().locator(this.locators.incidentResolveButton)).toBeVisible({ timeout: 5000 });
     }
 
     /**
-     * Verify resolve button is hidden (not visible)
+     * Verify resolve button is hidden on the lifecycle target row
      */
     async expectResolveButtonHidden() {
-        await expect(this.page.locator(this.locators.incidentResolveButton).first()).not.toBeVisible({ timeout: 5000 });
+        await expect(this._getLifecycleRow().locator(this.locators.incidentResolveButton)).not.toBeVisible({ timeout: 5000 });
     }
 
     /**
-     * Verify reopen button is visible on first incident
+     * Verify reopen button is visible on the lifecycle target row
      */
     async expectReopenButtonVisible() {
-        await expect(this.page.locator(this.locators.incidentReopenButton).first()).toBeVisible({ timeout: 5000 });
+        await expect(this._getLifecycleRow().locator(this.locators.incidentReopenButton)).toBeVisible({ timeout: 5000 });
     }
 
     /**
-     * Verify reopen button is hidden (not visible)
+     * Verify reopen button is hidden on the lifecycle target row
      */
     async expectReopenButtonHidden() {
-        await expect(this.page.locator(this.locators.incidentReopenButton).first()).not.toBeVisible({ timeout: 5000 });
+        await expect(this._getLifecycleRow().locator(this.locators.incidentReopenButton)).not.toBeVisible({ timeout: 5000 });
     }
 
     /**
@@ -1060,9 +1164,15 @@ export class AlertsPage {
      * Wait for incident status update notification
      */
     async waitForStatusUpdateNotification() {
-        // The notification text varies, but we can check for the success notification
-        await this.page.waitForTimeout(2000);
-        testLogger.info('Waited for status update');
+        // Wait for Quasar success notification to appear, with fixed timeout fallback
+        const notification = this.page.locator('.q-notification__message');
+        try {
+            await notification.first().waitFor({ state: 'visible', timeout: 5000 });
+            testLogger.info('Status update notification appeared');
+        } catch {
+            // Notification may have already disappeared or not rendered — proceed
+            testLogger.info('Notification not captured (may have auto-dismissed), continuing');
+        }
     }
 
     /**
@@ -1074,6 +1184,422 @@ export class AlertsPage {
         // Wait a bit for data to populate
         await this.page.waitForTimeout(2000);
         testLogger.info('Incidents table loaded');
+    }
+
+    // ==================== INCIDENT DETAIL PAGE METHODS ====================
+
+    /**
+     * Get count of incident rows in the list
+     * @returns {Promise<number>}
+     */
+    async getIncidentRowCount() {
+        const rows = this.page.locator(this.locators.incidentRow);
+        const count = await rows.count();
+        testLogger.info('Incident row count', { count });
+        return count;
+    }
+
+    /**
+     * Click incident row by index (0-based)
+     */
+    async clickIncidentRowByIndex(index = 0) {
+        testLogger.info('Clicking incident row', { index });
+        const row = this.page.locator(this.locators.incidentRow).nth(index);
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+        await row.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked incident row', { index });
+    }
+
+    /**
+     * Verify incident detail page is visible (full page, not drawer)
+     */
+    async expectIncidentDetailPageVisible() {
+        await expect(this.page.locator(this.locators.incidentDetailPage)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Incident detail page visible');
+    }
+
+    /**
+     * Get incident detail title text
+     * @returns {Promise<string>}
+     */
+    async getIncidentDetailTitleText() {
+        const titleEl = this.page.locator(this.locators.incidentDetailTitle);
+        await titleEl.waitFor({ state: 'visible', timeout: 10000 });
+        const text = await titleEl.textContent() || '';
+        testLogger.info('Incident detail title', { text });
+        return text.trim();
+    }
+
+    /**
+     * Click the back button on incident detail to return to list
+     */
+    async clickIncidentDetailBackButton() {
+        testLogger.info('Clicking incident detail back button');
+        const backBtn = this.page.locator(this.locators.incidentDetailBackButton);
+        await backBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await backBtn.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked back button');
+    }
+
+    /**
+     * Wait for incident detail page to fully load
+     */
+    async waitForIncidentDetailToLoad() {
+        testLogger.info('Waiting for incident detail to load');
+        await this.page.locator(this.locators.incidentDetailPage).waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Incident detail loaded');
+    }
+
+    /**
+     * Click the "Alert Triggers" tab on the incident detail page.
+     * The tab uses Quasar q-tab with name="alertTriggers".
+     */
+    async clickAlertTriggersTab() {
+        testLogger.info('Clicking Alert Triggers tab');
+        await this.page.locator('.q-tab[name="alertTriggers"], .q-tab:has-text("Alert Triggers")').first().click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked Alert Triggers tab');
+    }
+
+    /**
+     * Verify alert triggers table is visible in detail view
+     */
+    async expectAlertTriggersTableVisible() {
+        await expect(this.page.locator(this.locators.alertTriggersTable)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Alert triggers table visible');
+    }
+
+    /**
+     * Get count of alert name cells in triggers table
+     * @returns {Promise<number>}
+     */
+    async getAlertTriggerCount() {
+        const cells = this.page.locator(this.locators.alertNameCell);
+        const count = await cells.count();
+        testLogger.info('Alert trigger count', { count });
+        return count;
+    }
+
+    /**
+     * Get all alert names from the triggers table
+     * @returns {Promise<string[]>}
+     */
+    async getAlertNamesFromTriggersTable() {
+        const nameElements = this.page.locator(this.locators.alertNameText);
+        const count = await nameElements.count();
+        const names = [];
+        for (let i = 0; i < count; i++) {
+            const text = await nameElements.nth(i).textContent() || '';
+            names.push(text.trim());
+        }
+        testLogger.info('Alert names from triggers table', { names });
+        return names;
+    }
+
+    /**
+     * Verify fired-at timestamps are visible in triggers table
+     */
+    async expectFiredAtTimestampsVisible() {
+        const timestamps = this.page.locator(this.locators.firedAtTimestamp);
+        const count = await timestamps.count();
+        expect(count).toBeGreaterThan(0);
+        await expect(timestamps.first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Fired-at timestamps visible', { count });
+    }
+
+    /**
+     * Verify correlation reason badges are visible
+     * @returns {Promise<number>} count of badges found
+     */
+    async expectCorrelationReasonBadgesVisible() {
+        const badges = this.page.locator(this.locators.correlationReasonBadge);
+        const count = await badges.count();
+        expect(count).toBeGreaterThan(0);
+        await expect(badges.first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Correlation reason badges visible', { count });
+        return count;
+    }
+
+    /**
+     * Get all correlation reason badge texts
+     * @returns {Promise<string[]>}
+     */
+    async getCorrelationReasonBadgeTexts() {
+        const badges = this.page.locator(this.locators.correlationReasonBadge);
+        const count = await badges.count();
+        const texts = [];
+        for (let i = 0; i < count; i++) {
+            const text = await badges.nth(i).textContent() || '';
+            texts.push(text.trim());
+        }
+        testLogger.info('Correlation badge texts', { texts });
+        return texts;
+    }
+
+    // ==================== INCIDENT DETAIL — OVERVIEW TAB ====================
+
+    /**
+     * Get the Related Alerts container on the Overview tab.
+     * Uses :has-text to distinguish from other .o2-incident-card-bg panels.
+     */
+    _getRelatedAlertsContainer() {
+        return this.page.locator(`${this.locators.relatedAlertsContainer}:has-text("Related Alerts")`).first();
+    }
+
+    /**
+     * Get Related Alerts from the Overview tab panel.
+     * Returns array of { name, countText } objects.
+     * @returns {Promise<Array<{name: string, countText: string}>>}
+     */
+    async getRelatedAlerts() {
+        const container = this._getRelatedAlertsContainer();
+        await container.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+        // Each alert item is in a row with border-b class
+        const items = container.locator(this.locators.relatedAlertItem);
+        const count = await items.count();
+        const alerts = [];
+        for (let i = 0; i < count; i++) {
+            const name = await items.nth(i).locator(this.locators.relatedAlertName).textContent().catch(() => '') || '';
+            const countText = await items.nth(i).locator(this.locators.relatedAlertCountText).textContent().catch(() => '') || '';
+            alerts.push({ name: name.trim(), countText: countText.trim() });
+        }
+        testLogger.info('Related alerts', { count, alerts });
+        return alerts;
+    }
+
+    /**
+     * Verify Related Alerts section is visible and has at least one alert.
+     * @returns {Promise<number>} count of related alerts
+     */
+    async expectRelatedAlertsVisible() {
+        const container = this._getRelatedAlertsContainer();
+        await expect(container).toBeVisible({ timeout: 10000 });
+        // Count alert items inside the container
+        const items = container.locator(this.locators.relatedAlertItem);
+        const count = await items.count();
+        expect(count).toBeGreaterThan(0);
+        testLogger.info('Related alerts visible', { count });
+        return count;
+    }
+
+    /**
+     * Get severity badge text from incident detail header.
+     * Header has 3 badges: Status (icon=info), Severity (icon=warning), Alert Count (icon=notifications_active).
+     * Quasar renders q-icon name as <i> text content, NOT as an HTML attribute.
+     * We match the badge that contains a P1/P2/P3/P4 span.
+     * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
+     */
+    async getSeverityBadgeText() {
+        // Match the q-badge that contains P1, P2, P3, or P4 text
+        const badge = this.page.locator(this.locators.severityBadge).filter({ hasText: /^.*P[1-4].*$/ });
+        await badge.first().waitFor({ state: 'visible', timeout: 10000 });
+        // Get just the span with the severity value (first span inside the inner div)
+        const severitySpan = badge.first().locator('div span').first();
+        const severity = await severitySpan.textContent() || '';
+        testLogger.info('Severity badge text', { severity: severity.trim() });
+        return severity.trim();
+    }
+
+    /**
+     * Verify severity badge is visible and contains a valid severity value.
+     */
+    async expectSeverityBadgeVisible() {
+        const badge = this.page.locator(this.locators.severityBadge).filter({ hasText: /P[1-4]/ });
+        await expect(badge.first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Severity badge visible');
+    }
+
+    /**
+     * Verify the current URL contains an incident path (/incidents/{id}).
+     */
+    async expectUrlContainsIncidentPath() {
+        const url = this.page.url();
+        expect(url).toMatch(/\/incidents\//);
+        testLogger.info('URL contains incident path', { url });
+    }
+
+    // ==================== INCIDENT DETAIL — TAB NAVIGATION ====================
+
+    /**
+     * Tab name → visible label map for Quasar q-tab text-based fallback.
+     * Quasar may or may not render name= as an HTML attribute.
+     */
+    static TAB_LABELS = {
+        overview: 'Overview',
+        incidentAnalysis: 'Incident Analysis',
+        serviceGraph: 'Alert Graph',
+        alertTriggers: 'Alert Triggers',
+        logs: 'Logs',
+        metrics: 'Metrics',
+        traces: 'Traces',
+    };
+
+    /**
+     * Click a tab on the incident detail page by its Quasar tab name.
+     * Uses attribute selector with text-based fallback.
+     * @param {string} tabName - One of: overview, incidentAnalysis, serviceGraph, alertTriggers, logs, metrics, traces
+     */
+    async clickIncidentDetailTab(tabName) {
+        testLogger.info(`Clicking incident detail tab: ${tabName}`);
+        const label = AlertsPage.TAB_LABELS[tabName] || tabName;
+        const tab = this.page.locator(`.q-tab[name="${tabName}"], .q-tab:has-text("${label}")`);
+        await tab.first().waitFor({ state: 'visible', timeout: 10000 });
+        await tab.first().click();
+        await this.page.waitForTimeout(1500);
+        testLogger.info(`Clicked tab: ${tabName}`);
+    }
+
+    /**
+     * Verify the service graph tab content rendered.
+     * Tabs are v-if gated (no q-tab-panel wrapper). The serviceGraph tab
+     * renders IncidentServiceGraph inside an absolute-positioned div.
+     * Checks for the .incident-service-graph container OR the detail page
+     * still being visible (confirming no crash).
+     */
+    async expectServiceGraphTabContentVisible() {
+        const graph = this.page.locator(this.locators.serviceGraphContainer);
+        const detailPage = this.page.locator(this.locators.incidentDetailPage);
+        // Either the graph container rendered, or at minimum the detail page is still visible
+        const graphVisible = await graph.isVisible({ timeout: 10000 }).catch(() => false);
+        if (graphVisible) {
+            testLogger.info('Service graph container visible');
+            return;
+        }
+        // Graph not visible — verify detail page didn't crash
+        await expect(detailPage).toBeVisible({ timeout: 5000 });
+        testLogger.info('Service graph not rendered (empty/loading state), but detail page intact');
+    }
+
+    /**
+     * Verify Service Graph container is visible after clicking the serviceGraph tab.
+     */
+    async expectServiceGraphVisible() {
+        const graph = this.page.locator(this.locators.serviceGraphContainer);
+        await expect(graph).toBeVisible({ timeout: 15000 });
+        testLogger.info('Service graph container visible');
+    }
+
+    /**
+     * Check if Service Graph container rendered (visible or empty state).
+     * Returns true if graph is visible, false if empty/loading state.
+     * Does not throw — both states are acceptable for test data.
+     * @returns {Promise<boolean>}
+     */
+    async isServiceGraphRendered() {
+        const graph = this.page.locator(this.locators.serviceGraphContainer);
+        const isVisible = await graph.isVisible({ timeout: 10000 }).catch(() => false);
+        testLogger.info('Service graph rendered', { isVisible });
+        return isVisible;
+    }
+
+    /**
+     * Check if a telemetry tab (logs/metrics/traces) loaded without errors.
+     * After clicking the tab, the page shows one of:
+     *   - Loading spinner
+     *   - Content (TelemetryCorrelationDashboard)
+     *   - Info/error state with icon
+     * All are acceptable — an uncaught JS exception would be a failure.
+     * @param {string} tabName - 'logs', 'metrics', or 'traces'
+     * @returns {Promise<string>} state: 'loading' | 'content' | 'noData' | 'error'
+     */
+    async getTelemetryTabState(tabName) {
+        // Wait for either loading spinner to disappear or content to appear
+        await this.page.waitForTimeout(3000);
+
+        // Check for loading spinner still active
+        const spinner = this.page.locator(this.locators.loadingSpinner);
+        if (await spinner.isVisible({ timeout: 1000 }).catch(() => false)) {
+            testLogger.info(`Telemetry tab ${tabName}: still loading`);
+            // Wait up to 30s for spinner to go away
+            await spinner.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+        }
+
+        // Check for "No correlated" message (acceptable state)
+        const noData = this.page.locator(`text=/No correlated ${tabName} found/i`);
+        if (await noData.isVisible({ timeout: 2000 }).catch(() => false)) {
+            testLogger.info(`Telemetry tab ${tabName}: no data`);
+            return 'noData';
+        }
+
+        // Check for error icon (also acceptable — just means no correlation data)
+        // Note: Quasar renders q-icon name as text content, not HTML attribute
+        const errorIcon = this.page.locator('.q-icon:has-text("error_outline"), .q-icon:has-text("info_outline")');
+        if (await errorIcon.isVisible({ timeout: 1000 }).catch(() => false)) {
+            testLogger.info(`Telemetry tab ${tabName}: info/error state`);
+            return 'noData';
+        }
+
+        // Otherwise content loaded
+        testLogger.info(`Telemetry tab ${tabName}: content visible`);
+        return 'content';
+    }
+
+    /**
+     * Verify the "no triggers" message is shown (for incidents with no alerts)
+     */
+    async expectNoTriggersMessage() {
+        await expect(this.page.locator(this.locators.noTriggersMessage)).toBeVisible({ timeout: 5000 });
+        testLogger.info('No triggers message visible');
+    }
+
+    /**
+     * Verify RCA analysis container is visible in detail view
+     */
+    async expectRcaContainerVisible() {
+        await expect(this.page.locator(this.locators.rcaAnalysisContainer)).toBeVisible({ timeout: 10000 });
+        testLogger.info('RCA analysis container visible');
+    }
+
+    /**
+     * Check if RCA has existing content or is in empty state
+     * @returns {Promise<'content'|'empty'|'hidden'>}
+     */
+    async getRcaState() {
+        const existing = this.page.locator(this.locators.rcaExistingContent);
+        const empty = this.page.locator(this.locators.rcaEmptyState);
+
+        if (await existing.isVisible({ timeout: 3000 }).catch(() => false)) {
+            testLogger.info('RCA state: content');
+            return 'content';
+        }
+        if (await empty.isVisible({ timeout: 3000 }).catch(() => false)) {
+            testLogger.info('RCA state: empty');
+            return 'empty';
+        }
+        testLogger.info('RCA state: hidden');
+        return 'hidden';
+    }
+
+    /**
+     * Verify TOC container is visible in incident detail
+     */
+    async expectTocContainerVisible() {
+        await expect(this.page.locator(this.locators.tocContainer)).toBeVisible({ timeout: 10000 });
+        testLogger.info('TOC container visible');
+    }
+
+    /**
+     * Click refresh button on incidents list
+     */
+    async clickIncidentRefreshButton() {
+        testLogger.info('Clicking incident refresh button');
+        const refreshBtn = this.page.locator(this.locators.incidentRefreshButton);
+        await refreshBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await refreshBtn.click();
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Clicked refresh button');
+    }
+
+    /**
+     * Verify incidents list title is visible
+     */
+    async expectIncidentsListTitleVisible() {
+        await expect(this.page.locator(this.locators.incidentsListTitle)).toBeVisible({ timeout: 5000 });
+        testLogger.info('Incidents list title visible');
     }
 
     // ==================== IMPORT/EXPORT OPERATIONS ====================

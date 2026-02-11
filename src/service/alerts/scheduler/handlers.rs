@@ -680,12 +680,19 @@ async fn handle_alert_triggers(
                             _ => None,
                         };
 
+                    let semantic_groups =
+                        crate::service::db::system_settings::get_semantic_field_groups(
+                            &new_trigger.org,
+                        )
+                        .await;
+
                     if let Some(first_row) = data.first() {
                         crate::service::alerts::deduplication::calculate_fingerprint(
                             &alert,
                             first_row,
                             dedup_config,
                             org_config.as_ref(),
+                            &semantic_groups,
                         )
                     } else {
                         alert.get_unique_key()

@@ -121,7 +121,7 @@
     "source": "_source",
     "noResult": "कोई नतीजा नहीं",
     "syntaxGuide": "सिंटेक्स गाइड",
-    "rowsPerPage": "रिकॉर्ड प्रति पेज",
+    "recordsPerPage": "रिकॉर्ड प्रति पेज",
     "showing": "दिखा रहा है",
     "of": "का",
     "rowDetail": "स्रोत का विवरण",

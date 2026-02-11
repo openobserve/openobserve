@@ -823,7 +823,17 @@ impl MemorySize for SchemaCache {
 
 pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     let allowed_type = match from {
-        DataType::Boolean => vec![DataType::Utf8, DataType::LargeUtf8],
+        DataType::Boolean => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::Int8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+        ],
         DataType::Int8 => vec![
             DataType::Utf8,
             DataType::LargeUtf8,

@@ -41,7 +41,7 @@ export const useSearchResponseHandler = () => {
   const { getHistogramTitle, generateHistogramData, resetHistogramWithError } =
     useHistogram();
 
-  const { refreshPagination } = useSearchPagination();
+  const { refreshPagination, sortResponse } = useSearchPagination();
 
   const { clearCache } = useLogsHighlighter();
 
@@ -56,7 +56,7 @@ export const useSearchResponseHandler = () => {
     notificationMsg,
     searchPartitionMap,
     resetHistogramError,
-    histogramResults
+    histogramResults,
   } = searchState();
 
   const {
@@ -173,7 +173,6 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-
   const handleStreamingHits = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
@@ -201,6 +200,19 @@ export const useSearchResponseHandler = () => {
       trimPageCountExtraHit(
         payload.queryReq,
         searchObj.data.queryResults.hits.length,
+      );
+    }
+
+    if (
+      searchObj.data.queryResults.hits.length > 0 &&
+      store.state.zoConfig.timestamp_column != "" &&
+      searchObj.data.queryResults.hasOwnProperty("order_by_metadata") &&
+      searchObj.data.queryResults.order_by_metadata.length > 0
+    ) {
+      sortResponse(
+        searchObj.data.queryResults.hits,
+        store.state.zoConfig.timestamp_column,
+        searchObj.data.queryResults.order_by_metadata,
       );
     }
 
@@ -419,7 +431,6 @@ export const useSearchResponseHandler = () => {
         });
       }
     }
-
 
     if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
       searchObj.data.queryResults.aggs.push(...response.content.results.hits);

@@ -244,7 +244,8 @@ test.describe("Correlation Settings Tests", () => {
     });
 
     test.describe("P1 - Alert Correlation Tab", () => {
-        // Tests run in parallel - each test handles its own state
+        // Parallel: each test has its own page. Safe because ensureSemanticGroupsExist()
+        // only PUTs semantic groups (idempotent) and doesn't POST shared config state.
         test.describe.configure({ mode: 'parallel' });
 
         test("should display all configuration elements", {
@@ -396,11 +397,10 @@ test.describe("Correlation Settings Tests", () => {
                 testLogger.info('Cross-alert already enabled');
             }
 
-            // Wait for fingerprint groups to load
-            await pm.correlationSettingsPage.page.waitForTimeout(1000);
+            // Wait for fingerprint groups to load (component fetches semantic groups async)
+            await pm.correlationSettingsPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
             // Verify fingerprint groups section is now visible
-            // Note: ensureSemanticGroupsExist() is called in beforeEach so groups should always be present
             testLogger.info('Verifying fingerprint groups are visible');
             await pm.correlationSettingsPage.expectFingerprintGroupsVisible();
             const count = await pm.correlationSettingsPage.getFingerprintGroupsCount();
@@ -453,11 +453,11 @@ test.describe("Correlation Settings Tests", () => {
                 testLogger.info('Cross-alert already enabled');
             }
 
-            // Wait for fingerprint groups to load
-            await pm.correlationSettingsPage.page.waitForTimeout(1000);
+            // Wait for fingerprint groups to load (component fetches semantic groups async)
+            await pm.correlationSettingsPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            await pm.correlationSettingsPage.expectFingerprintGroupsVisible();
 
             // Interact with fingerprint groups
-            // Note: ensureSemanticGroupsExist() is called in beforeEach so groups should always be present
             const checkboxes = pm.correlationSettingsPage.getFingerprintGroupCheckboxes();
             const count = await checkboxes.count();
             testLogger.info(`Found ${count} fingerprint groups`);
