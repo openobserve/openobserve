@@ -87,14 +87,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-graph-side-panel-metrics"
         >
           <div class="section-title">Metrics</div>
-          <div class="metrics-grid">
-            <div class="metric-card" data-test="service-graph-side-panel-request-rate">
-              <div class="metric-label">Request Rate</div>
-              <div class="metric-value">
+
+          <!-- Request Rate Card (Full Width) -->
+          <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
+            <div class="metric-header">
+              <span class="metric-label">Total Requests:</span>
+              <span class="metric-value-large">
                 {{ serviceMetrics.requestRateValue }}
                 <span class="metric-unit">req/min</span>
+              </span>
+            </div>
+            <div class="metric-breakdown">
+              <div class="breakdown-item breakdown-incoming">
+                <div class="breakdown-icon-wrapper incoming">
+                  <q-icon name="arrow_downward" size="16px" />
+                </div>
+                <div class="breakdown-content">
+                  <span class="breakdown-label">Incoming</span>
+                  <span class="breakdown-value">{{ formatNumber(serviceMetrics.incomingRequests) }}</span>
+                </div>
+              </div>
+              <div class="breakdown-item breakdown-outgoing">
+                <div class="breakdown-icon-wrapper outgoing">
+                  <q-icon name="arrow_upward" size="16px" />
+                </div>
+                <div class="breakdown-content">
+                  <span class="breakdown-label">Outgoing</span>
+                  <span class="breakdown-value">{{ formatNumber(serviceMetrics.outgoingRequests) }}</span>
+                </div>
               </div>
             </div>
+          </div>
+
+          <!-- Error Rate and P95 Latency (Two Columns) -->
+          <div class="metrics-grid-bottom">
             <div class="metric-card" data-test="service-graph-side-panel-error-rate">
               <div class="metric-label">Error Rate</div>
               <div class="metric-value">{{ serviceMetrics.errorRate }}</div>
@@ -327,42 +353,46 @@ export default defineComponent({
       if (!props.selectedNode || !props.graphData) {
         return {
           requestRate: 'N/A',
+          requestRateValue: 'N/A',
+          totalRequests: 0,
+          incomingRequests: 0,
+          outgoingRequests: 0,
           errorRate: 'N/A',
           p95Latency: 'N/A',
         };
       }
 
-      const outgoingEdges = props.graphData.edges.filter(
-        (edge: any) => edge.from === props.selectedNode.id
+      // Get total request count - handle both graph view (uses 'value') and tree view (uses 'requests')
+      const totalRequests = props.selectedNode.value || props.selectedNode.requests || 0;
+
+      // Calculate incoming requests (sum of all edges TO this node)
+      const incomingEdges = props.graphData.edges.filter(
+        (edge: any) => edge.to === props.selectedNode.id
       );
-
-      // Debug: Log outgoing edges for selected node
-      console.log(`[ServiceMetrics] ${props.selectedNode.id} outgoing edges:`, {
-        count: outgoingEdges.length,
-        edges: outgoingEdges.map(e => ({
-          to: e.to,
-          p95_latency_ns: e.p95_latency_ns,
-          total_requests: e.total_requests
-        }))
-      });
-
-      const totalRequests = outgoingEdges.reduce(
+      const incomingRequests = incomingEdges.reduce(
         (sum: number, edge: any) => sum + (edge.total_requests || 0),
         0
       );
 
-      // Use node's own error_rate instead of calculating from edges
-      const errorRate = props.selectedNode.error_rate || 0;
+      // Calculate outgoing requests (sum of all edges FROM this node)
+      const outgoingEdges = props.graphData.edges.filter(
+        (edge: any) => edge.from === props.selectedNode.id
+      );
+      const outgoingRequests = outgoingEdges.reduce(
+        (sum: number, edge: any) => sum + (edge.total_requests || 0),
+        0
+      );
 
-      // Fix P95 latency: handle case when no outgoing edges
+      // Get errors and calculate error rate
+      const errors = props.selectedNode.errors || 0;
+      const errorRate = totalRequests > 0 ? (errors / totalRequests) * 100 : 0;
+
+      // Calculate P95 latency from incoming edges
       let p95Latency = 0;
-      if (outgoingEdges.length > 0) {
+      if (incomingEdges.length > 0) {
         p95Latency = Math.max(
-          ...outgoingEdges.map((edge: any) => edge.p95_latency_ns || 0)
+          ...incomingEdges.map((edge: any) => edge.p95_latency_ns || 0)
         );
-        console.log(`[ServiceMetrics] P95 latency calculated:`, p95Latency, 'ns');
-      } else {
-        console.log(`[ServiceMetrics] No outgoing edges, showing N/A`);
       }
 
       // Format request rate value without unit
@@ -378,8 +408,11 @@ export default defineComponent({
       return {
         requestRate: formatRequestRate(totalRequests),
         requestRateValue: requestRateValue,
+        totalRequests: totalRequests,
+        incomingRequests: incomingRequests,
+        outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + '%',
-        p95Latency: outgoingEdges.length > 0 ? formatLatency(p95Latency) : 'N/A',
+        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : 'N/A',
       };
     });
 
@@ -470,6 +503,17 @@ export default defineComponent({
         return (requests / 1000).toFixed(1) + 'K req/min';
       }
       return requests + ' req/min';
+    };
+
+    // Helper: Format Number (without unit)
+    const formatNumber = (num: number): string => {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      }
+      if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toString();
     };
 
     // Helper: Format Latency
@@ -643,6 +687,7 @@ export default defineComponent({
       isAllStreamsSelected,
       getHealthColor,
       getHealthText,
+      formatNumber,
       handleClose,
       handleViewLogs,
       handleViewTraces,
@@ -917,18 +962,147 @@ export default defineComponent({
 
 
 .metrics-section {
-  .metrics-grid {
+  // Full-width card for total requests
+  .metric-card-full {
+    padding: 20px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
+    border: 1px solid #374151;
+    margin-bottom: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+      border: 1px solid rgba(99, 102, 241, 0.15);
+    }
+
+    .metric-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #a5b4fc;
+    }
+
+    .metric-value-large {
+      font-size: 20px;
+      font-weight: 800;
+      color: #e0e7ff;
+      letter-spacing: -0.02em;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+      .metric-unit {
+        font-size: 12px;
+        font-weight: 500;
+        color: #a5b4fc;
+        margin-left: 4px;
+      }
+    }
+
+    .metric-breakdown {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid #2d3548;
+
+      .breakdown-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.04);
+          border-color: rgba(255, 255, 255, 0.1);
+          transform: translateY(-1px);
+        }
+
+        .breakdown-icon-wrapper {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          flex-shrink: 0;
+          transition: all 0.2s ease;
+
+          &.incoming {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+          }
+
+          &.outgoing {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+          }
+        }
+
+        .breakdown-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          flex: 1;
+
+          .breakdown-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+
+          .breakdown-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #e4e7eb;
+            letter-spacing: -0.01em;
+          }
+        }
+
+        &.breakdown-incoming:hover .breakdown-icon-wrapper.incoming {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(16, 185, 129, 0.1));
+          box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+        }
+
+        &.breakdown-outgoing:hover .breakdown-icon-wrapper.outgoing {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.1));
+          box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+        }
+      }
+    }
+  }
+
+  // Bottom grid for error rate and p95 latency
+  .metrics-grid-bottom {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px; 
-    margin-bottom: 24px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
 
     .metric-card {
-      padding: 12px; 
-      border-radius: 8px; 
+      padding: 12px;
+      border-radius: 8px;
       text-align: center;
-      background: #242938; 
-      border: 1px solid #2d3548; 
+      background: #242938;
+      border: 1px solid #2d3548;
       transition: all 0.2s ease;
 
       &:hover {
@@ -937,73 +1111,137 @@ export default defineComponent({
       }
 
       .metric-label {
-        font-size: 11px; 
+        font-size: 11px;
         font-weight: 600;
-        text-transform: none; // Use proper case from template
+        text-transform: none;
         letter-spacing: 0;
         margin-bottom: 6px;
-        color: #9ca3af; 
+        color: #9ca3af;
       }
 
       .metric-value {
-        font-size: 20px; 
+        font-size: 20px;
         font-weight: 700;
-        color: #e4e7eb; 
+        color: #e4e7eb;
         letter-spacing: -0.01em;
-        margin-bottom: 4px;
-        white-space: nowrap; // Prevent wrapping to multiple lines
+        white-space: nowrap;
 
-        &.green { color: #10b981; } 
-        &.yellow { color: #fbbf24; } 
-        &.orange { color: #f97316; } 
-        &.red { color: #ef4444; } 
+        &.green { color: #10b981; }
+        &.yellow { color: #fbbf24; }
+        &.orange { color: #f97316; }
+        &.red { color: #ef4444; }
 
         .metric-unit {
-          font-size: 11px; // Smaller unit text
+          font-size: 11px;
           font-weight: 500;
-          color: #9ca3af; 
+          color: #9ca3af;
           margin-left: 4px;
         }
-      }
-
-      
-      .metric-sparkline {
-        height: 20px;
-        background: linear-gradient(to right,
-          transparent 0%,
-          rgba(59, 130, 246, 0.1) 20%,
-          rgba(59, 130, 246, 0.2) 50%,
-          rgba(59, 130, 246, 0.1) 80%,
-          transparent 100%);
-        border-radius: 2px;
-        margin-top: 6px;
       }
     }
   }
 }
 
-.body--light .metrics-section .metrics-grid .metric-card {
-  background: #ffffff;
-  border-color: #e0e0e0;
+.body--light .metrics-section {
+  .metric-card-full {
+    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+    border-color: #d1d5db;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
-  &:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    &:hover {
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .metric-header {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.03));
+      border-color: rgba(99, 102, 241, 0.2);
+
+      .metric-label {
+        color: #6366f1;
+      }
+
+      .metric-value-large {
+        color: #4338ca;
+
+        .metric-unit {
+          color: #6366f1;
+        }
+      }
+    }
+
+    .metric-breakdown {
+      border-top-color: #e0e0e0;
+
+      .breakdown-item {
+        background: rgba(0, 0, 0, 0.02);
+        border-color: rgba(0, 0, 0, 0.08);
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.04);
+          border-color: rgba(0, 0, 0, 0.12);
+        }
+
+        .breakdown-icon-wrapper {
+          &.incoming {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
+            color: #059669;
+            border-color: rgba(16, 185, 129, 0.25);
+          }
+
+          &.outgoing {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+            color: #2563eb;
+            border-color: rgba(59, 130, 246, 0.25);
+          }
+        }
+
+        .breakdown-content {
+          .breakdown-label {
+            color: rgba(0, 0, 0, 0.6);
+          }
+
+          .breakdown-value {
+            color: #202124;
+          }
+        }
+
+        &.breakdown-incoming:hover .breakdown-icon-wrapper.incoming {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.08));
+          box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+        }
+
+        &.breakdown-outgoing:hover .breakdown-icon-wrapper.outgoing {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.08));
+          box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+        }
+      }
+    }
   }
 
-  .metric-label {
-    color: rgba(0, 0, 0, 0.6);
-  }
+  .metrics-grid-bottom .metric-card {
+    background: #ffffff;
+    border-color: #e0e0e0;
 
-  .metric-value {
-    color: #202124;
+    &:hover {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
 
-    &.green { color: #059669; }
-    &.yellow { color: #d97706; }
-    &.orange { color: #ea580c; }
-    &.red { color: #dc2626; }
-
-    .metric-unit {
+    .metric-label {
       color: rgba(0, 0, 0, 0.6);
+    }
+
+    .metric-value {
+      color: #202124;
+
+      &.green { color: #059669; }
+      &.yellow { color: #d97706; }
+      &.orange { color: #ea580c; }
+      &.red { color: #dc2626; }
+
+      .metric-unit {
+        color: rgba(0, 0, 0, 0.6);
+      }
     }
   }
 }
