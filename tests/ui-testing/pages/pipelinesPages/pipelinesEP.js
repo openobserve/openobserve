@@ -43,7 +43,9 @@ export class PipelinesEP {
     }
 
     async goToHomePage() {
-        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/?org_identifier=default");
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        await this.page.goto(`${baseUrl}/web/?org_identifier=${org}`);
     }
 
     async waitForPipelineInList(name) {
