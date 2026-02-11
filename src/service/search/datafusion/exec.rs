@@ -49,9 +49,8 @@ use datafusion::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::WorkGroup};
-use vortex::{VortexSessionDefault, session::VortexSession};
+use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
 use vortex_datafusion::VortexFormat;
-use vortex_io::session::RuntimeSessionExt;
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,

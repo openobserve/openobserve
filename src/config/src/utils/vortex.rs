@@ -8,14 +8,14 @@
 use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
 use vortex::{
-    array::{Array, ArrayRef, IntoArray},
+    array::{Array, ArrayRef, Canonical, IntoArray},
     compressor::BtrBlocksCompressor,
     dtype::DType,
     encodings::zstd::ZstdArray,
     error::VortexResult,
     layout::layouts::compressed::CompressorPlugin,
 };
-use vortex_array::Canonical;
+use vortex_btrblocks::BtrBlocksCompressorBuilder;
 
 use crate::config;
 
@@ -52,7 +52,7 @@ impl Utf8Compressor {
     /// Create a new smart compressor with default settings.
     pub fn new() -> Self {
         Self {
-            btr_compressor: BtrBlocksCompressor::default(),
+            btr_compressor: BtrBlocksCompressorBuilder::default().build(),
             zstd_level: 3,
             values_per_page: 8192,
         }
@@ -114,10 +114,9 @@ impl CompressorPlugin for Utf8Compressor {
 #[cfg(test)]
 mod tests {
     use vortex::{
-        array::IntoArray,
+        array::{IntoArray, arrays::VarBinViewArray},
         dtype::{DType, Nullability},
     };
-    use vortex_array::arrays::VarBinViewArray;
 
     use super::*;
 
@@ -172,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_non_utf8_uses_btrblocks() {
-        use vortex_array::arrays::PrimitiveArray;
+        use vortex::array::arrays::PrimitiveArray;
 
         let compressor = Utf8Compressor::new();
 
@@ -308,7 +307,7 @@ mod tests {
 
         // Test 3: Integer array (non-UTF8)
         println!("\n=== Test 3: Integer array ===");
-        use vortex_array::arrays::PrimitiveArray;
+        use vortex::array::arrays::PrimitiveArray;
         let array: PrimitiveArray = vec![1i32, 2, 3, 4, 5].into_iter().collect();
 
         println!("Original array encoding: {}", array.encoding_id());

@@ -34,10 +34,10 @@ use parquet::{
     errors::ParquetError,
     file::{metadata::KeyValue, properties::WriterProperties},
 };
-use vortex::{VortexSessionDefault, array::arrow::IntoArrowArray, buffer::Buffer};
-use vortex_file::OpenOptionsSessionExt;
-use vortex_io::session::RuntimeSessionExt;
-use vortex_session::VortexSession;
+use vortex::{
+    VortexSessionDefault, array::arrow::IntoArrowArray, buffer::Buffer,
+    file::OpenOptionsSessionExt, io::session::RuntimeSessionExt, session::VortexSession,
+};
 
 use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
 

@@ -32,9 +32,8 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use hashbrown::HashMap;
-use vortex_buffer::Buffer;
+use vortex::{buffer::Buffer, scan::Selection};
 use vortex_datafusion::VortexAccessPlan;
-use vortex_scan::Selection;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
 

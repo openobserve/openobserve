@@ -100,14 +100,9 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
-vortex-array.workspace = true
-vortex-buffer.workspace = true
-vortex-file.workspace = true
-vortex-io.workspace = true
-vortex-session.workspace = true
 vortex.workspace = true
 vortex-datafusion.workspace = true
-vortex-scan.workspace = true
+vortex-btrblocks.workspace = true
 env_logger.workspace = true
 faststr.workspace = true
 flate2.workspace = true
@@ -325,26 +320,14 @@ arrow-json = "57.2.0"
 arrow-schema = { version = "57.2.0", features = ["serde"] }
 parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-vortex-array = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
-vortex-buffer = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
-vortex-file = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
-vortex-io = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
-vortex-session = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
 vortex = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98", features = [
     "tokio",
 ] }
 vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
-vortex-scan = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98", features = [
-    "roaring",
-] }
-# vortex-scan = { version = "0.58.0" }
-# vortex-array = { version = "0.58.0" }
-# vortex-buffer = { version = "0.58.0" }
-# vortex-file = { version = "0.58.0" }
-# vortex-io = { version = "0.58.0" }
-# vortex-session = { version = "0.58.0" }
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
 # vortex = { version = "0.58.0", features = ["tokio"] }
 # vortex-datafusion = { version = "0.58.0" }
+# vortex-btrblocks = { version = "0.58.0" }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.3"
 dotenvy = "0.15.7"

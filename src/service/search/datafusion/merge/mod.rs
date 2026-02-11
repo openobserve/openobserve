@@ -36,11 +36,10 @@ use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, arrow::FromArrowArray},
     dtype::{DType, arrow::FromArrowType},
-    file::VortexWriteOptions,
+    file::{VortexWriteOptions, WriteStrategyBuilder},
+    io::session::RuntimeSessionExt,
     session::VortexSession,
 };
-use vortex_file::WriteStrategyBuilder;
-use vortex_io::session::RuntimeSessionExt;
 
 use super::table_provider::uniontable::NewUnionTable;
 use crate::service::search::datafusion::exec::{
