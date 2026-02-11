@@ -708,7 +708,7 @@ pub fn service_routes() -> Router {
 
         // Pipelines
         .route("/{org_id}/pipelines", get(pipeline::list_pipelines).post(pipeline::save_pipeline).put(pipeline::update_pipeline))
-        .route("/{org_id}/pipelines/{pipeline_id}", delete(pipeline::delete_pipeline))
+        .route("/{org_id}/pipelines/{pipeline_id}", get(pipeline::get_pipeline).delete(pipeline::delete_pipeline))
         .route("/{org_id}/pipelines/bulk", delete(pipeline::delete_pipeline_bulk))
         .route("/{org_id}/pipelines/{pipeline_id}/enable", put(pipeline::enable_pipeline))
         .route("/{org_id}/pipelines/bulk/enable", post(pipeline::enable_pipeline_bulk))
