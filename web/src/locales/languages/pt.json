@@ -1415,7 +1415,8 @@
     "noColumnsOrdered": "Nenhuma coluna ordenada",
     "columnsDefaultOrder": "As colunas serão exibidas em sua ordem padrão",
     "moveUp": "Mova-se para cima",
-    "moveDown": "Mover para baixo"
+    "moveDown": "Mover para baixo",
+    "connectNullValuesTooltip": "Conecte pontos de dados entre valores ausentes com uma linha."
   },
   "panel": {
     "header": "Painel",

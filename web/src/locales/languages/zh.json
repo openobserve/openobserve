@@ -1415,7 +1415,8 @@
     "noColumnsOrdered": "未订购任何列",
     "columnsDefaultOrder": "列将按其默认顺序显示",
     "moveUp": "向上移动",
-    "moveDown": "向下移动"
+    "moveDown": "向下移动",
+    "connectNullValuesTooltip": "用一条线将缺失值上的数据点连接起来。"
   },
   "panel": {
     "header": "面板",

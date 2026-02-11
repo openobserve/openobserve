@@ -1415,7 +1415,8 @@
     "noColumnsOrdered": "Sıralı sütun yok",
     "columnsDefaultOrder": "Sütunlar varsayılan sıralarında görüntülenecektir",
     "moveUp": "Yukarı hareket et",
-    "moveDown": "Aşağı hareket et"
+    "moveDown": "Aşağı hareket et",
+    "connectNullValuesTooltip": "Veri noktalarını eksik değerler arasında bir çizgi ile bağlayın."
   },
   "panel": {
     "header": "Panel",

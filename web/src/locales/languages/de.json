@@ -1415,7 +1415,8 @@
     "noColumnsOrdered": "Keine Spalten angeordnet",
     "columnsDefaultOrder": "Die Spalten werden in ihrer Standardreihenfolge angezeigt",
     "moveUp": "Steigen Sie auf",
-    "moveDown": "Gehe nach unten"
+    "moveDown": "Gehe nach unten",
+    "connectNullValuesTooltip": "Verbinde Datenpunkte über fehlende Werte mit einer Linie."
   },
   "panel": {
     "header": "Panel",

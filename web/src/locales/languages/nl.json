@@ -1415,7 +1415,8 @@
     "noColumnsOrdered": "Geen kolommen besteld",
     "columnsDefaultOrder": "De kolommen worden in hun standaardvolgorde weergegeven",
     "moveUp": "Ga omhoog",
-    "moveDown": "Naar beneden gaan"
+    "moveDown": "Naar beneden gaan",
+    "connectNullValuesTooltip": "Verbind datapunten over ontbrekende waarden met een lijn."
   },
   "panel": {
     "header": "Paneel",

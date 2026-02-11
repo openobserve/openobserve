@@ -1415,7 +1415,8 @@
     "noColumnsOrdered": "정렬된 컬럼 없음",
     "columnsDefaultOrder": "열은 기본 순서로 표시됩니다.",
     "moveUp": "위로 이동",
-    "moveDown": "아래로 이동"
+    "moveDown": "아래로 이동",
+    "connectNullValuesTooltip": "결측값의 데이터 포인트를 선으로 연결합니다."
   },
   "panel": {
     "header": "패널",
