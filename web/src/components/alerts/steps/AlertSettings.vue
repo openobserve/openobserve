@@ -1389,7 +1389,7 @@ export default defineComponent({
           }
         }
 
-        // Validate threshold with aggregation
+        // Validate aggregation having clause
         if (!props.formData.query_condition.aggregation.having.column || props.formData.query_condition.aggregation.having.column === '') {
           return { valid: false, message: null };
         }
@@ -1398,6 +1398,15 @@ export default defineComponent({
         }
         if (!props.formData.query_condition.aggregation.having.operator) {
           return { valid: false, message: null };
+        }
+
+        // Also validate threshold when aggregation is enabled
+        if (!props.formData.trigger_condition.operator) {
+          return { valid: false, message: null };
+        }
+        const threshold = Number(props.formData.trigger_condition.threshold);
+        if (isNaN(threshold) || threshold < 1) {
+          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
         }
       } else {
         // Validate threshold without aggregation
