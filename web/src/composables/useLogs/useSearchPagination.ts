@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import { debounce } from "quasar";
 
 // Sorting types and interfaces
 interface OrderByField {
@@ -267,10 +268,23 @@ export const useSearchPagination = () => {
 
     if (typeof ts === "string") {
       const timestamp = Date.parse(ts);
-      return timestamp * 1000;
+      return Number.isFinite(timestamp) ? timestamp * 1000 : 0;
     }
 
-    if (typeof ts === "number") return ts;
+    if (typeof ts === "number") {
+      if (!Number.isFinite(ts)) return 0;
+
+      // Normalize based on magnitude:
+      // - < 10^11: seconds (multiply by 1,000,000)
+      // - < 10^14: milliseconds (multiply by 1,000)
+      // - >= 10^14: microseconds (use as-is)
+      if (ts < 1e11) {
+        return ts * 1e6; // seconds to microseconds
+      } else if (ts < 1e14) {
+        return ts * 1e3; // milliseconds to microseconds
+      }
+      return ts; // already in microseconds
+    }
 
     return 0;
   }
@@ -309,12 +323,15 @@ export const useSearchPagination = () => {
           }
         }
 
-        const finalCmp = order === "desc" ? -cmp : cmp;
+        const finalCmp = order.toLowerCase() === "desc" ? -cmp : cmp;
         if (finalCmp !== 0) return finalCmp;
       }
       return 0;
     });
   }
+
+  // Debounced version for streaming scenarios (300ms delay)
+  const sortResponseDebounced = debounce(sortResponse, 300);
 
   return {
     refreshPagination,
@@ -329,6 +346,7 @@ export const useSearchPagination = () => {
     getCurrentPageData,
     getAggsTotal,
     sortResponse,
+    sortResponseDebounced,
   };
 };
 
