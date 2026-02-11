@@ -169,6 +169,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.messageWrapContent") }}
             </q-tooltip>
           </q-btn>
+          <!-- Show Histogram Button -->
+          <q-btn
+            v-if="searchObj.meta.logsVisualizeToggle === 'logs'"
+            data-test="logs-search-result-show-histogram-btn"
+            flat
+            dense
+            class="wrap-content-btn float-right"
+            :class="{ 'wrap-content-btn--active': searchObj.meta.showHistogram }"
+            @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+          >
+            <img
+              :src="store.state.theme === 'dark'
+                ? getImageURL('images/common/bar_chart_histogram_light.svg')
+                : getImageURL('images/common/bar_chart_histogram.svg')"
+              alt="Histogram"
+              style="width: 16px; height: 16px;"
+            />
+            <q-tooltip>
+              {{ t("search.showHistogramLabel") }}
+            </q-tooltip>
+          </q-btn>
         </div>
       </div>
       <div

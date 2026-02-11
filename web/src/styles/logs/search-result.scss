@@ -44,7 +44,7 @@
     border: 0.0626rem solid var(--o2-border-color) !important;
     border-radius: 0.25rem !important; // 4px - match select-pagination
     transition: all 0.2s ease;
-    margin-right: 0.5rem; // 8px
+    // margin-right: 0.5rem; // 8px
     margin-top: 0.4rem; // Match select-pagination vertical alignment
     background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
     backdrop-filter: blur(10px) !important;
@@ -59,6 +59,21 @@
     &--active {
       background: var(--q-primary) !important;
       color: white;
+
+      img {
+        filter: invert(1) brightness(100)
+                drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.3))
+                drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.2))
+                drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.1));
+        transform: translateY(-1px);
+      }
+
+      :deep(.q-icon) {
+        filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.3))
+                drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.2))
+                drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.1));
+        transform: translateY(-1px);
+      }
 
       &:hover {
         background: var(--q-primary) !important;

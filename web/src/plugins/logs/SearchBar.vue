@@ -86,30 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <!-- moved to dropdown if ai chat is enabled -->
-        <div
-          class="toolbar-toggle-container element-box-shadow"
-          v-if="!store.state.isAiChatEnabled"
-        >
-          <q-toggle
-            data-test="logs-search-bar-show-histogram-toggle-btn"
-            v-model="searchObj.meta.showHistogram"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-          </q-toggle>
-          <img :src="histogramIcon" alt="Histogram" class="toolbar-icon" />
-          <q-tooltip class="toolbar-icon" />
-          <q-tooltip>
-            {{ t("search.showHistogramLabel") }}
-          </q-tooltip>
-        </div>
+        <!-- moved to search result pagination section -->
         <div class="toolbar-toggle-container element-box-shadow">
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
@@ -134,22 +111,6 @@ alt="SQL Mode" class="toolbar-icon" />
             </q-tooltip>
           </q-toggle>
         </div>
-        <!-- Explain Query Button -->
-        <q-btn
-          v-if="!store.state.isAiChatEnabled && searchObj.meta.sqlMode"
-          data-test="logs-search-bar-explain-query-btn"
-          no-caps
-          flat
-          dense
-          icon="lightbulb"
-          class="toolbar-reset-btn"
-          :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
-          @click="openExplainDialog"
-        >
-          <q-tooltip>
-            {{ t("search.explainTooltip") }}
-          </q-tooltip>
-        </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <q-btn
           v-if="!store.state.isAiChatEnabled"
@@ -165,14 +126,7 @@ alt="SQL Mode" class="toolbar-icon" />
             {{ t("search.resetFilters") }}
           </q-tooltip>
         </q-btn>
-        <!-- moved to dropdown if ai chat is enabled -->
-        <syntax-guide
-          v-if="!store.state.isAiChatEnabled"
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          :sqlmode="searchObj.meta.sqlMode"
-          class="syntax-guide-in-toolbar element-box-shadow"
-        >
-        </syntax-guide>
+        <!-- moved to dropdown menu -->
         <q-btn-group class="q-ml-xs q-pa-none element-box-shadow el-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
@@ -813,6 +767,21 @@ class="q-pr-sm q-pt-xs" />
                       style="width: 20px; height: 20px"
                     />
                     {{ t("search.listScheduledSearch") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator v-if="!store.state.isAiChatEnabled" />
+              <q-item
+                v-if="!store.state.isAiChatEnabled"
+                data-test="syntax-guide-item-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+              >
+                <q-item-section @click.stop="showSyntaxGuidefn">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon name="help" size="20px" />
+                    {{ t("search.syntaxGuideLabel") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -1576,6 +1545,14 @@ class="q-pr-sm q-pt-xs" />
       v-model="showExplainDialog"
       :searchObj="searchObj"
     />
+    <!-- Syntax Guide (hidden, triggered from menu) -->
+    <div style="display: none;">
+      <syntax-guide
+        v-if="!store.state.isAiChatEnabled"
+        ref="syntaxGuideRef"
+        :sqlmode="searchObj.meta.sqlMode"
+      />
+    </div>
   </div>
 </template>
 
@@ -3588,6 +3565,13 @@ export default defineComponent({
       emit("showSearchHistory");
     };
 
+    const syntaxGuideRef = ref(null);
+    const showSyntaxGuidefn = () => {
+      if (syntaxGuideRef.value) {
+        syntaxGuideRef.value.$el.click();
+      }
+    };
+
     const QUERY_TEMPLATE = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
 
     function getFieldList(
@@ -4275,6 +4259,8 @@ export default defineComponent({
       saveFunctionLoader,
       shareURL,
       showSearchHistoryfn,
+      syntaxGuideRef,
+      showSyntaxGuidefn,
       getImageURL,
       resetFilters,
       customDownloadDialog,
