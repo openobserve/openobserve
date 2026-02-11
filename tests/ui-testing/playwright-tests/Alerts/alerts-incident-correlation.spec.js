@@ -128,7 +128,8 @@ async function apiCall(page, method, path, body = null) {
         };
         if (body) opts.body = JSON.stringify(body);
         const resp = await fetch(url, opts);
-        return { status: resp.status, data: await resp.json().catch((e) => { console.warn('JSON parse error:', e.message); return null; }) };
+        const data = await resp.json().catch(() => ({}));
+        return { status: resp.status, data };
     }, { url: `${baseUrl}${path}`, method, authToken, body });
 }
 
@@ -333,6 +334,7 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
             rowCount = await page.locator(INCIDENT_ROW_SELECTOR).count();
         } catch (e) {
             testLogger.warn('DOM error counting incident rows (not zero incidents)', { error: e.message });
+            await page.waitForTimeout(pollInterval);
             continue;
         }
         if (rowCount > 0) {
