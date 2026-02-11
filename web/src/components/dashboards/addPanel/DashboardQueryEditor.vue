@@ -161,45 +161,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #before>
-              <QueryEditor
+              <UnifiedQueryEditor
                 ref="queryEditorRef"
-                class="monaco-editor tw:h-full!"
-                style="width: 100%"
-                v-model:query="
+                :languages="['sql', 'promql']"
+                :default-language="dashboardPanelData.data.queryType"
+                :query="
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].query
                 "
-                data-test="dashboard-panel-query-editor"
-                editor-id="dashboard-query-editor"
-                :keywords="
-                  dashboardPanelData.data.queryType === 'promql'
-                    ? promqlAutoCompleteKeywords
-                    : sqlAutoCompleteKeywords
-                "
-                :suggestions="
-                  dashboardPanelData.data.queryType === 'promql'
-                    ? []
-                    : sqlAutoCompleteSuggestions
-                "
-                :autoComplete="
-                  dashboardPanelData.data.queryType === 'promql' && {
-                    showEmpty: true,
-                    selectOnOpen: true,
-                    filter: true,
-                    filterStrict: true,
-                  }
-                "
-                @update-query="updateQuery"
-                @run-query="searchData"
-                :readOnly="
+                :read-only="
                   !dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].customQuery
                 "
-                :language="dashboardPanelData.data.queryType"
-                :key="dashboardPanelData.data.queryType"
-              ></QueryEditor>
+                :hide-nl-toggle="
+                  !dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].customQuery
+                "
+                @update:query="handleQueryUpdate"
+                @language-change="handleLanguageChange"
+                @ask-ai="handleAskAI"
+                data-test-prefix="dashboard-query"
+                editor-height="100%"
+              />
             </template>
             <template #after>
               <div style="height: 100%; width: 100%">
@@ -324,12 +310,14 @@ import useNotifications from "@/composables/useNotifications";
 import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
     ConfirmDialog,
     QueryTypeSelector,
+    UnifiedQueryEditor,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -621,6 +609,40 @@ export default defineComponent({
       dashboardPanelData.layout.showQueryBar = true;
     };
 
+    // Unified Query Editor: Handle query update
+    const handleQueryUpdate = (newQuery) => {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query = newQuery;
+
+      // Also call the existing updateQuery logic for autocomplete
+      updateQuery(newQuery, {});
+    };
+
+    // Unified Query Editor: Handle language change
+    const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
+      console.log('[DashboardQueryEditor] Language changed to:', newLanguage);
+      dashboardPanelData.data.queryType = newLanguage;
+
+      // Explicitly sync the editor with the correct query after language change
+      setTimeout(() => {
+        if (queryEditorRef.value && queryEditorRef.value.setValue) {
+          const currentQuery = dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query;
+          console.log('[DashboardQueryEditor] Syncing editor with query for', newLanguage, ':', currentQuery);
+          queryEditorRef.value.setValue(currentQuery);
+        }
+      }, 50);
+    };
+
+    // Unified Query Editor: Handle Ask AI
+    const handleAskAI = async (naturalLanguage: string, language: 'sql' | 'promql') => {
+      console.log('[DashboardQueryEditor] Ask AI for language:', language, 'input:', naturalLanguage);
+      // The unified component handles AI generation internally
+      // This event is just for parent components that may need to react
+    };
+
     return {
       t,
       router,
@@ -648,6 +670,9 @@ export default defineComponent({
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,
+      handleQueryUpdate,
+      handleLanguageChange,
+      handleAskAI,
     };
   },
 });

@@ -2972,6 +2972,10 @@
     "clearChatTitle": "Clear Chat",
     "clearChatMessage": "Are you sure you want to clear this conversation?",
     "copiedToClipboard": "Copied to clipboard"
+  },
+  "nlMode": {
+    "toggle": "Natural Language Mode",
+    "noAdditionalOptions": "No additional options"
   }
 
 }

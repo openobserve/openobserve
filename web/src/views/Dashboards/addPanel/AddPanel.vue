@@ -639,6 +639,26 @@ export default defineComponent({
       contextRegistry.setActive("dashboards");
     });
 
+    // Watch for stream or query type changes and update context provider
+    watch(
+      () => [
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.stream,
+        dashboardPanelData.data.queryType,
+        dashboardPanelData.layout.currentQueryIndex,
+      ],
+      () => {
+        console.log('[AddPanel] Stream or query changed, updating context provider');
+        const dashboardProvider = createDashboardsContextProvider(
+          route,
+          store,
+          dashboardPanelData,
+          editMode.value,
+        );
+        contextRegistry.register("dashboards", dashboardProvider);
+        // Keep dashboards context active (don't need to re-set active)
+      }
+    );
+
     let list = computed(function () {
       return [toRaw(store.state.currentSelectedDashboard)];
     });

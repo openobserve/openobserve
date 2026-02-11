@@ -84,27 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:w-full">
               <div class="tw:flex tw:w-full tw:flex-col tw:h-full tw:gap-y-2">
                 <!-- SQL/PromQL Editor Section (60% of left) -->
-                <div class="tw:flex-[3] tw:w-full">
-                  <div class="tw:w-full tw:h-full" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-                    <div class="tw:flex tw:items-center tw:justify-between tw:pb-2 tw:pt-1">
+                <div class="tw:flex-[3] tw:w-full tw:flex tw:flex-col tw:overflow-hidden">
+                  <div class="tw:w-full tw:h-full tw:flex tw:flex-col" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+                    <!-- Toolbar: Field selector + Run Query -->
+                    <div class="tw:flex tw:items-center tw:justify-between tw:pb-2 tw:pt-1 tw:flex-shrink-0">
                       <span class="editor-text-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                       <div class="tw:flex tw:gap-2 tw:items-center tw:h-6">
-                        <div style="border: 1px solid #7980cc; border-radius: 4px; height: 32px;">
-                          <q-btn
-                            data-test="alert-generate-query-btn"
-                            size="sm"
-                            no-caps
-                            dense
-                            flat
-                            class="text-bold no-border"
-                            @click="toggleAIChat"
-                          >
-                            <img :style="{ width: '16px', height: '16px' }" :src="getBtnO2Logo" />
-                            <span class="tw:font-[400] tw:pl-[4px] tw:text-[12px] tw:pr-[6px] tw:py-[4px] tw:text-[#7980cc]">
-                              {{ localTab == 'sql' ? 'Generate SQL' : 'Generate PromQL' }}
-                            </span>
-                          </q-btn>
-                        </div>
                         <div class="tw:h-full tw:flex tw:justify-center tw:items-center o2-select-input tw:w-full col" style="padding-top: 0">
                           <q-select
                             v-model="selectedColumn"
@@ -147,13 +132,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
+
                     <FullViewContainer
                       name="Input"
                       label="Input"
                       :isExpanded="true"
                       :showExpandIcon="false"
                       :label-class="'tw:ml-2'"
-                      class="tw:mt-1"
+                      class="tw:mt-1 tw:flex-shrink-0"
                     >
                       <template #right>
                         <div v-if="streamName" class="tw:text-[12px] tw:font-semibold tw:mr-2">
@@ -165,54 +151,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </FullViewContainer>
 
-                    <!-- SQL Editor -->
-                    <QueryEditor
-                      v-if="localTab === 'sql'"
-                      data-test="scheduled-alert-sql-editor"
-                      ref="queryEditorRef"
-                      editor-id="alerts-query-editor"
-                      class="tw:w-full"
-                      :debounceTime="300"
-                      v-model:query="localSqlQuery"
-                      :class="[
-                        localSqlQuery === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
-                        store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
-                      ]"
-                      @update:query="updateSqlQuery"
-                      @focus="queryEditorPlaceholderFlag = false"
-                      @blur="onBlurQueryEditor"
-                      style="min-height: 18rem;"
-                      :style="{
-                        height: !!sqlQueryErrorMsg ? 'calc(100% - 150px)' : 'calc(100% - 80px)'
-                      }"
-                    />
+                    <!-- Unified Query Editor (SQL/PromQL with NL Mode) -->
+                    <div class="tw:flex-1 tw:min-h-0">
+                      <UnifiedQueryEditor
+                        ref="queryEditorRef"
+                        :languages="availableLanguages"
+                        :default-language="localTab"
+                        :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
+                        @update:query="handleQueryUpdate"
+                        @language-change="handleLanguageChange"
+                        @ask-ai="handleAskAI"
+                        editor-height="100%"
+                        data-test-prefix="alert"
+                      />
+                    </div>
 
                     <div
                       style="height: 50px; overflow: auto;"
                       v-show="!!(sqlQueryErrorMsg || localSqlQueryErrorMsg) && localTab === 'sql'"
-                      class="text-negative q-py-sm invalid-sql-error"
+                      class="text-negative q-py-sm invalid-sql-error tw:flex-shrink-0"
                     >
                       <span v-show="!!(sqlQueryErrorMsg || localSqlQueryErrorMsg)">Error: {{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
                     </div>
-
-                    <!-- PromQL Editor -->
-                    <QueryEditor
-                      v-if="localTab === 'promql'"
-                      data-test="scheduled-alert-promql-editor"
-                      ref="queryEditorRef"
-                      editor-id="alerts-query-editor-dialog"
-                      class="tw:w-full"
-                      :debounceTime="300"
-                      v-model:query="localPromqlQuery"
-                      @update:query="updatePromqlQuery"
-                      :class="[
-                        localPromqlQuery === '' ? 'empty-query' : '',
-                        store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
-                      ]"
-                      :style="{ height: 'calc(100% - 70px)' }"
-                      @blur="onBlurQueryEditor"
-                      style="min-height: 10rem;"
-                    />
                   </div>
                 </div>
 
@@ -490,12 +450,13 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { debounce } from "lodash-es";
-import { b64EncodeUnicode } from "@/utils/zincutils";
-import { getImageURL } from "@/utils/zincutils";
+import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import { outlinedLightbulb, outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import config from "@/aws-exports";
@@ -741,6 +702,13 @@ const onFunctionClear = () => {
 // Build multi-window query - includes all multi-windows automatically
 const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: number) => {
   const queryToSend: any[] = [];
+
+  // Guard: If multiTimeRange is null, undefined, or empty, return empty array
+  if (!props.multiTimeRange || props.multiTimeRange.length === 0) {
+    console.log('[QueryEditorDialog] No multi-time ranges defined, returning empty array');
+    return queryToSend;
+  }
+
   const regex = /^(\d+)([smhdwM])$/;
 
   const unitToMicroseconds: Record<string, number> = {
@@ -780,22 +748,28 @@ const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: n
 
 // Query execution
 const triggerQuery = async (fn = false) => {
+  console.log('[QueryEditorDialog] triggerQuery called with fn:', fn);
   try {
+    console.log('[QueryEditorDialog] Step 1: Building query payload...');
     const queryReq = buildQueryPayload({
       sqlMode: true,
       streamName: props.streamName,
     });
     queryReq.query.sql = localSqlQuery.value;
     queryReq.query.size = 10;
+    console.log('[QueryEditorDialog] Step 2: Query payload prepared:', queryReq);
 
+    console.log('[QueryEditorDialog] Step 3: Calculating time range...');
     const periodInMicroseconds = props.period * 60 * 1000000;
     const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
     const startTime = endTime - periodInMicroseconds;
+    console.log('[QueryEditorDialog] Time range:', { startTime, endTime, periodInMicroseconds });
 
     queryReq.query.query_fn = null;
     queryReq.query.sql_mode = true;
     queryReq.query.per_query_response = true;
 
+    console.log('[QueryEditorDialog] Step 4: Building query to send...');
     //initial query to send like with period for suppose we have 10minutes of period then we will send 10 minutes of data
     //so we will send 10 minutes of data in initial query
     //and then if any multi window offset is selected then we will call buildMultiWindowQuery function to get the query to send
@@ -809,9 +783,22 @@ const triggerQuery = async (fn = false) => {
         query_fn: fn ? b64EncodeUnicode(vrlFunctionContent.value) : null
       }
     ];
+    console.log('[QueryEditorDialog] Initial queryToSend:', queryToSend);
 
-    queryToSend.push(...buildMultiWindowQuery(queryReq.query.sql, fn, periodInMicroseconds));
+    console.log('[QueryEditorDialog] Step 5: Calling buildMultiWindowQuery...');
+    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, fn, periodInMicroseconds);
+    console.log('[QueryEditorDialog] Multi-window queries:', multiWindowQueries);
+
+    queryToSend.push(...multiWindowQueries);
     queryReq.query.sql = queryToSend;
+    console.log('[QueryEditorDialog] Final queryToSend with multi-window:', queryToSend);
+
+    console.log('[QueryEditorDialog] Step 6: About to call searchService.search with:', {
+      org_identifier: store.state.selectedOrganization.identifier,
+      page_type: props.streamType,
+      queryToSend: queryToSend,
+      validate: true,
+    });
 
     const res = await searchService.search({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -819,6 +806,8 @@ const triggerQuery = async (fn = false) => {
       page_type: props.streamType,
       validate: true,
     });
+
+    console.log('[QueryEditorDialog] Step 7: Search API response received:', res);
 
     if (res.data.hits.length > 0) {
       if (fn) {
@@ -828,6 +817,12 @@ const triggerQuery = async (fn = false) => {
       }
     }
   } catch (err: any) {
+    console.error('[QueryEditorDialog] ERROR in triggerQuery:', err);
+    console.error('[QueryEditorDialog] Error details:', {
+      message: err.message,
+      response: err.response,
+      stack: err.stack,
+    });
     q.notify({
       type: "negative",
       message: err.response?.data?.message ?? "Error while fetching results",
@@ -837,15 +832,21 @@ const triggerQuery = async (fn = false) => {
 };
 
 const runSqlQuery = async () => {
+  console.log('[QueryEditorDialog] runSqlQuery called with query:', localSqlQuery.value);
   runPromqlError.value = "";
 
   // Validate SQL query before running (checks for SELECT * and reserved words)
-  if (!getParser(localSqlQuery.value)) {
+  const parserResult = getParser(localSqlQuery.value);
+  console.log('[QueryEditorDialog] Parser result:', parserResult);
+
+  if (!parserResult) {
     // Parser validation failed - don't run the query
     // Error message is already set by getParser via sqlQueryErrorMsg
+    console.log('[QueryEditorDialog] Parser validation failed:', localSqlQueryErrorMsg.value);
     return;
   }
 
+  console.log('[QueryEditorDialog] Parser validation passed, triggering query...');
   tempRunQuery.value = true;
   expandSqlOutput.value = true;
   try {
@@ -853,6 +854,7 @@ const runSqlQuery = async () => {
     await triggerQuery();
     runQueryLoading.value = false;
   } catch (err) {
+    console.error('[QueryEditorDialog] Error in runSqlQuery:', err);
     runQueryLoading.value = false;
   }
 };
@@ -911,6 +913,62 @@ const runPromqlQuery = async () => {
   } catch (err) {
     runQueryLoading.value = false;
   }
+};
+
+// Unified Query Editor ref
+const queryEditorRef = ref<any>(null);
+
+// Determine available languages based on stream type
+const availableLanguages = computed(() => {
+  // For metrics streams, only PromQL is available
+  if (props.streamType === 'metrics') {
+    return ['promql'];
+  }
+  // For logs streams, only SQL is available
+  if (props.streamType === 'logs') {
+    return ['sql'];
+  }
+  // For other stream types, allow both SQL and PromQL
+  return ['sql', 'promql'];
+});
+
+// Unified Query Editor handlers
+const handleQueryUpdate = (newQuery: string) => {
+  if (localTab.value === 'sql') {
+    updateSqlQuery(newQuery);
+  } else {
+    updatePromqlQuery(newQuery);
+  }
+};
+
+const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
+  console.log('[QueryEditorDialog] Language changed to:', newLanguage);
+  localTab.value = newLanguage;
+
+  // Explicitly sync the editor with the correct query after language change
+  // This ensures the editor shows the right query for the selected language
+  setTimeout(() => {
+    if (queryEditorRef.value && queryEditorRef.value.setValue) {
+      const currentQuery = newLanguage === 'sql' ? localSqlQuery.value : localPromqlQuery.value;
+      console.log('[QueryEditorDialog] Syncing editor with query for', newLanguage, ':', currentQuery);
+      queryEditorRef.value.setValue(currentQuery);
+    }
+  }, 50); // Small delay to ensure editor has switched language
+};
+
+const handleRunQuery = (language: 'sql' | 'promql') => {
+  console.log('[QueryEditorDialog] Run query for language:', language);
+  if (language === 'sql') {
+    runSqlQuery();
+  } else {
+    runPromqlQuery();
+  }
+};
+
+const handleAskAI = async (naturalLanguage: string, language: 'sql' | 'promql') => {
+  console.log('[QueryEditorDialog] Ask AI for language:', language, 'input:', naturalLanguage);
+  // The unified component handles AI generation internally
+  // This event is just for parent components that may need to react
 };
 
 // AI Chat
@@ -979,5 +1037,27 @@ const getBtnLogo = computed(() => {
 // Force no transitions on collapsible output sections
 .tw:transition-none {
   transition: none !important;
+}
+
+// AI Generate Button Styling (matches O2 AI Assistant - purple gradient)
+.o2-ai-generate-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border: none !important;
+  font-size: 0.6875rem !important; // 11px
+  font-weight: 600 !important;
+  line-height: 1rem !important; // 16px
+  transition: all 0.3s ease !important;
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important; // 0 4px 15px
+  padding: 0 0.75rem !important; // 0 12px
+
+  &:hover {
+    box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.5) !important; // 0 6px 20px
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
 }
 </style>
