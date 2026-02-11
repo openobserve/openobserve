@@ -76,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 endTime: dateTime.endTime,
               }"
               :stream-name="rumSessionStreamName"
+              :query="completeQuery"
+              :show-count="false"
               @event-emitted="handleSidebarEvent"
             />
           </div>
@@ -160,6 +162,7 @@ import {
   type Ref,
   onBeforeMount,
   defineAsyncComponent,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/rum/AppTable.vue";
@@ -220,6 +223,15 @@ const dateTime = ref({
 });
 const rumSessionStreamName = "_rumdata";
 
+// Computed query that includes session_has_replay filter
+const completeQuery = computed(() => {
+  let whereClause = "session_has_replay IS NOT NULL AND session_id is not null";
+  if (sessionState.data.editorValue.length) {
+    whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
+  }
+  return whereClause;
+});
+
 const isMounted = ref(false);
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
@@ -252,8 +264,6 @@ const userDataSet = new Set([
   "source",
   "api",
   "usr_email",
-  "usr_id",
-  "usr_name",
   "session_id",
   "view_id",
 ]);
@@ -355,6 +365,18 @@ const getStreamFields = () => {
           "usr_id",
           "usr_name",
         ]);
+
+        // Define priority fields that should appear at the top
+        const priorityFields = [
+          "application_id",
+          "usr_email",
+          "session_id",
+          "env",
+        ];
+        const priorityFieldsMap = new Map(
+          priorityFields.map((field, index) => [field, index]),
+        );
+
         streamFields.value = [];
 
         stream.schema.forEach((field: any) => {
@@ -367,6 +389,23 @@ const getStreamFields = () => {
               showValues: true,
             });
           }
+        });
+
+        // Sort fields: priority fields first, then alphabetically
+        streamFields.value.sort((a, b) => {
+          const aPriority = priorityFieldsMap.get(a.name);
+          const bPriority = priorityFieldsMap.get(b.name);
+
+          // If both are priority fields, sort by priority order
+          if (aPriority !== undefined && bPriority !== undefined) {
+            return aPriority - bPriority;
+          }
+          // If only a is priority, it comes first
+          if (aPriority !== undefined) return -1;
+          // If only b is priority, it comes first
+          if (bPriority !== undefined) return 1;
+          // Otherwise, sort alphabetically
+          return a.name.localeCompare(b.name);
         });
       })
       .finally(() => {
@@ -425,6 +464,12 @@ const getSessions = () => {
       "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count";
   }
 
+  // Build WHERE clause with session replay filter
+  let whereClause = "session_has_replay IS NOT NULL";
+  if (sessionState.data.editorValue.length) {
+    whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
+  }
+
   // Query 1: Get sessions with all metrics from _rumdata (supports usr_email, usr_id, session_id filters)
   req.query.sql = `
     SELECT
@@ -433,13 +478,11 @@ const getSessions = () => {
       SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
       ${frustrationCountField},
       SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
-      SUM(CASE WHEN session_has_replay is not null THEN 1 ELSE 0 END) AS hasSessionReplay,
       ${geoFields}
       session_id
     FROM "_rumdata"
-    ${sessionState.data.editorValue.length ? "WHERE " + sessionState.data.editorValue.trim() : ""}
+    WHERE ${whereClause}
     GROUP BY session_id
-    HAVING hasSessionReplay>0
     ORDER BY zo_sql_timestamp DESC
     LIMIT ${sessionState.data.resultGrid.size}`;
   delete req.aggs;
@@ -480,7 +523,6 @@ const getSessions = () => {
         };
       });
 
-      debugger;
       const sessionIds = hits.map((hit: any) => hit.session_id);
 
       // Query 2: Get start/end times from _sessionreplay
