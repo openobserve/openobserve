@@ -2316,6 +2316,9 @@ export default defineComponent({
       currentlyExecutingPromises[name] = null;
 
       if (success) {
+        // Check if this is the first time loading (was not partially loaded before)
+        const isFirstLoad = !variableObject.isVariablePartialLoaded;
+
         // Update loading states
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
