@@ -1004,23 +1004,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'o2-toggle-button-lg-dark'
               : 'o2-toggle-button-lg-light'
           "
-        />
-
-        <q-icon
-          class="q-ml-xs"
-          size="20px"
-          name="info"
-          data-test="dashboard-config-top_results-others-info"
         >
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-top_results-others-info"
           >
-            {{ t("dashboard.addOthersSeriesTooltip") }}
-          </q-tooltip>
-        </q-icon>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.addOthersSeriesTooltip") }}
+            </q-tooltip>
+          </q-icon>
+        </q-toggle>
       </div>
 
       <div class="space"></div>
@@ -1089,8 +1089,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'o2-toggle-button-lg-dark'
             : 'o2-toggle-button-lg-light'
         "
-      />
-
+      >
+        <q-icon
+          class="q-ml-xs"
+          size="20px"
+          name="info"
+          data-test="dashboard-config-connect-null-values-info"
+        >
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.connectNullValuesTooltip") }}
+          </q-tooltip>
+        </q-icon>
+      </q-toggle>
       <div class="space"></div>
 
       <q-input
