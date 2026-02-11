@@ -64,14 +64,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-show="expandState.functions"
                     class="tw:border-[1px] tw:border-gray-200"
                   >
-                    <query-editor
-                      data-test="logs-vrl-function-editor"
+                    <UnifiedQueryEditor
+                      data-test-prefix="function-vrl"
                       ref="editorRef"
-                      editor-id="add-function-editor"
-                      class="monaco-editor"
-                      :style="{ height: `calc(100vh - (180px + ${heightOffset}px))` }"
-                      v-model:query="formData.function"
-                      :language="formData.transType === '1' ? 'javascript' : 'vrl'"
+                      :languages="['vrl', 'javascript']"
+                      :default-language="formData.transType === '1' ? 'javascript' : 'vrl'"
+                      :query="formData.function"
+                      @update:query="handleFunctionUpdate"
+                      @language-change="handleLanguageChange"
+                      @ask-ai="handleAskAI"
+                      editor-height="300px"
                     />
                   </div>
                   <div class="text-subtitle2">
@@ -185,6 +187,9 @@ export default defineComponent({
   components: {
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
+    ),
+    UnifiedQueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue"),
     ),
     FunctionsToolbar,
     FullViewContainer,
@@ -495,6 +500,31 @@ export default defineComponent({
       emit("sendToAiChat", value);
     };
 
+    // Unified Query Editor: Handle function update
+    const handleFunctionUpdate = (newFunction: string) => {
+      formData.value.function = newFunction;
+    };
+
+    // Unified Query Editor: Handle language change
+    const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
+      console.log('[AddFunction] Language changed to:', newLanguage);
+      // Update transType: '1' for JavaScript, '0' for VRL
+      formData.value.transType = newLanguage === 'javascript' ? '1' : '0';
+    };
+
+    // Unified Query Editor: Handle Ask AI
+    const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
+      console.log('[AddFunction] Ask AI for language:', language, 'input:', naturalLanguage);
+
+      // Enable AI chat if not already enabled
+      if (!store.state.isAiChatEnabled) {
+        openChat(true);
+      }
+
+      // The unified component handles AI generation internally
+      // This event is just for parent components that may need to react
+    };
+
     return {
       t,
       $q,
@@ -532,7 +562,10 @@ export default defineComponent({
       openChat,
       isAddFunctionComponent,
       sendToAiChat,
-      aiChatInputContext
+      aiChatInputContext,
+      handleFunctionUpdate,
+      handleLanguageChange,
+      handleAskAI,
     };
   },
   created() {
