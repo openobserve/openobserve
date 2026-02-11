@@ -574,9 +574,9 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
         pm = new PageManager(page);
 
         // Navigate to incidents page directly
-        await page.goto(
-            `${process.env["ZO_BASE_URL"]}/web/incidents?org_identifier=${process.env["ORGNAME"]}`
-        );
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        await page.goto(`${baseUrl}/web/incidents?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
         testLogger.info('Navigated to incidents page');
 
