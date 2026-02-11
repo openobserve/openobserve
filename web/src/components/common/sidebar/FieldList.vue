@@ -142,18 +142,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <q-list dense>
                           <q-item tag="label" class="q-pr-none">
-                            <div class="flex row wrap justify-between">
+                            <div
+                              class="flex row wrap justify-between tw:w-[calc(100%-2.625rem)]"
+                            >
                               <div
                                 :title="value.key"
-                                class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
+                                class="ellipsis q-pr-xs tw:max-w-[calc(100%-3.125rem)]!"
                               >
                                 {{ value.key }}
                               </div>
                               <div
+                                v-if="showCount"
                                 :title="value.count"
-                                class="ellipsis text-right q-pr-sm"
-                                style="width: 50px"
+                                class="ellipsis text-right q-pr-sm tw:w-[3.125rem]"
                               >
                                 {{ value.count }}
                               </div>
@@ -257,11 +258,17 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import { formatLargeNumber, getImageURL } from "@/utils/zincutils";
+import {
+  formatLargeNumber,
+  getImageURL,
+  b64EncodeUnicode,
+} from "@/utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import { generateTraceContext } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IndexList",
@@ -303,6 +310,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    query: {
+      type: String,
+      default: "",
+    },
+    showCount: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["event-emitted"],
   setup(props, { emit }) {
@@ -314,9 +329,13 @@ export default defineComponent({
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
-        values: { key: string; count: string }[];
+        values: { key: string; count: string | number }[];
+        errMsg?: string;
       };
     }> = ref({});
+
+    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+    const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -329,6 +348,117 @@ export default defineComponent({
         }
       }
       return filtered;
+    };
+
+    const fetchValuesWithWebsocket = (payload: any) => {
+      const wsPayload = {
+        queryReq: payload,
+        type: "values",
+        isPagination: false,
+        traceId: generateTraceContext().traceId,
+        org_id: store.state.selectedOrganization.identifier,
+        meta: payload,
+      };
+
+      fetchQueryDataWithHttpStream(wsPayload, {
+        data: handleSearchResponse,
+        error: handleSearchError,
+        complete: handleSearchClose,
+        reset: handleSearchReset,
+      });
+
+      addTraceId(payload.fields[0], wsPayload.traceId);
+    };
+
+    const handleSearchResponse = (payload: any, response: any) => {
+      const fieldName = payload?.queryReq?.fields[0];
+
+      try {
+        if (response.type === "cancel_response") {
+          removeTraceId(fieldName, response.content.trace_id);
+          return;
+        }
+
+        if (response.type !== "search_response_hits") {
+          return;
+        }
+
+        if (!fieldValues.value[fieldName]) {
+          fieldValues.value[fieldName] = {
+            values: [],
+            isLoading: false,
+            errMsg: "",
+          };
+        }
+
+        if (response.content.results.hits.length) {
+          const values: { key: string; count: number }[] = [];
+
+          response.content.results.hits.forEach((item: any) => {
+            item.values.forEach((subItem: any) => {
+              values.push({
+                key: subItem.zo_sql_key,
+                count: parseInt(subItem.zo_sql_num),
+              });
+            });
+          });
+
+          fieldValues.value[fieldName].values = values
+            .slice(0, store.state.zoConfig?.query_values_default_num || 10)
+            .map((v) => ({
+              key: v.key,
+              count: formatLargeNumber(v.count),
+            }));
+        }
+
+        fieldValues.value[fieldName].isLoading = false;
+      } catch (error) {
+        console.error("Failed to fetch field values:", error);
+        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+        fieldValues.value[fieldName].isLoading = false;
+      }
+    };
+
+    const handleSearchError = (request: any, err: any) => {
+      const fieldName = request.queryReq?.fields[0];
+      if (fieldValues.value[fieldName]) {
+        fieldValues.value[fieldName].isLoading = false;
+        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+      }
+      removeTraceId(fieldName, request.traceId);
+    };
+
+    const handleSearchClose = (payload: any, response: any) => {
+      const fieldName = payload.queryReq.fields[0];
+      if (fieldValues.value[fieldName]) {
+        fieldValues.value[fieldName].isLoading = false;
+      }
+      removeTraceId(fieldName, payload.traceId);
+    };
+
+    const handleSearchReset = (data: any) => {
+      const fieldName = data.payload.queryReq.fields[0];
+      fieldValues.value[fieldName] = {
+        values: [],
+        isLoading: true,
+        errMsg: "",
+      };
+      fetchValuesWithWebsocket(data.payload.queryReq);
+    };
+
+    const addTraceId = (field: string, traceId: string) => {
+      if (!traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = [];
+      }
+      traceIdMapper.value[field].push(traceId);
+    };
+
+    const removeTraceId = (field: string, traceId: string) => {
+      if (traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = traceIdMapper.value[field].filter(
+          (id) => id !== traceId,
+        );
+      }
     };
 
     const openFilterCreator = (
@@ -344,38 +474,28 @@ export default defineComponent({
       fieldValues.value[name] = {
         isLoading: true,
         values: [],
+        errMsg: "",
       };
-      streamService
-        .fieldValues({
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_name: stream_name ? stream_name : props.streamName,
-          start_time: props.timeStamp.startTime,
-          end_time: props.timeStamp.endTime,
-          fields: [name],
-          size: store.state.zoConfig?.query_values_default_num || 10,
-          type: props.streamType,
-        })
-        .then((res: any) => {
-          if (res.data.hits.length) {
-            fieldValues.value[name]["values"] = res.data.hits
-              .find((field: any) => field.field === name)
-              .values.map((value: any) => {
-                return {
-                  key: value.zo_sql_key ? value.zo_sql_key : "null",
-                  count: formatLargeNumber(value.zo_sql_num),
-                };
-              });
-          }
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: `Error while fetching values for ${name}`,
-          });
-        })
-        .finally(() => {
-          fieldValues.value[name]["isLoading"] = false;
-        });
+
+      const streamToUse = stream_name ? stream_name : props.streamName;
+      let query_context = `SELECT distinct(${name}) FROM "${streamToUse}"`;
+
+      if (props.query) {
+        query_context += ` WHERE ${props.query}`;
+      }
+
+      fetchValuesWithWebsocket({
+        fields: [name],
+        size: store.state.zoConfig?.query_values_default_num || 10,
+        no_count: !props.showCount,
+        start_time: props.timeStamp.startTime,
+        end_time: props.timeStamp.endTime,
+        timeout: 30000,
+        stream_name: streamToUse,
+        stream_type: props.streamType,
+        use_cache: (window as any).use_cache ?? true,
+        sql: b64EncodeUnicode(query_context) || "",
+      });
     };
 
     const addSearchTerm = (term: string) => {
