@@ -139,54 +139,13 @@ export class CorrelationSettingsPage {
                 body: putText.substring(0, 500)
             });
 
-            // Step 2: POST to config endpoint with semantic_field_groups included
-            // This is critical because the frontend reads from /config first, not /semantic-groups
-            const configUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/config`;
-            const configPayload = {
-                enabled: true,
-                alert_dedup_enabled: false, // Don't enable cross-alert by default, let tests control this
-                alert_fingerprint_groups: [],
-                semantic_field_groups: testSemanticGroups
-            };
+            // Note: We intentionally do NOT POST to /config here.
+            // The config endpoint doesn't persist semantic_field_groups anyway (GET returns 0),
+            // and concurrent config POSTs in parallel tests cause race conditions where
+            // loadConfig() overwrites UI checkbox state with stale API values.
+            // The PUT above is the single source of truth for semantic groups.
 
-            testLogger.info('POST deduplication config with semantic groups', { url: configUrl });
-
-            const configPostResponse = await fetch(configUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(configPayload)
-            });
-
-            const configPostText = await configPostResponse.text();
-            testLogger.info('POST config response', {
-                status: configPostResponse.status,
-                statusText: configPostResponse.statusText,
-                body: configPostText.substring(0, 500)
-            });
-
-            // Step 3: Verify by GET config (this is what frontend loads)
-            const configGetResponse = await fetch(configUrl, {
-                method: 'GET',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const configResult = await configGetResponse.json().catch(() => ({}));
-            testLogger.info('GET deduplication config verification', {
-                status: configGetResponse.status,
-                enabled: configResult.enabled,
-                alertDedupEnabled: configResult.alert_dedup_enabled,
-                semanticGroupCount: configResult.semantic_field_groups?.length || 0,
-                semanticGroupIds: configResult.semantic_field_groups?.map(g => g.id) || []
-            });
-
-            // Success if both PUT and POST succeeded
-            return putResponse.ok && configPostResponse.ok;
+            return putResponse.ok;
         } catch (error) {
             testLogger.error('Failed to setup semantic groups', { error: error.message, stack: error.stack });
             return false;
@@ -236,7 +195,17 @@ export class CorrelationSettingsPage {
 
     async clickAlertCorrelationTab() {
         const tab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
+        // Wait for semantic-groups API response that loadConfig() triggers on component mount.
+        // This prevents a race condition where the test interacts with checkboxes before
+        // loadConfig() completes and overwrites localConfig with API values.
+        const semanticGroupsPromise = this.page.waitForResponse(
+            resp => resp.url().includes('/alerts/deduplication/semantic-groups') && resp.status() === 200,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.info('Semantic groups API response not intercepted (may have already fired)');
+        });
         await tab.click();
+        await semanticGroupsPromise;
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
