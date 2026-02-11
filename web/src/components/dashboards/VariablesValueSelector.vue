@@ -1934,14 +1934,14 @@ export default defineComponent({
         }
         case "custom": {
           handleCustomVariable(variableObject);
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
@@ -2250,6 +2250,9 @@ export default defineComponent({
       currentlyExecutingPromises[name] = null;
 
       if (success) {
+        // Check if this is the first time loading (was not partially loaded before)
+        const isFirstLoad = !variableObject.isVariablePartialLoaded;
+
         // Update loading states
         variableObject.isLoading = false;
         variableObject.isVariablePartialLoaded = true;
@@ -2260,6 +2263,18 @@ export default defineComponent({
           (val: { isLoading: any; isVariableLoadingPending: any }) =>
             val.isLoading || val.isVariableLoadingPending,
         );
+
+        // Notify manager only on first load to trigger dependent children
+        // Don't notify on dropdown reopens (which reload already-loaded variables)
+        if (useManager && manager && isFirstLoad) {
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
+        }
 
         // Don't load child variables on dropdown open events
         // Load child variables if any
