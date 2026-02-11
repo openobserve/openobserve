@@ -325,9 +325,6 @@ vortex = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da19
 ] }
 vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
 vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "054ab28e459da193eed283f5a64d8ca408922d98" }
-# vortex = { version = "0.58.0", features = ["tokio"] }
-# vortex-datafusion = { version = "0.58.0" }
-# vortex-btrblocks = { version = "0.58.0" }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.3"
 dotenvy = "0.15.7"
