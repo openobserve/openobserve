@@ -2250,12 +2250,8 @@ export default defineComponent({
       currentlyExecutingPromises[name] = null;
 
       if (success) {
-        // Check if this is the first time loading (was not partially loaded before)
-        const isFirstLoad = !variableObject.isVariablePartialLoaded;
-
         // Update loading states
         variableObject.isLoading = false;
-        variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
 
         // Update global loading state
@@ -2264,9 +2260,10 @@ export default defineComponent({
             val.isLoading || val.isVariableLoadingPending,
         );
 
-        // Notify manager only on first load to trigger dependent children
-        // Don't notify on dropdown reopens (which reload already-loaded variables)
-        if (useManager && manager && isFirstLoad) {
+        // Notify manager only on first load (atomic check-and-set to prevent race conditions)
+        // Only notify if variable was NOT already partially loaded
+        if (useManager && manager && !variableObject.isVariablePartialLoaded) {
+          variableObject.isVariablePartialLoaded = true;
           const variableKey = getVariableKey(
             variableObject.name,
             variableObject.scope || "global",
@@ -2274,6 +2271,9 @@ export default defineComponent({
             variableObject.panelId,
           );
           manager.onVariablePartiallyLoaded(variableKey);
+        } else {
+          // Variable was already loaded, just update the flag
+          variableObject.isVariablePartialLoaded = true;
         }
 
         // Don't load child variables on dropdown open events
