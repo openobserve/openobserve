@@ -387,6 +387,8 @@ export default class DashboardVariablesScoped {
       dependsOnMultiple = [],
       dependencyFieldMap = {},
       defaultValue = null,
+      defaultValueType = null, // "all" | "custom" | "first" (default)
+      customValues = [], // Array of custom values for "custom" default type
       hideOnDashboard = false,
     } = options;
 
@@ -563,7 +565,46 @@ export default class DashboardVariablesScoped {
         .click();
     }
 
-    // Set default value if provided
+    // Handle default value type (all, custom, or first)
+    if (defaultValueType === "all") {
+      // Set default to "All"
+      // Note: Even for single-select, we use the multi-select toggle selector
+      await this.page
+        .locator('[data-test="dashboard-multi-select-default-value-toggle-all-values"]')
+        .click();
+    } else if (defaultValueType === "custom") {
+      // Set default to custom values
+      if (showMultipleValues) {
+        // Multi-select: use multi-select custom toggle
+        await this.page
+          .locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]')
+          .click();
+
+        // Add custom values
+        if (customValues.length > 0) {
+          for (let i = 0; i < customValues.length; i++) {
+            // if (i > 0) {
+              // Click add button for additional values
+              await this.page.locator('[data-test="dashboard-add-custom-value-btn"]').click();
+            // }
+            await this.page.locator(`[data-test="dashboard-variable-custom-value-${i}"]`).fill(customValues[i]);
+          }
+        }
+      } else {
+        // Single-select: use single-select custom toggle
+        await this.page
+          .locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]')
+          .click();
+
+        // Add single custom value
+        if (customValues.length > 0) {
+          await this.page.locator('[data-test="dashboard-variable-custom-value-0"]').fill(customValues[0]);
+        }
+      }
+    }
+    // If defaultValueType is "first" or null, do nothing (default behavior)
+
+    // Legacy: Set default value if provided (deprecated, use defaultValueType instead)
     if (defaultValue) {
       await this.setDefaultValue(defaultValue);
     }
@@ -573,7 +614,7 @@ export default class DashboardVariablesScoped {
       await this.page.locator('[data-test="dashboard-variable-hide_on_dashboard"]').click();
     }
 
-    // Custom value search
+    // Legacy: Custom value search (deprecated, use defaultValueType instead)
     if (customValueSearch) {
       await this.page
         .locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]')

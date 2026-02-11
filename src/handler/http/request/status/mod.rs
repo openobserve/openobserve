@@ -86,6 +86,28 @@ use crate::{
     },
 };
 
+/// Macro to conditionally select a value based on the "enterprise" feature flag.
+///
+/// # Usage
+/// ```rust
+/// let value = enterprise_value!(default_expr, enterprise_expr);
+/// ```
+///
+/// If the "enterprise" feature is enabled, returns `enterprise_expr`.
+/// Otherwise, returns `default_expr`.
+macro_rules! enterprise_value {
+    ($default:expr, $enterprise:expr) => {{
+        #[cfg(feature = "enterprise")]
+        {
+            $enterprise
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            $default
+        }
+    }};
+}
+
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
@@ -184,6 +206,24 @@ struct Rum {
     pub insecure_http: bool,
 }
 
+impl Rum {
+    /// Create a new [`Rum`] instance from [`Config`]
+    pub fn from_cfg(cfg: Arc<Config>) -> Self {
+        Self {
+            enabled: cfg.rum.enabled,
+            client_token: cfg.rum.client_token.to_string(),
+            application_id: cfg.rum.application_id.to_string(),
+            site: cfg.rum.site.to_string(),
+            service: cfg.rum.service.to_string(),
+            env: cfg.rum.env.to_string(),
+            version: cfg.rum.version.to_string(),
+            organization_identifier: cfg.rum.organization_identifier.to_string(),
+            api_version: cfg.rum.api_version.to_string(),
+            insecure_http: cfg.rum.insecure_http,
+        }
+    }
+}
+
 /// Healthz
 #[utoipa::path(
     get,
@@ -233,29 +273,23 @@ pub async fn healthz_head() -> impl IntoResponse {
 )]
 pub async fn schedulez() -> impl IntoResponse {
     let node_id = LOCAL_NODE.uuid.clone();
-    let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
-        return (
-            StatusCode::NOT_FOUND,
-            axum::Json(HealthzResponse {
-                status: "not ok".to_string(),
-            }),
-        );
-    };
-    if node.scheduled && node.status == NodeStatus::Online {
-        (
-            StatusCode::OK,
-            axum::Json(HealthzResponse {
-                status: "ok".to_string(),
-            }),
-        )
+
+    let (code, status) = if let Some(node) = cluster::get_node_by_uuid(&node_id).await {
+        if node.scheduled && node.status == NodeStatus::Online {
+            (StatusCode::OK, "ok")
+        } else {
+            (StatusCode::NOT_FOUND, "not ok")
+        }
     } else {
-        (
-            StatusCode::NOT_FOUND,
-            axum::Json(HealthzResponse {
-                status: "not ok".to_string(),
-            }),
-        )
-    }
+        (StatusCode::NOT_FOUND, "not ok")
+    };
+
+    (
+        code,
+        axum::Json(HealthzResponse {
+            status: status.to_string(),
+        }),
+    )
 }
 
 pub async fn zo_config() -> impl IntoResponse {
@@ -266,89 +300,30 @@ pub async fn zo_config() -> impl IntoResponse {
     let dex_cfg = get_dex_config();
     #[cfg(feature = "enterprise")]
     let openfga_cfg = get_openfga_config();
-    #[cfg(feature = "enterprise")]
-    let sso_enabled = dex_cfg.dex_enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let sso_enabled = false;
-    #[cfg(feature = "enterprise")]
-    let native_login_enabled = dex_cfg.native_login_enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let native_login_enabled = true;
 
+    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled);
+    let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
+    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled);
+    let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
+    let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
-    #[cfg(feature = "enterprise")]
-    let rbac_enabled = openfga_cfg.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let rbac_enabled = false;
-
-    #[cfg(feature = "enterprise")]
-    let actions_enabled = o2cfg.actions.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let actions_enabled = false;
-
-    #[cfg(feature = "enterprise")]
-    let super_cluster_enabled = o2cfg.super_cluster.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let super_cluster_enabled = false;
-
-    #[cfg(feature = "enterprise")]
-    let custom_logo_text = match get_logo_text().await {
-        Some(data) => data,
-        None => o2cfg.common.custom_logo_text.clone(),
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let custom_logo_text = "".to_string();
-    #[cfg(feature = "enterprise")]
-    let custom_slack_url = &o2cfg.common.custom_slack_url;
-    #[cfg(not(feature = "enterprise"))]
-    let custom_slack_url = "";
-    #[cfg(feature = "enterprise")]
-    let custom_docs_url = &o2cfg.common.custom_docs_url;
-    #[cfg(not(feature = "enterprise"))]
-    let custom_docs_url = "";
-
-    #[cfg(feature = "enterprise")]
-    let logo = get_logo().await;
-
-    #[cfg(not(feature = "enterprise"))]
-    let logo = None;
-
-    #[cfg(feature = "enterprise")]
-    let logo_dark = get_logo_dark().await;
-
-    #[cfg(not(feature = "enterprise"))]
-    let logo_dark = None;
-
-    #[cfg(feature = "enterprise")]
-    let custom_hide_menus = &o2cfg.common.custom_hide_menus;
-    #[cfg(not(feature = "enterprise"))]
-    let custom_hide_menus = "";
-
-    #[cfg(feature = "enterprise")]
-    let custom_hide_self_logo = o2cfg.common.custom_hide_self_logo;
-    #[cfg(not(feature = "enterprise"))]
-    let custom_hide_self_logo = false;
-
-    #[cfg(feature = "enterprise")]
-    let ai_enabled = o2cfg.ai.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let ai_enabled = false;
-
-    #[cfg(feature = "enterprise")]
-    let service_graph_enabled = o2cfg.service_graph.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let service_graph_enabled = false;
-
-    #[cfg(feature = "enterprise")]
-    let incidents_enabled = o2cfg.incidents.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let incidents_enabled = false;
-
-    #[cfg(feature = "enterprise")]
-    let service_streams_enabled = o2cfg.service_streams.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let service_streams_enabled = false;
+    let custom_logo_text = enterprise_value!(
+        "".to_string(),
+        get_logo_text()
+            .await
+            .unwrap_or_else(|| o2cfg.common.custom_logo_text.clone())
+    );
+    let custom_slack_url = enterprise_value!("", &o2cfg.common.custom_slack_url);
+    let custom_docs_url = enterprise_value!("", &o2cfg.common.custom_docs_url);
+    let logo = enterprise_value!(None, get_logo().await);
+    let logo_dark = enterprise_value!(None, get_logo_dark().await);
+    let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
+    let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
+    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
+    let service_graph_enabled = enterprise_value!(false, o2cfg.service_graph.enabled);
+    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -364,17 +339,14 @@ pub async fn zo_config() -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
     let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
 
-    #[cfg(feature = "enterprise")]
-    let usage_enabled = true;
-    #[cfg(not(feature = "enterprise"))]
-    let usage_enabled = cfg.common.usage_enabled;
+    let usage_enabled = enterprise_value!(cfg.common.usage_enabled, true);
 
     // max usage reporting interval can be 10 mins, because we
     // need relatively recent data for usage calculations
-    #[cfg(feature = "enterprise")]
-    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
-    #[cfg(not(feature = "enterprise"))]
-    let usage_publish_interval = cfg.common.usage_publish_interval;
+    let usage_publish_interval = enterprise_value!(
+        cfg.common.usage_publish_interval,
+        (10 * 60).min(cfg.common.usage_publish_interval)
+    );
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -412,18 +384,7 @@ pub async fn zo_config() -> impl IntoResponse {
         custom_logo_dark_img: logo_dark,
         custom_hide_menus: custom_hide_menus.to_string(),
         custom_hide_self_logo,
-        rum: Rum {
-            enabled: cfg.rum.enabled,
-            client_token: cfg.rum.client_token.to_string(),
-            application_id: cfg.rum.application_id.to_string(),
-            site: cfg.rum.site.to_string(),
-            service: cfg.rum.service.to_string(),
-            env: cfg.rum.env.to_string(),
-            version: cfg.rum.version.to_string(),
-            organization_identifier: cfg.rum.organization_identifier.to_string(),
-            api_version: cfg.rum.api_version.to_string(),
-            insecure_http: cfg.rum.insecure_http,
-        },
+        rum: Rum::from_cfg(cfg.clone()),
         meta_org: META_ORG_ID.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
@@ -459,18 +420,18 @@ pub async fn zo_config() -> impl IntoResponse {
         service_graph_enabled,
         incidents_enabled,
         service_streams_enabled,
-        #[cfg(feature = "enterprise")]
-        fqn_priority_dimensions: o2_enterprise::enterprise::common::config::get_config()
-            .service_streams
-            .get_fqn_priority_dimensions(),
-        #[cfg(not(feature = "enterprise"))]
-        fqn_priority_dimensions: vec![],
+        fqn_priority_dimensions: enterprise_value!(
+            vec![],
+            o2_enterprise::enterprise::common::config::get_config()
+                .service_streams
+                .get_fqn_priority_dimensions()
+        ),
     })
 }
 
 pub async fn cache_status() -> impl IntoResponse {
     let cfg = get_config();
-    let mut stats: HashMap<&str, json::Value> = HashMap::default();
+    let mut stats: HashMap<&str, json::Value> = HashMap::with_capacity(45);
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE.uuid.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
@@ -820,7 +781,8 @@ pub async fn config_reload() -> impl IntoResponse {
     )
 }
 
-fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
+/// Recursively walk through a JSON object and redact sensitive values
+fn hide_sensitive_fields(value: &mut serde_json::Value) {
     if let Some(obj) = value.as_object_mut() {
         for (key, val) in obj.iter_mut() {
             let key_lower = key.to_lowercase();
@@ -837,23 +799,22 @@ fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
 
             if is_sensitive && let Some(s) = val.as_str() {
                 *val = if s.is_empty() {
-                    serde_json::Value::String("[not set]".to_string())
+                    serde_json::json!("[not set]")
                 } else {
-                    serde_json::Value::String("[hidden]".to_string())
+                    serde_json::json!("[hidden]")
                 };
             }
 
             if val.is_object() {
-                *val = hide_sensitive_fields(val.clone());
+                hide_sensitive_fields(val);
             }
         }
     }
-    value
 }
 
 pub async fn config_runtime() -> impl IntoResponse {
     let cfg = get_config();
-    let config_value = match serde_json::to_value(cfg.as_ref()) {
+    let mut config_value = match serde_json::to_value(cfg.as_ref()) {
         Ok(v) => v,
         Err(e) => {
             return (
@@ -865,24 +826,23 @@ pub async fn config_runtime() -> impl IntoResponse {
         }
     };
 
-    let config_value = hide_sensitive_fields(config_value);
+    hide_sensitive_fields(&mut config_value);
 
-    let mut final_response = serde_json::Map::new();
-    final_response.insert(
-        "_metadata".to_string(),
-        json::json!({
-            "version": config::VERSION,
-            "commit_hash": config::COMMIT_HASH,
-            "build_date": config::BUILD_DATE,
-            "instance_id": get_instance_id(),
-        }),
-    );
+    const METADATA_KEY: &str = "_metadata";
+    let metadata_response = json::json!({
+        "version": config::VERSION,
+        "commit_hash": config::COMMIT_HASH,
+        "build_date": config::BUILD_DATE,
+        "instance_id": get_instance_id(),
+    });
 
-    if let Some(config_obj) = config_value.as_object() {
-        for (key, value) in config_obj {
-            final_response.insert(key.clone(), value.clone());
-        }
-    }
+    let mut final_response = if let serde_json::Value::Object(o) = config_value {
+        o
+    } else {
+        serde_json::Map::new()
+    };
+
+    final_response.insert(METADATA_KEY.to_string(), metadata_response);
 
     (
         StatusCode::OK,
@@ -891,13 +851,10 @@ pub async fn config_runtime() -> impl IntoResponse {
 }
 
 async fn get_stream_schema_status() -> (usize, usize) {
-    let mut stream_num = 0;
-    let mut stream_schema_num = 0;
     let r = STREAM_SCHEMAS.read().await;
-    for (_key, val) in r.iter() {
-        stream_num += 1;
-        stream_schema_num += val.len();
-    }
+    let stream_num = r.len();
+    let stream_schema_num = r.values().fold(0, |acc, val| acc + val.len());
+
     drop(r);
     (stream_num, stream_schema_num)
 }
@@ -906,6 +863,7 @@ async fn get_stream_schema_status() -> (usize, usize) {
 pub async fn redirect(Query(query): Query<std::collections::HashMap<String, String>>) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use config::meta::user::UserRole;
+    use itertools::Itertools;
 
     use crate::common::meta::user::AuthTokens;
 
@@ -918,11 +876,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                 .unwrap();
         }
     };
-    let query_string = query
-        .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
-        .collect::<Vec<_>>()
-        .join("&");
+    let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),

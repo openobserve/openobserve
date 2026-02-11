@@ -197,6 +197,7 @@ jobs:
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
                 "visualize.spec.js",
+                "visualize-vrl.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -283,6 +284,7 @@ jobs:
                 "dashboard-variables-refresh.spec.js",
                 "dashboard-variables-url-sync.spec.js",
                 "dashboard-variables-creation-scopes.spec.js",
+                "dashboard-variables-default-values-chain.spec.js",
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"
