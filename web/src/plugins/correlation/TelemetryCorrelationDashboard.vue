@@ -361,6 +361,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :span-list-prop="traceSpanList"
               :start-time-prop="computedTraceStartTime"
               :end-time-prop="computedTraceEndTime"
+              :correlated-log-stream="
+                logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+              "
               :show-back-button="false"
               :show-timeline="false"
               :show-log-stream-selector="false"
@@ -407,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-xs"
                   >
                     <q-tooltip>
-                      {{ t("correlation.viewInTracesTooltip") }}
+                      {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
                   </q-btn>
                   <q-chip dense color="primary" text-color="white">
@@ -711,6 +714,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :span-list-prop="traceSpanList"
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
+            :correlated-log-stream="
+              logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+            "
             :show-back-button="false"
             :show-timeline="false"
             :show-log-stream-selector="false"
@@ -760,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                 >
                   <q-tooltip>
-                    {{ t("correlation.viewInTracesTooltip") }}
+                    {{ t("correlation.viewInTraces") }}
                   </q-tooltip>
                 </q-btn>
               </div>
@@ -2047,17 +2053,28 @@ const openTraceInNewWindow = (trace) => {
 
   const org = store.state.selectedOrganization.identifier;
   const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+  const logStream = props.logStreams?.[0]?.stream_name;
 
-  // Build the URL with sql_mode and just trace_id filter
+  const queryParams: any = {
+    stream: traceStream,
+    trace_id: targetTraceId,
+    from: trace?.trace_start_time
+      ? trace.trace_start_time - 10000000
+      : props.timeRange.startTime.toString(),
+    to: trace?.trace_end_time
+      ? trace.trace_end_time + 10000000
+      : props.timeRange.endTime.toString(),
+    org_identifier: org,
+  };
+
+  // Add log_stream parameter if available for auto-selection in trace details
+  if (logStream) {
+    queryParams.log_stream = logStream;
+  }
+
   const route = router.resolve({
     name: "traceDetails",
-    query: {
-      stream: traceStream,
-      trace_id: targetTraceId,
-      from: trace.trace_start_time - 10000000,
-      to: trace.trace_end_time + 10000000,
-      org_identifier: org,
-    },
+    query: queryParams,
   });
 
   // Open in new window/tab
