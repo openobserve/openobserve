@@ -2814,5 +2814,9 @@
     "invalidFormat": "Formato no válido",
     "mustBeGreaterThan": "Debe ser mayor que {value}",
     "mustBeLessThan": "Debe ser inferior a {value}"
+  },
+  "nlMode": {
+    "toggle": "Modo de lenguaje natural",
+    "noAdditionalOptions": "Sin opciones adicionales"
   }
 }
