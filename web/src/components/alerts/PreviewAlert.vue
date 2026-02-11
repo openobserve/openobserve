@@ -890,8 +890,19 @@ onMounted(() => {
   }
 });
 
+// Resize chart without refetching data - relies on ResizeObserver to detect changes
+const resizeChart = async () => {
+  // Simply wait for the DOM to update
+  // The ResizeObserver in PanelSchemaRenderer will automatically detect the size change
+  // and call convertPanelDataCommon() which re-renders with existing data (no API call)
+  await nextTick();
+  await nextTick();
+
+  // No need to do anything else - ResizeObserver handles it automatically
+};
+
 // Expose refreshDataOnce instead of refreshData to prevent duplicate calls from parent
-defineExpose({ refreshData: refreshDataOnce, evaluationStatus });
+defineExpose({ refreshData: refreshDataOnce, resizeChart, evaluationStatus });
 </script>
 
 <style scoped>

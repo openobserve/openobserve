@@ -266,14 +266,29 @@ export default defineComponent({
       }
     };
 
-    // Handle window resize to rerender chart
+    // Note: ResizeObserver in PanelSchemaRenderer should automatically detect size changes
+    // and resize the chart without any intervention. We're keeping this watcher commented
+    // to verify if manual intervention is needed.
+
+    // watch(
+    //   () => [expandState.preview, expandState.summary],
+    //   async () => {
+    //     // Wait for CSS transition to complete
+    //     await new Promise(resolve => setTimeout(resolve, 350));
+    //     if (previewAlertRef.value && expandState.preview) {
+    //       (previewAlertRef.value as any).resizeChart();
+    //     }
+    //   }
+    // );
+
+    // Handle window resize to rerender chart (without refetching data)
     let resizeTimeout: NodeJS.Timeout;
     const handleResize = () => {
       // Debounce resize events to avoid excessive rerenders
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
         if (previewAlertRef.value && expandState.preview) {
-          (previewAlertRef.value as any).refreshData();
+          (previewAlertRef.value as any).resizeChart();
         }
       }, 300);
     };
