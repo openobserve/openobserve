@@ -1203,7 +1203,7 @@ describe("AlertSettings.vue", () => {
         },
       });
 
-      expect(darkWrapper.html()).toContain("bg-grey-10");
+      expect(darkWrapper.html()).toContain("bg-grey-9");
       darkWrapper.unmount();
     });
   });
