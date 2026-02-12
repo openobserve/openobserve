@@ -325,6 +325,10 @@ const getErrorLogs = () => {
     errorWhereClause += "error_type, ";
   }
 
+  if (schemaMapping.value["error_id"]) {
+    errorWhereClause += `FIRST_VALUE(error_id ORDER BY ${store.state.zoConfig.timestamp_column} DESC) as latest_error_id, `;
+  }
+
   schemaMapping.value["error_stack"] = false;
   schemaMapping.value["error_handling_stack"] = false;
 
@@ -414,7 +418,7 @@ const handleErrorTypeClick = async (payload: any) => {
   await nextTick();
   router.push({
     name: "ErrorViewer",
-    params: { id: payload.row.error_id },
+    params: { id: payload.row.latest_error_id },
     query: {
       timestamp: payload.row.zo_sql_timestamp,
     },
