@@ -10,8 +10,7 @@ import PageManager from "../../pages/page-manager.js";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
 import { waitForDashboardPage, deleteDashboard, reopenDashboardFromList } from "./utils/dashCreation.js";
 import { monitorVariableAPICalls } from "../utils/variable-helpers.js";
-const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
-const { SELECTORS } = require("../../pages/dashboardPages/dashboard-selectors.js");
+const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 const testLogger = require("../utils/test-logger.js");
 
 test.describe.configure({ mode: "parallel" });
@@ -33,7 +32,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Open settings
     await pm.dashboardSetting.openSetting();
@@ -50,7 +49,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     // Wait for the custom variable to be visible in the list
-    await page.locator(`[data-test="dashboard-edit-variable-${customVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(customVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     testLogger.debug("Creating query_values child with filter using custom parent");
@@ -67,13 +66,13 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     );
 
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
+    await scopedVars.waitForDialogHidden({ timeout: 5000 });
 
     testLogger.debug("Going back to dashboard list and reopening to test initial load");
 
     // Go back to dashboard list
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
 
     testLogger.debug("Monitoring API calls during dashboard reopen (initial load)");
 
@@ -89,8 +88,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     testLogger.debug("Verifying child variable loaded on initial dashboard open");
 
     // Both variables should be visible
-    await page.locator(`[data-test="variable-selector-${customVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="variable-selector-${queryVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForVariableSelectorVisible(customVar);
+    await scopedVars.waitForVariableSelectorVisible(queryVar);
 
     // Verify API call happened during initial load (not when dropdown opens)
     const apiResult = await apiMonitorPromise;
@@ -105,7 +104,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -120,7 +119,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Open settings
     await pm.dashboardSetting.openSetting();
@@ -137,7 +136,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     // Wait for the constant variable to be visible in the list
-    await page.locator(`[data-test="dashboard-edit-variable-${constantVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(constantVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     testLogger.debug("Creating query_values child with filter using constant parent");
@@ -154,13 +153,13 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     );
 
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
+    await scopedVars.waitForDialogHidden({ timeout: 5000 });
 
     testLogger.debug("Going back to dashboard list and reopening to test initial load");
 
     // Go back to dashboard list
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
 
     testLogger.debug("Monitoring API calls during dashboard reopen (initial load)");
 
@@ -176,8 +175,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     testLogger.debug("Verifying child variable loaded with constant parent filter");
 
     // Both variables should be visible
-    await page.locator(`[data-test="variable-selector-${constantVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="variable-selector-${queryVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForVariableSelectorVisible(constantVar);
+    await scopedVars.waitForVariableSelectorVisible(queryVar);
 
     // Verify API call happened during initial load (not when dropdown opens)
     const apiResult = await apiMonitorPromise;
@@ -192,7 +191,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -207,7 +206,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Open settings
     await pm.dashboardSetting.openSetting();
@@ -224,7 +223,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     // Wait for the textbox variable to be visible in the list
-    await page.locator(`[data-test="dashboard-edit-variable-${textboxVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(textboxVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     testLogger.debug("Creating query_values child using textbox parent in stream");
@@ -237,13 +236,13 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     );
 
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
+    await scopedVars.waitForDialogHidden({ timeout: 5000 });
 
     testLogger.debug("Going back to dashboard list and reopening to test initial load");
 
     // Go back to dashboard list
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
 
     testLogger.debug("Monitoring API calls during dashboard reopen (initial load)");
 
@@ -259,8 +258,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     testLogger.debug("Verifying child variable loaded with textbox parent");
 
     // Both variables should be visible
-    await page.locator(`[data-test="variable-selector-${textboxVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="variable-selector-${queryVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForVariableSelectorVisible(textboxVar);
+    await scopedVars.waitForVariableSelectorVisible(queryVar);
 
     // Verify API call happened during initial load (not when dropdown opens)
     const apiResult = await apiMonitorPromise;
@@ -275,10 +274,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     testLogger.debug("Changing textbox value and verifying child reloads");
 
     // Change textbox value and verify child reloads
-    const textboxSelector = page.locator(`[data-test="variable-selector-${textboxVar}"]`);
-    await textboxSelector.clear();
-    await textboxSelector.fill("default");
-    await page.keyboard.press('Enter');
+    await scopedVars.changeTextboxVariableValue(textboxVar, "default");
 
     // Wait for child to reload
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
@@ -291,7 +287,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -306,7 +302,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Open settings
     await pm.dashboardSetting.openSetting();
@@ -322,7 +318,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     // Wait for the custom variable to be visible in the list
-    await page.locator(`[data-test="dashboard-edit-variable-${customVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(customVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await scopedVars.addScopedVariable(
@@ -334,13 +330,13 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     );
 
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
+    await scopedVars.waitForDialogHidden({ timeout: 5000 });
 
     testLogger.debug("Going back to dashboard list and reopening to test initial load");
 
     // Go back to dashboard list
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
 
     testLogger.debug("Monitoring API calls during dashboard reopen (initial load)");
 
@@ -367,7 +363,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     });
 
     // Open parent dropdown (this should NOT trigger child reload)
-    const parentSelector = page.locator(`[data-test="variable-selector-${customVar}"]`);
+    const parentSelector = await scopedVars.waitForVariableSelectorVisible(customVar);
     await parentSelector.click();
 
     // Wait a bit and close dropdown without selecting
@@ -385,7 +381,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 });

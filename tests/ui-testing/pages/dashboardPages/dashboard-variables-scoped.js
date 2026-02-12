@@ -1641,6 +1641,18 @@ export default class DashboardVariablesScoped {
 
 
   /**
+   * Change textbox variable value (clear, fill, submit)
+   * @param {string} variableName - Variable name
+   * @param {string} newValue - New value to set
+   */
+  async changeTextboxVariableValue(variableName, newValue) {
+    const selector = await this.waitForVariableSelectorVisible(variableName);
+    await selector.clear();
+    await selector.fill(newValue);
+    await this.page.keyboard.press('Enter');
+  }
+
+  /**
    * Verify variable has loaded options (is not empty)
    * @param {string} variableName - Variable name
    * @param {Object} options - Options
