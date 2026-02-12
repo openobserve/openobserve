@@ -38,6 +38,7 @@ export interface CorrelatedLogsProps {
   hideViewRelatedButton?: boolean;
   hideSearchTermActions?: boolean;
   hideDimensionFilters?: boolean;
+  hideResetFiltersButton?: boolean;
 }
 
 export interface LogEntry {
