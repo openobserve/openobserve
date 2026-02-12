@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :editMode="true"
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       :showAddToDashboardButton="true"
-      @addToDashboard="showAddToDashboardDialog = true"
+      @addToDashboard="onAddToDashboard"
       @chartApiError="handleChartApiError"
       @queryGenerated="onQueryGenerated"
       @customQueryModeChanged="onCustomQueryModeChanged"
@@ -55,6 +55,7 @@ import {
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
+import useNotifications from "@/composables/useNotifications";
 
 // ============================================================================
 // Component Imports
@@ -116,8 +117,10 @@ const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 
 // Get dashboard panel data for build page
-const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields, makeAutoSQLQuery } =
+const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields, makeAutoSQLQuery, validatePanel } =
   useDashboardPanelData("build");
+
+const { showErrorNotification } = useNotifications();
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", "build");
@@ -293,6 +296,18 @@ const initializeFromQuery = async () => {
 
 const handleChartApiError = (error: any) => {
   console.error("Chart API error:", error);
+};
+
+const onAddToDashboard = () => {
+  const errors: string[] = [];
+  validatePanel(errors, true);
+  if (errors.length) {
+    showErrorNotification(
+      "There are some errors, please fix them and try again",
+    );
+    return;
+  }
+  showAddToDashboardDialog.value = true;
 };
 
 const addPanelToDashboard = () => {
