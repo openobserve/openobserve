@@ -165,7 +165,7 @@ async fn write_downsampled_parquet(
             file_metas.push(file_meta);
 
             // reset for next file
-            buf = Vec::with_capacity(cfg.compact.max_file_size);
+            buf.clear();
             file_meta = FileMeta::default();
             writer =
                 new_parquet_writer(&mut buf, schema, bloom_filter_fields, metadata, false, None);
