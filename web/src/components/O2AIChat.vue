@@ -655,6 +655,7 @@ export default defineComponent({
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
+    const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore ();
     const chatUpdated = computed(() => store.state.chatUpdated);
 
@@ -1197,6 +1198,10 @@ export default defineComponent({
 
                   // Handle complete events - complete any active tool call
                   if (data && data.type === 'complete') {
+                    // Capture trace_id for feedback correlation
+                    if (data.trace_id) {
+                      lastTraceId.value = data.trace_id;
+                    }
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
                         type: 'tool_call',
@@ -1428,6 +1433,10 @@ export default defineComponent({
 
                 // Handle complete events - complete any active tool call
                 if (data && data.type === 'complete') {
+                  // Capture trace_id for feedback correlation
+                  if (data.trace_id) {
+                    lastTraceId.value = data.trace_id;
+                  }
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
@@ -1701,6 +1710,7 @@ export default defineComponent({
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
+      lastTraceId.value = null; // Reset trace correlation for new chat
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
@@ -2488,6 +2498,7 @@ export default defineComponent({
         orgId,
         currentSessionId.value || undefined,
         queryIndex,
+        lastTraceId.value || undefined,
       );
       if (success) {
         $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
@@ -2503,6 +2514,7 @@ export default defineComponent({
         orgId,
         currentSessionId.value || undefined,
         queryIndex,
+        lastTraceId.value || undefined,
       );
       if (success) {
         $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
