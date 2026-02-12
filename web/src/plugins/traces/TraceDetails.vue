@@ -724,7 +724,8 @@ export default defineComponent({
     const spanMap: any = ref({});
     const activeTab = ref("timeline");
 
-    const { searchObj, getUrlQueryParams, generateNewColor } = useTraces();
+    const { searchObj, getUrlQueryParams, generateNewColor, navigateToLogs } =
+      useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -1980,27 +1981,18 @@ export default defineComponent({
         searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
       const to =
         searchObj.data.traceDetails.selectedTrace?.trace_end_time + 60000000;
-      const refresh = 0;
 
       const query = b64EncodeUnicode(
         `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
       );
 
-      router.push({
-        path: "/logs",
-        query: {
-          stream_type: "logs",
-          stream,
-          from,
-          to,
-          refresh,
-          sql_mode: "false",
-          query,
-          org_identifier: store.state.selectedOrganization.identifier,
-          show_histogram: "true",
-          type: "trace_explorer",
-          quick_mode: "false",
-        },
+      navigateToLogs({
+        stream,
+        from,
+        to,
+        refresh: 0,
+        query,
+        orgIdentifier: store.state.selectedOrganization.identifier,
       });
     };
 
