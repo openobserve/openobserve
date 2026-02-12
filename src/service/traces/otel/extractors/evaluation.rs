@@ -112,7 +112,8 @@ impl EvaluationExtractor {
     /// Also extracts evaluator metadata and commentary.
     pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> Evaluation {
         let scores = self.extract_scores(attributes);
-        let commentary = self.extract_string(attributes, EvaluationAttributes::COMMENTARY)
+        let commentary = self
+            .extract_string(attributes, EvaluationAttributes::COMMENTARY)
             .or_else(|| self.extract_string(attributes, "llm_evaluation_commentary"));
         let evaluator = self.extract_evaluator_info(attributes);
 
@@ -173,10 +174,12 @@ impl EvaluationExtractor {
     }
 
     fn extract_evaluator_info(&self, attributes: &HashMap<String, json::Value>) -> EvaluatorInfo {
-        let name = self.extract_string(attributes, EvaluationAttributes::EVALUATOR_NAME)
+        let name = self
+            .extract_string(attributes, EvaluationAttributes::EVALUATOR_NAME)
             .or_else(|| self.extract_string(attributes, "llm_evaluator_name"));
 
-        let version = self.extract_string(attributes, EvaluationAttributes::EVALUATOR_VERSION)
+        let version = self
+            .extract_string(attributes, EvaluationAttributes::EVALUATOR_VERSION)
             .or_else(|| self.extract_string(attributes, "llm_evaluator_version"));
 
         let evaluator_type = self
@@ -193,7 +196,7 @@ impl EvaluationExtractor {
     }
 
     fn extract_score(&self, attributes: &HashMap<String, json::Value>, key: &str) -> Option<f64> {
-        attributes.get(key).and_then(|v| extract_f64(v))
+        attributes.get(key).and_then(extract_f64)
     }
 
     fn extract_string(
@@ -227,10 +230,7 @@ mod tests {
             "llm.evaluation.tool_effectiveness".to_string(),
             json::json!(0.75),
         );
-        attrs.insert(
-            "llm.evaluation.groundedness".to_string(),
-            json::json!(0.88),
-        );
+        attrs.insert("llm.evaluation.groundedness".to_string(), json::json!(0.88));
         attrs.insert("llm.evaluation.safety".to_string(), json::json!(0.95));
         attrs.insert("llm.evaluation.duration_ms".to_string(), json::json!(12.5));
 
