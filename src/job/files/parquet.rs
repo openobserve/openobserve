@@ -224,9 +224,9 @@ async fn scan_wal_files(
     tokio::spawn(async move {
         if let Err(e) = scan_files_with_channel(
             pattern.as_path(),
-            "parquet", // TODO: create a constant for parquet extension
+            "parquet",
             Some(cfg.limit.file_push_limit),
-            tx.clone(),
+            tx,
         )
         .await
             && !e.to_string().contains("No such file or directory")
@@ -677,7 +677,6 @@ async fn merge_files(
         max_ts,
         records: total_records,
         original_size: new_file_size,
-        flattened: false,
         ..Default::default()
     };
     if new_file_meta.records == 0 {

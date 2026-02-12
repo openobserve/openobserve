@@ -19,11 +19,7 @@ use arrow::array::RecordBatch;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileMeta, StreamType},
-    utils::{
-        parquet::new_parquet_writer,
-        util::DISTINCT_STREAM_PREFIX,
-        vortex::{Utf8Compressor, VORTEX_RUNTIME},
-    },
+    utils::{parquet::new_parquet_writer, util::DISTINCT_STREAM_PREFIX, vortex::Utf8Compressor},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -32,6 +28,7 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+use infra::runtime::VORTEX_RUNTIME;
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, arrow::FromArrowArray},

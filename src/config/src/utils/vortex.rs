@@ -1,3 +1,18 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 //! A smart UTF8 compressor that chooses between dict encoding and Zstd compression.
 //!
 //! Strategy:
@@ -5,8 +20,6 @@
 //! - If dict encoding is not beneficial: Fall back to Zstd compression.
 //! - For other types: Use BtrBlocks compression.
 
-use once_cell::sync::Lazy;
-use tokio::runtime::Runtime;
 use vortex::{
     array::{Array, ArrayRef, Canonical, IntoArray},
     compressor::BtrBlocksCompressor,
@@ -16,18 +29,6 @@ use vortex::{
     layout::layouts::compressed::CompressorPlugin,
 };
 use vortex_btrblocks::{BtrBlocksCompressorBuilder, IntCode};
-
-use crate::config;
-
-pub static VORTEX_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    tokio::runtime::Builder::new_multi_thread()
-        .thread_name("vortex_runtime")
-        .worker_threads(config::get_config().limit.vortex_thread_num)
-        .thread_stack_size(16 * 1024 * 1024)
-        .enable_all()
-        .build()
-        .unwrap()
-});
 
 /// A compressor optimized for UTF8 fields using Zstd compression.
 ///

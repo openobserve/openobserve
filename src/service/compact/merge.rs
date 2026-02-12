@@ -799,10 +799,9 @@ pub async fn merge_files(
             "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
             &file.key
         );
-        // TODO: check if this read the total size of the file
         let buf = file_data::get(&file.account, &file.key, None).await?;
         let file_format = FileFormat::from_extension(&file.key)
-            .unwrap_or_else(|| panic!("invalid file format: {}", file.key));
+            .ok_or_else(|| anyhow::anyhow!("invalid file format: {}", file.key))?;
         let schema = read_schema_from_bytes(file_format, &buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
@@ -900,8 +899,9 @@ pub async fn merge_files(
             if should_process {
                 // Process the merged data for service discovery
                 // Works with all stream types (same as ingester mode)
+                let file_format = get_config().common.file_format;
                 if let Err(e) =
-                    process_service_streams_from_parquet(org_id, stream_name, stream_type, &buf)
+                    process_service_streams(org_id, stream_name, stream_type, file_format, &buf)
                         .await
                 {
                     log::warn!(
@@ -1338,10 +1338,11 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
 
 /// Process service streams from merged parquet data (compactor mode)
 #[cfg(feature = "enterprise")]
-async fn process_service_streams_from_parquet(
+async fn process_service_streams(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    file_format: FileFormat,
     parquet_result: &MergeParquetResult,
 ) -> Result<(), anyhow::Error> {
     let parquet_bytes = match parquet_result {
@@ -1349,25 +1350,25 @@ async fn process_service_streams_from_parquet(
         MergeParquetResult::Multiple { bufs, .. } => {
             // For multiple files, process each one
             for buf in bufs {
-                process_single_parquet_buffer(org_id, stream_name, stream_type, buf).await?;
+                process_single_buffer(org_id, stream_name, stream_type, file_format, buf).await?;
             }
             return Ok(());
         }
     };
 
-    process_single_parquet_buffer(org_id, stream_name, stream_type, parquet_bytes).await
+    process_single_buffer(org_id, stream_name, stream_type, file_format, parquet_bytes).await
 }
 
 #[cfg(feature = "enterprise")]
-async fn process_single_parquet_buffer(
+async fn process_single_buffer(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    file_format: FileFormat,
     parquet_bytes: &[u8],
 ) -> Result<(), anyhow::Error> {
-    // Read record batches from parquet bytes
+    // Read record batches from bytes
     let bytes = Bytes::from(parquet_bytes.to_vec());
-    let file_format = get_config().common.file_format;
     let (_schema, batches) = read_recordbatch_from_bytes(file_format, &bytes).await?;
 
     if batches.is_empty() {
