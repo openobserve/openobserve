@@ -101,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Toggle to enable panel-level time -->
       <q-toggle
-        v-model="allowPanelTime"
-        :label="t('dashboard.allowPanelTime')"
+        v-model="panelTimeEnabled"
+        :label="t('dashboard.panelTimeEnabled')"
         data-test="dashboard-config-allow-panel-time"
         @update:model-value="onTogglePanelTime"
         class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Show mode selection when enabled -->
-      <div v-if="allowPanelTime" class="q-mt-sm q-ml-lg">
+      <div v-if="panelTimeEnabled" class="q-mt-sm q-ml-lg">
         <!-- Using individual q-radio components for better data-test support -->
         <div class="q-gutter-sm">
           <q-radio
@@ -2616,7 +2616,7 @@ export default defineComponent({
     });
 
     // Panel time configuration
-    const allowPanelTime = ref(
+    const panelTimeEnabled = ref(
       !!dashboardPanelData.data.config?.panel_time_enabled,
     );
 
@@ -2760,7 +2760,7 @@ export default defineComponent({
       shouldApplyChartAlign,
       shouldShowGridlines,
       // Panel time configuration
-      allowPanelTime,
+      panelTimeEnabled,
       panelTimeMode,
       onTogglePanelTime,
       onPanelTimeModeChange,

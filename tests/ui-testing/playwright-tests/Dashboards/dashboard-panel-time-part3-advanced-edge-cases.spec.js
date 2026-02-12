@@ -36,7 +36,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -87,7 +87,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -131,9 +131,9 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_A_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
-        { panelName: `Panel_C_${timestamp}`, allowPanelTime: false }
+        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
+        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
+        { panelName: `Panel_C_${timestamp}`, panelTimeEnabled: false }
       ]
     });
 
@@ -161,10 +161,10 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_A_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
-        { panelName: `Panel_C_${timestamp}`, allowPanelTime: true, panelTimeMode: "global" },
-        { panelName: `Panel_D_${timestamp}`, allowPanelTime: false }
+        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
+        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
+        { panelName: `Panel_C_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "global" },
+        { panelName: `Panel_D_${timestamp}`, panelTimeEnabled: false }
       ]
     });
 
@@ -200,7 +200,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -230,9 +230,9 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_1_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_2_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
-        { panelName: `Panel_3_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "15-m" }
+        { panelName: `Panel_1_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
+        { panelName: `Panel_2_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
+        { panelName: `Panel_3_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "15-m" }
       ]
     });
 
