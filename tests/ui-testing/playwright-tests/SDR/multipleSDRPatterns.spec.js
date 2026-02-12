@@ -111,12 +111,35 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     const { baseUrl, org, headers } = getApiConfig();
     const allPatternsToCreate = [...queryTimePatterns, ...ingestionTimePatterns];
 
+    // Helper: fetch with retry for transient 502/proxy errors
+    async function fetchWithRetry(url, options, label, maxRetries = 3) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await fetch(url, options);
+          if (res.status >= 502 && res.status <= 504 && attempt < maxRetries) {
+            const body = await res.text();
+            testLogger.warn(`${label}: ${res.status} on attempt ${attempt}/${maxRetries}: ${body.substring(0, 100)}`);
+            await new Promise(r => setTimeout(r, attempt * 3000));
+            continue;
+          }
+          return res;
+        } catch (err) {
+          if (attempt < maxRetries) {
+            testLogger.warn(`${label}: network error on attempt ${attempt}/${maxRetries}: ${err.message}`);
+            await new Promise(r => setTimeout(r, attempt * 3000));
+            continue;
+          }
+          throw err;
+        }
+      }
+    }
+
     for (const patternDef of allPatternsToCreate) {
-      const res = await fetch(`${baseUrl}/api/${org}/re_patterns`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ name: patternDef.name, description: patternDef.description, pattern: patternDef.pattern })
-      });
+      const res = await fetchWithRetry(
+        `${baseUrl}/api/${org}/re_patterns`,
+        { method: 'POST', headers, body: JSON.stringify({ name: patternDef.name, description: patternDef.description, pattern: patternDef.pattern }) },
+        `Create pattern ${patternDef.name}`
+      );
       if (!res.ok) {
         const body = await res.text();
         throw new Error(`Failed to create pattern ${patternDef.name}: ${res.status} ${body}`);
@@ -125,7 +148,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     }
 
     // Verify all patterns exist
-    const listRes = await fetch(`${baseUrl}/api/${org}/re_patterns`, { headers });
+    const listRes = await fetchWithRetry(`${baseUrl}/api/${org}/re_patterns`, { headers }, 'List patterns');
     const listData = await listRes.json();
     const existingNames = new Set((listData.patterns || []).map(p => p.name));
     for (const p of allPatternsToCreate) {
@@ -232,8 +255,8 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   test('should link 4 patterns to one field and verify with sequential ingestion', {
     tag: ['@sdr', '@poc', '@sdrMultiPattern']
   }, async ({ page }, testInfo) => {
-    // Extend timeout to 5 minutes - this test has 10 sequential steps with navigation
-    test.setTimeout(300000);
+    // Extend timeout to 7 minutes - 10 sequential steps with navigation + CI overhead
+    test.setTimeout(420000);
     testLogger.info('=== Testing multiple patterns on ONE field - SEQUENTIAL FLOW ===');
     testLogger.info(`Field: ${fieldName}`);
     testLogger.info('Strategy: Ingest one log → verify → ingest next → verify (repeating pattern)');
