@@ -190,7 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('traces.backToLogs')
                     : t('traces.viewLogs')
                 "
-                :disable="!searchObj.data.traceDetails.selectedLogStreams.length"
                 padding="sm sm"
                 size="sm"
                 no-caps
@@ -1970,16 +1969,6 @@ export default defineComponent({
 
     const redirectToLogs = () => {
       if (!searchObj.data.traceDetails.selectedTrace) {
-        return;
-      }
-
-      // Check if at least one log stream is selected
-      if (!searchObj.data.traceDetails.selectedLogStreams.length) {
-        $q.notify({
-          type: "negative",
-          message: "Please select at least one log stream",
-          timeout: 2000,
-        });
         return;
       }
 
