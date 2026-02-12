@@ -34,13 +34,11 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         view_name: view.view_name.clone(),
     };
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
-    db::put(
-        &key,
-        json::to_vec(&view).unwrap().into(),
-        db::NO_NEED_WATCH,
-        None,
-    )
-    .await?;
+    let val = json::to_vec(&view).unwrap();
+    if val.is_empty() {
+        return Err(Error::Message("Saved views value is empty".to_string()));
+    }
+    db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
     Ok(view)
 }
 
