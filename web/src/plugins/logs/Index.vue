@@ -1912,6 +1912,14 @@ export default defineComponent({
             await nextTick();
             isRestoringFromUrl.value = false;
 
+            // Only clear fieldsExtractionLoading if we have data to reuse (no API call needed)
+            // If searchResponseForVisualization has hits, data will be reused and no API call
+            // If empty, API call will happen and trace IDs watcher will clear the flag
+            const hasDataToReuse = searchResponseForVisualization.value?.hits?.length > 0;
+            if (hasDataToReuse) {
+              variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+            }
+
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
@@ -2566,6 +2574,11 @@ export default defineComponent({
         );
 
         await copyDashboardDataToVisualize();
+
+        // Don't clear fieldsExtractionLoading here - let the watcher handle it.
+        // The watcher will clear it when:
+        // 1. Trace IDs appear (API call started) - existing watcher at line ~2630
+        // 2. Chart data is set AND no trace IDs (data reused) - new watcher below
 
         return shouldUseHistogramQuery.value;
       } catch (err) {
