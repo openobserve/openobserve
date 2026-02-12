@@ -371,7 +371,6 @@ export default defineComponent({
           lastChartOptions.value &&
           chartKey.value === lastChartOptions.value.key &&
           !hasActiveFilters) {
-        console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
         return {
           options: lastChartOptions.value.data.options,
           notMerge: false,
@@ -514,9 +513,6 @@ export default defineComponent({
           availableStreams.value.length === 0 &&
           streamFilter.value !== "all"
         ) {
-          console.log(
-            "[ServiceGraph] Fetching all streams first to populate dropdown",
-          );
           const allStreamsResponse =
             await serviceGraphService.getCurrentTopology(orgId, {
               startTime: searchObj.data.datetime.startTime,
@@ -845,11 +841,8 @@ export default defineComponent({
 
     // Side Panel Handlers
     const handleNodeClick = (params: any) => {
-      console.log('[ServiceGraph] Click event:', params);
-
       // Check if it's an edge click (for graph visualization)
       if (params.dataType === 'edge' && params.data) {
-        console.log('[ServiceGraph] Opening edge panel for edge:', params.data);
         // Close node panel when opening edge panel
         showSidePanel.value = false;
         selectedNode.value = null;
@@ -869,11 +862,9 @@ export default defineComponent({
       else if (params.dataType === 'node' && params.data) {
         // Check if clicking the same node - if so, close the panel
         if (selectedNode.value && selectedNode.value.id === params.data.id) {
-          console.log('[ServiceGraph] Clicking same node, closing side panel');
           showSidePanel.value = false;
           selectedNode.value = null;
         } else {
-          console.log('[ServiceGraph] Opening side panel for node:', params.data);
           // Close edge panel when opening node panel
           showEdgePanel.value = false;
           selectedEdge.value = null;
@@ -892,11 +883,9 @@ export default defineComponent({
         if (nodeData) {
           // Check if clicking the same node - if so, close the panel
           if (selectedNode.value && selectedNode.value.id === nodeData.id) {
-            console.log('[ServiceGraph] Clicking same tree node, closing side panel');
             showSidePanel.value = false;
             selectedNode.value = null;
           } else {
-            console.log('[ServiceGraph] Opening side panel for tree node:', params.data);
             // Close edge panel when opening node panel
             showEdgePanel.value = false;
             selectedEdge.value = null;
