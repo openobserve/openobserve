@@ -165,15 +165,6 @@ const getConfig = async () => {
             return false;
           }
 
-          // Filter sensitive information
-          if (log.message) {
-            // Remove tokens from log messages
-            log.message = log.message
-              .replace(/token=[^&\s]+/gi, "token=REDACTED")
-              .replace(/password=[^&\s]+/gi, "password=REDACTED")
-              .replace(/apiKey=[^&\s]+/gi, "apiKey=REDACTED");
-          }
-
           // Allow all other logs to be sent
           return true;
         },
