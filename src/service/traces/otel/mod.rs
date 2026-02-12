@@ -629,4 +629,286 @@ mod tests {
         );
         assert!(span_attrs.contains_key(O2Attributes::USAGE_DETAILS));
     }
+
+    /// Full E2E integration test simulating what the o2-sre-agent sends:
+    /// A chat span with evaluation scores, usage, cost, metadata, and tool info.
+    /// Verifies the complete enrichment pipeline from raw OTEL attributes to O2-prefixed fields.
+    #[test]
+    fn test_integration_e2e_sre_agent_with_evaluation() {
+        let processor = OtelIngestionProcessor::new();
+
+        // ── Resource attributes (from OTLP ResourceSpans) ──
+        let mut resource_attrs = HashMap::new();
+        resource_attrs.insert("service.name".to_string(), json::json!("o2-sre-agent"));
+        resource_attrs.insert("service.version".to_string(), json::json!("0.1.0"));
+        resource_attrs.insert(
+            "deployment.environment.name".to_string(),
+            json::json!("production"),
+        );
+
+        // ── Span attributes (from TracedLlm in o2-sre-agent) ──
+        let mut span_attrs = HashMap::new();
+
+        // Gen-AI semantic conventions
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("claude-3-5-sonnet"),
+        );
+        span_attrs.insert(
+            "gen_ai.response.model".to_string(),
+            json::json!("claude-3-5-sonnet"),
+        );
+        span_attrs.insert("gen_ai.system".to_string(), json::json!("anthropic"));
+        span_attrs.insert("gen_ai.request.temperature".to_string(), json::json!(0.7));
+        span_attrs.insert("gen_ai.request.max_tokens".to_string(), json::json!(4096));
+
+        // Input/output messages
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!(r#"[{"role":"user","content":"What are the top error logs in the last hour?"}]"#),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!(r#"[{"role":"assistant","content":"I found 3 critical errors in the nginx service..."}]"#),
+        );
+
+        // Usage tokens
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1250));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(340));
+
+        // User and session
+        span_attrs.insert("user.id".to_string(), json::json!("admin@example.com"));
+        span_attrs.insert(
+            "gen_ai.conversation.id".to_string(),
+            json::json!("01936b7a-8c4f-7d00-a000-deadbeef1234"),
+        );
+
+        // Evaluation scores (from EvaluationRunner in o2-sre-agent)
+        span_attrs.insert(
+            "llm.evaluation.quality_score".to_string(),
+            json::json!(0.82),
+        );
+        span_attrs.insert("llm.evaluation.relevance".to_string(), json::json!(0.9));
+        span_attrs.insert("llm.evaluation.completeness".to_string(), json::json!(0.75));
+        span_attrs.insert(
+            "llm.evaluation.tool_effectiveness".to_string(),
+            json::json!(0.85),
+        );
+        span_attrs.insert(
+            "llm.evaluation.groundedness".to_string(),
+            json::json!(0.88),
+        );
+        span_attrs.insert("llm.evaluation.safety".to_string(), json::json!(0.95));
+        span_attrs.insert("llm.evaluation.duration_ms".to_string(), json::json!(15.3));
+
+        let events = vec![];
+
+        // ── Process the span (this is what happens in handle_otlp_request) ──
+        processor.process_span(
+            &mut span_attrs,
+            &resource_attrs,
+            Some("anthropic"),
+            &events,
+        );
+
+        // ═══ Verify complete enrichment pipeline ═══
+
+        // 1. Observation type
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::OBSERVATION_TYPE)
+                .and_then(|v| v.as_str()),
+            Some("GENERATION"),
+            "Should detect GENERATION from gen_ai.operation.name=chat"
+        );
+
+        // 2. Model name (response model takes precedence)
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::MODEL_NAME)
+                .and_then(|v| v.as_str()),
+            Some("claude-3-5-sonnet"),
+            "Should extract model name from gen_ai.response.model"
+        );
+
+        // 3. Provider name (from gen_ai.system)
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::PROVIDER_NAME)
+                .and_then(|v| v.as_str()),
+            Some("anthropic"),
+            "Should extract provider from gen_ai.system"
+        );
+
+        // 4. Usage details
+        assert!(
+            span_attrs.contains_key(O2Attributes::USAGE_DETAILS),
+            "Should have usage details"
+        );
+        let usage = span_attrs.get(O2Attributes::USAGE_DETAILS).unwrap();
+        assert_eq!(usage.get("input").and_then(|v| v.as_i64()), Some(1250));
+        assert_eq!(usage.get("output").and_then(|v| v.as_i64()), Some(340));
+        assert_eq!(
+            usage.get("total").and_then(|v| v.as_i64()),
+            Some(1590),
+            "Total should be input + output"
+        );
+
+        // 5. Cost details (calculated from model pricing)
+        assert!(
+            span_attrs.contains_key(O2Attributes::COST_DETAILS),
+            "Should have cost details calculated from token counts"
+        );
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+        assert!(
+            cost.get("input").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0,
+            "Input cost should be > 0 for known model"
+        );
+        assert!(
+            cost.get("output").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0,
+            "Output cost should be > 0 for known model"
+        );
+        assert!(
+            cost.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0,
+            "Total cost should be > 0"
+        );
+
+        // 6. Model parameters (stored as HashMap<String, String> → JSON object with string values)
+        assert!(
+            span_attrs.contains_key(O2Attributes::MODEL_PARAMETERS),
+            "Should have model parameters"
+        );
+        let params = span_attrs.get(O2Attributes::MODEL_PARAMETERS).unwrap();
+        assert!(params.is_object(), "Model parameters should be a JSON object");
+        assert_eq!(
+            params.get("temperature").and_then(|v| v.as_str()),
+            Some("0.7")
+        );
+        assert_eq!(
+            params.get("max_tokens").and_then(|v| v.as_str()),
+            Some("4096")
+        );
+
+        // 7. User/session metadata
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::USER_ID)
+                .and_then(|v| v.as_str()),
+            Some("admin@example.com")
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::SESSION_ID)
+                .and_then(|v| v.as_str()),
+            Some("01936b7a-8c4f-7d00-a000-deadbeef1234")
+        );
+
+        // 8. Input/output (moved from gen_ai.* to O2 fields)
+        assert!(
+            span_attrs.contains_key(O2Attributes::INPUT),
+            "Should have enriched input"
+        );
+        assert!(
+            span_attrs.contains_key(O2Attributes::OUTPUT),
+            "Should have enriched output"
+        );
+        // Original gen_ai.input/output should be removed
+        assert!(
+            !span_attrs.contains_key("gen_ai.input.messages"),
+            "Original input messages should be removed after enrichment"
+        );
+        assert!(
+            !span_attrs.contains_key("gen_ai.output.messages"),
+            "Original output messages should be removed after enrichment"
+        );
+
+        // 9. Evaluation scores (the new feature!)
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_QUALITY)
+                .and_then(|v| v.as_f64()),
+            Some(0.82),
+            "Quality score should be enriched"
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_RELEVANCE)
+                .and_then(|v| v.as_f64()),
+            Some(0.9),
+            "Relevance score should be enriched"
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_COMPLETENESS)
+                .and_then(|v| v.as_f64()),
+            Some(0.75),
+            "Completeness score should be enriched"
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_TOOL_EFFECTIVENESS)
+                .and_then(|v| v.as_f64()),
+            Some(0.85),
+            "Tool effectiveness score should be enriched"
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_GROUNDEDNESS)
+                .and_then(|v| v.as_f64()),
+            Some(0.88),
+            "Groundedness score should be enriched"
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_SAFETY)
+                .and_then(|v| v.as_f64()),
+            Some(0.95),
+            "Safety score should be enriched"
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_DURATION_MS)
+                .and_then(|v| v.as_f64()),
+            Some(15.3),
+            "Evaluation duration should be enriched"
+        );
+
+        // 10. Verify the nested usage object has all fields for frontend consumption
+        let usage_obj = span_attrs.get(O2Attributes::USAGE_DETAILS).unwrap();
+        assert!(usage_obj.is_object());
+        assert_eq!(usage_obj.get("input").and_then(|v| v.as_i64()), Some(1250));
+        assert_eq!(usage_obj.get("output").and_then(|v| v.as_i64()), Some(340));
+        assert_eq!(usage_obj.get("total").and_then(|v| v.as_i64()), Some(1590));
+    }
+
+    /// Integration test: span with NO evaluation data should NOT have evaluation fields
+    #[test]
+    fn test_integration_no_evaluation_when_absent() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4"));
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(100));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(50));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Should NOT have evaluation fields when no evaluation data was sent
+        assert!(
+            !span_attrs.contains_key(O2Attributes::EVALUATION_QUALITY),
+            "Should NOT add evaluation fields when no evaluation data present"
+        );
+        assert!(!span_attrs.contains_key(O2Attributes::EVALUATION_RELEVANCE));
+        assert!(!span_attrs.contains_key(O2Attributes::EVALUATION_COMPLETENESS));
+        assert!(!span_attrs.contains_key(O2Attributes::EVALUATION_GROUNDEDNESS));
+        assert!(!span_attrs.contains_key(O2Attributes::EVALUATION_SAFETY));
+
+        // But should still have usage/cost
+        assert!(span_attrs.contains_key(O2Attributes::USAGE_DETAILS));
+    }
 }
