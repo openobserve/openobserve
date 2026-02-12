@@ -709,7 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: (incidentDetails?.topology_context?.nodes?.length && triggers.length > 0)
+                  height: (sortedAlertsByTriggerCount?.length)
                     ? 'calc(35% - 5.6px)'
                     : 'calc(65% - 2px)',
                   minHeight: 0,
