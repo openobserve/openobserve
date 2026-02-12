@@ -2319,6 +2319,10 @@ export default defineComponent({
       if (isFirstBuildToggle.value) {
         isFirstBuildToggle.value = false;
       }
+
+      // Clear fields extraction loading flag since build page has finished initialization
+      // This prevents the cancel button from staying visible when no query is actually running
+      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
     };
 
     // Selected date time for BuildQueryPage
@@ -2446,11 +2450,13 @@ export default defineComponent({
         let logsPageQuery = "";
 
         // handle sql mode
-        if (!searchObj.meta.sqlMode) {
+        // Prioritize searchObj.data.query when it has content (e.g., synced from build page)
+        // This ensures queries from the build tab are preserved when switching to visualize
+        if (searchObj.meta.sqlMode || searchObj.data.query?.trim()) {
+          logsPageQuery = searchObj.data.query;
+        } else {
           const queryBuild = buildSearch();
           logsPageQuery = queryBuild?.query?.sql ?? "";
-        } else {
-          logsPageQuery = searchObj.data.query;
         }
 
         // return if query is empty and stream is not selected
