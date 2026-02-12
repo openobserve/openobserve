@@ -17,7 +17,7 @@ use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
-    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
         stream::FileKey,
@@ -29,7 +29,7 @@ use datafusion::{
     catalog::TableProvider,
     config::Dialect,
     datasource::{
-        file_format::parquet::ParquetFormat,
+        file_format::{FileFormat as DataFusionFileFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
     },
@@ -49,13 +49,16 @@ use datafusion::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::WorkGroup};
+use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
+use vortex_datafusion::VortexFormat;
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list, udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
-    datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
+    datafusion::table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
+    index::IndexCondition,
 };
 
 pub(crate) const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
@@ -320,11 +323,12 @@ pub async fn register_metrics_table(
         .build(session.target_partitions)
         .await?;
 
-    let table = TableBuilder::new()
+    let tables = TableBuilder::new()
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
-        .build(session.clone(), files, schema)
+        .build(session.clone(), files, schema.clone())
         .await?;
-    ctx.register_table(table_name, table)?;
+    let union_table = Arc::new(NewUnionTable::new(schema, tables));
+    ctx.register_table(table_name, union_table)?;
 
     Ok(ctx)
 }
@@ -383,7 +387,7 @@ impl TableBuilder {
         session: SearchSession,
         files: Vec<FileKey>,
         schema: Arc<Schema>,
-    ) -> Result<Arc<dyn TableProvider>> {
+    ) -> Result<Vec<Arc<dyn TableProvider>>> {
         let cfg = get_config();
         let target_partitions = if session.target_partitions == 0 {
             cfg.limit.cpu_num
@@ -404,11 +408,76 @@ impl TableBuilder {
         )
         .await?;
 
-        // Configure listing options
-        let file_format = ParquetFormat::default();
-        let mut listing_options = ListingOptions::new(Arc::new(file_format))
+        // Group files by format
+        let mut parquet_files = Vec::new();
+        let mut vortex_files = Vec::new();
+
+        for file in files {
+            match FileFormat::from_extension(&file.key) {
+                Some(FileFormat::Vortex) => vortex_files.push(file),
+                _ => parquet_files.push(file), // Default to parquet
+            }
+        }
+
+        log::info!(
+            "[trace_id: {}] parquet_files numbers: {}, vortex_files numbers: {}",
+            session.id,
+            parquet_files.len(),
+            vortex_files.len()
+        );
+
+        // Build table providers for each format
+        let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
+
+        if !parquet_files.is_empty() {
+            let table = self
+                .build_table_for_format(
+                    session.clone(),
+                    parquet_files,
+                    schema.clone(),
+                    FileFormat::Parquet,
+                    target_partitions,
+                )
+                .await?;
+            tables.push(table);
+        }
+
+        if !vortex_files.is_empty() {
+            let table = self
+                .build_table_for_format(
+                    session.clone(),
+                    vortex_files,
+                    schema.clone(),
+                    FileFormat::Vortex,
+                    target_partitions,
+                )
+                .await?;
+            tables.push(table);
+        }
+
+        Ok(tables)
+    }
+
+    async fn build_table_for_format(
+        &self,
+        session: SearchSession,
+        files: Vec<FileKey>,
+        schema: Arc<Schema>,
+        format: FileFormat,
+        target_partitions: usize,
+    ) -> Result<Arc<dyn TableProvider>> {
+        // Configure listing options with the appropriate file format
+        let file_format: Arc<dyn DataFusionFileFormat> = match format {
+            FileFormat::Parquet => Arc::new(ParquetFormat::default()),
+            FileFormat::Vortex => {
+                let vortex_session = VortexSession::default().with_tokio();
+                Arc::new(VortexFormat::new(vortex_session))
+            }
+        };
+
+        let mut listing_options = ListingOptions::new(file_format)
             .with_target_partitions(target_partitions)
-            .with_collect_stat(true); // current is default to true
+            .with_collect_stat(true);
 
         if self.sorted_by_time {
             // specify sort columns for parquet file
@@ -417,17 +486,17 @@ impl TableBuilder {
         }
 
         let schema_key = schema.hash_key();
-        let prefix = if session.storage_type == StorageType::Memory {
-            file_list::set(&session.id, &schema_key, files).await;
-            format!("memory:///{}/schema={}/", session.id, schema_key)
-        } else if session.storage_type == StorageType::Wal {
-            file_list::set(&session.id, &schema_key, files).await;
-            format!("wal:///{}/schema={}/", session.id, schema_key)
-        } else {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported storage_type {:?}",
-                session.storage_type,
-            )));
+        let format = format.extension();
+        let trace_id = &session.id;
+        let prefix = match session.storage_type {
+            StorageType::Memory => {
+                file_list::set(trace_id, &schema_key, format, files).await;
+                format!("memory:///{trace_id}/schema={schema_key}/format={format}/",)
+            }
+            StorageType::Wal => {
+                file_list::set(trace_id, &schema_key, format, files).await;
+                format!("wal:///{trace_id}/schema={schema_key}/format={format}/",)
+            }
         };
         let prefix = match ListingTableUrl::parse(prefix) {
             Ok(url) => url,
@@ -465,12 +534,12 @@ impl TableBuilder {
         let mut table = ListingTableAdapter::try_new(
             config,
             session.id.clone(),
-            self.index_condition,
-            self.fst_fields,
+            self.index_condition.clone(),
+            self.fst_fields.clone(),
             self.timestamp_filter,
         )?;
         if self.file_stat_cache.is_some() {
-            table = table.with_cache(self.file_stat_cache);
+            table = table.with_cache(self.file_stat_cache.clone());
         }
         Ok(Arc::new(table))
     }

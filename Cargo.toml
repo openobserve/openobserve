@@ -100,6 +100,9 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
+vortex.workspace = true
+vortex-datafusion.workspace = true
+vortex-btrblocks.workspace = true
 env_logger.workspace = true
 faststr.workspace = true
 flate2.workspace = true
@@ -306,10 +309,10 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "52"
-datafusion-proto = "52"
-datafusion-functions-aggregate-common = "52"
-datafusion-functions-json = "0.52.0"
+datafusion = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-json = { git = "https://github.com/openobserve/datafusion-functions-json", rev = "f53f08cddf467d3d492425f0e50f98f6a300d2f5" }
 expect-test = "1.4"
 arrow = { version = "57.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "57.2.0"
@@ -317,6 +320,11 @@ arrow-json = "57.2.0"
 arrow-schema = { version = "57.2.0", features = ["serde"] }
 parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
+vortex = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83", features = [
+    "tokio",
+] }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83" }
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83" }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.3"
 dotenvy = "0.15.7"
