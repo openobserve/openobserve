@@ -1417,7 +1417,7 @@
     "moveUp": "Sposta verso l'alto",
     "moveDown": "Sposta verso il basso",
     "panelTimeSettings": "Impostazioni dell'ora del pannello",
-    "allowPanelTime": "Consenti tempo a livello di pannello",
+    "panelTimeEnabled": "Consenti tempo a livello di pannello",
     "useGlobalTime": "Usa l'ora globale",
     "useIndividualTime": "Usa il tempo individuale",
     "panelTimeGlobalHint": "Il pannello terrà traccia del tempo del dashboard globale. Le modifiche all'ora globale aggiorneranno questo pannello.",

@@ -418,12 +418,12 @@ export function assertExportedDashboardContainsPanelTime(exportedData, expectedP
   expect(exportedData.panels).toBeDefined();
 
   for (const expectedConfig of expectedPanelTimeConfigs) {
-    const { panelId, allowPanelTime, panelTimeMode, panelTimeRange } = expectedConfig;
+    const { panelId, panelTimeEnabled, panelTimeMode, panelTimeRange } = expectedConfig;
 
     const panel = exportedData.panels.find(p => p.id === panelId);
     expect(panel).toBeDefined();
 
-    if (allowPanelTime) {
+    if (panelTimeEnabled) {
       expect(panel.config.panel_time_enabled).toBe(true);
       expect(panel.config.panel_time_mode).toBe(panelTimeMode);
 

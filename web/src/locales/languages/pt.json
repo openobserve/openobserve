@@ -1417,7 +1417,7 @@
     "moveUp": "Mova-se para cima",
     "moveDown": "Mover para baixo",
     "panelTimeSettings": "Configurações de tempo do painel",
-    "allowPanelTime": "Permitir tempo no nível do painel",
+    "panelTimeEnabled": "Permitir tempo no nível do painel",
     "useGlobalTime": "Use a hora global",
     "useIndividualTime": "Use o tempo individual",
     "panelTimeGlobalHint": "O painel rastreará a hora global do painel. Alterações na hora global atualizarão esse painel.",

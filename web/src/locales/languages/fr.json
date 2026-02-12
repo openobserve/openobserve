@@ -1417,7 +1417,7 @@
     "moveUp": "Monter",
     "moveDown": "Déplacer vers le bas",
     "panelTimeSettings": "Réglages de l'heure du panneau",
-    "allowPanelTime": "Laisser passer du temps au niveau du panneau",
+    "panelTimeEnabled": "Laisser passer du temps au niveau du panneau",
     "useGlobalTime": "Utiliser l'heure mondiale",
     "useIndividualTime": "Utilisez le temps individuel",
     "panelTimeGlobalHint": "Le panneau suivra l'heure globale du tableau de bord. Les modifications apportées à l'heure mondiale mettront à jour ce panneau.",

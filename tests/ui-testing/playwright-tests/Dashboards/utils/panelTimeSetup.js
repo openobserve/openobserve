@@ -14,7 +14,7 @@ import { waitForDashboardPage, deleteDashboard } from './dashCreation.js';
  * @param {Object} config - Configuration object
  * @param {string} config.dashboardName - Dashboard name
  * @param {string} config.panelName - Panel name (optional, default: "Test Panel")
- * @param {boolean} config.allowPanelTime - Enable panel time (optional, default: true)
+ * @param {boolean} config.panelTimeEnabled - Enable panel time (optional, default: true)
  * @param {string} config.panelTimeMode - "global" or "individual" (optional, default: "individual")
  * @param {string} config.panelTimeRange - Time range for individual mode (optional, default: "1-h")
  * @param {string} config.stream - Stream name (optional, default: "e2e_automate")
@@ -25,7 +25,7 @@ export async function createDashboardWithPanelTime(page, pm, config) {
   const {
     dashboardName,
     panelName = 'Test Panel',
-    allowPanelTime = true,
+    panelTimeEnabled = true,
     panelTimeMode = 'individual',
     panelTimeRange = '1-h',
     stream = 'e2e_automate',
@@ -35,7 +35,7 @@ export async function createDashboardWithPanelTime(page, pm, config) {
   testLogger.info('Creating dashboard with panel time', {
     dashboardName,
     panelName,
-    allowPanelTime,
+    panelTimeEnabled,
     panelTimeMode,
     panelTimeRange
   });
@@ -55,7 +55,7 @@ export async function createDashboardWithPanelTime(page, pm, config) {
   // Add panel with panel time configuration
   const panelId = await addPanelWithPanelTime(page, pm, {
     panelName,
-    allowPanelTime,
+    panelTimeEnabled,
     panelTimeMode,
     panelTimeRange,
     stream,
@@ -77,14 +77,14 @@ export async function createDashboardWithPanelTime(page, pm, config) {
 export async function addPanelWithPanelTime(page, pm, config) {
   const {
     panelName = 'Test Panel',
-    allowPanelTime = true,
+    panelTimeEnabled = true,
     panelTimeMode = 'individual',
     panelTimeRange = '1-h',
     stream = 'e2e_automate',
     streamType = 'logs'
   } = config;
 
-  testLogger.info('Adding panel with panel time', { panelName, allowPanelTime, panelTimeMode });
+  testLogger.info('Adding panel with panel time', { panelName, panelTimeEnabled, panelTimeMode });
 
   // Click add panel button - handle both cases (no panels vs existing panels)
   const noPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
@@ -119,7 +119,7 @@ export async function addPanelWithPanelTime(page, pm, config) {
   await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 
   // Configure panel time if enabled
-  if (allowPanelTime) {
+  if (panelTimeEnabled) {
     // Open config panel sidebar
     await pm.dashboardPanelConfigs.openConfigPanel();
 
@@ -456,12 +456,12 @@ export async function cleanupDashboard(page, pm, dashboardName) {
  * Verify panel time configuration in panel config
  * @param {Object} page - Playwright page object
  * @param {Object} expectedConfig - Expected configuration
- * @param {boolean} expectedConfig.allowPanelTime - Should panel time be enabled
+ * @param {boolean} expectedConfig.panelTimeEnabled - Should panel time be enabled
  * @param {string} expectedConfig.panelTimeMode - Expected mode ("global" or "individual")
  * @param {string} expectedConfig.panelTimeRange - Expected time range (for individual mode)
  */
 export async function verifyPanelTimeConfig(page, expectedConfig) {
-  const { allowPanelTime, panelTimeMode, panelTimeRange } = expectedConfig;
+  const { panelTimeEnabled, panelTimeMode, panelTimeRange } = expectedConfig;
 
   testLogger.info('Verifying panel time config', expectedConfig);
 
@@ -469,7 +469,7 @@ export async function verifyPanelTimeConfig(page, expectedConfig) {
   const toggleLocator = page.locator('[data-test="dashboard-config-allow-panel-time"]');
   const isChecked = await toggleLocator.getAttribute('aria-checked');
 
-  if (allowPanelTime) {
+  if (panelTimeEnabled) {
     expect(isChecked).toBe('true');
 
     // Verify mode

@@ -37,7 +37,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -81,8 +81,8 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_A_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, allowPanelTime: true, panelTimeMode: "individual", panelTimeRange: "6-d" }
+        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
+        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" }
       ]
     });
     await pm.dashboardPanelTime.clickGlobalRefresh();
@@ -145,7 +145,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     for (let i = 0; i < 5; i++) {
       panels.push({
         panelName: `Panel_${i}_${timestamp}`,
-        allowPanelTime: true,
+        panelTimeEnabled: true,
         panelTimeMode: "individual",
         panelTimeRange: i % 2 === 0 ? "1-h" : "6-d"
       });
@@ -201,7 +201,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     // Panel A: config "1h"
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_A_${timestamp}`,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -209,7 +209,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     // Panel B: no panel time (uses global)
     const panelBId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_B_${timestamp}`,
-      allowPanelTime: false
+      panelTimeEnabled: false
     });
 
     // Step 2: Load without URL params
@@ -248,14 +248,14 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     // Panel A: "Use global" mode
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_A_${timestamp}`,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "global"
     });
 
     // Panel B: "Use individual" mode with config "1h"
     const panelBId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_B_${timestamp}`,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });

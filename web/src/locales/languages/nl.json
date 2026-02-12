@@ -1417,7 +1417,7 @@
     "moveUp": "Ga omhoog",
     "moveDown": "Naar beneden gaan",
     "panelTimeSettings": "Instellingen voor paneeltijd",
-    "allowPanelTime": "Tijd op paneelniveau toestaan",
+    "panelTimeEnabled": "Tijd op paneelniveau toestaan",
     "useGlobalTime": "Gebruik wereldwijde tijd",
     "useIndividualTime": "Gebruik individuele tijd",
     "panelTimeGlobalHint": "Het paneel houdt de wereldwijde dashboardtijd bij. Wijzigingen in de globale tijd zullen dit paneel updaten.",

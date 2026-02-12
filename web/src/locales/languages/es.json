@@ -1417,7 +1417,7 @@
     "moveUp": "Muévete hacia arriba",
     "moveDown": "Muévete hacia abajo",
     "panelTimeSettings": "Configuración de tiempo del panel",
-    "allowPanelTime": "Permitir tiempo a nivel de panel",
+    "panelTimeEnabled": "Permitir tiempo a nivel de panel",
     "useGlobalTime": "Usa la hora global",
     "useIndividualTime": "Usa el tiempo individual",
     "panelTimeGlobalHint": "El panel realizará un seguimiento del tiempo global del panel de control. Los cambios en la hora global actualizarán este panel.",

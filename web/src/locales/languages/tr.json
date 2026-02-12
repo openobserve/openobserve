@@ -1417,7 +1417,7 @@
     "moveUp": "Yukarı hareket et",
     "moveDown": "Aşağı hareket et",
     "panelTimeSettings": "Panel Zaman Ayarları",
-    "allowPanelTime": "Panel seviyesi süresine izin ver",
+    "panelTimeEnabled": "Panel seviyesi süresine izin ver",
     "useGlobalTime": "Küresel zamanı kullan",
     "useIndividualTime": "Bireysel zaman kullanın",
     "panelTimeGlobalHint": "Panel, küresel gösterge paneli zamanını izleyecektir. Genel saatteki değişiklikler bu paneli güncelleyecektir.",

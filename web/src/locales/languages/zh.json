@@ -1417,7 +1417,7 @@
     "moveUp": "向上移动",
     "moveDown": "向下移动",
     "panelTimeSettings": "小组讨论时间设置",
-    "allowPanelTime": "允许面板关卡时间",
+    "panelTimeEnabled": "允许面板关卡时间",
     "useGlobalTime": "使用全球时间",
     "useIndividualTime": "使用个人时间",
     "panelTimeGlobalHint": "面板将跟踪全球仪表板时间。对全球时间的更改将更新此面板。",
