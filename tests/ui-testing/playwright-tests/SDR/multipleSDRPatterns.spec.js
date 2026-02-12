@@ -67,6 +67,29 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
   }
 }
 
+// Helper: fetch with retry for transient 502/proxy errors in beforeAll/afterAll
+async function fetchWithRetry(url, options, label, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.status >= 502 && res.status <= 504 && attempt < maxRetries) {
+        const body = await res.text();
+        testLogger.warn(`${label}: ${res.status} on attempt ${attempt}/${maxRetries}: ${body.substring(0, 100)}`);
+        await new Promise(r => setTimeout(r, attempt * 3000));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      if (attempt < maxRetries) {
+        testLogger.warn(`${label}: network error on attempt ${attempt}/${maxRetries}: ${err.message}`);
+        await new Promise(r => setTimeout(r, attempt * 3000));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -110,29 +133,6 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     testLogger.info(`=== SETUP (beforeAll): Creating 4 patterns via API, testRunId: ${testRunId} ===`);
     const { baseUrl, org, headers } = getApiConfig();
     const allPatternsToCreate = [...queryTimePatterns, ...ingestionTimePatterns];
-
-    // Helper: fetch with retry for transient 502/proxy errors
-    async function fetchWithRetry(url, options, label, maxRetries = 3) {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          const res = await fetch(url, options);
-          if (res.status >= 502 && res.status <= 504 && attempt < maxRetries) {
-            const body = await res.text();
-            testLogger.warn(`${label}: ${res.status} on attempt ${attempt}/${maxRetries}: ${body.substring(0, 100)}`);
-            await new Promise(r => setTimeout(r, attempt * 3000));
-            continue;
-          }
-          return res;
-        } catch (err) {
-          if (attempt < maxRetries) {
-            testLogger.warn(`${label}: network error on attempt ${attempt}/${maxRetries}: ${err.message}`);
-            await new Promise(r => setTimeout(r, attempt * 3000));
-            continue;
-          }
-          throw err;
-        }
-      }
-    }
 
     for (const patternDef of allPatternsToCreate) {
       const res = await fetchWithRetry(
