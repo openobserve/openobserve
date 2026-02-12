@@ -348,6 +348,7 @@ impl EvaluationAttributes {
     pub const EVALUATOR_VERSION: &'static str = "llm.evaluator.version";
     pub const EVALUATOR_TYPE: &'static str = "llm.evaluator.type";
 
+
     // Design-doc specified fields (alternative attribute names)
     pub const EVAL_RELEVANCE: &'static str = "evaluation_relevance";
     pub const EVAL_COMPLETENESS: &'static str = "evaluation_completeness";
