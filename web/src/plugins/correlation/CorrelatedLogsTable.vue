@@ -178,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @addSearchTerm="handleAddSearchTerm"
           @addFieldToTable="handleAddFieldToTable"
           @closeColumn="handleCloseColumn"
+          @update:columnOrder="handleColumnOrderChange"
           @expandRow="handleExpandRow"
           @view-trace="handleViewTrace"
           @show-correlation="handleNestedCorrelation"
@@ -271,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("correlation.logs.noDataDetails") }}
           </p>
           <q-btn
+            v-if="!props.hideResetFiltersButton"
             class="o2-secondary-button"
             :label="t('correlation.logs.resetFilters')"
             outline
@@ -349,6 +351,8 @@ const selectedFields = ref<any[]>([]);
 const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+let isSaving = false; // Prevent recursive saves
+let isUpdatingFromTable = false; // Prevent recursive updates from table
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -395,7 +399,9 @@ onMounted(() => {
 watch(
   visibleColumns,
   () => {
-    saveColumnState();
+    if (!isSaving) {
+      saveColumnState();
+    }
   },
   { deep: true }
 );
@@ -403,7 +409,9 @@ watch(
 watch(
   columnOrder,
   () => {
-    saveColumnState();
+    if (!isSaving) {
+      saveColumnState();
+    }
   },
   { deep: true }
 );
@@ -901,7 +909,54 @@ const toggleSelectAll = () => {
   }
 };
 
-// Handle drag start for column reordering
+// Handle column order change from TenstackTable drag-and-drop
+const handleColumnOrderChange = (newOrder: string[]) => {
+  // Prevent recursive calls
+  if (isUpdatingFromTable) {
+    console.log("[CorrelatedLogsTable] Already updating from table, skipping");
+    return;
+  }
+
+  console.log("=== COLUMN ORDER CHANGED FROM TABLE ===");
+  console.log("[CorrelatedLogsTable] New order from table:", newOrder);
+  console.log("[CorrelatedLogsTable] Current columnOrder:", columnOrder.value);
+
+  // Check if order actually changed to prevent recursive updates
+  const currentOrder = JSON.stringify(columnOrder.value);
+  const newOrderStr = JSON.stringify(newOrder);
+
+  if (currentOrder === newOrderStr) {
+    console.log("[CorrelatedLogsTable] Order unchanged, skipping update");
+    return;
+  }
+
+  console.log("[CorrelatedLogsTable] Order changed, updating...");
+
+  // Set flags to prevent recursive updates
+  isUpdatingFromTable = true;
+  isSaving = true;
+
+  try {
+    // Update columnOrder to match the new order from the table
+    columnOrder.value = [...newOrder];
+
+    console.log("[CorrelatedLogsTable] Updated columnOrder:", columnOrder.value);
+
+    // Manually save
+    saveColumnState();
+
+    console.log("=== COLUMN ORDER CHANGE END ===");
+  } finally {
+    // Always reset flags even if error occurs
+    isSaving = false;
+    // Use nextTick to ensure all reactive updates complete before allowing new updates
+    setTimeout(() => {
+      isUpdatingFromTable = false;
+    }, 100);
+  }
+};
+
+// Handle drag start for column reordering (dropdown)
 const handleDragStart = (event: DragEvent, index: number) => {
   draggedIndex.value = index;
   if (event.dataTransfer) {

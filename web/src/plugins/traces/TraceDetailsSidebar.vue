@@ -675,6 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hide-view-related-button="true"
         :hide-search-term-actions="false"
         :hide-dimension-filters="true"
+        :hide-reset-filters-button="true"
       />
       <!-- Loading/Empty state when no data -->
       <div
@@ -1449,10 +1450,12 @@ export default defineComponent({
           // the correct field names for the log stream (e.g., k8s_namespace_name)
           // instead of semantic IDs (k8s-namespace) or trace field names
           // (service_k8s_namespace_name). Same fix as 9127b6172 for incidents.
-          const logFilters = correlationData.related_streams.logs?.[0]?.filters || {};
-          const actualMatchedDimensions = Object.keys(logFilters).length > 0
-            ? logFilters
-            : correlationData.matched_dimensions;
+          const logFilters =
+            correlationData.related_streams.logs?.[0]?.filters || {};
+          const actualMatchedDimensions =
+            Object.keys(logFilters).length > 0
+              ? logFilters
+              : correlationData.matched_dimensions;
 
           correlationProps.value = {
             serviceName: correlationData.service_name,
@@ -1463,8 +1466,8 @@ export default defineComponent({
             traceStreams: correlationData.related_streams.traces,
             sourceStream: props.streamName,
             sourceType: "traces",
-            // Use log stream filters as availableDimensions for field name resolution
-            availableDimensions: logFilters,
+            // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
+            availableDimensions: { ...logFilters, ...context.fields },
             ftsFields: [],
             timeRange: {
               startTime: spanStartUs - bufferUs,

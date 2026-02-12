@@ -1,4 +1,4 @@
-import { toZonedTime, format } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
@@ -234,8 +234,7 @@ export const convertServiceGraphToTree = (
   const globalVisited = new Set<string>();
 
   // Helper to build tree recursively
-  // incomingEdge: the edge that led to this node (for direction-aware metrics)
-  const buildTree = (nodeId: string, visited = new Set<string>(), incomingEdge: any = null): any => {
+  const buildTree = (nodeId: string, visited = new Set<string>()): any => {
     if (visited.has(nodeId)) return null; // Prevent cycles
     visited.add(nodeId);
     globalVisited.add(nodeId);
@@ -245,37 +244,14 @@ export const convertServiceGraphToTree = (
 
     const outgoingEdges = edgesMap.get(nodeId) || [];
     const children = outgoingEdges
-      .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
+      .map((edge: any) => buildTree(edge.to, new Set(visited)))
       .filter((child: any) => child !== null);
 
-    // Simple: show only incoming requests from parent in this tree path
-    let totalRequests: number;
-    let failedRequests: number;
-    let errorRate: number;
-
-    if (incomingEdge) {
-      // Non-root: show incoming from parent
-      totalRequests = incomingEdge.total_requests ?? 0;
-      failedRequests = incomingEdge.failed_requests ?? 0;
-      errorRate = incomingEdge.error_rate ?? 0;
-    } else {
-      // Root: sum of outgoing edges
-      totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
-      failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
-
-      // If no edges, use node's own metrics
-      if (totalRequests === 0 && node.requests !== undefined) {
-        totalRequests = node.requests;
-        failedRequests = node.errors ?? 0;
-      }
-
-      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
-
-      // If still no data, try node.error_rate directly
-      if (errorRate === 0 && node.error_rate !== undefined) {
-        errorRate = node.error_rate;
-      }
-    }
+    // Use node's own request count from backend (authoritative source)
+    // This ensures consistency with the graph view
+    const totalRequests = node.requests ?? 0;
+    const failedRequests = node.errors ?? 0;
+    const errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
 
     // Calculate connections count
     const incomingEdges = incomingEdgesMap.get(nodeId) || [];
@@ -463,7 +439,7 @@ export const convertServiceGraphToTree = (
             rotate: 0, // Keep text horizontal, no rotation
           },
         },
-        expandAndCollapse: true,
+        expandAndCollapse: false, // Disable collapse on click - clicking only selects the node
         animationDuration: 550,
         animationDurationUpdate: 750,
       },
@@ -584,36 +560,28 @@ export const convertServiceGraphToNetwork = (
     edgeCount: graphData.edges?.length || 0,
     layoutType: normalizedLayoutType
   });
-  // Build node metrics map (requests, errors, connections)
+  // Build node metrics map using each node's own data from backend (authoritative source)
   const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
 
-  // Count connections for each node
-  const connectionCount = new Map<string, number>();
+  // Initialize metrics for all nodes using their own backend data
   graphData.nodes.forEach((node: any) => {
-    connectionCount.set(node.id, 0);
-  });
-
-  graphData.edges.forEach((edge: any) => {
-    connectionCount.set(edge.from, (connectionCount.get(edge.from) || 0) + 1);
-    connectionCount.set(edge.to, (connectionCount.get(edge.to) || 0) + 1);
-
-    // Update metrics for both source and target nodes
-    [edge.from, edge.to].forEach((nodeId: string) => {
-      if (!nodeMetrics.has(nodeId)) {
-        nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: 0 });
-      }
-      const metrics = nodeMetrics.get(nodeId)!;
-      metrics.requests += edge.total_requests || 0;
-      metrics.errors += edge.failed_requests || 0;
+    nodeMetrics.set(node.id, {
+      requests: node.requests || 0,
+      errors: node.errors || 0,
+      connections: 0, // Will be updated below
     });
   });
 
-  // Update connection counts in metrics
-  connectionCount.forEach((count, nodeId) => {
-    if (nodeMetrics.has(nodeId)) {
-      nodeMetrics.get(nodeId)!.connections = count;
-    } else {
-      nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: count });
+  // Count connections for each node
+  graphData.edges.forEach((edge: any) => {
+    const fromMetrics = nodeMetrics.get(edge.from);
+    const toMetrics = nodeMetrics.get(edge.to);
+
+    if (fromMetrics) {
+      fromMetrics.connections += 1;
+    }
+    if (toMetrics) {
+      toMetrics.connections += 1;
     }
   });
 
@@ -627,7 +595,7 @@ export const convertServiceGraphToNetwork = (
   });
 
   const nodes = validNodes.map((node: any) => {
-    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0 };
+    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0, connections: 0 };
     const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
     // Border color based on error rate (theme-aware)
@@ -709,7 +677,7 @@ export const convertServiceGraphToNetwork = (
           Requests: ${formatNumber(metrics.requests)}<br/>
           Errors: ${formatNumber(metrics.errors)}<br/>
           Error Rate: ${errorRate.toFixed(2)}%<br/>
-          Connections: ${connectionCount.get(node.id) || 0}
+          Connections: ${metrics.connections}
         `,
       },
     };

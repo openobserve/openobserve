@@ -863,6 +863,7 @@ export const usePagination = () => {
     getPaginatedData,
     refreshPartitionPagination,
     refreshJobPagination,
+    sortResponse,
   };
 };
 
