@@ -34,7 +34,8 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         view_name: view.view_name.clone(),
     };
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
-    let val = json::to_vec(&view).unwrap();
+    let val = json::to_vec(&view)
+        .map_err(|e| Error::Message(format!("Failed to serialize saved view: {e}")))?;
     if val.is_empty() {
         return Err(Error::Message("Saved views value is empty".to_string()));
     }
@@ -57,7 +58,8 @@ pub async fn update_view(
         },
         Err(e) => return Err(e),
     };
-    let val = json::to_vec(&updated_view).unwrap();
+    let val = json::to_vec(&updated_view)
+        .map_err(|e| Error::Message(format!("Failed to serialize saved view: {e}")))?;
     if val.is_empty() {
         return Err(Error::Message("Saved views value is empty".to_string()));
     }
@@ -69,7 +71,8 @@ pub async fn update_view(
 pub async fn get_view(org_id: &str, view_id: &str) -> Result<View, Error> {
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     let ret = db::get(&key).await?;
-    let view = json::from_slice(&ret).unwrap();
+    let view = json::from_slice(&ret)
+        .map_err(|e| Error::Message(format!("Failed to deserialize saved view: {e}")))?;
     Ok(view)
 }
 
@@ -80,7 +83,7 @@ pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error
     let ret = db::list_values(&key).await?;
     let mut views: Vec<ViewWithoutData> = ret
         .iter()
-        .map(|view| json::from_slice(view).unwrap())
+        .filter_map(|view| json::from_slice(view).ok())
         .collect();
     views.sort_by_key(|v| v.view_name.clone());
 
