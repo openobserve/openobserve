@@ -584,7 +584,6 @@ async fn get_cpu_and_mem_limit(
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
     use config::get_config;
 
@@ -596,24 +595,6 @@ mod tests {
             Field::new("field1", DataType::Utf8, true),
             Field::new("field2", DataType::Int64, true),
         ]))
-    }
-
-    #[allow(dead_code)]
-    fn create_test_record_batch() -> RecordBatch {
-        let schema = create_test_schema();
-        let timestamp_array = Int64Array::from(vec![1000, 2000, 3000]);
-        let field1_array = StringArray::from(vec![Some("a"), Some("b"), Some("c")]);
-        let field2_array = Int64Array::from(vec![Some(10), Some(20), Some(30)]);
-
-        RecordBatch::try_new(
-            schema,
-            vec![
-                Arc::new(timestamp_array),
-                Arc::new(field1_array),
-                Arc::new(field2_array),
-            ],
-        )
-        .unwrap()
     }
 
     #[tokio::test]
