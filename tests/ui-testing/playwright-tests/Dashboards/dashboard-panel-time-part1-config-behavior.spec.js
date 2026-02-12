@@ -248,7 +248,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardCreate.createDashboard(dashboardName);
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
-    // Panel A: allow_panel_time: true with individual time "Last 1h"
+    // Panel A: panel_time_enabled: true with individual time "Last 1h"
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_A_${timestamp}`,
       allowPanelTime: true,
@@ -256,7 +256,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       panelTimeRange: "1-h"
     });
 
-    // Panel B: allow_panel_time: false
+    // Panel B: panel_time_enabled: false
     const panelBId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_B_${timestamp}`,
       allowPanelTime: false

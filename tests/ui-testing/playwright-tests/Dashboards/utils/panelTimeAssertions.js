@@ -424,7 +424,7 @@ export function assertExportedDashboardContainsPanelTime(exportedData, expectedP
     expect(panel).toBeDefined();
 
     if (allowPanelTime) {
-      expect(panel.config.allow_panel_time).toBe(true);
+      expect(panel.config.panel_time_enabled).toBe(true);
       expect(panel.config.panel_time_mode).toBe(panelTimeMode);
 
       if (panelTimeMode === 'individual') {

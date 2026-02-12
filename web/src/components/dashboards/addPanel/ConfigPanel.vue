@@ -101,18 +101,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Toggle to enable panel-level time -->
       <q-toggle
-      v-model="allowPanelTime"
+        v-model="allowPanelTime"
         :label="t('dashboard.allowPanelTime')"
         data-test="dashboard-config-allow-panel-time"
         @update:model-value="onTogglePanelTime"
-      class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
-      size="lg"
-      :class="
-        store.state.theme === 'dark'
-          ? 'o2-toggle-button-lg-dark'
-          : 'o2-toggle-button-lg-light'
-      "
-    />
+        class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+        size="lg"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-lg-dark'
+            : 'o2-toggle-button-lg-light'
+        "
+      />
 
       <!-- Show mode selection when enabled -->
       <div v-if="allowPanelTime" class="q-mt-sm q-ml-lg">
@@ -407,7 +407,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type == 'table' &&
         dashboardPanelData.data.config.table_pagination
       "
-      v-model.number="dashboardPanelData.data.config.table_pagination_rows_per_page"
+      v-model.number="
+        dashboardPanelData.data.config.table_pagination_rows_per_page
+      "
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
@@ -423,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
-          {{ t('dashboard.rowsPerPage') }}
+          {{ t("dashboard.rowsPerPage") }}
           <div>
             <q-icon
               class="q-ml-xs"
@@ -437,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="bottom middle"
               max-width="250px"
             >
-              {{ t('dashboard.rowsPerPageTooltip') }}
+              {{ t("dashboard.rowsPerPageTooltip") }}
             </q-tooltip>
           </div>
         </div>
@@ -899,7 +901,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
       <div
         v-if="
-          promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'
+          promqlMode &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'
         "
         class="q-py-md showLabelOnTop"
         style="font-weight: 600"
@@ -1099,7 +1103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <CommonAutoComplete
-        v-if="promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'"
+        v-if="
+          promqlMode &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'
+        "
         :label="t('common.legend')"
         v-model="
           dashboardPanelData.data.queries[
@@ -1608,12 +1616,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-rotate"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 4px">
               <span>Label Rotate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer;"
+                style="cursor: pointer"
                 data-test="dashboard-config-axis-label-rotate-info"
               >
                 <q-tooltip
@@ -1623,9 +1631,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bg-grey-8"
                 >
                   <div>
-                    Rotate the x-axis label text by a chosen angle (in degrees) to improve readability when labels are long or crowded.
+                    Rotate the x-axis label text by a chosen angle (in degrees)
+                    to improve readability when labels are long or crowded.
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for
+                    time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -1633,7 +1643,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-input
-          v-model.number="dashboardPanelData.data.config.axis_label_truncate_width"
+          v-model.number="
+            dashboardPanelData.data.config.axis_label_truncate_width
+          "
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1652,12 +1664,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-truncate-width"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 4px">
               <span>Label Truncate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer;"
+                style="cursor: pointer"
                 data-test="dashboard-config-axis-label-truncate-info"
               >
                 <q-tooltip
@@ -1669,7 +1681,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     Truncate x-axis labels to the specified width (in pixels).
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for
+                    time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -2604,23 +2617,22 @@ export default defineComponent({
 
     // Panel time configuration
     const allowPanelTime = ref(
-      !!dashboardPanelData.data.config?.allow_panel_time
+      !!dashboardPanelData.data.config?.panel_time_enabled,
     );
 
     // Panel time mode: "global" or "individual"
     const panelTimeMode = ref(
-      dashboardPanelData.data.config?.panel_time_mode || 'global'
+      dashboardPanelData.data.config?.panel_time_mode || "global",
     );
-
 
     // Toggle panel time on/off
     const onTogglePanelTime = (enabled: boolean) => {
-      dashboardPanelData.data.config.allow_panel_time = enabled;
+      dashboardPanelData.data.config.panel_time_enabled = enabled;
 
       if (enabled) {
         // Default to global mode
-        dashboardPanelData.data.config.panel_time_mode = 'global';
-        panelTimeMode.value = 'global';
+        dashboardPanelData.data.config.panel_time_mode = "global";
+        panelTimeMode.value = "global";
       } else {
         // Clear panel time settings
         dashboardPanelData.data.config.panel_time_mode = undefined;
@@ -2632,19 +2644,19 @@ export default defineComponent({
     const onPanelTimeModeChange = (mode: string) => {
       dashboardPanelData.data.config.panel_time_mode = mode;
 
-      if (mode === 'individual') {
+      if (mode === "individual") {
         // INDIVIDUAL MODE: Initialize panel_time_range if not set
         // User will set the actual time using the date time picker
         if (!dashboardPanelData.data.config.panel_time_range) {
           dashboardPanelData.data.config.panel_time_range = {
-            type: 'relative',
-            relativeTimePeriod: '15m',
+            type: "relative",
+            relativeTimePeriod: "15m",
           };
         }
 
         // Initialize panel time picker value using helper function
         panelTimeValue.value = convertPanelTimeRangeToPicker(
-          dashboardPanelData.data.config.panel_time_range
+          dashboardPanelData.data.config.panel_time_range,
         );
       } else {
         // GLOBAL MODE: DON'T save panel_time_range
@@ -2662,17 +2674,22 @@ export default defineComponent({
     // Initialize panel time picker value if panel already has individual time configured
     if (shouldUsePanelTime(dashboardPanelData.data)) {
       panelTimeValue.value = convertPanelTimeRangeToPicker(
-        dashboardPanelData.data.config.panel_time_range
+        dashboardPanelData.data.config.panel_time_range,
       );
     }
 
     // Watch for changes to panel time picker and sync to config
-    watch(panelTimeValue, (newValue) => {
-      if (newValue && panelTimeMode.value === 'individual') {
-        // Store panel time range using utility function
-        dashboardPanelData.data.config.panel_time_range = buildPanelTimeRange(newValue);
-      }
-    }, { deep: true });
+    watch(
+      panelTimeValue,
+      (newValue) => {
+        if (newValue && panelTimeMode.value === "individual") {
+          // Store panel time range using utility function
+          dashboardPanelData.data.config.panel_time_range =
+            buildPanelTimeRange(newValue);
+        }
+      },
+      { deep: true },
+    );
 
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
@@ -2779,7 +2796,7 @@ export default defineComponent({
 // Ensure label icons are always interactive
 :deep(.q-field__label) {
   pointer-events: auto !important;
-  
+
   .q-icon {
     pointer-events: auto !important;
   }

@@ -444,7 +444,7 @@ pub struct PanelConfig {
     table_pagination_rows_per_page: Option<i64>,
     /// Enable panel-level time range
     #[serde(skip_serializing_if = "Option::is_none")]
-    allow_panel_time: Option<bool>,
+    panel_time_enabled: Option<bool>,
     /// Panel time mode: "global" or "individual"
     /// - "global": Panel tracks global dashboard time explicitly
     /// - "individual": Panel uses its own custom time range
