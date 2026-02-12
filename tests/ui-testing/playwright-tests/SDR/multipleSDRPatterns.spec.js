@@ -170,7 +170,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     // Step 1: List patterns to get their IDs (needed for both unlink and delete)
     let patternMap = {}; // name -> { id, description, pattern }
     try {
-      const listRes = await fetch(`${baseUrl}/api/${org}/re_patterns`, { headers });
+      const listRes = await fetchWithRetry(`${baseUrl}/api/${org}/re_patterns`, { headers }, 'List patterns');
       if (listRes.ok) {
         const listData = await listRes.json();
         const testPatternNames = new Set(allTestPatterns);
@@ -206,11 +206,11 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
 
     if (removeAssociations.length > 0) {
       try {
-        const updateRes = await fetch(`${baseUrl}/api/${org}/streams/${testStreamName}/settings?type=logs`, {
+        const updateRes = await fetchWithRetry(`${baseUrl}/api/${org}/streams/${testStreamName}/settings?type=logs`, {
           method: 'PUT',
           headers,
           body: JSON.stringify({ pattern_associations: { add: [], remove: removeAssociations } })
-        });
+        }, 'Unlink patterns');
         if (updateRes.ok) {
           testLogger.info(`Unlinked ${removeAssociations.length} patterns from stream via API`);
         } else {
@@ -225,9 +225,9 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     // Step 3: Delete patterns by ID (now that they're unlinked)
     for (const [name, info] of Object.entries(patternMap)) {
       try {
-        const delRes = await fetch(`${baseUrl}/api/${org}/re_patterns/${info.id}`, {
+        const delRes = await fetchWithRetry(`${baseUrl}/api/${org}/re_patterns/${info.id}`, {
           method: 'DELETE', headers
-        });
+        }, `Delete pattern ${name}`);
         if (delRes.ok) {
           testLogger.info(`Pattern ${name} deleted via API`);
         } else {
