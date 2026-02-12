@@ -63,7 +63,6 @@ pub struct EvaluatorInfo {
     pub evaluator_type: EvaluatorType,
 }
 
-
 /// Evaluation scores extracted from span attributes
 pub struct EvaluationScores {
     pub quality_score: Option<f64>,
