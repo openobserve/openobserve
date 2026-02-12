@@ -123,14 +123,6 @@ const getConfig = async () => {
             if (shouldIgnore) {
               return false; // Don't send this error
             }
-
-            // Ignore errors from specific URLs (e.g., browser extensions)
-            const errorSource = event.error?.source || "";
-            const ignoredSources = ["chrome-extension://", "moz-extension://"];
-
-            if (ignoredSources.some((source) => errorSource.includes(source))) {
-              return false;
-            }
           }
 
           // Allow all other events to be sent
@@ -169,16 +161,6 @@ const getConfig = async () => {
           if (
             options.env === "production" &&
             (logStatus === "debug" || log.level === "debug")
-          ) {
-            return false;
-          }
-
-          // Ignore logs from browser extensions
-          const logContext = log.context || {};
-          const logUrl = logContext.url || "";
-          if (
-            logUrl.includes("chrome-extension://") ||
-            logUrl.includes("moz-extension://")
           ) {
             return false;
           }
