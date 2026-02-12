@@ -166,6 +166,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-input>
                   </div>
                 </template>
+                <template #option="{ itemProps, opt, selected, toggleOption }">
+                  <q-item v-bind="itemProps">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="toggleOption(opt)"
+                        dense
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ opt }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
               </q-select>
               <q-btn
                 data-test="trace-details-view-logs-btn"
@@ -176,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('traces.backToLogs')
                     : t('traces.viewLogs')
                 "
+                :disable="!searchObj.data.traceDetails.selectedLogStreams.length"
                 padding="sm sm"
                 size="sm"
                 no-caps
@@ -1955,6 +1970,16 @@ export default defineComponent({
 
     const redirectToLogs = () => {
       if (!searchObj.data.traceDetails.selectedTrace) {
+        return;
+      }
+
+      // Check if at least one log stream is selected
+      if (!searchObj.data.traceDetails.selectedLogStreams.length) {
+        $q.notify({
+          type: "negative",
+          message: "Please select at least one log stream",
+          timeout: 2000,
+        });
         return;
       }
 
