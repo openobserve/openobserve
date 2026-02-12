@@ -465,24 +465,7 @@ async fn map_group_to_custom_role(
             UserRole::from_str(&dex_cfg.default_role).unwrap()
         };
 
-        // Extract orgs and their roles from custom roles (format: "org/role")
-        // Check if custom claim parsing was used by looking for roles with custom orgs
-        // If custom claim parsing is disabled, custom_roles come from LDAP groups and should use
-        // default org
-
-        // Use HashMap<String, Vec<String>> to support multiple roles per org
-        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
-            let mut map: std::collections::HashMap<String, Vec<String>> =
-                std::collections::HashMap::new();
-            for r in &custom_roles {
-                if let Some((org, role)) = r.split_once('/') {
-                    map.entry(org.to_string())
-                        .or_default()
-                        .push(role.to_string());
-                }
-            }
-            map
-        };
+        let custom_orgs = group_roles_by_org(&custom_roles);
 
         // Always create default org (system org)
         let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
@@ -620,20 +603,7 @@ async fn map_group_to_custom_role(
         }
         log::info!("group_to_custom_role: User exists in the database");
 
-        // Extract orgs and their roles from custom roles (format: "org/role")
-        // Use HashMap<String, Vec<String>> to support multiple roles per org
-        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
-            let mut map: std::collections::HashMap<String, Vec<String>> =
-                std::collections::HashMap::new();
-            for r in &custom_roles {
-                if let Some((org, role)) = r.split_once('/') {
-                    map.entry(org.to_string())
-                        .or_default()
-                        .push(role.to_string());
-                }
-            }
-            map
-        };
+        let custom_orgs = group_roles_by_org(&custom_roles);
 
         // Validate that orgs exist (do NOT auto-create for custom claim parsing)
         // Filter out non-existent orgs and log errors for them
@@ -764,6 +734,22 @@ async fn map_group_to_custom_role(
 fn format_role_name(org_id: &str, role: &str) -> String {
     let role = format_role_name_only(role);
     format!("{org_id}/{role}")
+}
+
+/// Groups custom roles by organization.
+/// Parses roles in "org/role" format into a map of org -> [role1, role2, ...].
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+fn group_roles_by_org(custom_roles: &[String]) -> std::collections::HashMap<String, Vec<String>> {
+    let mut map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for r in custom_roles {
+        if let Some((org, role)) = r.split_once('/') {
+            map.entry(org.to_string())
+                .or_default()
+                .push(role.to_string());
+        }
+    }
+    map
 }
 
 /// Splits a full name into (first_name, last_name).
