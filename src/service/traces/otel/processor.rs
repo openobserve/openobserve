@@ -294,48 +294,70 @@ impl OtelIngestionProcessor {
             span_attributes.insert(O2Attributes::TOOL_CALL_RESULT.to_string(), tresult);
         }
 
-        // Add evaluation scores if present
+        // Add evaluation scores and metadata if present
         if evaluation.has_any() {
-            if let Some(q) = evaluation.quality_score {
+            if let Some(q) = evaluation.scores.quality_score {
                 span_attributes
                     .insert(O2Attributes::EVALUATION_QUALITY.to_string(), json::json!(q));
             }
-            if let Some(r) = evaluation.relevance {
+            if let Some(r) = evaluation.scores.relevance {
                 span_attributes.insert(
                     O2Attributes::EVALUATION_RELEVANCE.to_string(),
                     json::json!(r),
                 );
             }
-            if let Some(c) = evaluation.completeness {
+            if let Some(c) = evaluation.scores.completeness {
                 span_attributes.insert(
                     O2Attributes::EVALUATION_COMPLETENESS.to_string(),
                     json::json!(c),
                 );
             }
-            if let Some(t) = evaluation.tool_effectiveness {
+            if let Some(t) = evaluation.scores.tool_effectiveness {
                 span_attributes.insert(
                     O2Attributes::EVALUATION_TOOL_EFFECTIVENESS.to_string(),
                     json::json!(t),
                 );
             }
-            if let Some(g) = evaluation.groundedness {
+            if let Some(g) = evaluation.scores.groundedness {
                 span_attributes.insert(
                     O2Attributes::EVALUATION_GROUNDEDNESS.to_string(),
                     json::json!(g),
                 );
             }
-            if let Some(s) = evaluation.safety {
+            if let Some(s) = evaluation.scores.safety {
                 span_attributes.insert(
                     O2Attributes::EVALUATION_SAFETY.to_string(),
                     json::json!(s),
                 );
             }
-            if let Some(d) = evaluation.duration_ms {
+            if let Some(d) = evaluation.scores.duration_ms {
                 span_attributes.insert(
                     O2Attributes::EVALUATION_DURATION_MS.to_string(),
                     json::json!(d),
                 );
             }
+            if let Some(ref commentary) = evaluation.commentary {
+                span_attributes.insert(
+                    O2Attributes::EVALUATION_COMMENTARY.to_string(),
+                    json::json!(commentary),
+                );
+            }
+            if let Some(ref name) = evaluation.evaluator.name {
+                span_attributes.insert(
+                    O2Attributes::EVALUATOR_NAME.to_string(),
+                    json::json!(name),
+                );
+            }
+            if let Some(ref version) = evaluation.evaluator.version {
+                span_attributes.insert(
+                    O2Attributes::EVALUATOR_VERSION.to_string(),
+                    json::json!(version),
+                );
+            }
+            span_attributes.insert(
+                O2Attributes::EVALUATOR_TYPE.to_string(),
+                json::json!(evaluation.evaluator.evaluator_type.as_str()),
+            );
         }
     }
 }
