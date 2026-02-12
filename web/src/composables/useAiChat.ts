@@ -203,7 +203,6 @@ const useAiChat = () => {
             body.trace_id = traceId;
         }
 
-
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
         };
