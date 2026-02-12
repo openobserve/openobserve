@@ -1701,28 +1701,8 @@ export default defineComponent({
       }));
       console.log("[Variable Config] Stream options:", streamOptions.length, "streams");
 
-      // Build combined list with section separators
-      const combined = [];
-
-      // Add variables section if there are any variables
-      if (variableOptions.length > 0) {
-        combined.push({
-          label: '── Variables ──',
-          value: null,
-          disable: true,
-        });
-        combined.push(...variableOptions);
-      }
-
-      // Add streams section if there are any streams
-      if (streamOptions.length > 0) {
-        combined.push({
-          label: '── Streams ──',
-          value: null,
-          disable: true,
-        });
-        combined.push(...streamOptions);
-      }
+      // Combine variables and streams into a single list
+      const combined = [...variableOptions, ...streamOptions];
 
       console.log("[Variable Config] Total stream options:", combined.length);
       return combined;
@@ -1746,28 +1726,8 @@ export default defineComponent({
       }));
       console.log("[Variable Config] Field options:", fieldOptions.length, "fields");
 
-      // Build combined list with section separators
-      const combined = [];
-
-      // Add variables section if there are any variables
-      if (variableOptions.length > 0) {
-        combined.push({
-          label: '── Variables ──',
-          value: null,
-          disable: true,
-        });
-        combined.push(...variableOptions);
-      }
-
-      // Add fields section if there are any fields
-      if (fieldOptions.length > 0) {
-        combined.push({
-          label: '── Fields ──',
-          value: null,
-          disable: true,
-        });
-        combined.push(...fieldOptions);
-      }
+      // Combine variables and fields into a single list
+      const combined = [...variableOptions, ...fieldOptions];
 
       console.log("[Variable Config] Total field options:", combined.length);
       return combined;
