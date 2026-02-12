@@ -287,7 +287,7 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete service account", "category": "users"}))
+        ("x-o2-mcp" = json!({"description": "Delete service account", "category": "users", "requires_confirmation": true}))
     )
 )]
 pub async fn delete(
