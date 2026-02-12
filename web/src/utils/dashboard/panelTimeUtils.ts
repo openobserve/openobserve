@@ -42,7 +42,7 @@ export interface PanelTimeRange {
  */
 export const getPanelTimeFromURL = (
   panelId: string,
-  query?: LocationQuery
+  query?: LocationQuery,
 ): PanelTimePickerValue | null => {
   if (!query) return null;
 
@@ -74,7 +74,7 @@ export const getPanelTimeFromURL = (
  * Convert panel time range config to date picker format
  */
 export const convertPanelTimeRangeToPicker = (
-  range: PanelTimeRange | null | undefined
+  range: PanelTimeRange | null | undefined,
 ): PanelTimePickerValue | null => {
   if (!range) return null;
 
@@ -97,7 +97,9 @@ export const convertPanelTimeRangeToPicker = (
 /**
  * Convert time object (with Date objects) to picker format
  */
-export const convertTimeObjToPickerFormat = (timeObj: any): PanelTimePickerValue | null => {
+export const convertTimeObjToPickerFormat = (
+  timeObj: any,
+): PanelTimePickerValue | null => {
   if (!timeObj || !timeObj.start_time || !timeObj.end_time) {
     return null;
   }
@@ -114,7 +116,7 @@ export const convertTimeObjToPickerFormat = (timeObj: any): PanelTimePickerValue
  * Convert global time object to picker format
  */
 export const convertGlobalTimeToPickerFormat = (
-  globalTime: any
+  globalTime: any,
 ): PanelTimePickerValue | null => {
   if (!globalTime || !globalTime.start_time || !globalTime.end_time) {
     return null;
@@ -132,7 +134,7 @@ export const convertGlobalTimeToPickerFormat = (
  * Build panel time range object from picker value
  */
 export const buildPanelTimeRange = (
-  pickerValue: PanelTimePickerValue
+  pickerValue: PanelTimePickerValue,
 ): PanelTimeRange => {
   const timeType = pickerValue.valueType || pickerValue.type;
 
@@ -156,7 +158,7 @@ export const buildPanelTimeRange = (
 export const hasPanelTime = (
   panel: any,
   panelId: string,
-  query?: LocationQuery
+  query?: LocationQuery,
 ): boolean => {
   return !!(
     panel?.config?.panel_time_range ||
@@ -170,7 +172,7 @@ export const hasPanelTime = (
  */
 export const shouldUsePanelTime = (panel: any): boolean => {
   return !!(
-    panel?.config?.allow_panel_time &&
+    panel?.config?.panel_time_enabled &&
     panel?.config?.panel_time_mode === "individual" &&
     panel?.config?.panel_time_range
   );
@@ -187,7 +189,7 @@ export const resolvePanelTimeValue = (
   panel: any,
   panelId: string,
   query?: LocationQuery,
-  currentTimeObj?: any
+  currentTimeObj?: any,
 ): PanelTimePickerValue | null => {
   // Priority 1: URL params
   if (query) {

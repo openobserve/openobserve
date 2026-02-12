@@ -11,6 +11,7 @@
 **⚠️ Documentation Updated to Match Actual Implementation**
 
 This document has been revised to reflect the **actual implemented behavior**:
+
 - **Removed:** Yellow refresh button indicator behavior (not implemented)
 - **Updated:** Apply button is the only way to apply time changes
 - **Clarified:** Auto-apply is disabled, user must explicitly click Apply
@@ -146,44 +147,51 @@ Based on team discussion, here are the finalized requirements:
 **Three States:**
 
 **State 1: Toggle OFF (Default)**
+
 - Panel uses global dashboard time
-- Backend: No panel time config saved (or `allow_panel_time: false`)
+- Backend: No panel time config saved (or `panel_time_enabled: false`)
 - Runtime: Uses `defaultDatetimeDuration` from dashboard config
 
 **State 2: Toggle ON + "Use global time"**
+
 - Panel explicitly configured to use global time
 - Backend saves:
-  - `allow_panel_time: true`
+  - `panel_time_enabled: true`
   - `panel_time_mode: "global"`
   - `panel_time_range: undefined` (NOT saved or null)
 - Runtime: Uses `defaultDatetimeDuration` from dashboard config
 - Useful for: Tracking explicit user choice (vs default), URL override handling
 
 **State 3: Toggle ON + "Use individual time"**
+
 - Panel uses custom time range
 - Backend saves:
-  - `allow_panel_time: true`
+  - `panel_time_enabled: true`
   - `panel_time_mode: "individual"`
   - `panel_time_range: {...}` (actual PanelTimeRange with time values)
 - Runtime: Uses `panel_time_range`, **ignores global time changes**
 
 **CRITICAL - Runtime Logic (Simple Check):**
+
 ```javascript
 // At runtime, DON'T mix global and panel time sources
 // Simple check based on panel_time_range existence:
 
-if (panel.config.panel_time_range !== undefined &&
-    panel.config.panel_time_range !== null) {
+if (
+  panel.config.panel_time_range !== undefined &&
+  panel.config.panel_time_range !== null
+) {
   // Panel has its own time → use it
-  timeRange = panel.config.panel_time_range
+  timeRange = panel.config.panel_time_range;
   // DON'T sync with global, DON'T look at defaultDatetimeDuration
 } else {
   // Panel doesn't have its own time → use global
-  timeRange = dashboard.defaultDatetimeDuration
+  timeRange = dashboard.defaultDatetimeDuration;
 }
 ```
 
 **Two Data Sources (Don't Confuse Them):**
+
 - **Global:** `dashboard.defaultDatetimeDuration` - for panels without `panel_time_range`
 - **Panel:** `panel.config.panel_time_range` - only for individual panels
 - **Rule:** If `panel_time_range` exists → use it, otherwise → use global
@@ -195,6 +203,7 @@ if (panel.config.panel_time_range !== undefined &&
 When "Use individual time" is selected, create a **NEW date time picker component** (same as "comparison against" picker) for setting panel-level time:
 
 **Behavior:**
+
 - When "Use individual time" radio button is selected:
   1. Display a NEW date time picker component (not reusing existing one)
   2. Use same DateTimePickerDashboard component as "comparison against" feature
@@ -204,6 +213,7 @@ When "Use individual time" is selected, create a **NEW date time picker componen
   6. This becomes the default panel time when viewing dashboard
 
 **Key Points:**
+
 - ✅ **New/separate picker** - Create dedicated date time picker for panel-level time
 - ✅ **Same as comparison picker** - Use same component type as "comparison against" feature
 - ✅ **Save to config** - Value stored in `panel.config.panel_time_range`
@@ -226,6 +236,7 @@ Similar to panel variables, add a date time picker widget to each panel that has
 ```
 
 **Behavior:**
+
 - Only visible when panel has `allowPanelTime: true`
 - Shows current panel time range
 - Clicking opens date time picker dropdown
@@ -235,6 +246,7 @@ Similar to panel variables, add a date time picker widget to each panel that has
 - User must explicitly click Apply to apply time changes
 
 **Position:**
+
 - Date time picker placed in RenderDashboardCharts area, above or near the corresponding panel
 - Similar to how panel variables are displayed
 - Enables better coordination with dashboard-level state management
@@ -242,6 +254,7 @@ Similar to panel variables, add a date time picker widget to each panel that has
 ### Requirement 4: URL Parameter Sync
 
 Panel-level time ranges should be reflected in URL for:
+
 - Sharing dashboards with specific panel times
 - Bookmarking panel configurations
 - Deep linking to specific views
@@ -269,6 +282,7 @@ Example:
 ```
 
 **Priority:**
+
 1. Panel-specific URL param (highest)
 2. Panel config setting
 3. Global dashboard time (fallback)
@@ -282,21 +296,25 @@ Example:
 **IMPORTANT:** Panel time changes require explicit Apply button click:
 
 #### In AddPanel/ConfigPanel (Configuration Mode)
+
 - **NEW date time picker** is created when "Use individual time" is selected (same as "comparison against" picker)
 - This picker is for **saving panel-level time to config**
 - When user clicks **Apply** or **Save** on the panel → saves `panel_time_range` to panel config
 - No API call is fired - this just saves the configuration
 
 #### In RenderDashboardCharts (View Mode)
+
 Date time picker is shown for each panel that has panel-level time enabled.
 
 **When user changes time in picker:**
+
 - Picker value updates
 - Panel data does NOT refresh yet
 - URL does NOT update yet
 - User must click Apply to apply changes
 
 **When user clicks Apply button on date time picker:**
+
 1. **Immediately fires API call** to refresh panel with new time
 2. **Updates URL** with new panel time parameters
 3. Panel displays new data
@@ -305,6 +323,7 @@ Date time picker is shown for each panel that has panel-level time enabled.
 ### Global Refresh Behavior
 
 When user clicks the **global refresh button**:
+
 - **All panels refresh simultaneously**
 - **Each panel uses its effective time based on simple check:**
   - If panel has `panel_time_range` → use that (panel's own time)
@@ -312,6 +331,7 @@ When user clicks the **global refresh button**:
 - This allows mixed time ranges to coexist and all refresh together
 
 **Example:**
+
 ```javascript
 // Dashboard config
 dashboard.defaultDatetimeDuration = { type: "relative", relativeTimePeriod: "15m" }
@@ -328,12 +348,13 @@ Panel C: Uses defaultDatetimeDuration → fires API with Last 15m (global)
 ```
 
 **Simple Logic Per Panel:**
+
 ```javascript
 function getEffectiveTimeForPanel(panel, dashboard) {
   if (panel.config.panel_time_range) {
-    return panel.config.panel_time_range;  // Panel's own time
+    return panel.config.panel_time_range; // Panel's own time
   } else {
-    return dashboard.defaultDatetimeDuration;  // Global time
+    return dashboard.defaultDatetimeDuration; // Global time
   }
 }
 ```
@@ -341,12 +362,14 @@ function getEffectiveTimeForPanel(panel, dashboard) {
 ### Panel Time Picker Behavior
 
 **When user changes panel time picker value:**
+
 - Picker value updates in UI
 - Panel data does NOT refresh automatically
 - URL does NOT update yet
 - User must click Apply button to apply changes
 
 **When user clicks Apply button:**
+
 - API call fires immediately to fetch panel data
 - URL updates with new panel time parameters
 - Panel refreshes with new time range data
@@ -357,32 +380,39 @@ function getEffectiveTimeForPanel(panel, dashboard) {
 **IMPORTANT:** Variables should use the appropriate time range based on their scope:
 
 #### Panel-Level Variables
+
 - **Use panel-level date time** when the panel has individual time configured
 - If panel has `panel_time_range` (individual time mode), panel variables query using that panel's time
 - This ensures panel variables are consistent with the panel's data time range
 
 #### Tab-Level Variables
+
 - **Use global date time** from `defaultDatetimeDuration`
 - Tab variables apply to all panels in that tab
 - Since panels in a tab can have different times, tab variables use the global time as reference
 
 #### Global Variables
+
 - **Use global date time** from `defaultDatetimeDuration`
 - Global variables apply to entire dashboard
 - Always use global time for consistency across all panels
 
 **Example Logic:**
+
 ```javascript
 function getTimeRangeForVariable(variable, panel, dashboard) {
-  if (variable.scope === 'panel') {
+  if (variable.scope === "panel") {
     // Panel-level variable: use panel's effective time
-    if (panel.config.panel_time_range && panel.config.panel_time_mode === 'individual') {
-      return panel.config.panel_time_range;  // Panel's individual time
+    if (
+      panel.config.panel_time_range &&
+      panel.config.panel_time_mode === "individual"
+    ) {
+      return panel.config.panel_time_range; // Panel's individual time
     }
   }
 
   // Tab-level or global variable: always use global time
-  return dashboard.defaultDatetimeDuration;  // Global time
+  return dashboard.defaultDatetimeDuration; // Global time
 }
 ```
 
@@ -395,6 +425,7 @@ function getTimeRangeForVariable(variable, panel, dashboard) {
 | Global | Global time | Applies to entire dashboard |
 
 **Key Benefits:**
+
 - ✅ **Consistency:** Panel variables match panel data time range
 - ✅ **Clarity:** Global/tab variables always use global time as reference
 - ✅ **Predictable:** Users understand which time range affects their variables
@@ -468,6 +499,7 @@ function getTimeRangeForVariable(variable, panel, dashboard) {
 **IMPORTANT:** This is a **NEW ADD-ON feature** for panel-level time. The existing global time logic already works perfectly with `defaultDatetimeDuration` - **DON'T change it!**
 
 **Simple Addition to Existing Code:**
+
 ```javascript
 // Add this simple conditional check to existing panel rendering logic:
 if (panel.config.panel_time_range) {
@@ -483,12 +515,14 @@ if (panel.config.panel_time_range) {
 ```
 
 **What This Means:**
+
 - ✅ **Add:** New conditional check: `if (panel.config.panel_time_range)`
 - ✅ **Add:** New logic inside the `if` block to handle panel time
 - ❌ **Don't change:** Existing global time flow (works fine)
 - ❌ **Don't refactor:** Current code that uses `defaultDatetimeDuration`
 
 **Two Scenarios:**
+
 1. **Panel has `panel_time_range` (NEW):**
    - This is the new feature
    - Add new code to use panel time
@@ -500,6 +534,7 @@ if (panel.config.panel_time_range) {
    - No changes needed to existing code
 
 **When is panel_time_range saved?**
+
 - **Toggle OFF** → panel_time_range = undefined → **uses existing global logic (no changes)**
 - **Toggle ON + "Use Global"** → panel_time_range = undefined → **uses existing global logic (no changes)**
 - **Toggle ON + "Use Individual"** → panel_time_range = {...} → **NEW: uses panel time (add new logic)**
@@ -520,7 +555,7 @@ pub struct PanelConfig {
 
     /// Enable panel-level time range
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub allow_panel_time: Option<bool>,
+    pub panel_time_enabled: Option<bool>,
 
     /// Panel time mode: "global" or "individual"
     /// - "global": Panel explicitly configured to use global (NO panel_time_range saved)
@@ -546,37 +581,38 @@ interface PanelConfig {
   // ... existing fields ...
 
   // Enable panel-level time
-  allow_panel_time?: boolean;  // undefined or false = use global (default)
+  panel_time_enabled?: boolean; // undefined or false = use global (default)
 
   // Panel time mode
-  panel_time_mode?: "global" | "individual";  // Only relevant if allow_panel_time = true
+  panel_time_mode?: "global" | "individual"; // Only relevant if panel_time_enabled = true
 
   // Panel time range (only used if panel_time_mode = "individual")
   panel_time_range?: {
     type: "relative" | "absolute";
-    relativeTimePeriod?: string;  // "15m", "1h", "7d"
-    startTime?: number;            // milliseconds
-    endTime?: number;              // milliseconds
+    relativeTimePeriod?: string; // "15m", "1h", "7d"
+    startTime?: number; // milliseconds
+    endTime?: number; // milliseconds
   };
 }
 ```
 
 **States:**
 
-| allow_panel_time | panel_time_mode | panel_time_range | Runtime Behavior |
-|-----------------|----------------|------------------|----------|
-| `false`/`undefined` | - | `undefined` | Use `defaultDatetimeDuration` (global) |
-| `true` | `"global"` | `undefined` | Use `defaultDatetimeDuration` (global, explicitly chosen) |
-| `true` | `"individual"` | `{...}` (saved) | Use `panel_time_range` (panel's own time) |
+| panel_time_enabled  | panel_time_mode | panel_time_range | Runtime Behavior                                          |
+| ------------------- | --------------- | ---------------- | --------------------------------------------------------- |
+| `false`/`undefined` | -               | `undefined`      | Use `defaultDatetimeDuration` (global)                    |
+| `true`              | `"global"`      | `undefined`      | Use `defaultDatetimeDuration` (global, explicitly chosen) |
+| `true`              | `"individual"`  | `{...}` (saved)  | Use `panel_time_range` (panel's own time)                 |
 
 **CRITICAL - Runtime Logic:**
+
 ```javascript
-// Simple check at runtime - don't look at allow_panel_time or panel_time_mode
+// Simple check at runtime - don't look at panel_time_enabled or panel_time_mode
 // Only check: does panel_time_range exist?
 if (panel.config.panel_time_range) {
-  timeRange = panel.config.panel_time_range;  // Use panel time
+  timeRange = panel.config.panel_time_range; // Use panel time
 } else {
-  timeRange = dashboard.defaultDatetimeDuration;  // Use global time
+  timeRange = dashboard.defaultDatetimeDuration; // Use global time
 }
 ```
 
@@ -633,45 +669,45 @@ Add configuration UI after step_value input (around line 92):
 </template>
 
 <script lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
-  name: 'ConfigPanel',
+  name: "ConfigPanel",
 
   setup() {
     const { t } = useI18n();
 
     // Panel time enabled?
     const allowPanelTime = ref(
-      !!dashboardPanelData.data.config?.allow_panel_time
+      !!dashboardPanelData.data.config?.panel_time_enabled,
     );
 
     // Panel time mode: "global" or "individual"
     const panelTimeMode = ref(
-      dashboardPanelData.data.config?.panel_time_mode || 'global'
+      dashboardPanelData.data.config?.panel_time_mode || "global",
     );
 
     // Mode options
     const panelTimeModeOptions = computed(() => [
       {
-        label: t('dashboard.useGlobalTime'),
-        value: 'global',
+        label: t("dashboard.useGlobalTime"),
+        value: "global",
       },
       {
-        label: t('dashboard.useIndividualTime'),
-        value: 'individual',
+        label: t("dashboard.useIndividualTime"),
+        value: "individual",
       },
     ]);
 
     // Toggle panel time on/off
     const onTogglePanelTime = (enabled: boolean) => {
-      dashboardPanelData.data.config.allow_panel_time = enabled;
+      dashboardPanelData.data.config.panel_time_enabled = enabled;
 
       if (enabled) {
         // Default to global mode
-        dashboardPanelData.data.config.panel_time_mode = 'global';
-        panelTimeMode.value = 'global';
+        dashboardPanelData.data.config.panel_time_mode = "global";
+        panelTimeMode.value = "global";
       } else {
         // Clear panel time settings
         dashboardPanelData.data.config.panel_time_mode = undefined;
@@ -683,21 +719,21 @@ export default defineComponent({
     const onPanelTimeModeChange = (mode: string) => {
       dashboardPanelData.data.config.panel_time_mode = mode;
 
-      if (mode === 'individual') {
+      if (mode === "individual") {
         // INDIVIDUAL MODE: Save panel_time_range
         // Initialize with default time if not set
         if (!dashboardPanelData.data.config.panel_time_range) {
           // User will set the actual time using the NEW date time picker that appears
           dashboardPanelData.data.config.panel_time_range = {
-            type: 'relative',
-            relativeTimePeriod: '15m',
+            type: "relative",
+            relativeTimePeriod: "15m",
           };
         }
       } else {
         // GLOBAL MODE: DON'T save panel_time_range
         // Clear panel_time_range when switching to global
         // Panel will use dashboard.defaultDatetimeDuration at runtime
-        // Keep allow_panel_time = true to track explicit choice
+        // Keep panel_time_enabled = true to track explicit choice
         dashboardPanelData.data.config.panel_time_range = undefined;
       }
     };
@@ -723,6 +759,7 @@ Modify the existing date time picker to work for panel-level time:
 **✅ IMPLEMENTED:** When editing a panel that has panel-level time configured, the date time picker now automatically shows the panel's time instead of the global time. This provides a seamless experience where users can see and modify the panel-specific time directly.
 
 **Priority for Date Time Picker Display in Edit Mode:**
+
 1. **URL Panel Time Parameters** (pt-{panelId}) - Highest priority
 2. **Panel Config Time** (panel_time_range) - If no URL params
 3. **Global Time** - Fallback if panel has no specific time
@@ -736,13 +773,13 @@ Modify the existing date time picker to work for panel-level time:
     <!-- Label changes based on panel time mode -->
     <div class="picker-label">
       <span v-if="isPanelTimeIndividual">
-        {{ t('dashboard.panelTimeRange') }}
+        {{ t("dashboard.panelTimeRange") }}
         <q-icon name="info" size="16px">
-          <q-tooltip>{{ t('dashboard.panelTimeRangeTooltip') }}</q-tooltip>
+          <q-tooltip>{{ t("dashboard.panelTimeRangeTooltip") }}</q-tooltip>
         </q-icon>
       </span>
       <span v-else>
-        {{ t('dashboard.timeRange') }}
+        {{ t("dashboard.timeRange") }}
       </span>
     </div>
 
@@ -760,23 +797,27 @@ Modify the existing date time picker to work for panel-level time:
 <script setup lang="ts">
 const isPanelTimeIndividual = computed(() => {
   return (
-    dashboardPanelData.data.config?.allow_panel_time &&
-    dashboardPanelData.data.config?.panel_time_mode === 'individual'
+    dashboardPanelData.data.config?.panel_time_enabled &&
+    dashboardPanelData.data.config?.panel_time_mode === "individual"
   );
 });
 
 // Watch for date time picker changes when in individual mode
-watch(dateTimeValue, (newValue) => {
-  if (isPanelTimeIndividual.value) {
-    // Store panel time range
-    dashboardPanelData.data.config.panel_time_range = {
-      type: newValue.valueType || newValue.type,
-      relativeTimePeriod: newValue.relativeTimePeriod,
-      startTime: newValue.startTime,
-      endTime: newValue.endTime,
-    };
-  }
-}, { deep: true });
+watch(
+  dateTimeValue,
+  (newValue) => {
+    if (isPanelTimeIndividual.value) {
+      // Store panel time range
+      dashboardPanelData.data.config.panel_time_range = {
+        type: newValue.valueType || newValue.type,
+        relativeTimePeriod: newValue.relativeTimePeriod,
+        startTime: newValue.startTime,
+        endTime: newValue.endTime,
+      };
+    }
+  },
+  { deep: true },
+);
 
 // ✅ NEW: In loadDashboard(), after setting selectedDate from global time,
 // check if we're in edit mode and if the panel has panel-level time.
@@ -793,7 +834,7 @@ if (editMode.value && route.query.panelId) {
   // Priority 2: Check panel config for panel_time_range
   else if (dashboardPanelData.data.config?.panel_time_range) {
     panelTimeValue = convertPanelTimeRangeToPicker(
-      dashboardPanelData.data.config.panel_time_range
+      dashboardPanelData.data.config.panel_time_range,
     );
   }
 
@@ -830,7 +871,7 @@ Add a date time picker widget for each panel that has panel-level time enabled (
         data-test="panel-time-picker"
       >
         <DateTimePickerDashboard
-          :ref="el => setPanelTimePickerRef(panel.id, el)"
+          :ref="(el) => setPanelTimePickerRef(panel.id, el)"
           v-model="panelTimeValues[panel.id]"
           :auto-apply-dashboard="true"
           size="xs"
@@ -850,14 +891,14 @@ Add a date time picker widget for each panel that has panel-level time enabled (
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import DateTimePickerDashboard from '@/components/DateTimePickerDashboard.vue';
-import PanelContainer from '@/components/dashboards/PanelContainer.vue';
+import { ref, computed, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import PanelContainer from "@/components/dashboards/PanelContainer.vue";
 
 const props = defineProps({
-  panels: Array,  // Array of panel configurations
-  globalTimeObj: Object,  // Global time range (computed from dashboard.defaultDatetimeDuration)
+  panels: Array, // Array of panel configurations
+  globalTimeObj: Object, // Global time range (computed from dashboard.defaultDatetimeDuration)
   // ... other props
 });
 
@@ -872,12 +913,12 @@ const panelTimePickerRefs = ref({});
 
 // Check if a specific panel has time enabled
 const hasPanelTime = (panel: any) => {
-  return !!panel?.config?.allow_panel_time;
+  return !!panel?.config?.panel_time_enabled;
 };
 
 // Get panel time mode
 const getPanelTimeMode = (panel: any) => {
-  return panel?.config?.panel_time_mode || 'global';
+  return panel?.config?.panel_time_mode || "global";
 };
 
 // Set panel time picker ref
@@ -890,7 +931,7 @@ const setPanelTimePickerRef = (panelId: string, el: any) => {
 // Initialize all panel time values (for UI pickers)
 const initializePanelTimes = () => {
   props.panels?.forEach((panel: any) => {
-    // Only initialize picker for panels that have allow_panel_time enabled
+    // Only initialize picker for panels that have panel_time_enabled enabled
     if (hasPanelTime(panel)) {
       const panelId = panel.id;
 
@@ -915,11 +956,13 @@ const initializePanelTimes = () => {
         return;
       }
 
-      // Priority 3: Panel has allow_panel_time enabled but no panel_time_range
+      // Priority 3: Panel has panel_time_enabled enabled but no panel_time_range
       // (This is "Use global time" mode - panel_time_mode = "global")
       // Initialize picker with current global time for display purposes
       if (props.globalTimeObj) {
-        panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(props.globalTimeObj);
+        panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(
+          props.globalTimeObj,
+        );
       }
     }
   });
@@ -933,16 +976,16 @@ const getPanelTimeFromURL = (panelId: string) => {
 
   if (relativeParam) {
     return {
-      type: 'relative',
-      valueType: 'relative',
+      type: "relative",
+      valueType: "relative",
       relativeTimePeriod: relativeParam,
     };
   }
 
   if (fromParam && toParam) {
     return {
-      type: 'absolute',
-      valueType: 'absolute',
+      type: "absolute",
+      valueType: "absolute",
       startTime: parseInt(fromParam as string),
       endTime: parseInt(toParam as string),
     };
@@ -956,14 +999,14 @@ const convertGlobalTimeToPickerFormat = (globalTime: any) => {
   // Check if it's relative or absolute from route
   if (route.query.period) {
     return {
-      type: 'relative',
-      valueType: 'relative',
+      type: "relative",
+      valueType: "relative",
       relativeTimePeriod: route.query.period,
     };
   } else if (route.query.from && route.query.to) {
     return {
-      type: 'absolute',
-      valueType: 'absolute',
+      type: "absolute",
+      valueType: "absolute",
       startTime: parseInt(route.query.from as string),
       endTime: parseInt(route.query.to as string),
     };
@@ -971,9 +1014,9 @@ const convertGlobalTimeToPickerFormat = (globalTime: any) => {
 
   // Default
   return {
-    type: 'relative',
-    valueType: 'relative',
-    relativeTimePeriod: '15m',
+    type: "relative",
+    valueType: "relative",
+    relativeTimePeriod: "15m",
   };
 };
 
@@ -995,7 +1038,7 @@ const onPanelTimeApply = async (panelId: string) => {
     // Fire API call to refresh panel with new time
     await refreshPanelData(panelId, currentPanelTime);
   } catch (error) {
-    console.error('Error applying panel time:', error);
+    console.error("Error applying panel time:", error);
   }
 };
 
@@ -1010,7 +1053,7 @@ const onRefreshPanel = async (panelId: string) => {
 
     await refreshPanelData(panelId, effectiveTime);
   } catch (error) {
-    console.error('Error refreshing panel:', error);
+    console.error("Error refreshing panel:", error);
   }
 };
 
@@ -1021,7 +1064,7 @@ const refreshPanelData = async (panelId: string, timeRange: any) => {
 
   // Implementation will depend on existing panel data loading logic
   // Typically this would emit an event or call a store action
-  emit('refresh-panel', { panelId, timeRange });
+  emit("refresh-panel", { panelId, timeRange });
 };
 
 // Update URL with panel time params
@@ -1034,9 +1077,12 @@ const updateURLWithPanelTime = (panelId: string, timeValue: any) => {
   delete query[`pt-period.${panelId}-to`];
 
   // Add new params based on type
-  if (timeValue.type === 'relative' || timeValue.valueType === 'relative') {
+  if (timeValue.type === "relative" || timeValue.valueType === "relative") {
     query[`pt-period.${panelId}`] = timeValue.relativeTimePeriod;
-  } else if (timeValue.type === 'absolute' || timeValue.valueType === 'absolute') {
+  } else if (
+    timeValue.type === "absolute" ||
+    timeValue.valueType === "absolute"
+  ) {
     query[`pt-period.${panelId}-from`] = timeValue.startTime.toString();
     query[`pt-period.${panelId}-to`] = timeValue.endTime.toString();
   }
@@ -1051,7 +1097,7 @@ const getPanelTimeRange = (panelId: string) => {
   const panel = props.panels?.find((p: any) => p.id === panelId);
 
   if (!panel) {
-    return props.globalTimeObj;  // Existing global logic
+    return props.globalTimeObj; // Existing global logic
   }
 
   // NEW FEATURE: Check if panel has its own time range
@@ -1076,8 +1122,8 @@ const getPanelTimeRange = (panelId: string) => {
     // Panel doesn't have panel_time_range → use existing global logic
     // This handles all existing scenarios:
     // - Panels that never had panel time configured
-    // - allow_panel_time = false (toggle off)
-    // - allow_panel_time = true + panel_time_mode = "global" (explicitly chose global)
+    // - panel_time_enabled = false (toggle off)
+    // - panel_time_enabled = true + panel_time_mode = "global" (explicitly chose global)
     // props.globalTimeObj already works with defaultDatetimeDuration
     return props.globalTimeObj;
     // ===== END EXISTING CODE =====
@@ -1086,9 +1132,12 @@ const getPanelTimeRange = (panelId: string) => {
 
 // Calculate time object from picker value
 const calculateTimeFromPickerValue = (pickerValue: any) => {
-  if (pickerValue.type === 'relative' || pickerValue.valueType === 'relative') {
+  if (pickerValue.type === "relative" || pickerValue.valueType === "relative") {
     const endTime = new Date();
-    const startTime = calculateRelativeTime(endTime, pickerValue.relativeTimePeriod);
+    const startTime = calculateRelativeTime(
+      endTime,
+      pickerValue.relativeTimePeriod,
+    );
     return {
       start_time: startTime,
       end_time: endTime,
@@ -1107,15 +1156,15 @@ const calculateRelativeTime = (endTime: Date, period: string): Date => {
   const unit = period.slice(-1);
 
   const unitMap: Record<string, string> = {
-    's': 'seconds',
-    'm': 'minutes',
-    'h': 'hours',
-    'd': 'days',
-    'w': 'weeks',
-    'M': 'months',
+    s: "seconds",
+    m: "minutes",
+    h: "hours",
+    d: "days",
+    w: "weeks",
+    M: "months",
   };
 
-  const dateUnit = unitMap[unit] || 'minutes';
+  const dateUnit = unitMap[unit] || "minutes";
   const subtractObject = { [dateUnit]: value };
 
   return date.subtractFromDate(endTime, subtractObject);
@@ -1127,23 +1176,32 @@ onMounted(() => {
 });
 
 // Watch for panels changes (when dashboard loads or updates)
-watch(() => props.panels, () => {
-  initializePanelTimes();
-}, { deep: true });
+watch(
+  () => props.panels,
+  () => {
+    initializePanelTimes();
+  },
+  { deep: true },
+);
 
 // Watch for global time changes (update panels that DON'T have panel_time_range)
 // props.globalTimeObj is computed from dashboard.defaultDatetimeDuration
-watch(() => props.globalTimeObj, (newGlobalTime) => {
-  props.panels?.forEach((panel: any) => {
-    // SIMPLE CHECK: Only update panels that DON'T have their own panel_time_range
-    // If panel has panel_time_range → ignore global time changes
-    // If panel doesn't have panel_time_range → update picker to show new global time
-    if (hasPanelTime(panel) && !panel.config?.panel_time_range) {
-      const panelId = panel.id;
-      panelTimeValues.value[panelId] = convertGlobalTimeToPickerFormat(newGlobalTime);
-    }
-  });
-}, { deep: true });
+watch(
+  () => props.globalTimeObj,
+  (newGlobalTime) => {
+    props.panels?.forEach((panel: any) => {
+      // SIMPLE CHECK: Only update panels that DON'T have their own panel_time_range
+      // If panel has panel_time_range → ignore global time changes
+      // If panel doesn't have panel_time_range → update picker to show new global time
+      if (hasPanelTime(panel) && !panel.config?.panel_time_range) {
+        const panelId = panel.id;
+        panelTimeValues.value[panelId] =
+          convertGlobalTimeToPickerFormat(newGlobalTime);
+      }
+    });
+  },
+  { deep: true },
+);
 
 // Handle global refresh - refreshes all panels with their respective times
 const onGlobalRefresh = async () => {
@@ -1220,7 +1278,7 @@ const parsePanelTimeParams = () => {
     if (relativeMatch) {
       const panelId = relativeMatch[1];
       panelTimes[panelId] = {
-        type: 'relative',
+        type: "relative",
         relativeTimePeriod: route.query[key],
       };
     }
@@ -1232,7 +1290,7 @@ const parsePanelTimeParams = () => {
       const toKey = `pt-to.${panelId}`;
       if (route.query[toKey]) {
         panelTimes[panelId] = {
-          type: 'absolute',
+          type: "absolute",
           startTime: parseInt(route.query[key] as string),
           endTime: parseInt(route.query[toKey] as string),
         };
@@ -1265,8 +1323,8 @@ const computePanelTimeRanges = () => {
       }
 
       // Priority 2: Panel config
-      if (panel.config?.allow_panel_time) {
-        if (panel.config.panel_time_mode === 'individual') {
+      if (panel.config?.panel_time_enabled) {
+        if (panel.config.panel_time_mode === "individual") {
           const config = panel.config.panel_time_range;
           if (config) {
             timeRanges[panelId] = calculateTimeObject(config);
@@ -1285,21 +1343,24 @@ const computePanelTimeRanges = () => {
 
 // Calculate time object from config/URL
 const calculateTimeObject = (timeConfig: any) => {
-  if (timeConfig.type === 'relative' && timeConfig.relativeTimePeriod) {
+  if (timeConfig.type === "relative" && timeConfig.relativeTimePeriod) {
     const endTime = new Date();
-    const startTime = calculateRelativeTime(endTime, timeConfig.relativeTimePeriod);
+    const startTime = calculateRelativeTime(
+      endTime,
+      timeConfig.relativeTimePeriod,
+    );
     return {
       start_time: startTime,
       end_time: endTime,
     };
-  } else if (timeConfig.type === 'absolute') {
+  } else if (timeConfig.type === "absolute") {
     return {
       start_time: new Date(timeConfig.startTime),
       end_time: new Date(timeConfig.endTime),
     };
   }
 
-  return currentTimeObj.value;  // Fallback
+  return currentTimeObj.value; // Fallback
 };
 
 // Call on dashboard load and global time changes
@@ -1307,10 +1368,14 @@ watch(currentTimeObj, () => {
   computePanelTimeRanges();
 });
 
-watch(() => route.query, () => {
-  // Recompute when URL changes (back/forward navigation)
-  computePanelTimeRanges();
-}, { deep: true });
+watch(
+  () => route.query,
+  () => {
+    // Recompute when URL changes (back/forward navigation)
+    computePanelTimeRanges();
+  },
+  { deep: true },
+);
 ```
 
 ---
@@ -1333,16 +1398,19 @@ const calculateTimeObject = (timeConfig: any) => {
   // - dateTimePicker.getConsumableDateTime()
   // - Existing time conversion utilities in the codebase
 
-  if (timeConfig.type === 'relative' && timeConfig.relativeTimePeriod) {
+  if (timeConfig.type === "relative" && timeConfig.relativeTimePeriod) {
     // Reuse existing relative time calculation
     // Same logic as global dashboard uses
     const endTime = new Date();
-    const startTime = calculateRelativeTime(endTime, timeConfig.relativeTimePeriod);
+    const startTime = calculateRelativeTime(
+      endTime,
+      timeConfig.relativeTimePeriod,
+    );
     return {
       start_time: startTime,
       end_time: endTime,
     };
-  } else if (timeConfig.type === 'absolute') {
+  } else if (timeConfig.type === "absolute") {
     // Reuse existing absolute time conversion
     return {
       start_time: new Date(timeConfig.startTime),
@@ -1350,7 +1418,7 @@ const calculateTimeObject = (timeConfig: any) => {
     };
   }
 
-  return currentTimeObj.value;  // Fallback to global
+  return currentTimeObj.value; // Fallback to global
 };
 
 // The calculateRelativeTime function should be the SAME one
@@ -1361,6 +1429,7 @@ const calculateTimeObject = (timeConfig: any) => {
 **Where to Find Existing Functions:**
 
 Look for existing time conversion functions in these locations:
+
 1. **ViewDashboard.vue** - Check how `currentTimeObj` is calculated from global date time picker
 2. **DateTimePickerDashboard.vue** - May have `getConsumableDateTime()` method
 3. **DateTime.vue** - Core date time picker component
@@ -1391,6 +1460,7 @@ const getPanelTimeObject = () => {
 **No New File Needed:**
 
 Since we're reusing existing functions, we do NOT need to create:
+
 - ❌ `usePanelTimeRange.ts` composable
 - ❌ New `calculateRelativeTime()` function
 - ❌ New `calculateTimeFromConfig()` function
@@ -1408,6 +1478,7 @@ When a panel is opened in **View Panel** mode or **Full Screen** mode, the panel
 **File:** View panel modal component (needs identification)
 
 **Behavior:**
+
 - When user clicks "View" on a panel with panel-level time
 - Modal opens showing full panel details
 - Panel time picker should be visible in modal header
@@ -1487,6 +1558,7 @@ When a panel is opened in **View Panel** mode or **Full Screen** mode, the panel
 **File:** Full screen panel view component
 
 **Behavior:**
+
 - When user clicks "Full Screen" on a panel
 - Panel opens in full screen view
 - Panel time picker visible in top bar
@@ -1496,6 +1568,7 @@ When a panel is opened in **View Panel** mode or **Full Screen** mode, the panel
 - Back button restores dashboard view with panel time preserved
 
 **URL Format for Full Screen:**
+
 ```
 /dashboards/fullscreen?
   org_identifier=default&
@@ -1703,14 +1776,14 @@ const exitFullScreen = () => {
 
 #### Key Behaviors
 
-| Scenario | Panel Time Behavior | URL Behavior |
-|----------|-------------------|--------------|
-| **View Panel Modal** | Time picker visible if panel has panel-level time enabled | URL updates with `pt-period.<id>` param |
-| **Full Screen** | Time picker in header bar | URL includes panel ID and time params |
-| **Exit View Panel** | Panel time preserved in dashboard | URL retains panel time param |
-| **Exit Full Screen** | Return to dashboard with panel time | URL removes `panel` param, keeps time param |
-| **Share View Panel URL** | Recipient sees same panel time | Panel time loaded from URL |
-| **Share Full Screen URL** | Recipient sees full screen with same time | Full screen opens with correct time |
+| Scenario                  | Panel Time Behavior                                       | URL Behavior                                |
+| ------------------------- | --------------------------------------------------------- | ------------------------------------------- |
+| **View Panel Modal**      | Time picker visible if panel has panel-level time enabled | URL updates with `pt-period.<id>` param     |
+| **Full Screen**           | Time picker in header bar                                 | URL includes panel ID and time params       |
+| **Exit View Panel**       | Panel time preserved in dashboard                         | URL retains panel time param                |
+| **Exit Full Screen**      | Return to dashboard with panel time                       | URL removes `panel` param, keeps time param |
+| **Share View Panel URL**  | Recipient sees same panel time                            | Panel time loaded from URL                  |
+| **Share Full Screen URL** | Recipient sees full screen with same time                 | Full screen opens with correct time         |
 
 #### Additional Considerations
 
@@ -1798,7 +1871,7 @@ const exitFullScreen = () => {
 4. User sets time range in AddPanel date time picker
 5. User clicks Save
 6. Panel config saved with:
-   - allow_panel_time: true
+   - panel_time_enabled: true
    - panel_time_mode: "individual"
    - panel_time_range: {...}
 ```
@@ -1914,7 +1987,7 @@ const exitFullScreen = () => {
 **Key UI Elements:**
 
 1. **Global Time Picker** - Top of dashboard (existing)
-2. **Panel Time Picker** - Panel header (only when `allow_panel_time = true`)
+2. **Panel Time Picker** - Panel header (only when `panel_time_enabled = true`)
 3. **Config Toggle** - ConfigPanel sidebar (enable panel time)
 4. **Config Radio** - Choose global or individual mode
 
@@ -1927,6 +2000,7 @@ const exitFullScreen = () => {
 **Scenario:** Dashboard global time is "Last 15m", Panel A has individual time "Last 1h". User changes global to "Last 24h".
 
 **Behavior:**
+
 - Panel A continues to show "Last 1h" (individual time takes priority)
 - Panel A's date time picker still shows "Last 1h"
 - Other panels update to "Last 24h"
@@ -1940,6 +2014,7 @@ const exitFullScreen = () => {
 **Scenario:** Panel saved with "Last 1h" in config. User opens URL with `?pt-period.panelA=7d`.
 
 **Behavior:**
+
 - Panel shows "Last 7 days" (URL has highest priority)
 - Panel date time picker shows "Last 7 days"
 - If user changes panel time picker, URL updates
@@ -1951,9 +2026,10 @@ const exitFullScreen = () => {
 
 ### 3. Panel Has "Use Global Time" Mode, Global Changes
 
-**Scenario:** Panel configured with `allow_panel_time = true` and `panel_time_mode = "global"`. User changes global time.
+**Scenario:** Panel configured with `panel_time_enabled = true` and `panel_time_mode = "global"`. User changes global time.
 
 **Behavior:**
+
 - Panel automatically updates to new global time
 - Panel date time picker shows new global time
 - Panel tracks global explicitly (even if URL has panel-specific param)
@@ -1967,6 +2043,7 @@ const exitFullScreen = () => {
 **Scenario:** User shares URL with panel times. Recipient opens and changes a panel time.
 
 **Behavior:**
+
 - Recipient's URL updates with new panel time
 - Original URL unchanged (each user has their own URL)
 - If recipient saves dashboard, their version has the new config
@@ -1981,6 +2058,7 @@ const exitFullScreen = () => {
 **Scenario:** Dashboard has duplicate panel IDs (shouldn't happen, but safety check).
 
 **Behavior:**
+
 - URL param `pt-period.<panelId>` affects all panels with that ID
 - First panel's time used for URL generation
 
@@ -1993,11 +2071,13 @@ const exitFullScreen = () => {
 **Scenario:** Dashboard with 50 panels, each with custom time → long URL.
 
 **Behavior:**
+
 - URL might exceed browser limits (2048 chars typical)
 - Modern browsers support longer URLs (Chrome: 32K+)
 - If too long, browser may truncate
 
 **Solution:**
+
 - Document URL length limitations
 - Recommend using saved dashboard configs for complex setups
 - Consider URL shortening service integration (future enhancement)
@@ -2022,6 +2102,7 @@ Since we're **reusing existing time conversion functions** from the global dashb
 **Existing Tests to Verify:**
 
 Instead of writing new tests, verify that the existing time conversion tests in the codebase cover:
+
 - Relative time calculation ("15m", "1h", "7d", etc.)
 - Absolute time handling (Unix timestamps)
 - Edge cases (invalid periods, timezone handling)
@@ -2029,6 +2110,7 @@ Instead of writing new tests, verify that the existing time conversion tests in 
 **Where to Find Existing Tests:**
 
 Look for unit tests for:
+
 - `DateTimePickerDashboard.vue` component
 - `DateTime.vue` component
 - Any existing time utility functions in the codebase
@@ -2050,6 +2132,7 @@ These existing tests already cover the time conversion logic that will be reused
 ### Manual Testing Checklist
 
 **Configuration (Edit Mode):**
+
 - [ ] Toggle "Allow panel level time" on/off
 - [ ] Switch between "Use global time" and "Use individual time"
 - [ ] Set individual time in AddPanel date time picker
@@ -2057,6 +2140,7 @@ These existing tests already cover the time conversion logic that will be reused
 - [ ] Save panel and verify config stored
 
 **View Mode:**
+
 - [ ] Panel with individual time shows date time picker widget
 - [ ] Panel without panel time enabled has no picker widget
 - [ ] Panel with "use global" mode has picker but tracks global
@@ -2069,6 +2153,7 @@ These existing tests already cover the time conversion logic that will be reused
 - [ ] **Verify panel data refreshes with new time**
 
 **URL Parameters:**
+
 - [ ] Load dashboard with `pt-period.<id>=1h` → verify panel uses 1h
 - [ ] Load dashboard with absolute panel time params → verify works
 - [ ] Change panel time → verify URL updates immediately
@@ -2076,12 +2161,14 @@ These existing tests already cover the time conversion logic that will be reused
 - [ ] Mix of global and panel times in URL → verify all work
 
 **Priority System:**
+
 - [ ] URL panel time overrides config
 - [ ] Config panel time overrides global
 - [ ] Global time used when no panel time configured
 - [ ] Panel "use global" mode follows global even with URL override
 
 **Edge Cases:**
+
 - [ ] Very long URL with many panel times → verify still works
 - [ ] Panel time in different timezone → verify correct calculation
 - [ ] Dashboard with 20+ panels → verify performance
@@ -2096,44 +2183,43 @@ To enable reliable E2E testing and distinguish between multiple date time picker
 #### Date Time Pickers
 
 **Global Dashboard Date Time Picker:**
+
 ```html
-<DateTimePickerDashboard
-  data-test="dashboard-global-date-time-picker"
-  ...
-/>
+<DateTimePickerDashboard data-test="dashboard-global-date-time-picker" ... />
 ```
+
 - Location: ViewDashboard.vue (dashboard header)
 - Purpose: Global dashboard time selection
 - Usage: `page.locator('[data-test="dashboard-global-date-time-picker"]')`
 
 **Panel-Level Time Picker (Wrapper):**
+
 ```html
 <div :data-test="`dashboard-panel-${item.id}-time-picker`">
   <DateTimePickerDashboard ... />
 </div>
 ```
+
 - Location: RenderDashboardCharts.vue (above each panel)
 - Purpose: Container for panel time picker
 - Usage: `page.locator('[data-test="dashboard-panel-panel123-time-picker"]')`
 
 **Panel-Level Time Picker (Component):**
+
 ```html
-<DateTimePickerDashboard
-  :data-test="`panel-time-picker-${item.id}`"
-  ...
-/>
+<DateTimePickerDashboard :data-test="`panel-time-picker-${item.id}`" ... />
 ```
+
 - Location: RenderDashboardCharts.vue (inside panel time picker wrapper)
 - Purpose: Individual panel date time picker component
 - Usage: `page.locator('[data-test="panel-time-picker-panel123"]')`
 
 **ViewPanel Modal Date Time Picker:**
+
 ```html
-<DateTimePickerDashboard
-  data-test="dashboard-viewpanel-date-time-picker"
-  ...
-/>
+<DateTimePickerDashboard data-test="dashboard-viewpanel-date-time-picker" ... />
 ```
+
 - Location: ViewPanel.vue (modal header)
 - Purpose: Time picker in View Panel modal
 - Usage: `page.locator('[data-test="dashboard-viewpanel-date-time-picker"]')`
@@ -2141,12 +2227,11 @@ To enable reliable E2E testing and distinguish between multiple date time picker
 #### Configuration UI
 
 **Allow Panel Time Toggle:**
+
 ```html
-<q-checkbox
-  data-test="dashboard-config-allow-panel-time"
-  ...
-/>
+<q-checkbox data-test="dashboard-config-allow-panel-time" ... />
 ```
+
 - Location: ConfigPanel.vue
 - Purpose: Toggle to enable/disable panel-level time
 - Usage: `page.locator('[data-test="dashboard-config-allow-panel-time"]')`
@@ -2154,11 +2239,11 @@ To enable reliable E2E testing and distinguish between multiple date time picker
 #### Panel-Level Variables (Existing)
 
 **Panel Variables Selector:**
+
 ```html
-<div :data-test="`dashboard-panel-${item.id}-variables`">
-  ...
-</div>
+<div :data-test="`dashboard-panel-${item.id}-variables`">...</div>
 ```
+
 - Location: RenderDashboardCharts.vue
 - Purpose: Panel-level variable selectors
 - Usage: `page.locator('[data-test="dashboard-panel-panel123-variables"]')`
@@ -2176,22 +2261,25 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 #### Category 1: Basic Configuration (8 test cases)
 
 **E2E-001: Enable Panel Level Time**
+
 - Navigate to dashboard
 - Edit a panel
 - Enable "Allow panel level time" toggle
 - Verify toggle state is ON
 - Save panel
-- Verify config saved with `allow_panel_time: true`
+- Verify config saved with `panel_time_enabled: true`
 
 **E2E-002: Disable Panel Level Time**
+
 - Navigate to dashboard with panel that has panel time enabled
 - Edit the panel
 - Disable "Allow panel level time" toggle
 - Verify toggle state is OFF
 - Save panel
-- Verify config saved with `allow_panel_time: false` or `undefined`
+- Verify config saved with `panel_time_enabled: false` or `undefined`
 
 **E2E-003: Select "Use Global Time" Mode**
+
 - Navigate to dashboard
 - Edit a panel
 - Enable "Allow panel level time"
@@ -2201,6 +2289,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify config has `panel_time_mode: "global"`
 
 **E2E-004: Select "Use Individual Time" Mode**
+
 - Navigate to dashboard
 - Edit a panel
 - Enable "Allow panel level time"
@@ -2210,6 +2299,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify config has `panel_time_mode: "individual"`
 
 **E2E-005: Set Individual Panel Time - Relative**
+
 - Navigate to dashboard
 - Edit a panel
 - Enable panel time with "Use individual time"
@@ -2220,6 +2310,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify config has `panel_time_range: { type: "relative", relativeTimePeriod: "1h" }`
 
 **E2E-006: Set Individual Panel Time - Absolute**
+
 - Navigate to dashboard
 - Edit a panel
 - Enable panel time with "Use individual time"
@@ -2230,6 +2321,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify config has `panel_time_range: { type: "absolute", startTime: ..., endTime: ... }`
 
 **E2E-007: Switch from Individual to Global Mode**
+
 - Navigate to dashboard with panel having individual time
 - Edit the panel
 - Switch from "Use individual time" to "Use global time"
@@ -2238,6 +2330,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify `panel_time_mode` is "global"
 
 **E2E-008: Date Time Picker Label Changes**
+
 - Navigate to dashboard
 - Edit a panel
 - Enable panel time with "Use individual time"
@@ -2250,16 +2343,19 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 #### Category 2: View Mode Panel Time Picker (10 test cases)
 
 **E2E-009: Panel Time Picker Visibility - Enabled**
-- Load dashboard with panel having `allow_panel_time: true`
+
+- Load dashboard with panel having `panel_time_enabled: true`
 - Verify date time picker widget visible in panel header
 - Verify picker shows current panel time
 
 **E2E-010: Panel Time Picker Visibility - Disabled**
-- Load dashboard with panel having `allow_panel_time: false` or `undefined`
+
+- Load dashboard with panel having `panel_time_enabled: false` or `undefined`
 - Verify NO date time picker widget in panel header
 - Panel uses global time
 
 **E2E-011: Change Panel Time via View Mode Picker - Relative**
+
 - Load dashboard with panel having panel time enabled
 - Panel time picker visible using `data-test="panel-time-picker-{panelId}"`
 - Click panel date time picker
@@ -2273,6 +2369,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify panel shows data for last 7 days
 
 **E2E-012: Change Panel Time via View Mode Picker - Absolute**
+
 - Load dashboard with panel having panel time enabled
 - Click panel date time picker
 - Select absolute date range (e.g., Jan 1-15, 2024)
@@ -2286,6 +2383,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify panel shows data for selected dates
 
 **E2E-013: Global Time Change Does Not Affect Individual Panel Time**
+
 - Load dashboard with:
   - Global time: Last 15m
   - Panel A: Individual time (Last 1h)
@@ -2295,6 +2393,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify other panels update to "Last 24h"
 
 **E2E-014: Global Time Change Affects "Use Global" Panel Time**
+
 - Load dashboard with:
   - Global time: Last 15m
   - Panel A: "Use global" mode
@@ -2304,6 +2403,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify Panel A data refreshes with new time
 
 **E2E-015: Multiple Panels with Different Times**
+
 - Load dashboard with:
   - Panel A: Last 1h (individual)
   - Panel B: Last 7d (individual)
@@ -2314,6 +2414,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify each panel shows correct data for its time range
 
 **E2E-016: Panel Time Picker Dropdown Interaction**
+
 - Click panel date time picker
 - Verify dropdown opens
 - Click outside dropdown
@@ -2322,6 +2423,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify dropdown closes and time updates
 
 **E2E-017: Panel Time Picker in Tab Navigation**
+
 - Load dashboard with multiple tabs
 - Tab 1 has Panel A with individual time
 - Tab 2 has Panel B with individual time
@@ -2332,6 +2434,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify Panel A time unchanged
 
 **E2E-018: Panel Time Picker with Variables**
+
 - Load dashboard with panel having:
   - Panel-level time enabled (individual time: "Last 1h")
   - Panel-level variables
@@ -2349,6 +2452,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 #### Category 3: URL Parameter Sync (10 test cases)
 
 **E2E-019: URL Updates on Panel Time Change**
+
 - Load dashboard with panel having panel time enabled
 - Click panel date time picker
 - Select "Last 1h"
@@ -2364,12 +2468,14 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Panel data loads with "Last 1h" on initial load
 
 **E2E-020: Load Dashboard with Panel Time URL Parameter**
+
 - Open URL: `?period=15m&pt-period.panel123=7d`
 - Verify global time shows "Last 15m"
 - Verify Panel 123 shows "Last 7d" in its picker
 - Verify Panel 123 data shows 7 days of data
 
 **E2E-021: URL with Multiple Panel Times**
+
 - Open URL with:
   - `?period=15m`
   - `&pt-period.panel1=1h`
@@ -2379,6 +2485,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify each panel shows correct data
 
 **E2E-022: URL Panel Time Overrides Config**
+
 - Dashboard has Panel A saved with "Last 1h" in config
 - Open URL with `pt-period.panelA=7d`
 - Verify Panel A picker shows "Last 7d" (URL takes priority)
@@ -2387,6 +2494,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify URL updates to `pt-period.panelA=1h`
 
 **E2E-023: Share URL with Panel Times**
+
 - Configure Panel A with "Last 1h"
 - Configure Panel B with "Last 7d"
 - Copy dashboard URL
@@ -2396,6 +2504,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify both panels show correct data
 
 **E2E-024: Browser Back/Forward with Panel Time URL Changes**
+
 - Load dashboard
 - Change Panel A time to "Last 1h" (URL: `...pt-period.panelA=1h`)
 - Change Panel A time to "Last 7d" (URL: `...pt-period.panelA=7d`)
@@ -2408,6 +2517,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify Panel A picker shows "Last 7d"
 
 **E2E-025: Absolute Panel Time in URL**
+
 - Configure Panel A with absolute time (Jan 1-15, 2024)
 - Verify URL contains:
   - `pt-period.panelA-from=<timestamp>`
@@ -2416,12 +2526,14 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify Panel A shows correct absolute date range
 
 **E2E-026: URL Parameter Persistence Across Page Reload**
+
 - Load dashboard with panel time URL params
 - Reload page (F5)
 - Verify URL params remain unchanged
 - Verify panel times load correctly from URL
 
 **E2E-027: Long URL with Many Panel Times**
+
 - Configure 20 panels with different times
 - Verify URL contains all `pt-*` parameters
 - Copy URL (check length)
@@ -2429,6 +2541,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify all 20 panels load with correct times
 
 **E2E-028: Clear Panel Time URL Parameter**
+
 - Load dashboard with `pt-period.panelA=1h` in URL
 - Disable panel time for Panel A
 - Verify `pt-period.panelA=1h` removed from URL
@@ -2441,12 +2554,14 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 #### Category 4: Priority System (7 test cases)
 
 **E2E-029: URL Priority Over Config**
+
 - Dashboard Panel A config: `panel_time_range: { relativeTimePeriod: "1h" }`
 - Open URL with `pt-period.panelA=7d`
 - Verify Panel A shows "Last 7d" (URL priority)
 - Not "Last 1h" from config
 
 **E2E-030: Config Priority Over Global**
+
 - Dashboard global time: "Last 15m"
 - Panel A config: `panel_time_range: { relativeTimePeriod: "1h" }`
 - Panel A has NO URL parameter
@@ -2454,12 +2569,14 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Not "Last 15m" from global
 
 **E2E-031: Global Fallback When No Panel Time**
+
 - Dashboard global time: "Last 15m"
-- Panel A has `allow_panel_time: false` or `undefined`
+- Panel A has `panel_time_enabled: false` or `undefined`
 - Verify Panel A uses "Last 15m" (global fallback)
 - No panel picker visible
 
 **E2E-032: Three-Level Priority Test**
+
 - Setup:
   - Global time: "Last 15m"
   - Panel A config: "Last 1h" (individual)
@@ -2467,13 +2584,15 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify Panel A shows "Last 7d" (URL highest priority)
 
 **E2E-033: Panel "Use Global" Mode Priority**
-- Panel A: `allow_panel_time: true`, `panel_time_mode: "global"`
+
+- Panel A: `panel_time_enabled: true`, `panel_time_mode: "global"`
 - URL has: `pt-period.panelA=7d`
 - Panel A picker visible
 - Verify Panel A tracks global time (mode takes priority over URL)
 - Panel A ignores URL parameter
 
 **E2E-034: Priority After URL Parameter Removed**
+
 - Load with URL: `pt-period.panelA=7d`
 - Panel A shows "Last 7d"
 - Remove URL parameter (change panel time via picker)
@@ -2481,6 +2600,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify correct fallback behavior
 
 **E2E-035: Mixed Priority Scenarios**
+
 - Dashboard with 5 panels:
   - Panel 1: URL param (highest)
   - Panel 2: Config individual (medium)
@@ -2495,6 +2615,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 #### Category 5: View Panel & Full Screen (5 test cases)
 
 **E2E-036: View Panel Modal with Panel Time**
+
 - Load dashboard with Panel A having individual time "Last 1h"
 - Click "View" on Panel A
 - Modal opens
@@ -2503,6 +2624,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify panel data shows 1 hour of data
 
 **E2E-037: Change Time in View Panel Modal**
+
 - Open Panel A in View Panel modal
 - Panel has individual time "Last 1h"
 - Change time to "Last 7d" in modal picker
@@ -2517,6 +2639,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify Panel A in dashboard picker shows "Last 7d"
 
 **E2E-038: Full Screen Panel with Panel Time**
+
 - Load dashboard with Panel A having individual time "Last 1h"
 - Click "Full Screen" on Panel A
 - Panel opens in full screen mode
@@ -2525,6 +2648,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify panel data shows 1 hour of data
 
 **E2E-039: Change Time in Full Screen Mode**
+
 - Open Panel A in full screen mode
 - Panel has individual time "Last 1h"
 - Change time to "Last 24h" in full screen picker
@@ -2539,6 +2663,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify Panel A in dashboard picker shows "Last 24h"
 
 **E2E-040: Full Screen URL Sharing**
+
 - Open Panel A in full screen with time "Last 7d"
 - URL should be: `/fullscreen?panel=panelA&pt-period.panelA=7d`
 - Copy URL and open in new tab
@@ -2551,6 +2676,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 #### Category 6: Dashboard Operations & Variables (7 test cases)
 
 **E2E-041: Export Dashboard with Panel Times**
+
 - Configure multiple panels with different times
 - Export dashboard as JSON
 - Verify JSON contains panel time configs
@@ -2559,6 +2685,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify all panels work correctly
 
 **E2E-042: Clone/Duplicate Panel with Panel Time**
+
 - Panel A has individual time "Last 1h"
 - Clone/duplicate Panel A
 - Verify cloned panel has same time config
@@ -2567,6 +2694,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify cloned panel unchanged (independent)
 
 **E2E-043: Delete Panel with Panel Time**
+
 - Panel A has individual time with URL param
 - Delete Panel A from dashboard
 - Verify panel removed from dashboard
@@ -2575,6 +2703,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify panel config removed from backend
 
 **E2E-044: Global Refresh with Mixed Panel Times**
+
 - Configure Panel A with "Last 1h" (individual time)
 - Configure Panel B with "Last 7d" (individual time)
 - Configure Panel C with no panel time (uses global "Last 15m")
@@ -2586,6 +2715,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Each panel respects its own effective time range during global refresh
 
 **E2E-045: Print Dashboard with Panel Times**
+
 - Configure panels with different times
 - Enter print mode
 - Verify panel time pickers hidden (or shown as text)
@@ -2594,6 +2724,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - Verify output shows panel times
 
 **E2E-046: Panel Variable Uses Panel Time Range**
+
 - Setup:
   - Global time: "Last 15m"
   - Panel A: Individual time "Last 1h" with panel-level variable
@@ -2608,6 +2739,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 - **Verify Panel A variable query now uses "Last 7d"** (new panel time)
 
 **E2E-047: Tab and Global Variables Use Global Time**
+
 - Setup:
   - Global time: "Last 15m"
   - Tab 1: Has tab-level variable
@@ -2632,6 +2764,7 @@ Comprehensive list of **End-to-End (E2E) test cases** using Playwright, Cypress,
 **Test Framework:** Playwright (recommended) or Cypress
 
 **Test Organization:**
+
 ```
 tests/ui-testing/playwright-tests/Dashboards/
   ├── dashboard-panel-time-configuration.spec.js    (E2E-001 to E2E-008)  [8 tests]
@@ -2643,6 +2776,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 ```
 
 **Test Data Setup:**
+
 - Create test dashboard with 10+ panels
 - Configure various panel time settings
 - Configure panel-level, tab-level, and global variables
@@ -2650,10 +2784,12 @@ tests/ui-testing/playwright-tests/Dashboards/
 - Setup test data in backend (if needed)
 
 **Execution Time Estimate:**
+
 - 47 test cases × ~2 minutes average = ~94 minutes total
 - Parallel execution: ~20-25 minutes (with 3-4 workers)
 
 **CI/CD Integration:**
+
 - Run E2E tests on every PR
 - Run full suite nightly
 - Generate test reports with screenshots/videos
@@ -2666,12 +2802,14 @@ tests/ui-testing/playwright-tests/Dashboards/
 ### Phase 1: Backend Schema & Config UI (2 days)
 
 **Day 1: Backend Schema**
-- [ ] Add `allow_panel_time`, `panel_time_mode`, `panel_time_range` to PanelConfig (Rust)
+
+- [ ] Add `panel_time_enabled`, `panel_time_mode`, `panel_time_range` to PanelConfig (Rust)
 - [ ] Build and test backend
 - [ ] Verify serialization/deserialization
 - [ ] Test with existing dashboards (backward compatibility)
 
 **Day 2: Config UI**
+
 - [ ] Add toggle and radio buttons to ConfigPanel.vue
 - [ ] Wire up state management
 - [ ] Integrate with AddPanel date time picker
@@ -2681,12 +2819,14 @@ tests/ui-testing/playwright-tests/Dashboards/
 ### Phase 2: Panel Time Picker Widget (2 days)
 
 **Day 3: Panel Time Picker Component**
+
 - [ ] Add DateTimePickerDashboard to PanelContainer.vue
-- [ ] Show/hide based on allow_panel_time
+- [ ] Show/hide based on panel_time_enabled
 - [ ] Initialize panel time value correctly
 - [ ] Handle picker change events
 
 **Day 4: Time Calculation Logic**
+
 - [ ] Create usePanelTimeRange.ts composable
 - [ ] Implement calculateRelativeTime()
 - [ ] Implement calculateTimeFromConfig()
@@ -2696,12 +2836,14 @@ tests/ui-testing/playwright-tests/Dashboards/
 ### Phase 3: URL Parameter Management (2 days)
 
 **Day 5: URL Sync**
+
 - [ ] Implement updateURLWithPanelTime()
 - [ ] Implement getPanelTimeFromURL()
 - [ ] Test URL parameter generation
 - [ ] Test URL parameter parsing
 
 **Day 6: Priority System**
+
 - [ ] Implement computePanelTimeRanges() in ViewDashboard.vue
 - [ ] Test URL > config > global priority
 - [ ] Handle panel time mode ("global" vs "individual")
@@ -2710,6 +2852,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 ### Phase 4: View Panel & Full Screen Support (2 days)
 
 **Day 7: View Panel Modal**
+
 - [ ] Add panel time picker to View Panel modal component
 - [ ] Initialize panel time from URL/config in modal
 - [ ] Handle panel time changes in modal
@@ -2717,6 +2860,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 - [ ] Test modal open/close with panel time preservation
 
 **Day 8: Full Screen Mode**
+
 - [ ] Add panel time picker to Full Screen component/route
 - [ ] Handle full screen URL with panel time parameters
 - [ ] Implement exit full screen with time preservation
@@ -2726,6 +2870,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 ### Phase 5: Integration & Manual Testing (2 days)
 
 **Day 9: Integration**
+
 - [ ] Connect all components end-to-end
 - [ ] Test complete flow: config → view → URL → fullscreen
 - [ ] Test browser back/forward navigation
@@ -2733,6 +2878,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 - [ ] Fix any integration issues
 
 **Day 10: Manual Testing & Polish**
+
 - [ ] Execute manual testing checklist (all items)
 - [ ] Test edge cases (long URLs, many panels, etc.)
 - [ ] Performance testing with 20+ panels
@@ -2743,6 +2889,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 ### Phase 6: E2E Test Development (3 days)
 
 **Day 11: E2E Tests - Configuration & View Mode**
+
 - [ ] Setup E2E testing framework (Playwright/Cypress)
 - [ ] Write tests for Category 1: Configuration (E2E-001 to E2E-008)
 - [ ] Write tests for Category 2: View Mode Picker (E2E-009 to E2E-018)
@@ -2750,12 +2897,14 @@ tests/ui-testing/playwright-tests/Dashboards/
 - [ ] Generate test reports
 
 **Day 12: E2E Tests - URL & Priority**
+
 - [ ] Write tests for Category 3: URL Parameters (E2E-019 to E2E-028)
 - [ ] Write tests for Category 4: Priority System (E2E-029 to E2E-035)
 - [ ] Run and debug tests
 - [ ] Add screenshots/video capture for failures
 
 **Day 13: E2E Tests - View/Fullscreen & Operations**
+
 - [ ] Write tests for Category 5: View Panel & Full Screen (E2E-036 to E2E-040)
 - [ ] Write tests for Category 6: Dashboard Operations (E2E-041 to E2E-045)
 - [ ] Run full E2E test suite
@@ -2765,6 +2914,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 ### Phase 7: Documentation & Deployment (1 day)
 
 **Day 14: Documentation & Release**
+
 - [ ] Update user documentation with panel time feature
 - [ ] Create demo videos/GIFs showing panel time usage
 - [ ] Write release notes with feature highlights
@@ -2775,6 +2925,7 @@ tests/ui-testing/playwright-tests/Dashboards/
 **Total Estimated Time: 14 days (2 weeks + 4 days)**
 
 ### Detailed Breakdown
+
 - Backend & Config UI: 2 days
 - Panel Time Picker Widget: 2 days
 - URL Parameter Management: 2 days
@@ -2789,21 +2940,21 @@ tests/ui-testing/playwright-tests/Dashboards/
 
 ### Backend Files
 
-| File | Type | Changes | Lines Est. |
-|------|------|---------|-----------|
-| `src/config/src/meta/dashboards/v8/mod.rs` | Edit | Add 3 fields to PanelConfig | ~15 |
+| File                                       | Type | Changes                     | Lines Est. |
+| ------------------------------------------ | ---- | --------------------------- | ---------- |
+| `src/config/src/meta/dashboards/v8/mod.rs` | Edit | Add 3 fields to PanelConfig | ~15        |
 
 ### Frontend Files
 
-| File | Type | Changes | Lines Est. |
-|------|------|---------|-----------|
-| `web/src/components/dashboards/addPanel/ConfigPanel.vue` | Edit | Add toggle, radio buttons, NEW date time picker for individual time | ~120 |
-| `web/src/views/Dashboards/addPanel/AddPanel.vue` | Edit | Update to support new individual time picker | ~50 |
-| `web/src/views/Dashboards/RenderDashboardCharts.vue` | Edit | Add panel time pickers, Apply→API call logic, global refresh handling | ~220 |
-| `web/src/views/Dashboards/ViewDashboard.vue` | Edit | Add URL parsing, time computation, **reuse existing time conversion functions** | ~150 |
-| `web/src/components/dashboards/ViewPanel.vue` (or modal) | Edit | Add panel time picker to view modal | ~80 |
-| `web/src/components/dashboards/FullScreenPanel.vue` (or route) | Edit | Add panel time picker to full screen | ~100 |
-| `web/src/locales/en-US.json` | Edit | Add i18n translations | ~10 |
+| File                                                           | Type | Changes                                                                         | Lines Est. |
+| -------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------- | ---------- |
+| `web/src/components/dashboards/addPanel/ConfigPanel.vue`       | Edit | Add toggle, radio buttons, NEW date time picker for individual time             | ~120       |
+| `web/src/views/Dashboards/addPanel/AddPanel.vue`               | Edit | Update to support new individual time picker                                    | ~50        |
+| `web/src/views/Dashboards/RenderDashboardCharts.vue`           | Edit | Add panel time pickers, Apply→API call logic, global refresh handling           | ~220       |
+| `web/src/views/Dashboards/ViewDashboard.vue`                   | Edit | Add URL parsing, time computation, **reuse existing time conversion functions** | ~150       |
+| `web/src/components/dashboards/ViewPanel.vue` (or modal)       | Edit | Add panel time picker to view modal                                             | ~80        |
+| `web/src/components/dashboards/FullScreenPanel.vue` (or route) | Edit | Add panel time picker to full screen                                            | ~100       |
+| `web/src/locales/en-US.json`                                   | Edit | Add i18n translations                                                           | ~10        |
 
 **Total New/Modified Code:** ~730 lines
 
@@ -2811,14 +2962,14 @@ tests/ui-testing/playwright-tests/Dashboards/
 
 ### Test Files (New)
 
-| File | Type | Purpose | Tests |
-|------|------|---------|-------|
-| `tests/e2e/panel-time/01-configuration.spec.ts` | New | E2E: Configuration UI | 8 tests |
-| `tests/e2e/panel-time/02-view-mode-picker.spec.ts` | New | E2E: View mode picker | 10 tests |
-| `tests/e2e/panel-time/03-url-parameters.spec.ts` | New | E2E: URL sync | 10 tests |
-| `tests/e2e/panel-time/04-priority-system.spec.ts` | New | E2E: Priority system | 7 tests |
-| `tests/e2e/panel-time/05-view-fullscreen.spec.ts` | New | E2E: View/fullscreen | 5 tests |
-| `tests/e2e/panel-time/06-dashboard-operations.spec.ts` | New | E2E: Operations | 7 tests |
+| File                                                   | Type | Purpose               | Tests    |
+| ------------------------------------------------------ | ---- | --------------------- | -------- |
+| `tests/e2e/panel-time/01-configuration.spec.ts`        | New  | E2E: Configuration UI | 8 tests  |
+| `tests/e2e/panel-time/02-view-mode-picker.spec.ts`     | New  | E2E: View mode picker | 10 tests |
+| `tests/e2e/panel-time/03-url-parameters.spec.ts`       | New  | E2E: URL sync         | 10 tests |
+| `tests/e2e/panel-time/04-priority-system.spec.ts`      | New  | E2E: Priority system  | 7 tests  |
+| `tests/e2e/panel-time/05-view-fullscreen.spec.ts`      | New  | E2E: View/fullscreen  | 5 tests  |
+| `tests/e2e/panel-time/06-dashboard-operations.spec.ts` | New  | E2E: Operations       | 7 tests  |
 
 **Total Test Files:** 6 E2E test files (~47 E2E tests)
 
@@ -2860,7 +3011,7 @@ interface PanelConfig {
    * Enable panel-level time range
    * @default false
    */
-  allow_panel_time?: boolean;
+  panel_time_enabled?: boolean;
 
   /**
    * Panel time mode
@@ -2955,12 +3106,14 @@ This implementation provides a comprehensive solution for panel-level time range
 ### Critical Design Decision: Add-On, Not Refactor
 
 **This is a NEW feature addition, not a refactor:**
+
 - ✅ **Add:** New conditional check `if (panel.config.panel_time_range)`
 - ✅ **Add:** New logic to handle panel-specific time
 - ❌ **Don't change:** Existing global time flow (works fine with defaultDatetimeDuration)
 - ❌ **Don't refactor:** Current code paths for global time
 
 **How it works:**
+
 ```javascript
 // Simple addition to existing code:
 if (panel.config.panel_time_range) {
@@ -2971,12 +3124,14 @@ if (panel.config.panel_time_range) {
 ```
 
 **Result:**
+
 - Panels without `panel_time_range` → work exactly as before (no changes)
 - Panels with `panel_time_range` → new feature (panel-specific time)
 
 ### Implementation Scope
 
 **Code Changes:**
+
 - Backend: 1 file (~15 lines)
 - Frontend: 7 files (~690 lines) - **Reuses existing time conversion functions**
 - Variable Logic: Update to support panel/tab/global time range usage
@@ -2984,6 +3139,7 @@ if (panel.config.panel_time_range) {
 - **Total**: ~705 lines of code + 47 E2E tests
 
 **Time Estimate:**
+
 - Development: 11 days (completed)
 - Variable Time Logic: 1 day (pending)
 - E2E Testing: 3 days (pending)
@@ -2991,6 +3147,7 @@ if (panel.config.panel_time_range) {
 - **Total**: 16 days
 
 **Test Coverage:**
+
 - **Category 1**: Configuration (8 E2E tests)
 - **Category 2**: View Mode Picker (10 E2E tests)
 - **Category 3**: URL Parameters (10 E2E tests)
@@ -3055,6 +3212,7 @@ if (panel.config.panel_time_range) {
 ### Quick Reference
 
 **47 E2E Test Cases Breakdown:**
+
 - Basic Configuration: 8 tests
 - View Mode Picker: 10 tests
 - URL Parameters: 10 tests
@@ -3063,10 +3221,12 @@ if (panel.config.panel_time_range) {
 - Dashboard Operations & Variables: 7 tests
 
 **Estimated E2E Test Execution Time:**
+
 - Full suite: ~94 minutes sequential
 - Parallel (4 workers): ~20-25 minutes
 
 **Implementation Status:**
+
 - ✅ Backend: Complete (schema changes in mod.rs)
 - ✅ Frontend: Complete (all 7 files updated)
 - ✅ Data-test attributes: Added for E2E testing
@@ -3074,6 +3234,7 @@ if (panel.config.panel_time_range) {
 - ⏳ E2E Tests: **Pending Implementation** (47 tests to be written)
 
 **Next Steps:**
+
 1. Implement variable time range logic (panel variables use panel time, tab/global use global time)
 2. Implement E2E tests starting with 9 critical path tests
 3. Run tests to validate implementation
@@ -3085,7 +3246,8 @@ if (panel.config.panel_time_range) {
 ## Implementation Summary
 
 ### ✅ Completed
-- Backend schema with `allow_panel_time`, `panel_time_mode`, `panel_time_range`
+
+- Backend schema with `panel_time_enabled`, `panel_time_mode`, `panel_time_range`
 - Configuration UI in ConfigPanel.vue and AddPanel.vue
 - Panel time picker widget in RenderDashboardCharts.vue
 - URL parameter sync for panel times
@@ -3096,12 +3258,14 @@ if (panel.config.panel_time_range) {
 - Data-test attributes for testing
 
 ### 🔄 In Progress
+
 - **Variables Time Range Logic**
   - Panel-level variables should use panel's individual time
   - Tab-level and global variables should use global time
   - Implementation: Update variable query logic to check panel time
 
 ### ⏳ Pending
+
 - **E2E Test Implementation** (47 tests)
   - Priority: Start with 9 "Must-Have" critical path tests
   - New: E2E-046 and E2E-047 test variable time range behavior
@@ -3109,6 +3273,7 @@ if (panel.config.panel_time_range) {
   - Files: 6 spec files in `tests/ui-testing/playwright-tests/Dashboards/`
 
 ### Data-Test Selectors
+
 - Global picker: `data-test="dashboard-global-date-time-picker"`
 - Panel picker: `data-test="panel-time-picker-{panelId}"`
 - Panel wrapper: `data-test="dashboard-panel-{panelId}-time-picker"`

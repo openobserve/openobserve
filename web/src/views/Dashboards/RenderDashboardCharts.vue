@@ -87,9 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
             :variablesManager="variablesManager"
             :selectedTimeDate="
-              currentTimeObj?.[panels[0].id] ||
-              currentTimeObj['__global'] ||
-              {}
+              currentTimeObj?.[panels[0].id] || currentTimeObj['__global'] || {}
             "
             :initialVariableValues="initialVariableValues"
             data-test="panel-variables-selector"
@@ -219,7 +217,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="panel-time-picker-widget"
                           @update:modelValue="onPanelTimeApply(item.id)"
                           :data-test="`panel-time-picker-${item.id}`"
-                          :ref="(el) => { if (el) panelDateTimePickerRefs.set(item.id, el); }"
+                          :ref="
+                            (el) => {
+                              if (el) panelDateTimePickerRefs.set(item.id, el);
+                            }
+                          "
                         />
                       </div>
 
@@ -774,14 +776,26 @@ export default defineComponent({
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving
+            enable:
+              !props.viewOnly &&
+              !saveDashboardData.isLoading.value &&
+              !props.simplifiedPanelView, // Enable dragging unless view-only or saving
             handle: ".drag-allow", // Only allow dragging from specific handle
           },
           resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable resizing unless view-only or saving
+            enable:
+              !props.viewOnly &&
+              !saveDashboardData.isLoading.value &&
+              !props.simplifiedPanelView, // Enable resizing unless view-only or saving
           },
-          disableResize: props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable resize in view-only
-          disableDrag: props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable drag in view-only
+          disableResize:
+            props.viewOnly ||
+            saveDashboardData.isLoading.value ||
+            props.simplifiedPanelView, // Disable resize in view-only
+          disableDrag:
+            props.viewOnly ||
+            saveDashboardData.isLoading.value ||
+            props.simplifiedPanelView, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
@@ -1066,15 +1080,17 @@ export default defineComponent({
       (newData) => {
         // Helper to find variable in committed state
         const findInCommitted = (v: any) => {
-          if (v.scope === 'global') {
+          if (v.scope === "global") {
             return variablesManager.committedVariablesData.global.find(
-              (cv: any) => cv.name === v.name
+              (cv: any) => cv.name === v.name,
             );
-          } else if (v.scope === 'tabs' && v.tabId) {
-            const tabVars = variablesManager.committedVariablesData.tabs[v.tabId] || [];
+          } else if (v.scope === "tabs" && v.tabId) {
+            const tabVars =
+              variablesManager.committedVariablesData.tabs[v.tabId] || [];
             return tabVars.find((cv: any) => cv.name === v.name);
-          } else if (v.scope === 'panels' && v.panelId) {
-            const panelVars = variablesManager.committedVariablesData.panels[v.panelId] || [];
+          } else if (v.scope === "panels" && v.panelId) {
+            const panelVars =
+              variablesManager.committedVariablesData.panels[v.panelId] || [];
             return panelVars.find((cv: any) => cv.name === v.name);
           }
           return null;
@@ -1091,7 +1107,7 @@ export default defineComponent({
 
         for (const variable of allVariables) {
           // Only check query_values variables that just finished loading
-          if (variable.type !== 'query_values') continue;
+          if (variable.type !== "query_values") continue;
           if (!variable.isVariablePartialLoaded) continue;
 
           // Find this variable in committed state
@@ -1114,7 +1130,7 @@ export default defineComponent({
           variablesManager.commitAll();
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Watch for tab visibility changes
@@ -1309,7 +1325,7 @@ export default defineComponent({
 
     // Check if a specific panel has time enabled
     const hasPanelTime = (panel: any) => {
-      return !!panel?.config?.allow_panel_time;
+      return !!panel?.config?.panel_time_enabled;
     };
 
     // Computed property to get the correct time for view panel
@@ -1333,7 +1349,7 @@ export default defineComponent({
     // Initialize panel time values for panels with panel-level time enabled
     const initializePanelTimes = () => {
       panels.value?.forEach((panel: any) => {
-        // Only initialize picker for panels that have allow_panel_time enabled
+        // Only initialize picker for panels that have panel_time_enabled enabled
         if (hasPanelTime(panel)) {
           const panelId = panel.id;
 
@@ -1345,27 +1361,41 @@ export default defineComponent({
             panel,
             panelId,
             route.query,
-            props.currentTimeObj
+            props.currentTimeObj,
           );
 
           // Helper to check if two picker values are equal
           const arePickerValuesEqual = (v1: any, v2: any) => {
             if (!v1 || !v2) return v1 === v2;
-            return v1.type === v2.type && 
-                   v1.valueType === v2.valueType && 
-                   v1.relativeTimePeriod === v2.relativeTimePeriod && 
-                   v1.startTime === v2.startTime && 
-                   v1.endTime === v2.endTime;
+            return (
+              v1.type === v2.type &&
+              v1.valueType === v2.valueType &&
+              v1.relativeTimePeriod === v2.relativeTimePeriod &&
+              v1.startTime === v2.startTime &&
+              v1.endTime === v2.endTime
+            );
           };
 
           // If no resolved value from standard sources, try global time with route fallback
-          if (!resolvedValue && props.currentTimeObj?.['__global']) {
-            const globalPickerValue = convertGlobalTimeToPickerFormat(props.currentTimeObj['__global']);
-            if (!arePickerValuesEqual(panelTimeValues.value[panelId], globalPickerValue)) {
+          if (!resolvedValue && props.currentTimeObj?.["__global"]) {
+            const globalPickerValue = convertGlobalTimeToPickerFormat(
+              props.currentTimeObj["__global"],
+            );
+            if (
+              !arePickerValuesEqual(
+                panelTimeValues.value[panelId],
+                globalPickerValue,
+              )
+            ) {
               panelTimeValues.value[panelId] = globalPickerValue;
             }
           } else if (resolvedValue) {
-            if (!arePickerValuesEqual(panelTimeValues.value[panelId], resolvedValue)) {
+            if (
+              !arePickerValuesEqual(
+                panelTimeValues.value[panelId],
+                resolvedValue,
+              )
+            ) {
               panelTimeValues.value[panelId] = resolvedValue;
             }
           }
@@ -1375,7 +1405,6 @@ export default defineComponent({
         }
       });
     };
-
 
     // Convert global time object to picker format (with route fallback)
     const convertGlobalTimeToPickerFormat = (globalTime: any) => {
@@ -1388,14 +1417,14 @@ export default defineComponent({
       // Check if it's relative or absolute from route
       if (route.query.period) {
         return {
-          type: 'relative',
-          valueType: 'relative',
+          type: "relative",
+          valueType: "relative",
           relativeTimePeriod: route.query.period,
         };
       } else if (route.query.from && route.query.to) {
         return {
-          type: 'absolute',
-          valueType: 'absolute',
+          type: "absolute",
+          valueType: "absolute",
           startTime: parseInt(route.query.from as string),
           endTime: parseInt(route.query.to as string),
         };
@@ -1403,9 +1432,9 @@ export default defineComponent({
 
       // Default
       return {
-        type: 'relative',
-        valueType: 'relative',
-        relativeTimePeriod: '15m',
+        type: "relative",
+        valueType: "relative",
+        relativeTimePeriod: "15m",
       };
     };
 
@@ -1437,9 +1466,17 @@ export default defineComponent({
       delete query[`pt-to.${panelId}`];
 
       // Add new params based on type
-      if (timeValue.relativeTimePeriod || timeValue.type === 'relative' || timeValue.valueType === 'relative') {
+      if (
+        timeValue.relativeTimePeriod ||
+        timeValue.type === "relative" ||
+        timeValue.valueType === "relative"
+      ) {
         query[`pt-period.${panelId}`] = timeValue.relativeTimePeriod;
-      } else if (timeValue.type === 'absolute' || timeValue.valueType === 'absolute' || (timeValue.startTime && timeValue.endTime)) {
+      } else if (
+        timeValue.type === "absolute" ||
+        timeValue.valueType === "absolute" ||
+        (timeValue.startTime && timeValue.endTime)
+      ) {
         query[`pt-from.${panelId}`] = timeValue.startTime.toString();
         query[`pt-to.${panelId}`] = timeValue.endTime.toString();
       }
@@ -1458,7 +1495,7 @@ export default defineComponent({
       () => {
         initializePanelTimes();
       },
-      { deep: true, immediate: true }
+      { deep: true, immediate: true },
     );
 
     return {
