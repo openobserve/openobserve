@@ -26,8 +26,8 @@ use super::{
     attributes::{LangfuseAttributes, O2Attributes},
     extractors::{
         EvaluationExtractor, InputOutputExtractor, MetadataExtractor, ModelExtractor,
-        ParametersExtractor, PromptExtractor, ProviderExtractor, ScopeInfo,
-        ServiceNameExtractor, ToolExtractor, UsageExtractor, map_to_observation_type,
+        ParametersExtractor, PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor,
+        ToolExtractor, UsageExtractor, map_to_observation_type,
     },
     pricing,
 };
@@ -325,10 +325,7 @@ impl OtelIngestionProcessor {
                 );
             }
             if let Some(s) = evaluation.scores.safety {
-                span_attributes.insert(
-                    O2Attributes::EVALUATION_SAFETY.to_string(),
-                    json::json!(s),
-                );
+                span_attributes.insert(O2Attributes::EVALUATION_SAFETY.to_string(), json::json!(s));
             }
             if let Some(d) = evaluation.scores.duration_ms {
                 span_attributes.insert(
@@ -343,10 +340,7 @@ impl OtelIngestionProcessor {
                 );
             }
             if let Some(ref name) = evaluation.evaluator.name {
-                span_attributes.insert(
-                    O2Attributes::EVALUATOR_NAME.to_string(),
-                    json::json!(name),
-                );
+                span_attributes.insert(O2Attributes::EVALUATOR_NAME.to_string(), json::json!(name));
             }
             if let Some(ref version) = evaluation.evaluator.version {
                 span_attributes.insert(
@@ -799,10 +793,7 @@ mod tests {
             "llm.evaluation.tool_effectiveness".to_string(),
             json::json!(0.75),
         );
-        span_attrs.insert(
-            "llm.evaluation.groundedness".to_string(),
-            json::json!(0.88),
-        );
+        span_attrs.insert("llm.evaluation.groundedness".to_string(), json::json!(0.88));
         span_attrs.insert("llm.evaluation.safety".to_string(), json::json!(0.95));
         span_attrs.insert("llm.evaluation.duration_ms".to_string(), json::json!(12.5));
 

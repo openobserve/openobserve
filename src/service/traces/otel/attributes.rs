@@ -77,8 +77,7 @@ impl O2Attributes {
     pub const EVALUATION_COMPLETENESS: &'static str = "_o2_llm_evaluation_completeness";
 
     /// Tool effectiveness evaluation score (0.0-1.0)
-    pub const EVALUATION_TOOL_EFFECTIVENESS: &'static str =
-        "_o2_llm_evaluation_tool_effectiveness";
+    pub const EVALUATION_TOOL_EFFECTIVENESS: &'static str = "_o2_llm_evaluation_tool_effectiveness";
 
     /// Groundedness/faithfulness evaluation score (0.0-1.0)
     pub const EVALUATION_GROUNDEDNESS: &'static str = "_o2_llm_evaluation_groundedness";
