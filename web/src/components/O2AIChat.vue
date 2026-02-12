@@ -562,6 +562,47 @@
                       </div>
                     </div>
                   </div>
+                  <!-- Log Entry block - expandable -->
+                  <div
+                    v-else-if="block.type === 'log_entry'"
+                    class="log-entry-item"
+                    :class="[
+                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
+                    ]"
+                    @click="toggleLogEntryExpanded(index, blockIndex)"
+                  >
+                    <div class="log-entry-header">
+                      <q-icon
+                        name="description"
+                        size="14px"
+                        color="primary"
+                      />
+                      <span class="log-entry-info">
+                        {{ block.preview }}
+                      </span>
+                      <q-icon
+                        :name="isLogEntryExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
+                        size="16px"
+                        class="expand-icon"
+                      />
+                    </div>
+                    <!-- Expandable details -->
+                    <div v-if="isLogEntryExpanded(index, blockIndex)" class="log-entry-details" @click.stop>
+                      <div class="log-entry-content">
+                        <q-btn
+                          flat
+                          dense
+                          size="xs"
+                          icon="content_copy"
+                          class="copy-btn"
+                          @click.stop="copyToClipboard(block.content)"
+                        >
+                          <q-tooltip>Copy content</q-tooltip>
+                        </q-btn>
+                        <code class="log-entry-code" v-html="formatLogEntryContent(block.content)"></code>
+                      </div>
+                    </div>
+                  </div>
                   <!-- Stream-level error block -->
                   <div
                     v-else-if="block.type === 'error'"
@@ -742,13 +783,7 @@
         </div>
       </div>
 
-      <div
-        class="chat-input-wrapper tw:flex tw:flex-col q-ma-md"
-        @click="focusInput"
-        @dragover="handleDragOver"
-        @drop="handleDrop"
-        @paste="handlePaste"
-      >
+      <div class="chat-input-container q-ma-md">
         <!-- Hidden file input for image upload -->
         <input
           ref="imageInputRef"
@@ -759,87 +794,97 @@
           @change="handleImageSelect"
         />
 
-        <!-- Image preview strip -->
-        <div v-if="pendingImages.length > 0" class="image-preview-strip">
-          <div
-            v-for="(img, index) in pendingImages"
-            :key="index"
-            class="image-preview-item"
-          >
-            <img
-              :src="'data:' + img.mimeType + ';base64,' + img.data"
-              :alt="img.filename"
-              class="preview-image"
-            />
-            <q-btn
-              round
-              dense
-              flat
-              size="xs"
-              class="image-remove-btn"
-              @click.stop="removeImage(index)"
-            >
-              <q-icon name="close" size="12px" color="white" />
-            </q-btn>
-            <q-tooltip>{{ img.filename }} ({{ (img.size / 1024).toFixed(0) }}KB)</q-tooltip>
-          </div>
-        </div>
-
-        <q-input
-          ref="chatInput"
-          v-model="inputMessage"
-          placeholder="Write your prompt"
-          dense
-          :disable="isLoading"
-          rows="10"
-          @keydown="handleKeyDown"
-          type="textarea"
-          autogrow
-          :borderless="true"
-          class="chat-input"
-          flat
+        <div
+          class="unified-input-box"
+          :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+          @paste="handlePaste"
         >
-        </q-input>
-        <div class="tw:flex tw:items-center tw:justify-between tw:mt-2 tw:gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
-          <!-- Image upload button -->
-          <q-btn
-            v-if="!isLoading"
-            @click.stop="triggerImageUpload"
-            round
-            dense
-            flat
-            class="image-upload-btn"
-          >
-            <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
-            <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
-          </q-btn>
-          <div v-else class="tw:w-8"></div>
+          <!-- Image preview strip -->
+          <div v-if="pendingImages.length > 0" class="image-preview-strip">
+            <div
+              v-for="(img, index) in pendingImages"
+              :key="index"
+              class="image-preview-item"
+            >
+              <img
+                :src="'data:' + img.mimeType + ';base64,' + img.data"
+                :alt="img.filename"
+                class="preview-image"
+              />
+              <q-btn
+                round
+                dense
+                flat
+                size="xs"
+                class="image-remove-btn"
+                @click.stop="removeImage(index)"
+              >
+                <q-icon name="close" size="12px" color="white" />
+              </q-btn>
+              <q-tooltip>{{ img.filename }} ({{ (img.size / 1024).toFixed(0) }}KB)</q-tooltip>
+            </div>
+          </div>
 
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <!-- Send button - shown when not loading -->
+          <RichTextInput
+            ref="chatInput"
+            v-model="inputMessage"
+            :placeholder="'Write your prompt'"
+            :disabled="isLoading"
+            :theme="store.state.theme"
+            :references="contextReferences"
+            :borderless="true"
+            @keydown="handleKeyDown"
+            @submit="sendMessage"
+            @update:references="handleReferencesUpdate"
+          />
+
+          <!-- Bottom bar with buttons -->
+          <div class="input-bottom-bar">
+            <!-- Image upload button -->
             <q-btn
               v-if="!isLoading"
-              :disable="!inputMessage.trim() && pendingImages.length === 0"
-              @click="sendMessage"
+              @click.stop="triggerImageUpload"
               round
               dense
               flat
-              class="tw:ml-1 send-button"
+              size="sm"
+              class="image-upload-btn"
             >
-              <q-icon name="send" size="16px" color="white" />
+              <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
+              <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
             </q-btn>
+            <div v-else class="tw:w-8"></div>
 
-            <!-- Stop button - shown when loading/streaming -->
-            <q-btn
-              v-if="isLoading"
-              @click="cancelCurrentRequest"
-              round
-              dense
-              flat
-              class="tw:ml-1 stop-button"
-            >
-              <q-icon name="stop" size="16px" color="white" />
-            </q-btn>
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <!-- Send button - shown when not loading -->
+              <q-btn
+                v-if="!isLoading"
+                :disable="!inputMessage.trim() && pendingImages.length === 0"
+                @click="sendMessage"
+                round
+                dense
+                flat
+                size="sm"
+                class="send-button"
+              >
+                <q-icon name="send" size="16px" color="white" />
+              </q-btn>
+
+              <!-- Stop button - shown when loading/streaming -->
+              <q-btn
+                v-if="isLoading"
+                @click="cancelCurrentRequest"
+                round
+                dense
+                flat
+                size="sm"
+                class="stop-button"
+              >
+                <q-icon name="stop" size="16px" color="white" />
+              </q-btn>
+            </div>
           </div>
         </div>
       </div>
@@ -862,6 +907,7 @@ import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/m
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -926,6 +972,7 @@ export default defineComponent({
   name: 'O2AIChat',
   components: {
     ConfirmDialog,
+    RichTextInput,
   },
   props: {
     isOpen: {
@@ -952,7 +999,7 @@ export default defineComponent({
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
-    const chatInput = ref<HTMLElement | null>(null);
+    const chatInput = ref<any>(null); // RichTextInput component instance
     const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref('');
     const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
@@ -992,6 +1039,9 @@ export default defineComponent({
     // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
 
+    // Track expanded log entries by message index and block index
+    const expandedLogEntries = ref<Set<string>>(new Set());
+
     // Active tool call state - for showing tool progress outside message box
     const activeToolCall = ref<{ tool: string; message: string; context: Record<string, any> } | null>(null);
 
@@ -1016,6 +1066,13 @@ export default defineComponent({
     // Image preview dialog state
     const showImagePreview = ref(false);
     const previewImage = ref<ImageAttachment | null>(null);
+
+    // Context references for rich text input chips
+    const contextReferences = ref<ReferenceChip[]>([]);
+
+    // Component readiness tracking
+    const componentReady = ref(false);
+    const pendingChips = ref<ReferenceChip[]>([]);
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
@@ -1338,22 +1395,106 @@ export default defineComponent({
       }
     };
 
+    // Process any pending chips that were queued before component was ready
+    const processPendingChips = () => {
+      if (pendingChips.value.length > 0) {
+        nextTick(() => {
+          if (chatInput.value && typeof chatInput.value.insertChip === 'function') {
+            // Focus input first to ensure cursor is positioned correctly
+            focusInput();
+
+            // Only clear if appendMode is false and there are no existing chips
+            // Check DOM directly for existing chips instead of relying on reactive state
+            const inputElement = chatInput.value.$el || chatInput.value;
+            const editableDiv = inputElement?.querySelector('.rich-text-input') || inputElement?.querySelector('[contenteditable]');
+            const hasExistingChips = editableDiv?.querySelector('.reference-chip') !== null;
+            const hasExistingText = editableDiv?.textContent?.trim().length > 0;
+
+            // Only clear if:
+            // 1. appendMode is false (user wants to replace content)
+            // 2. AND there are no existing chips
+            // 3. AND there is no existing text
+            if (!props.appendMode && !hasExistingChips && !hasExistingText) {
+              if (chatInput.value && typeof chatInput.value.clear === 'function') {
+                chatInput.value.clear();
+              }
+              inputMessage.value = '';
+            }
+
+            // Insert all pending chips at the cursor position
+            pendingChips.value.forEach(chip => {
+              chatInput.value.insertChip(chip);
+            });
+            pendingChips.value = [];
+          }
+        });
+      }
+    };
+
+    // Helper to create a better preview of content
+    const createPreview = (content: string, maxLength: number = 40): string => {
+      // Clean up content
+      let preview = content.trim();
+
+      // Try to detect JSON and create a meaningful preview
+      try {
+        const parsed = JSON.parse(content);
+        if (typeof parsed === 'object' && parsed !== null) {
+          // For objects, show first few keys
+          const keys = Object.keys(parsed);
+          if (keys.length > 0) {
+            const firstKeys = keys.slice(0, 3).map(k => {
+              const val = parsed[k];
+              if (typeof val === 'string') {
+                const truncatedVal = val.length > 8 ? val.substring(0, 8) + '...' : val;
+                return k + ': "' + truncatedVal + '"';
+              }
+              return k + ': ' + String(val).substring(0, 8);
+            }).join(', ');
+            const moreKeys = keys.length > 3 ? ', ...' : '';
+            preview = '{' + firstKeys + moreKeys + '}';
+          }
+        }
+      } catch {
+        // Not JSON, use plain text preview
+        // Replace newlines and multiple spaces with single space
+        preview = preview.replace(/\s+/g, ' ');
+      }
+
+      // Truncate if still too long
+      if (preview.length > maxLength) {
+        preview = preview.substring(0, maxLength) + '...';
+      }
+
+      return preview;
+    };
+
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
       if(newAiChatInputContext) {
-        if (props.appendMode) {
-          // Append mode: add to existing input with separator if needed
-          const currentValue = inputMessage.value?.trim();
-          if (currentValue) {
-            inputMessage.value = currentValue + "\n\n" + newAiChatInputContext;
-          } else {
-            inputMessage.value = newAiChatInputContext;
-          }
-          // Scroll to show the newly appended content
-          scrollInputToBottom();
-        } else {
-          // Replace mode: replace the input
-          inputMessage.value = newAiChatInputContext;
+        // Create a reference chip from the context
+        const contextChip: ReferenceChip = {
+          id: `context-${Date.now()}`,
+          filename: 'Log Entry',
+          preview: createPreview(newAiChatInputContext, 10),
+          fullContent: newAiChatInputContext,
+          charCount: newAiChatInputContext.length,
+          type: 'context'
+        };
+
+        // Always queue the chip first for consistent behavior
+        pendingChips.value.push(contextChip);
+
+        // If component is ready, process immediately with proper timing
+        if (componentReady.value && chatInput.value && typeof chatInput.value.insertChip === 'function') {
+          // Use a small delay to ensure input is focused and ready
+          nextTick(() => {
+            setTimeout(() => {
+              processPendingChips();
+            }, 50);
+          });
         }
+        // If component not ready, chips will be processed when componentReady becomes true
+        // No fallback text needed - avoids flickering when chat opens
       }
     });
 
@@ -2539,6 +2680,13 @@ export default defineComponent({
       const hasImages = pendingImages.value.length > 0;
       if ((!hasText && !hasImages) || isLoading.value) return;
 
+      // Get the message for backend (with unwrapped chips)
+      let backendMessage = inputMessage.value;
+      if (chatInput.value && typeof chatInput.value.getMessageForBackend === 'function') {
+        backendMessage = chatInput.value.getMessageForBackend();
+      }
+
+      // Use the plain text message for display
       const userMessage = inputMessage.value;
       const messagesToSend = [...pendingImages.value]; // Capture images before clearing
 
@@ -2547,13 +2695,18 @@ export default defineComponent({
         addToHistory(userMessage);
       }
 
-      // Push user message with images
+      // Push user message with images for display
+      // But we'll use backendMessage for the API call
       chatMessages.value.push({
         role: 'user',
-        content: userMessage,
+        content: backendMessage, // Use backend message with full context
         ...(hasImages && { images: messagesToSend })
       });
       inputMessage.value = '';
+      contextReferences.value = []; // Clear reference chips
+      if (chatInput.value && typeof chatInput.value.clear === 'function') {
+        chatInput.value.clear(); // Clear the rich text input
+      }
       clearPendingImages(); // Clear pending images after capturing
       shouldAutoScroll.value = true; // Reset auto-scroll for new message
       await scrollToBottom(); // Scroll after user message
@@ -2656,37 +2809,98 @@ export default defineComponent({
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
       } else if (e.key === 'Backspace') {
-        // Check if cursor is right after a @[filename] reference
-        const textarea = e.target as HTMLTextAreaElement;
-        const cursorPos = textarea.selectionStart;
-        const text = inputMessage.value;
+        // Handle backspace for RichTextInput (contenteditable)
+        const target = e.target as HTMLElement;
+        const contenteditable = target.closest('[contenteditable="true"]') || target.querySelector('[contenteditable="true"]');
 
-        // Find if cursor is at the end of a @[filename] pattern
-        const textBeforeCursor = text.substring(0, cursorPos);
-        const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
+        if (contenteditable) {
+          // Check if cursor is right after an image reference span
+          const selection = window.getSelection();
+          if (!selection || selection.rangeCount === 0) return;
 
-        if (match) {
-          e.preventDefault();
-          const filename = match[1];
-          const refStart = cursorPos - match[0].length;
+          const range = selection.getRangeAt(0);
+          const cursorNode = range.startContainer;
+          let imageRefSpan: Element | null = null;
 
-          // Remove the entire @[filename] reference from text
-          inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
-
-          // Remove the associated image from pendingImages
-          const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
-          if (imageIndex !== -1) {
-            pendingImages.value.splice(imageIndex, 1);
+          // Case 1: Cursor is in a text node at position 0, check previous sibling
+          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
+            const prevSibling = cursorNode.previousSibling;
+            if (prevSibling && (prevSibling as Element).classList?.contains('image-reference')) {
+              imageRefSpan = prevSibling as Element;
+            }
+          }
+          // Case 2: Cursor is in an element node, check the child before cursor
+          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
+            const element = cursorNode as Element;
+            const prevChild = element.childNodes[range.startOffset - 1];
+            if (prevChild && (prevChild as Element).classList?.contains('image-reference')) {
+              imageRefSpan = prevChild as Element;
+            }
           }
 
-          // Set cursor position after the deletion
-          nextTick(() => {
-            textarea.selectionStart = textarea.selectionEnd = refStart;
-          });
+          // If we found an image reference to delete
+          if (imageRefSpan) {
+            e.preventDefault();
+
+            // Extract filename from the span text
+            const refText = imageRefSpan.textContent || '';
+            const match = refText.match(/@\[([^\]]+)\]/);
+
+            if (match) {
+              const filename = match[1];
+
+              // Remove the associated image from pendingImages
+              const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
+              if (imageIndex !== -1) {
+                pendingImages.value.splice(imageIndex, 1);
+              }
+            }
+
+            // Remove the span element
+            imageRefSpan.remove();
+
+            // Trigger input event to update model
+            if (contenteditable) {
+              contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+        } else {
+          // Legacy textarea handling
+          const textarea = e.target as HTMLTextAreaElement;
+          const cursorPos = textarea.selectionStart;
+          const text = inputMessage.value;
+
+          // Find if cursor is at the end of a @[filename] pattern
+          const textBeforeCursor = text.substring(0, cursorPos);
+          const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
+
+          if (match) {
+            e.preventDefault();
+            const filename = match[1];
+            const refStart = cursorPos - match[0].length;
+
+            // Remove the entire @[filename] reference from text
+            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
+
+            // Remove the associated image from pendingImages
+            const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
+            if (imageIndex !== -1) {
+              pendingImages.value.splice(imageIndex, 1);
+            }
+
+            // Set cursor position after the deletion
+            nextTick(() => {
+              textarea.selectionStart = textarea.selectionEnd = refStart;
+            });
+          }
         }
-      } else if (e.key === 'ArrowUp' && isOnFirstLine(e.target as HTMLTextAreaElement)) {
-        e.preventDefault();
-        navigateHistory('up');
+      } else if (e.key === 'ArrowUp') {
+        const target = e.target as HTMLElement;
+        const textarea = target.tagName === 'TEXTAREA' ? target as HTMLTextAreaElement : null;
+        if (textarea && isOnFirstLine(textarea)) {
+          e.preventDefault();
+          navigateHistory('up');
+        }
       } else if (e.key === 'ArrowDown' && historyIndex.value > -1) {
         e.preventDefault();
         navigateHistory('down');
@@ -2726,14 +2940,19 @@ export default defineComponent({
 
     const focusInput = () => {
       if (chatInput.value) {
-        // For Quasar components, we need to call the focus method on the component
-        chatInput.value.focus();
-        // Alternative: directly focus the native textarea element
-        const textarea = chatInput.value.$el?.querySelector('textarea');
-        if (textarea) {
-          textarea.focus();
+        // For RichTextInput component, call its focusInput method
+        if (typeof chatInput.value.focusInput === 'function') {
+          chatInput.value.focusInput();
+        } else {
+          // Fallback for other input types
+          chatInput.value.focus();
         }
       }
+    };
+
+    // Handle reference chip updates from RichTextInput
+    const handleReferencesUpdate = (refs: ReferenceChip[]) => {
+      contextReferences.value = refs;
     };
 
     // Image handling functions
@@ -2790,32 +3009,137 @@ export default defineComponent({
           });
 
           // Insert image reference at cursor position
-          const textarea = chatInput.value?.$el?.querySelector('textarea') as HTMLTextAreaElement | null;
-          if (textarea) {
-            const start = textarea.selectionStart || 0;
-            const end = textarea.selectionEnd || 0;
-            const text = inputMessage.value;
-            const before = text.substring(0, start);
-            const after = text.substring(end);
+          // Check if we're using RichTextInput (contenteditable)
+          const contenteditable = chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+                                   chatInput.value?.$el?.querySelector('.rich-text-input');
 
-            // Add space before if needed
-            const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
-            const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+          if (contenteditable) {
+            // RichTextInput - insert at cursor position in contenteditable
+            const selection = window.getSelection();
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
 
-            const insertion = (needsSpaceBefore ? ' ' : '') + imageRef + (needsSpaceAfter ? ' ' : '');
-            inputMessage.value = before + insertion + after;
+            // Create a non-editable span for the image reference
+            const imageRefSpan = document.createElement('span');
+            imageRefSpan.contentEditable = 'false';
+            imageRefSpan.className = 'image-reference';
+            imageRefSpan.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; font-size: 13px; color: #2e7d32; user-select: none;';
 
-            // Set cursor position after the inserted reference
-            nextTick(() => {
-              const newPos = start + insertion.length;
-              textarea.setSelectionRange(newPos, newPos);
-              textarea.focus();
-            });
+            // Add image icon
+            const imageIcon = document.createElement('span');
+            imageIcon.textContent = '🖼️';
+            imageIcon.style.cssText = 'font-size: 12px;';
+
+            // Add filename text
+            const filenameText = document.createElement('span');
+            filenameText.textContent = file.name;
+
+            // Add remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '×';
+            removeBtn.style.cssText = 'display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: #2e7d32; transition: all 0.15s ease;';
+            removeBtn.onmouseover = () => {
+              removeBtn.style.background = '#c62828';
+              removeBtn.style.color = 'white';
+            };
+            removeBtn.onmouseout = () => {
+              removeBtn.style.background = 'transparent';
+              removeBtn.style.color = '#2e7d32';
+            };
+            removeBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+
+              // Find and remove the image from pendingImages
+              const imageIndex = pendingImages.value.findIndex(img => img.filename === file.name);
+              if (imageIndex !== -1) {
+                pendingImages.value.splice(imageIndex, 1);
+              }
+
+              // Remove the span
+              imageRefSpan.remove();
+
+              // Trigger input event
+              contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+
+            imageRefSpan.appendChild(imageIcon);
+            imageRefSpan.appendChild(filenameText);
+            imageRefSpan.appendChild(removeBtn);
+
+            if (range && contenteditable.contains(range.startContainer)) {
+              // Insert at cursor position
+              range.deleteContents();
+
+              // Add space before if needed
+              const textBefore = range.startContainer.textContent || '';
+              if (textBefore.length > 0 && !textBefore.endsWith(' ') && !textBefore.endsWith('\n')) {
+                range.insertNode(document.createTextNode(' '));
+              }
+
+              range.insertNode(imageRefSpan);
+
+              // Add space after for cursor positioning
+              const spaceAfter = document.createTextNode(' ');
+              range.setStartAfter(imageRefSpan);
+              range.insertNode(spaceAfter);
+
+              // Move cursor after the space
+              range.setStartAfter(spaceAfter);
+              range.collapse(true);
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            } else {
+              // No selection or selection outside - append to end
+              const spaceNeeded = contenteditable.textContent &&
+                                 !contenteditable.textContent.endsWith(' ') &&
+                                 !contenteditable.textContent.endsWith('\n');
+              if (spaceNeeded) {
+                contenteditable.appendChild(document.createTextNode(' '));
+              }
+              contenteditable.appendChild(imageRefSpan);
+              const spaceAfter = document.createTextNode(' ');
+              contenteditable.appendChild(spaceAfter);
+
+              // Move cursor to end
+              const newRange = document.createRange();
+              newRange.setStartAfter(spaceAfter);
+              newRange.collapse(true);
+              selection?.removeAllRanges();
+              selection?.addRange(newRange);
+            }
+
+            // Trigger input event to update model
+            contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+            focusInput();
           } else {
-            // Fallback: append to end
-            const currentText = inputMessage.value;
-            const separator = currentText && !currentText.endsWith(' ') && !currentText.endsWith('\n') ? ' ' : '';
-            inputMessage.value = currentText + separator + imageRef + ' ';
+            // Legacy textarea fallback
+            const textarea = chatInput.value?.$el?.querySelector('textarea') as HTMLTextAreaElement | null;
+            if (textarea) {
+              const start = textarea.selectionStart || 0;
+              const end = textarea.selectionEnd || 0;
+              const text = inputMessage.value;
+              const before = text.substring(0, start);
+              const after = text.substring(end);
+
+              // Add space before if needed
+              const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+              const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+
+              const insertion = (needsSpaceBefore ? ' ' : '') + imageRef + (needsSpaceAfter ? ' ' : '');
+              inputMessage.value = before + insertion + after;
+
+              // Set cursor position after the inserted reference
+              nextTick(() => {
+                const newPos = start + insertion.length;
+                textarea.setSelectionRange(newPos, newPos);
+                textarea.focus();
+              });
+            } else {
+              // Final fallback: append to end
+              const currentText = inputMessage.value;
+              const separator = currentText && !currentText.endsWith(' ') && !currentText.endsWith('\n') ? ' ' : '';
+              inputMessage.value = currentText + separator + imageRef + ' ';
+            }
           }
 
           resolve(true);
@@ -2836,11 +3160,29 @@ export default defineComponent({
       // Get the filename before removing
       const image = pendingImages.value[index];
       if (image) {
-        // Remove the image reference from the text input
         const imageRef = `@[${image.filename}]`;
-        inputMessage.value = inputMessage.value
-          .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, 'g'), ' ')
-          .trim();
+
+        // Check if we're using RichTextInput (contenteditable)
+        const contenteditable = chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+                                 chatInput.value?.$el?.querySelector('.rich-text-input');
+
+        if (contenteditable) {
+          // Find and remove all image reference spans with this filename
+          const imageRefSpans = contenteditable.querySelectorAll('.image-reference');
+          imageRefSpans.forEach((span: Element) => {
+            if (span.textContent === imageRef) {
+              span.remove();
+            }
+          });
+
+          // Trigger input event to update model
+          contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+          // Legacy textarea - remove from text
+          inputMessage.value = inputMessage.value
+            .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, 'g'), ' ')
+            .trim();
+        }
       }
       pendingImages.value.splice(index, 1);
     };
@@ -2981,6 +3323,15 @@ export default defineComponent({
           fetchInitialMessage();
         }
         loadHistory(); // Load history when chat is opened
+
+        // Mark component as ready and process any pending chips
+        // Use a slight delay to ensure RichTextInput is fully mounted
+        nextTick(() => {
+          setTimeout(() => {
+            componentReady.value = true;
+            processPendingChips();
+          }, 100);
+        });
       }
     });
 
@@ -2990,6 +3341,15 @@ export default defineComponent({
         fetchInitialMessage();
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
+
+        // Mark component as ready and process any pending chips
+        // Use a slight delay to ensure RichTextInput is fully mounted
+        nextTick(() => {
+          setTimeout(() => {
+            componentReady.value = true;
+            processPendingChips();
+          }, 100);
+        });
       }
 
       // Load query history from localStorage
@@ -3159,12 +3519,117 @@ export default defineComponent({
       return blocks;
     };
 
+    // Helper to format JSON with syntax highlighting
+    const formatLogEntryContent = (content: string): string => {
+      try {
+        const parsed = JSON.parse(content);
+        const formatted = JSON.stringify(parsed, null, 2);
+        // Apply syntax highlighting
+        return formatted
+          .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+            let cls = 'json-number';
+            if (/^"/.test(match)) {
+              if (/:$/.test(match)) {
+                cls = 'json-key';
+              } else {
+                cls = 'json-string';
+              }
+            } else if (/true|false/.test(match)) {
+              cls = 'json-boolean';
+            } else if (/null/.test(match)) {
+              cls = 'json-null';
+            }
+            return `<span class="${cls}">${match}</span>`;
+          });
+      } catch {
+        // Not JSON, return plain text with HTML escaping
+        return content
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;')
+          .replace(/\n/g, '<br>');
+      }
+    };
+
+    // Parse log entries from message content and maintain order
+    const parseLogEntries = (content: string) => {
+      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
+      const orderedBlocks: any[] = [];
+      let lastIndex = 0;
+      let match;
+
+      // Reset regex state
+      logEntryPattern.lastIndex = 0;
+
+      while ((match = logEntryPattern.exec(content)) !== null) {
+        const [fullMatch, filename, lineStart, lineEnd, logContent] = match;
+        const matchIndex = match.index;
+
+        // Add text before this log entry (if any)
+        if (matchIndex > lastIndex) {
+          const textBefore = content.substring(lastIndex, matchIndex).trim();
+          if (textBefore) {
+            orderedBlocks.push({
+              type: 'text',
+              text: textBefore
+            });
+          }
+        }
+
+        // Add the log entry
+        orderedBlocks.push({
+          type: 'log_entry',
+          filename,
+          lineStart: lineStart ? parseInt(lineStart) : undefined,
+          lineEnd: lineEnd ? parseInt(lineEnd) : undefined,
+          content: logContent.trim(),
+          preview: createPreview(logContent.trim(), 60)
+        });
+
+        lastIndex = matchIndex + fullMatch.length;
+      }
+
+      // Add any remaining text after the last log entry
+      if (lastIndex < content.length) {
+        const textAfter = content.substring(lastIndex).trim();
+        if (textAfter) {
+          orderedBlocks.push({
+            type: 'text',
+            text: textAfter
+          });
+        }
+      }
+
+      return orderedBlocks;
+    };
+
     const processedMessages = computed(() => {
-      return chatMessages.value.map(message => ({
-        ...message,
-        blocks: processMessageContent(message.content),
-        contentBlocks: message.contentBlocks || []
-      }));
+      return chatMessages.value.map(message => {
+        // For user messages, check for log entries
+        if (message.role === 'user') {
+          const orderedBlocks = parseLogEntries(message.content);
+
+          // If we have ordered blocks from parsing, combine them with existing contentBlocks
+          const combinedContentBlocks = orderedBlocks.length > 0
+            ? [...orderedBlocks, ...(message.contentBlocks || [])]
+            : message.contentBlocks || [];
+
+          return {
+            ...message,
+            blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
+            contentBlocks: combinedContentBlocks
+          };
+        }
+
+        // For assistant messages, keep as is
+        return {
+          ...message,
+          blocks: processMessageContent(message.content),
+          contentBlocks: message.contentBlocks || []
+        };
+      });
     });
 
     // Check if there's an assistant message in progress (for loading indicator positioning)
@@ -3266,6 +3731,20 @@ export default defineComponent({
 
     const isToolCallExpanded = (messageIndex: number, blockIndex: number) => {
       return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
+    };
+
+    // Log entry expansion helpers
+    const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
+      const key = `${messageIndex}-${blockIndex}`;
+      if (expandedLogEntries.value.has(key)) {
+        expandedLogEntries.value.delete(key);
+      } else {
+        expandedLogEntries.value.add(key);
+      }
+    };
+
+    const isLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
+      return expandedLogEntries.value.has(`${messageIndex}-${blockIndex}`);
     };
 
     // Extract display fields from tool call context (handles different tool schemas)
@@ -3457,6 +3936,10 @@ export default defineComponent({
       formatToolCallMessage,
       formatTimestamp,
       formatContextValue,
+      expandedLogEntries,
+      toggleLogEntryExpanded,
+      isLogEntryExpanded,
+      formatLogEntryContent,
       // AI-generated title
       aiGeneratedTitle,
       displayedTitle,
@@ -3712,36 +4195,57 @@ export default defineComponent({
     }
   }
 
-  .chat-input-wrapper {
-    padding: 4px 8px 8px 8px;
+  .chat-input-container {
     flex-shrink: 0;
-    display: flex;
-    justify-content: center;
-    transition: all 0.2s ease;
+    max-width: 900px;
+    width: calc(100% - 0px);
+    margin: 8px auto;
+    padding: 0 8px;
+  }
 
-    :deep(.q-field) {
-      max-width: 900px;
+  .unified-input-box {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 8px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    gap: 12px;
+
+    &.light-mode {
+      background: #ffffff;
+      border: 1px solid #e4e7ec;
+
+      &:focus-within {
+        border: 1px solid transparent;
+        box-shadow: 0 0 0 2px #667eea;
+      }
+    }
+
+    &.dark-mode {
+      background: #191919;
+      border: 1px solid #323232;
+
+      &:focus-within {
+        border: 1px solid transparent;
+        box-shadow: 0 0 0 2px #5a6ec3;
+      }
+    }
+
+    :deep(.rich-text-input-wrapper) {
       width: 100%;
+      min-height: 40px;
     }
-  
-  }
-  .light-mode .chat-input-wrapper{
-    background:#ffffff;
-    border: 1px solid #e4e7ec;
-    border-radius: 12px;
-    &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #667eea
+
+    :deep(.rich-text-input) {
+      padding: 4px 0;
     }
   }
-  .dark-mode .chat-input-wrapper{
-    background:#191919;
-    border: 1px solid #323232;
-    border-radius: 12px;
-     &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #5a6ec3
-    }
+
+  .input-bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
   }
 
 
@@ -4710,7 +5214,175 @@ export default defineComponent({
       }
     }
   }
+}
 
+// Log entry item - expandable log content display
+.log-entry-item {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  cursor: pointer;
+
+  &.light-mode {
+    background: rgba(33, 150, 243, 0.08);
+    color: #4a5568;
+  }
+
+  &.dark-mode {
+    background: #252a31;
+    border: 1px solid #3a4149;
+    color: #e2e8f0;
+  }
+
+  &:hover {
+    &.light-mode {
+      background: rgba(33, 150, 243, 0.12);
+    }
+    &.dark-mode {
+      background: #20242e;
+      border-color: #4a5568;
+    }
+  }
+
+  .log-entry-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .log-entry-info {
+    flex: 1;
+    font-weight: 500;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .expand-icon {
+    opacity: 0.6;
+    transition: transform 0.2s;
+  }
+
+  .log-entry-details {
+    margin-top: 10px;
+  }
+
+  .log-entry-content {
+    position: relative;
+    border-radius: 6px;
+    border: 1px solid;
+    overflow: hidden;
+
+    .light-mode & {
+      background: #ffffff;
+      border-color: #e4e7ec;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .dark-mode & {
+      background: #1e293b;
+      border-color: #475569;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      opacity: 0.6;
+      z-index: 1;
+      background: rgba(128, 128, 128, 0.1);
+      border-radius: 4px;
+      padding: 4px 8px;
+
+      &:hover {
+        opacity: 1;
+        .light-mode & {
+          background: rgba(0, 0, 0, 0.08);
+        }
+        .dark-mode & {
+          background: rgba(255, 255, 255, 0.15);
+        }
+      }
+    }
+
+    .log-entry-code {
+      display: block;
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      padding: 12px;
+      padding-right: 40px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      user-select: text;
+      cursor: text;
+      max-height: 300px;
+      overflow-y: auto;
+
+      .light-mode & {
+        background: #f8fafc;
+        color: #1a202c;
+      }
+      .dark-mode & {
+        background: #0d1017;
+        color: #e2e8f0;
+      }
+
+      // JSON syntax highlighting - use :deep() for v-html content
+      :deep(.json-key) {
+        color: #0066cc;
+        font-weight: 600;
+      }
+
+      :deep(.json-string) {
+        color: #22863a;
+      }
+
+      :deep(.json-number) {
+        color: #005cc5;
+      }
+
+      :deep(.json-boolean) {
+        color: #d73a49;
+        font-weight: 600;
+      }
+
+      :deep(.json-null) {
+        color: #6f42c1;
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+// Dark mode JSON syntax highlighting for log entries
+.dark-mode .log-entry-code {
+  :deep(.json-key) {
+    color: #60a5fa;
+  }
+
+  :deep(.json-string) {
+    color: #86efac;
+  }
+
+  :deep(.json-number) {
+    color: #7dd3fc;
+  }
+
+  :deep(.json-boolean) {
+    color: #fca5a5;
+  }
+
+  :deep(.json-null) {
+    color: #c4b5fd;
+  }
+}
+
+.tool-call-item {
   .tool-response-hits {
     display: flex;
     flex-direction: column;
