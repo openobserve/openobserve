@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="{ rows: filteredTableRows, columns: tableColumns }"
         :wrap-cells="config.wrap_table_cells"
         :value-mapping="config.mappings ?? []"
-        :show-pagination="config.table_pagination"
+        :show-pagination="config.table_pagination && !store.state.printMode"
         :rows-per-page="config.table_pagination_rows_per_page"
         @row-click="$emit('row-click', $event)"
       >
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <q-space />
             <TablePaginationControls
-              :show-pagination="config.table_pagination"
+              :show-pagination="config.table_pagination && !store.state.printMode"
               :pagination="scope.pagination"
               :pagination-options="scope.paginationOptions"
               :total-rows="scope.totalRows"
@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
+import { useStore } from "vuex";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
@@ -95,6 +96,7 @@ export default defineComponent({
   },
   components: { TableRenderer, TablePaginationControls },
   setup(props) {
+    const store = useStore();
     const filter = ref("");
     const loading = ref(false);
 
@@ -225,6 +227,7 @@ export default defineComponent({
 
     return {
       filter,
+      store,
       loading,
       tableColumns,
       tableRows,
