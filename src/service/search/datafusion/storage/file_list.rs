@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -37,8 +37,8 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data)
 }
 
-pub async fn set(trace_id: &str, schema_key: &str, files: Vec<FileKey>) {
-    let key = format!("{trace_id}/schema={schema_key}");
+pub async fn set(trace_id: &str, schema_key: &str, format: &str, files: Vec<FileKey>) {
+    let key = format!("{trace_id}/schema={schema_key}/format={format}");
     let mut values = Vec::with_capacity(files.len());
     let mut segment_data = HashMap::new();
     for file in files {

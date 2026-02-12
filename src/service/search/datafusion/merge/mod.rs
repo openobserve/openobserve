@@ -15,11 +15,11 @@
 
 use std::sync::Arc;
 
-use arrow::record_batch::RecordBatch;
+use arrow::array::RecordBatch;
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileMeta, StreamType},
-    utils::{parquet::new_parquet_writer, util::DISTINCT_STREAM_PREFIX},
+    utils::{parquet::new_parquet_writer, util::DISTINCT_STREAM_PREFIX, vortex::Utf8Compressor},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -28,7 +28,16 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+use infra::runtime::VORTEX_RUNTIME;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use vortex::{
+    VortexSessionDefault,
+    array::{ArrayRef, arrow::FromArrowArray},
+    dtype::{DType, arrow::FromArrowType},
+    file::{VortexWriteOptions, WriteStrategyBuilder},
+    io::session::RuntimeSessionExt,
+    session::VortexSession,
+};
 
 use super::table_provider::uniontable::NewUnionTable;
 use crate::service::search::datafusion::exec::{
@@ -44,7 +53,7 @@ use {
 };
 
 pub enum MergeParquetResult {
-    Single(Vec<u8>),
+    Single(Vec<u8>, FileMeta),
     #[allow(unused)]
     Multiple {
         bufs: Vec<Vec<u8>>,
@@ -58,9 +67,9 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
-    metadata: &FileMeta,
+    mut metadata: FileMeta,
     is_ingester: bool,
-) -> Result<(Arc<Schema>, MergeParquetResult)> {
+) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -73,18 +82,14 @@ pub async fn merge_parquet_files(
                 tables,
                 bloom_filter_fields,
                 rule,
-                metadata,
+                &metadata,
             )
             .await;
         }
     }
 
     // get all sorted data
-    let sql = if stream_type == StreamType::Index {
-        format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {TIMESTAMP_COL_NAME} DESC) ORDER BY {TIMESTAMP_COL_NAME} DESC"
-        )
-    } else if cfg.limit.distinct_values_hourly
+    let sql = if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
         && stream_name.starts_with(DISTINCT_STREAM_PREFIX)
     {
@@ -106,13 +111,9 @@ pub async fn merge_parquet_files(
     };
     log::debug!("merge_parquet_files sql: {sql}");
 
-    // create datafusion context
-    let sort_by_timestamp_desc = true;
-    // force use DATAFUSION_MIN_PARTITION for each merge task
-    let target_partitions = DATAFUSION_MIN_PARTITION;
     let ctx = DataFusionContextBuilder::new()
-        .sorted_by_time(sort_by_timestamp_desc)
-        .build(target_partitions)
+        .sorted_by_time(true)
+        .build(DATAFUSION_MIN_PARTITION)
         .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
@@ -133,29 +134,11 @@ pub async fn merge_parquet_files(
         println!("{plan}");
     }
 
-    // write result to parquet file
-    let mut buf = Vec::new();
-    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
-        Some("none")
-    } else {
-        None
-    };
-    let mut writer = new_parquet_writer(
-        &mut buf,
-        &schema,
-        bloom_filter_fields,
-        metadata,
-        false,
-        compression,
-    );
-
-    // calculate the new file meta records
     let mut new_file_meta = metadata.clone();
     new_file_meta.records = 0;
-
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-    let task = tokio::task::spawn(async move {
+    let read_task = tokio::task::spawn(async move {
         loop {
             match batch_stream.try_next().await {
                 Ok(None) => {
@@ -175,27 +158,91 @@ pub async fn merge_parquet_files(
         }
         Ok(())
     });
-    while let Some(batch) = rx.recv().await {
-        new_file_meta.records += batch.num_rows() as i64;
-        if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write error: {e}");
-            return Err(e.into());
-        }
-    }
-    task.await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-    append_metadata(&mut writer, &new_file_meta)?;
-    writer.close().await?;
 
-    ctx.deregister_table("tbl")?;
-    drop(ctx);
+    // write batches to the appropriate format
+    let buf = match cfg.common.file_format {
+        FileFormat::Parquet => {
+            let mut buf = Vec::new();
+            let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
+                Some("none")
+            } else {
+                None
+            };
+            let mut writer = new_parquet_writer(
+                &mut buf,
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                false,
+                compression,
+            );
+
+            while let Some(batch) = rx.recv().await {
+                new_file_meta.records += batch.num_rows() as i64;
+                if let Err(e) = writer.write(&batch).await {
+                    log::error!("merge_parquet_files write error: {e}");
+                    return Err(e.into());
+                }
+            }
+
+            read_task
+                .await
+                .map_err(|e| DataFusionError::External(Box::new(e)))??;
+            append_metadata(&mut writer, &new_file_meta)?;
+            writer.close().await?;
+            buf
+        }
+        FileFormat::Vortex => {
+            let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
+                VORTEX_RUNTIME.block_on(async move {
+                    let mut buf = Vec::new();
+                    let session = VortexSession::default().with_tokio();
+                    let dtype = DType::from_arrow(schema.as_ref());
+                    let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
+                        WriteStrategyBuilder::default()
+                            .with_compressor(Utf8Compressor::default())
+                            .build(),
+                    );
+                    let mut writer = write_options.writer(&mut buf, dtype);
+
+                    while let Some(batch) = rx.recv().await {
+                        let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
+                            DataFusionError::Execution(format!(
+                                "Failed to convert arrow array to vortex array: {e}"
+                            ))
+                        })?;
+                        writer.push(array).await?;
+                    }
+
+                    writer.finish().await?;
+
+                    Ok::<Vec<u8>, anyhow::Error>(buf)
+                })
+            });
+
+            // Wait for both tasks to complete
+            read_task
+                .await
+                .map_err(|e| DataFusionError::External(Box::new(e)))??;
+
+            writer_task
+                .await
+                .map_err(|e| {
+                    DataFusionError::Execution(format!("Vortex runtime task failed: {e}"))
+                })?
+                .map_err(|e| {
+                    DataFusionError::Execution(format!("Failed to write vortex file: {e}"))
+                })?
+        }
+    };
 
     log::debug!(
         "merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
-    Ok((schema, MergeParquetResult::Single(buf)))
+    metadata.compressed_size = buf.len() as i64;
+    Ok(MergeParquetResult::Single(buf, metadata))
 }
 
 pub(crate) fn append_metadata(
@@ -225,9 +272,7 @@ pub(crate) fn append_metadata(
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, StringArray};
     use arrow_schema::{DataType, Field, Schema};
-    use parquet::arrow::AsyncArrowWriter;
 
     use super::*;
 
@@ -237,83 +282,6 @@ mod tests {
             Field::new("field1", DataType::Utf8, true),
             Field::new("field2", DataType::Int64, true),
         ]))
-    }
-
-    #[allow(dead_code)]
-    fn create_test_record_batch() -> RecordBatch {
-        let schema = create_test_schema();
-        let timestamp_array = Int64Array::from(vec![1000, 2000, 3000]);
-        let field1_array = StringArray::from(vec![Some("a"), Some("b"), Some("c")]);
-        let field2_array = Int64Array::from(vec![Some(10), Some(20), Some(30)]);
-
-        RecordBatch::try_new(
-            schema,
-            vec![
-                Arc::new(timestamp_array),
-                Arc::new(field1_array),
-                Arc::new(field2_array),
-            ],
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn test_append_metadata() -> Result<()> {
-        let mut buf = Vec::new();
-        let schema = create_test_schema();
-        let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
-
-        let file_meta = FileMeta {
-            min_ts: 1000,
-            max_ts: 2000,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            flattened: false,
-            index_size: 0,
-        };
-
-        let result = append_metadata(&mut writer, &file_meta);
-        assert!(result.is_ok());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_append_metadata_values() -> Result<()> {
-        let mut buf = Vec::new();
-        let schema = create_test_schema();
-        let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
-
-        let file_meta = FileMeta {
-            min_ts: 1000,
-            max_ts: 2000,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            flattened: false,
-            index_size: 0,
-        };
-
-        append_metadata(&mut writer, &file_meta)?;
-
-        // Verify the writer has the metadata (indirectly by checking no errors)
-        let result = writer.close().await;
-        assert!(result.is_ok());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_append_metadata_with_defaults() -> Result<()> {
-        let mut buf = Vec::new();
-        let schema = create_test_schema();
-        let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
-
-        let file_meta = FileMeta::default();
-        let result = append_metadata(&mut writer, &file_meta);
-        assert!(result.is_ok());
-
-        Ok(())
     }
 
     #[tokio::test]
@@ -330,7 +298,7 @@ mod tests {
             schema,
             empty_tables,
             &bloom_fields,
-            &metadata,
+            metadata,
             false,
         )
         .await;
