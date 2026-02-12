@@ -57,13 +57,11 @@ pub async fn update_view(
         },
         Err(e) => return Err(e),
     };
-    db::put(
-        &key,
-        json::to_vec(&updated_view).unwrap().into(),
-        db::NO_NEED_WATCH,
-        None,
-    )
-    .await?;
+    let val = json::to_vec(&updated_view).unwrap();
+    if val.is_empty() {
+        return Err(Error::Message("Saved views value is empty".to_string()));
+    }
+    db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
     Ok(updated_view)
 }
 
