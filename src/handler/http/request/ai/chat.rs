@@ -725,13 +725,13 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     // Forward session ID if present
     if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
         && let Ok(val) = session_id.to_str()
+        && val.len() == 36
+        && val.chars().filter(|&c| c == '-').count() == 4
     {
-        if val.len() == 36 && val.chars().filter(|&c| c == '-').count() == 4 {
-            forward_headers.insert(
-                X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-                val.to_string(),
-            );
-        }
+        forward_headers.insert(
+            X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+            val.to_string(),
+        );
     }
 
     // Parse JSON body
@@ -785,11 +785,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
                 Json(response).into_response()
             }
             Err(e) => {
-                log::error!(
-                    "[trace_id:{}] Feedback submission failed: {}",
-                    trace_id,
-                    e
-                );
+                log::error!("[trace_id:{}] Feedback submission failed: {}", trace_id, e);
                 MetaHttpResponse::internal_error(format!("Feedback submission failed: {}", e))
             }
         }
