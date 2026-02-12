@@ -102,6 +102,18 @@
           <span class="text-weight-bold">{{ formatCost(llmData.cost.total) }}</span>
         </div>
 
+        <!-- Quality score badge -->
+        <div
+          v-if="llmData.evaluation && llmData.evaluation.qualityScore != null"
+          class="quality-badge q-mr-md text-caption"
+        >
+          <q-badge
+            :color="getQualityScoreColor(llmData.evaluation.qualityScore)"
+            :label="`Quality: ${formatScore(llmData.evaluation.qualityScore)}`"
+            class="q-py-xs"
+          />
+        </div>
+
         <!-- Input preview (truncated) -->
         <div class="input-preview ellipsis text-caption flex-1">
           <q-icon name="chat" size="12px" class="q-mr-xs" />
@@ -135,6 +147,8 @@ import {
   extractLLMData,
   formatCost,
   formatTokens,
+  formatScore,
+  getQualityScoreColor,
 } from "@/utils/llmUtils";
 
 const props = defineProps({
