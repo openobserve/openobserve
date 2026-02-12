@@ -15,7 +15,7 @@ use vortex::{
     error::VortexResult,
     layout::layouts::compressed::CompressorPlugin,
 };
-use vortex_btrblocks::BtrBlocksCompressorBuilder;
+use vortex_btrblocks::{BtrBlocksCompressorBuilder, IntCode};
 
 use crate::config;
 
@@ -52,7 +52,9 @@ impl Utf8Compressor {
     /// Create a new smart compressor with default settings.
     pub fn new() -> Self {
         Self {
-            btr_compressor: BtrBlocksCompressorBuilder::default().build(),
+            btr_compressor: BtrBlocksCompressorBuilder::default()
+                .exclude_int([IntCode::Dict])
+                .build(),
             zstd_level: 3,
             values_per_page: 8192,
         }
