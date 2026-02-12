@@ -16,6 +16,7 @@ import {
   assertPanelTimePickerInModal,
   assertPanelTimePickerInFullScreen
 } from "./utils/panelTimeAssertions.js";
+const { safeWaitForHidden, safeWaitForNetworkIdle, safeWaitForDOMContentLoaded } = require("../utils/wait-helpers.js");
 
 test.describe.configure({ mode: "parallel" });
 
@@ -56,7 +57,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
 
     // Step 6: Click Apply
     await page.locator('[data-test="date-time-apply-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Step 7: Verify URL remains unchanged (View Panel time is temporary)
     await assertPanelTimeInURL(page, panelId, "1h");
@@ -112,7 +113,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
 
     // Step 8: Reload to verify persistence
     await page.reload();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Step 9: Verify URL still has "1d" after reload
     await assertPanelTimeInURL(page, panelId, "1d");
@@ -171,7 +172,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await pm.dashboardPanelTime.clickGlobalRefresh();
 
     // Step 3: Verify all panels refresh
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Step 4: Verify each panel maintains its time
     await assertPanelTimeInURL(page, panelIds[0], "1h");
@@ -209,7 +210,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
 
     // Step 2: Delete Panel using helper method
     await pm.dashboardPanelEdit.deletePanel(panelName);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     
     await pm.dashboardPanelTime.clickGlobalRefresh();
     
@@ -239,7 +240,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const currentURL = page.url();
     const invalidURL = `${currentURL}&pt-period.${panelIds[0]}=invalidvalue`;
     await page.goto(invalidURL);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Should fallback to config or global (should not crash)
     const panelPicker = page.locator(`[data-test="panel-time-picker-${panelIds[0]}"]`);
@@ -248,7 +249,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     // Step 3: Test missing panel in URL
     const missingPanelURL = `${currentURL}&pt-period.nonexistent=1h`;
     await page.goto(missingPanelURL);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Should ignore unknown panel (should not crash)
     expect(await panelPicker.isVisible()).toBe(true);
@@ -266,7 +267,7 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
     await page.locator('[data-test="date-time-relative-1-m-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Last change (1m) should be applied
     await assertPanelTimeInURL(page, panelIds[0], "1m");
