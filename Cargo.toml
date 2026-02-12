@@ -320,11 +320,11 @@ arrow-json = "57.2.0"
 arrow-schema = { version = "57.2.0", features = ["serde"] }
 parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-vortex = { git = "https://github.com/openobserve/vortex", rev = "b9c1a020bf5c3373055e381ba142e840cfe2b6a3", features = [
+vortex = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83", features = [
     "tokio",
 ] }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "b9c1a020bf5c3373055e381ba142e840cfe2b6a3" }
-vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "b9c1a020bf5c3373055e381ba142e840cfe2b6a3" }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83" }
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83" }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.3"
 dotenvy = "0.15.7"
