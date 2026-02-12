@@ -153,6 +153,7 @@ size="lg" color="primary" />
               clickable
               v-close-popup
               v-if="
+                !hideSearchTermActions &&
                 searchObj.data.stream.selectedStreamFields.some((item: any) =>
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
@@ -180,6 +181,7 @@ size="lg" color="primary" />
               clickable
               v-close-popup
               v-if="
+                !hideSearchTermActions &&
                 searchObj.data.stream.selectedStreamFields.some((item: any) =>
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
@@ -435,6 +437,10 @@ export default {
       required: false,
     },
     hideViewRelated: {
+      type: Boolean,
+      default: false,
+    },
+    hideSearchTermActions: {
       type: Boolean,
       default: false,
     },

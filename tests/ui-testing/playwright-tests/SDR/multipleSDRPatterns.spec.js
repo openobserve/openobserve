@@ -49,7 +49,7 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
 
     if (response.status === 200) {
       testLogger.info('Ingestion successful, waiting for stream to be indexed...');
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(5000);
       return;
     }
 
@@ -64,89 +64,6 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
 
     testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
     throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
-  }
-}
-
-async function closeStreamDetailSidebar(page) {
-  const cancelButton = page.getByRole('button', { name: 'Cancel' });
-  const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
-  if (cancelVisible) {
-    await cancelButton.click();
-    testLogger.info('Closed stream detail sidebar');
-    await page.waitForTimeout(500);
-  }
-}
-
-async function navigateToLogsQuick(page) {
-  await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle');
-  testLogger.info('Navigated to Logs (fast - no VRL wait)');
-}
-
-// Verify a single field in the most recent log entry
-async function verifySingleFieldInLatestLog(page, pm, streamName, fieldName, shouldBeDropped, shouldBeRedacted) {
-  testLogger.info(`Verifying field: ${fieldName}, shouldBeDropped: ${shouldBeDropped}, shouldBeRedacted: ${shouldBeRedacted}`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(1000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(2000);
-
-  // Get log entries
-  let logTableCell = page.locator('[data-test="log-table-column-0-source"]');
-  let logCount = await logTableCell.count();
-
-  if (logCount === 0) {
-    logTableCell = page.locator('tbody tr');
-    logCount = await logTableCell.count();
-  }
-
-  testLogger.info(`Found ${logCount} log entries in the UI`);
-
-  if (logCount === 0) {
-    throw new Error('No logs found in the stream');
-  }
-
-  // Get the first log entry (most recent)
-  const logText = await logTableCell.nth(0).textContent();
-  testLogger.info(`Latest log text (first 300 chars): ${logText.substring(0, 300)}...`);
-
-  // Check if field exists in the log
-  const fieldAsJsonKey = `"${fieldName}":`;
-  const fieldAsKey = `${fieldName}:`;
-  const fieldFound = logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey);
-
-  if (shouldBeDropped) {
-    // Field should NOT be present at all
-    if (fieldFound) {
-      testLogger.error(`Field ${fieldName} should have been DROPPED but was found in log!`);
-      throw new Error(`Field ${fieldName} was not dropped - still present in logs`);
-    }
-    testLogger.info(`✓ Field ${fieldName} is correctly DROPPED (not present)`);
-  } else if (shouldBeRedacted) {
-    // Field should be present with [REDACTED]
-    if (!fieldFound) {
-      testLogger.error(`Field ${fieldName} should be present but was not found in log!`);
-      throw new Error(`Field ${fieldName} not found in log`);
-    }
-    if (!logText.includes('[REDACTED]')) {
-      testLogger.error(`Field ${fieldName} should be REDACTED but [REDACTED] marker not found!`);
-      throw new Error(`Field ${fieldName} was not redacted`);
-    }
-    testLogger.info(`✓ Field ${fieldName} is correctly REDACTED`);
-  } else {
-    // Field should be visible with actual value
-    if (!fieldFound) {
-      testLogger.error(`Field ${fieldName} should be visible but was not found in log!`);
-      throw new Error(`Field ${fieldName} not found in log`);
-    }
-    if (logText.includes('[REDACTED]')) {
-      testLogger.error(`Field ${fieldName} should be visible but is REDACTED!`);
-      throw new Error(`Field ${fieldName} is unexpectedly redacted`);
-    }
-    testLogger.info(`✓ Field ${fieldName} is visible with actual value (as expected)`);
   }
 }
 
@@ -220,7 +137,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   // TEST 2: Multiple patterns on ONE field (SEQUENTIAL FLOW)
   // This test has 10 steps with multiple navigations, so needs extended timeout
   test('should link 4 patterns to one field and verify with sequential ingestion', {
-    tag: ['@sdr', '@poc', '@multiPattern']
+    tag: ['@sdr', '@poc', '@sdrMultiPattern']
   }, async ({ page }, testInfo) => {
     // Extend timeout to 5 minutes - this test has 10 sequential steps with navigation
     test.setTimeout(300000);
@@ -232,7 +149,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     // ==================== STEP 1: Ingest log #1 for query-time drop pattern ====================
     testLogger.info('========== STEP 1: Ingest log with value "application.log" ==========');
     await ingestSingleLog(page, testStreamName, fieldName, queryTimePatterns[0].value); // "application.log"
-    await verifySingleFieldInLatestLog(page, pm, testStreamName, fieldName, false, false);
+    await pm.sdrVerificationPage.verifySingleFieldInLatestLog(pm.logsPage, testStreamName, fieldName, false, false);
     testLogger.info('✓ STEP 1 PASSED: Log #1 ingested, field visible (no patterns yet)');
 
     // ==================== STEP 2: Link query-time DROP pattern ====================
@@ -248,13 +165,13 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
 
     // ==================== STEP 3: Verify query-time DROP on existing log ====================
     testLogger.info('========== STEP 3: Verify query-time DROP works on EXISTING log ==========');
-    await verifySingleFieldInLatestLog(page, pm, testStreamName, fieldName, true, false);
+    await pm.sdrVerificationPage.verifySingleFieldInLatestLog(pm.logsPage, testStreamName, fieldName, true, false);
     testLogger.info('✓ STEP 3 PASSED: Field DROPPED at query time (no re-ingestion needed)');
 
     // ==================== STEP 4: Ingest log #2 for query-time redact pattern ====================
     testLogger.info('========== STEP 4: Ingest log with value "14:30:45" ==========');
     await ingestSingleLog(page, testStreamName, fieldName, queryTimePatterns[1].value); // "14:30:45"
-    await verifySingleFieldInLatestLog(page, pm, testStreamName, fieldName, false, false);
+    await pm.sdrVerificationPage.verifySingleFieldInLatestLog(pm.logsPage, testStreamName, fieldName, false, false);
     testLogger.info('✓ STEP 4 PASSED: Log #2 ingested, field visible (pattern not yet linked)');
 
     // ==================== STEP 5: Link query-time REDACT pattern ====================
@@ -270,7 +187,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
 
     // ==================== STEP 6: Verify query-time REDACT on existing log ====================
     testLogger.info('========== STEP 6: Verify query-time REDACT works on EXISTING log ==========');
-    await verifySingleFieldInLatestLog(page, pm, testStreamName, fieldName, false, true);
+    await pm.sdrVerificationPage.verifySingleFieldInLatestLog(pm.logsPage, testStreamName, fieldName, false, true);
     testLogger.info('✓ STEP 6 PASSED: Field REDACTED at query time (no re-ingestion needed)');
 
     // ==================== STEP 7: Link ingestion-time DROP pattern ====================
@@ -287,7 +204,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     // ==================== STEP 8: Ingest log #3 and verify ingestion-time DROP ====================
     testLogger.info('========== STEP 8: Ingest log with value "AB12CDEF1234567890" ==========');
     await ingestSingleLog(page, testStreamName, fieldName, ingestionTimePatterns[0].value); // IFSC code
-    await verifySingleFieldInLatestLog(page, pm, testStreamName, fieldName, true, false);
+    await pm.sdrVerificationPage.verifySingleFieldInLatestLog(pm.logsPage, testStreamName, fieldName, true, false);
     testLogger.info('✓ STEP 8 PASSED: Field DROPPED at ingestion time');
 
     // ==================== STEP 9: Link ingestion-time REDACT pattern ====================
@@ -304,7 +221,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     // ==================== STEP 10: Ingest log #4 and verify ingestion-time REDACT ====================
     testLogger.info('========== STEP 10: Ingest log with value "25/12/2024" ==========');
     await ingestSingleLog(page, testStreamName, fieldName, ingestionTimePatterns[1].value); // Date
-    await verifySingleFieldInLatestLog(page, pm, testStreamName, fieldName, false, true);
+    await pm.sdrVerificationPage.verifySingleFieldInLatestLog(pm.logsPage, testStreamName, fieldName, false, true);
     testLogger.info('✓ STEP 10 PASSED: Field REDACTED at ingestion time');
 
     testLogger.info('=== ✓ ALL 4 PATTERNS ON ONE FIELD TEST COMPLETED SUCCESSFULLY ===');
@@ -356,10 +273,14 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
           }
         }
       } else {
-        testLogger.info(`✓ Pattern ${patternName} does not exist, no cleanup needed`);
+        testLogger.info(`✓ Pattern ${patternName} already absent, no cleanup needed`);
       }
-    }
 
+      // Verify pattern is gone regardless of which path was taken
+      await pm.sdrPatternsPage.navigateToRegexPatterns();
+      const stillExists = await pm.sdrPatternsPage.checkPatternExists(patternName);
+      expect(stillExists, `Pattern ${patternName} should have been deleted`).toBeFalsy();
+    }
     testLogger.info('=== END CLEANUP COMPLETE ===');
   });
 });

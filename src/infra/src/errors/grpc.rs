@@ -17,23 +17,6 @@ use datafusion::{common::SchemaError, error::DataFusionError};
 
 use super::{Error, ErrorCodes};
 
-fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
-    for punctuation in ['\'', '"'] {
-        let pos_start = err[pos..].find(punctuation);
-        if pos_start.is_none() {
-            continue;
-        }
-        let pos_start = pos_start.unwrap();
-        let pos_end = err[pos + pos_start + 1..].find(punctuation);
-        if pos_end.is_none() {
-            continue;
-        }
-        let pos_end = pos_end.unwrap();
-        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
-    }
-    None
-}
-
 impl From<DataFusionError> for Error {
     fn from(err: DataFusionError) -> Self {
         if let DataFusionError::SchemaError(schema_err, _) = &err
@@ -47,22 +30,14 @@ impl From<DataFusionError> for Error {
 
         let err = err.to_string();
         if err.contains("Schema error: No field named") {
-            let pos = err.find("Schema error: No field named").unwrap();
-            return match get_key_from_error(&err, pos) {
-                Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
-                None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-            };
+            return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(err));
         }
         if err.contains("parquet not found") || err.contains("parquet file not found") {
             log::error!("[Datafusion] Parquet file not found: {err}");
             return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
         }
         if err.contains("Invalid function ") {
-            let pos = err.find("Invalid function ").unwrap();
-            return match get_key_from_error(&err, pos) {
-                Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
-                None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-            };
+            return Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(err));
         }
         if err.contains("Incompatible data types") {
             let pos = err.find("for field").unwrap();

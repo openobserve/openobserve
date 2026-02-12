@@ -49,6 +49,7 @@ use crate::{
 
 pub mod dag;
 pub mod session;
+pub mod user;
 
 /// TracesIngest
 #[utoipa::path(

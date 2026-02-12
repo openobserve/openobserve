@@ -257,7 +257,7 @@ export default defineComponent({
       selectedCategory.value = category;
       if (!contentArea.value) return;
 
-      const element = contentArea.value.querySelector(
+      const element = contentArea?.value?.querySelector(
         `[data-category="${category}"]`,
       ) as HTMLElement;
       if (element) {

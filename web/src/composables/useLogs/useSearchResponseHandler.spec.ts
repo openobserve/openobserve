@@ -82,7 +82,10 @@ const createMockState = () => ({
 let mockState: ReturnType<typeof createMockState>;
 
 // Create a separate shared searchPartitionMap that persists across the composable and tests
-const mockSearchPartitionMap: Record<string, { partition: number; chunks: Record<number, number> }> = {};
+const mockSearchPartitionMap: Record<
+  string,
+  { partition: number; chunks: Record<number, number> }
+> = {};
 
 // Create shared mock functions
 const mockNotifications = {
@@ -122,7 +125,7 @@ const mockLogsHighlighter = {
 // Mock dependencies
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
-    state: { timezone: "UTC" },
+    state: { timezone: "UTC", zoConfig: { timestamp_column: "_timestamp" } },
   })),
 }));
 
@@ -185,7 +188,9 @@ describe("useSearchResponseHandler", () => {
     mockState = createMockState();
 
     // Clear the shared searchPartitionMap
-    Object.keys(mockSearchPartitionMap).forEach(key => delete mockSearchPartitionMap[key]);
+    Object.keys(mockSearchPartitionMap).forEach(
+      (key) => delete mockSearchPartitionMap[key],
+    );
 
     vi.clearAllMocks();
 
@@ -254,7 +259,9 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.setCancelSearchError();
 
-      expect(Array.isArray(mockState.searchObj.data.queryResults.hits)).toBe(true);
+      expect(Array.isArray(mockState.searchObj.data.queryResults.hits)).toBe(
+        true,
+      );
     });
 
     it("should clear error when no hits", () => {
@@ -277,7 +284,7 @@ describe("useSearchResponseHandler", () => {
       responseHandler.setCancelSearchError();
 
       expect(mockState.searchObj.data.histogram.errorMsg).toBe(
-        "Histogram search query was cancelled"
+        "Histogram search query was cancelled",
       );
     });
   });
@@ -353,9 +360,11 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleSearchError(request, error as any);
 
       expect(mockState.searchObj.data.countErrorMsg).toContain(
-        "Error while retrieving total events"
+        "Error while retrieving total events",
       );
-      expect(mockState.searchObj.data.countErrorMsg).toContain("TraceID: trace-pc");
+      expect(mockState.searchObj.data.countErrorMsg).toContain(
+        "TraceID: trace-pc",
+      );
     });
 
     it("should handle histogram error", () => {
@@ -373,10 +382,12 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleSearchError(request, error as any);
 
       expect(mockState.searchObj.data.histogram.errorMsg).toContain(
-        "Histogram failed"
+        "Histogram failed",
       );
       expect(mockState.searchObj.data.histogram.errorCode).toBe(404);
-      expect(mockState.searchObj.data.histogram.errorDetail).toBe("Data not found");
+      expect(mockState.searchObj.data.histogram.errorDetail).toBe(
+        "Data not found",
+      );
     });
   });
 
@@ -405,7 +416,10 @@ describe("useSearchResponseHandler", () => {
         },
       };
 
-      responseHandler.handleSearchResponse(metadataPayload as any, metadataResponse as any);
+      responseHandler.handleSearchResponse(
+        metadataPayload as any,
+        metadataResponse as any,
+      );
 
       // Now test the hits response
       const payload = {
@@ -468,9 +482,7 @@ describe("useSearchResponseHandler", () => {
         type: "search_response_hits",
         content: {
           results: {
-            hits: [
-              { zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 100 },
-            ],
+            hits: [{ zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 100 }],
           },
         },
       };
@@ -519,7 +531,9 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleFunctionError(queryReq as any, response);
 
-      expect(mockState.searchObj.data.functionError).toBe("Invalid function syntax");
+      expect(mockState.searchObj.data.functionError).toBe(
+        "Invalid function syntax",
+      );
     });
 
     it("should update datetime when function error has new time range", () => {
