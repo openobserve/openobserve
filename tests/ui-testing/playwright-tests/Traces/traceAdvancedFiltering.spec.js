@@ -20,7 +20,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
     pm = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Navigate to traces page
     await pm.tracesPage.navigateToTracesUrl();

@@ -166,7 +166,7 @@ export class SanityPage {
     // Pagination Methods
     async displayResultTextAndPagination() {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         await expect(this.page.getByText("Showing 1 to 50")).toBeVisible({ timeout: 15000 });
         await this.page.waitForTimeout(1000);
@@ -176,7 +176,7 @@ export class SanityPage {
         } catch (error) {
             testLogger.warn('Pagination element not found, retrying with refresh button click');
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
         }
     }
@@ -270,7 +270,7 @@ export class SanityPage {
     // Query Limit Methods
     async displayLimitedResults() {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').nth(2).click();
         
@@ -292,7 +292,7 @@ export class SanityPage {
     // Function Methods
     async createAndDeleteFunction(functionName) {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         const fnEditor = this.page.locator(this.fnEditor);
 
@@ -482,7 +482,7 @@ export class SanityPage {
         await this.page.getByRole("option", { name: "Logs" }).click();
         
         await this.page.locator(this.saveStreamButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Handle success notification dismissal (text might vary or auto-dismiss)
         const successMessages = [
@@ -546,7 +546,7 @@ export class SanityPage {
         });
         
         // Wait for search results to load using proper wait
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Click delete button for the specific stream using first() to handle search results
@@ -572,7 +572,7 @@ export class SanityPage {
             throw new Error('No confirmation dialog button found with variants: ' + confirmButtonVariants.join(', '));
         }
 
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Verify stream was deleted - search should return no results
         await this.page.getByPlaceholder("Search Stream").clear();
@@ -588,7 +588,7 @@ export class SanityPage {
     // Result Summary Methods
     async displayPaginationAfterResultSummary() {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         await expect(this.page.locator(this.resultColumnSource)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.resultColumnSource).click();
@@ -600,7 +600,7 @@ export class SanityPage {
         const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
             const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
@@ -628,7 +628,7 @@ export class SanityPage {
         await this.page.locator(this.refreshStatsButton).click();
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.getByRole(this.streamCellButton.role, { name: this.streamCellButton.name, exact: true }).click();
     }
 
@@ -693,7 +693,7 @@ export class SanityPage {
         testLogger.debug('Reloading page to refresh schema');
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Select stream again after reload using the search-and-filter approach
         testLogger.debug('Selecting e2e_automate stream after reload');
@@ -927,7 +927,7 @@ export class SanityPage {
         
         // Wait for canvas to be ready and visible (should now be there after data load)
         await expect(this.page.locator(this.histogramCanvas)).toBeVisible({ timeout: 15000 });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // First canvas click with error handling
         try {

@@ -101,7 +101,7 @@ export class LoginPage {
       }
     });
 
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     console.log("ZO_BASE_URL_SC_UI", process.env["ZO_BASE_URL_SC_UI"]);
   }
 

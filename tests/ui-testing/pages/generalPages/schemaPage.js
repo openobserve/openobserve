@@ -57,7 +57,7 @@ class SchemaPage {
     async applyQuery() {
         testLogger.debug('Applying query with search response wait');
         const search = this.page.waitForResponse(logData.applyQuery);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.locator(this.schemaLocators.logsSearchBarRefreshBtn).click({ force: true });
         await expect.poll(async () => (await search).status()).toBe(200);
     }
@@ -79,7 +79,7 @@ class SchemaPage {
     // Open stream details
     async openStreamDetails() {
         testLogger.debug('Opening stream details');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         const streamDetailButton = this.page.getByRole('button', { name: this.schemaLocators.streamDetailButton }).first();
         await streamDetailButton.waitFor({ state: 'visible', timeout: 15000 });
@@ -93,7 +93,7 @@ class SchemaPage {
         testLogger.debug('Configuring schema fields - removing kubernetes annotations if present');
         
         // Ensure we're in the right tab context
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Try to find and click kubernetes checkboxes (they may not always exist)
         try {
@@ -276,7 +276,7 @@ class SchemaPage {
                 await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
                 await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(toStream);
                 await this.page.getByText(toStream).click();
-                await this.page.waitForLoadState('networkidle');
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForSelector('text=Loading...', { state: 'hidden' });
                 return; // Exit early, skipping VRL editor interaction
             }
@@ -302,7 +302,7 @@ class SchemaPage {
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(toStream);
         await this.page.getByText(toStream).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForSelector('text=Loading...', { state: 'hidden' });
 
         // Close the dropdown by pressing Escape or clicking outside

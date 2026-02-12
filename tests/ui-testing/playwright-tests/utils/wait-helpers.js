@@ -353,7 +353,7 @@ const waitUtils = {
       await page.waitForLoadState('domcontentloaded');
     } else if (ms <= 5000) {
       // Medium waits - usually for network/API
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     } else {
       // Long waits - fallback to shorter intelligent wait
       await page.waitForLoadState('networkidle', { timeout: Math.min(ms, 10000) });

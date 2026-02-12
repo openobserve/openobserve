@@ -94,7 +94,7 @@ export
         await this.page.goto(
             process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=" + process.env["ORGNAME"]
           );
-          await this.page.waitForLoadState('networkidle');
+          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
           // Wait for logs page to fully load before navigating away
           await this.page.waitForTimeout(2000);
@@ -103,7 +103,7 @@ export
           await this.page.goto(
             process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=" + process.env["ORGNAME"]
           );
-          await this.page.waitForLoadState('networkidle');
+          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         const toggleSelector = '[data-test="general-settings-enable-streaming"]';
         

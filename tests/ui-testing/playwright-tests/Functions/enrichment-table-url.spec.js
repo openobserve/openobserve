@@ -421,7 +421,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Table created with protocols.csv');
 
         // Step 2: Verify table exists (wait for page to be ready)
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
         testLogger.info('Table found in list');
@@ -444,7 +444,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Step 6: Save the changes
         await enrichmentPage.clickSaveButton();
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Save clicked - job processing async');
 
         // Step 7: Wait for job to complete (poll until buttons appear or warning icon shows)
@@ -514,7 +514,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Test table created');
 
         // Wait for table to appear and navigate to list
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await enrichmentPage.page.waitForTimeout(2000);
 
         // Step 2: Test search functionality using POM method

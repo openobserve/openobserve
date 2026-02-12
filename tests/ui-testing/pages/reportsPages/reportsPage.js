@@ -198,7 +198,7 @@ export class ReportsPage {
 
     // Navigate to reports list to verify report exists
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Search for the report
     await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
