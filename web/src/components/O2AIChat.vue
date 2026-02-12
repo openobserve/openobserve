@@ -211,6 +211,7 @@
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
+
       <!-- Image Preview Dialog -->
       <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
         <q-card class="image-preview-dialog" style="max-width: 90vw; max-height: 90vh;">
@@ -283,6 +284,7 @@
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
+
       <!-- Image Preview Dialog -->
       <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
         <q-card class="image-preview-dialog" style="max-width: 90vw; max-height: 90vh;">
@@ -340,25 +342,59 @@
                     :class="[
                       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
                       { 'has-details': hasToolCallDetails(block) },
-                      { 'error': block.success === false },
+                      { 'error': block.success === false && !block.pendingConfirmation },
+                      { 'pending-confirmation': block.pendingConfirmation },
                     ]"
-                    @click="hasToolCallDetails(block) && toggleToolCallExpanded(index, blockIndex)"
+                    @click="hasToolCallDetails(block) && !block.pendingConfirmation && toggleToolCallExpanded(index, blockIndex)"
                   >
                     <div class="tool-call-header">
                       <q-icon
-                        :name="block.success === false ? 'error' : 'check_circle'"
+                        :name="block.pendingConfirmation ? 'help_outline' : (block.success === false ? 'error' : 'check_circle')"
                         size="14px"
-                        :color="block.success === false ? 'negative' : 'positive'"
+                        :color="block.pendingConfirmation ? 'warning' : (block.success === false ? 'negative' : 'positive')"
                       />
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
                       <q-icon
-                        v-if="hasToolCallDetails(block)"
+                        v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
                         size="16px"
                         class="expand-icon"
                       />
+                    </div>
+                    <!-- Inline confirmation buttons -->
+                    <div v-if="block.pendingConfirmation" class="tool-confirmation-inline" @click.stop>
+                      <span class="confirmation-message">{{ block.confirmationMessage }}</span>
+                      <div v-if="block.confirmationArgs && Object.keys(block.confirmationArgs).length" class="confirmation-args">
+                        <div v-for="(value, key) in block.confirmationArgs" :key="key" class="confirmation-arg">
+                          <span class="arg-key">{{ key }}:</span>
+                          <code class="arg-value">{{ typeof value === 'object' ? JSON.stringify(value) : value }}</code>
+                        </div>
+                      </div>
+                      <div class="confirmation-buttons">
+                        <q-btn
+                          dense
+                          no-caps
+                          size="sm"
+                          outline
+                          color="grey"
+                          label="Confirm"
+                          icon="check"
+                          class="confirmation-btn"
+                          @click="handleToolConfirm"
+                        />
+                        <q-btn
+                          dense
+                          no-caps
+                          size="sm"
+                          color="negative"
+                          label="Cancel"
+                          icon="close"
+                          class="confirmation-btn"
+                          @click="handleToolCancel"
+                        />
+                      </div>
                     </div>
                     <!-- Expandable details -->
                     <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
@@ -944,6 +980,9 @@ export default defineComponent({
     const showDeleteChatConfirmDialog = ref(false);
     const chatToDelete = ref<number | null>(null);
 
+    // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
+    const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string } | null>(null);
+
     // AI-generated chat title state
     const aiGeneratedTitle = ref<string | null>(null);
     const displayedTitle = ref<string>('');
@@ -1371,6 +1410,41 @@ export default defineComponent({
                   if (data && data.type === 'title') {
                     aiGeneratedTitle.value = data.title;
                     animateTitle(data.title);
+                    continue;
+                  }
+
+                  // Handle confirmation_required events - add inline confirmation block in chat
+                  if (data && data.type === 'confirmation_required') {
+                    // Complete any active tool call indicator and turn it into a pending-confirmation block
+                    const confirmBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value?.tool || data.tool,
+                      message: activeToolCall.value?.message || `Execute ${data.tool}`,
+                      context: activeToolCall.value?.context || {},
+                      pendingConfirmation: true,
+                      confirmationMessage: data.message || `Confirm execution of ${data.tool}?`,
+                      confirmationArgs: data.args || {},
+                    };
+                    activeToolCall.value = null;
+
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(confirmBlock);
+                    } else {
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: '',
+                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                      });
+                      pendingToolCalls.value = [];
+                    }
+                    pendingConfirmation.value = {
+                      tool: data.tool,
+                      args: data.args || {},
+                      message: data.message || `Confirm execution of ${data.tool}?`,
+                    };
+                    await scrollToBottom();
                     continue;
                   }
 
@@ -2311,6 +2385,66 @@ export default defineComponent({
 
     const clearAllConversations = () => {
       showClearAllConfirmDialog.value = true;
+    };
+
+    /** Resolve the pendingConfirmation block — mark as success or failure */
+    const resolveConfirmationBlock = (approved: boolean) => {
+      for (const msg of chatMessages.value) {
+        if (msg.contentBlocks) {
+          for (const block of msg.contentBlocks) {
+            if (block.pendingConfirmation) {
+              block.pendingConfirmation = false;
+              if (!approved) {
+                block.success = false;
+                block.resultMessage = 'Action cancelled by user';
+              }
+              return;
+            }
+          }
+        }
+      }
+    };
+
+    const handleToolConfirm = async () => {
+      resolveConfirmationBlock(true);
+      if (!currentSessionId.value) return;
+
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ approved: true }),
+          }
+        );
+      } catch (error) {
+        console.error('Error confirming action:', error);
+      }
+      pendingConfirmation.value = null;
+    };
+
+    const handleToolCancel = async () => {
+      resolveConfirmationBlock(false);
+      if (!currentSessionId.value) return;
+
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ approved: false }),
+          }
+        );
+      } catch (error) {
+        console.error('Error cancelling action:', error);
+      }
+      pendingConfirmation.value = null;
     };
 
     const confirmClearAllConversations = async () => {
@@ -3280,6 +3414,10 @@ export default defineComponent({
       clearAllConversations,
       showClearAllConfirmDialog,
       confirmClearAllConversations,
+      // Tool confirmation
+      pendingConfirmation,
+      handleToolConfirm,
+      handleToolCancel,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -4391,6 +4529,97 @@ export default defineComponent({
       }
       &.dark-mode {
         background: rgba(255, 152, 0, 0.22);
+      }
+    }
+  }
+
+  // Pending confirmation state styling (yellow/amber)
+  &.pending-confirmation {
+    cursor: default;
+
+    &.light-mode {
+      background: rgba(255, 193, 7, 0.12);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+    &.dark-mode {
+      background: rgba(255, 193, 7, 0.15);
+      border: 1px solid rgba(255, 193, 7, 0.25);
+    }
+  }
+
+  .tool-confirmation-inline {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 193, 7, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .confirmation-message {
+      font-size: 13px;
+      font-weight: 500;
+
+      .light-mode & {
+        color: #6d5800;
+      }
+      .dark-mode & {
+        color: #ffd54f;
+      }
+    }
+
+    .confirmation-args {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px 10px;
+      border-radius: 4px;
+
+      .light-mode & {
+        background: rgba(255, 193, 7, 0.08);
+      }
+      .dark-mode & {
+        background: rgba(255, 193, 7, 0.06);
+      }
+
+      .confirmation-arg {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        font-size: 12px;
+
+        .arg-key {
+          font-weight: 600;
+          white-space: nowrap;
+
+          .light-mode & {
+            color: #6d5800;
+          }
+          .dark-mode & {
+            color: #ffd54f;
+          }
+        }
+
+        .arg-value {
+          font-family: 'Fira Code', 'Consolas', monospace;
+          word-break: break-all;
+
+          .light-mode & {
+            color: #4a5568;
+          }
+          .dark-mode & {
+            color: #e2e8f0;
+          }
+        }
+      }
+    }
+
+    .confirmation-buttons {
+      display: flex;
+      gap: 8px;
+
+      .confirmation-btn {
+        font-size: 12px;
+        padding: 2px 12px;
       }
     }
   }

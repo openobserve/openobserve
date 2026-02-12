@@ -228,7 +228,7 @@ pub async fn set_user_setting(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete org system setting", "category": "system"}))
+        ("x-o2-mcp" = json!({"description": "Delete org system setting", "category": "system", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> Response {
@@ -264,7 +264,7 @@ pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> 
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete user system setting", "category": "system"}))
+        ("x-o2-mcp" = json!({"description": "Delete user system setting", "category": "system", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_user_setting(

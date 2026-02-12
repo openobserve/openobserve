@@ -359,7 +359,7 @@ pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response 
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines"}))
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) -> Response {
