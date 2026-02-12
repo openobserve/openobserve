@@ -35,6 +35,16 @@ export class HomePage {
         this.logoutButton = page.locator('[data-test="menu-link-logout-item"]');
         this.aiChatButton = page.locator('[data-test="menu-link-ai-item"]');
 
+        // ===== ENTERPRISE BUTTON SELECTORS (VERIFIED) =====
+        this.enterpriseButton = page.locator('[data-test="upgrade-to-enterprise-btn"]');
+        this.enterpriseDialogCard = page.locator('.enterprise-dialog-v3');
+        this.enterpriseDialogCloseBtn = page.locator('.enterprise-dialog-v3 .close-btn-top-right');
+        this.enterpriseDialogHeroTitle = page.locator('.enterprise-dialog-v3 .hero-title');
+        this.enterpriseDialogFeaturesPanel = page.locator('.enterprise-dialog-v3 .features-panel');
+        this.enterpriseDialogFeatureItems = page.locator('.enterprise-dialog-v3 .feature-list-item');
+        this.enterpriseDialogPrimaryButton = page.locator('.enterprise-dialog-v3 .download-btn');
+        this.enterpriseDialogLearnMoreButton = page.locator('.enterprise-dialog-v3 .learn-more-btn');
+
         // ===== THEME SWITCHER SELECTORS =====
         // Note: ThemeSwitcher component doesn't have data-test attribute
         // Using tooltip-based identification
@@ -833,6 +843,106 @@ export class HomePage {
     }
 
     // ===== FAVICON METHODS (Bug #9217) =====
+
+    // ===== ENTERPRISE BUTTON METHODS =====
+
+    /**
+     * Click the Enterprise Edition button in the header
+     * Opens the EnterpriseUpgradeDialog
+     */
+    async clickEnterpriseButton() {
+        await this.enterpriseButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.enterpriseButton.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Verify enterprise button is visible in header
+     */
+    async expectEnterpriseButtonVisible() {
+        await expect(this.enterpriseButton).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Get the text content of the enterprise button
+     * @returns {Promise<string>} The button text
+     */
+    async getEnterpriseButtonText() {
+        await this.enterpriseButton.waitFor({ state: 'visible', timeout: 10000 });
+        return await this.enterpriseButton.textContent();
+    }
+
+    /**
+     * Verify enterprise dialog is visible after clicking button
+     */
+    async expectEnterpriseDialogVisible() {
+        await expect(this.enterpriseDialogCard).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Verify enterprise dialog is not visible (closed)
+     */
+    async expectEnterpriseDialogNotVisible() {
+        await expect(this.enterpriseDialogCard).not.toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Close the enterprise dialog using the close button
+     */
+    async closeEnterpriseDialog() {
+        await this.enterpriseDialogCloseBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await this.enterpriseDialogCloseBtn.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Get the hero title text from the enterprise dialog
+     * @returns {Promise<string>} The hero title text
+     */
+    async getEnterpriseDialogHeroTitle() {
+        await this.enterpriseDialogHeroTitle.waitFor({ state: 'visible', timeout: 5000 });
+        return await this.enterpriseDialogHeroTitle.textContent();
+    }
+
+    /**
+     * Verify the features panel is visible in enterprise dialog
+     */
+    async expectEnterpriseFeaturesPanelVisible() {
+        await expect(this.enterpriseDialogFeaturesPanel).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Get the count of feature items in the enterprise dialog
+     * @returns {Promise<number>} Number of feature items
+     */
+    async getEnterpriseFeatureCount() {
+        await this.enterpriseDialogFeaturesPanel.waitFor({ state: 'visible', timeout: 5000 });
+        return await this.enterpriseDialogFeatureItems.count();
+    }
+
+    /**
+     * Click a feature item by index in the enterprise dialog
+     * @param {number} index - The index of the feature item to click
+     */
+    async clickEnterpriseFeatureItem(index) {
+        const featureItem = this.enterpriseDialogFeatureItems.nth(index);
+        await featureItem.waitFor({ state: 'visible', timeout: 5000 });
+        await featureItem.click();
+    }
+
+    /**
+     * Verify the primary CTA button is visible in enterprise dialog
+     */
+    async expectEnterprisePrimaryButtonVisible() {
+        await expect(this.enterpriseDialogPrimaryButton).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify the learn more button is visible in enterprise dialog
+     */
+    async expectEnterpriseLearnMoreButtonVisible() {
+        await expect(this.enterpriseDialogLearnMoreButton).toBeVisible({ timeout: 5000 });
+    }
 
     /**
      * Verify favicon is present and loads correctly

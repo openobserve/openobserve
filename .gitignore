@@ -52,3 +52,7 @@ CLAUDE.md
 .claude/agents/
 .claude/skills/
 .claude/settings.json
+/tests/test-data/correlation-data
+.mcp.json
+tests/ui-testing/fixtures/correlation.json
+tests/ui-testing/playwright-tests/Dashboards/DASHBOARD_VARIABLES_FIXES.md
