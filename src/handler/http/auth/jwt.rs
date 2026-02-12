@@ -171,7 +171,6 @@ pub async fn process_token(
         if let Some(db_user) = db_user {
             // check if user is service account and skip the role update ,
             // assumption is always a service account irrespective of the orgs it belongs to
-            println!("{:?}", db_user.organizations);
             if res
                 .0
                 .user_role
@@ -356,10 +355,11 @@ pub async fn process_token(
                     tuples_to_add.insert(org.name.to_owned(), tuples);
                 }
             }
+            let (first_name, last_name) = split_name(&name);
             let updated_db_user = DBUser {
                 email: user_email.to_owned(),
-                first_name: name.to_owned(),
-                last_name: "".to_owned(),
+                first_name: first_name.to_owned(),
+                last_name: last_name.to_owned(),
                 password: "".to_owned(),
                 salt: "".to_owned(),
                 organizations: source_orgs,
@@ -469,10 +469,9 @@ async fn map_group_to_custom_role(
         // Check if custom claim parsing was used by looking for roles with custom orgs
         // If custom claim parsing is disabled, custom_roles come from LDAP groups and should use
         // default org
-        let use_custom_orgs = openfga_cfg.custom_claim_parsing_enabled;
 
         // Use HashMap<String, Vec<String>> to support multiple roles per org
-        let custom_orgs: std::collections::HashMap<String, Vec<String>> = if use_custom_orgs {
+        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
             let mut map: std::collections::HashMap<String, Vec<String>> =
                 std::collections::HashMap::new();
             for r in &custom_roles {
@@ -483,9 +482,6 @@ async fn map_group_to_custom_role(
                 }
             }
             map
-        } else {
-            // LDAP groups: use default org with all roles
-            std::collections::HashMap::new()
         };
 
         // Always create default org (system org)
@@ -493,9 +489,7 @@ async fn map_group_to_custom_role(
 
         // For custom claim parsing, validate that orgs exist (do NOT auto-create)
         // Filter out non-existent orgs and log errors for them
-        let custom_orgs: std::collections::HashMap<String, Vec<String>> = if use_custom_orgs
-            && !custom_orgs.is_empty()
-        {
+        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
             let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
                 std::collections::HashMap::new();
             for (org_id, roles) in custom_orgs {
@@ -515,8 +509,6 @@ async fn map_group_to_custom_role(
                 }
             }
             valid_orgs
-        } else {
-            custom_orgs
         };
 
         if openfga_cfg.enabled {
@@ -529,16 +521,14 @@ async fn map_group_to_custom_role(
             );
 
             // If custom claim parsing enabled, also add to custom orgs
-            if use_custom_orgs && !custom_orgs.is_empty() {
-                for org_name in custom_orgs.keys() {
-                    if org_name != &dex_cfg.default_org {
-                        get_add_user_to_org_tuples(
-                            org_name,
-                            user_email,
-                            &role.to_string(),
-                            &mut tuples,
-                        );
-                    }
+            for org_name in custom_orgs.keys() {
+                if org_name != &dex_cfg.default_org {
+                    get_add_user_to_org_tuples(
+                        org_name,
+                        user_email,
+                        &role.to_string(),
+                        &mut tuples,
+                    );
                 }
             }
 
@@ -558,30 +548,19 @@ async fn map_group_to_custom_role(
             tuples.clear();
 
             // Group custom roles by organization
-            if use_custom_orgs && !custom_orgs.is_empty() {
-                // Custom claim parsing: roles are assigned to their respective orgs
-                // custom_orgs already has roles grouped by org: { org_name => [role1, role2, ...] }
-                for (org_name, role_names) in &custom_orgs {
-                    // Format roles as "org_name/role_name" for the tuple function
-                    let org_roles: Vec<String> = role_names
-                        .iter()
-                        .map(|role_name| format!("{org_name}/{role_name}"))
-                        .collect();
+            // Custom claim parsing: roles are assigned to their respective orgs
+            // custom_orgs already has roles grouped by org: { org_name => [role1, role2, ...] }
+            for (org_name, role_names) in &custom_orgs {
+                // Format roles as "org_name/role_name" for the tuple function
+                let org_roles: Vec<String> = role_names
+                    .iter()
+                    .map(|role_name| format!("{org_name}/{role_name}"))
+                    .collect();
 
-                    check_and_get_crole_tuple_for_new_user(
-                        user_email,
-                        org_name,
-                        org_roles,
-                        &mut tuples,
-                    )
-                    .await;
-                }
-            } else {
-                // LDAP groups: all roles belong to default org
                 check_and_get_crole_tuple_for_new_user(
                     user_email,
-                    &dex_cfg.default_org,
-                    custom_roles.clone(),
+                    org_name,
+                    org_roles,
                     &mut tuples,
                 )
                 .await;
@@ -593,32 +572,22 @@ async fn map_group_to_custom_role(
         // - Otherwise: add to default org only
         let mut organizations = Vec::new();
 
-        if use_custom_orgs && !custom_orgs.is_empty() {
-            // Custom claim parsing: add user to custom orgs
-            for org_name in custom_orgs.keys() {
-                organizations.push(UserOrg {
-                    role: role.clone(),
-                    name: org_name.clone(),
-                    org_name: org_name.clone(),
-                    token: Default::default(),
-                    rum_token: Default::default(),
-                });
-            }
-        } else {
-            // LDAP groups or no custom orgs: add to default org
+        // Custom claim parsing: add user to custom orgs
+        for org_name in custom_orgs.keys() {
             organizations.push(UserOrg {
                 role: role.clone(),
-                name: dex_cfg.default_org.clone(),
-                org_name: dex_cfg.default_org.clone(),
+                name: org_name.clone(),
+                org_name: org_name.clone(),
                 token: Default::default(),
                 rum_token: Default::default(),
             });
         }
 
+        let (first_name, last_name) = split_name(name);
         let updated_db_user = DBUser {
             email: user_email.to_owned(),
-            first_name: name.to_owned(),
-            last_name: "".to_owned(),
+            first_name: first_name.to_owned(),
+            last_name: last_name.to_owned(),
             password: "".to_owned(),
             salt: "".to_owned(),
             organizations,
@@ -797,6 +766,14 @@ fn format_role_name(org_id: &str, role: &str) -> String {
     format!("{org_id}/{role}")
 }
 
+/// Splits a full name into (first_name, last_name).
+/// Everything before the first space is the first name, everything after is the last name.
+/// If there is no space, last_name will be an empty string.
+#[cfg(feature = "enterprise")]
+fn split_name(name: &str) -> (&str, &str) {
+    name.split_once(' ').unwrap_or((name, ""))
+}
+
 #[cfg(feature = "enterprise")]
 pub fn format_role_name_only(role: &str) -> String {
     RE_ROLE_NAME.replace_all(role, "_").to_string()
@@ -842,7 +819,7 @@ pub async fn check_and_add_to_org(
 
     let mut is_new_user = false;
     let mut tuples_to_add = HashMap::new();
-    let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
+    let (first_name, last_name) = split_name(name);
     let db_user = db::user::get_user_by_email(user_email).await;
     let now = chrono::Utc::now().timestamp_micros();
     let pending_invites = match db::user::list_user_invites(user_email).await {
@@ -1184,8 +1161,10 @@ async fn process_custom_claim_parsing(
                     assignment.org,
                     assignment.role
                 );
+                // Check if the given role is standard role, otherwise use default role
                 source_orgs.push(UserOrg {
-                    role: UserRole::from_str(&dex_cfg.default_role).unwrap(),
+                    role: UserRole::from_str(&assignment.role)
+                        .unwrap_or(UserRole::from_str(&dex_cfg.default_role).unwrap()),
                     name: assignment.org.clone(),
                     org_name: assignment.org.clone(),
                     token: Default::default(),
@@ -1356,19 +1335,19 @@ mod tests {
         assert!(role_org.custom_role.is_some() || role_org.custom_role.is_none());
     }
 
-    #[cfg(feature = "cloud")]
     #[test]
-    fn test_user_name_parsing() {
-        let name = "John Doe Smith";
-        let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
-        assert_eq!(first_name, "John");
-        assert_eq!(last_name, "Doe Smith");
+    fn test_split_name() {
+        let (first, last) = split_name("John Doe Smith");
+        assert_eq!(first, "John");
+        assert_eq!(last, "Doe Smith");
 
-        let name_single = "John";
-        let (first_name_single, last_name_single) =
-            name_single.split_once(' ').unwrap_or((name_single, ""));
-        assert_eq!(first_name_single, "John");
-        assert_eq!(last_name_single, "");
+        let (first, last) = split_name("John");
+        assert_eq!(first, "John");
+        assert_eq!(last, "");
+
+        let (first, last) = split_name("");
+        assert_eq!(first, "");
+        assert_eq!(last, "");
     }
 
     #[test]
