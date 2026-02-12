@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-80px)]!"
+      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]!"
       v-model="splitterModel"
       unit="px"
       vertical
