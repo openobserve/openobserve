@@ -879,7 +879,11 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
                 Json(response).into_response()
             }
             Err(e) => {
-                log::error!("[trace_id:{}] Feedback submission failed: {}", trace_id, e);
+                log::error!(
+                    "[trace_id:{}] Feedback submission failed: {}",
+                    trace_id,
+                    e
+                );
                 MetaHttpResponse::internal_error(format!("Feedback submission failed: {}", e))
             }
         }
