@@ -199,11 +199,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PanelErrorButtons
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
-                      :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                      :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                      :limitNumberOfSeriesWarningMessage="
+                        limitNumberOfSeriesWarningMessage
+                      "
+                      :isCachedDataDifferWithCurrentTimeRange="
+                        isCachedDataDifferWithCurrentTimeRange
+                      "
                       :isPartialData="isPartialData"
                       :isPanelLoading="isPanelLoading"
-                      :lastTriggeredAt="resolvedConfig.showLastRefreshedTime ? (lastTriggeredAt as any) : null"
+                      :lastTriggeredAt="
+                        resolvedConfig.showLastRefreshedTime
+                          ? (lastTriggeredAt as any)
+                          : null
+                      "
                       :viewOnly="false"
                     />
 
@@ -263,8 +271,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @show-legends="showLegendsDialog = true"
                         @is-partial-data-update="handleIsPartialDataUpdate"
                         @loading-state-change="handleLoadingStateChange"
-                        @is-cached-data-differ-with-current-time-range-update="handleIsCachedDataDifferWithCurrentTimeRangeUpdate"
-                        @update:initial-variable-values="handleInitialVariableValuesUpdate"
+                        @is-cached-data-differ-with-current-time-range-update="
+                          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                        "
+                        @update:initial-variable-values="
+                          handleInitialVariableValuesUpdate
+                        "
                       />
                     </div>
                   </div>
@@ -560,8 +572,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @show-legends="showLegendsDialog = true"
                         @is-partial-data-update="handleIsPartialDataUpdate"
                         @loading-state-change="handleLoadingStateChange"
-                        @is-cached-data-differ-with-current-time-range-update="handleIsCachedDataDifferWithCurrentTimeRangeUpdate"
-                        @update:initial-variable-values="handleInitialVariableValuesUpdate"
+                        @is-cached-data-differ-with-current-time-range-update="
+                          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                        "
+                        @update:initial-variable-values="
+                          handleInitialVariableValuesUpdate
+                        "
                       />
                     </template>
                   </q-splitter>
@@ -617,7 +633,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, defineAsyncComponent, toRef, watch } from "vue";
+import {
+  ref,
+  computed,
+  provide,
+  defineAsyncComponent,
+  toRef,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
@@ -709,9 +732,8 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery } = useDashboardPanelData(
-  pageKey.value,
-);
+const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery } =
+  useDashboardPanelData(pageKey.value);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -990,7 +1012,6 @@ const handleInitialVariableValuesUpdate = (values: Record<string, any>) => {
   emit("initialVariableValuesUpdated", values);
 };
 
-
 const handleCustomChartTemplateSelected = (templateCode: string) => {
   dashboardPanelData.data.customChartContent = templateCode;
 };
@@ -1044,28 +1065,49 @@ const handleChartTypeSelection = async (selection: any) => {
 // This is the centralized watcher that replaces duplicate watchers in AddPanel, Metrics, and BuildQueryPage
 watch(
   () => [
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.stream,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.x,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.y,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.breakdown,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.z,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.filter,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.latitude,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.longitude,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.weight,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.source,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.target,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.value,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.name,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.value_for_maps,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config?.limit,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.stream,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.x,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.y,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.breakdown,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.z,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.filter,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.customQuery,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.latitude,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.longitude,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.weight,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.source,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.target,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.value,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.name,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.fields?.value_for_maps,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.config?.limit,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.joins,
     dashboardPanelData.data.type,
   ],
   async () => {
     // Only auto-generate SQL if in builder mode (customQuery = false)
-    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery) {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.customQuery
+    ) {
       const result = await makeAutoSQLQuery();
 
       // Only emit if makeAutoSQLQuery actually ran and generated a query
@@ -1076,16 +1118,18 @@ watch(
       }
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Watch for customQuery mode changes to notify parent
 watch(
-  () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery,
+  () =>
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      ?.customQuery,
   (isCustomMode) => {
     emit("customQueryModeChanged", isCustomMode ?? false);
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Watch for searchRequestTraceIds changes to notify parent (for cancel query functionality)
@@ -1094,7 +1138,17 @@ watch(
   (newTraceIds) => {
     emit("searchRequestTraceIdsUpdated", newTraceIds);
   },
-  { immediate: true }
+  { immediate: true },
+);
+
+// Watch for metaData changes to emit to parent (for QueryInspector)
+watch(
+  metaData,
+  (newMetaData) => {
+    // This ensures parent (AddPanel) stays in sync with PanelEditor's metadata state
+    emit("metaDataUpdated", newMetaData);
+  },
+  { deep: true },
 );
 
 // ============================================================================
@@ -1130,7 +1184,6 @@ defineExpose({
   limitNumberOfSeriesWarningMessage,
   errorMessage,
 });
-
 </script>
 
 <style lang="scss" scoped>
