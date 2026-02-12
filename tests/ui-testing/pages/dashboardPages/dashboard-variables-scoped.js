@@ -1189,4 +1189,483 @@ export default class DashboardVariablesScoped {
       variableName: variableName
     };
   }
+
+  /**
+   * Add a custom type variable
+   * @param {string} name - Variable name
+   * @param {string[]} values - Array of custom values (can also be objects with {label, value})
+   * @param {Object} options - Additional options
+   * @param {string} options.label - Display label (defaults to name)
+   * @param {string} options.scope - Variable scope: 'global', 'tabs', 'panels'
+   * @param {string[]} options.assignedTabs - Tab IDs if scope is 'tabs'
+   * @param {string[]} options.assignedPanels - Panel IDs if scope is 'panels'
+   * @param {boolean} options.multiSelect - Enable multi-select (default: false)
+   * @returns {Promise<void>}
+   */
+  async addCustomVariable(name, values = [], options = {}) {
+    const {
+      label = name,
+      scope = "global",
+      assignedTabs = [],
+      assignedPanels = [],
+      multiSelect = false,
+    } = options;
+
+    // Wait for settings panel and variable tab
+    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+    await variableTab.waitFor({ state: "visible", timeout: 10000 });
+
+    // Only click if not already active
+    const isActive = await variableTab.getAttribute('aria-selected');
+    if (isActive !== 'true') {
+      await variableTab.click();
+      await this.page.waitForTimeout(500);
+    } else {
+      await this.page.waitForTimeout(300);
+    }
+
+    // Click Add Variable button
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
+    await this.page.waitForTimeout(500);
+
+    // Select scope first (before filling other fields)
+    const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
+    const scopeUIText = {
+      'global': 'Global',
+      'tabs': 'Selected Tabs',
+      'panels': 'Selected Panels'
+    };
+
+    await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+
+    // Assign to tabs if needed
+    if (normalizedScope === "tabs" && assignedTabs.length > 0) {
+      const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+      await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
+      await tabsSelect.click();
+      await this.page.waitForTimeout(500);
+
+      for (const tabId of assignedTabs) {
+        const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
+        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        await tabItem.waitFor({ state: "visible", timeout: 5000 });
+        await tabItem.click();
+      }
+
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+    }
+
+    // Assign to panels if needed
+    if (normalizedScope === "panels") {
+      const tabsToSelect = assignedTabs.length > 0 ? assignedTabs : ['default'];
+
+      const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+      await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
+      await tabsSelect.click();
+      await this.page.waitForTimeout(500);
+
+      for (const tabId of tabsToSelect) {
+        const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
+        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        await tabItem.waitFor({ state: "visible", timeout: 5000 });
+        await tabItem.click();
+      }
+
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+
+      if (assignedPanels.length > 0) {
+        const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
+        await panelsSelect.waitFor({ state: "visible", timeout: 10000 });
+        await panelsSelect.click();
+        await this.page.waitForTimeout(1000);
+
+        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+
+        for (const panelName of assignedPanels) {
+          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          await panelItem.waitFor({ state: "visible", timeout: 5000 });
+          await panelItem.click();
+          await this.page.waitForTimeout(500);
+        }
+
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Select variable type - Custom
+    await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await this.page.getByRole("option", { name: "Custom", exact: true }).click();
+    await this.page.waitForTimeout(500);
+
+    // Fill name and label
+    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
+
+    // Add custom options - the first option already exists by default
+    if (values.length > 0) {
+      for (let i = 0; i < values.length; i++) {
+        const value = values[i];
+        const valueLabel = typeof value === 'string' ? value : value.label;
+        const valueValue = typeof value === 'string' ? value : value.value;
+        const isDefault = typeof value === 'object' && value.selected === true;
+
+        // If this is not the first item, add a new option
+        if (i > 0) {
+          await this.page.locator('button:has-text("Add Option")').click();
+          await this.page.waitForTimeout(300);
+        }
+
+        // Fill label and value for this option
+        await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label"]`).fill(valueLabel);
+        await this.page.locator(`[data-test="dashboard-custom-variable-${i}-value"]`).fill(valueValue);
+
+        // Set as default if specified
+        if (isDefault) {
+          const checkbox = this.page.locator(`[data-test="dashboard-custom-variable-${i}-checkbox"]`);
+          const isChecked = await checkbox.isChecked();
+          if (!isChecked) {
+            await checkbox.click();
+          }
+        }
+      }
+    }
+
+    // Enable multi-select if requested
+    if (multiSelect) {
+      await this.page.locator('[data-test="dashboard-query_values-show_multiple_values"]').click();
+    }
+
+    // Save variable
+    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
+
+    // Wait for save to complete
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    const addVariableBtn = this.page.locator('[data-test="dashboard-add-variable-btn"]');
+    const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
+
+    try {
+      await Promise.race([
+        addVariableBtn.waitFor({ state: "visible", timeout: 8000 }),
+        editBtn.waitFor({ state: "visible", timeout: 8000 })
+      ]);
+    } catch (e) {
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Add a constant type variable
+   * @param {string} name - Variable name
+   * @param {string} value - Constant value
+   * @param {Object} options - Additional options
+   * @param {string} options.label - Display label (defaults to name)
+   * @param {string} options.scope - Variable scope: 'global', 'tabs', 'panels'
+   * @param {string[]} options.assignedTabs - Tab IDs if scope is 'tabs'
+   * @param {string[]} options.assignedPanels - Panel IDs if scope is 'panels'
+   * @returns {Promise<void>}
+   */
+  async addConstantVariable(name, value, options = {}) {
+    const {
+      label = name,
+      scope = "global",
+      assignedTabs = [],
+      assignedPanels = [],
+    } = options;
+
+    // Wait for settings panel and variable tab
+    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+    await variableTab.waitFor({ state: "visible", timeout: 10000 });
+
+    // Only click if not already active
+    const isActive = await variableTab.getAttribute('aria-selected');
+    if (isActive !== 'true') {
+      await variableTab.click();
+      await this.page.waitForTimeout(500);
+    } else {
+      await this.page.waitForTimeout(300);
+    }
+
+    // Click Add Variable button
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
+    await this.page.waitForTimeout(500);
+
+    // Select scope first
+    const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
+    const scopeUIText = {
+      'global': 'Global',
+      'tabs': 'Selected Tabs',
+      'panels': 'Selected Panels'
+    };
+
+    await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+
+    // Assign to tabs if needed
+    if (normalizedScope === "tabs" && assignedTabs.length > 0) {
+      const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+      await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
+      await tabsSelect.click();
+      await this.page.waitForTimeout(500);
+
+      for (const tabId of assignedTabs) {
+        const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
+        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        await tabItem.waitFor({ state: "visible", timeout: 5000 });
+        await tabItem.click();
+      }
+
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+    }
+
+    // Assign to panels if needed
+    if (normalizedScope === "panels") {
+      const tabsToSelect = assignedTabs.length > 0 ? assignedTabs : ['default'];
+
+      const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+      await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
+      await tabsSelect.click();
+      await this.page.waitForTimeout(500);
+
+      for (const tabId of tabsToSelect) {
+        const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
+        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        await tabItem.waitFor({ state: "visible", timeout: 5000 });
+        await tabItem.click();
+      }
+
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+
+      if (assignedPanels.length > 0) {
+        const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
+        await panelsSelect.waitFor({ state: "visible", timeout: 10000 });
+        await panelsSelect.click();
+        await this.page.waitForTimeout(1000);
+
+        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+
+        for (const panelName of assignedPanels) {
+          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          await panelItem.waitFor({ state: "visible", timeout: 5000 });
+          await panelItem.click();
+          await this.page.waitForTimeout(500);
+        }
+
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Select variable type - Constant
+    await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await this.page.getByRole("option", { name: "Constant", exact: true }).click();
+    await this.page.waitForTimeout(500);
+
+    // Fill name and label
+    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
+
+    // Set constant value
+    await this.page.locator('[data-test="dashboard-variable-constant-value"]').fill(value);
+
+    // Save variable
+    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
+
+    // Wait for save to complete
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    const addVariableBtn = this.page.locator('[data-test="dashboard-add-variable-btn"]');
+    const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
+
+    try {
+      await Promise.race([
+        addVariableBtn.waitFor({ state: "visible", timeout: 8000 }),
+        editBtn.waitFor({ state: "visible", timeout: 8000 })
+      ]);
+    } catch (e) {
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Add a textbox type variable
+   * @param {string} name - Variable name
+   * @param {string} defaultValue - Default textbox value
+   * @param {Object} options - Additional options
+   * @param {string} options.label - Display label (defaults to name)
+   * @param {string} options.scope - Variable scope: 'global', 'tabs', 'panels'
+   * @param {string[]} options.assignedTabs - Tab IDs if scope is 'tabs'
+   * @param {string[]} options.assignedPanels - Panel IDs if scope is 'panels'
+   * @returns {Promise<void>}
+   */
+  async addTextboxVariable(name, defaultValue = "", options = {}) {
+    const {
+      label = name,
+      scope = "global",
+      assignedTabs = [],
+      assignedPanels = [],
+    } = options;
+
+    // Wait for settings panel and variable tab
+    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+    await variableTab.waitFor({ state: "visible", timeout: 10000 });
+
+    // Only click if not already active
+    const isActive = await variableTab.getAttribute('aria-selected');
+    if (isActive !== 'true') {
+      await variableTab.click();
+      await this.page.waitForTimeout(500);
+    } else {
+      await this.page.waitForTimeout(300);
+    }
+
+    // Click Add Variable button
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
+    await this.page.waitForTimeout(500);
+
+    // Select scope first
+    const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
+    const scopeUIText = {
+      'global': 'Global',
+      'tabs': 'Selected Tabs',
+      'panels': 'Selected Panels'
+    };
+
+    await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+
+    // Assign to tabs if needed
+    if (normalizedScope === "tabs" && assignedTabs.length > 0) {
+      const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+      await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
+      await tabsSelect.click();
+      await this.page.waitForTimeout(500);
+
+      for (const tabId of assignedTabs) {
+        const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
+        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        await tabItem.waitFor({ state: "visible", timeout: 5000 });
+        await tabItem.click();
+      }
+
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+    }
+
+    // Assign to panels if needed
+    if (normalizedScope === "panels") {
+      const tabsToSelect = assignedTabs.length > 0 ? assignedTabs : ['default'];
+
+      const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+      await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
+      await tabsSelect.click();
+      await this.page.waitForTimeout(500);
+
+      for (const tabId of tabsToSelect) {
+        const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
+        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        await tabItem.waitFor({ state: "visible", timeout: 5000 });
+        await tabItem.click();
+      }
+
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+
+      if (assignedPanels.length > 0) {
+        const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
+        await panelsSelect.waitFor({ state: "visible", timeout: 10000 });
+        await panelsSelect.click();
+        await this.page.waitForTimeout(1000);
+
+        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+
+        for (const panelName of assignedPanels) {
+          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          await panelItem.waitFor({ state: "visible", timeout: 5000 });
+          await panelItem.click();
+          await this.page.waitForTimeout(500);
+        }
+
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Select variable type - Textbox
+    await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await this.page.getByRole("option", { name: "Textbox", exact: true }).click();
+    await this.page.waitForTimeout(500);
+
+    // Fill name and label
+    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
+
+    // Set default value
+    if (defaultValue) {
+      await this.page.locator('[data-test="dashboard-variable-textbox-default-value"]').fill(defaultValue);
+    }
+
+    // Save variable
+    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
+
+    // Wait for save to complete
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    const addVariableBtn = this.page.locator('[data-test="dashboard-add-variable-btn"]');
+    const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
+
+    try {
+      await Promise.race([
+        addVariableBtn.waitFor({ state: "visible", timeout: 8000 }),
+        editBtn.waitFor({ state: "visible", timeout: 8000 })
+      ]);
+    } catch (e) {
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+
+  /**
+   * Verify variable has loaded options (is not empty)
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Options
+   * @param {number} options.timeout - Timeout in ms
+   * @returns {Promise<number>} Number of options found
+   */
+  async verifyVariableHasOptions(variableName, options = {}) {
+    const { timeout = 10000 } = options;
+
+    // Open variable dropdown
+    const selector = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
+    await selector.click();
+
+    // Wait for dropdown menu
+    await this.page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for and count options
+    const dropdown = this.page.locator(`${SELECTORS.MENU} ${SELECTORS.MENU_ITEM}`);
+    await dropdown.first().waitFor({ state: "visible", timeout });
+    const count = await dropdown.count();
+
+    // Close dropdown
+    await this.page.keyboard.press('Escape');
+    await this.page.locator(SELECTORS.MENU).waitFor({ state: "hidden", timeout: 3000 });
+
+    return count;
+  }
 }
