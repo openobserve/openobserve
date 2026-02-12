@@ -404,16 +404,21 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
     await page.getByRole("option", { name: "logs", exact: true }).click();
 
+    // Stream select (CommonAutoComplete component)
     const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
     await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+    await streamSelect.locator('input').fill("e2e_automate");
+    const streamOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
+    await streamOpt.waitFor({ state: "visible", timeout: 10000 });
+    await streamOpt.click();
 
+    // Field select (CommonAutoComplete component)
     const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
     await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_container_name");
-    await page.locator(SELECTORS.OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.OPTION).first().click();
+    await fieldSelect.locator('input').fill("kubernetes_container_name");
+    const fieldOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_container_name" }).first();
+    await fieldOpt.waitFor({ state: "visible", timeout: 10000 });
+    await fieldOpt.click();
 
     // Add a filter to check dependency dropdown - panel variables should NOT be in the list
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -433,8 +438,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await autoComplete.click();
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Get all available variable options
-    const options = page.locator(SELECTORS.OPTION);
+    // Get all available variable options (CommonAutoComplete options)
+    const options = page.locator(SELECTORS.AUTO_COMPLETE_OPTION);
     const optionTexts = await options.allTextContents();
 
     // Panel1's variable should NOT be in the list

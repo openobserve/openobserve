@@ -504,40 +504,25 @@ export default class DashboardVariablesScoped {
       .nth(2)
       .click();
 
-    // Select Stream
+    // Select Stream (CommonAutoComplete component)
     const streamSelect = this.page.locator('[data-test="dashboard-variable-stream-select"]');
     await streamSelect.click();
-    await streamSelect.fill(streamName);
-    await this.page.getByRole("option", { name: streamName, exact: true }).click();
+    await streamSelect.locator('input').fill(streamName);
+    // Wait for and click the matching CommonAutoComplete option
+    const streamOption = this.page.locator('[data-test="common-auto-complete-option"]')
+      .filter({ hasText: streamName }).first();
+    await streamOption.waitFor({ state: "visible", timeout: 10000 });
+    await streamOption.click();
 
-    // Select Field
+    // Select Field (CommonAutoComplete component)
     const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
     await fieldSelect.click();
-    await this.page.keyboard.type(field, { delay: 100 });
-    await this.page.waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
-      { timeout: 10000, polling: 100 }
-    );
-
-    // Select field using multiple strategies
-    let fieldSelected = false;
-    try {
-      await this.page.getByRole("option", { name: field, exact: true }).click({ timeout: 5000 });
-      fieldSelected = true;
-    } catch (e) {
-      try {
-        await this.page.getByRole("option", { name: field, exact: false }).first().click({ timeout: 5000 });
-        fieldSelected = true;
-      } catch (e2) {
-        await this.page.keyboard.press("ArrowDown");
-        await this.page.keyboard.press("Enter");
-        fieldSelected = true;
-      }
-    }
-
-    if (!fieldSelected) {
-      throw new Error(`Failed to select field: ${field}`);
-    }
+    await fieldSelect.locator('input').fill(field);
+    // Wait for and click the matching CommonAutoComplete option
+    const fieldOption = this.page.locator('[data-test="common-auto-complete-option"]')
+      .filter({ hasText: field }).first();
+    await fieldOption.waitFor({ state: "visible", timeout: 10000 });
+    await fieldOption.click();
 
     // Add dependency if specified
     if (dependsOn) {
