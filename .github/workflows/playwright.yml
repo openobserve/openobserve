@@ -282,6 +282,7 @@ jobs:
                 "dashboard-variables-url-sync.spec.js",
                 "dashboard-variables-creation-scopes.spec.js",
                 "dashboard-variables-default-values-chain.spec.js",
+                "dashboard-variables-custom-parents.spec.js"
               ]
     steps:
       - name: Clone the current repo
