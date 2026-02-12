@@ -31,6 +31,12 @@ export interface CostDetails {
   total: number;
 }
 
+export interface EvaluatorInfo {
+  name: string | null;
+  version: string | null;
+  evaluatorType: 'human' | 'model' | 'deterministic';
+}
+
 export interface EvaluationScores {
   qualityScore: number | null;
   relevance: number | null;
@@ -39,6 +45,8 @@ export interface EvaluationScores {
   groundedness: number | null;
   safety: number | null;
   durationMs: number | null;
+  commentary: string | null;
+  evaluator: EvaluatorInfo | null;
 }
 
 export interface LLMData {
@@ -352,6 +360,10 @@ export function parseEvaluationScores(data: any): EvaluationScores | null {
   const groundedness = data._o2_llm_evaluation_groundedness;
   const safety = data._o2_llm_evaluation_safety;
   const durationMs = data._o2_llm_evaluation_duration_ms;
+  const commentary = data._o2_llm_evaluation_commentary;
+  const evaluatorName = data._o2_llm_evaluator_name;
+  const evaluatorVersion = data._o2_llm_evaluator_version;
+  const evaluatorType = data._o2_llm_evaluator_type;
 
   // Return null if no evaluation data present
   if (
@@ -365,6 +377,14 @@ export function parseEvaluationScores(data: any): EvaluationScores | null {
     return null;
   }
 
+  const evaluator: EvaluatorInfo | null = evaluatorName || evaluatorVersion || evaluatorType
+    ? {
+        name: evaluatorName || null,
+        version: evaluatorVersion || null,
+        evaluatorType: evaluatorType || 'deterministic',
+      }
+    : null;
+
   return {
     qualityScore: quality != null ? Number(quality) : null,
     relevance: relevance != null ? Number(relevance) : null,
@@ -373,6 +393,8 @@ export function parseEvaluationScores(data: any): EvaluationScores | null {
     groundedness: groundedness != null ? Number(groundedness) : null,
     safety: safety != null ? Number(safety) : null,
     durationMs: durationMs != null ? Number(durationMs) : null,
+    commentary: commentary || null,
+    evaluator,
   };
 }
 

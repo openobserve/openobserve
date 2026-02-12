@@ -88,6 +88,18 @@ impl O2Attributes {
 
     /// Evaluation duration in milliseconds
     pub const EVALUATION_DURATION_MS: &'static str = "_o2_llm_evaluation_duration_ms";
+
+    /// Per-evaluator reasoning/commentary (JSON object: {evaluator_name: reasoning_string})
+    pub const EVALUATION_COMMENTARY: &'static str = "_o2_llm_evaluation_commentary";
+
+    /// Evaluator name (e.g., "o2-sre-agent-evaluator")
+    pub const EVALUATOR_NAME: &'static str = "_o2_llm_evaluator_name";
+
+    /// Evaluator version (e.g., "v1.0")
+    pub const EVALUATOR_VERSION: &'static str = "_o2_llm_evaluator_version";
+
+    /// Evaluator type: "human", "model", or "deterministic"
+    pub const EVALUATOR_TYPE: &'static str = "_o2_llm_evaluator_type";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -316,6 +328,14 @@ impl EvaluationAttributes {
     pub const TOOL_EFFECTIVENESS: &'static str = "llm.evaluation.tool_effectiveness";
     pub const GROUNDEDNESS: &'static str = "llm.evaluation.groundedness";
     pub const SAFETY: &'static str = "llm.evaluation.safety";
+
+    // Commentary (aggregated reasoning from evaluators)
+    pub const COMMENTARY: &'static str = "llm.evaluation.commentary";
+
+    // Evaluator metadata
+    pub const EVALUATOR_NAME: &'static str = "llm.evaluator.name";
+    pub const EVALUATOR_VERSION: &'static str = "llm.evaluator.version";
+    pub const EVALUATOR_TYPE: &'static str = "llm.evaluator.type";
 
     // Design-doc specified fields (alternative attribute names)
     pub const EVAL_RELEVANCE: &'static str = "evaluation_relevance";
