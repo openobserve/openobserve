@@ -740,8 +740,7 @@ fn format_role_name(org_id: &str, role: &str) -> String {
 /// Parses roles in "org/role" format into a map of org -> [role1, role2, ...].
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 fn group_roles_by_org(custom_roles: &[String]) -> std::collections::HashMap<String, Vec<String>> {
-    let mut map: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
     for r in custom_roles {
         if let Some((org, role)) = r.split_once('/') {
             map.entry(org.to_string())
