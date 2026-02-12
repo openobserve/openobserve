@@ -706,6 +706,29 @@
                     <div v-else class="text-block" v-html="processHtmlBlock(block.content)"></div>
                   </template>
                 </template>
+                <!-- Feedback buttons for assistant messages -->
+                <div v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''" class="feedback-buttons">
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="xs"
+                    @click="likeCodeBlock(index)"
+                  >
+                    <q-icon :name="outlinedThumbUpOffAlt" size="14px" />
+                    <q-tooltip>Helpful</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="xs"
+                    @click="dislikeCodeBlock(index)"
+                  >
+                    <q-icon :name="outlinedThumbDownOffAlt" size="14px" />
+                    <q-tooltip>Not helpful</q-tooltip>
+                  </q-btn>
+                </div>
               </div>
             </div>
           </div>
@@ -943,7 +966,7 @@ import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
 
-const { fetchAiChat } = useAiChat();
+const { fetchAiChat, submitFeedback } = useAiChat();
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
@@ -4183,12 +4206,35 @@ export default defineComponent({
       return date.toLocaleString();
     };
 
-    const likeCodeBlock = (message: any) => {
-      // console.log('likeCodeBlock', message);
+    const likeCodeBlock = async (messageIndex: number) => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId) return;
+      // Each user+assistant pair = 1 query turn, so queryIndex = floor(index / 2)
+      const queryIndex = Math.floor(messageIndex / 2);
+      const success = await submitFeedback(
+        'thumbs_up',
+        orgId,
+        currentSessionId.value || undefined,
+        queryIndex,
+      );
+      if (success) {
+        $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
+      }
     };
 
-    const dislikeCodeBlock = (message: any) => {
-      // console.log('dislikeCodeBlock', message);
+    const dislikeCodeBlock = async (messageIndex: number) => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId) return;
+      const queryIndex = Math.floor(messageIndex / 2);
+      const success = await submitFeedback(
+        'thumbs_down',
+        orgId,
+        currentSessionId.value || undefined,
+        queryIndex,
+      );
+      if (success) {
+        $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
+      }
     };
     const o2AiTitleLogo = computed(() => {
       return store.state.theme == 'dark' ? getImageURL('images/common/o2_ai_logo_dark.svg') : getImageURL('images/common/o2_ai_logo.svg')
@@ -4671,6 +4717,19 @@ export default defineComponent({
       overflow-x: auto;
       word-wrap: break-word;
       overflow-wrap: break-word;
+    }
+
+    .feedback-buttons {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-top: 4px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+
+      &:hover {
+        opacity: 1;
+      }
     }
 
     .text-block {

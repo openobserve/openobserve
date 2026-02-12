@@ -31,6 +31,16 @@ export interface CostDetails {
   total: number;
 }
 
+export interface EvaluationScores {
+  qualityScore: number | null;
+  relevance: number | null;
+  completeness: number | null;
+  toolEffectiveness: number | null;
+  groundedness: number | null;
+  safety: number | null;
+  durationMs: number | null;
+}
+
 export interface LLMData {
   provider: string;
   observationType: string;
@@ -44,6 +54,7 @@ export interface LLMData {
   sessionId: string | null;
   promptName: string | null;
   inputPreview: string;
+  evaluation: EvaluationScores | null;
 }
 
 /**
@@ -331,6 +342,60 @@ export function truncateLLMContent(
 }
 
 /**
+ * Parse evaluation scores from span attributes
+ */
+export function parseEvaluationScores(data: any): EvaluationScores | null {
+  const quality = data._o2_llm_evaluation_quality;
+  const relevance = data._o2_llm_evaluation_relevance;
+  const completeness = data._o2_llm_evaluation_completeness;
+  const toolEffectiveness = data._o2_llm_evaluation_tool_effectiveness;
+  const groundedness = data._o2_llm_evaluation_groundedness;
+  const safety = data._o2_llm_evaluation_safety;
+  const durationMs = data._o2_llm_evaluation_duration_ms;
+
+  // Return null if no evaluation data present
+  if (
+    quality == null &&
+    relevance == null &&
+    completeness == null &&
+    toolEffectiveness == null &&
+    groundedness == null &&
+    safety == null
+  ) {
+    return null;
+  }
+
+  return {
+    qualityScore: quality != null ? Number(quality) : null,
+    relevance: relevance != null ? Number(relevance) : null,
+    completeness: completeness != null ? Number(completeness) : null,
+    toolEffectiveness: toolEffectiveness != null ? Number(toolEffectiveness) : null,
+    groundedness: groundedness != null ? Number(groundedness) : null,
+    safety: safety != null ? Number(safety) : null,
+    durationMs: durationMs != null ? Number(durationMs) : null,
+  };
+}
+
+/**
+ * Format evaluation score as percentage for display
+ */
+export function formatScore(score: number | null): string {
+  if (score == null) return 'N/A';
+  return `${(score * 100).toFixed(0)}%`;
+}
+
+/**
+ * Get color for quality score badge
+ * Green for good (>= 0.7), yellow for medium (>= 0.4), red for poor
+ */
+export function getQualityScoreColor(score: number | null): string {
+  if (score == null) return 'grey';
+  if (score >= 0.7) return 'green';
+  if (score >= 0.4) return 'orange';
+  return 'red';
+}
+
+/**
  * Get color for observation type badge
  */
 export function getObservationTypeColor(type: string): string {
@@ -371,6 +436,7 @@ export function extractLLMData(span: any): LLMData | null {
   const modelParams = parseModelParameters(span._o2_llm_model_parameters);
   const usage = parseUsageDetails(span);
   const cost = parseCostDetails(span);
+  const evaluation = parseEvaluationScores(span);
 
   return {
     provider: span._o2_llm_provider_name || 'unknown',
@@ -385,6 +451,7 @@ export function extractLLMData(span: any): LLMData | null {
     sessionId: span._o2_llm_session_id || null,
     promptName: span._o2_llm_prompt_name || null,
     inputPreview: truncateLLMContent(span._o2_llm_input, 100),
+    evaluation,
   };
 }
 

@@ -175,6 +175,49 @@ const useAiChat = () => {
         }
     }
 
+    /**
+     * Submit user feedback (thumbs up/down) for an AI response
+     *
+     * @param feedbackType - "thumbs_up" or "thumbs_down"
+     * @param org_id - Organization identifier
+     * @param sessionId - Session ID for linking feedback to conversation
+     * @param queryIndex - Index of the query in the session this feedback is for
+     */
+    const submitFeedback = async (
+        feedbackType: 'thumbs_up' | 'thumbs_down',
+        org_id: string,
+        sessionId?: string,
+        queryIndex?: number,
+    ) => {
+        const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/feedback`;
+
+        const body = {
+            feedback_type: feedbackType,
+            query_index: queryIndex ?? -1,
+        };
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        if (sessionId) {
+            headers['x-o2-assistant-session-id'] = sessionId;
+        }
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: JSON.stringify(body),
+                credentials: 'include',
+                headers,
+            });
+            return response.ok;
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            return false;
+        }
+    };
+
     const getFormattedContext = (message: any, context: any) => {
         // Initialize context section
 
@@ -210,6 +253,7 @@ const useAiChat = () => {
 
     return {
         fetchAiChat,
+        submitFeedback,
         registerAiChatHandler,
         removeAiChatHandler,
         getContext,

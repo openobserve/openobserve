@@ -66,6 +66,28 @@ impl O2Attributes {
 
     /// Completion start time in microseconds
     pub const COMPLETION_START_TIME: &'static str = "_o2_llm_completion_start_time";
+
+    /// Aggregate quality score from evaluation (0.0-1.0)
+    pub const EVALUATION_QUALITY: &'static str = "_o2_llm_evaluation_quality";
+
+    /// Relevance evaluation score (0.0-1.0)
+    pub const EVALUATION_RELEVANCE: &'static str = "_o2_llm_evaluation_relevance";
+
+    /// Completeness evaluation score (0.0-1.0)
+    pub const EVALUATION_COMPLETENESS: &'static str = "_o2_llm_evaluation_completeness";
+
+    /// Tool effectiveness evaluation score (0.0-1.0)
+    pub const EVALUATION_TOOL_EFFECTIVENESS: &'static str =
+        "_o2_llm_evaluation_tool_effectiveness";
+
+    /// Groundedness/faithfulness evaluation score (0.0-1.0)
+    pub const EVALUATION_GROUNDEDNESS: &'static str = "_o2_llm_evaluation_groundedness";
+
+    /// Safety evaluation score (0.0-1.0)
+    pub const EVALUATION_SAFETY: &'static str = "_o2_llm_evaluation_safety";
+
+    /// Evaluation duration in milliseconds
+    pub const EVALUATION_DURATION_MS: &'static str = "_o2_llm_evaluation_duration_ms";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -280,6 +302,29 @@ impl FrameworkAttributes {
     pub const MODEL_CONFIG: &'static str = "model_config";
 }
 
+/// LLM Evaluation Attributes (emitted by evaluation frameworks)
+pub struct EvaluationAttributes;
+
+impl EvaluationAttributes {
+    // Aggregate quality score
+    pub const QUALITY_SCORE: &'static str = "llm.evaluation.quality_score";
+    pub const DURATION_MS: &'static str = "llm.evaluation.duration_ms";
+
+    // Per-evaluator scores
+    pub const RELEVANCE: &'static str = "llm.evaluation.relevance";
+    pub const COMPLETENESS: &'static str = "llm.evaluation.completeness";
+    pub const TOOL_EFFECTIVENESS: &'static str = "llm.evaluation.tool_effectiveness";
+    pub const GROUNDEDNESS: &'static str = "llm.evaluation.groundedness";
+    pub const SAFETY: &'static str = "llm.evaluation.safety";
+
+    // Design-doc specified fields (alternative attribute names)
+    pub const EVAL_RELEVANCE: &'static str = "evaluation_relevance";
+    pub const EVAL_COMPLETENESS: &'static str = "evaluation_completeness";
+    pub const EVAL_TOOL_EFFECTIVENESS: &'static str = "evaluation_tool_effectiveness";
+    pub const EVAL_GROUNDEDNESS: &'static str = "evaluation_groundedness";
+    pub const EVAL_SAFETY: &'static str = "evaluation_safety";
+}
+
 /// Gen-AI Event Names
 pub struct GenAiEventNames;
 
@@ -317,5 +362,18 @@ mod tests {
             "_o2_llm_tool_call_arguments"
         );
         assert_eq!(O2Attributes::TOOL_CALL_RESULT, "_o2_llm_tool_call_result");
+        assert_eq!(
+            O2Attributes::EVALUATION_QUALITY,
+            "_o2_llm_evaluation_quality"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_RELEVANCE,
+            "_o2_llm_evaluation_relevance"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_GROUNDEDNESS,
+            "_o2_llm_evaluation_groundedness"
+        );
+        assert_eq!(O2Attributes::EVALUATION_SAFETY, "_o2_llm_evaluation_safety");
     }
 }
