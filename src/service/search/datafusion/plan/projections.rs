@@ -1083,7 +1083,7 @@ mod tests {
         assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
         // Top-level HAVING should be captured
         assert!(
-            !extractor.having.is_empty(),
+            extractor.having.is_some(),
             "Top-level HAVING should be detected"
         );
         assert_eq!(
@@ -1112,7 +1112,7 @@ mod tests {
         assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
         // Only the outermost HAVING should be captured
         assert!(
-            !extractor.having.is_empty(),
+            extractor.having.is_some(),
             "Only top-level HAVING should be detected"
         );
         assert_eq!(extractor.projections, vec!["k8s_namespace_name", "total"]);
@@ -1176,7 +1176,7 @@ mod tests {
         assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
         // Top-level HAVING should be captured
         assert!(
-            !extractor.having.is_empty(),
+            extractor.having.is_some(),
             "Top-level HAVING should be detected"
         );
     }
@@ -1223,7 +1223,7 @@ mod tests {
         let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
         assert!(
-            !extractor.having.is_empty(),
+            extractor.having.is_some(),
             "HAVING with CASE should be detected"
         );
     }
