@@ -1934,14 +1934,14 @@ export default defineComponent({
         }
         case "custom": {
           handleCustomVariable(variableObject);
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
@@ -2252,7 +2252,6 @@ export default defineComponent({
       if (success) {
         // Update loading states
         variableObject.isLoading = false;
-        variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
 
         // Update global loading state
@@ -2260,6 +2259,22 @@ export default defineComponent({
           (val: { isLoading: any; isVariableLoadingPending: any }) =>
             val.isLoading || val.isVariableLoadingPending,
         );
+
+        // Notify manager only on first load (atomic check-and-set to prevent race conditions)
+        // Only notify if variable was NOT already partially loaded
+        if (useManager && manager && !variableObject.isVariablePartialLoaded) {
+          variableObject.isVariablePartialLoaded = true;
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
+        } else {
+          // Variable was already loaded, just update the flag
+          variableObject.isVariablePartialLoaded = true;
+        }
 
         // Don't load child variables on dropdown open events
         // Load child variables if any
