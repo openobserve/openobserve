@@ -237,7 +237,7 @@ Similar to panel variables, add a date time picker widget to each panel that has
 
 **Behavior:**
 
-- Only visible when panel has `allowPanelTime: true`
+- Only visible when panel has `panelTimeEnabled: true`
 - Shows current panel time range
 - Clicking opens date time picker dropdown
 - **Date time picker is shown in RenderDashboardCharts.vue** (not in panel header/PanelContainer)
@@ -638,14 +638,14 @@ Add configuration UI after step_value input (around line 92):
 
     <!-- Toggle to enable panel-level time -->
     <q-checkbox
-      v-model="allowPanelTime"
-      :label="t('dashboard.allowPanelTime')"
+      v-model="panelTimeEnabled"
+      :label="t('dashboard.panelTimeEnabled')"
       data-test="dashboard-config-allow-panel-time"
       @update:model-value="onTogglePanelTime"
     />
 
     <!-- Show mode selection when enabled -->
-    <div v-if="allowPanelTime" class="q-mt-sm q-ml-lg">
+    <div v-if="panelTimeEnabled" class="q-mt-sm q-ml-lg">
       <q-option-group
         v-model="panelTimeMode"
         :options="panelTimeModeOptions"
@@ -679,7 +679,7 @@ export default defineComponent({
     const { t } = useI18n();
 
     // Panel time enabled?
-    const allowPanelTime = ref(
+    const panelTimeEnabled = ref(
       !!dashboardPanelData.data.config?.panel_time_enabled,
     );
 
@@ -739,7 +739,7 @@ export default defineComponent({
     };
 
     return {
-      allowPanelTime,
+      panelTimeEnabled,
       panelTimeMode,
       panelTimeModeOptions,
       onTogglePanelTime,
@@ -2985,7 +2985,7 @@ Add these translation keys to `web/src/locales/en-US.json`:
 {
   "dashboard": {
     "panelTimeSettings": "Panel Time Settings",
-    "allowPanelTime": "Allow panel level time",
+    "panelTimeEnabled": "Allow panel level time",
     "useGlobalTime": "Use global time",
     "useIndividualTime": "Use individual time",
     "panelTimeGlobalHint": "Panel will track the global dashboard time. Changes to global time will update this panel.",

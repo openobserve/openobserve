@@ -58,7 +58,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Add a basic panel using helper (panel time disabled initially)
     let panelId = await addPanelWithPanelTime(page, pm, {
       panelName,
-      allowPanelTime: false
+      panelTimeEnabled: false
     });
 
     // Step 2: Edit panel and enable panel time
@@ -119,7 +119,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -166,7 +166,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -251,7 +251,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Panel A: panel_time_enabled: true with individual time "Last 1h"
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_A_${timestamp}`,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -259,7 +259,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Panel B: panel_time_enabled: false
     const panelBId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_B_${timestamp}`,
-      allowPanelTime: false
+      panelTimeEnabled: false
     });
 
     // Step 2: Verify Panel A has picker visible
@@ -306,7 +306,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -362,7 +362,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Panel A: Individual time "Last 1h"
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_A_${timestamp}`,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
@@ -370,14 +370,14 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Panel B: "Use global" mode
     const panelBId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_B_${timestamp}`,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "global"
     });
 
     // Panel C: No panel time (uses global by default)
     const panelCId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_C_${timestamp}`,
-      allowPanelTime: false
+      panelTimeEnabled: false
     });
 
     // Step 2: Change global time to "Last 24h"
@@ -445,7 +445,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Step 3: Create Panel A with individual time "Last 1h" using helper
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName,
-      allowPanelTime: true,
+      panelTimeEnabled: true,
       panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
