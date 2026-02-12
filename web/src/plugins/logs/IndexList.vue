@@ -147,6 +147,7 @@ import {
   watch,
   computed,
   onBeforeMount,
+  onUpdated,
   onBeforeUnmount,
   nextTick,
   defineAsyncComponent,
@@ -277,6 +278,10 @@ export default defineComponent({
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
     const showOnlyInterestingFields = ref(false);
+
+    // 🔍 PERFORMANCE TRACKING: Monitor IndexList component re-renders
+    const indexListRenderCount = ref(0);
+    const indexListLastRenderTime = ref(Date.now());
 
     const userDefinedSchemaBtnGroupOption = ref([
       {
@@ -1377,6 +1382,45 @@ export default defineComponent({
     const setPage = (page) => {
       pagination.value = { ...pagination.value, page };
     };
+
+    // 🔍 PERFORMANCE TRACKING: Monitor IndexList component re-renders
+    /* eslint-disable */
+    onUpdated(() => {
+      if (import.meta.env.DEV) {
+        indexListRenderCount.value++;
+        const now = Date.now();
+        const timeSinceLastRender = now - indexListLastRenderTime.value;
+        indexListLastRenderTime.value = now;
+
+        // Add performance mark for Chrome DevTools Performance tab
+        performance.mark(`indexlist-render-${indexListRenderCount.value}`);
+
+        // Store render info on window for debugging
+        if (!window.__INDEXLIST_PERF__) {
+          window.__INDEXLIST_PERF__ = { renders: [] };
+        }
+        window.__INDEXLIST_PERF__.renders.push({
+          count: indexListRenderCount.value,
+          timeSinceLastRender,
+          timestamp: Date.now(),
+          selectedStreams: searchObj.data.stream.selectedStream,
+          showInterestingOnly: showOnlyInterestingFields.value,
+        });
+
+        // 📊 CONSOLE LOG - Visible in browser console
+        console.log(
+          `%c🔄 IndexList (Sidebar) Re-render #${indexListRenderCount.value}`,
+          "background: #f39c12; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;",
+          `⏱️ ${timeSinceLastRender}ms`
+        );
+
+        // Keep only last 50 renders in memory
+        if (window.__INDEXLIST_PERF__.renders.length > 50) {
+          window.__INDEXLIST_PERF__.renders.shift();
+        }
+      }
+    });
+    /* eslint-enable */
 
     return {
       t,

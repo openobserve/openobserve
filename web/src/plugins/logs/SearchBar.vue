@@ -1654,6 +1654,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onUpdated,
   nextTick,
   watch,
   toRaw,
@@ -1903,6 +1904,10 @@ export default defineComponent({
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
     const { buildSearch } = useSearchStream();
+
+    // 🔍 PERFORMANCE TRACKING: Monitor SearchBar component re-renders
+    const searchBarRenderCount = ref(0);
+    const searchBarLastRenderTime = ref(Date.now());
 
     const {
       fnParsedSQL,
@@ -4289,6 +4294,45 @@ export default defineComponent({
       }
     };
     // [END] explain query functionality
+
+    // 🔍 PERFORMANCE TRACKING: Monitor SearchBar component re-renders
+    /* eslint-disable */
+    onUpdated(() => {
+      if (import.meta.env.DEV) {
+        searchBarRenderCount.value++;
+        const now = Date.now();
+        const timeSinceLastRender = now - searchBarLastRenderTime.value;
+        searchBarLastRenderTime.value = now;
+
+        // Add performance mark for Chrome DevTools Performance tab
+        performance.mark(`searchbar-render-${searchBarRenderCount.value}`);
+
+        // Store render info on window for debugging
+        if (!window.__SEARCHBAR_PERF__) {
+          window.__SEARCHBAR_PERF__ = { renders: [] };
+        }
+        window.__SEARCHBAR_PERF__.renders.push({
+          count: searchBarRenderCount.value,
+          timeSinceLastRender,
+          timestamp: Date.now(),
+          sqlMode: searchObj.meta.sqlMode,
+          queryValue: searchObj.data.editorValue?.substring(0, 50), // First 50 chars
+        });
+
+        // 📊 CONSOLE LOG - Visible in browser console
+        console.log(
+          `%c🔄 SearchBar Re-render #${searchBarRenderCount.value}`,
+          "background: #50c878; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;",
+          `⏱️ ${timeSinceLastRender}ms`
+        );
+
+        // Keep only last 50 renders in memory
+        if (window.__SEARCHBAR_PERF__.renders.length > 50) {
+          window.__SEARCHBAR_PERF__.renders.shift();
+        }
+      }
+    });
+    /* eslint-enable */
 
     return {
       $q,

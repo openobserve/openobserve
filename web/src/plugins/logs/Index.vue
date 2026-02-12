@@ -393,6 +393,7 @@ import {
   defineAsyncComponent,
   provide,
   onMounted,
+  onUpdated,
   onBeforeUnmount,
   onUnmounted,
   toRaw,
@@ -673,6 +674,10 @@ export default defineComponent({
     const splitterModel = ref(15);
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
+
+    // 🔍 PERFORMANCE TRACKING: Monitor Index component re-renders
+    const indexRenderCount = ref(0);
+    const indexLastRenderTime = ref(Date.now());
 
     const { showErrorNotification, showAliasErrorForVisualization } =
       useNotifications();
@@ -2412,6 +2417,45 @@ export default defineComponent({
     onBeforeUnmount(() => {
       window.removeEventListener("cancelQuery", cancelFieldExtraction);
     });
+
+    // 🔍 PERFORMANCE TRACKING: Monitor Index component re-renders
+    /* eslint-disable */
+    onUpdated(() => {
+      if (import.meta.env.DEV) {
+        indexRenderCount.value++;
+        const now = Date.now();
+        const timeSinceLastRender = now - indexLastRenderTime.value;
+        indexLastRenderTime.value = now;
+
+        // Add performance mark for Chrome DevTools Performance tab
+        performance.mark(`logs-index-render-${indexRenderCount.value}`);
+
+        // Store render info on window for debugging (accessible via browser console)
+        if (!window.__LOGSINDEX_PERF__) {
+          window.__LOGSINDEX_PERF__ = { renders: [] };
+        }
+        window.__LOGSINDEX_PERF__.renders.push({
+          count: indexRenderCount.value,
+          timeSinceLastRender,
+          timestamp: Date.now(),
+          currentView: searchObj.meta.logsVisualizeToggle,
+          showFields: searchObj.meta.showFields,
+        });
+
+        // 📊 CONSOLE LOG - Visible in browser console
+        console.log(
+          `%c🔄 Index (Parent) Re-render #${indexRenderCount.value}`,
+          "background: #4a90e2; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;",
+          `⏱️ ${timeSinceLastRender}ms`
+        );
+
+        // Keep only last 50 renders in memory
+        if (window.__LOGSINDEX_PERF__.renders.length > 50) {
+          window.__LOGSINDEX_PERF__.renders.shift();
+        }
+      }
+    });
+    /* eslint-enable */
 
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(

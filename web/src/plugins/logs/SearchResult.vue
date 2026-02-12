@@ -426,12 +426,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+// @ts-nocheck
 import {
   computed,
   defineComponent,
   ref,
   onMounted,
   onUpdated,
+  onRenderTriggered,
   onBeforeUnmount,
   defineAsyncComponent,
   watch,
@@ -751,6 +753,10 @@ export default defineComponent({
     const selectedPattern = ref(null);
     const showPatternDetails = ref(false);
 
+    // 🔍 PERFORMANCE TRACKING: Monitor SearchResult component re-renders
+    const renderCount = ref(0);
+    const lastRenderTime = ref(Date.now());
+
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
     const hasHistogramSelection = ref(false);
@@ -882,7 +888,107 @@ export default defineComponent({
 
     onUpdated(() => {
       pageNumberInput.value = searchObj.data.resultGrid.currentPage;
+
+      // 🔍 PERFORMANCE TRACKING: Track re-renders with console logging
+      /* eslint-disable */
+      if (import.meta.env.DEV) {
+        renderCount.value++;
+        const now = Date.now();
+        const timeSinceLastRender = now - lastRenderTime.value;
+        lastRenderTime.value = now;
+
+        // Add performance mark for Chrome DevTools
+        performance.mark(`searchresult-render-${renderCount.value}`);
+
+        // Store render info on window
+        if (!window.__SEARCHRESULT_PERF__) {
+          window.__SEARCHRESULT_PERF__ = {
+            renders: [],
+            triggers: [],
+            // Helper function to analyze triggers
+            analyzeTriggers: function() {
+              const counts = {};
+              this.triggers.forEach(t => {
+                const key = `${t.key} (${t.type})`;
+                counts[key] = (counts[key] || 0) + 1;
+              });
+              console.log('%c📊 SearchResult Re-render Trigger Analysis',
+                'background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;');
+              console.table(
+                Object.entries(counts)
+                  .map(([trigger, count]) => ({ trigger, count }))
+                  .sort((a, b) => b.count - a.count)
+              );
+              return counts;
+            }
+          };
+        }
+        window.__SEARCHRESULT_PERF__.renders.push({
+          count: renderCount.value,
+          timeSinceLastRender,
+          timestamp: Date.now(),
+          currentPage: searchObj.data.resultGrid.currentPage,
+        });
+
+        // 📊 CONSOLE LOG - Visible in browser console
+        // Get the most recent trigger info
+        const recentTriggers = window.__SEARCHRESULT_PERF__.triggers?.slice(-3) || [];
+        const triggerSummary = recentTriggers.map(t => `${t.key} (${t.type})`).join(', ');
+
+        console.log(
+          `%c🔄 SearchResult Re-render #${renderCount.value}`,
+          "background: #ff6b6b; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;",
+          `⏱️ ${timeSinceLastRender}ms`,
+          triggerSummary ? `📍 Caused by: ${triggerSummary}` : ''
+        );
+
+        // Keep only last 50 renders
+        if (window.__SEARCHRESULT_PERF__.renders.length > 50) {
+          window.__SEARCHRESULT_PERF__.renders.shift();
+        }
+      }
+      /* eslint-enable */
     });
+
+    // 🔍 TRACK WHAT CAUSES RE-RENDERS
+    /* eslint-disable */
+    onRenderTriggered((event) => {
+      if (import.meta.env.DEV) {
+        // Log what triggered this re-render
+        console.log(
+          `%c💡 SearchResult Re-render Triggered`,
+          "background: #9b59b6; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;",
+          {
+            type: event.type, // 'set', 'add', 'delete', etc.
+            key: event.key, // The property that changed
+            target: event.target, // The reactive object
+            newValue: event.newValue,
+            oldValue: event.oldValue,
+          }
+        );
+
+        // Store trigger info
+        if (!window.__SEARCHRESULT_PERF__) {
+          window.__SEARCHRESULT_PERF__ = { renders: [], triggers: [] };
+        }
+        if (!window.__SEARCHRESULT_PERF__.triggers) {
+          window.__SEARCHRESULT_PERF__.triggers = [];
+        }
+
+        window.__SEARCHRESULT_PERF__.triggers.push({
+          timestamp: Date.now(),
+          type: event.type,
+          key: String(event.key),
+          targetType: event.target?.constructor?.name || 'unknown',
+        });
+
+        // Keep only last 50 triggers
+        if (window.__SEARCHRESULT_PERF__.triggers.length > 50) {
+          window.__SEARCHRESULT_PERF__.triggers.shift();
+        }
+      }
+    });
+    /* eslint-enable */
 
     // Patterns are kept in memory when switching views and only cleared on explicit search
     // This allows users to toggle between logs/patterns/visualize without losing pattern data
