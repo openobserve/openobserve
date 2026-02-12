@@ -182,19 +182,26 @@ const useAiChat = () => {
      * @param org_id - Organization identifier
      * @param sessionId - Session ID for linking feedback to conversation
      * @param queryIndex - Index of the query in the session this feedback is for
+     * @param traceId - Trace ID from the workflow to link feedback to the same trace
      */
     const submitFeedback = async (
         feedbackType: 'thumbs_up' | 'thumbs_down',
         org_id: string,
         sessionId?: string,
         queryIndex?: number,
+        traceId?: string,
     ) => {
         const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/feedback`;
 
-        const body = {
+        const body: Record<string, any> = {
             feedback_type: feedbackType,
             query_index: queryIndex ?? -1,
         };
+
+        // Include trace_id so the feedback span is linked to the workflow trace
+        if (traceId) {
+            body.trace_id = traceId;
+        }
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
