@@ -37,6 +37,7 @@ export interface EvaluatorInfo {
   evaluatorType: 'human' | 'model' | 'deterministic';
 }
 
+
 export interface EvaluationScores {
   qualityScore: number | null;
   relevance: number | null;
@@ -416,6 +417,7 @@ export function parseEvaluationScores(data: any): EvaluationScores | null {
         evaluatorType: evaluatorType || 'deterministic',
       }
     : null;
+
 
   return {
     qualityScore: quality != null ? Number(quality) : null,
