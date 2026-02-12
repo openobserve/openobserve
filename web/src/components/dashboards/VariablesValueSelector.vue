@@ -1986,14 +1986,14 @@ export default defineComponent({
         }
         case "custom": {
           handleCustomVariable(variableObject);
-          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
+          finalizePartialVariableLoading(variableObject, true);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
-          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
+          finalizePartialVariableLoading(variableObject, true);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
@@ -2316,9 +2316,6 @@ export default defineComponent({
       currentlyExecutingPromises[name] = null;
 
       if (success) {
-        // Check if this is the first time loading (was not partially loaded before)
-        const isFirstLoad = !variableObject.isVariablePartialLoaded;
-
         // Update loading states
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;

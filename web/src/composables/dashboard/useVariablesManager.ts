@@ -483,13 +483,9 @@ export const useVariablesManager = () => {
     });
 
     independentGlobalVars.forEach((v) => {
-      // Mark as pending so selector will load them
-      // Non-API types (custom, constant, textbox) need to load to notify manager
-      // query_values types without custom/all need API calls
-      if (v.type === "custom" || v.type === "constant" || v.type === "textbox") {
-        // Non-API types still need to load to set values and notify manager
-        v.isVariableLoadingPending = true;
-      } else if (v.type === "query_values") {
+      // Mark as pending so selector will fire API
+      // Skip custom and "all" variables during initial load - they don't need API calls
+      if (v.type === "query_values") {
         const hasCustomOrAllDefault =
           v.selectAllValueForMultiSelect === "custom" ||
           v.selectAllValueForMultiSelect === "all";
@@ -513,11 +509,8 @@ export const useVariablesManager = () => {
         const key = getVariableKey(v.name, v.scope);
         const parentKeys = dependencyGraph.value[key]?.parents || [];
 
-        // Check if all parents are non-API types (don't require API calls to load)
-        // These variables are treated the same: they load synchronously without API calls
-        // 1. Custom type variables: custom, constant, textbox, dynamic_filters
-        // 2. Query_values with custom/all defaults (values set from config, not API)
-        const allParentsAreNonAPITypes = parentKeys.every((parentKey) => {
+        // Check if all parents are custom/all variables (and thus already loaded)
+        const allParentsAreCustomOrAll = parentKeys.every((parentKey) => {
           const parentVar = globalVars.find((gv) => {
             const gvKey = getVariableKey(gv.name, gv.scope);
             return gvKey === parentKey;
@@ -525,23 +518,16 @@ export const useVariablesManager = () => {
 
           if (!parentVar) return false;
 
-          // Parent is non-API type if:
-          // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
-          // - OR it's a query_values with custom/all default (no API call needed)
-          const parentIsNonAPIType =
-            parentVar.type === "custom" ||
-            parentVar.type === "constant" ||
-            parentVar.type === "textbox" ||
-            parentVar.type === "dynamic_filters" ||
-            (parentVar.type === "query_values" &&
-              (parentVar.selectAllValueForMultiSelect === "custom" ||
-                parentVar.selectAllValueForMultiSelect === "all"));
+          const parentIsCustomOrAll =
+            parentVar.type === "query_values" &&
+            (parentVar.selectAllValueForMultiSelect === "custom" ||
+              parentVar.selectAllValueForMultiSelect === "all");
 
-          return parentIsNonAPIType;
+          return parentIsCustomOrAll;
         });
 
-        // If all parents are non-API types, mark this child as pending to load
-        if (allParentsAreNonAPITypes && parentKeys.length > 0) {
+        // If all parents are custom/all, mark this child as pending to load
+        if (allParentsAreCustomOrAll && parentKeys.length > 0) {
           v.isVariableLoadingPending = true;
         }
       }
