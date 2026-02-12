@@ -2146,7 +2146,6 @@
       "groupsLabel": "groepen",
       "noMatchingGroups": "Geen overeenkomende groepen",
       "fqnFormulaTitle": "Identiteitsformule",
-      "fqnFormulaTooltip": "Toont hoe de service-identiteit wordt berekend. Scope-dimensies (blauw) worden samengevoegd met '/'. De eerste niet-null workload-dimensie (groen) wordt de servicenaam.",
       "scopeDimension": "Scope-dimensie",
       "workloadDimension": "Workload-dimensie",
       "noFormulaConfigured": "Geen identiteitsformule geconfigureerd. Voeg hierboven dimensies toe.",

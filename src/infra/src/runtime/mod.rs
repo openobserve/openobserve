@@ -30,3 +30,15 @@ pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
             .unwrap(),
     )
 });
+
+pub static VORTEX_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
+    Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .thread_name("vortex_runtime")
+            .worker_threads(get_config().limit.vortex_thread_num)
+            .thread_stack_size(16 * 1024 * 1024)
+            .enable_all()
+            .build()
+            .unwrap(),
+    )
+});

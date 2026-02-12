@@ -2146,7 +2146,6 @@
       "groupsLabel": "gruplar",
       "noMatchingGroups": "Eşleşen grup yok",
       "fqnFormulaTitle": "Kimlik Formülü",
-      "fqnFormulaTooltip": "Servis kimliğinin nasıl hesaplanacağını gösterir. Kapsam boyutları (mavi) '/' ile birleştirilir. İlk null olmayan iş yükü boyutu (yeşil) servis adı olur.",
       "scopeDimension": "Kapsam Boyutu",
       "workloadDimension": "İş Yükü Boyutu",
       "noFormulaConfigured": "Hiçbir kimlik formülü yapılandırılmamış. Yukarıda boyutlar ekleyin.",

@@ -29,13 +29,13 @@ use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
+        parquet::RecordBatchStream,
         tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
 use infra::storage;
-use parquet::arrow::async_reader::ParquetRecordBatchStream;
 use puffin_directory::writer::PuffinDirWriter;
 use tokio::task::JoinHandle;
 
@@ -80,7 +80,7 @@ pub(crate) async fn create_tantivy_index(
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
-    reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    reader: RecordBatchStream,
 ) -> Result<usize, anyhow::Error> {
     let start = std::time::Instant::now();
     let caller = format!("[{caller}:JOB]");
@@ -135,7 +135,7 @@ pub(crate) async fn create_tantivy_index(
 /// Create a tantivy index in the given directory for the record batch
 pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     tantivy_dir: D,
-    mut reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    reader: RecordBatchStream,
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
@@ -215,6 +215,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(2);
     let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
         let mut total_num_rows = 0;
+        let mut reader = reader;
         loop {
             let batch = reader.try_next().await?;
             let Some(inverted_idx_batch) = batch else {
@@ -326,16 +327,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Cursor, sync::Arc};
+    use std::sync::Arc;
 
     use arrow::{
         array::{Int64Array, StringArray},
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
-    use bytes::Bytes;
-    use config::{INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
-    use parquet::arrow::async_reader::ParquetRecordBatchStream;
+    use config::{FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
     use tantivy::directory::RamDirectory;
 
     use super::*;
@@ -385,10 +384,8 @@ mod tests {
         RecordBatch::try_new(schema, columns).unwrap()
     }
 
-    // Helper function to create a mock ParquetRecordBatchStream
-    async fn create_test_stream(
-        batches: Vec<RecordBatch>,
-    ) -> ParquetRecordBatchStream<Cursor<Bytes>> {
+    // Helper function to create a mock RecordBatchStream
+    async fn create_test_stream(batches: Vec<RecordBatch>) -> RecordBatchStream {
         // Create a simple parquet file from the batches
         let schema = batches[0].schema();
         let mut buffer = Vec::new();
@@ -416,15 +413,13 @@ mod tests {
         }
         writer.close().await.unwrap();
 
-        // Create stream from the buffer
-        let bytes = Bytes::from(buffer);
-        let cursor = Cursor::new(bytes);
-        parquet::arrow::async_reader::ParquetRecordBatchStreamBuilder::new(cursor)
-            .await
-            .unwrap()
-            .with_batch_size(1000)
-            .build()
-            .unwrap()
+        // Create stream from the buffer using the new API
+        let bytes = bytes::Bytes::from(buffer);
+        let (_schema, stream) =
+            config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, &bytes)
+                .await
+                .unwrap();
+        stream
     }
 
     #[tokio::test]

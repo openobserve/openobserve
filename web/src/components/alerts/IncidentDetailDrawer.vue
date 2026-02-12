@@ -1056,6 +1056,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-view-related-button="true"
               :hide-search-term-actions="true"
               :hide-dimension-filters="true"
+              :hide-reset-filters-button="true"
               @sendToAiChat="handleSendToAiChat"
             />
           </div>

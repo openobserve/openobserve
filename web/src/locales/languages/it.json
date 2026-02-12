@@ -2144,7 +2144,6 @@
       "groupsLabel": "gruppi",
       "noMatchingGroups": "Nessun gruppo corrispondente",
       "fqnFormulaTitle": "Formula identità",
-      "fqnFormulaTooltip": "Mostra come verrà calcolata l'identità del servizio. Le dimensioni di ambito (blu) sono concatenate con '/'. La prima dimensione di workload non nulla (verde) diventa il nome del servizio.",
       "scopeDimension": "Dimensione di ambito",
       "workloadDimension": "Dimensione di workload",
       "noFormulaConfigured": "Nessuna formula di identità configurata. Aggiungi dimensioni sopra.",

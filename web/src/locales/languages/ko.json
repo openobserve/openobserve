@@ -2146,7 +2146,6 @@
       "groupsLabel": "그룹",
       "noMatchingGroups": "일치하는 그룹 없음",
       "fqnFormulaTitle": "식별자 공식",
-      "fqnFormulaTooltip": "서비스 식별자가 어떻게 계산되는지 보여줍니다. 범위 차원(파란색)은 '/'로 연결됩니다. 첫 번째 non-null 워크로드 차원(녹색)이 서비스 이름이 됩니다.",
       "scopeDimension": "범위 차원",
       "workloadDimension": "워크로드 차원",
       "noFormulaConfigured": "식별자 공식이 구성되지 않았습니다. 위에 차원을 추가하십시오.",

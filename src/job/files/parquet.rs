@@ -672,14 +672,12 @@ async fn merge_files(
     let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
     let total_records = new_file_list.iter().map(|f| f.meta.records).sum();
     let new_file_size = new_file_list.iter().map(|f| f.meta.original_size).sum();
-    let mut new_file_meta = FileMeta {
+    let new_file_meta = FileMeta {
         min_ts,
         max_ts,
         records: total_records,
         original_size: new_file_size,
-        compressed_size: 0,
-        flattened: false,
-        index_size: 0,
+        ..Default::default()
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -750,11 +748,10 @@ async fn merge_files(
         work_group: None,
         target_partitions: 0,
     };
-    let table = TableBuilder::new()
+    let tables = TableBuilder::new()
         .sorted_by_time(true)
         .build(session, new_file_list, schema.clone())
         .await?;
-    let tables = vec![table];
 
     let start = std::time::Instant::now();
     let merge_result = merge::merge_parquet_files(
@@ -763,7 +760,7 @@ async fn merge_files(
         schema,
         tables,
         &bloom_filter_fields,
-        &new_file_meta,
+        new_file_meta,
         true,
     )
     .await;
@@ -771,7 +768,7 @@ async fn merge_files(
     // clear session data
     crate::service::search::datafusion::storage::file_list::clear(&trace_id);
 
-    let (_new_schema, buf) = match merge_result {
+    let buf = match merge_result {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -781,16 +778,14 @@ async fn merge_files(
         }
     };
 
-    // ingester should not support multiple files
-    // multiple files is for downsampling that will be handled in compactor
-    let buf = match buf {
-        MergeParquetResult::Single(v) => v,
+    let (buf, mut new_file_meta) = match buf {
+        MergeParquetResult::Single(buf, meta) => (buf, meta),
         MergeParquetResult::Multiple { .. } => {
+            // ingester should not support multiple files, it will be handled in compactor mode
             panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
         }
     };
 
-    new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"
@@ -931,7 +926,8 @@ async fn merge_files(
     }
 
     // generate tantivy inverted index and write to storage
-    let (_parquet_schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+    let file_format = config::get_config().common.file_format;
+    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, &buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
@@ -973,7 +969,9 @@ async fn extract_patterns_from_parquet(
 
     // Read parquet data and extract log messages
     let parquet_bytes = Bytes::from(parquet_data.to_vec());
-    let (_schema, mut reader) = get_recordbatch_reader_from_bytes(&parquet_bytes).await?;
+    let file_format = config::get_config().common.file_format;
+    let (_schema, mut reader) =
+        get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await?;
     let mut log_messages = Vec::new();
     let read_start = std::time::Instant::now();
 
@@ -1143,7 +1141,8 @@ async fn queue_services_from_parquet(
         let mut records_dropped = 0u64;
         let mut batches_sent = 0u64;
 
-        let reader_result = get_recordbatch_reader_from_bytes(&parquet_bytes).await;
+        let file_format = config::get_config().common.file_format;
+        let reader_result = get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await;
         let (_schema, mut reader) = match reader_result {
             Ok(r) => r,
             Err(e) => {

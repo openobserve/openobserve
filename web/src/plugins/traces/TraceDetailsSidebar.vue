@@ -675,6 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hide-view-related-button="true"
         :hide-search-term-actions="false"
         :hide-dimension-filters="true"
+        :hide-reset-filters-button="true"
       />
       <!-- Loading/Empty state when no data -->
       <div

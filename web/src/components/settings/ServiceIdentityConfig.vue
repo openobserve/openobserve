@@ -946,6 +946,9 @@ const saveSemanticMappings = async () => {
     const idCounts = new Map<string, number>();
     const duplicateIds: string[] = [];
 
+    // Check for duplicate display names within the same category
+    const categoryDisplayNames = new Map<string, Map<string, string>>();
+
     for (const group of localSemanticGroups.value) {
       if (!group.id) {
         $q.notify({
@@ -955,6 +958,56 @@ const saveSemanticMappings = async () => {
         });
         savingSemanticMappings.value = false;
         return;
+      }
+
+      // Validate display name is not empty
+      if (!group.display || group.display.trim() === "") {
+        $q.notify({
+          type: "negative",
+          message: t("common.nameRequired"),
+          timeout: 3000,
+        });
+        savingSemanticMappings.value = false;
+        return;
+      }
+
+      // Validate fields array is not empty
+      if (!group.fields || group.fields.length === 0) {
+        $q.notify({
+          type: "negative",
+          message: `"${group.display || group.id}": ${t("settings.correlation.emptyFieldsError")}`,
+          timeout: 3000,
+        });
+        savingSemanticMappings.value = false;
+        return;
+      }
+
+      // Check for duplicate display names within the same category
+      const category = group.group || "Other";
+      const displayNameLower = group.display.trim().toLowerCase();
+
+      if (!categoryDisplayNames.has(category)) {
+        categoryDisplayNames.set(category, new Map<string, string>());
+      }
+
+      const categoryMap = categoryDisplayNames.get(category)!;
+      if (categoryMap.has(displayNameLower)) {
+        const existingId = categoryMap.get(displayNameLower);
+        // Only flag as duplicate if it's a different group (different ID)
+        if (existingId !== group.id) {
+          $q.notify({
+            type: "negative",
+            message: t("settings.correlation.duplicateNamesInCategoryError", {
+              name: group.display,
+              category: category,
+            }),
+            timeout: 5000,
+          });
+          savingSemanticMappings.value = false;
+          return;
+        }
+      } else {
+        categoryMap.set(displayNameLower, group.id);
       }
 
       const count = idCounts.get(group.id) || 0;
