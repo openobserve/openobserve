@@ -1632,10 +1632,19 @@ export default defineComponent({
             searchObj.meta.buildModeQueryEditorDisabled = false;
           }
 
-          // Set loading flag for build mode to prevent flicker between initialization and chart API call
+          // Set loading flag for build mode with SQL mode ON to prevent flicker between initialization and chart API call
           // This will be cleared when trace IDs arrive (via watcher) or when unmounting
-          if (searchObj.meta.logsVisualizeToggle === "build") {
+          // When SQL mode is OFF, build page handles its own loading state
+          if (searchObj.meta.logsVisualizeToggle === "build" && searchObj.meta.sqlMode) {
             variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
+
+            // Check for empty query - no API call will be made, so clear loading flag
+            if (!searchObj.data.query?.trim()) {
+              showErrorNotification(
+                "Query is empty, please select fields to build query",
+              );
+              variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+            }
           }
 
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
@@ -2232,6 +2241,14 @@ export default defineComponent({
       }
 
       if (searchObj.meta.logsVisualizeToggle == "build") {
+        // Validate query before running - same as visualization mode
+        if (searchObj.meta.sqlMode && !searchObj.data.query?.trim()) {
+          showErrorNotification(
+            "Query is empty, please select fields to build query",
+          );
+          return;
+        }
+
         // Run query in build mode - same approach as visualization
         const dateTime =
           searchObj.data.datetime.type === "relative"
