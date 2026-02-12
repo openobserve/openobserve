@@ -1668,6 +1668,13 @@ class="q-pr-sm q-pt-xs" />
       </q-card>
     </q-dialog>
     <ConfirmDialog
+      title="Change Query Mode"
+      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+      @update:ok="confirmBuildModeChangeOk"
+      @update:cancel="confirmBuildModeChange = false"
+      v-model="confirmBuildModeChange"
+    />
+    <ConfirmDialog
       title="Delete Saved View"
       message="Are you sure you want to delete saved view?"
       @update:ok="confirmDeleteSavedViews"
@@ -3925,10 +3932,25 @@ export default defineComponent({
     };
 
     // Toggle between Builder and Custom mode in Build tab
+    const confirmBuildModeChange = ref(false);
+
     const onBuildModeToggle = (isBuilderMode: boolean) => {
+      const currentlyCustom = !searchObj.meta.buildModeQueryEditorDisabled;
+
+      // Show confirmation when switching from Custom to Builder
+      if (currentlyCustom && isBuilderMode) {
+        confirmBuildModeChange.value = true;
+        return;
+      }
+
       searchObj.meta.buildModeQueryEditorDisabled = isBuilderMode;
-      // Emit event so Index.vue can update panel schema's customQuery
-      emit("buildModeToggle", !isBuilderMode); // isCustomMode = !isBuilderMode
+      emit("buildModeToggle", !isBuilderMode);
+    };
+
+    const confirmBuildModeChangeOk = () => {
+      confirmBuildModeChange.value = false;
+      searchObj.meta.buildModeQueryEditorDisabled = true;
+      emit("buildModeToggle", false); // isCustomMode = false
     };
 
     const onLogsVisualizeToggleUpdate = async (value: any) => {
@@ -4447,6 +4469,8 @@ export default defineComponent({
       cancelQuery,
       onLogsVisualizeToggleUpdate,
       onBuildModeToggle,
+      confirmBuildModeChange,
+      confirmBuildModeChangeOk,
       visualizeSearchRequestTraceIds,
       disable,
       cancelVisualizeQueries,

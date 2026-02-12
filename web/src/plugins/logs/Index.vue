@@ -717,7 +717,11 @@ export default defineComponent({
     } = useDashboardPanelData("logs");
 
     // Get build page's dashboardPanelData for watching chart type/config changes
-    const { dashboardPanelData: buildDashboardPanelData } = useDashboardPanelData("build");
+    const {
+      dashboardPanelData: buildDashboardPanelData,
+      removeXYFilters: buildRemoveXYFilters,
+      updateXYFieldsForCustomQueryMode: buildUpdateXYFieldsForCustomQueryMode,
+    } = useDashboardPanelData("build");
 
     const visualizeErrorData: any = reactive({
       errors: [],
@@ -2306,10 +2310,26 @@ export default defineComponent({
     };
 
     // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
-    const onBuildModeToggle = (isCustomMode: boolean) => {
+    const onBuildModeToggle = async (isCustomMode: boolean) => {
       // Update the panel schema's customQuery flag
       if (buildDashboardPanelData.data.queries[0]) {
         buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
+
+        // Reuse the same logic as QueryTypeSelector's changeToggle:
+        // clear fields and query when switching modes
+        await nextTick();
+        buildRemoveXYFilters();
+        buildUpdateXYFieldsForCustomQueryMode();
+
+        // Clear query when switching from Custom to Builder mode
+        if (!isCustomMode) {
+          buildDashboardPanelData.data.queries[
+            buildDashboardPanelData.layout.currentQueryIndex
+          ].query = "";
+          // Also clear the search bar editor
+          searchObj.data.query = "";
+          searchObj.data.editorValue = "";
+        }
       }
     };
 
