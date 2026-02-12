@@ -1,0 +1,181 @@
+name: Check Skill Sync
+
+on:
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - '.github/workflows/check-skill-sync.yml'
+
+jobs:
+  check-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout openobserve
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout test_agents
+        uses: actions/checkout@v4
+        with:
+          repository: openobserve/test_agents
+          ref: main
+          path: test_agents
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if skills are in sync
+        id: check_sync
+        run: |
+          echo "🔍 Checking skill sync status..."
+          echo ""
+
+          # Get expected commit from test_agents
+          EXPECTED_COMMIT=$(git -C test_agents/e2e-dev rev-parse HEAD)
+          EXPECTED_SHORT=$(git -C test_agents/e2e-dev rev-parse --short HEAD)
+
+          # Get actual commit from sync version file
+          if [ -f .claude/skills/.skill-sync-version ]; then
+            ACTUAL_COMMIT=$(grep "^commit:" .claude/skills/.skill-sync-version | cut -d' ' -f2)
+            ACTUAL_SHORT=$(grep "^commit_short:" .claude/skills/.skill-sync-version | cut -d' ' -f2)
+            SYNC_DATE=$(grep "^sync_date:" .claude/skills/.skill-sync-version | cut -d' ' -f2-)
+          else
+            echo "❌ ERROR: .skill-sync-version file not found!"
+            echo "This file should exist at .claude/skills/.skill-sync-version"
+            echo ""
+            echo "To fix: Run sync script in test_agents:"
+            echo "  cd test_agents/e2e-dev/.claude"
+            echo "  ./sync-skills.sh"
+            exit 1
+          fi
+
+          echo "📊 Sync Status:"
+          echo "  Expected (test_agents): $EXPECTED_SHORT"
+          echo "  Actual (openobserve):   $ACTUAL_SHORT"
+          echo "  Last sync: $SYNC_DATE"
+          echo ""
+
+          if [ "$EXPECTED_COMMIT" = "$ACTUAL_COMMIT" ]; then
+            echo "✅ Skills are IN SYNC with test_agents"
+            echo ""
+            echo "sync_status=in_sync" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "⚠️ Skills are OUT OF SYNC!"
+            echo ""
+            echo "Details:"
+            echo "  - Expected commit (test_agents): $EXPECTED_COMMIT"
+            echo "  - Actual commit (openobserve):   $ACTUAL_COMMIT"
+            echo "  - Last synced: $SYNC_DATE"
+            echo ""
+            echo "sync_status=out_of_sync" >> $GITHUB_OUTPUT
+
+            # Show what changed in test_agents since last sync
+            echo "📝 Changes in test_agents since last sync:"
+            git -C test_agents/e2e-dev log --oneline "$ACTUAL_COMMIT..$EXPECTED_COMMIT" -- .claude/skills/ || echo "  (Unable to show diff)"
+            echo ""
+
+            exit 1
+          fi
+
+      - name: Show sync instructions
+        if: failure()
+        run: |
+          echo "🔧 How to sync skills:"
+          echo ""
+          echo "1. Clone test_agents repository:"
+          echo "   git clone https://github.com/openobserve/test_agents.git"
+          echo ""
+          echo "2. Navigate to sync script:"
+          echo "   cd test_agents/e2e-dev/.claude"
+          echo ""
+          echo "3. Run sync (dry-run first to preview):"
+          echo "   ./sync-skills.sh --dry-run"
+          echo ""
+          echo "4. Execute sync:"
+          echo "   ./sync-skills.sh"
+          echo ""
+          echo "5. Commit synced skills:"
+          echo "   cd \$OPENOBSERVE_REPO_PATH"
+          echo "   git add .claude/skills"
+          echo "   git commit -m 'chore: sync skills from test_agents'"
+          echo ""
+          echo "6. Push and update PR"
+          echo ""
+          echo "📖 Documentation:"
+          echo "  - Sync script: test_agents/e2e-dev/.claude/sync-skills.sh"
+          echo "  - Refactoring plan: openobserve/.claude/REFACTORING_PLAN.md"
+
+      - name: Comment on PR (if out of sync)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read sync version info
+            let syncInfo = '';
+            try {
+              const syncFile = fs.readFileSync('.claude/skills/.skill-sync-version', 'utf8');
+              const actual = syncFile.match(/commit_short: (\w+)/)?.[1] || 'unknown';
+              const syncDate = syncFile.match(/sync_date: (.+)/)?.[1] || 'unknown';
+              syncInfo = `
+              **Current Sync Status:**
+              - Last synced from: \`${actual}\`
+              - Sync date: ${syncDate}
+              `;
+            } catch (e) {
+              syncInfo = '**Error:** Could not read .skill-sync-version file';
+            }
+
+            const body = `## ⚠️ Skills Out of Sync
+
+            This PR modifies files in \`.claude/skills/\` but the skills are not in sync with the master copy in \`test_agents\`.
+
+            ${syncInfo}
+
+            ### 🔧 How to Fix
+
+            Skills must be synced from \`test_agents\` (single source of truth) before merging:
+
+            \`\`\`bash
+            # 1. Clone test_agents (if not already)
+            git clone https://github.com/openobserve/test_agents.git
+
+            # 2. Run sync script
+            cd test_agents/e2e-dev/.claude
+            ./sync-skills.sh --dry-run  # Preview changes
+            ./sync-skills.sh            # Execute sync
+
+            # 3. Commit synced skills
+            cd $OPENOBSERVE_REPO_PATH
+            git add .claude/skills
+            git commit -m 'chore: sync skills from test_agents'
+            git push
+            \`\`\`
+
+            ### 📖 Documentation
+
+            - **Sync Script:** \`test_agents/e2e-dev/.claude/sync-skills.sh\`
+            - **Refactoring Plan:** \`.claude/REFACTORING_PLAN.md\`
+            - **Phase 2 Summary:** \`.claude/PHASE-2-COMPLETION-SUMMARY.md\`
+
+            ### ℹ️ Why This Check Exists
+
+            We maintain skills in \`test_agents\` as the single source of truth to prevent drift and ensure consistency across repositories. All skill updates must originate from \`test_agents\` and be synced to \`openobserve\`.
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Upload sync check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skill-sync-check-results
+          path: |
+            .claude/skills/.skill-sync-version
+          retention-days: 30

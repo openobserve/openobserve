@@ -167,8 +167,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Provider Badge -->
-      <q-badge :label="span._o2_llm_provider_name" color="primary" />
+      <div class="flex items-center">
+        <!-- Quality Badge -->
+        <q-badge
+          v-if="evaluationScores && evaluationScores.qualityScore != null"
+          :label="`Quality: ${formatScore(evaluationScores.qualityScore)}`"
+          :color="getQualityScoreColor(evaluationScores.qualityScore)"
+          class="q-mr-sm"
+        />
+        <!-- Provider Badge -->
+        <q-badge :label="span._o2_llm_provider_name" color="primary" />
+      </div>
     </div>
   </div>
 
@@ -347,6 +356,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mt-md"
         >
           <pre class="model-params-json q-pa-sm">{{ formatModelParams(span._o2_llm_model_parameters) }}</pre>
+        </q-expansion-item>
+
+        <!-- Evaluation Scores (collapsible) -->
+        <q-expansion-item
+          v-if="evaluationScores"
+          label="Evaluation Scores"
+          class="q-mt-md"
+          default-opened
+        >
+          <div class="evaluation-scores q-pa-sm">
+            <div class="flex items-center q-mb-sm" v-if="evaluationScores.qualityScore != null">
+              <span class="text-grey-7 q-mr-sm" style="min-width: 140px">Quality Score</span>
+              <q-badge
+                :color="getQualityScoreColor(evaluationScores.qualityScore)"
+                :label="formatScore(evaluationScores.qualityScore)"
+              />
+              <q-linear-progress
+                :value="evaluationScores.qualityScore"
+                :color="getQualityScoreColor(evaluationScores.qualityScore)"
+                class="q-ml-sm"
+                style="flex: 1; max-width: 200px"
+                rounded
+                size="8px"
+              />
+            </div>
+            <div class="flex items-center q-mb-xs" v-if="evaluationScores.relevance != null">
+              <span class="text-grey-7 q-mr-sm" style="min-width: 140px">Relevance</span>
+              <span style="min-width: 40px">{{ formatScore(evaluationScores.relevance) }}</span>
+              <q-linear-progress
+                :value="evaluationScores.relevance"
+                color="blue"
+                class="q-ml-sm"
+                style="flex: 1; max-width: 200px"
+                rounded
+                size="6px"
+              />
+            </div>
+            <div class="flex items-center q-mb-xs" v-if="evaluationScores.groundedness != null">
+              <span class="text-grey-7 q-mr-sm" style="min-width: 140px">Groundedness</span>
+              <span style="min-width: 40px">{{ formatScore(evaluationScores.groundedness) }}</span>
+              <q-linear-progress
+                :value="evaluationScores.groundedness"
+                color="blue"
+                class="q-ml-sm"
+                style="flex: 1; max-width: 200px"
+                rounded
+                size="6px"
+              />
+            </div>
+            <div class="flex items-center q-mb-xs" v-if="evaluationScores.completeness != null">
+              <span class="text-grey-7 q-mr-sm" style="min-width: 140px">Completeness</span>
+              <span style="min-width: 40px">{{ formatScore(evaluationScores.completeness) }}</span>
+              <q-linear-progress
+                :value="evaluationScores.completeness"
+                color="teal"
+                class="q-ml-sm"
+                style="flex: 1; max-width: 200px"
+                rounded
+                size="6px"
+              />
+            </div>
+            <div class="flex items-center q-mb-xs" v-if="evaluationScores.toolEffectiveness != null">
+              <span class="text-grey-7 q-mr-sm" style="min-width: 140px">Tool Effectiveness</span>
+              <span style="min-width: 40px">{{ formatScore(evaluationScores.toolEffectiveness) }}</span>
+              <q-linear-progress
+                :value="evaluationScores.toolEffectiveness"
+                color="orange"
+                class="q-ml-sm"
+                style="flex: 1; max-width: 200px"
+                rounded
+                size="6px"
+              />
+            </div>
+            <div class="flex items-center q-mb-xs" v-if="evaluationScores.safety != null">
+              <span class="text-grey-7 q-mr-sm" style="min-width: 140px">Safety</span>
+              <span style="min-width: 40px">{{ formatScore(evaluationScores.safety) }}</span>
+              <q-linear-progress
+                :value="evaluationScores.safety"
+                color="purple"
+                class="q-ml-sm"
+                style="flex: 1; max-width: 200px"
+                rounded
+                size="6px"
+              />
+            </div>
+            <div class="text-caption text-grey-6 q-mt-xs" v-if="evaluationScores.durationMs != null">
+              Evaluated in {{ evaluationScores.durationMs.toFixed(0) }}ms
+            </div>
+          </div>
         </q-expansion-item>
       </div>
     </q-tab-panel>
@@ -771,8 +869,11 @@ import {
   isLLMTrace,
   parseUsageDetails,
   parseCostDetails,
+  parseEvaluationScores,
   getObservationTypeColor,
   formatModelParameters,
+  formatScore,
+  getQualityScoreColor,
 } from "@/utils/llmUtils";
 
 export default defineComponent({
@@ -1528,6 +1629,12 @@ export default defineComponent({
       };
     });
 
+    // LLM evaluation scores
+    const evaluationScores = computed(() => {
+      if (!isLLMSpan.value) return null;
+      return parseEvaluationScores(props.span);
+    });
+
     // Copy LLM content to clipboard
     const copyContent = (content: any, type: 'input' | 'output') => {
       try {
@@ -1633,9 +1740,12 @@ export default defineComponent({
       // LLM
       isLLMSpan,
       llmMetrics,
+      evaluationScores,
       copyContent,
       formatModelParams,
+      formatScore,
       getObservationTypeColor,
+      getQualityScoreColor,
       inputExpanded,
       outputExpanded,
       inputViewMode,
