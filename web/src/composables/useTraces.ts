@@ -330,22 +330,18 @@ const useTraces = () => {
   });
 
   // Color palette for service visualization
-  const colorPalette = [
-    "#b7885e",
-    "#1ab8be",
-    "#ffcb99",
-    "#f89570",
-    "#839ae2",
-  ];
+  const colorPalette = ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"];
 
   /**
    * Generate a new color in HSL format
    * Used when the color palette is exhausted
    */
   const generateNewColor = (currentColorCount: number): string => {
-    const hue = currentColorCount * (360 / 50);
-    const lightness = 50 + (currentColorCount % 2) * 15;
-    return `hsl(${hue}, 100%, ${lightness}%)`;
+    // Generate a color in HSL format
+    const hue = (currentColorCount * 137.508) % 360; // Using golden angle approximation
+    const saturation = 40 + (currentColorCount % 3) * 10;
+    const lightness = 55;
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   };
 
   /**
@@ -417,6 +413,7 @@ const useTraces = () => {
     navigateToLogs,
     tracesShareURL,
     formatTracesMetaData,
+    generateNewColor,
   };
 };
 

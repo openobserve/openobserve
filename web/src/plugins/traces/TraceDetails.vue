@@ -710,7 +710,7 @@ export default defineComponent({
     const spanMap: any = ref({});
     const activeTab = ref("timeline");
 
-    const { searchObj, getUrlQueryParams } = useTraces();
+    const { searchObj, getUrlQueryParams, generateNewColor } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -1444,7 +1444,7 @@ export default defineComponent({
         (service: any) => {
           if (!searchObj.meta.serviceColors[service.service_name]) {
             if (serviceColorIndex.value >= colors.value.length)
-              generateNewColor();
+              addNewColorToList();
 
             searchObj.meta.serviceColors[service.service_name] =
               colors.value[serviceColorIndex.value];
@@ -1473,12 +1473,10 @@ export default defineComponent({
       return;
     };
 
-    function generateNewColor() {
-      // Generate a color in HSL format
-      const hue = (colors.value.length * 137.508) % 360; // Using golden angle approximation
-      const saturation = 70 + (colors.value.length % 2) * 15;
-      const lightness = 50;
-      colors.value.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+    function addNewColorToList() {
+      // Use generateNewColor from useTraces to get a non-neon color
+      const newColor = generateNewColor(colors.value.length);
+      colors.value.push(newColor);
       return colors;
     }
 
