@@ -29,6 +29,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use infra::runtime::VORTEX_RUNTIME;
+use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, arrow::FromArrowArray},
@@ -133,6 +134,8 @@ pub async fn merge_parquet_files(
         println!("{plan}");
     }
 
+    let mut new_file_meta = metadata.clone();
+    new_file_meta.records = 0;
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let read_task = tokio::task::spawn(async move {
@@ -175,6 +178,7 @@ pub async fn merge_parquet_files(
             );
 
             while let Some(batch) = rx.recv().await {
+                new_file_meta.records += batch.num_rows() as i64;
                 if let Err(e) = writer.write(&batch).await {
                     log::error!("merge_parquet_files write error: {e}");
                     return Err(e.into());
@@ -184,6 +188,7 @@ pub async fn merge_parquet_files(
             read_task
                 .await
                 .map_err(|e| DataFusionError::External(Box::new(e)))??;
+            append_metadata(&mut writer, &new_file_meta)?;
             writer.close().await?;
             buf
         }
@@ -238,6 +243,29 @@ pub async fn merge_parquet_files(
 
     metadata.compressed_size = buf.len() as i64;
     Ok(MergeParquetResult::Single(buf, metadata))
+}
+
+pub(crate) fn append_metadata(
+    writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
+    file_meta: &FileMeta,
+) -> Result<()> {
+    writer.append_key_value_metadata(KeyValue::new(
+        "min_ts".to_string(),
+        file_meta.min_ts.to_string(),
+    ));
+    writer.append_key_value_metadata(KeyValue::new(
+        "max_ts".to_string(),
+        file_meta.max_ts.to_string(),
+    ));
+    writer.append_key_value_metadata(KeyValue::new(
+        "records".to_string(),
+        file_meta.records.to_string(),
+    ));
+    writer.append_key_value_metadata(KeyValue::new(
+        "original_size".to_string(),
+        file_meta.original_size.to_string(),
+    ));
+    Ok(())
 }
 
 #[cfg(test)]

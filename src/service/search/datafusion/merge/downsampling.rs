@@ -43,7 +43,7 @@ use vortex::{
 
 use crate::service::search::datafusion::{
     exec::{DATAFUSION_MIN_PARTITION, DataFusionContextBuilder},
-    merge::MergeParquetResult,
+    merge::{MergeParquetResult, append_metadata},
     table_provider::uniontable::NewUnionTable,
 };
 
@@ -159,6 +159,7 @@ async fn write_downsampled_parquet(
         if would_exceed_limit {
             // Close current file before writing the batch that would exceed the limit
             file_meta.min_ts = last_min_ts;
+            append_metadata(&mut writer, &file_meta)?;
             writer.close().await?;
             bufs.push(std::mem::take(&mut buf));
             file_metas.push(file_meta);
