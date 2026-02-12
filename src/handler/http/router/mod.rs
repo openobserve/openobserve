@@ -772,6 +772,7 @@ pub fn service_routes() -> Router {
             // AI
             .route("/{org_id}/ai/chat", post(ai::chat::chat))
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+            .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))

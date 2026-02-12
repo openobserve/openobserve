@@ -161,7 +161,7 @@ pub async fn get_annotations(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete annotations", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({"description": "Delete annotations", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_annotations(
@@ -259,7 +259,7 @@ pub async fn update_annotations(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Remove annotation from panel", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({"description": "Remove annotation from panel", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_annotation_panels(
