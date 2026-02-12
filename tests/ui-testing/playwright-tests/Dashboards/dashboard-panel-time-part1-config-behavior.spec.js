@@ -26,6 +26,13 @@ import {
   monitorVariableAPICalls,
   waitForVariableToLoad
 } from "../utils/variable-helpers.js";
+const { safeWaitForHidden, safeWaitForNetworkIdle, safeWaitForDOMContentLoaded } = require("../utils/wait-helpers.js");
+// Import centralized selectors
+const {
+  SELECTORS,
+  getVariableSelector,
+  getEditVariableBtn,
+} = require("../../pages/dashboardPages/dashboard-selectors.js");
 
 test.describe.configure({ mode: "parallel" });
 
@@ -429,11 +436,11 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       "kubernetes_container_name",
       { scope: "global" }
     );
-    await page.locator(`[data-test="dashboard-edit-variable-${globalVariableName}"]`).waitFor({ state: "visible", timeout: 15000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.locator(getEditVariableBtn(globalVariableName)).waitFor({ state: "visible", timeout: 15000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await pm.dashboardSetting.closeSettingWindow();
-    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Step 3: Create Panel A with individual time "Last 1h" using helper
     const panelAId = await addPanelWithPanelTime(page, pm, {
@@ -452,23 +459,23 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       "kubernetes_namespace_name",
       { scope: "panels", assignedPanels: [panelName] }
     );
-    await page.locator(`[data-test="dashboard-edit-variable-${panelVariableName}"]`).waitFor({ state: "visible", timeout: 15000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.locator(getEditVariableBtn(panelVariableName)).waitFor({ state: "visible", timeout: 15000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await pm.dashboardSetting.closeSettingWindow();
-    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Step 5: Verify Panel A has panel time picker showing "1h"
     await assertPanelTimePickerVisible(page, panelAId);
     await assertPanelTimeInURL(page, panelAId, "1h");
 
     // Step 6: Verify panel variable is visible
-    await page.locator(`[data-test="variable-selector-${panelVariableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(getVariableSelector(panelVariableName)).waitFor({ state: "visible", timeout: 10000 });
 
     // Step 7: Change Panel A's panel variable
-    const panelVariableDropdown = page.locator(`[data-test="variable-selector-${panelVariableName}-inner"]`);
+    const panelVariableDropdown = page.locator(getVariableSelector(panelVariableName) + '-inner');
     await panelVariableDropdown.waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Monitor API call when clicking dropdown
     const apiMonitor1 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
@@ -481,15 +488,15 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Close dropdown
     await page.keyboard.press('Escape');
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 9: Change Panel A time to "Last 1d"
     await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "1-d", true);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     await assertPanelTimeInURL(page, panelAId, "1d");
 
     // Step 10: Change Panel A's variable again
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
     const apiMonitor2 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
     await panelVariableDropdown.click();
     const result2 = await apiMonitor2;
@@ -500,12 +507,12 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Close dropdown
     await page.keyboard.press('Escape');
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 12: Test global variable uses global time (not panel time)
-    const globalVariableDropdown = page.locator(`[data-test="variable-selector-${globalVariableName}-inner"]`);
+    const globalVariableDropdown = page.locator(getVariableSelector(globalVariableName) + '-inner');
     await globalVariableDropdown.waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Monitor global variable API call
     const apiMonitor3 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
@@ -518,11 +525,11 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Close dropdown
     await page.keyboard.press('Escape');
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 14: Change global time to verify global variable tracks it
     await pm.dashboardPanelTime.changeGlobalTime("1-h");
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Monitor global variable API call after global time change
     const apiMonitor4 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });

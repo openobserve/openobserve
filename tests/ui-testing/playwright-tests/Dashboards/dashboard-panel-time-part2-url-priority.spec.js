@@ -17,6 +17,7 @@ import {
   assertURLChanged,
   assertURLUnchanged
 } from "./utils/panelTimeAssertions.js";
+const {  safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 
 test.describe.configure({ mode: "parallel" });
 
@@ -43,7 +44,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
 
     // Step 2: Change Panel time to "Last 6d" and Apply
     await pm.dashboardPanelTime.changePanelTimeInView(panelId, "6-d", true);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Step 3: Verify URL immediately updates
     await assertPanelTimeInURL(page, panelId, "6d");
@@ -62,7 +63,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
 
     // Step 10: Reload page (F5)
     await page.reload();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Step 11: Verify URL params remain
     await assertPanelTimeInURL(page, panelId, "6d");
@@ -107,12 +108,12 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
 
     // Step 5: Change Panel A to "Last 1d"
     await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "1-d", true);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     await assertPanelTimeInURL(page, panelAId, "1d");
 
     // Step 6: Change Panel A to "Last 1m"
     await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "1-m", true);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
     await assertPanelTimeInURL(page, panelAId, "1m");
 
     // Step 7: Verify Panel B remains unchanged
@@ -223,7 +224,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const dashboardId = getDashboardIdFromURL(page);
     const urlWithParams = `${page.url().split('?')[0]}?dashboard=${dashboardId}&pt-period.${panelAId}=1m`;
     await page.goto(urlWithParams);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Step 7: Verify Panel A shows "1m" (URL priority over config)
     await assertPanelTimeInURL(page, panelAId, "1m");
@@ -267,7 +268,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const dashboardId = getDashboardIdFromURL(page);
     const urlWithParams = `${page.url().split('?')[0]}?dashboard=${dashboardId}&pt-period.${panelAId}=1d`;
     await page.goto(urlWithParams);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Step 4: Verify Panel A still uses global time (URL ignored)
     // Panel should NOT have URL param applied because mode is "global"
