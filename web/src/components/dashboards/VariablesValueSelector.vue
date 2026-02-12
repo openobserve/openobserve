@@ -1986,14 +1986,14 @@ export default defineComponent({
         }
         case "custom": {
           handleCustomVariable(variableObject);
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
