@@ -666,7 +666,9 @@ mod tests {
         // Input/output messages
         span_attrs.insert(
             "gen_ai.input.messages".to_string(),
-            json::json!(r#"[{"role":"user","content":"What are the top error logs in the last hour?"}]"#),
+            json::json!(
+                r#"[{"role":"user","content":"What are the top error logs in the last hour?"}]"#
+            ),
         );
         span_attrs.insert(
             "gen_ai.output.messages".to_string(),
@@ -695,22 +697,14 @@ mod tests {
             "llm.evaluation.tool_effectiveness".to_string(),
             json::json!(0.85),
         );
-        span_attrs.insert(
-            "llm.evaluation.groundedness".to_string(),
-            json::json!(0.88),
-        );
+        span_attrs.insert("llm.evaluation.groundedness".to_string(), json::json!(0.88));
         span_attrs.insert("llm.evaluation.safety".to_string(), json::json!(0.95));
         span_attrs.insert("llm.evaluation.duration_ms".to_string(), json::json!(15.3));
 
         let events = vec![];
 
         // ── Process the span (this is what happens in handle_otlp_request) ──
-        processor.process_span(
-            &mut span_attrs,
-            &resource_attrs,
-            Some("anthropic"),
-            &events,
-        );
+        processor.process_span(&mut span_attrs, &resource_attrs, Some("anthropic"), &events);
 
         // ═══ Verify complete enrichment pipeline ═══
 
@@ -780,7 +774,10 @@ mod tests {
             "Should have model parameters"
         );
         let params = span_attrs.get(O2Attributes::MODEL_PARAMETERS).unwrap();
-        assert!(params.is_object(), "Model parameters should be a JSON object");
+        assert!(
+            params.is_object(),
+            "Model parameters should be a JSON object"
+        );
         assert_eq!(
             params.get("temperature").and_then(|v| v.as_str()),
             Some("0.7")
