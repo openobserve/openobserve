@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="variableData.query_data.stream"
                     :items="streamOptionsWithVariables"
                     searchRegex="(?:^|[^$])\$?(\w+)"
-                    @update:model-value="streamUpdated"
+                    @select="streamUpdated"
                     :rules="[(val: any) => !!val || 'Field is required!']"
                     data-test="dashboard-variable-stream-select"
                     class="no-case"
