@@ -156,6 +156,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
           </div>
+          <!-- Output Format field - only shown for Pipeline destinations -->
+          <div v-if="!isAlerts" class="col-6 q-py-xs">
+            <q-select
+              data-test="add-destination-output-format-select"
+              v-model="formData.output_format"
+              :label="t('alert_destinations.output_format') + ' *'"
+              :options="outputFormats"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              emit-value
+              map-options
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              tabindex="0"
+            />
+          </div>
+          <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
+          <div
+            v-if="!isAlerts && formData.output_format === 'stringseparated'"
+            class="col-6 q-py-xs"
+          >
+            <q-input
+              data-test="add-destination-separator-input"
+              v-model="formData.separator"
+              :label="'Separator *'"
+              :placeholder="'Enter separator (e.g., |, \\n, \\t, space)'"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
+                (val: any) =>
+                  (val !== null && val !== undefined && val !== '') || 'Separator is required for StringSeparated format',
+              ]"
+              tabindex="0"
+            >
+              <template v-slot:hint>
+                Separator string to use between records (spaces allowed)
+              </template>
+            </q-input>
+          </div>
           <div class="col-12 q-py-sm">
             <div class="text-bold q-py-xs" style="paddingleft: 10px">
               Headers
@@ -352,6 +400,11 @@ const props = defineProps({
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
+const outputFormats = [
+  { label: "JSON", value: "json" },
+  { label: "NDJSON", value: "ndjson" },
+  { label: "String Separated", value: "stringseparated" },
+];
 const store = useStore();
 const { t } = useI18n();
 const formData: Ref<DestinationData> = ref({
@@ -364,6 +417,8 @@ const formData: Ref<DestinationData> = ref({
   emails: "",
   type: "http",
   action_id: "",
+  output_format: "json",
+  separator: "",
 });
 const isUpdatingDestination = ref(false);
 
@@ -456,6 +511,25 @@ const setupDestinationData = () => {
     formData.value.type = props.destination.type || "http";
     formData.value.action_id = props.destination.action_id || "";
 
+    // Handle output_format for pipeline destinations
+    if (props.destination.output_format) {
+      if (
+        typeof props.destination.output_format === "object" &&
+        props.destination.output_format.stringseparated
+      ) {
+        formData.value.output_format = "stringseparated";
+        formData.value.separator =
+          props.destination.output_format.stringseparated.separator || "";
+      } else if (typeof props.destination.output_format === "string") {
+        formData.value.output_format = props.destination.output_format;
+        formData.value.separator = "";
+      }
+    } else {
+      // Default to "json" if output_format doesn't exist (for existing destinations)
+      formData.value.output_format = "json";
+      formData.value.separator = "";
+    }
+
     if (Object.keys(formData.value?.headers || {}).length) {
       apiHeaders.value = [];
       Object.entries(formData.value?.headers || {}).forEach(([key, value]) => {
@@ -475,8 +549,8 @@ const getFormattedTemplates = computed(() =>
     .map((template: any) => template.name),
 );
 
-const isValidDestination = computed(
-  () =>
+const isValidDestination = computed(() => {
+  const basicValidation =
     formData.value.name &&
     ((formData.value.url &&
       formData.value.method &&
@@ -484,8 +558,15 @@ const isValidDestination = computed(
       (formData.value.type === "email" && formData.value?.emails?.length) ||
       (formData.value.type === "action" && formData.value?.action_id?.length) ||
       (!props.isAlerts && formData.value.url && formData?.value?.method)) &&
-    (props.isAlerts ? formData.value.template : true),
-);
+    (props.isAlerts ? formData.value.template : true);
+
+  // Additional validation for pipeline destinations with StringSeparated format
+  if (!props.isAlerts && formData.value.output_format === "stringseparated") {
+    return basicValidation && (formData.value.separator !== null && formData.value.separator !== undefined && formData.value.separator !== '');
+  }
+
+  return basicValidation;
+});
 
 const updateActionOptions = () => {
   actionOptions.value = [];
@@ -518,6 +599,20 @@ const getActionOptions = async () => {
 };
 
 const saveDestination = () => {
+  // Validate StringSeparated format specifically
+  if (
+    !props.isAlerts &&
+    formData.value.output_format === "stringseparated" &&
+    (formData.value.separator === null || formData.value.separator === undefined || formData.value.separator === '')
+  ) {
+    q.notify({
+      type: "negative",
+      message: "Separator is required for StringSeparated format",
+      timeout: 2000,
+    });
+    return;
+  }
+
   if (!isValidDestination.value) {
     q.notify({
       type: "negative",
@@ -536,6 +631,20 @@ const saveDestination = () => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
 
+  // Handle output format - for stringseparated, format as JSON object with separator
+  let outputFormat: any = formData.value.output_format;
+  if (
+    !props.isAlerts &&
+    outputFormat === "stringseparated" &&
+    formData.value.separator
+  ) {
+    outputFormat = {
+      stringseparated: {
+        separator: formData.value.separator,
+      },
+    };
+  }
+
   const payload: any = {
     url: formData.value.url,
     method: formData.value.method,
@@ -544,6 +653,11 @@ const saveDestination = () => {
     headers: headers,
     name: formData.value.name,
   };
+
+  // Add output_format for pipeline destinations
+  if (!props.isAlerts) {
+    payload.output_format = outputFormat;
+  }
 
   if (formData.value.type === "email") {
     payload["type"] = "email";

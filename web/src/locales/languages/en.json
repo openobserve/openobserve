@@ -1063,7 +1063,8 @@
     "api_header_value": "Value",
     "add_template": "New Template",
     "skip_tls_verify": "Skip TLS Verify",
-    "action": "Action"
+    "action": "Action",
+    "output_format": "Output Format"
   },
   "pipeline_destinations": {
     "header":"Pipeline Destinations"
