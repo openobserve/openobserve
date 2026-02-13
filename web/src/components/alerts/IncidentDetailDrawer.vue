@@ -1011,9 +1011,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Logs Tab Content -->
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
-            <div class="tw-text-base">Loading correlated logs...</div>
           </div>
 
           <!-- Error/No Data State -->
