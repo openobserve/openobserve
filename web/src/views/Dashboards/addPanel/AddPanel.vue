@@ -2311,6 +2311,9 @@ export default defineComponent({
       variablesAndPanelsDataLoadingState,
     );
 
+    // provide runQuery to allow child components (like QueryEditor AI bar) to trigger query execution
+    provide("runQuery", runQuery);
+
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState.searchRequestTraceIds,

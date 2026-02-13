@@ -936,37 +936,17 @@ import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/m
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, NavigationAction, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
-
-// Add IndexedDB setup
-const DB_NAME = 'o2ChatDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'chatHistory';
+import { useChatHistory } from '@/composables/useChatHistory';
 
 const { fetchAiChat } = useAiChat();
-
-const initDB = () => {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    //this opens / creates(if not exists) the database with the name o2ChatDB and version 1
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => reject(request.error);
-    //this is called when the database is successfully opened and returns the database object
-    request.onsuccess = () => resolve(request.result);
-    //this is called when the database is created for the first time / when the version is changed
-    request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        //this creates the object store with the name chatHistory and the key is id , autoIncrement is true
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-        //this creates the index with the name timestamp
-        store.createIndex('timestamp', 'timestamp', { unique: false });
-        //this creates the index with the name title
-        store.createIndex('title', 'title', { unique: false });
-      }
-    };
-  });
-};
+const {
+  saveToHistory: dbSaveToHistory,
+  loadHistory: dbLoadHistory,
+  loadChat: dbLoadChat,
+  deleteChatById: dbDeleteChatById,
+  clearAllHistory: dbClearAllHistory,
+  updateChatTitle: dbUpdateChatTitle,
+} = useChatHistory();
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
@@ -2286,70 +2266,26 @@ export default defineComponent({
     const saveToHistory = async () => {
       saveHistoryLoading.value = true;
       if (chatMessages.value.length === 0) return;
-      
+
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const DbIndexStore = transaction.objectStore(STORE_NAME);
-
-        // Prefer AI-generated title, fallback to truncated first user message
-        const firstUserMessage = chatMessages.value.find(msg => msg.role === 'user');
-        const title = aiGeneratedTitle.value || (firstUserMessage ?
-          (firstUserMessage.content.length > 40 ?
-            firstUserMessage.content.substring(0, 40) + '...' :
-            firstUserMessage.content) :
-          'New Chat');
-
-        // Create a serializable version of the messages (including contentBlocks and images)
-        // Use JSON parse/stringify to strip Vue reactive proxies
-        const serializableMessages = chatMessages.value.map(msg => {
-          const serialized: any = {
-            role: msg.role,
-            content: msg.content
-          };
-          if (msg.contentBlocks && msg.contentBlocks.length > 0) {
-            // Deep clone to remove Vue reactivity
-            serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
-          }
-          if (msg.images && msg.images.length > 0) {
-            // Deep clone images to remove Vue reactivity
-            serialized.images = JSON.parse(JSON.stringify(msg.images));
-          }
-          return serialized;
-        });
-
         // Generate session ID if not already set for this chat
         if (!currentSessionId.value) {
           currentSessionId.value = getUUIDv7();
         }
 
-        const chatData = {
-          timestamp: new Date().toISOString(),
-          title,
-          messages: serializableMessages,
-          sessionId: currentSessionId.value
-        };
+        const savedId = await dbSaveToHistory(
+          chatMessages.value,
+          currentSessionId.value,
+          aiGeneratedTitle.value || undefined,
+          currentChatId.value,
+        );
 
-        // Always use put with the current chat ID to update existing chat
-        // instead of creating a new one
-        let chatId = currentChatId.value || Date.now();
-        const request = DbIndexStore.put({ 
-          ...chatData, 
-          id: chatId // Use timestamp as ID if no current ID
-        });
-
-
-
-
-        request.onsuccess = (event: Event) => {
-          if (!currentChatId.value) {
-            currentChatId.value = (event.target as IDBRequest).result as number;
-          }
-        };
+        if (savedId && !currentChatId.value) {
+          currentChatId.value = savedId;
+        }
       } catch (error) {
         console.error('Error saving chat history:', error);
-      }
-      finally {
+      } finally {
         saveHistoryLoading.value = false;
       }
     };
@@ -2367,57 +2303,10 @@ export default defineComponent({
       }
     };
 
-    const MAX_HISTORY_ITEMS = 100;
-
     const loadHistory = async () => {
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.index('timestamp').openCursor(null, 'prev');
-        //one the promise is resolved we get the history here 
-        //this history length might be more than 100 so after resolving / finishing the indexDB call
-        // we do the filtering
-        const history: any[] = [];
-        
-        const loadResult = await new Promise((resolve, reject) => {
-          request.onsuccess = (event: Event) => {
-            const cursor = (event.target as IDBRequest).result as IDBCursorWithValue;
-            if (cursor) {
-              history.push(cursor.value);
-              cursor.continue();
-            } else {
-              resolve(history);
-            }
-          };
-          request.onerror = () => reject(request.error);
-        });
-
-        // If we have more than MAX_HISTORY_ITEMS, delete the oldest ones
-        //this will allows the user to see only top 100 chat histories and also delete the non required ones
-        //as we are not giving option to delete history manually we are doing this
-        //some times it takes time to delete the history from the indexDB so we only delete the history if user access the history menu
-        if (history.length > MAX_HISTORY_ITEMS) {
-          const itemsToDelete = history.slice(MAX_HISTORY_ITEMS);
-          const deleteTransaction = db.transaction(STORE_NAME, 'readwrite');
-          const deleteStore = deleteTransaction.objectStore(STORE_NAME);
-          
-          for (const item of itemsToDelete) {
-            deleteStore.delete(item.id);
-          }
-
-          // Wait for deletion transaction to complete
-          await new Promise((resolve, reject) => {
-            deleteTransaction.oncomplete = () => resolve(true);
-            deleteTransaction.onerror = () => reject(deleteTransaction.error);
-          });
-        }
-
-        //here we do assign the history to the actual chat history 
-        // Keep only the latest MAX_HISTORY_ITEMS
-        chatHistory.value = history.slice(0, MAX_HISTORY_ITEMS);
+        chatHistory.value = await dbLoadHistory();
         return chatHistory.value;
-
       } catch (error) {
         console.error('Error loading chat history:', error);
         return [];
@@ -2454,42 +2343,17 @@ export default defineComponent({
       }
 
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.get(currentChatId.value);
+        const trimmedTitle = editingTitle.value.trim();
+        const success = await dbUpdateChatTitle(currentChatId.value, trimmedTitle);
 
-        request.onsuccess = () => {
-          const chat = request.result;
-          if (chat) {
-            // Update the title
-            chat.title = editingTitle.value.trim();
-            const updateRequest = store.put(chat);
-
-            updateRequest.onsuccess = () => {
-              // Update the displayed title
-              displayedTitle.value = editingTitle.value.trim();
-              aiGeneratedTitle.value = editingTitle.value.trim();
-
-              // Reload history to reflect changes
-              loadHistory();
-
-              showEditTitleDialog.value = false;
-            };
-
-            updateRequest.onerror = () => {
-              console.error('Error updating chat title:', updateRequest.error);
-              showEditTitleDialog.value = false;
-            };
-          }
-        };
-
-        request.onerror = () => {
-          console.error('Error retrieving chat for edit:', request.error);
-          showEditTitleDialog.value = false;
-        };
+        if (success) {
+          displayedTitle.value = trimmedTitle;
+          aiGeneratedTitle.value = trimmedTitle;
+          loadHistory();
+        }
       } catch (error) {
         console.error('Error updating chat title:', error);
+      } finally {
         showEditTitleDialog.value = false;
       }
     };
@@ -2503,32 +2367,16 @@ export default defineComponent({
       if (!chatToDelete.value) return;
 
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const deleteRequest = store.delete(chatToDelete.value);
+        await dbDeleteChatById(chatToDelete.value);
 
-        deleteRequest.onsuccess = () => {
-          // If the deleted chat is the current one, reset to new chat
-          if (currentChatId.value === chatToDelete.value) {
-            addNewChat();
-          }
+        if (currentChatId.value === chatToDelete.value) {
+          addNewChat();
+        }
 
-          // Reload history to reflect changes
-          loadHistory();
-
-          // Reset state
-          chatToDelete.value = null;
-          showDeleteChatConfirmDialog.value = false;
-        };
-
-        deleteRequest.onerror = () => {
-          console.error('Error deleting chat:', deleteRequest.error);
-          chatToDelete.value = null;
-          showDeleteChatConfirmDialog.value = false;
-        };
+        loadHistory();
       } catch (error) {
         console.error('Error deleting chat:', error);
+      } finally {
         chatToDelete.value = null;
         showDeleteChatConfirmDialog.value = false;
       }
@@ -2842,80 +2690,52 @@ export default defineComponent({
 
     const confirmClearAllConversations = async () => {
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const clearRequest = store.clear();
-
-        clearRequest.onsuccess = () => {
-          // Reset to new chat
-          addNewChat();
-
-          // Clear the chat history array
-          chatHistory.value = [];
-
-          showClearAllConfirmDialog.value = false;
-        };
-
-        clearRequest.onerror = () => {
-          console.error('Error clearing all conversations:', clearRequest.error);
-          showClearAllConfirmDialog.value = false;
-        };
+        await dbClearAllHistory();
+        addNewChat();
+        chatHistory.value = [];
       } catch (error) {
         console.error('Error clearing all conversations:', error);
+      } finally {
         showClearAllConfirmDialog.value = false;
       }
     };
 
     const loadChat = async (chatId: number) => {
       try {
-
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const indexDbStore = transaction.objectStore(STORE_NAME);
-        if(chatId == null) {
+        if (chatId == null) {
           addNewChat();
           return;
         }
-        const request = indexDbStore.get(chatId);
 
-        request.onsuccess = async () => {
-          const chat = request.result;
-          if (chat) {
-            // Ensure messages are properly formatted (including contentBlocks and images)
-            const formattedMessages = chat.messages.map((msg: any) => ({
-              role: msg.role,
-              content: msg.content,
-              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
-              ...(msg.images ? { images: msg.images } : {})
-            }));
-            
-            // Check if the last message is a user message without an assistant response
-            const lastMessage = formattedMessages[formattedMessages.length - 1];
-            
-            chatMessages.value = formattedMessages;
-            currentChatId.value = chatId;
-            currentSessionId.value = chat.sessionId || null; // Restore session ID from history
-            showHistory.value = false;
-            shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
+        const chat = await dbLoadChat(chatId);
+        if (chat) {
+          // Ensure messages are properly formatted (including contentBlocks)
+          const formattedMessages = chat.messages.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content,
+            ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
+          }));
 
-            // Load title from history (no animation for existing chats)
-            displayedTitle.value = chat.title || '';
-            aiGeneratedTitle.value = chat.title || null;
-            isTypingTitle.value = false;
+          chatMessages.value = formattedMessages;
+          currentChatId.value = chatId;
+          currentSessionId.value = chat.sessionId || null;
+          showHistory.value = false;
+          shouldAutoScroll.value = true;
 
-            if(chatId !== store.state.currentChatTimestamp) {
-              store.dispatch('setCurrentChatTimestamp', chatId);
-              store.dispatch('setChatUpdated', true);
-            }
+          // Load title from history (no animation for existing chats)
+          displayedTitle.value = chat.title || '';
+          aiGeneratedTitle.value = chat.title || null;
+          isTypingTitle.value = false;
 
-
-            // Scroll to bottom after loading chat
-            await nextTick(() => {
-              scrollToBottom();
-            });
+          if (chatId !== store.state.currentChatTimestamp) {
+            store.dispatch('setCurrentChatTimestamp', chatId);
+            store.dispatch('setChatUpdated', true);
           }
-        };
+
+          await nextTick(() => {
+            scrollToBottom();
+          });
+        }
       } catch (error) {
         console.error('Error loading chat:', error);
       }
