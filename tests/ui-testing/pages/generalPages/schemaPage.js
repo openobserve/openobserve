@@ -263,7 +263,7 @@ class SchemaPage {
             currentUrl.searchParams.set('vrl', 'true');
             
             await this.page.goto(currentUrl.toString());
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             
             const fnEditorCountAfterReload = await this.page.locator(this.schemaLocators.fnEditor).count();
             

@@ -597,7 +597,7 @@ export class TracesPage {
     await this.page.goto(tracesUrl);
 
     try {
-      await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+      await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     } catch {
     }
   }

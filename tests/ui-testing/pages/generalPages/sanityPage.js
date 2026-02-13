@@ -369,7 +369,7 @@ export class SanityPage {
         await this.page.locator(this.savedFunctionNameInput).click();
         await this.page.locator(this.savedFunctionNameInput).fill(functionName);
         await this.page.locator(this.savedViewDialogSave).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.locator(this.realtimeTab).click();
@@ -395,10 +395,10 @@ export class SanityPage {
         const uniqueFunctionName = `sanitytest_${generateSuffix()}`;
 
         await this.page.locator(this.pipelineMenuItem).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         await this.page.locator(this.streamPipelinesTab).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         await this.page.locator(this.realtimeTab).click();
         await this.page.waitForTimeout(500);
@@ -740,7 +740,7 @@ export class SanityPage {
         await streamSelectInput.clear();
 
         // Wait for stream selection to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Ensure data is loaded by clicking the refresh button
         testLogger.debug('Refreshing to load data with 70 fields');
@@ -750,7 +750,7 @@ export class SanityPage {
         });
 
         await refreshButton.click({ timeout: 10000 });
-        await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
 
         // Wait for pagination to be visible (wait for the first page button as indicator)
         testLogger.debug('Waiting for schema pagination to be visible');
@@ -813,13 +813,13 @@ export class SanityPage {
         
         try {
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         }
 
@@ -865,7 +865,7 @@ export class SanityPage {
         const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
             const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
@@ -885,7 +885,7 @@ export class SanityPage {
 
         // Click run query button
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Click on result column
@@ -900,7 +900,7 @@ export class SanityPage {
         const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
             const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
@@ -917,12 +917,12 @@ export class SanityPage {
         
         try {
             await initialRefreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         } catch (error) {
             console.warn('Initial refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await initialRefreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         }
         
         // Wait for canvas to be ready and visible (should now be there after data load)
@@ -963,12 +963,12 @@ export class SanityPage {
         
         try {
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         }
 
         await expect(
@@ -1003,7 +1003,7 @@ export class SanityPage {
         const logsUrl = `/web/logs?org_identifier=${orgId}&fn_editor=true`;
         
         await this.page.goto(logsUrl);
-        await this.page.waitForLoadState('networkidle', { timeout: 20000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
         
         // Select the e2e_automate stream before proceeding
         try {
@@ -1022,7 +1022,7 @@ export class SanityPage {
         }
         
         // Wait for stream selection to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Check if VRL editor is visible, if not click the toggle
         const fnEditor = this.page.locator('#fnEditor');
@@ -1071,13 +1071,13 @@ export class SanityPage {
         
         try {
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         }
 

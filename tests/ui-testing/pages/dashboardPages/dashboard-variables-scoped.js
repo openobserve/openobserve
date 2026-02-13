@@ -114,7 +114,7 @@ export default class DashboardVariablesScoped {
 
     // Ensure network is idle before clicking
     try {
-      await this.page.waitForLoadState('networkidle', { timeout: 3000 });
+      await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     } catch { /* acceptable if timeout */ }
 
     await varDropdown.click();

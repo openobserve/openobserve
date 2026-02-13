@@ -191,7 +191,7 @@ test.describe("Logs Page testcases", () => {
     await page.waitForTimeout(500);
     await pm.logsPage.clickRelative6WeeksButton();
     await applyQueryButton(page);
-    await page.waitForLoadState('networkidle', { timeout: 10000 }); // Replace long hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace long hard wait
     await pm.logsPage.expectSearchListVisible();
     // Strategic 500ms wait for UI stabilization - this is functionally necessary
     await page.waitForTimeout(500);

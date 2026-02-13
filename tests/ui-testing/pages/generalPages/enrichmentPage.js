@@ -297,11 +297,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         try {
             // Wait for logs page to be fully loaded and stable
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
             
             // Wait for VRL editor to be fully initialized (addressing the race condition)
             // The original working code had a 3-second wait after "Explore" click for editor initialization
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             
             // Ensure VRL functions panel is available if needed
             try {
@@ -331,7 +331,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             // Critical: Wait for VRL query validation and processing before proceeding
             // The VRL editor needs time to parse and validate the query syntax
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         } catch (error) {
             throw new Error(`VRL Query filling failed: ${error.message}`);
         }
@@ -351,7 +351,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await expect.poll(async () => response.status()).toBe(200);
         
         // Wait for results to render and process
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     }
 
     async waitForVRLEditorReady() {
@@ -373,12 +373,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await refreshButton.click({ force: true });
             if (i < 3) { // Wait between clicks except after last click
                 await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForLoadState('networkidle', { timeout: 1000 });
+                await this.page.waitForLoadState('networkidle', { timeout: 1000 }).catch(() => {});
             }
         }
         
         // Wait for query execution to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async verifyNoQueryWarning() {
@@ -390,7 +390,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForLoadState('networkidle', { timeout: 60000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Additional run query clicks to ensure VRL enrichment is fully processed
@@ -400,7 +400,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 await refreshButton.click({ force: true });
                 await this.page.waitForLoadState('domcontentloaded');
                 await this.page.waitForTimeout(2000);
-                await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             }
         }
         
@@ -437,7 +437,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         });
         
         // Wait for table to be stable after file upload
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Try to find the file with retries (table might still be loading in CI)
         let fileFound = false;
@@ -464,7 +464,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             if (!fileFound) {
                 attempts++;
                 if (attempts < maxAttempts) {
-                    await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+                    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
                 }
             }
         }
@@ -553,14 +553,14 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.getByRole("button", { name: this.exploreButton }).waitFor({ state: 'visible' });
         
         // Wait for navigation response before clicking
-        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 30000 });
+        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
         await this.page.getByRole("button", { name: this.exploreButton }).click();
         await navigationPromise;
         
         // Ensure we're on the logs page with additional wait
         await this.page.waitForLoadState('domcontentloaded');
         // Wait for VRL editor initialization to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Verify we're on the correct page before proceeding
         await this.page.waitForSelector(this.refreshButton, { 
@@ -627,7 +627,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.applyQueryMultipleClicks();
 
         // Wait for query results to load
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Check if error occurred and retry with additional wait
@@ -640,7 +640,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
             // Retry the query
             await this.applyQueryMultipleClicks();
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
 
             // Check again if error persists
