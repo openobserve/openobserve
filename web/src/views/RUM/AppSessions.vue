@@ -549,7 +549,21 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
     return;
   }
 
-  const whereClause = `WHERE session_id IN (${sessionIds.map((id) => `'${id}'`).join(", ")})`;
+  // Sanitize session IDs to prevent SQL injection
+  // Only allow alphanumeric characters, hyphens, and underscores
+  const sanitizedIds = sessionIds
+    .filter((id) => /^[a-zA-Z0-9_-]+$/.test(id))
+    .map((id) => id.replace(/'/g, "''")) // Escape single quotes
+    .map((id) => `'${id}'`)
+    .join(", ");
+
+  if (!sanitizedIds) {
+    rows.value = [];
+    isLoading.value.pop();
+    return;
+  }
+
+  const whereClause = `WHERE session_id IN (${sanitizedIds})`;
 
   req.query.sql = `
     SELECT
