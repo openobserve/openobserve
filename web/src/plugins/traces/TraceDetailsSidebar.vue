@@ -1467,13 +1467,12 @@ export default defineComponent({
             },
           };
         } else {
-          correlationError.value =
-            "No related services found for this trace span";
+          correlationError.value = t("correlation.noLogsFound");
         }
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
         correlationError.value =
-          err.message || "Failed to load correlation data";
+          err.message || t("correlation.failedToLoad");
       } finally {
         correlationLoading.value = false;
       }
