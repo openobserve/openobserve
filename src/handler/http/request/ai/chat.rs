@@ -199,8 +199,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        if !config.incidents.rca_enabled || config.incidents.rca_agent_url.is_empty() {
-            return MetaHttpResponse::bad_request("Agent service not configured");
+        if config.incidents.rca_agent_url.is_empty() {
+            return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
         // Extract user token from cookie/header for per-user MCP auth

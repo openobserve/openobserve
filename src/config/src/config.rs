@@ -36,7 +36,7 @@ use lettre::{
     },
 };
 use once_cell::sync::Lazy;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha256::digest;
 
 use crate::{
@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 29;
+pub const DB_SCHEMA_VERSION: u64 = 30;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -78,6 +78,7 @@ pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
+pub const FILE_EXT_VORTEX: &str = ".vortex";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
 pub const FILE_EXT_TANTIVY: &str = ".ttv";
 
@@ -469,6 +470,54 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
         .collect()
 });
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum FileFormat {
+    #[default]
+    Parquet,
+    Vortex,
+}
+
+impl std::fmt::Display for FileFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parquet => write!(f, "parquet"),
+            Self::Vortex => write!(f, "vortex"),
+        }
+    }
+}
+
+impl std::str::FromStr for FileFormat {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "parquet" => Ok(Self::Parquet),
+            "vortex" => Ok(Self::Vortex),
+            _ => Err(anyhow::anyhow!("Invalid file format: {}", s)),
+        }
+    }
+}
+
+impl FileFormat {
+    pub fn extension(&self) -> &'static str {
+        match self {
+            Self::Parquet => FILE_EXT_PARQUET,
+            Self::Vortex => FILE_EXT_VORTEX,
+        }
+    }
+
+    pub fn from_extension(path: &str) -> Option<Self> {
+        if path.ends_with(FILE_EXT_PARQUET) {
+            Some(Self::Parquet)
+        } else if path.ends_with(FILE_EXT_VORTEX) {
+            Some(Self::Vortex)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
@@ -791,6 +840,13 @@ pub struct Common {
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
+    #[env_config(
+        name = "ZO_FILE_FORMAT",
+        parse,
+        default = "parquet",
+        help = "File format for data storage: parquet or vortex"
+    )]
+    pub file_format: FileFormat,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
@@ -1321,6 +1377,8 @@ pub struct Limit {
     pub file_merge_thread_num: usize,
     #[env_config(name = "ZO_MEM_DUMP_THREAD_NUM", default = 0)]
     pub mem_dump_thread_num: usize,
+    #[env_config(name = "ZO_VORTEX_THREAD_NUM", default = 0)]
+    pub vortex_thread_num: usize,
     #[env_config(name = "ZO_USAGE_REPORTING_THREAD_NUM", default = 0)]
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
@@ -2390,6 +2448,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.mem_dump_thread_num == 0 {
         cfg.limit.mem_dump_thread_num = cpu_num;
     }
+    // HACK for vortex_thread_num equal to CPU core
+    if cfg.limit.vortex_thread_num == 0 {
+        cfg.limit.vortex_thread_num = cpu_num;
+    }
     // HACK for usage_reporting_thread_num equal to half of CPU core
     if cfg.limit.usage_reporting_thread_num == 0 {
         if cfg.common.local_mode {
@@ -2543,6 +2605,16 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
+
+    // Vortex file format requires enterprise feature, fallback to parquet
+    #[cfg(not(feature = "enterprise"))]
+    if cfg.common.file_format == FileFormat::Vortex {
+        log::error!("Vortex file format requires enterprise feature, falling back to parquet");
+        cfg.common.file_format = FileFormat::Parquet;
+    }
+
+    // log file format selection
+    log::info!("File format configured: {}", cfg.common.file_format);
 
     // format metadata storage
     if cfg.common.meta_store.is_empty() {

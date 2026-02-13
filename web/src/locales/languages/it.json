@@ -1179,6 +1179,9 @@
     "wraptext": "Avvolgi le celle della tabella",
     "tableTranspose": "Trasporre",
     "tableDynamicColumns": "Consenti colonne dinamiche",
+    "pagination": "Paginazione",
+    "rowsPerPage": "Righe per pagina",
+    "rowsPerPageTooltip": "Imposta il numero predefinito di record da visualizzare per pagina",
     "showBorder": "Mostra bordo dell'asse",
     "currencyDollar": "Valuta - Dollaro ($)",
     "currencyEuro": "Valuta - Euro (€)",
@@ -2141,7 +2144,6 @@
       "groupsLabel": "gruppi",
       "noMatchingGroups": "Nessun gruppo corrispondente",
       "fqnFormulaTitle": "Formula identità",
-      "fqnFormulaTooltip": "Mostra come verrà calcolata l'identità del servizio. Le dimensioni di ambito (blu) sono concatenate con '/'. La prima dimensione di workload non nulla (verde) diventa il nome del servizio.",
       "scopeDimension": "Dimensione di ambito",
       "workloadDimension": "Dimensione di workload",
       "noFormulaConfigured": "Nessuna formula di identità configurata. Aggiungi dimensioni sopra.",
@@ -2748,7 +2750,8 @@
       }
     },
     "viewInTraces": "Visualizza in Tracce",
-    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate"
+    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate",
+    "exportToJson": "Esporta in JSON"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

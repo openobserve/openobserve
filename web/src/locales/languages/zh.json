@@ -1179,6 +1179,9 @@
     "wraptext": "换行表格单元格",
     "tableTranspose": "转置",
     "tableDynamicColumns": "允许动态列",
+    "pagination": "分页",
+    "rowsPerPage": "每页行数",
+    "rowsPerPageTooltip": "设置每页显示的默认记录数",
     "showBorder": "显示轴边框",
     "currencyDollar": "货币-美元 ($)",
     "currencyEuro": "货币-欧元 (€)",
@@ -2118,6 +2121,10 @@
       "saveConfiguration": "保存配置",
       "configSavedSuccess": "服务身份配置已成功保存",
       "configSaveFailed": "保存设置失败",
+      "duplicateIdsError": "找到重复的组 ID：{ids}。请确保每个组都有唯一的 ID。",
+      "duplicateNamesInCategoryError": "在类别 \"{category}\" 中找到重复的名称 \"{name}\"。类别中的每个组必须具有唯一的名称。",
+      "emptyIdError": " 类别具有空的组名称。请确保所有组都有有效的名称。",
+      "emptyFieldsError": "至少需要一个字段名称",
       "correlationSettingsSaved": "关联设置已成功保存。",
       "logs": "日志",
       "traces": "痕迹",
@@ -2143,7 +2150,7 @@
       "groupsLabel": "组",
       "noMatchingGroups": "没有匹配的组",
       "fqnFormulaTitle": "标识公式",
-      "fqnFormulaTooltip": "显示服务标识将如何计算。范围维度（蓝色）使用 '/' 连接。第一个非空工作负载维度（绿色）成为服务名称。",
+      "fqnFormulaTooltip": "显示服务标识将如何计算。范围维度 使用 '/' 连接。第一个非空工作负载维度 成为服务名称。",
       "scopeDimension": "范围维度",
       "workloadDimension": "工作负载维度",
       "noFormulaConfigured": "未配置标识公式。请在上方添加维度。",
@@ -2750,7 +2757,8 @@
       }
     },
     "viewInTraces": "在轨迹中查看",
-    "viewInTracesTooltip": "打开包含 RED 指标仪表板和所有相关追踪记录的跟踪页面"
+    "viewInTracesTooltip": "打开包含 RED 指标仪表板和所有相关追踪记录的跟踪页面",
+    "exportToJson": "导出到 JSON"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

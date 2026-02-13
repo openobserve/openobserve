@@ -1197,6 +1197,9 @@
     "wraptext": "ラップテーブルセル",
     "tableTranspose": "トランスポーズ",
     "tableDynamicColumns": "動的列を許可",
+    "pagination": "ページネーション",
+    "rowsPerPage": "ページあたりの行数",
+    "rowsPerPageTooltip": "ページごとに表示するレコードのデフォルト数を設定します",
     "showBorder": "軸境界を表示",
     "currencyDollar": "通貨-ドル ($)",
     "currencyEuro": "通貨-ユーロ (€)",
@@ -2164,7 +2167,6 @@
       "groupsLabel": "グループ",
       "noMatchingGroups": "一致するグループがありません",
       "fqnFormulaTitle": "識別子フォーミュラ",
-      "fqnFormulaTooltip": "サービス識別子の計算方法を示します。スコープディメンション（青）は '/' で連結されます。最初の非NULLワークロードディメンション（緑）がサービス名になります。",
       "scopeDimension": "スコープディメンション",
       "workloadDimension": "ワークロードディメンション",
       "noFormulaConfigured": "識別子フォーミュラが設定されていません。上でディメンションを追加してください。",
@@ -2750,7 +2752,8 @@
       }
     },
     "viewInTraces": "トレースで表示",
-    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く"
+    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く",
+    "exportToJson": "JSON へのエクスポート"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,22 +19,60 @@ pub mod puffin_directory;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Context;
-use arrow::array::{Array, BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
+use arrow::array::{
+    Array, BooleanArray, Float64Array, Int64Array, LargeStringArray, StringArray, StringViewArray,
+    UInt64Array,
+};
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
+        parquet::RecordBatchStream,
         tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
 use infra::storage;
-use parquet::arrow::async_reader::ParquetRecordBatchStream;
 use puffin_directory::writer::PuffinDirWriter;
 use tokio::task::JoinHandle;
+
+// macro to reduce duplication in array processing
+macro_rules! process_string_array {
+    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
+        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
+            for (i, doc) in $docs.iter_mut().enumerate() {
+                if array.is_null(i) {
+                    doc.add_text($field, "");
+                } else {
+                    doc.add_text($field, array.value(i));
+                }
+                tokio::task::coop::consume_budget().await;
+            }
+            continue;
+        }
+    };
+}
+
+// macro to reduce duplication in array processing
+macro_rules! process_numeric_array {
+    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
+        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
+            for (i, doc) in $docs.iter_mut().enumerate() {
+                if array.is_null(i) {
+                    doc.add_text($field, "");
+                } else {
+                    let text = array.value(i).to_string();
+                    doc.add_text($field, &text);
+                }
+                tokio::task::coop::consume_budget().await;
+            }
+            continue;
+        }
+    };
+}
 
 pub(crate) async fn create_tantivy_index(
     caller: &str,
@@ -42,7 +80,7 @@ pub(crate) async fn create_tantivy_index(
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
-    reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    reader: RecordBatchStream,
 ) -> Result<usize, anyhow::Error> {
     let start = std::time::Instant::now();
     let caller = format!("[{caller}:JOB]");
@@ -82,10 +120,7 @@ pub(crate) async fn create_tantivy_index(
     match storage::put(&account, &idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
-                "{} generated tantivy index file: {}, size {}, took: {} ms",
-                caller,
-                idx_file_name,
-                index_size,
+                "{caller} generated tantivy index file: {idx_file_name}, size {index_size}, took: {} ms",
                 start.elapsed().as_millis()
             );
         }
@@ -100,7 +135,7 @@ pub(crate) async fn create_tantivy_index(
 /// Create a tantivy index in the given directory for the record batch
 pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     tantivy_dir: D,
-    mut reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    reader: RecordBatchStream,
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
@@ -180,6 +215,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(2);
     let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
         let mut total_num_rows = 0;
+        let mut reader = reader;
         loop {
             let batch = reader.try_next().await?;
             let Some(inverted_idx_batch) = batch else {
@@ -196,66 +232,36 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
             // process full text search fields
             let mut docs = vec![tantivy::doc!(); num_rows];
             for column_name in tantivy_fields.iter() {
-                // utf8, uint64, int64, float64, boolean
-                let column_data = match inverted_idx_batch.column_by_name(column_name) {
-                    Some(data) => {
-                        if let Some(array) = data.as_any().downcast_ref::<StringArray>() {
-                            array
-                        } else if let Some(array) = data.as_any().downcast_ref::<Int64Array>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else if let Some(array) = data.as_any().downcast_ref::<UInt64Array>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else if let Some(array) = data.as_any().downcast_ref::<BooleanArray>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else if let Some(array) = data.as_any().downcast_ref::<Float64Array>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else {
-                            // generate empty array to ensure the tantivy and parquet have same rows
-                            &StringArray::from(vec![""; num_rows])
-                        }
-                    }
-                    None => {
-                        // generate empty array to ensure the tantivy and parquet have same rows
-                        &StringArray::from(vec![""; num_rows])
-                    }
-                };
-
                 // get field
                 let field = match tantivy_schema.get_field(column_name) {
                     Ok(f) => f,
                     Err(_) => fts_field.unwrap(),
                 };
-                for (i, doc) in docs.iter_mut().enumerate() {
-                    doc.add_text(field, column_data.value(i));
-                    tokio::task::coop::consume_budget().await;
+
+                // get column data and convert to strings for indexing
+                if let Some(data) = inverted_idx_batch.column_by_name(column_name) {
+                    // handle string types directly
+                    process_string_array!(data, StringViewArray, docs, field);
+                    process_string_array!(data, StringArray, docs, field);
+                    process_string_array!(data, LargeStringArray, docs, field);
+
+                    // handle numeric and boolean types with to_string conversion
+                    process_numeric_array!(data, Int64Array, docs, field);
+                    process_numeric_array!(data, UInt64Array, docs, field);
+                    process_numeric_array!(data, Float64Array, docs, field);
+                    process_numeric_array!(data, BooleanArray, docs, field);
+
+                    // unsupported type, add empty string
+                    for doc in docs.iter_mut() {
+                        doc.add_text(field, "");
+                        tokio::task::coop::consume_budget().await;
+                    }
+                } else {
+                    // column not found, add empty string
+                    for doc in docs.iter_mut() {
+                        doc.add_text(field, "");
+                        tokio::task::coop::consume_budget().await;
+                    }
                 }
             }
 
@@ -321,16 +327,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Cursor, sync::Arc};
+    use std::sync::Arc;
 
     use arrow::{
         array::{Int64Array, StringArray},
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
-    use bytes::Bytes;
-    use config::{INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
-    use parquet::arrow::async_reader::ParquetRecordBatchStream;
+    use config::{FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
     use tantivy::directory::RamDirectory;
 
     use super::*;
@@ -380,10 +384,8 @@ mod tests {
         RecordBatch::try_new(schema, columns).unwrap()
     }
 
-    // Helper function to create a mock ParquetRecordBatchStream
-    async fn create_test_stream(
-        batches: Vec<RecordBatch>,
-    ) -> ParquetRecordBatchStream<Cursor<Bytes>> {
+    // Helper function to create a mock RecordBatchStream
+    async fn create_test_stream(batches: Vec<RecordBatch>) -> RecordBatchStream {
         // Create a simple parquet file from the batches
         let schema = batches[0].schema();
         let mut buffer = Vec::new();
@@ -411,15 +413,13 @@ mod tests {
         }
         writer.close().await.unwrap();
 
-        // Create stream from the buffer
-        let bytes = Bytes::from(buffer);
-        let cursor = Cursor::new(bytes);
-        parquet::arrow::async_reader::ParquetRecordBatchStreamBuilder::new(cursor)
-            .await
-            .unwrap()
-            .with_batch_size(1000)
-            .build()
-            .unwrap()
+        // Create stream from the buffer using the new API
+        let bytes = bytes::Bytes::from(buffer);
+        let (_schema, stream) =
+            config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, &bytes)
+                .await
+                .unwrap();
+        stream
     }
 
     #[tokio::test]

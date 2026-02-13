@@ -572,6 +572,7 @@ pub fn service_routes() -> Router {
         // Traces
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
+        .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // Metrics
@@ -620,7 +621,6 @@ pub fn service_routes() -> Router {
         // Dashboards
         .route("/{org_id}/dashboards", get(dashboards::list_dashboards).post(dashboards::create_dashboard))
         .route("/{org_id}/dashboards/{dashboard_id}", get(dashboards::get_dashboard).put(dashboards::update_dashboard).delete(dashboards::delete_dashboard))
-        .route("/{org_id}/dashboards/{dashboard_id}/export", get(dashboards::export_dashboard))
         .route("/{org_id}/dashboards/bulk", delete(dashboards::delete_dashboard_bulk))
         .route("/{org_id}/folders/dashboards/{dashboard_id}", put(dashboards::move_dashboard))
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))

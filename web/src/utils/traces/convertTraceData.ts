@@ -1,4 +1,4 @@
-import { toZonedTime, format } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
@@ -194,18 +194,14 @@ export const convertTraceServiceMapData = (
  * Convert service graph data (nodes/edges) to ECharts tree format
  * @param graphData - Object containing nodes and edges arrays
  * @param layoutType - Layout orientation: 'horizontal' | 'vertical' | 'radial'
+ * @param isDarkMode - Whether dark mode is active
  * @returns ECharts tree options
  */
 export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
-  layoutType: string = 'horizontal'
+  layoutType: string = 'horizontal',
+  isDarkMode: boolean = true
 ) => {
-  console.log('[convertServiceGraphToTree] Called with:', {
-    nodeCount: graphData.nodes.length,
-    edgeCount: graphData.edges.length,
-    layoutType
-  });
-
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
   graphData.edges.forEach((edge: any) => {
@@ -232,8 +228,7 @@ export const convertServiceGraphToTree = (
   const globalVisited = new Set<string>();
 
   // Helper to build tree recursively
-  // incomingEdge: the edge that led to this node (for direction-aware metrics)
-  const buildTree = (nodeId: string, visited = new Set<string>(), incomingEdge: any = null): any => {
+  const buildTree = (nodeId: string, visited = new Set<string>()): any => {
     if (visited.has(nodeId)) return null; // Prevent cycles
     visited.add(nodeId);
     globalVisited.add(nodeId);
@@ -243,56 +238,79 @@ export const convertServiceGraphToTree = (
 
     const outgoingEdges = edgesMap.get(nodeId) || [];
     const children = outgoingEdges
-      .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
+      .map((edge: any) => buildTree(edge.to, new Set(visited)))
       .filter((child: any) => child !== null);
 
-    // Simple: show only incoming requests from parent in this tree path
-    let totalRequests: number;
-    let failedRequests: number;
-    let errorRate: number;
-
-    if (incomingEdge) {
-      // Non-root: show incoming from parent
-      totalRequests = incomingEdge.total_requests ?? 0;
-      failedRequests = incomingEdge.failed_requests ?? 0;
-      errorRate = incomingEdge.error_rate ?? 0;
-    } else {
-      // Root: sum of outgoing edges
-      totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
-      failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
-
-      // If no edges, use node's own metrics
-      if (totalRequests === 0 && node.requests !== undefined) {
-        totalRequests = node.requests;
-        failedRequests = node.errors ?? 0;
-      }
-
-      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
-
-      // If still no data, try node.error_rate directly
-      if (errorRate === 0 && node.error_rate !== undefined) {
-        errorRate = node.error_rate;
-      }
-    }
+    // Use node's own request count from backend (authoritative source)
+    // This ensures consistency with the graph view
+    const totalRequests = node.requests ?? 0;
+    const failedRequests = node.errors ?? 0;
+    const errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
 
     // Calculate connections count
     const incomingEdges = incomingEdgesMap.get(nodeId) || [];
     const connectionCount = incomingEdges.length + outgoingEdges.length;
 
-    // Determine node color based on error rate
-    let nodeColor = "#4CAF50"; // Green for healthy
-    if (errorRate > 10) nodeColor = "#F44336"; // Red
-    else if (errorRate > 5) nodeColor = "#FF9800"; // Orange
-    else if (errorRate > 1) nodeColor = "#FFC107"; // Yellow
+    // Border color based on error rate (theme-aware) - matches graph view
+    let borderColor: string;
+    if (isDarkMode) {
+      // Dark mode colors
+      borderColor = "#10b981"; // Green (healthy)
+      if (errorRate > 10) borderColor = "#ef4444"; // Red (critical)
+      else if (errorRate > 5) borderColor = "#f97316"; // Orange (warning)
+      else if (errorRate > 1) borderColor = "#fbbf24"; // Yellow (degraded)
+    } else {
+      // Light mode colors
+      borderColor = "#52c41a"; // Green (healthy)
+      if (errorRate > 10) borderColor = "#f5222d"; // Red (critical)
+      else if (errorRate > 5) borderColor = "#fa8c16"; // Orange (warning)
+      else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
+    }
+
+    // Fixed size for tree view to prevent overlapping
+    const symbolSize = 45;
 
     return {
       name: node.label || node.id,
       value: totalRequests,
-      symbolSize: Math.max(20, Math.min(60, Math.log10(totalRequests + 1) * 15)),
+      symbolSize: symbolSize,
       itemStyle: {
-        color: nodeColor,
-        borderColor: nodeColor,
-        borderWidth: 2,
+        color: isDarkMode ? '#1a1f2e' : '#ffffff',
+        borderColor: borderColor,
+        borderWidth: 4,
+        shadowBlur: 10,
+        shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)',
+        shadowOffsetX: 0,
+        shadowOffsetY: 0,
+      },
+      emphasis: {
+        scale: true,
+        scaleSize: 1.15,
+        itemStyle: {
+          shadowBlur: 20,
+          shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
+        },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: 'bold',
+        },
+      },
+      select: {
+        // Persistent selection styling - matches graph view
+        itemStyle: {
+          borderColor: borderColor,
+          borderWidth: 5,
+          shadowBlur: 45,
+          shadowColor: 'rgba(59, 130, 246, 0.9)', // Prominent blue glow for selected
+          shadowOffsetX: 0,
+          shadowOffsetY: 0,
+        },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: 'bold',
+        },
       },
       label: {
         show: true,
@@ -317,39 +335,44 @@ export const convertServiceGraphToTree = (
   };
 
   // Start with root nodes
-  console.log('[convertServiceGraphToTree] Root nodes:', rootNodes.map((n: any) => n.id));
   let treeData = rootNodes.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
-  console.log('[convertServiceGraphToTree] Trees from roots:', treeData.length);
-
+  
   // Find unvisited nodes (disconnected components or cycles)
   const unvisitedNodes = graphData.nodes.filter((n: any) => !globalVisited.has(n.id));
-  console.log('[convertServiceGraphToTree] Unvisited nodes:', unvisitedNodes.map((n: any) => n.id));
-
+  
   // Add unvisited nodes as separate root trees
   if (unvisitedNodes.length > 0) {
     const additionalTrees = unvisitedNodes
       .map((node: any) => buildTree(node.id))
       .filter((n: any) => n !== null);
     treeData = [...treeData, ...additionalTrees];
-    console.log('[convertServiceGraphToTree] Total trees after adding unvisited:', treeData.length);
   }
 
   // If still no tree data, create a flat structure
   if (treeData.length === 0 && graphData.nodes.length > 0) {
     return {
-      tooltip: { show: true, trigger: 'item' },
+      backgroundColor: 'transparent', // Make chart background transparent to match graph view
+      tooltip: { show: true, trigger: 'item', hideDelay: 0, enterable: false },
       series: [{
         type: 'tree',
         data: graphData.nodes.map((node: any) => ({
           name: node.label || node.id,
           value: 0,
-          symbolSize: 20,
-          itemStyle: { color: '#9E9E9E' },
+          symbolSize: 45,
+          itemStyle: {
+            color: isDarkMode ? '#1a1f2e' : '#ffffff',
+            borderColor: '#9E9E9E',
+            borderWidth: 4,
+            shadowBlur: 10,
+            shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)',
+          },
         })),
         layout: 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         initialTreeDepth: -1,
-        symbolSize: 20,
+        symbolSize: 45,
+        roam: true, // Enable panning and zooming
+        selectedMode: 'single', // Enable single node selection
         label: {
           position: layoutType === 'vertical' ? 'bottom' : 'right',
           verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
@@ -372,10 +395,13 @@ export const convertServiceGraphToTree = (
     : treeData;
 
   const options = {
+    backgroundColor: 'transparent', // Make chart background transparent to match graph view
     tooltip: {
       show: true,
       trigger: 'item',
       triggerOn: 'mousemove',
+      hideDelay: 0, // Hide immediately when mouse leaves
+      enterable: false, // Prevent mouse from entering tooltip
     },
     series: [
       {
@@ -385,7 +411,9 @@ export const convertServiceGraphToTree = (
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         initialTreeDepth: -1,
         symbol: 'circle',
-        symbolSize: 20,
+        symbolSize: 45,
+        roam: true, // Enable panning and zooming
+        selectedMode: 'single', // Enable single node selection
         label: {
           position: layoutType === 'vertical' ? 'top' : 'left',
           verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
@@ -401,14 +429,14 @@ export const convertServiceGraphToTree = (
             rotate: 0, // Keep text horizontal, no rotation
           },
         },
-        expandAndCollapse: true,
+        expandAndCollapse: false, // Disable collapse on click - clicking only selects the node
         animationDuration: 550,
         animationDurationUpdate: 750,
       },
     ],
   };
 
-  return { options };
+  return { options, positions: null };
 };
 
 // D3-Force simulation physics parameters
@@ -503,7 +531,9 @@ const computeForceLayout = (
 export const convertServiceGraphToNetwork = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = "force",
-  cachedPositions?: Map<string, { x: number; y: number }>
+  cachedPositions?: Map<string, { x: number; y: number }>,
+  isDarkMode: boolean = true,
+  selectedNodeId?: string
 ) => {
   // Validate layout type - graph view only supports 'force' and 'circular'
   // Tree layouts ('horizontal', 'vertical', 'radial') should use convertServiceGraphToTree instead
@@ -514,42 +544,28 @@ export const convertServiceGraphToNetwork = (
     console.warn(`[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`);
   }
 
-  console.log('[convertServiceGraphToNetwork] VERSION: 2025-11-26-v4 - Fixed bidirectional edge overlap');
-  console.log('[convertServiceGraphToNetwork] Input:', {
-    nodeCount: graphData.nodes?.length || 0,
-    edgeCount: graphData.edges?.length || 0,
-    layoutType: normalizedLayoutType
-  });
-  // Build node metrics map (requests, errors, connections)
+  // Build node metrics map using each node's own data from backend (authoritative source)
   const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
 
-  // Count connections for each node
-  const connectionCount = new Map<string, number>();
+  // Initialize metrics for all nodes using their own backend data
   graphData.nodes.forEach((node: any) => {
-    connectionCount.set(node.id, 0);
-  });
-
-  graphData.edges.forEach((edge: any) => {
-    connectionCount.set(edge.from, (connectionCount.get(edge.from) || 0) + 1);
-    connectionCount.set(edge.to, (connectionCount.get(edge.to) || 0) + 1);
-
-    // Update metrics for both source and target nodes
-    [edge.from, edge.to].forEach((nodeId: string) => {
-      if (!nodeMetrics.has(nodeId)) {
-        nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: 0 });
-      }
-      const metrics = nodeMetrics.get(nodeId)!;
-      metrics.requests += edge.total_requests || 0;
-      metrics.errors += edge.failed_requests || 0;
+    nodeMetrics.set(node.id, {
+      requests: node.requests || 0,
+      errors: node.errors || 0,
+      connections: 0, // Will be updated below
     });
   });
 
-  // Update connection counts in metrics
-  connectionCount.forEach((count, nodeId) => {
-    if (nodeMetrics.has(nodeId)) {
-      nodeMetrics.get(nodeId)!.connections = count;
-    } else {
-      nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: count });
+  // Count connections for each node
+  graphData.edges.forEach((edge: any) => {
+    const fromMetrics = nodeMetrics.get(edge.from);
+    const toMetrics = nodeMetrics.get(edge.to);
+
+    if (fromMetrics) {
+      fromMetrics.connections += 1;
+    }
+    if (toMetrics) {
+      toMetrics.connections += 1;
     }
   });
 
@@ -563,17 +579,30 @@ export const convertServiceGraphToNetwork = (
   });
 
   const nodes = validNodes.map((node: any) => {
-    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0 };
+    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0, connections: 0 };
     const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
-    // Border color based on error rate
-    let borderColor = "#52c41a"; // Green (healthy)
-    if (errorRate > 10) borderColor = "#f5222d"; // Red (critical)
-    else if (errorRate > 5) borderColor = "#fa8c16"; // Orange (high)
-    else if (errorRate > 1) borderColor = "#faad14"; // Yellow (warning)
+    // Border color based on error rate (theme-aware)
+    let borderColor: string;
+    if (isDarkMode) {
+      // Dark mode colors
+      borderColor = "#10b981"; // Green (healthy)
+      if (errorRate > 10) borderColor = "#ef4444"; // Red (critical)
+      else if (errorRate > 5) borderColor = "#f97316"; // Orange (warning)
+      else if (errorRate > 1) borderColor = "#fbbf24"; // Yellow (degraded)
+    } else {
+      // Light mode colors
+      borderColor = "#52c41a"; // Green (healthy)
+      if (errorRate > 10) borderColor = "#f5222d"; // Red (critical)
+      else if (errorRate > 5) borderColor = "#fa8c16"; // Orange (warning)
+      else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
+    }
 
     // Size based on request volume - much smaller nodes
     const symbolSize = Math.max(40, Math.min(80, Math.log10(metrics.requests + 1) * 20));
+
+    // Check if this node is selected
+    const isSelected = selectedNodeId === node.id;
 
     // Use cached position if available
     const cachedPos = cachedPositions?.get(node.id);
@@ -582,18 +611,44 @@ export const convertServiceGraphToNetwork = (
       name: node.label || node.id,
       value: metrics.requests,
       errors: metrics.errors,
-      symbolSize: symbolSize,
+      symbolSize: isSelected ? symbolSize * 1.1 : symbolSize, // Scale up selected node
       itemStyle: {
-        color: '#ffffff', // White background
-        borderColor: borderColor,
+        color: isDarkMode ? '#1a1f2e' : '#ffffff',
+        borderColor: borderColor, // Keep health-based border color
         borderWidth: 4,
-        shadowBlur: 10,
-        shadowColor: 'rgba(0, 0, 0, 0.3)',
+        shadowBlur: isSelected ? 25 : 10, // Enhanced shadow for selected node
+        shadowColor: isSelected
+          ? 'rgba(59, 130, 246, 0.6)' // Blue glow for selected
+          : (isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
+        shadowOffsetX: 0,
+        shadowOffsetY: 0,
       },
       label: {
         show: true,
       },
       emphasis: {
+        scale: true,
+        scaleSize: 1.15,
+        itemStyle: {
+          shadowBlur: 20, // Enhanced shadow on hover
+          shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
+        },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: 'bold',
+        },
+      },
+      select: {
+        // Persistent selection styling
+        itemStyle: {
+          borderColor: borderColor, // Keep health-based border color
+          borderWidth: 5,
+          shadowBlur: 45,
+          shadowColor: 'rgba(59, 130, 246, 0.9)', // Prominent blue glow for selected
+          shadowOffsetX: 0,
+          shadowOffsetY: 0,
+        },
         label: {
           show: true,
           fontSize: 12,
@@ -606,7 +661,7 @@ export const convertServiceGraphToNetwork = (
           Requests: ${formatNumber(metrics.requests)}<br/>
           Errors: ${formatNumber(metrics.errors)}<br/>
           Error Rate: ${errorRate.toFixed(2)}%<br/>
-          Connections: ${connectionCount.get(node.id) || 0}
+          Connections: ${metrics.connections}
         `,
       },
     };
@@ -625,8 +680,6 @@ export const convertServiceGraphToNetwork = (
 
   // Create a set of valid node IDs for edge validation
   const validNodeIds = new Set(nodes.map((n: any) => n.id));
-
-  console.log('[convertServiceGraphToNetwork] Valid node IDs:', Array.from(validNodeIds));
 
   // Prepare edges with arrows showing flow direction
   // For circular layout, use curved lines; for force layout, use straight lines
@@ -664,8 +717,6 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  console.log('[convertServiceGraphToNetwork] Valid edges after dedup:', edgeMap.size);
-
   // Detect bidirectional edges and assign curvature direction
   // For bidirectional edges, one edge curves left, the other curves right
   const edgeCurvature = new Map<string, number>();
@@ -688,8 +739,6 @@ export const convertServiceGraphToNetwork = (
       edgeCurvature.set(key, 0);
     }
   });
-
-  console.log('[convertServiceGraphToNetwork] Bidirectional pairs:', processedPairs.size);
 
   const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any], edgeIndex: number) => {
     const errorRate = edge.total_requests > 0 ? (edge.failed_requests / edge.total_requests) * 100 : 0;
@@ -768,7 +817,6 @@ export const convertServiceGraphToNetwork = (
 
   // For force layout without cached positions, compute layout with D3-force
   if (normalizedLayoutType === 'force' && !hasPositions) {
-    console.log('[convertServiceGraphToNetwork] Computing force layout with D3-force');
     const positionedNodes = computeForceLayout(nodes, graphData.edges, 800, 600);
 
     // Apply computed positions to nodes and mark them as fixed
@@ -780,8 +828,6 @@ export const convertServiceGraphToNetwork = (
         node.fixed = true; // Lock positions so ECharts doesn't re-layout
       }
     });
-
-    console.log('[convertServiceGraphToNetwork] Applied D3-force positions to', positionedNodes.length, 'nodes');
   }
 
   // For circular layout, calculate positions manually on the periphery
@@ -810,8 +856,6 @@ export const convertServiceGraphToNetwork = (
         shadowColor: 'rgba(0, 0, 0, 0.2)',
       };
     });
-
-    console.log('[convertServiceGraphToNetwork] Using circular layout with', nodeCount, 'nodes on periphery');
   } else if (hasPositions) {
     console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
   }
@@ -821,9 +865,12 @@ export const convertServiceGraphToNetwork = (
   const layoutMode = "none";
 
   const options = {
+    backgroundColor: 'transparent', // Make chart background transparent
     tooltip: {
       trigger: "item",
       triggerOn: "mousemove",
+      hideDelay: 0, // Hide immediately when mouse leaves
+      enterable: false, // Prevent mouse from entering tooltip
       backgroundColor: 'rgba(50, 50, 50, 0.95)',
       borderColor: '#777',
       borderWidth: 1,
@@ -831,7 +878,9 @@ export const convertServiceGraphToNetwork = (
         color: '#fff',
       },
     },
-    animation: hasPositions ? false : true, // Disable animation when using cached positions
+    animation: false, // Disable animation to prevent position jumping
+    animationDuration: 200,
+    animationEasing: 'cubicOut', // Smooth easing for hover effect
     series: [
       {
         type: "graph",
@@ -841,59 +890,68 @@ export const convertServiceGraphToNetwork = (
         roam: true,
         draggable: true, // Enable dragging to allow manual position adjustments
         focusNodeAdjacency: true,
+        selectedMode: 'single', // Enable single node selection
         scaleLimit: {
           min: 0.4,
           max: 3,
         },
+        animationDurationUpdate: 200,
+        animationEasingUpdate: 'cubicOut',
         label: normalizedLayoutType === 'circular' ? {
           show: true,
           position: 'top',
           formatter: (params: any) => params.data.name,
           fontSize: 11,
-          color: '#333',
+          color: isDarkMode ? '#e4e7eb' : '#333', // Theme-aware text color
         } : {
           show: true,
+          position: 'inside',
           formatter: (params: any) => {
-            const requests = params.data.value || 0;
-            const errors = params.data.errors || 0;
-            const errorRate = requests > 0 ? (errors / requests) : 0;
-            const reqPerSec = (requests / 60).toFixed(2);
-            const errorDisplay = (errorRate * 100).toFixed(2);
             const serviceName = params.data.name;
+            const requests = params.data.value || 0;
 
-            // Display metrics inside, name below using rich text
-            return `{metrics|${errorDisplay} ms/r}\n{metrics|${reqPerSec} r/sec}\n{spacer|}\n{name|${serviceName}}`;
+            // Format request count with K, M notation
+            let requestsDisplay;
+            if (requests >= 1000000) {
+              requestsDisplay = (requests / 1000000).toFixed(1) + 'M';
+            } else if (requests >= 1000) {
+              requestsDisplay = (requests / 1000).toFixed(1) + 'K';
+            } else {
+              requestsDisplay = requests.toString();
+            }
+
+            // Display service name and request count in the middle
+            return `{name|${serviceName}}\n{requests|${requestsDisplay} req}`;
           },
           rich: {
-            metrics: {
-              fontSize: 10,
-              color: '#333',
-              lineHeight: 14,
-              align: 'center',
-            },
-            spacer: {
-              height: 40,
-              lineHeight: 40,
-            },
             name: {
-              fontSize: 11,
-              fontWeight: 'normal',
-              color: '#333',
+              fontSize: 12,
+              fontWeight: '500',
+              color: isDarkMode ? '#e4e7eb' : '#333', // Dark: light text, Light: dark text
               align: 'center',
               lineHeight: 16,
+            },
+            requests: {
+              fontSize: 10,
+              fontWeight: 'normal',
+              color: isDarkMode ? '#9ca3af' : '#666', // Dark: light gray, Light: dark gray
+              align: 'center',
+              lineHeight: 14,
             },
           },
         },
         emphasis: {
           focus: "adjacency",
+          scale: true,
+          scaleSize: 1.15,
           label: {
             show: true,
             fontSize: 13,
             fontWeight: 'bold',
           },
           itemStyle: {
-            shadowBlur: 15,
-            shadowColor: 'rgba(0, 0, 0, 0.5)',
+            shadowBlur: 20,
+            shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
           },
         },
         lineStyle: {

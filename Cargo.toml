@@ -109,7 +109,7 @@ hashbrown.workspace = true
 hex.workspace = true
 http-auth-basic = "0.3"
 itertools.workspace = true
-jsonwebtoken = "10.3"
+jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
 log.workspace = true
 maxminddb = "0.27"
 md5.workspace = true
@@ -306,10 +306,10 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "52"
-datafusion-proto = "52"
-datafusion-functions-aggregate-common = "52"
-datafusion-functions-json = "0.52.0"
+datafusion = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-json = { git = "https://github.com/openobserve/datafusion-functions-json", rev = "f53f08cddf467d3d492425f0e50f98f6a300d2f5" }
 expect-test = "1.4"
 arrow = { version = "57.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "57.2.0"

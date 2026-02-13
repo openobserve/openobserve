@@ -1,6 +1,6 @@
 <template>
   <q-card flat class="tw:h-full">
-    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container">
+    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container service-graph-container">
       <!-- Top row with search and control buttons -->
       <div class="row items-center q-col-gutter-sm q-mb-md">
         <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
@@ -8,26 +8,27 @@
           <q-select
             v-model="streamFilter"
             :options="
-              searchObj.data.stream.streamLists && searchObj.data.stream.streamLists.length > 0
+              availableStreams.length > 0
                 ? [
                     { label: 'All Streams', value: 'all' },
-                    ...searchObj.data.stream.streamLists,
+                    ...availableStreams.map((s) => ({ label: s, value: s })),
                   ]
                 : [{ label: 'All Streams', value: 'all' }]
             "
             dense
-            outlined
+            borderless
             emit-value
             map-options
             class="tw:w-[180px] tw:flex-shrink-0"
             @update:model-value="onStreamFilterChange"
-            :disable="!searchObj.data.stream.streamLists || searchObj.data.stream.streamLists.length === 0"
+            :disable="availableStreams.length === 0"
           >
             <template #prepend>
               <q-icon name="storage" size="xs" />
             </template>
-            <q-tooltip v-if="!searchObj.data.stream.streamLists || searchObj.data.stream.streamLists.length === 0">
-              No streams detected. Loading streams from parent...
+            <q-tooltip v-if="availableStreams.length === 0">
+              No streams detected. Ensure service graph metrics include
+              stream_name labels.
             </q-tooltip>
           </q-select>
 
@@ -36,10 +37,11 @@
             v-model="searchFilter"
             borderless
             dense
-            class="no-border tw:h-[36px] tw:flex-grow"
+            class="no-border tw:h-[36px]"
             placeholder="Search services..."
             debounce="300"
             @update:model-value="applyFilters"
+            clearable
           >
             <template #prepend>
               <q-icon class="o2-search-input-icon" name="search" />
@@ -69,35 +71,30 @@
             data-test="service-graph-refresh-btn"
             no-caps
             flat
-            dense
-            icon="refresh"
-            class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw:bg-[var(--o2-hover-accent)]"
+            class="o2-secondary-button"
             @click="loadServiceGraph"
             :loading="loading"
           >
-            <q-tooltip>Refresh Service Graph</q-tooltip>
+          Refresh
           </q-btn>
 
-          <!-- 3. Graph/Tree view toggle buttons -->
-          <q-btn-toggle
-            v-model="visualizationType"
-            toggle-color="primary"
-            :options="[
-              { label: 'Graph View', value: 'graph', icon: 'hub' },
-              { label: 'Tree View', value: 'tree', icon: 'account_tree' },
-            ]"
-            dense
-            no-caps
-            class="view-toggle-buttons"
-            @update:model-value="setVisualizationType"
-          />
+          <!-- 3. Graph/Tree view toggle -->
+          <div class="app-tabs-container tw:h-[36px]">
+            <app-tabs
+              data-test="service-graph-view-tabs"
+              class="tabs-selection-container"
+              :tabs="visualizationTabs"
+              v-model:active-tab="visualizationType"
+              @update:active-tab="setVisualizationType"
+            />
+          </div>
 
           <!-- 4. Layout dropdown -->
           <q-select
             v-model="layoutType"
             :options="layoutOptions"
             dense
-            filled
+            borderless
             class="tw:w-[160px]"
             emit-value
             map-options
@@ -150,13 +147,37 @@
                 </div>
               </div>
             </div>
-            <div v-else class="tw:h-full">
+            <div v-else class="tw:h-full graph-with-panel-container">
               <ChartRenderer
                 ref="chartRendererRef"
                 data-test="service-graph-chart"
                 :data="chartData"
                 :key="chartKey"
                 class="tw:h-full"
+                @click="handleNodeClick"
+              />
+
+              <!-- Service Graph Side Panel -->
+              <ServiceGraphSidePanel
+                v-if="selectedNode"
+                :selected-node="selectedNode"
+                :graph-data="graphData"
+                :time-range="searchObj.data.datetime"
+                :visible="showSidePanel"
+                :stream-filter="streamFilter"
+                @close="handleCloseSidePanel"
+                @view-logs="handleViewLogs"
+                @view-traces="handleViewTraces"
+              />
+
+              <!-- Service Graph Edge Panel -->
+              <ServiceGraphEdgePanel
+                v-if="selectedEdge"
+                :selected-edge="selectedEdge"
+                :graph-data="graphData"
+                :time-range="searchObj.data.datetime"
+                :visible="showEdgePanel"
+                @close="handleCloseEdgePanel"
               />
             </div>
           </div>
@@ -205,18 +226,23 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import DateTime from "@/components/DateTime.vue";
+import ServiceGraphSidePanel from "./ServiceGraphSidePanel.vue";
+import ServiceGraphEdgePanel from "./ServiceGraphEdgePanel.vue";
 import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
+import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -224,9 +250,14 @@ export default defineComponent({
     AppTabs,
     ChartRenderer,
     DateTime,
+    ServiceGraphSidePanel,
+    ServiceGraphEdgePanel,
   },
-  setup() {
+  emits: ['view-traces'],
+  setup(props, { emit }) {
     const store = useStore();
+    const $q = useQuasar();
+    const router = useRouter();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
 
@@ -235,6 +266,14 @@ export default defineComponent({
     const showSettings = ref(false);
     const lastUpdated = ref("");
 
+    // Side panel state
+    const selectedNode = ref<any>(null);
+    const showSidePanel = ref(false);
+
+    // Edge panel state
+    const selectedEdge = ref<any>(null);
+    const showEdgePanel = ref(false);
+
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem(
       "serviceGraph_visualizationType",
@@ -242,6 +281,12 @@ export default defineComponent({
     const visualizationType = ref<"tree" | "graph">(
       (storedVisualizationType as "tree" | "graph") || "graph",
     );
+
+    // Visualization tabs configuration
+    const visualizationTabs = [
+      { label: "Graph View", value: "graph" },
+      { label: "Tree View", value: "tree" },
+    ];
 
     // Initialize layout type based on visualization type
     const storedLayoutType = localStorage.getItem("serviceGraph_layoutType");
@@ -255,20 +300,12 @@ export default defineComponent({
     const searchFilter = ref("");
     const connectionTypeFilter = ref("all");
 
-    // Stream filter - use computed property to read from and write to shared state
-    const streamFilter = computed({
-      get: () => {
-        const selectedValue = searchObj.data.stream.selectedStream?.value;
-        return selectedValue || "all";
-      },
-      set: (value) => {
-        searchObj.data.stream.selectedStream = {
-          label: value === "all" ? "" : value,
-          value: value === "all" ? "" : value,
-        };
-      },
-    });
-    // availableStreams removed - now using searchObj.data.stream.streamLists directly
+    // Stream filter
+    const storedStreamFilter = localStorage.getItem(
+      "serviceGraph_streamFilter",
+    );
+    const streamFilter = ref(storedStreamFilter || "all");
+    const availableStreams = ref<string[]>([]);
 
     // Connection type tabs configuration
     const connectionTypeTabs = [
@@ -282,7 +319,6 @@ export default defineComponent({
     const graphData = ref<any>({
       nodes: [],
       edges: [],
-      availableStreams: [],
     });
 
     const filteredGraphData = ref<any>({
@@ -297,10 +333,6 @@ export default defineComponent({
 
     const dateTimeRef = ref<any>(null);
 
-    // Store node positions for graph view to prevent re-layout on updates
-    const graphNodePositions = ref<Map<string, { x: number; y: number }>>(
-      new Map(),
-    );
 
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
@@ -329,45 +361,139 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      // Disabled caching to ensure fresh edges with __original property
-      // Position stability maintained through graphNodePositions passed to conversion
-      // if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
-      //   console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
-      //   return {
-      //     options: lastChartOptions.value.data.options,
-      //     notMerge: false,
-      //     lazyUpdate: true
-      //   };
-      // }
+      // Don't use cache if filters are active (search or connection type)
+      const hasActiveFilters = searchFilter.value?.trim() || connectionTypeFilter.value !== "all";
 
-      console.log(
-        "[ServiceGraph] Generating new chart options, chartKey:",
-        chartKey.value,
-        "visualizationType:",
-        visualizationType.value,
-      );
+      // Use cached options if chartKey hasn't changed (prevents double rendering)
+      // BUT only if no filters are active
+      if (visualizationType.value === "graph" &&
+          lastChartOptions.value &&
+          chartKey.value === lastChartOptions.value.key &&
+          !hasActiveFilters) {
+        return {
+          options: lastChartOptions.value.data.options,
+          notMerge: false,
+          lazyUpdate: true,
+          silent: true,
+        };
+      }
+
       const newOptions =
         visualizationType.value === "tree"
-          ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
+          ? convertServiceGraphToTree(
+              filteredGraphData.value,
+              layoutType.value,
+              $q.dark.isActive // Pass dark mode state
+            )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
               layoutType.value,
-              graphNodePositions.value,
+              new Map(), // Empty position cache to allow free movement
+              $q.dark.isActive, // Pass dark mode state
+              undefined, // Don't pass selected node - we'll use dispatchAction instead
             );
 
-      // Cache the options with the current key for graph view
-      if (visualizationType.value === "graph") {
+      // Cache the options for graph view
+      // BUT only if no filters are active (to avoid caching filtered states)
+      if (visualizationType.value === "graph" && !hasActiveFilters) {
         lastChartOptions.value = {
           key: chartKey.value,
           data: newOptions,
         };
+      } else if (hasActiveFilters) {
+        // Clear cache when filtering to ensure fresh render on filter removal
+        lastChartOptions.value = null;
       }
 
       return {
         ...newOptions,
         notMerge: visualizationType.value === "graph" ? false : true, // Merge for graph, replace for tree
+        lazyUpdate: true, // Prevent viewport reset when only styles change
+        silent: true, // Disable animations during update to prevent position jumps
       };
     });
+
+    // Use ECharts select action to persistently highlight selected node
+    watch(
+      () => selectedNode.value?.id,
+      async (newId, oldId) => {
+        await nextTick();
+
+        if (!chartRendererRef.value?.chart) {
+          return;
+        }
+
+        const chart = chartRendererRef.value.chart;
+
+        // Unselect the old node (if any)
+        if (oldId) {
+          chart.dispatchAction({
+            type: 'unselect',
+            seriesIndex: 0,
+            name: oldId,
+          });
+        }
+
+        // Select the new node (if any)
+        if (newId) {
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: newId,
+          });
+        }
+      },
+      { flush: 'post' }
+    );
+
+    // Watch for theme changes and re-apply selection
+    watch(
+      () => store.state.theme,
+      async () => {
+        // Increment chartKey to force regeneration with new theme colors
+        chartKey.value++;
+
+        // Save the current selected node ID (in case it changes during the delay)
+        const nodeIdToReselect = selectedNode.value?.id;
+
+        // Use setTimeout to wait for chart to be fully regenerated after theme change
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart || !nodeIdToReselect) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Re-apply node selection
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: nodeIdToReselect,
+          });
+        }, 500); // 500ms delay to ensure chart has fully regenerated
+      }
+    );
+
+    // Watch for stream filter changes and restore chart viewport
+    watch(
+      () => streamFilter.value,
+      async () => {
+        // Wait for chart to update with new data
+        await nextTick();
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Restore chart to default zoom/pan to fit all content
+          chart.dispatchAction({
+            type: 'restore',
+          });
+        }, 500); // Longer delay to ensure chart has recalculated positions
+      }
+    );
 
     const loadServiceGraph = async () => {
       loading.value = true;
@@ -380,7 +506,24 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
-        // Streams are loaded by parent Index.vue and available in searchObj.data.stream.streamLists
+        // If a specific stream is selected but we don't have available streams yet,
+        // first fetch all streams to populate the dropdown
+        if (
+          availableStreams.value.length === 0 &&
+          streamFilter.value !== "all"
+        ) {
+          const allStreamsResponse =
+            await serviceGraphService.getCurrentTopology(orgId, {
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            });
+          if (
+            allStreamsResponse.data.availableStreams &&
+            allStreamsResponse.data.availableStreams.length > 0
+          ) {
+            availableStreams.value = allStreamsResponse.data.availableStreams;
+          }
+        }
 
         // Stream-only implementation - no store stats needed
         // Use JSON topology endpoint with time range
@@ -440,7 +583,6 @@ export default defineComponent({
         graphData.value = {
           nodes,
           edges,
-          availableStreams: rawData.availableStreams || [],
         };
 
         // Calculate stats
@@ -497,7 +639,6 @@ export default defineComponent({
     const parsePrometheusMetrics = (metricsText: string) => {
       const nodes = new Map<string, any>();
       const edges: any[] = [];
-      const availableStreams = new Set<string>();
 
       const lines = metricsText.split("\n");
 
@@ -518,11 +659,6 @@ export default defineComponent({
         }
 
         if (!labels.client || !labels.server) continue;
-
-        // Track available stream names for the stream selector
-        if (labels.stream_name) {
-          availableStreams.add(labels.stream_name);
-        }
 
         // Add nodes
         if (!nodes.has(labels.client)) {
@@ -584,16 +720,11 @@ export default defineComponent({
       return {
         nodes: Array.from(nodes.values()),
         edges,
-        availableStreams: Array.from(availableStreams).sort(),
       };
     };
 
     const onStreamFilterChange = (stream: string) => {
-      // Update shared stream selection
-      searchObj.data.stream.selectedStream = {
-        label: stream === "all" ? "" : stream,
-        value: stream === "all" ? "" : stream,
-      };
+      streamFilter.value = stream;
       localStorage.setItem("serviceGraph_streamFilter", stream);
 
       // Reload service graph with new stream filter
@@ -605,8 +736,9 @@ export default defineComponent({
       let edges = [...graphData.value.edges];
 
       // Filter by search
-      if (searchFilter.value) {
-        const search = searchFilter.value.toLowerCase();
+      const trimmedSearch = searchFilter.value?.trim();
+      if (trimmedSearch) {
+        const search = trimmedSearch.toLowerCase();
         const matchingNodeIds = new Set(
           nodes
             .filter((n) => n.label.toLowerCase().includes(search))
@@ -657,8 +789,6 @@ export default defineComponent({
         layoutType.value = "horizontal";
       } else {
         layoutType.value = "force";
-        // Clear cached positions when switching to graph view to allow fresh layout
-        graphNodePositions.value = new Map();
       }
       // Force chart recreation when visualization type changes
       chartKey.value++;
@@ -671,25 +801,163 @@ export default defineComponent({
     };
 
     const updateTimeRange = (value: any) => {
-      // Update shared datetime state
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
         relativeTimePeriod:
           value.relativeTimePeriod || searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
-        queryRangeRestrictionMsg: searchObj.data.datetime?.queryRangeRestrictionMsg || "",
-        queryRangeRestrictionInHour: searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
       };
       // Reload service graph with new time range
       loadServiceGraph();
     };
 
     // Load trace streams using the same method as the Traces search page
-    // Streams are loaded by parent Index.vue into searchObj.data.stream.streamLists
-    // No need to load them again here
+    const loadTraceStreams = async () => {
+      try {
+        const res = await getStreams("traces", false, false);
+        if (res?.list?.length > 0) {
+          availableStreams.value = res.list.map((stream: any) => stream.name);
+        }
+      } catch (e) {
+        console.error("Error loading trace streams:", e);
+      }
+    };
 
-    onMounted(() => {
+    // Settings handler
+    const resetSettings = () => {
+      // Reset to default settings if needed
+      showSettings.value = false;
+    };
+
+    // Side Panel Handlers
+    const handleNodeClick = (params: any) => {
+      // Check if it's an edge click (for graph visualization)
+      if (params.dataType === 'edge' && params.data) {
+        // Close node panel when opening edge panel
+        showSidePanel.value = false;
+        selectedNode.value = null;
+
+        // Find the full edge data from graphData
+        const edgeData = graphData.value.edges.find(
+          (e: any) => e.from === params.data.source && e.to === params.data.target
+        );
+        if (edgeData) {
+          selectedEdge.value = edgeData;
+          showEdgePanel.value = true;
+        } else {
+          console.warn('[ServiceGraph] Could not find edge data for:', params.data.source, '->', params.data.target);
+        }
+      }
+      // Check if it's a node click (for graph visualization)
+      else if (params.dataType === 'node' && params.data) {
+        // Check if clicking the same node - if so, close the panel
+        if (selectedNode.value && selectedNode.value.id === params.data.id) {
+          showSidePanel.value = false;
+          selectedNode.value = null;
+        } else {
+          // Close edge panel when opening node panel
+          showEdgePanel.value = false;
+          selectedEdge.value = null;
+
+          selectedNode.value = params.data;
+          showSidePanel.value = true;
+        }
+      }
+      // For tree visualization, check if it's a tree node
+      else if (params.componentType === 'series' && params.data && params.data.name) {
+        // Find the actual node data from graphData
+        const nodeData = graphData.value.nodes.find(
+          (n: any) => n.label === params.data.name || n.id === params.data.name
+        );
+
+        if (nodeData) {
+          // Check if clicking the same node - if so, close the panel
+          if (selectedNode.value && selectedNode.value.id === nodeData.id) {
+            showSidePanel.value = false;
+            selectedNode.value = null;
+          } else {
+            // Close edge panel when opening node panel
+            showEdgePanel.value = false;
+            selectedEdge.value = null;
+
+            selectedNode.value = nodeData;
+            showSidePanel.value = true;
+          }
+        } else {
+          console.warn('[ServiceGraph] Could not find node data for:', params.data.name);
+        }
+      } else {
+        console.log('[ServiceGraph] Click not on a node or edge, ignoring');
+      }
+    };
+
+    const handleCloseSidePanel = () => {
+      showSidePanel.value = false;
+      // Don't clear selectedNode immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedNode.value = null;
+      }, 300);
+    };
+
+    const handleViewLogs = () => {
+      if (!selectedNode.value) return;
+
+      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
+      const escapedServiceName = escapeSingleQuotes(serviceName);
+      const escapedStream = escapeSingleQuotes(streamFilter.value);
+      const sql = `SELECT * FROM "${escapedStream}" WHERE service_name = '${escapedServiceName}' ORDER BY _timestamp DESC`;
+      const query = b64EncodeUnicode(sql);
+
+      const queryObject = {
+        stream_type: "logs",
+        stream: streamFilter.value,
+        from: searchObj.data.datetime.startTime,
+        to: searchObj.data.datetime.endTime,
+        refresh: 0,
+        sql_mode: "true",
+        query,
+        defined_schemas: "user_defined_schema",
+        org_identifier: store.state.selectedOrganization.identifier,
+        quick_mode: "false",
+        show_histogram: "true",
+        type: "service_graph_view_logs",
+      };
+
+      router.push({
+        path: "/logs",
+        query: queryObject,
+      });
+    };
+
+    const handleViewTraces = () => {
+      if (!selectedNode.value) return;
+
+      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
+
+      // Emit event to parent to switch tab and apply query
+      // Parent will handle tab switching and query application
+      emit('view-traces', {
+        stream: streamFilter.value,
+        serviceName: serviceName,
+        timeRange: {
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
+        },
+      });
+    };
+
+    // Edge Panel Handlers
+    const handleCloseEdgePanel = () => {
+      showEdgePanel.value = false;
+      // Don't clear selectedEdge immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedEdge.value = null;
+      }, 300);
+    };
+
+    onMounted(async () => {
+      await loadTraceStreams();
       loadServiceGraph();
     });
 
@@ -703,9 +971,11 @@ export default defineComponent({
       lastUpdated,
       searchFilter,
       streamFilter,
+      availableStreams,
       connectionTypeFilter,
       connectionTypeTabs,
       visualizationType,
+      visualizationTabs,
       layoutType,
       layoutOptions,
       chartData,
@@ -720,6 +990,18 @@ export default defineComponent({
       setLayout,
       setVisualizationType,
       updateTimeRange,
+      resetSettings,
+      // Side panel
+      selectedNode,
+      showSidePanel,
+      handleNodeClick,
+      handleCloseSidePanel,
+      handleViewLogs,
+      handleViewTraces,
+      // Edge panel
+      selectedEdge,
+      showEdgePanel,
+      handleCloseEdgePanel,
     };
   },
 });
@@ -747,33 +1029,26 @@ export default defineComponent({
   overflow: hidden;
 }
 
+.service-graph-container {
+  position: relative;
+  overflow: hidden;
+  background: #0f1419 !important;
+}
+
+.body--light .service-graph-container {
+  background: #ffffff !important; // White background for light mode
+}
+
+.graph-with-panel-container {
+  position: relative;
+  overflow: visible;
+}
+
 code {
   background: #f0f0f0;
   padding: 2px 6px;
   border-radius: 3px;
   font-family: "Courier New", monospace;
   font-size: 0.9em;
-  font-weight: 600;
-  color: #333;
-}
-
-.view-toggle-buttons {
-  :deep(.q-btn) {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  :deep(.q-btn-item) {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  :deep(.q-btn__content) {
-    gap: 0.5rem;
-  }
-
-  :deep(.q-separator) {
-    margin: 0.25rem 0;
-  }
 }
 </style>

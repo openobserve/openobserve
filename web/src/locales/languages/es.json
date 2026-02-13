@@ -1179,6 +1179,9 @@
     "wraptext": "Ajustar texto en celdas",
     "tableTranspose": "Transponer",
     "tableDynamicColumns": "Permitir columnas dinámicas",
+    "pagination": "Paginación",
+    "rowsPerPage": "Filas por página",
+    "rowsPerPageTooltip": "Establezca el número predeterminado de registros para mostrar por página",
     "showBorder": "Mostrar borde del eje",
     "currencyDollar": "Moneda - Dólar ($)",
     "currencyEuro": "Moneda - Euro (€)",
@@ -2141,7 +2144,6 @@
       "groupsLabel": "grupos",
       "noMatchingGroups": "No hay grupos coincidentes",
       "fqnFormulaTitle": "Fórmula de identidad",
-      "fqnFormulaTooltip": "Muestra cómo se calculará la identidad del servicio. Las dimensiones de alcance (azul) se concatenan con '/'. La primera dimensión de carga de trabajo no nula (verde) se convierte en el nombre del servicio.",
       "scopeDimension": "Dimensión de alcance",
       "workloadDimension": "Dimensión de carga de trabajo",
       "noFormulaConfigured": "No hay fórmula de identidad configurada. Agregue dimensiones arriba.",
@@ -2748,7 +2750,8 @@
       }
     },
     "viewInTraces": "Ver en Traces",
-    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados"
+    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados",
+    "exportToJson": "Exportar a JSON"
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
