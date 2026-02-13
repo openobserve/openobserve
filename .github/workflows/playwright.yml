@@ -3,7 +3,7 @@ name: Playwright UI Tests
 on:
   push:
     branches:
-      - "main"
+      - "*"
     # paths-ignore:
     #   - "**.md"
     #   - "**.yml"
@@ -76,6 +76,7 @@ jobs:
         with:
           cache-on-failure: true
           prefix-key: playwright
+          cache-workspace-crates: true
 
       - name: Install Protoc
         run: |
@@ -93,7 +94,7 @@ jobs:
         run: cd web && npm install && npm run build
 
       - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        run: cargo build --profile test-release --target x86_64-unknown-linux-gnu
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

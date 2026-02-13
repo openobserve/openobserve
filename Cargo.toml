@@ -38,6 +38,13 @@ profiling = [
 pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
 
+[profile.test-release]
+inherits = "release"
+debug = false
+strip = false
+lto = "off"
+incremental = true
+
 [profile.release]
 debug = false
 strip = true
