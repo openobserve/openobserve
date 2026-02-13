@@ -26,35 +26,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card class="analysis-dashboard-card">
       <!-- Header -->
-      <q-card-section class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
-        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
+      <q-card-section class="analysis-header tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4">
+        <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
           <q-icon name="dashboard" size="md" color="primary" />
-          <span class="tw:text-lg tw:font-semibold tw:whitespace-nowrap">
+          <span class="tw-text-lg tw-font-semibold tw-whitespace-nowrap">
             <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
             <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
             <template v-else-if="props.analysisType === 'error'">{{ t('errorInsights.title') }}</template>
           </span>
 
           <!-- Time Range Display: Inline chips -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+          <div class="tw-flex tw-items-center tw-gap-2 tw-flex-wrap">
             <!-- Baseline Chip -->
-            <div class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded">
-              <span class="tw:font-semibold tw:text-[0.6rem] tw:uppercase tw:tracking-wide tw:opacity-70">Baseline</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start }}</span>
-              <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end }}</span>
+            <div class="time-range-chip baseline-chip tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-0.5 tw-rounded">
+              <span class="tw-font-semibold tw-text-[0.6rem] tw-uppercase tw-tracking-wide tw-opacity-70">Baseline</span>
+              <span class="tw-whitespace-nowrap tw-text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start }}</span>
+              <span class="tw-opacity-60 tw-text-[0.65rem]">→</span>
+              <span class="tw-whitespace-nowrap tw-text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end }}</span>
             </div>
 
             <!-- Selected Chip -->
-            <div v-if="hasSelectedTimeRange" class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded">
-              <span class="tw:font-semibold tw:text-[0.6rem] tw:uppercase tw:tracking-wide">Selected</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).start }}</span>
-              <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).end }}</span>
+            <div v-if="hasSelectedTimeRange" class="time-range-chip selected-chip tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-0.5 tw-rounded">
+              <span class="tw-font-semibold tw-text-[0.6rem] tw-uppercase tw-tracking-wide">Selected</span>
+              <span class="tw-whitespace-nowrap tw-text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).start }}</span>
+              <span class="tw-opacity-70 tw-text-[0.65rem]">→</span>
+              <span class="tw-whitespace-nowrap tw-text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).end }}</span>
             </div>
 
             <!-- Additional filter info -->
-            <span v-if="filterMetadata" class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1">
+            <span v-if="filterMetadata" class="tw-opacity-60 tw-text-[0.65rem] tw-ml-1">
               {{ filterMetadata }}
             </span>
           </div>
