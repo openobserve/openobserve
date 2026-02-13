@@ -431,10 +431,10 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.verifyUpdateMode();
         testLogger.info('Edit form opened');
 
-        // Step 4: Select "Add new URL" mode to show the URL input field
+        // Step 4: Select "Replace all URLs" mode to show the URL input field
         // Default mode is "reload" which doesn't show URL input
-        await enrichmentPage.selectUpdateMode('append');
-        testLogger.info('Selected "Add new URL" update mode');
+        await enrichmentPage.selectUpdateMode('replace');
+        testLogger.info('Selected "Replace all URLs" update mode');
 
         // Step 5: Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
         // enrichment_info.csv has 11 different columns, which will fail schema validation

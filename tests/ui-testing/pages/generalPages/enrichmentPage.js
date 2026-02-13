@@ -1212,11 +1212,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 'Re-process existing URLs',
                 'Re-process'
             ],
-            append: [
-                'Add new URL',
-                'Add URL',
-                'Append URL',
-                'Append'
+            replaceFailed: [
+                'Replace failed URL only',
+                'Replace failed URL',
+                'Replace failed',
             ],
             replace: [
                 'Replace all URLs',
