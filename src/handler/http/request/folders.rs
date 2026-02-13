@@ -294,7 +294,7 @@ pub async fn get_folder_by_name(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a folder by ID", "category": "folders"}))
+        ("x-o2-mcp" = json!({"description": "Delete a folder by ID", "category": "folders", "requires_confirmation": true}))
     ),
 )]
 pub async fn delete_folder(
