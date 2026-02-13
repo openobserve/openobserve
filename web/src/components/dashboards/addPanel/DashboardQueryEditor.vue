@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>
                   {{
                     dashboardPanelData.layout.hiddenQueries.includes(index)
-                      ? "Show query results"
-                      : "Hide query results"
+                      ? t("dashboard.showQueryResults")
+                      : t("dashboard.hideQueryResults")
                   }}
                 </q-tooltip>
               </q-icon>
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
           :icon="'img:' + getImageURL('images/common/function.svg')"
-          title="Toggle Function Editor"
+          :title="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
           class="float-left tw:h-[36px] o2-toggle-button-xs tw:mt-2"
@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:query="handleQueryUpdate"
                 @language-change="handleLanguageChange"
                 @ask-ai="handleAskAI"
+                @run-query="handleRunQuery"
                 data-test-prefix="dashboard-query"
                 editor-height="100%"
               />
@@ -224,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div style="display: flex; height: 40px">
                     <q-select
                       v-model="selectedFunction"
-                      label="Use Saved function"
+                      :label="t('dashboard.useSavedFunction')"
                       :options="functionOptions"
                       data-test="dashboard-use-saved-vrl-function"
                       input-debounce="0"
@@ -265,10 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         self="top right"
                         max-width="250px"
                       >
-                        To use extracted VRL fields in the chart, write a VRL
-                        function and click on the Apply button. The fields will
-                        be extracted, allowing you to use them to build the
-                        chart.
+                        {{ t('dashboard.vrlExtractionTooltip') }}
                       </q-tooltip>
                     </q-btn>
                   </div>
@@ -322,7 +320,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
   },
-  emits: ["searchdata"],
+  emits: ["searchdata", "run-query"],
   methods: {
     searchData() {
       this.$emit("searchdata");
@@ -374,7 +372,7 @@ export default defineComponent({
         });
         return;
       } catch (e) {
-        showErrorNotification("Error while fetching functions");
+        showErrorNotification(t("dashboard.errorFetchingFunctions"));
       }
     };
 
@@ -393,7 +391,7 @@ export default defineComponent({
       selectedFunction.value = "";
 
       // show success message
-      showPositiveNotification(`${val.name} function applied successfully.`);
+      showPositiveNotification(t("dashboard.functionAppliedSuccess", { name: val.name }));
     };
 
     const {
@@ -643,6 +641,21 @@ export default defineComponent({
       // This event is just for parent components that may need to react
     };
 
+    // Try to inject runQuery from parent (if provided), otherwise use emit
+    const injectedRunQuery = inject<((withoutCache?: boolean) => void) | null>('runQuery', null);
+
+    // Unified Query Editor: Handle run query from AI bar execution intent
+    const handleRunQuery = () => {
+      console.log('[DashboardQueryEditor] Run query triggered from AI bar');
+      if (injectedRunQuery) {
+        injectedRunQuery(false);
+      } else {
+        // Emit event for parent to handle
+        // Note: emits need to be handled by parent in template
+        console.warn('[DashboardQueryEditor] No injected runQuery found, parent should listen to @run-query event');
+      }
+    };
+
     return {
       t,
       router,
@@ -673,6 +686,7 @@ export default defineComponent({
       handleQueryUpdate,
       handleLanguageChange,
       handleAskAI,
+      handleRunQuery,
     };
   },
 });
