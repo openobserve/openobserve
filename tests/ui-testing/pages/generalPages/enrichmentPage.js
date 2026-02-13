@@ -1877,19 +1877,27 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
         await row.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Find the Type cell that contains "Url" text and click the icon next to it
-        // The icon can be: clock (processing), warning (failed), check_circle (completed)
+        // The Vue template has @click="showUrlJobsDialog" on two elements:
+        // 1. <span class="cursor-pointer"> containing "Url" text (always present for URL tables)
+        // 2. <q-icon name="warning" class="cursor-pointer"> (only when job failed)
+        // The <td> cell itself does NOT have the @click handler, so we must click the span.
         const typeCell = row.locator('td').filter({ hasText: 'Url' });
         await typeCell.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Click on the icon within the Type cell
-        const statusIcon = typeCell.locator('i, .q-icon, svg').first();
-        if (await statusIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await statusIcon.click();
+        // Click the "Url" text span which always has the @click handler
+        const urlSpan = typeCell.locator('span.cursor-pointer').first();
+        if (await urlSpan.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await urlSpan.click();
         } else {
-            // Fallback: click on the cell itself
-            testLogger.debug('No icon found, clicking on Type cell');
-            await typeCell.click();
+            // Fallback: try the icon (warning/check_circle) which also has @click
+            const statusIcon = typeCell.locator('i.cursor-pointer, .q-icon.cursor-pointer').first();
+            if (await statusIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await statusIcon.click();
+            } else {
+                // Last resort: click the "Url" text directly
+                testLogger.debug('No cursor-pointer element found, clicking Url text');
+                await typeCell.getByText('Url').first().click();
+            }
         }
 
         await this.page.waitForLoadState('domcontentloaded');

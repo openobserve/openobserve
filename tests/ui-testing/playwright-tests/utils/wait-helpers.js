@@ -356,7 +356,7 @@ const waitUtils = {
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     } else {
       // Long waits - fallback to shorter intelligent wait
-      await page.waitForLoadState('networkidle', { timeout: Math.min(ms, 10000) });
+      await page.waitForLoadState('networkidle', { timeout: Math.min(ms, 10000) }).catch(() => {});
     }
   },
 
