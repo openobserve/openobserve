@@ -161,7 +161,8 @@ impl HTTPOutputFormat {
         match self {
             Self::JSON => "application/json",
             Self::NDJSON => "application/x-ndjson",
-            Self::StringSeparated { .. } => "application/x-ndjson",
+            // this is not a json anymore, the handler must process it as a string
+            Self::StringSeparated { .. } => "text/plain",
         }
     }
 
