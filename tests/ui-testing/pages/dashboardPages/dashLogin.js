@@ -1,7 +1,9 @@
 // dashLogin.js
 export const login = async (page) => {  
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "domcontentloaded" });
-    
+    // Best-effort wait for JS to render the login page (SSO link or form)
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+
     if (await page.getByText('Login as internal user').isVisible()) {
       await page.getByText('Login as internal user').click();
     }
