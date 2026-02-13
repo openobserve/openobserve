@@ -1577,8 +1577,6 @@ export default defineComponent({
     // Build fallback correlation using first alert's stream schema
     const buildFallbackCorrelation = async (org: string, incident: Incident) => {
       try {
-        console.log("[Fallback Correlation] Building local correlation from first alert's stream");
-
         // Get first alert to determine source stream
         const firstAlert = alerts.value?.[0];
         if (!firstAlert) {
@@ -1603,11 +1601,6 @@ export default defineComponent({
           : (schema.schema || schema.fields || []);
         const schemaFields = new Set(schemaFieldsArray.map((f: any) => f.name));
 
-        console.log("[Fallback Correlation] Incident dimensions:", incident.stable_dimensions);
-        console.log("[Fallback Correlation] Using schema type:", schema.uds_schema && schema.uds_schema.length > 0 ? 'uds_schema (user-defined)' : 'schema (full)');
-        console.log("[Fallback Correlation] Total schema fields:", schemaFields.size);
-        console.log("[Fallback Correlation] Schema fields:", Array.from(schemaFields).filter(f => !f.startsWith('_')).slice(0, 30));
-
         // Step 3: Get semantic groups to resolve dimension names to field patterns
         const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
         const semanticGroups = semanticGroupsResponse.data;
@@ -1616,30 +1609,19 @@ export default defineComponent({
 
         // Step 4: For each dimension, find the matching schema field
         for (const [dimId, dimValue] of Object.entries(incident.stable_dimensions)) {
-          console.log(`[Fallback Correlation] Processing dimension: ${dimId} = ${dimValue}`);
-
           let matchedField = null;
 
           // Get semantic group
           const group = semanticGroups.find((g: any) => g.id === dimId);
 
           if (group && group.fields && group.fields.length > 0) {
-            console.log(`[Fallback Correlation] Semantic group fields for ${dimId}:`, group.fields);
-            console.log(`[Fallback Correlation] Checking which fields exist in schema...`);
-
             // Check each field from semantic group
             for (const fieldName of group.fields) {
               const existsInSchema = schemaFields.has(fieldName);
-              console.log(`  - ${fieldName}: ${existsInSchema ? '✅ EXISTS' : '❌ not in schema'}`);
-
               if (existsInSchema && !matchedField) {
                 matchedField = fieldName;
                 // Don't break - keep logging all fields for debugging
               }
-            }
-
-            if (matchedField) {
-              console.log(`[Fallback Correlation] ✅ Selected field from semantic group: ${matchedField}`);
             }
           } else {
             console.warn(`[Fallback Correlation] No semantic group found for: ${dimId}`);
@@ -1649,8 +1631,7 @@ export default defineComponent({
           if (!matchedField) {
             console.warn(`[Fallback Correlation] Semantic group failed, scanning schema fields directly...`);
             const dimParts = dimId.split('-');
-            console.log(`[Fallback Correlation] Looking for fields matching parts:`, dimParts);
-
+            
             const schemaFieldsArray = Array.from(schemaFields).filter(f => !f.startsWith('_'));
             for (const schemaField of schemaFieldsArray) {
               const fieldLower = schemaField.toLowerCase();
@@ -1658,7 +1639,6 @@ export default defineComponent({
 
               if (allPartsMatch) {
                 matchedField = schemaField;
-                console.log(`[Fallback Correlation] ✅ Found via pattern match: ${schemaField}`);
                 break;
               }
             }
@@ -1666,10 +1646,6 @@ export default defineComponent({
 
           if (matchedField) {
             filters[matchedField] = dimValue;
-            console.log(`[Fallback Correlation] ✅✅✅ FINAL: ${dimId} → ${matchedField} = ${dimValue}`);
-          } else {
-            console.error(`[Fallback Correlation] ❌❌❌ FAILED to find field for: ${dimId}`);
-            console.error(`[Fallback Correlation] Schema fields:`, Array.from(schemaFields).filter(f => !f.startsWith('_')).slice(0, 30));
           }
         }
 
@@ -1677,11 +1653,6 @@ export default defineComponent({
           console.warn("[Fallback Correlation] No dimensions could be mapped to stream fields");
           return;
         }
-
-        console.log("[Fallback Correlation] Mapped filters:", filters);
-        console.log("[Fallback Correlation] Schema fields:", Array.from(schemaFields));
-        console.log("[Fallback Correlation] Stream type:", streamType);
-
         // Build StreamInfo object
         const streamInfo = {
           stream_name: streamName,
@@ -1709,10 +1680,6 @@ export default defineComponent({
             correlation_method: "frontend-fallback"
           }
         };
-
-        console.log("[Fallback Correlation] Built correlation data:", correlationData.value);
-        console.log("[Fallback Correlation] Log streams:", correlationData.value.logStreams);
-        console.log("[Fallback Correlation] Filters being passed:", correlationData.value.logStreams[0]?.filters);
       } catch (fallbackError) {
         console.error("[Fallback Correlation] Failed to build fallback:", fallbackError);
         // Don't set error - let tabs show "No correlated X found"

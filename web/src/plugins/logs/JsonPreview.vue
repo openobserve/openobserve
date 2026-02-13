@@ -541,14 +541,11 @@ export default {
       try {
         // Gate correlation feature behind enterprise check to avoid 403 errors
         if (config.isEnterprise !== "true") {
-          console.log("[JsonPreview] Correlation feature requires enterprise license");
           showViewRelatedBtn.value = false;
           return;
         }
 
         const available = await isCorrelationAvailable();
-        console.log("[JsonPreview] Correlation feature available:", available, "Mode:", props.mode);
-
         // Show button if correlation is available AND we're in detail view (sidebar or expanded)
         // AND service_streams is enabled in config
         // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
@@ -556,8 +553,6 @@ export default {
         const isDetailView = props.mode === 'sidebar' || props.mode === 'expanded';
         const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
         showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
-
-        console.log("[JsonPreview] showViewRelatedBtn set to:", showViewRelatedBtn.value, "isDetailView:", isDetailView, "serviceStreamsEnabled:", serviceStreamsEnabled, "hideViewRelated:", props.hideViewRelated);
       } catch (err) {
         console.error("[JsonPreview] Error checking correlation availability:", err);
         showViewRelatedBtn.value = false;
@@ -765,10 +760,6 @@ export default {
     };
 
     const openCorrelation = () => {
-      console.log(
-        "[JsonPreview] openCorrelation clicked, emitting show-correlation event with value:",
-        props.value,
-      );
       emit("show-correlation", props.value);
     };
 
