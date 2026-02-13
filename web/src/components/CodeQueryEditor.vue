@@ -361,7 +361,7 @@ export default defineComponent({
      * Calls AI to generate query based on current language (SQL, PromQL, VRL, JavaScript)
      * @param customText - Optional custom text to use instead of editor content
      */
-    const handleGenerateSQL = async (customText?: string) => {
+    const handleGenerateSQL = async (customText?: string, abortSignal?: AbortSignal, sessionId?: string) => {
       const currentText = customText || currentEditorText.value;
       if (!currentText.trim()) return;
 
@@ -396,7 +396,7 @@ export default defineComponent({
 
         // Generate query from natural language
         console.log('[NL2Q-UI] Calling generateSQL...');
-        const generatedSQL = await generateSQL(prompt, orgId);
+        const generatedSQL = await generateSQL(prompt, orgId, abortSignal, sessionId);
         console.log('[NL2Q-UI] generateSQL returned:', {
           value: generatedSQL,
           type: typeof generatedSQL,
