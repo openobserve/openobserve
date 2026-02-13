@@ -2943,9 +2943,13 @@ async fn run_maintenance() -> Result<()> {
     } else {
         lock_id as i64
     };
+
+    // Use a dedicated connection so lock and unlock happen on the same session
+    let mut conn = pool.acquire().await?;
+
     let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1)")
         .bind(lock_id)
-        .fetch_one(&pool)
+        .fetch_one(&mut *conn)
         .await
         .unwrap_or(false);
 
@@ -2957,10 +2961,10 @@ async fn run_maintenance() -> Result<()> {
     // Always release the advisory lock on exit
     let result = run_maintenance_inner(&pool).await;
 
-    // Release advisory lock
+    // Release advisory lock on the same connection that acquired it
     if let Err(e) = sqlx::query("SELECT pg_advisory_unlock($1)")
         .bind(lock_id)
-        .execute(&pool)
+        .execute(&mut *conn)
         .await
     {
         log::warn!("[POSTGRES] maintenance: failed to release advisory lock: {e}");
