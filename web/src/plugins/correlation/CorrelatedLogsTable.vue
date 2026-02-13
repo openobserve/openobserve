@@ -226,15 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <p class="tw:text-sm tw:opacity-70 tw:mb-4">
             {{ t("correlation.logs.noDataDetails") }}
           </p>
-          <q-btn
-            class="o2-secondary-button"
-            flat
-            :label="t('correlation.logs.resetFilters')"
-            icon="restart_alt"
-            color="primary"
-            @click="handleResetFilters"
-            data-test="reset-filters-btn"
-          />
         </div>
       </div>
     </div>
