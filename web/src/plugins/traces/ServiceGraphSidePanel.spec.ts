@@ -24,6 +24,9 @@ installQuasar({
   plugins: [Notify],
 });
 
+// Create a mock router instance that persists across tests
+const mockRouterPush = vi.fn();
+
 // Mock dependencies
 vi.mock("@/services/search", () => ({
   default: {
@@ -33,7 +36,7 @@ vi.mock("@/services/search", () => ({
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockRouterPush,
   }),
 }));
 
@@ -73,18 +76,48 @@ describe("ServiceGraphSidePanel.vue", () => {
       label: "Service A",
       name: "Service A",
       error_rate: 2.5,
+      requests: 2000, // Total requests
+      errors: 50, // 2.5% of 2000 = 50 (exactly 2.50%)
     },
     {
       id: "service-b",
       label: "Service B",
       name: "Service B",
       error_rate: 7.8,
+      requests: 1500,
+      errors: 117, // 7.8% of 1500
     },
     {
       id: "service-c",
       label: "Service C",
       name: "Service C",
       error_rate: 12.5,
+      requests: 800,
+      errors: 100, // 12.5% of 800
+    },
+    {
+      id: "service-upstream",
+      label: "Service Upstream",
+      name: "Service Upstream",
+      error_rate: 2.0,
+      requests: 1000,
+      errors: 20,
+    },
+    {
+      id: "service-upstream-2",
+      label: "Service Upstream 2",
+      name: "Service Upstream 2",
+      error_rate: 2.0,
+      requests: 500,
+      errors: 10,
+    },
+    {
+      id: "service-upstream-3",
+      label: "Service Upstream 3",
+      name: "Service Upstream 3",
+      error_rate: 3.375,
+      requests: 800,
+      errors: 27,
     },
   ];
 
@@ -96,6 +129,22 @@ describe("ServiceGraphSidePanel.vue", () => {
       failed_requests: 20,
       p95_latency_ns: 50000000, // 50ms
       error_rate: 2.0,
+    },
+    {
+      from: "service-upstream-2",
+      to: "service-a",
+      total_requests: 500,
+      failed_requests: 10,
+      p95_latency_ns: 75000000, // 75ms
+      error_rate: 2.0,
+    },
+    {
+      from: "service-upstream-3",
+      to: "service-a",
+      total_requests: 800,
+      failed_requests: 27,
+      p95_latency_ns: 100000000, // 100ms (max latency for service-a)
+      error_rate: 3.375,
     },
     {
       from: "service-a",
@@ -175,6 +224,7 @@ describe("ServiceGraphSidePanel.vue", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRouterPush.mockClear();
     // Mock clipboard API
     Object.assign(navigator, {
       clipboard: {
@@ -227,7 +277,7 @@ describe("ServiceGraphSidePanel.vue", () => {
       wrapper = createWrapper();
       const upstream = wrapper.vm.upstreamServices;
 
-      expect(upstream).toHaveLength(1);
+      expect(upstream).toHaveLength(3);
       expect(upstream[0].id).toBe("service-upstream");
       expect(upstream[0].requests).toBe(1000);
     });
@@ -309,8 +359,8 @@ describe("ServiceGraphSidePanel.vue", () => {
       wrapper = createWrapper();
       const metrics = wrapper.vm.serviceMetrics;
 
-      // 1500 + 800 = 2300 total requests
-      expect(metrics.requestRateValue).toBe("2.3K");
+      // Total requests from node
+      expect(metrics.requestRateValue).toBe("2.0K");
     });
 
     it("should use node's error_rate property", () => {
@@ -352,8 +402,8 @@ describe("ServiceGraphSidePanel.vue", () => {
     it("should format high latency in seconds", () => {
       const highLatencyEdges = [
         {
-          from: "service-a",
-          to: "service-b",
+          from: "service-upstream",
+          to: "service-a",
           total_requests: 1000,
           p95_latency_ns: 2500000000, // 2.5 seconds
         },
@@ -368,16 +418,18 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should format large request numbers with M suffix", () => {
-      const highVolumeEdges = [
-        {
-          from: "service-a",
-          to: "service-b",
-          total_requests: 2500000,
-        },
-      ];
+      const highVolumeNode = {
+        id: "service-a",
+        label: "Service A",
+        name: "Service A",
+        error_rate: 2.5,
+        requests: 2500000, // 2.5M requests
+        errors: 62500,
+      };
 
       wrapper = createWrapper({
-        graphData: { nodes: mockNodes, edges: highVolumeEdges },
+        selectedNode: highVolumeNode,
+        graphData: { nodes: [highVolumeNode], edges: [] },
       });
 
       const metrics = wrapper.vm.serviceMetrics;
@@ -587,6 +639,150 @@ describe("ServiceGraphSidePanel.vue", () => {
 
       // The method should be callable without errors
       expect(wrapper.vm.handleTraceClick).toBeTruthy();
+    });
+
+    it("should navigate to trace details with correct query parameters", () => {
+      wrapper = createWrapper();
+
+      const mockTrace = {
+        traceId: "test-trace-12345",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "traceDetails",
+        query: {
+          trace_id: "test-trace-12345",
+          stream: "default",
+          org_identifier: "test-org",
+          from: mockTimeRange.startTime,
+          to: mockTimeRange.endTime,
+        },
+      });
+    });
+
+    it("should include time range parameters in navigation", () => {
+      const customTimeRange = {
+        startTime: 1609459200000, // 2021-01-01 00:00:00
+        endTime: 1609545600000,   // 2021-01-02 00:00:00
+      };
+
+      wrapper = createWrapper({
+        timeRange: customTimeRange,
+      });
+
+      const mockTrace = {
+        traceId: "trace-abc123",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            from: customTimeRange.startTime,
+            to: customTimeRange.endTime,
+          }),
+        })
+      );
+    });
+
+    it("should use stream filter from props", () => {
+      wrapper = createWrapper({
+        streamFilter: "custom-stream",
+      });
+
+      const mockTrace = {
+        traceId: "trace-xyz789",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            stream: "custom-stream",
+          }),
+        })
+      );
+    });
+
+    it("should use default stream when streamFilter is empty", () => {
+      wrapper = createWrapper({
+        streamFilter: "",
+      });
+
+      const mockTrace = {
+        traceId: "trace-def456",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            stream: "default",
+          }),
+        })
+      );
+    });
+
+    it("should include org identifier from store", () => {
+      wrapper = createWrapper();
+
+      const mockTrace = {
+        traceId: "trace-org123",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            org_identifier: "test-org",
+          }),
+        })
+      );
+    });
+
+    it("should handle different org identifiers", () => {
+      wrapper = createWrapper({}, {
+        selectedOrganization: {
+          identifier: "different-org",
+        },
+      });
+
+      const mockTrace = {
+        traceId: "trace-different",
+      };
+
+      wrapper.vm.handleTraceClick(mockTrace);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            org_identifier: "different-org",
+          }),
+        })
+      );
+    });
+
+    it("should navigate when trace is clicked in UI", async () => {
+      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
+
+      wrapper = createWrapper({ visible: true, streamFilter: "default" });
+      await flushPromises();
+      await nextTick();
+
+      const traceItems = wrapper.findAll('[data-test="service-graph-side-panel-trace-item"]');
+      expect(traceItems.length).toBeGreaterThan(0);
+
+      // Click on the trace ID
+      const traceId = traceItems[0].find(".trace-id");
+      await traceId.trigger("click");
+
+      expect(mockRouterPush).toHaveBeenCalled();
     });
   });
 
@@ -832,7 +1028,7 @@ describe("ServiceGraphSidePanel.vue", () => {
     it("should display correct upstream service count", () => {
       wrapper = createWrapper();
       const upstreamSection = wrapper.find('[data-test="service-graph-side-panel-upstream-services"]');
-      expect(upstreamSection.text()).toContain("(1)");
+      expect(upstreamSection.text()).toContain("(3)");
     });
 
     it("should display correct downstream service count", () => {
@@ -932,16 +1128,18 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should handle very large request numbers", () => {
-      const largeEdges = [
-        {
-          from: "service-a",
-          to: "service-b",
-          total_requests: 99999999,
-        },
-      ];
+      const largeNode = {
+        id: "service-a",
+        label: "Service A",
+        name: "Service A",
+        error_rate: 2.5,
+        requests: 99999999, // ~100M requests
+        errors: 2499999,
+      };
 
       wrapper = createWrapper({
-        graphData: { nodes: mockNodes, edges: largeEdges },
+        selectedNode: largeNode,
+        graphData: { nodes: [largeNode], edges: [] },
       });
 
       const metrics = wrapper.vm.serviceMetrics;

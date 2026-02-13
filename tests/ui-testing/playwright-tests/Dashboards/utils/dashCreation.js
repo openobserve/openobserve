@@ -187,6 +187,52 @@ export async function deleteDashboard(page, dashboardName) {
 }
 
 /**
+ * Reopen a dashboard from the dashboard list
+ * Uses the same XPath pattern as deleteDashboard for reliable dashboard selection
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page
+ * @param {string} dashboardName - Name of the dashboard to open
+ */
+export async function reopenDashboardFromList(page, dashboardName) {
+  testLogger.info('Reopening dashboard from list', { dashboardName });
+
+  // Wait for dashboard list to load
+  await Promise.race([
+    page.waitForResponse(
+      (response) => {
+        const url = response.url();
+        return (
+          ( /\/api\/.*\/dashboards/.test(url) ||
+            /\/api\/.*\/folders/.test(url) ) &&
+          response.status() === 200
+        );
+      },
+      { timeout: 20000 }
+    ),
+    page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
+  ]);
+
+  // Find the dashboard row using XPath (same pattern as deleteDashboard)
+  const dashboardRow = page
+    .locator('//tr[.//div[@title="' + dashboardName + '"]]')
+    .nth(0);
+
+  // Click on the dashboard name to open it (using CSS attribute selector)
+  const dashboardNameDiv = dashboardRow.locator('div[title="' + dashboardName + '"]');
+  await dashboardNameDiv.click();
+
+  testLogger.debug('Clicked on dashboard name');
+
+  // Wait for dashboard to open
+  await page.waitForSelector('[data-test="dashboard-if-no-panel-add-panel-btn"]', {
+    state: "visible",
+    timeout: 10000
+  });
+
+  testLogger.info('Dashboard reopened successfully', { dashboardName });
+}
+
+/**
  * Set up a test dashboard for variable tests
  * Consolidates the common pattern of navigating to dashboards,
  * creating a dashboard, and waiting for it to be ready

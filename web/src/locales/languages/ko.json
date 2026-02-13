@@ -125,7 +125,7 @@
     "source": "_소스",
     "noResult": "결과 없음",
     "syntaxGuide": "구문 가이드",
-    "rowsPerPage": "페이지당 레코드",
+    "recordsPerPage": "페이지당 레코드",
     "showing": "표시",
     "of": "의",
     "rowDetail": "소스 세부 정보",
@@ -2146,7 +2146,6 @@
       "groupsLabel": "그룹",
       "noMatchingGroups": "일치하는 그룹 없음",
       "fqnFormulaTitle": "식별자 공식",
-      "fqnFormulaTooltip": "서비스 식별자가 어떻게 계산되는지 보여줍니다. 범위 차원(파란색)은 '/'로 연결됩니다. 첫 번째 non-null 워크로드 차원(녹색)이 서비스 이름이 됩니다.",
       "scopeDimension": "범위 차원",
       "workloadDimension": "워크로드 차원",
       "noFormulaConfigured": "식별자 공식이 구성되지 않았습니다. 위에 차원을 추가하십시오.",
@@ -2753,7 +2752,8 @@
       }
     },
     "viewInTraces": "트레이스에서 보기",
-    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기"
+    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기",
+    "exportToJson": "JSON으로 내보내기"
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

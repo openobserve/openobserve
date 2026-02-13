@@ -720,6 +720,7 @@ async fn search_tantivy_index(
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
     let file_account = parquet_file.account.clone();
+    // TODO: this convert happen two times, once before cache_files and once in search_tantivy_index
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",

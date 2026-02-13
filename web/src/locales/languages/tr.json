@@ -125,7 +125,7 @@
     "source": "_kaynak",
     "noResult": "Sonuç Yok",
     "syntaxGuide": "Sözdizimi kılavuzu",
-    "rowsPerPage": "Sayfa başına kayıtlar",
+    "recordsPerPage": "Sayfa başına kayıtlar",
     "showing": "Gösterme",
     "of": "dan",
     "rowDetail": "Kaynak Ayrıntıları",
@@ -2146,7 +2146,6 @@
       "groupsLabel": "gruplar",
       "noMatchingGroups": "Eşleşen grup yok",
       "fqnFormulaTitle": "Kimlik Formülü",
-      "fqnFormulaTooltip": "Servis kimliğinin nasıl hesaplanacağını gösterir. Kapsam boyutları (mavi) '/' ile birleştirilir. İlk null olmayan iş yükü boyutu (yeşil) servis adı olur.",
       "scopeDimension": "Kapsam Boyutu",
       "workloadDimension": "İş Yükü Boyutu",
       "noFormulaConfigured": "Hiçbir kimlik formülü yapılandırılmamış. Yukarıda boyutlar ekleyin.",
@@ -2753,7 +2752,8 @@
       }
     },
     "viewInTraces": "İzlerde Görüntüle",
-    "viewInTracesTooltip": "RED metrikler panosu ve tüm ilişkili izlerle izleme sayfasını açın"
+    "viewInTracesTooltip": "RED metrikler panosu ve tüm ilişkili izlerle izleme sayfasını açın",
+    "exportToJson": "JSON'a dışa aktar"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

@@ -109,7 +109,6 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::update_dashboard,
         request::dashboards::list_dashboards,
         request::dashboards::get_dashboard,
-        request::dashboards::export_dashboard,
         request::dashboards::delete_dashboard,
         request::dashboards::move_dashboard,
         request::dashboards::move_dashboards,

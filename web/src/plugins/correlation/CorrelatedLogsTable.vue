@@ -178,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @addSearchTerm="handleAddSearchTerm"
           @addFieldToTable="handleAddFieldToTable"
           @closeColumn="handleCloseColumn"
+          @update:columnOrder="handleColumnOrderChange"
           @expandRow="handleExpandRow"
           @view-trace="handleViewTrace"
           @show-correlation="handleNestedCorrelation"
@@ -271,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("correlation.logs.noDataDetails") }}
           </p>
           <q-btn
+            v-if="!props.hideResetFiltersButton"
             class="o2-secondary-button"
             :label="t('correlation.logs.resetFilters')"
             outline
@@ -349,6 +351,8 @@ const selectedFields = ref<any[]>([]);
 const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+let isSaving = false; // Prevent recursive saves
+let isUpdatingFromTable = false; // Prevent recursive updates from table
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -395,7 +399,9 @@ onMounted(() => {
 watch(
   visibleColumns,
   () => {
-    saveColumnState();
+    if (!isSaving) {
+      saveColumnState();
+    }
   },
   { deep: true }
 );
@@ -403,7 +409,9 @@ watch(
 watch(
   columnOrder,
   () => {
-    saveColumnState();
+    if (!isSaving) {
+      saveColumnState();
+    }
   },
   { deep: true }
 );
@@ -777,16 +785,10 @@ const handleDimensionUpdate = ({
   value: string;
 }) => {
   pendingFilters.value[key] = value;
-  console.log("[CorrelatedLogsTable] Pending filter changed:", {
-    key,
-    value,
-    pending: pendingFilters.value,
-  });
 };
 
 // Apply pending filter changes
 const handleApplyFilters = () => {
-  console.log("[CorrelatedLogsTable] Applying filters:", pendingFilters.value);
   // Update all filters at once using batch update (triggers single API call)
   updateFilters(pendingFilters.value);
 };
@@ -819,7 +821,6 @@ const handleCopy = (log: any, copyAsJson: boolean = true) => {
 };
 
 const handleSendToAiChat = (value: any) => {
-  console.log("[CorrelatedLogsTable] Send to AI chat:", value);
   emit("sendToAiChat", value);
 };
 
@@ -837,7 +838,6 @@ const handleAddSearchTerm = (
 };
 
 const handleAddFieldToTable = (field: string) => {
-  console.log("[CorrelatedLogsTable] Add field to table:", field);
 
   // Add the field to visible columns if it's not already visible
   if (!visibleColumns.value.has(field)) {
@@ -862,7 +862,6 @@ const handleAddFieldToTable = (field: string) => {
 };
 
 const handleCloseColumn = (columnDef: any) => {
-  console.log("[CorrelatedLogsTable] Close column:", columnDef);
   const columnId = columnDef.id || columnDef.name;
 
   // Remove from visible columns
@@ -901,7 +900,43 @@ const toggleSelectAll = () => {
   }
 };
 
-// Handle drag start for column reordering
+// Handle column order change from TenstackTable drag-and-drop
+const handleColumnOrderChange = (newOrder: string[]) => {
+  // Prevent recursive calls
+  if (isUpdatingFromTable) {
+    return;
+  }
+
+  // Check if order actually changed to prevent recursive updates
+  const currentOrder = JSON.stringify(columnOrder.value);
+  const newOrderStr = JSON.stringify(newOrder);
+
+  if (currentOrder === newOrderStr) {
+    console.log("[CorrelatedLogsTable] Order unchanged, skipping update");
+    return;
+  }
+
+  // Set flags to prevent recursive updates
+  isUpdatingFromTable = true;
+  isSaving = true;
+
+  try {
+    // Update columnOrder to match the new order from the table
+    columnOrder.value = [...newOrder];
+
+    // Manually save
+    saveColumnState();
+  } finally {
+    // Always reset flags even if error occurs
+    isSaving = false;
+    // Use nextTick to ensure all reactive updates complete before allowing new updates
+    setTimeout(() => {
+      isUpdatingFromTable = false;
+    }, 100);
+  }
+};
+
+// Handle drag start for column reordering (dropdown)
 const handleDragStart = (event: DragEvent, index: number) => {
   draggedIndex.value = index;
   if (event.dataTransfer) {
@@ -938,8 +973,6 @@ const handleExpandRow = (row: any) => {
 };
 
 const handleViewTrace = (log: any) => {
-  console.log("[CorrelatedLogsTable] View trace clicked:", log);
-
   // 15 mins +- from the log timestamp
   const from = log[store.state.zoConfig.timestamp_column] - 900000000;
   const to = log[store.state.zoConfig.timestamp_column] + 900000000;
@@ -977,17 +1010,6 @@ const handleNestedCorrelation = (row: any) => {
 
 // Lifecycle
 onMounted(() => {
-  console.log("[CorrelatedLogsTable] Component mounted with props:", {
-    serviceName: props.serviceName,
-    matchedDimensions: props.matchedDimensions,
-    additionalDimensions: props.additionalDimensions,
-    logStreams: props.logStreams,
-    sourceStream: props.sourceStream,
-    sourceType: props.sourceType,
-    timeRange: props.timeRange,
-    primaryStream: primaryStream.value,
-  });
-
   // Fetch logs on mount
   fetchCorrelatedLogs();
 });
