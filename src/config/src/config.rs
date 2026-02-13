@@ -1680,8 +1680,8 @@ pub struct Limit {
     pub aggs_min_num_partition_secs: usize,
     #[env_config(
         name = "ZO_BATCH_SIZE",
-        default = 8192,
-        help = "Batch size for parquet read/write operations and datafusion execution. Range: [1024, 8192]. Should carefully set this value, default is enough for most cases."
+        default = 0,
+        help = "Default is 8192, Batch size for parquet read/write operations and datafusion execution. Range: [1024, 8192]. Should carefully set this value, default is enough for most cases."
     )]
     pub batch_size: usize,
 }
@@ -2527,6 +2527,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.ingest_allowed_in_future * 3600 * 1_000_000;
 
     // clamp batch_size to [1024, 8192]
+    if cfg.limit.batch_size == 0 {
+        cfg.limit.batch_size = 8192;
+    }
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
 
     Ok(())
