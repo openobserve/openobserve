@@ -12,6 +12,21 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const generateUniqueDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now();
 
+// Helper function to clear Monaco editor content (cross-platform)
+const clearMonacoEditor = async (page, monacoEditor) => {
+  // Use triple-click to select all text (works on all platforms)
+  await monacoEditor.click({ clickCount: 3 });
+  await page.keyboard.press('Backspace');
+};
+
+// Helper function to wait for Monaco suggestions widget to be stable
+const waitForSuggestionsStable = async (page, suggestWidget) => {
+  await suggestWidget.waitFor({ state: "visible", timeout: 10000 });
+  // Wait for at least one suggestion row to be present
+  const suggestionRows = page.locator('.monaco-editor .suggest-widget .monaco-list-row');
+  await suggestionRows.first().waitFor({ state: "visible", timeout: 5000 });
+};
+
 // Configure tests to run in parallel for better performance
 test.describe.configure({ mode: "parallel" });
 
@@ -43,7 +58,7 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
   });
-  
+
   test("should display label name suggestions when typing inside curly braces metric{}", async ({
     page,
   }) => {
@@ -98,23 +113,19 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
 
     // Type 'cpu_usage{}' and position cursor inside to trigger label NAME suggestions
     // Labels like 'node', 'instance', 'region', 'service_name' should appear
-    // Step 1: Clear editor
-    await page.keyboard.press('Control+a');
-    await page.keyboard.press('Backspace');
-    await page.waitForTimeout(300);
+    // Step 1: Clear editor (cross-platform)
+    await clearMonacoEditor(page, monacoEditor);
 
     // Step 2: Type metric name with curly braces (both opening and closing)
     await page.keyboard.type('cpu_usage{}', { delay: 50 });
-    await page.waitForTimeout(300);
 
     // Step 3: Move cursor inside the curly braces and trigger suggestions
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(300);
     await page.keyboard.press('Control+Space');
 
-    // Wait for Monaco autocomplete suggestions to appear
+    // Wait for Monaco autocomplete suggestions to appear and stabilize
     const suggestWidget = page.locator('.monaco-editor .suggest-widget');
-    await suggestWidget.waitFor({ state: "visible", timeout: 10000 });
+    await waitForSuggestionsStable(page, suggestWidget);
 
     testLogger.info('Monaco autocomplete suggestions widget is visible after typing cpu_usage{');
 
@@ -197,29 +208,24 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     await monacoEditor.click();
 
     // Type query step by step: metric_name{} then type inside curly braces
-    // Step 1: Clear editor
-    await page.keyboard.press('Control+a');
-    await page.keyboard.press('Backspace');
-    await page.waitForTimeout(300);
+    // Step 1: Clear editor (cross-platform)
+    await clearMonacoEditor(page, monacoEditor);
 
     // Step 2: Type metric name with curly braces (both opening and closing)
     await page.keyboard.type('cpu_usage{}', { delay: 50 });
-    await page.waitForTimeout(300);
 
     // Step 3: Move cursor inside the curly braces (one position left)
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(300);
 
     // Step 4: Type label name with equals sign inside curly braces to trigger VALUE suggestions
     await page.keyboard.type('service_name=', { delay: 50 });
-    await page.waitForTimeout(500);
 
     // Step 5: Trigger suggestions manually with Control+Space
     await page.keyboard.press('Control+Space');
 
-    // Wait for Monaco autocomplete suggestions to appear
+    // Wait for Monaco autocomplete suggestions to appear and stabilize
     const suggestWidget = page.locator('.monaco-editor .suggest-widget');
-    await suggestWidget.waitFor({ state: "visible", timeout: 10000 });
+    await waitForSuggestionsStable(page, suggestWidget);
 
     testLogger.info('Monaco autocomplete suggestions widget is visible after typing cpu_usage{service_name=}');
 
@@ -302,32 +308,27 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     await monacoEditor.click();
 
     // Type query step by step: metric_name{} then type inside curly braces
-    // Step 1: Clear editor
-    await page.keyboard.press('Control+a');
-    await page.keyboard.press('Backspace');
-    await page.waitForTimeout(300);
+    // Step 1: Clear editor (cross-platform)
+    await clearMonacoEditor(page, monacoEditor);
 
     // Step 2: Type metric name with curly braces (both opening and closing)
     await page.keyboard.type('cpu_usage{}', { delay: 50 });
-    await page.waitForTimeout(300);
 
     // Step 3: Move cursor inside the curly braces (one position left)
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(300);
 
     // Step 4: Type label name with equals sign inside curly braces
     await page.keyboard.type('service_name=', { delay: 50 });
-    await page.waitForTimeout(500);
 
-    // Step 5: Trigger suggestions manually (in case they don't appear automatically)
+    // Step 5: Trigger suggestions manually and wait for widget to stabilize
     await page.keyboard.press('Control+Space');
-    await page.waitForTimeout(300);
+    const suggestWidget = page.locator('.monaco-editor .suggest-widget');
+    await waitForSuggestionsStable(page, suggestWidget);
 
     // Step 6: Type single character to filter ('u' for user-service)
     await page.keyboard.type('u', { delay: 50 });
 
-    // Wait for Monaco autocomplete suggestions to appear
-    const suggestWidget = page.locator('.monaco-editor .suggest-widget');
+    // Wait for filtered suggestions to appear
     await suggestWidget.waitFor({ state: "visible", timeout: 10000 });
 
     testLogger.info('Monaco autocomplete suggestions visible after typing cpu_usage{service_name=u}');
@@ -355,13 +356,8 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     testLogger.info(`Filtered label value suggestions for 'u': ${suggestions.join(', ')}`);
 
     // Assert that suggestions contain 'user' related values
-    if (hasUserServiceSuggestion) {
-      testLogger.info('Found "user-service" in filtered suggestions');
-      expect(hasUserServiceSuggestion).toBe(true);
-    } else {
-      // At minimum, verify we have suggestions
-      expect(suggestions.length).toBeGreaterThan(0);
-    }
+    expect(hasUserServiceSuggestion).toBe(true);
+    testLogger.info('Found "user-service" in filtered suggestions');
 
     // Dismiss suggestions
     await page.keyboard.press('Escape');
@@ -425,25 +421,21 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     await monacoEditor.click();
 
     // Step 1: Type 'cpu_usage{}' and position cursor inside to get label NAME suggestions
-    // Clear editor first
-    await page.keyboard.press('Control+a');
-    await page.keyboard.press('Backspace');
-    await page.waitForTimeout(300);
+    // Clear editor first (cross-platform)
+    await clearMonacoEditor(page, monacoEditor);
 
     // Type metric name with curly braces
     await page.keyboard.type('cpu_usage{}', { delay: 50 });
-    await page.waitForTimeout(300);
 
     // Move cursor inside the curly braces
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(300);
 
-    // Type a space or trigger suggestions manually to get label NAME suggestions
+    // Trigger suggestions manually to get label NAME suggestions
     await page.keyboard.press('Control+Space');
 
-    // Wait for label name suggestions
+    // Wait for label name suggestions to stabilize
     const suggestWidget = page.locator('.monaco-editor .suggest-widget');
-    await suggestWidget.waitFor({ state: "visible", timeout: 10000 });
+    await waitForSuggestionsStable(page, suggestWidget);
 
     testLogger.info('Label name suggestions visible after typing cpu_usage{}');
 
@@ -451,39 +443,36 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     const suggestionRows = page.locator('.monaco-editor .suggest-widget .monaco-list-row');
     let suggestionsCount = await suggestionRows.count();
 
-    if (suggestionsCount > 0) {
-      const firstLabelName = await suggestionRows.first().textContent();
-      testLogger.info(`First label name suggestion: ${firstLabelName.trim()}`);
+    expect(suggestionsCount).toBeGreaterThan(0);
 
-      // Select the first label name
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(500);
+    const firstLabelName = await suggestionRows.first().textContent();
+    testLogger.info(`First label name suggestion: ${firstLabelName.trim()}`);
 
-      // Step 2: Type '=' to trigger label VALUE suggestions
-      await page.keyboard.type('=');
+    // Select the first label name
+    await page.keyboard.press('Enter');
 
-      // Wait for label value suggestions to appear
-      await suggestWidget.waitFor({ state: "visible", timeout: 10000 });
+    // Step 2: Type '=' to trigger label VALUE suggestions
+    await page.keyboard.type('=');
 
-      testLogger.info('Label value suggestions visible after typing =');
+    // Wait for label value suggestions to appear
+    await waitForSuggestionsStable(page, suggestWidget);
 
-      // Verify we now have VALUE suggestions
-      suggestionsCount = await suggestionRows.count();
-      testLogger.info(`Found ${suggestionsCount} label value suggestions after typing =`);
+    testLogger.info('Label value suggestions visible after typing =');
 
-      // Get the value suggestions
-      const valueSuggestions = [];
-      for (let i = 0; i < Math.min(suggestionsCount, 5); i++) {
-        const suggestionText = await suggestionRows.nth(i).textContent();
-        valueSuggestions.push(suggestionText.trim());
-      }
-      testLogger.info(`Label value suggestions: ${valueSuggestions.join(', ')}`);
+    // Verify we now have VALUE suggestions
+    suggestionsCount = await suggestionRows.count();
+    testLogger.info(`Found ${suggestionsCount} label value suggestions after typing =`);
 
-      // Assert that value suggestions appear
-      expect(suggestionsCount).toBeGreaterThan(0);
-    } else {
-      testLogger.warn('No label name suggestions available');
+    // Get the value suggestions
+    const valueSuggestions = [];
+    for (let i = 0; i < Math.min(suggestionsCount, 5); i++) {
+      const suggestionText = await suggestionRows.nth(i).textContent();
+      valueSuggestions.push(suggestionText.trim());
     }
+    testLogger.info(`Label value suggestions: ${valueSuggestions.join(', ')}`);
+
+    // Assert that value suggestions appear
+    expect(suggestionsCount).toBeGreaterThan(0);
 
     // Dismiss suggestions
     await page.keyboard.press('Escape');
