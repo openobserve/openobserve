@@ -465,34 +465,11 @@ async fn map_group_to_custom_role(
             UserRole::from_str(&dex_cfg.default_role).unwrap()
         };
 
-        let custom_orgs = group_roles_by_org(&custom_roles);
-
         // Always create default org (system org)
         let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
 
-        // For custom claim parsing, validate that orgs exist (do NOT auto-create)
-        // Filter out non-existent orgs and log errors for them
-        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
-            let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
-                std::collections::HashMap::new();
-            for (org_id, roles) in custom_orgs {
-                if org_id == dex_cfg.default_org {
-                    // Default org is always valid
-                    valid_orgs.insert(org_id, roles);
-                } else if organization::get_org(&org_id).await.is_some() {
-                    // Org exists, include it
-                    valid_orgs.insert(org_id, roles);
-                } else {
-                    // Org does not exist, log error
-                    log::error!(
-                        "SSO claim parser: organization '{}' does not exist, skipping assignment",
-                        org_id
-                    );
-                    publish_org_not_found_error(&org_id, user_email).await;
-                }
-            }
-            valid_orgs
-        };
+        let custom_orgs =
+            validate_and_filter_custom_orgs(&custom_roles, &dex_cfg.default_org, user_email).await;
 
         if openfga_cfg.enabled {
             // Always add user to default org
@@ -603,31 +580,8 @@ async fn map_group_to_custom_role(
         }
         log::info!("group_to_custom_role: User exists in the database");
 
-        let custom_orgs = group_roles_by_org(&custom_roles);
-
-        // Validate that orgs exist (do NOT auto-create for custom claim parsing)
-        // Filter out non-existent orgs and log errors for them
-        let custom_orgs: std::collections::HashMap<String, Vec<String>> = {
-            let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
-                std::collections::HashMap::new();
-            for (org_id, roles) in custom_orgs {
-                if org_id == dex_cfg.default_org {
-                    // Default org is always valid
-                    valid_orgs.insert(org_id, roles);
-                } else if organization::get_org(&org_id).await.is_some() {
-                    // Org exists, include it
-                    valid_orgs.insert(org_id, roles);
-                } else {
-                    // Org does not exist, log error
-                    log::error!(
-                        "SSO claim parser: organization '{}' does not exist, skipping assignment",
-                        org_id
-                    );
-                    publish_org_not_found_error(&org_id, user_email).await;
-                }
-            }
-            valid_orgs
-        };
+        let custom_orgs =
+            validate_and_filter_custom_orgs(&custom_roles, &dex_cfg.default_org, user_email).await;
 
         // Get existing user and update their organizations list
         let existing_org_names: std::collections::HashSet<String> = existing_user
@@ -749,6 +703,32 @@ fn group_roles_by_org(custom_roles: &[String]) -> std::collections::HashMap<Stri
         }
     }
     map
+}
+
+/// Groups custom roles by org and filters out non-existent orgs.
+/// The default org is always considered valid. For other orgs, checks existence via
+/// `organization::get_org` and logs errors for missing ones.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+async fn validate_and_filter_custom_orgs(
+    custom_roles: &[String],
+    default_org: &str,
+    user_email: &str,
+) -> std::collections::HashMap<String, Vec<String>> {
+    let custom_orgs = group_roles_by_org(custom_roles);
+    let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for (org_id, roles) in custom_orgs {
+        if org_id == default_org || organization::get_org(&org_id).await.is_some() {
+            valid_orgs.insert(org_id, roles);
+        } else {
+            log::error!(
+                "SSO claim parser: organization '{}' does not exist, skipping assignment",
+                org_id
+            );
+            publish_org_not_found_error(&org_id, user_email).await;
+        }
+    }
+    valid_orgs
 }
 
 /// Splits a full name into (first_name, last_name).
