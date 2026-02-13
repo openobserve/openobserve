@@ -432,7 +432,7 @@ pub async fn list_destinations(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete alert destination", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Delete alert destination", "category": "alerts", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) -> Response {

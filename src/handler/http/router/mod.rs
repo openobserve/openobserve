@@ -707,7 +707,7 @@ pub fn service_routes() -> Router {
 
         // Pipelines
         .route("/{org_id}/pipelines", get(pipeline::list_pipelines).post(pipeline::save_pipeline).put(pipeline::update_pipeline))
-        .route("/{org_id}/pipelines/{pipeline_id}", delete(pipeline::delete_pipeline))
+        .route("/{org_id}/pipelines/{pipeline_id}", get(pipeline::get_pipeline).delete(pipeline::delete_pipeline))
         .route("/{org_id}/pipelines/bulk", delete(pipeline::delete_pipeline_bulk))
         .route("/{org_id}/pipelines/{pipeline_id}/enable", put(pipeline::enable_pipeline))
         .route("/{org_id}/pipelines/bulk/enable", post(pipeline::enable_pipeline_bulk))
@@ -772,6 +772,7 @@ pub fn service_routes() -> Router {
             // AI
             .route("/{org_id}/ai/chat", post(ai::chat::chat))
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+            .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))

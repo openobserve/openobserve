@@ -512,9 +512,28 @@ async fn send_and_respond(
     }
 
     if is_streaming {
+        let path_for_log = target.path.clone();
+        let node_for_log = target.node_addr.clone();
         let stream = resp
             .bytes_stream()
-            .map(|chunk| chunk.map_err(|e| std::io::Error::other(e.to_string())));
+            .map(move |chunk| -> Result<Bytes, std::io::Error> {
+                match chunk {
+                    Ok(bytes) => Ok(bytes),
+                    Err(e) => {
+                        log::error!(
+                            "proxy streaming error: {} -> {}, error: {:?}",
+                            path_for_log,
+                            node_for_log,
+                            e
+                        );
+                        let error_event = serde_json::json!({
+                            "type": "error",
+                            "error": format!("Stream interrupted: {}", e)
+                        });
+                        Ok(Bytes::from(format!("data: {}\n\n", error_event)))
+                    }
+                }
+            });
         match builder.body(Body::from_stream(stream)) {
             Ok(r) => r,
             Err(e) => (
