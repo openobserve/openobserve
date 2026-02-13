@@ -279,11 +279,13 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
             imgs.into_iter()
-                .map(|img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
-                    data: img.data,
-                    mime_type: img.mime_type,
-                    filename: img.filename,
-                })
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
                 .collect()
         });
 
@@ -623,11 +625,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
             imgs.into_iter()
-                .map(|img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
-                    data: img.data,
-                    mime_type: img.mime_type,
-                    filename: img.filename,
-                })
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
                 .collect()
         });
 
@@ -808,10 +812,13 @@ pub async fn confirm_action(
         // Inject user_token into the body for identity verification by the agent
         let mut forward_body: serde_json::Value =
             serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}));
-        if let Some(token) = &user_token {
-            if let Some(obj) = forward_body.as_object_mut() {
-                obj.insert("user_token".to_string(), serde_json::Value::String(token.clone()));
-            }
+        if let Some(token) = &user_token
+            && let Some(obj) = forward_body.as_object_mut()
+        {
+            obj.insert(
+                "user_token".to_string(),
+                serde_json::Value::String(token.clone()),
+            );
         }
         let forward_bytes = serde_json::to_vec(&forward_body).unwrap_or_default();
 
@@ -832,10 +839,7 @@ pub async fn confirm_action(
         {
             Ok(resp) => {
                 let status = resp.status();
-                let response_body = resp
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| "{}".to_string());
+                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
 
                 if status.is_success() {
                     (
@@ -860,9 +864,7 @@ pub async fn confirm_action(
             }
             Err(e) => {
                 log::error!("Failed to forward confirmation to agent: {e}");
-                MetaHttpResponse::internal_error(format!(
-                    "Failed to forward confirmation: {e}"
-                ))
+                MetaHttpResponse::internal_error(format!("Failed to forward confirmation: {e}"))
             }
         }
     }

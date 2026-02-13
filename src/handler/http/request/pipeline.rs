@@ -290,19 +290,19 @@ pub async fn get_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) 
     // Get last error info
     let last_error =
         match crate::service::db::pipeline_errors::get_by_pipeline_id(&pipeline_id).await {
-            Ok(Some(error)) => Some(
-                crate::handler::http::models::pipelines::PipelineErrorInfo {
-                    last_error_timestamp: error.last_error_timestamp,
-                    error_summary: error.error_summary,
-                    node_errors: error.node_errors,
-                },
-            ),
+            Ok(Some(error)) => Some(crate::handler::http::models::pipelines::PipelineErrorInfo {
+                last_error_timestamp: error.last_error_timestamp,
+                error_summary: error.error_summary,
+                node_errors: error.node_errors,
+            }),
             _ => None,
         };
 
-    MetaHttpResponse::json(
-        crate::handler::http::models::pipelines::Pipeline::from(meta_pipeline, paused_at, last_error),
-    )
+    MetaHttpResponse::json(crate::handler::http::models::pipelines::Pipeline::from(
+        meta_pipeline,
+        paused_at,
+        last_error,
+    ))
 }
 
 /// GetStreamsWithPipeline
