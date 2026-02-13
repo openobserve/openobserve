@@ -1423,7 +1423,9 @@
     "panelTimeGlobalHint": "Het paneel houdt de wereldwijde dashboardtijd bij. Wijzigingen in de globale tijd zullen dit paneel updaten.",
     "panelTimeIndividualHint": "Panel zal zijn eigen tijdbereik gebruiken. Stel de tijd in met behulp van de datumkiezer hieronder. Wereldwijde tijdwijzigingen hebben geen invloed op dit paneel.",
     "panelTimeRange": "Tijdbereik van het paneel",
-    "panelTimeRangeTooltip": "Dit tijdbereik is alleen van toepassing op dit paneel. Andere panels gebruiken hun eigen geconfigureerde tijden of de globale dashboardtijd."
+    "panelTimeRangeTooltip": "Dit tijdbereik is alleen van toepassing op dit paneel. Andere panels gebruiken hun eigen geconfigureerde tijden of de globale dashboardtijd.",
+    "panelTimeSettingsTooltip": "Configureer hoe dit paneel het tijdbereik bepaalt. U kunt het tijdbereik van het dashboard gebruiken of een aangepaste tijdsperiode instellen voor dit paneel.",
+    "panelTimeMode": "Bron voor tijdbereik (bij laden van het dashboard)"
   },
   "panel": {
     "header": "Paneel",

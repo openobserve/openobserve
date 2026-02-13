@@ -1423,7 +1423,9 @@
     "panelTimeGlobalHint": "Le panneau suivra l'heure globale du tableau de bord. Les modifications apportées à l'heure mondiale mettront à jour ce panneau.",
     "panelTimeIndividualHint": "Le panneau utilisera sa propre plage de temps. Réglez l'heure à l'aide du sélecteur de date ci-dessous. Les changements d'heure globaux n'affecteront pas ce panneau.",
     "panelTimeRange": "Plage horaire du panneau",
-    "panelTimeRangeTooltip": "Cette plage de temps s'applique uniquement à ce panneau. Les autres panneaux utiliseront leurs propres heures configurées ou l'heure globale du tableau de bord."
+    "panelTimeRangeTooltip": "Cette plage de temps s'applique uniquement à ce panneau. Les autres panneaux utiliseront leurs propres heures configurées ou l'heure globale du tableau de bord.",
+    "panelTimeSettingsTooltip": "Configurez la façon dont ce panneau détermine son intervalle de temps. Vous pouvez utiliser la plage horaire du tableau de bord ou en définir une personnalisée pour ce panneau.",
+    "panelTimeMode": "Source de plage horaire (lors du chargement du tableau de bord)"
   },
   "panel": {
     "header": "Panneau",

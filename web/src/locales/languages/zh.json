@@ -1423,7 +1423,9 @@
     "panelTimeGlobalHint": "面板将跟踪全球仪表板时间。对全球时间的更改将更新此面板。",
     "panelTimeIndividualHint": "小组将使用自己的时间范围。使用下面的日期选择器设置时间。全球时间更改不会影响此面板。",
     "panelTimeRange": "小组讨论时间范围",
-    "panelTimeRangeTooltip": "此时间范围仅适用于此面板。其他面板将使用自己配置的时间或全球仪表板时间。"
+    "panelTimeRangeTooltip": "此时间范围仅适用于此面板。其他面板将使用自己配置的时间或全球仪表板时间。",
+    "panelTimeSettingsTooltip": "配置此面板如何确定其时间范围。您可以使用仪表板的时间范围，也可以为该面板设置自定义时间范围。",
+    "panelTimeMode": "时间范围来源（仪表板加载时）"
   },
   "panel": {
     "header": "面板",

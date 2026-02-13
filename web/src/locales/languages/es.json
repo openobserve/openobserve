@@ -1423,7 +1423,9 @@
     "panelTimeGlobalHint": "El panel realizará un seguimiento del tiempo global del panel de control. Los cambios en la hora global actualizarán este panel.",
     "panelTimeIndividualHint": "El panel utilizará su propio intervalo de tiempo. Configure la hora con el selector de fechas que aparece a continuación. Los cambios de hora globales no afectarán a este panel.",
     "panelTimeRange": "Rango de tiempo del panel",
-    "panelTimeRangeTooltip": "Este intervalo de tiempo solo se aplica a este panel. Otros paneles utilizarán sus propias horas configuradas o la hora global del panel de control."
+    "panelTimeRangeTooltip": "Este intervalo de tiempo solo se aplica a este panel. Otros paneles utilizarán sus propias horas configuradas o la hora global del panel de control.",
+    "panelTimeSettingsTooltip": "Configure la forma en que este panel determina su intervalo de tiempo. Puede usar el intervalo de tiempo del panel de control o establecer uno personalizado para este panel.",
+    "panelTimeMode": "Fuente de rango de tiempo (al cargar el tablero)"
   },
   "panel": {
     "header": "Panel",

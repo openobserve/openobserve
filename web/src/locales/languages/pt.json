@@ -1423,7 +1423,9 @@
     "panelTimeGlobalHint": "O painel rastreará a hora global do painel. Alterações na hora global atualizarão esse painel.",
     "panelTimeIndividualHint": "O painel usará seu próprio intervalo de tempo. Defina a hora usando o seletor de data abaixo. As mudanças globais de horário não afetarão esse painel.",
     "panelTimeRange": "Intervalo de tempo do painel",
-    "panelTimeRangeTooltip": "Esse intervalo de tempo se aplica somente a esse painel. Outros painéis usarão seus próprios horários configurados ou o horário global do painel."
+    "panelTimeRangeTooltip": "Esse intervalo de tempo se aplica somente a esse painel. Outros painéis usarão seus próprios horários configurados ou o horário global do painel.",
+    "panelTimeSettingsTooltip": "Configure como esse painel determina seu intervalo de tempo. Você pode usar o intervalo de tempo do painel ou definir um personalizado para esse painel.",
+    "panelTimeMode": "Fonte do intervalo de tempo (no carregamento do painel)"
   },
   "panel": {
     "header": "Painel",

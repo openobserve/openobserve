@@ -1423,7 +1423,9 @@
     "panelTimeGlobalHint": "Il pannello terrà traccia del tempo del dashboard globale. Le modifiche all'ora globale aggiorneranno questo pannello.",
     "panelTimeIndividualHint": "Il pannello utilizzerà il proprio intervallo di tempo. Imposta l'ora utilizzando il selettore di date qui sotto. Le modifiche temporali globali non influiranno su questo pannello.",
     "panelTimeRange": "Intervallo di tempo del pannello",
-    "panelTimeRangeTooltip": "Questo intervallo di tempo si applica solo a questo pannello. Gli altri pannelli utilizzeranno i propri orari configurati o l'ora globale del dashboard."
+    "panelTimeRangeTooltip": "Questo intervallo di tempo si applica solo a questo pannello. Gli altri pannelli utilizzeranno i propri orari configurati o l'ora globale del dashboard.",
+    "panelTimeSettingsTooltip": "Configura il modo in cui questo pannello determina il suo intervallo di tempo. Puoi utilizzare l'intervallo di tempo della dashboard o impostarne uno personalizzato per questo pannello.",
+    "panelTimeMode": "Origine dell'intervallo di tempo (al caricamento del dashboard)"
   },
   "panel": {
     "header": "Pannello",
