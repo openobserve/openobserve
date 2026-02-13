@@ -328,7 +328,7 @@ pub async fn update_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
