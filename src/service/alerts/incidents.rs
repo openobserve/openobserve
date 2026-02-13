@@ -901,10 +901,10 @@ pub async fn enrich_with_topology(
                     }
                 };
 
-                let (_, sg_topo_edges, _) = if !raw_sg_edges.is_empty() {
+                let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
                     o2_enterprise::enterprise::service_graph::build_topology(raw_sg_edges)
                 } else {
-                    (vec![], vec![], vec![])
+                    (vec![], vec![])
                 };
 
                 let has_sg_edge = sg_topo_edges.iter().any(|e| {

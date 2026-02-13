@@ -167,11 +167,17 @@ export default defineComponent({
       }
     );
 
+    const sanitizeTimeWindow = (val: any): number | undefined => {
+      if (val == null || val === "") return undefined;
+      const num = Number(val);
+      return isNaN(num) || num <= 0 ? undefined : num;
+    };
+
     const emitUpdate = () => {
       emit("update:deduplication", {
         enabled: true,
         fingerprint_fields: localDeduplication.value.fingerprint_fields,
-        time_window_minutes: localDeduplication.value.time_window_minutes,
+        time_window_minutes: sanitizeTimeWindow(localDeduplication.value.time_window_minutes),
       });
     };
 

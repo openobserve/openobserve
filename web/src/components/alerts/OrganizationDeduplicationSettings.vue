@@ -257,9 +257,18 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
+    // Sanitize: convert empty/NaN time_window_minutes to null
+    const configToSave = {
+      ...localConfig.value,
+      time_window_minutes:
+        localConfig.value.time_window_minutes != null &&
+        !isNaN(Number(localConfig.value.time_window_minutes))
+          ? Number(localConfig.value.time_window_minutes) || null
+          : null,
+    };
     await alertsService.setOrganizationDeduplicationConfig(
       props.orgId,
-      localConfig.value,
+      configToSave,
     );
 
     $q.notify({
