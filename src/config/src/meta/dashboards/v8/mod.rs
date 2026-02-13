@@ -442,16 +442,10 @@ pub struct PanelConfig {
     table_pagination: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pagination_rows_per_page: Option<i64>,
-    /// Enable panel-level time range
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_enabled: Option<bool>,
-    /// Panel time mode: "global" or "individual"
-    /// - "global": Panel tracks global dashboard time explicitly
-    /// - "individual": Panel uses its own custom time range
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_mode: Option<String>,
-    /// Panel-level time range (only used when panel_time_mode = "individual")
-    /// Uses separate PanelTimeRange struct to avoid conflicts with global DateTimeOptions
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_range: Option<PanelTimeRange>,
 }
@@ -657,25 +651,16 @@ pub struct DateTimeOptions {
     pub end_time: Option<i64>,
 }
 
-/// Panel-specific time range configuration (separate from global DateTimeOptions)
-/// This prevents conflicts between global dashboard time and panel-level time
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelTimeRange {
-    /// Time type: "relative" or "absolute"
     #[serde(rename = "type")]
     pub typee: String,
-    /// Relative time period (e.g., "15m", "1h", "7d")
-    /// Only used when type = "relative"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relative_time_period: Option<String>,
-    /// Start time in microseconds
-    /// Only used when type = "absolute"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_time: Option<i64>,
-    /// End time in microseconds
-    /// Only used when type = "absolute"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<i64>,
 }
