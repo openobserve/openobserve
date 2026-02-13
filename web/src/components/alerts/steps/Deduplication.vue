@@ -89,17 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               min="1"
               :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-              :class="
-                store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
-              "
               style="background: none;"
               @update:model-value="emitUpdate"
             />
           </div>
           <div
             style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-            :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
-            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+            :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
             class="flex justify-center items-center"
           >
             {{ t("alerts.minutes") }}

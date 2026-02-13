@@ -432,7 +432,7 @@ describe("AlertWizardRightColumn.vue", () => {
       const summarySection = wrapper
         .findAll(".collapsible-section")
         .find((s) => s.text().includes("Summary"));
-      const content = summarySection?.find(".section-content");
+      const content = summarySection?.find(".summary-section-content");
 
       expect(content?.isVisible()).toBe(true);
     });
@@ -444,7 +444,7 @@ describe("AlertWizardRightColumn.vue", () => {
       const summarySection = wrapper
         .findAll(".collapsible-section")
         .find((s) => s.text().includes("Summary"));
-      const content = summarySection?.find(".section-content");
+      const content = summarySection?.find(".summary-section-content");
 
       expect(content?.isVisible()).toBe(false);
     });
@@ -457,7 +457,7 @@ describe("AlertWizardRightColumn.vue", () => {
 
       const style = wrapper.vm.previewSectionStyle;
       expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("0");
+      expect(style.minHeight).toBe("250px");
     });
 
     it("should calculate previewSectionStyle when preview collapsed", () => {
@@ -474,7 +474,7 @@ describe("AlertWizardRightColumn.vue", () => {
 
       const style = wrapper.vm.previewSectionStyle;
       expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("0");
+      expect(style.minHeight).toBe("250px");
     });
 
     it("should calculate summarySectionStyle when both expanded", () => {
@@ -483,7 +483,7 @@ describe("AlertWizardRightColumn.vue", () => {
 
       const style = wrapper.vm.summarySectionStyle;
       expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("0");
+      expect(style.minHeight).toBe("250px");
     });
 
     it("should calculate summarySectionStyle when summary collapsed", () => {
@@ -500,7 +500,7 @@ describe("AlertWizardRightColumn.vue", () => {
 
       const style = wrapper.vm.summarySectionStyle;
       expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("0");
+      expect(style.minHeight).toBe("250px");
     });
 
     it("should have auto flex for both when both collapsed", () => {

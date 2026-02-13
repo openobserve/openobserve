@@ -1891,7 +1891,101 @@
     "msteams": "Equipos de Microsoft",
     "pagerduty": "Pager Duty",
     "opsgenie": "Opsgenia",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Guardar alerta",
+    "aggregation_threshold": "Alerta si hay algún grupo",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avisarme cuando",
+      "metricTypes": {
+        "resultsPassedFilter": "los resultados superaron los filtros",
+        "distinctGroupsAffected": "distintos grupos se ven afectados",
+        "metricsMatchCriteria": "las métricas coinciden con los criterios",
+        "matchingLogsFound": "registros coincidentes encontrados",
+        "groupsPassFilter": "los grupos superan los criterios de filtro",
+        "distinctGroups": "grupos distintos encontrados",
+        "resultRows": "filas de resultados devueltas",
+        "timeSeries": "se encontró una serie temporal activa",
+        "matchingRecords": "registros coincidentes encontrados",
+        "groupsWithHaving": "condiciones de coincidencia de grupos",
+        "uniqueGroups": "grupos únicos",
+        "events": "condiciones de coincidencia de eventos",
+        "aggregatedValue": "condiciones de partido"
+      },
+      "contextLabels": {
+        "groupedBy": "Agrupados por:",
+        "havingConditions": "TENER condiciones:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nombre de alerta",
+      "sqlQuery": "Consulta SQL",
+      "promqlQuery": "Consulta ProMQL",
+      "conditions": "Condiciones",
+      "copy": "Copiar",
+      "noCondition": "Sin condición",
+      "noDescription": "Sin descripción",
+      "evaluationHistory": "Historial de evaluación",
+      "loadingHistory": "Cargando historial...",
+      "noHistoryAvailable": "No hay ningún historial de evaluación disponible para esta alerta",
+      "results": "Resultados"
+    },
+    "historyTable": {
+      "timestamp": "Marca de tiempo",
+      "status": "Estado",
+      "evaluationTime": "Evaluación (es)",
+      "queryTime": "Consulta (ms)",
+      "error": "Error"
+    },
+    "back": "Atrás",
+    "continue": "Continuar",
+    "wouldTrigger": "DESENCADENARÍA",
+    "wouldNotTrigger": "NO SE ACTIVARÍA",
+    "queryBuilder": "Constructor",
+    "groupByHelp": {
+      "description": "Agrupe los datos agregados por campos específicos para crear alertas independientes para cada valor único.",
+      "example": "Ejemplo: agrupe por «nombre de host» para recibir alertas individuales por servidor o por «status_code» para realizar un seguimiento de los errores por separado."
+    },
+    "conditions": {
+      "condition": "Condición",
+      "conditionGroup": "Grupo de condiciones",
+      "addConditionTooltip": "Agregar una nueva condición a este grupo",
+      "addConditionGroupTooltip": "Agregar un grupo de condiciones anidadas (profundidad máxima: 2)",
+      "maxDepthReachedTooltip": "Se ha alcanzado la profundidad máxima de anidación"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Alerta configurada para",
+      "currentWindow": "Ventana actual",
+      "cycle": "Ciclo",
+      "cycleTooltip": "Compare los resultados con los del mismo tiempo del ciclo anterior.",
+      "runningFor": "Se ejecuta durante {período} en el intervalo de cada {frecuencia}",
+      "currentWindowCannotBeDeleted": "No se puede eliminar la ventana actual",
+      "comparingWith": "Comparando con",
+      "referenceWindow": "Ventana de referencia",
+      "timeFrame": "Marco temporal",
+      "timeFrameTooltip": "Intervalo de tiempo para su consulta.",
+      "comparingText": "Comparar el resultado de la consulta de la ventana actual con el resultado de la consulta del {offset} anterior.",
+      "addComparisonWindow": "Agregar ventana de comparación",
+      "goToConditions": "Ir a Condiciones",
+      "goToConditionsTooltip": "Haga clic en «Ir a condiciones» para verificar los eventos en las ventanas de comparación seleccionadas"
+    },
+    "alertSettings": {
+      "cronSchedule": "Calendario de Cron",
+      "addNewDestination": "Agregar nuevo destino",
+      "cooldownTooltip": "Si la alerta se activa, ¿cuánto tiempo debe esperar antes de enviar otra notificación? Por ejemplo, si la alerta se activa a las 16:00 y la notificación de silencio está configurada en 10 minutos, no se enviará otra notificación hasta las 16:10 p. m., incluso si la alerta persiste después de 1 minuto. Esto se hace para evitar enviar notificaciones no deseadas al usuario.",
+      "thresholdTooltip": "Define cuándo debe activarse la alerta en función del recuento de eventos o del valor agregado. Ejemplo: si se establece en «> 100\", la alerta se activa cuando el recuento supera los 100 eventos.",
+      "periodTooltip": "Período durante el que debe ejecutarse la consulta. Por ejemplo, 10 minutos significa que, siempre que se ejecute la consulta, utilizará los últimos 10 minutos de datos.",
+      "frequencyTooltipMinutes": "Con qué frecuencia se debe ejecutar la tarea. Por ejemplo, cada 5 minutos.",
+      "frequencyTooltipCron": "Formato cron estándar de UNIX con 5 campos separados por un espacio: [Minuto 0-59] [Hora 0-23] [Día del mes 1-31] [Mes 1-12 o enero-diciembre] [Día de la semana 0-7 o '1L-7L', 0 y 7 para el domingo].",
+      "timezoneWarning": "Advertencia: La zona horaria que se muestra es aproximada. Verifica y selecciona la zona horaria correcta manualmente.",
+      "destinationsTooltip": "Seleccione uno o más destinos para enviar notificaciones de alerta.",
+      "templateTooltip": "Opcional: seleccione una plantilla para usarla en todos los destinos de esta alerta. Las plantillas permiten personalizar el formato de los mensajes de alerta. Si no se selecciona, cada destino utilizará su propia plantilla configurada."
+    },
+    "advanced": {
+      "addVariable": "Agregar variable",
+      "variablesTooltip": "Las variables se utilizan para pasar datos de la alerta al destino.",
+      "rowTemplateTooltip": "La plantilla de fila se utiliza para dar formato al mensaje de alerta.",
+      "templateType": "Tipo de plantilla:"
+    }
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2597,7 +2691,8 @@
     "showLegends": "Mostrar leyendas"
   },
   "alert_list": {
-    "alert_details": "Detalles de la alerta"
+    "alert_details": "Detalles de la alerta",
+    "alert_history": "Historial de alertas"
   },
   "latencyInsights": {
     "title": "Perspectivas",

@@ -19,19 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="step-content card-container tw:px-3 tw:py-4" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
       <!-- Alert set for header -->
       <div class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md">
-        <span>Alert set for</span>
+        <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
         <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
 
       <!-- Current Window -->
-      <div class="tw:flex tw:flex-col lg:tw:flex-row tw:justify-between tw:items-start multi-window-container q-px-md q-py-sm">
-        <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
-          Current window
+      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start multi-window-container q-px-md q-py-sm">
+        <div class="multi-window-text tw:w-auto tw:text-left">
+          {{ t('alerts.compareWithPast.currentWindow') }}
         </div>
 
-        <div class="tw:flex lg:tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
-            Cycle
+        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
+          <div class="multi-window-text tw:w-auto tw:text-left">
+            {{ t('alerts.compareWithPast.cycle') }}
             <span class="tw:cursor-pointer">
               <q-icon
                 name="info"
@@ -40,14 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
                 <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  Compare results with the same time in the previous cycle.
+                  {{ t('alerts.compareWithPast.cycleTooltip') }}
                 </q-tooltip>
               </q-icon>
             </span>
           </div>
           <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-full lg:tw:w-[300px] running-text">
-              Running for {{ convertMinutesToDisplayValue(period) }} in the interval of every {{ convertMinutesToDisplayValue(frequency) }}
+            <div class="tw:w-[300px] running-text">
+              {{ t('alerts.compareWithPast.runningFor', { period: convertMinutesToDisplayValue(period), frequency: convertMinutesToDisplayValue(frequency) }) }}
             </div>
             <div>
               <span class="tw:inline-block">
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   self="bottom middle"
                   :offset="[0, 8]"
                 >
-                  Current window cannot be deleted
+                  {{ t('alerts.compareWithPast.currentWindowCannotBeDeleted') }}
                 </q-tooltip>
               </span>
             </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Comparing with header -->
       <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-sm">
-        <span>Comparing with</span>
+        <span>{{ t('alerts.compareWithPast.comparingWith') }}</span>
         <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
 
@@ -86,17 +86,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
-        class="tw:flex tw:flex-col lg:tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 q-px-md q-py-sm"
+        class="tw:flex tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 q-px-md q-py-sm"
       >
-        <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
-          Reference Window {{ index + 1 }}
+        <div class="multi-window-text tw:w-auto tw:text-left">
+          {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}
         </div>
 
         <!-- Time Frame -->
-        <div class="tw:flex tw:flex-col tw:gap-2 tw:items-center">
+        <div class="tw:flex tw:flex-col tw:gap-2 tw:items-start">
           <div class="tw:flex tw:items-center">
             <span class="tw:mr-1"><q-icon name="schedule" size="16px" /></span>
-            Time Frame
+            {{ t('alerts.compareWithPast.timeFrame') }}
             <span class="tw:ml-2 tw:cursor-pointer">
               <q-icon
                 name="info"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
                 <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  Time range for your query.
+                  {{ t('alerts.compareWithPast.timeFrameTooltip') }}
                 </q-tooltip>
               </q-icon>
             </span>
@@ -122,9 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cycle Info -->
-        <div class="tw:flex lg:tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
-            Cycle
+        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
+          <div class="multi-window-text tw:w-auto tw:text-left">
+            {{ t('alerts.compareWithPast.cycle') }}
             <span class="tw:cursor-pointer">
               <q-icon
                 name="info"
@@ -133,14 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
                 <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  Compare results with the same time in the previous cycle.
+                  {{ t('alerts.compareWithPast.cycleTooltip') }}
                 </q-tooltip>
               </q-icon>
             </span>
           </div>
           <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-full lg:tw:w-[300px] reference-text">
-              Comparing current window query result with query result from previous {{ getDisplayValue(picker.offSet) }}.
+            <div class="tw:w-[300px] reference-text">
+              {{ t('alerts.compareWithPast.comparingText', { offset: getDisplayValue(picker.offSet) }) }}
             </div>
             <div>
               <q-btn
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 q-mt-sm">
         <q-btn
           data-test="multi-time-range-alerts-add-btn"
-          label="Add Comparison Window"
+          :label="t('alerts.compareWithPast.addComparisonWindow')"
           size="md"
           class="o2-secondary-button"
           style="font-size: 14px;"
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="localMultiTimeRange.length > 0" class="tw:flex tw:items-center tw:gap-2">
           <q-btn
             data-test="go-to-view-editor-btn"
-            label="Go to Conditions"
+            :label="t('alerts.compareWithPast.goToConditions')"
             size="md"
             class="o2-secondary-button"
             style="font-size: 14px;"
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="300px"
               :offset="[0, 8]"
             >
-              Click on "Go to Conditions" to verify the events for selected comparison windows
+              {{ t('alerts.compareWithPast.goToConditionsTooltip') }}
             </q-tooltip>
         </q-btn>
         </div>
@@ -429,13 +429,13 @@ export default defineComponent({
 }
 
 .dark-mode-multi-window .reference-window-container {
-  background-color: #111111;
-  border: 1px solid #343939;
+  background-color: var(--o2-card-bg, #212121);
+  border: 1px solid var(--o2-border-color, #343434);
 }
 
 .light-mode-multi-window .reference-window-container {
-  background-color: #ffffff;
-  border: 1px solid #e0e0e0;
+  background-color: var(--o2-card-bg, #ffffff);
+  border: 1px solid var(--o2-border-color, #e6e6e6);
 }
 
 .reference-window-container {
@@ -444,13 +444,13 @@ export default defineComponent({
 }
 
 .dark-mode-multi-window .multi-window-container {
-  background-color: #111111;
-  border: 1px solid #343939;
+  background-color: var(--o2-card-bg, #212121);
+  border: 1px solid var(--o2-border-color, #343434);
 }
 
 .light-mode-multi-window .multi-window-container {
-  background-color: #ffffff;
-  border: 1px solid #e0e0e0;
+  background-color: var(--o2-card-bg, #ffffff);
+  border: 1px solid var(--o2-border-color, #e6e6e6);
 }
 
 .multi-window-container {
