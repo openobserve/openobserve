@@ -115,7 +115,9 @@
     "retry": "Probeer het opnieuw",
     "copy": "Kopiëren",
     "copySuccess": "Gekopieerd naar klembord",
-    "copyError": "Kopiëren naar klembord is mislukt"
+    "copyError": "Kopiëren naar klembord is mislukt",
+    "goBack": "Ga terug",
+    "stopGenerating": "Stop met genereren"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -332,7 +334,20 @@
     "askAIPlaceholder": "Vraag AI om hulp bij je vraag...",
     "aiBarSuccessPlaceholder": "Wat zou je hierna willen doen?",
     "askAI": "Vraag het aan AI",
-    "askAITooltip": "Vraag AI om hulp bij je vraag"
+    "askAITooltip": "Vraag AI om hulp bij je vraag",
+    "enterPrompt": "Voer een prompt in om een query te genereren",
+    "analyzingQuery": "Zoekopdracht analyseren...",
+    "generatingQuery": "Zoekopdracht genereren...",
+    "queryGeneratedSuccess": "Zoekopdracht succesvol gegenereerd!",
+    "queryGenerationStopped": "Het genereren van query's is gestopt.",
+    "queryGenerationFailed": "Het genereren van query's is mislukt.",
+    "fetchingResults": "Zoekresultaten ophalen...",
+    "noResultsFound": "Geen resultaten gevonden",
+    "errorFetchingResults": "Fout bij het ophalen van resultaten",
+    "somethingWentWrong": "Er is iets misgegaan",
+    "selectStreamForAI": "Selecteer eerst een stream om AI te gebruiken",
+    "collapseFields": "Velden samenvouwen",
+    "openFields": "Open velden"
   },
   "menu": {
     "home": "Home",
@@ -977,7 +992,8 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL-functie",
     "jsFunctionHint": "Gebruik het object `row` om logvelden te openen en te wijzigen. Voorbeeld: row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'"
+    "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'",
+    "jsErrorDetails": "Details van JavaScript-fouten"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
@@ -1428,7 +1444,14 @@
     "noColumnsOrdered": "Geen kolommen besteld",
     "columnsDefaultOrder": "De kolommen worden in hun standaardvolgorde weergegeven",
     "moveUp": "Ga omhoog",
-    "moveDown": "Naar beneden gaan"
+    "moveDown": "Naar beneden gaan",
+    "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
+    "useSavedFunction": "Gebruik de functie Opgeslagen",
+    "showQueryResults": "Resultaten van de zoekopdracht weergeven",
+    "hideQueryResults": "Resultaten van zoekopdrachten verbergen",
+    "vrlExtractionTooltip": "Om geëxtraheerde VRL-velden in het diagram te gebruiken, schrijft u een VRL-functie en klikt u op de knop Toepassen. De velden worden geëxtraheerd, zodat u ze kunt gebruiken om de grafiek samen te stellen.",
+    "errorFetchingFunctions": "Fout bij het ophalen van functies",
+    "functionAppliedSuccess": "De functie {name} is succesvol toegepast."
   },
   "panel": {
     "header": "Paneel",
@@ -2013,7 +2036,20 @@
       "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
       "rowTemplateTooltip": "Rijsjabloon wordt gebruikt om het waarschuwingsbericht op te maken.",
       "templateType": "Sjabloontype:"
-    }
+    },
+    "addConditions": "Voorwaarden toevoegen",
+    "sqlEditor": "SQL-editor",
+    "promqlEditor": "ProMQL-editor",
+    "vrlEditor": "VRL-redacteur",
+    "generateVRL": "Genereer VRL",
+    "applyVRL": "VRL toepassen",
+    "runQuery": "Query uitvoeren",
+    "onStream": "op",
+    "streamLabel": "stroom",
+    "noStreamSelected": "Geen stream geselecteerd",
+    "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
+    "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2428,7 +2464,11 @@
     "errorSavingPipeline": "Fout tijdens het opslaan van de pijplijn",
     "cancelChangesConfirm": "Weet je zeker dat je wijzigingen wilt annuleren?",
     "cancel": "Annuleer",
-    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten"
+    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
+    "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
+    "invalidCronExpression": "Ongeldige cron-expressie",
+    "thresholdShouldNotBeEmpty": "Drempelwaarde mag niet leeg zijn",
+    "errorGettingResults": "Fout bij het verkrijgen van resultaten"
   },
   "reports": {
     "header": "Rapporten",
@@ -2937,6 +2977,7 @@
   },
   "nlMode": {
     "toggle": "Modus voor natuurlijke taal",
-    "noAdditionalOptions": "Geen aanvullende opties"
+    "noAdditionalOptions": "Geen aanvullende opties",
+    "generateVRL": "Genereer VRL"
   }
 }

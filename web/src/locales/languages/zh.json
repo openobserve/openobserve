@@ -115,7 +115,9 @@
     "copySuccess": "已复制到剪贴板",
     "copyError": "无法复制到剪贴板",
     "reset": "重置",
-    "retry": "重试"
+    "retry": "重试",
+    "goBack": "回去",
+    "stopGenerating": "停止生成"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -332,7 +334,20 @@
     "askAIPlaceholder": "让 AI 帮你完成查询...",
     "aiBarSuccessPlaceholder": "接下来你想做什么？",
     "askAI": "向 AI 提问",
-    "askAITooltip": "让 AI 帮你完成查询"
+    "askAITooltip": "让 AI 帮你完成查询",
+    "enterPrompt": "输入提示生成查询",
+    "analyzingQuery": "正在分析查询...",
+    "generatingQuery": "正在生成查询...",
+    "queryGeneratedSuccess": "查询成功生成！",
+    "queryGenerationStopped": "查询生成已停止。",
+    "queryGenerationFailed": "查询生成失败。",
+    "fetchingResults": "正在获取搜索结果...",
+    "noResultsFound": "未找到任何结果",
+    "errorFetchingResults": "获取结果时出错",
+    "somethingWentWrong": "出了点问题",
+    "selectStreamForAI": "先选择一个直播来使用 AI",
+    "collapseFields": "折叠字段",
+    "openFields": "打开字段"
   },
   "menu": {
     "home": "主页",
@@ -977,7 +992,8 @@
     "jsType": "脚本 (ES2023)",
     "vrlfunction": "VRL 函数",
     "jsFunctionHint": "使用 `row`对象访问和修改日志字段。示例：row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "使用 `.` 表示当前事件。示例：.new_field = .existing_field + “已处理”"
+    "vrlFunctionHint": "使用 `.` 表示当前事件。示例：.new_field = .existing_field + “已处理”",
+    "jsErrorDetails": "脚本错误详情"
   },
   "confirmDialog": {
     "cancel": "取消",
@@ -1428,7 +1444,14 @@
     "noColumnsOrdered": "未订购任何列",
     "columnsDefaultOrder": "列将按其默认顺序显示",
     "moveUp": "向上移动",
-    "moveDown": "向下移动"
+    "moveDown": "向下移动",
+    "toggleFunctionEditor": "切换函数编辑器",
+    "useSavedFunction": "使用 “已保存” 功能",
+    "showQueryResults": "显示查询结果",
+    "hideQueryResults": "隐藏查询结果",
+    "vrlExtractionTooltip": "要在图表中使用提取的 VRL 字段，请编写 VRL 函数，然后单击 “应用” 按钮。这些字段将被提取，允许您使用它们来构建图表。",
+    "errorFetchingFunctions": "获取函数时出错",
+    "functionAppliedSuccess": "{name} 函数成功应用。"
   },
   "panel": {
     "header": "面板",
@@ -2013,7 +2036,20 @@
       "variablesTooltip": "变量用于将数据从警报传递到目标。",
       "rowTemplateTooltip": "行模板用于格式化警报消息。",
       "templateType": "模板类型："
-    }
+    },
+    "addConditions": "添加条件",
+    "sqlEditor": "SQL 编辑器",
+    "promqlEditor": "PromQL 编辑器",
+    "vrlEditor": "VRL 编辑器",
+    "generateVRL": "生成 VRL",
+    "applyVRL": "申请 VRL",
+    "runQuery": "运行查询",
+    "onStream": "上",
+    "streamLabel": "流",
+    "noStreamSelected": "未选择任何直播",
+    "resultsIncludeAllWindows": "结果包括所有多窗口新增内容",
+    "runQueryForOutput": "请单击 “运行查询” 以查看输出",
+    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出"
   },
   "alert_templates": {
     "header": "模板",
@@ -2428,7 +2464,11 @@
     "errorSavingPipeline": "保存管道时出错",
     "cancelChangesConfirm": "您确定要取消更改吗？",
     "cancel": "取消",
-    "dragDropNodesHere": "将节点拖放到此处"
+    "dragDropNodesHere": "将节点拖放到此处",
+    "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
+    "invalidCronExpression": "无效的 cron 表达式",
+    "thresholdShouldNotBeEmpty": "阈值不应为空",
+    "errorGettingResults": "获取结果时出错"
   },
   "reports": {
     "header": "报表",
@@ -2937,6 +2977,7 @@
   },
   "nlMode": {
     "toggle": "自然语言模式",
-    "noAdditionalOptions": "没有其他选项"
+    "noAdditionalOptions": "没有其他选项",
+    "generateVRL": "生成 VRL"
   }
 }

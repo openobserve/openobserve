@@ -115,7 +115,9 @@
     "retry": "Reintentar",
     "copy": "Copiar",
     "copySuccess": "Copiado al portapapeles",
-    "copyError": "No se pudo copiar al portapapeles"
+    "copyError": "No se pudo copiar al portapapeles",
+    "goBack": "Regresar",
+    "stopGenerating": "Deja de generar"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -332,7 +334,20 @@
     "askAIPlaceholder": "Pídele a la IA que te ayude con tu consulta...",
     "aiBarSuccessPlaceholder": "¿Qué le gustaría hacer a continuación?",
     "askAI": "Pregúntale a AI",
-    "askAITooltip": "Pídele a la IA que te ayude con tu consulta"
+    "askAITooltip": "Pídele a la IA que te ayude con tu consulta",
+    "enterPrompt": "Introduzca un mensaje para generar una consulta",
+    "analyzingQuery": "Analizando la consulta...",
+    "generatingQuery": "Generando consulta...",
+    "queryGeneratedSuccess": "¡Consulta generada correctamente!",
+    "queryGenerationStopped": "Se detuvo la generación de consultas.",
+    "queryGenerationFailed": "No se pudo generar la consulta.",
+    "fetchingResults": "Obteniendo resultados de búsqueda...",
+    "noResultsFound": "No se han encontrado resultados",
+    "errorFetchingResults": "Error al obtener los resultados",
+    "somethingWentWrong": "Algo salió mal",
+    "selectStreamForAI": "Selecciona primero una transmisión para usar la IA",
+    "collapseFields": "Campos colapsados",
+    "openFields": "Campos abiertos"
   },
   "menu": {
     "home": "Inicio",
@@ -977,7 +992,8 @@
     "jsType": "JavaScript (ES 2023)",
     "vrlfunction": "Función VRL",
     "jsFunctionHint": "Utilice el objeto `fila` para acceder a los campos de registro y modificarlos. Ejemplo: row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'"
+    "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'",
+    "jsErrorDetails": "Detalles del error de JavaScript"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -1428,7 +1444,14 @@
     "noColumnsOrdered": "No hay columnas ordenadas",
     "columnsDefaultOrder": "Las columnas se mostrarán en su orden predeterminado",
     "moveUp": "Muévete hacia arriba",
-    "moveDown": "Muévete hacia abajo"
+    "moveDown": "Muévete hacia abajo",
+    "toggleFunctionEditor": "Alternar editor de funciones",
+    "useSavedFunction": "Usar la función Guardado",
+    "showQueryResults": "Mostrar los resultados de la consulta",
+    "hideQueryResults": "Ocultar los resultados de la consulta",
+    "vrlExtractionTooltip": "Para usar los campos VRL extraídos en el gráfico, escriba una función VRL y haga clic en el botón Aplicar. Los campos se extraerán, lo que le permitirá usarlos para crear el gráfico.",
+    "errorFetchingFunctions": "Error al recuperar las funciones",
+    "functionAppliedSuccess": "La función {name} se aplicó correctamente."
   },
   "panel": {
     "header": "Panel",
@@ -2013,7 +2036,20 @@
       "variablesTooltip": "Las variables se utilizan para pasar datos de la alerta al destino.",
       "rowTemplateTooltip": "La plantilla de fila se utiliza para dar formato al mensaje de alerta.",
       "templateType": "Tipo de plantilla:"
-    }
+    },
+    "addConditions": "Agregar condiciones",
+    "sqlEditor": "Editor SQL",
+    "promqlEditor": "Editor ProMQL",
+    "vrlEditor": "Editor VRL",
+    "generateVRL": "Generar VRL",
+    "applyVRL": "Aplicar VRL",
+    "runQuery": "Ejecutar consulta",
+    "onStream": "en",
+    "streamLabel": "corriente",
+    "noStreamSelected": "No se ha seleccionado ninguna transmisión",
+    "resultsIncludeAllWindows": "Los resultados incluyen todas las adiciones de ventanas múltiples",
+    "runQueryForOutput": "Haga clic en Ejecutar consulta para ver el resultado",
+    "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada"
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2426,7 +2462,11 @@
     "errorSavingPipeline": "Error al guardar la canalización",
     "cancelChangesConfirm": "¿Estás seguro de que deseas cancelar los cambios?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arrastra y suelta los nodos aquí"
+    "dragDropNodesHere": "Arrastra y suelta los nodos aquí",
+    "promqlOnlyForMetrics": "PromQL solo está disponible para el tipo de flujo de métricas",
+    "invalidCronExpression": "Expresión cron no válida",
+    "thresholdShouldNotBeEmpty": "El umbral no debe estar vacío",
+    "errorGettingResults": "Error al obtener los resultados"
   },
   "reports": {
     "header": "Informes",
@@ -2935,6 +2975,7 @@
   },
   "nlMode": {
     "toggle": "Modo de lenguaje natural",
-    "noAdditionalOptions": "Sin opciones adicionales"
+    "noAdditionalOptions": "Sin opciones adicionales",
+    "generateVRL": "Generar VRL"
   }
 }

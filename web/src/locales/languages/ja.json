@@ -115,7 +115,9 @@
     "copySuccess": "クリップボードにコピー",
     "copyError": "クリップボードへのコピーに失敗しました",
     "reset": "リセット",
-    "retry": "リトライ"
+    "retry": "リトライ",
+    "goBack": "戻る",
+    "stopGenerating": "生成を停止"
   },
   "search": {
     "metrics": "メトリクス",
@@ -332,7 +334,20 @@
     "askAIPlaceholder": "AIに問い合わせて...",
     "aiBarSuccessPlaceholder": "次は何をしたいですか？",
     "askAI": "AI に聞く",
-    "askAITooltip": "AIに問い合わせを依頼する"
+    "askAITooltip": "AIに問い合わせを依頼する",
+    "enterPrompt": "クエリを生成するプロンプトを入力してください",
+    "analyzingQuery": "クエリを分析中...",
+    "generatingQuery": "クエリーを生成中...",
+    "queryGeneratedSuccess": "クエリは正常に生成されました!",
+    "queryGenerationStopped": "クエリの生成が停止されました。",
+    "queryGenerationFailed": "クエリの生成が失敗しました。",
+    "fetchingResults": "検索結果を取得中...",
+    "noResultsFound": "結果が見つかりません",
+    "errorFetchingResults": "結果を取得中にエラーが発生しました",
+    "somethingWentWrong": "何かがおかしくなった",
+    "selectStreamForAI": "AI を使用するには、まずストリームを選択してください",
+    "collapseFields": "フィールドを折りたたむ",
+    "openFields": "オープンフィールド"
   },
   "menu": {
     "home": "ホーム",
@@ -994,7 +1009,8 @@
     "jsType": "ジャバスクリプト (2023)",
     "vrlfunction": "VRL ファンクション",
     "jsFunctionHint": "`row` オブジェクトを使用して、ログフィールドにアクセスして変更します。例:row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'"
+    "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'",
+    "jsErrorDetails": "JavaScript エラーの詳細"
   },
   "confirmDialog": {
     "cancel": "キャンセル",
@@ -1445,7 +1461,14 @@
     "noColumnsOrdered": "列は順序付けられていません",
     "columnsDefaultOrder": "列はデフォルトの順序で表示されます",
     "moveUp": "上へ移動",
-    "moveDown": "下に移動"
+    "moveDown": "下に移動",
+    "toggleFunctionEditor": "関数エディターの切り替え",
+    "useSavedFunction": "保存済み関数を使う",
+    "showQueryResults": "クエリ結果を表示",
+    "hideQueryResults": "クエリ結果を非表示にする",
+    "vrlExtractionTooltip": "抽出された VRL フィールドをチャートで使用するには、VRL 関数を記述して [適用] ボタンをクリックします。フィールドが抽出され、そのフィールドを使用してチャートを作成できます。",
+    "errorFetchingFunctions": "関数を取得中にエラーが発生しました",
+    "functionAppliedSuccess": "{name} 関数が正常に適用されました。"
   },
   "panel": {
     "header": "パネル",
@@ -2030,7 +2053,20 @@
       "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
       "rowTemplateTooltip": "行テンプレートはアラートメッセージのフォーマットに使用されます。",
       "templateType": "テンプレートタイプ:"
-    }
+    },
+    "addConditions": "条件を追加",
+    "sqlEditor": "SQL エディター",
+    "promqlEditor": "プロムQL エディター",
+    "vrlEditor": "VRL エディター",
+    "generateVRL": "VRL を生成",
+    "applyVRL": "VRL を適用",
+    "runQuery": "クエリーを実行",
+    "onStream": "オン",
+    "streamLabel": "ストリーム",
+    "noStreamSelected": "ストリームが選択されていません",
+    "resultsIncludeAllWindows": "結果にはマルチウィンドウの追加がすべて含まれます",
+    "runQueryForOutput": "[クエリの実行] をクリックして出力を確認してください",
+    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2449,7 +2485,11 @@
     "errorSavingPipeline": "パイプラインの保存中にエラーが発生しました",
     "cancelChangesConfirm": "変更をキャンセルしてもよろしいですか?",
     "cancel": "[キャンセル]",
-    "dragDropNodesHere": "ここにノードをドラッグアンドドロップ"
+    "dragDropNodesHere": "ここにノードをドラッグアンドドロップ",
+    "promqlOnlyForMetrics": "PromQL はメトリクスストリームタイプでのみ使用できます",
+    "invalidCronExpression": "cron 表現が無効です",
+    "thresholdShouldNotBeEmpty": "敷居は空であってはなりません",
+    "errorGettingResults": "結果を取得中にエラーが発生しました"
   },
   "reports": {
     "header": "レポート",
@@ -2937,6 +2977,7 @@
   },
   "nlMode": {
     "toggle": "自然言語モード",
-    "noAdditionalOptions": "追加オプションなし"
+    "noAdditionalOptions": "追加オプションなし",
+    "generateVRL": "VRL を生成"
   }
 }
