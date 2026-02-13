@@ -473,7 +473,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await page.locator(getVariableSelector(panelVariableName)).waitFor({ state: "visible", timeout: 10000 });
 
     // Step 7: Change Panel A's panel variable
-    const panelVariableDropdown = page.locator(getVariableSelector(panelVariableName) + '-inner');
+    const panelVariableDropdown = page.locator(getVariableSelector(panelVariableName));
     await panelVariableDropdown.waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -510,7 +510,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 12: Test global variable uses global time (not panel time)
-    const globalVariableDropdown = page.locator(getVariableSelector(globalVariableName) + '-inner');
+    const globalVariableDropdown = page.locator(getVariableSelector(globalVariableName));
     await globalVariableDropdown.waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
