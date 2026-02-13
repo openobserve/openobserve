@@ -2747,6 +2747,7 @@
     "semanticFieldGroupsTitle": "Field Mappings",
     "semanticFieldGroupsCaption": "Define field name mappings for correlation and deduplication (e.g., host, hostname, node → 'host' group)",
     "groupsLabel": "groups",
+    "exportToJson": "Export to JSON",
     "importFromJson": "Import from JSON",
     "addCustomGroup": "Add Custom Group",
     "actionNormalize": "Lowercase and trim values for matching",

@@ -2750,7 +2750,8 @@
       }
     },
     "viewInTraces": "Visualizza in Tracce",
-    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate"
+    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate",
+    "exportToJson": "Esporta in JSON"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

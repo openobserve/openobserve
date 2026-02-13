@@ -319,7 +319,6 @@ export default defineComponent({
     const graphData = ref<any>({
       nodes: [],
       edges: [],
-      availableStreams: [],
     });
 
     const filteredGraphData = ref<any>({
@@ -584,7 +583,6 @@ export default defineComponent({
         graphData.value = {
           nodes,
           edges,
-          availableStreams: rawData.availableStreams || [],
         };
 
         // Calculate stats
@@ -641,7 +639,6 @@ export default defineComponent({
     const parsePrometheusMetrics = (metricsText: string) => {
       const nodes = new Map<string, any>();
       const edges: any[] = [];
-      const availableStreams = new Set<string>();
 
       const lines = metricsText.split("\n");
 
@@ -662,11 +659,6 @@ export default defineComponent({
         }
 
         if (!labels.client || !labels.server) continue;
-
-        // Track available stream names for the stream selector
-        if (labels.stream_name) {
-          availableStreams.add(labels.stream_name);
-        }
 
         // Add nodes
         if (!nodes.has(labels.client)) {
@@ -728,7 +720,6 @@ export default defineComponent({
       return {
         nodes: Array.from(nodes.values()),
         edges,
-        availableStreams: Array.from(availableStreams).sort(),
       };
     };
 

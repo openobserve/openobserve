@@ -80,11 +80,10 @@ pub async fn get_current_topology(
                 "[ServiceGraph] Stream query failed (likely stream doesn't exist yet): {}",
                 e
             );
-            return MetaHttpResponse::json(serde_json::json!({
-                "nodes": vec![] as Vec<()>,
-                "edges": vec![] as Vec<()>,
-                "availableStreams": vec![] as Vec<String>,
-            }));
+            return MetaHttpResponse::json(ServiceGraphData {
+                nodes: vec![],
+                edges: vec![],
+            });
         }
     };
 
@@ -106,14 +105,9 @@ pub async fn get_current_topology(
     );
 
     // Use enterprise business logic to build topology
-    let (nodes, edges, available_streams) =
-        o2_enterprise::enterprise::service_graph::build_topology(edges);
+    let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology(edges);
 
-    MetaHttpResponse::json(serde_json::json!({
-        "nodes": nodes,
-        "edges": edges,
-        "availableStreams": available_streams,
-    }))
+    MetaHttpResponse::json(ServiceGraphData { nodes, edges })
 }
 
 #[cfg(feature = "enterprise")]
