@@ -19,7 +19,7 @@ use arrow::array::RecordBatch;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileMeta, StreamType},
-    utils::{parquet::new_parquet_writer, util::DISTINCT_STREAM_PREFIX, vortex::Utf8Compressor},
+    utils::{parquet::new_parquet_writer, util::DISTINCT_STREAM_PREFIX},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -28,16 +28,7 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
-use infra::runtime::VORTEX_RUNTIME;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
-use vortex::{
-    VortexSessionDefault,
-    array::{ArrayRef, arrow::FromArrowArray},
-    dtype::{DType, arrow::FromArrowType},
-    file::{VortexWriteOptions, WriteStrategyBuilder},
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
-};
 
 use super::table_provider::uniontable::NewUnionTable;
 use crate::service::search::datafusion::exec::{
@@ -134,8 +125,6 @@ pub async fn merge_parquet_files(
         println!("{plan}");
     }
 
-    let mut new_file_meta = metadata.clone();
-    new_file_meta.records = 0;
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let read_task = tokio::task::spawn(async move {
@@ -162,78 +151,17 @@ pub async fn merge_parquet_files(
     // write batches to the appropriate format
     let buf = match cfg.common.file_format {
         FileFormat::Parquet => {
-            let mut buf = Vec::new();
-            let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
-                Some("none")
-            } else {
-                None
-            };
-            let mut writer = new_parquet_writer(
-                &mut buf,
+            write_parquet(
                 &schema,
                 bloom_filter_fields,
                 &metadata,
-                false,
-                compression,
-            );
-
-            while let Some(batch) = rx.recv().await {
-                new_file_meta.records += batch.num_rows() as i64;
-                if let Err(e) = writer.write(&batch).await {
-                    log::error!("merge_parquet_files write error: {e}");
-                    return Err(e.into());
-                }
-            }
-
-            read_task
-                .await
-                .map_err(|e| DataFusionError::External(Box::new(e)))??;
-            append_metadata(&mut writer, &new_file_meta)?;
-            writer.close().await?;
-            buf
+                is_ingester,
+                &mut rx,
+                read_task,
+            )
+            .await?
         }
-        FileFormat::Vortex => {
-            let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-                VORTEX_RUNTIME.block_on(async move {
-                    let mut buf = Vec::new();
-                    let session = VortexSession::default().with_tokio();
-                    let dtype = DType::from_arrow(schema.as_ref());
-                    let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
-                        WriteStrategyBuilder::default()
-                            .with_compressor(Utf8Compressor::default())
-                            .build(),
-                    );
-                    let mut writer = write_options.writer(&mut buf, dtype);
-
-                    while let Some(batch) = rx.recv().await {
-                        let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
-                            DataFusionError::Execution(format!(
-                                "Failed to convert arrow array to vortex array: {e}"
-                            ))
-                        })?;
-                        writer.push(array).await?;
-                    }
-
-                    writer.finish().await?;
-
-                    Ok::<Vec<u8>, anyhow::Error>(buf)
-                })
-            });
-
-            // Wait for both tasks to complete
-            read_task
-                .await
-                .map_err(|e| DataFusionError::External(Box::new(e)))??;
-
-            writer_task
-                .await
-                .map_err(|e| {
-                    DataFusionError::Execution(format!("Vortex runtime task failed: {e}"))
-                })?
-                .map_err(|e| {
-                    DataFusionError::Execution(format!("Failed to write vortex file: {e}"))
-                })?
-        }
+        FileFormat::Vortex => write_vortex(schema, rx, read_task).await?,
     };
 
     log::debug!(
@@ -243,6 +171,66 @@ pub async fn merge_parquet_files(
 
     metadata.compressed_size = buf.len() as i64;
     Ok(MergeParquetResult::Single(buf, metadata))
+}
+
+async fn write_parquet(
+    schema: &Arc<Schema>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
+    is_ingester: bool,
+    rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
+    read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<Vec<u8>> {
+    let cfg = get_config();
+    let mut buf = Vec::new();
+    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
+        Some("none")
+    } else {
+        None
+    };
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        schema,
+        bloom_filter_fields,
+        metadata,
+        false,
+        compression,
+    );
+
+    let mut new_file_meta = metadata.clone();
+    new_file_meta.records = 0;
+    while let Some(batch) = rx.recv().await {
+        new_file_meta.records += batch.num_rows() as i64;
+        if let Err(e) = writer.write(&batch).await {
+            log::error!("merge_parquet_files write error: {e}");
+            return Err(e.into());
+        }
+    }
+
+    read_task
+        .await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
+    append_metadata(&mut writer, &new_file_meta)?;
+    writer.close().await?;
+    Ok(buf)
+}
+
+async fn write_vortex(
+    schema: Arc<Schema>,
+    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<Vec<u8>> {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::search::vortex::write_vortex(schema, rx, read_task).await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (schema, rx, read_task);
+        Err(DataFusionError::Execution(
+            "Vortex file format requires enterprise feature".to_string(),
+        ))
+    }
 }
 
 pub(crate) fn append_metadata(

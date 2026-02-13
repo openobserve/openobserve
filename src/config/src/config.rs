@@ -2606,8 +2606,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
-    // log file format selection
-    log::info!("File format configured: {}", cfg.common.file_format);
+    // Vortex file format requires enterprise feature, fallback to parquet
+    #[cfg(not(feature = "enterprise"))]
+    if cfg.common.file_format == FileFormat::Vortex {
+        return Err(anyhow::anyhow!(
+            "Vortex file format requires enterprise feature, please change ZO_FILE_FORMAT to parquet or unset it"
+        ));
+    }
 
     // format metadata storage
     if cfg.common.meta_store.is_empty() {

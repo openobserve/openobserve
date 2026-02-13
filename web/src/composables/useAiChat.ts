@@ -123,7 +123,6 @@ const useAiChat = () => {
             // Add session ID header if provided for linking API calls within a chat session
             if (sessionId) {
                 headers['x-o2-assistant-session-id'] = sessionId;
-                console.log('[O2 Assistant] Session ID:', sessionId);
             }
 
             // Configure fetch options with abort signal for request cancellation

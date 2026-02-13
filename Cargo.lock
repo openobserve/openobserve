@@ -2349,7 +2349,6 @@ dependencies = [
  "utoipa",
  "uuid",
  "vortex",
- "vortex-btrblocks",
  "vrl",
 ]
 
@@ -7022,9 +7021,6 @@ dependencies = [
  "utoipa-axum",
  "utoipa-swagger-ui",
  "version-compare",
- "vortex",
- "vortex-btrblocks",
- "vortex-datafusion",
  "vrl",
  "wal",
  "webpki-roots 0.26.7",
@@ -11872,37 +11868,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vortex-datafusion"
-version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
-dependencies = [
- "arrow-schema",
- "async-trait",
- "chrono",
- "datafusion-catalog",
- "datafusion-common",
- "datafusion-common-runtime",
- "datafusion-datasource",
- "datafusion-execution",
- "datafusion-expr",
- "datafusion-functions",
- "datafusion-physical-expr",
- "datafusion-physical-expr-adapter",
- "datafusion-physical-expr-common",
- "datafusion-physical-plan",
- "datafusion-pruning",
- "futures",
- "itertools 0.14.0",
- "moka",
- "object_store",
- "tokio",
- "tokio-stream",
- "tracing",
- "vortex",
- "vortex-utils",
-]
-
-[[package]]
 name = "vortex-datetime-parts"
 version = "0.1.0"
 source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
@@ -11968,7 +11933,6 @@ dependencies = [
  "arrow-schema",
  "flatbuffers",
  "jiff",
- "object_store",
  "prost 0.14.1",
  "tokio",
  "url",
@@ -12007,7 +11971,6 @@ dependencies = [
  "getrandom 0.3.4",
  "itertools 0.14.0",
  "kanal",
- "object_store",
  "oneshot",
  "parking_lot 0.12.5",
  "pin-project-lite",
@@ -12083,7 +12046,6 @@ dependencies = [
  "getrandom 0.3.4",
  "handle",
  "kanal",
- "object_store",
  "oneshot",
  "parking_lot 0.12.5",
  "pin-project-lite",
