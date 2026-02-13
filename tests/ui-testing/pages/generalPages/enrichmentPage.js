@@ -992,7 +992,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Hard reload the page to ensure fresh API data
         // This is more reliable than menu navigation in CI environments
-        await this.page.reload({ waitUntil: 'networkidle' });
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
         testLogger.debug('Page reloaded for fresh data');
 
         // Wait for the enrichment tables list to be visible after reload
@@ -1060,7 +1060,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.debug(`Polling attempt ${attempts}, elapsed: ${elapsed}ms`);
 
             // Reload page to get fresh DOM state from server
-            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
 
             // Find the row with table name
             const row = this.page.locator('tbody tr').filter({ hasText: tableName });
@@ -1467,7 +1467,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForTimeout(3000);
 
         // Reload page to ensure fresh data
-        await this.page.reload({ waitUntil: 'networkidle' });
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
 
         // Wait for the enrichment tables list to be visible after reload
         await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
@@ -1846,7 +1846,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             if (attempt < maxAttempts) {
                 testLogger.info('Table not found yet, waiting and retrying...');
                 await this.page.waitForTimeout(5000);
-                await this.page.reload({ waitUntil: 'networkidle' });
+                await this.page.reload({ waitUntil: 'domcontentloaded' });
                 await this.waitForEnrichmentTablesList();
             }
         }
@@ -1984,7 +1984,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             const elapsed = Math.round((Date.now() - startTime) / 1000);
 
             // Reload to get fresh status
-            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
             await this.waitForEnrichmentTablesList();
             await this.searchEnrichmentTableInList(tableName);
 
@@ -2123,7 +2123,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         for (let i = 0; i < maxAttempts; i++) {
             await this.page.waitForTimeout(pollInterval);
-            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
             await this.waitForEnrichmentTablesList();
             await this.searchEnrichmentTableInList(tableName);
 
