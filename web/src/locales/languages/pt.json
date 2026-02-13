@@ -2752,7 +2752,8 @@
       }
     },
     "viewInTraces": "Exibir em traços",
-    "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados"
+    "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados",
+    "exportToJson": "Exportar para JSON"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
