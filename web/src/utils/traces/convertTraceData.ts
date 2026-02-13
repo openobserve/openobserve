@@ -202,12 +202,6 @@ export const convertServiceGraphToTree = (
   layoutType: string = 'horizontal',
   isDarkMode: boolean = true
 ) => {
-  console.log('[convertServiceGraphToTree] Called with:', {
-    nodeCount: graphData.nodes.length,
-    edgeCount: graphData.edges.length,
-    layoutType
-  });
-
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
   graphData.edges.forEach((edge: any) => {
@@ -341,21 +335,17 @@ export const convertServiceGraphToTree = (
   };
 
   // Start with root nodes
-  console.log('[convertServiceGraphToTree] Root nodes:', rootNodes.map((n: any) => n.id));
   let treeData = rootNodes.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
-  console.log('[convertServiceGraphToTree] Trees from roots:', treeData.length);
-
+  
   // Find unvisited nodes (disconnected components or cycles)
   const unvisitedNodes = graphData.nodes.filter((n: any) => !globalVisited.has(n.id));
-  console.log('[convertServiceGraphToTree] Unvisited nodes:', unvisitedNodes.map((n: any) => n.id));
-
+  
   // Add unvisited nodes as separate root trees
   if (unvisitedNodes.length > 0) {
     const additionalTrees = unvisitedNodes
       .map((node: any) => buildTree(node.id))
       .filter((n: any) => n !== null);
     treeData = [...treeData, ...additionalTrees];
-    console.log('[convertServiceGraphToTree] Total trees after adding unvisited:', treeData.length);
   }
 
   // If still no tree data, create a flat structure
@@ -554,12 +544,6 @@ export const convertServiceGraphToNetwork = (
     console.warn(`[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`);
   }
 
-  console.log('[convertServiceGraphToNetwork] VERSION: 2025-11-26-v4 - Fixed bidirectional edge overlap');
-  console.log('[convertServiceGraphToNetwork] Input:', {
-    nodeCount: graphData.nodes?.length || 0,
-    edgeCount: graphData.edges?.length || 0,
-    layoutType: normalizedLayoutType
-  });
   // Build node metrics map using each node's own data from backend (authoritative source)
   const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
 
@@ -697,8 +681,6 @@ export const convertServiceGraphToNetwork = (
   // Create a set of valid node IDs for edge validation
   const validNodeIds = new Set(nodes.map((n: any) => n.id));
 
-  console.log('[convertServiceGraphToNetwork] Valid node IDs:', Array.from(validNodeIds));
-
   // Prepare edges with arrows showing flow direction
   // For circular layout, use curved lines; for force layout, use straight lines
   // Filter out any invalid edges and ensure all required fields are present
@@ -735,8 +717,6 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  console.log('[convertServiceGraphToNetwork] Valid edges after dedup:', edgeMap.size);
-
   // Detect bidirectional edges and assign curvature direction
   // For bidirectional edges, one edge curves left, the other curves right
   const edgeCurvature = new Map<string, number>();
@@ -759,8 +739,6 @@ export const convertServiceGraphToNetwork = (
       edgeCurvature.set(key, 0);
     }
   });
-
-  console.log('[convertServiceGraphToNetwork] Bidirectional pairs:', processedPairs.size);
 
   const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any], edgeIndex: number) => {
     const errorRate = edge.total_requests > 0 ? (edge.failed_requests / edge.total_requests) * 100 : 0;
@@ -839,7 +817,6 @@ export const convertServiceGraphToNetwork = (
 
   // For force layout without cached positions, compute layout with D3-force
   if (normalizedLayoutType === 'force' && !hasPositions) {
-    console.log('[convertServiceGraphToNetwork] Computing force layout with D3-force');
     const positionedNodes = computeForceLayout(nodes, graphData.edges, 800, 600);
 
     // Apply computed positions to nodes and mark them as fixed
@@ -851,8 +828,6 @@ export const convertServiceGraphToNetwork = (
         node.fixed = true; // Lock positions so ECharts doesn't re-layout
       }
     });
-
-    console.log('[convertServiceGraphToNetwork] Applied D3-force positions to', positionedNodes.length, 'nodes');
   }
 
   // For circular layout, calculate positions manually on the periphery
@@ -881,8 +856,6 @@ export const convertServiceGraphToNetwork = (
         shadowColor: 'rgba(0, 0, 0, 0.2)',
       };
     });
-
-    console.log('[convertServiceGraphToNetwork] Using circular layout with', nodeCount, 'nodes on periphery');
   } else if (hasPositions) {
     console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
   }
