@@ -297,11 +297,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         try {
             // Wait for logs page to be fully loaded and stable
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-            
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
             // Wait for VRL editor to be fully initialized (addressing the race condition)
             // The original working code had a 3-second wait after "Explore" click for editor initialization
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             
             // Ensure VRL functions panel is available if needed
             try {
@@ -390,7 +390,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Additional run query clicks to ensure VRL enrichment is fully processed
@@ -553,7 +553,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.getByRole("button", { name: this.exploreButton }).waitFor({ state: 'visible' });
         
         // Wait for navigation response before clicking
-        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.getByRole("button", { name: this.exploreButton }).click();
         await navigationPromise;
         
