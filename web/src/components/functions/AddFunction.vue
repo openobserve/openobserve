@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <FullViewContainer
                         name="function"
                         v-model:is-expanded="expandState.functionError"
-                        :label="formData.transType === '1' ? 'JavaScript Error Details' : t('function.errorDetails')"
+                        :label="formData.transType === '1' ? t('function.jsErrorDetails') : t('function.errorDetails')"
                         labelClass="tw:text-red-600 tw:font-semibold"
                       />
                       <div

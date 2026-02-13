@@ -1049,7 +1049,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="logs-search-field-list-collapse-btn"
               :icon="collapseFields ? 'chevron_right' : 'chevron_left'"
-              :title="collapseFields ? 'Collapse Fields' : 'Open Fields'"
+              :title="collapseFields ? t('search.collapseFields') : t('search.openFields')"
               dense
               size="20px"
               round
@@ -1087,12 +1087,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :languages="tab === 'promql' ? ['promql'] : ['sql']"
                     :default-language="tab === 'promql' ? 'promql' : 'sql'"
                     :query="query"
+                    :disable-ai="!selectedStreamName"
+                    :disable-ai-reason="t('search.selectStreamForAI')"
                     :class="
                       query == '' && queryEditorPlaceholderFlag
                         ? 'empty-query'
                         : ''
                     "
                     @update:query="updateQueryValue"
+                    @run-query="runQuery"
                     editor-height="calc(100vh - 190px)"
                   />
                 </div>
@@ -1469,7 +1472,7 @@ const tabOptions = computed(() => [
     value: "promql",
     disabled: selectedStreamType.value !== "metrics",
     tooltipLabel: selectedStreamType.value !== "metrics"
-      ? "Promql is only available for metrics stream type"
+      ? t("pipeline.promqlOnlyForMetrics")
       : "",
   },
 ]);
@@ -1842,7 +1845,7 @@ function convertCronToMinutes(cronExpression: string) {
 
     return diffInMinutes;
   } catch (err) {
-    cronJobError.value = "Invalid cron expression";
+    cronJobError.value = t("pipeline.invalidCronExpression");
     return -1;
   }
 }
@@ -2060,7 +2063,7 @@ const validateInputs = (notify: boolean = true) => {
       notify &&
         q.notify({
           type: "negative",
-          message: "Threshold should not be empty",
+          message: t("pipeline.thresholdShouldNotBeEmpty"),
           timeout: 1500,
         });
       return false;
@@ -2078,7 +2081,7 @@ const validateInputs = (notify: boolean = true) => {
     notify &&
       q.notify({
         type: "negative",
-        message: "Threshold should not be empty",
+        message: t("pipeline.thresholdShouldNotBeEmpty"),
         timeout: 1500,
       });
     return false;
@@ -2104,7 +2107,7 @@ const validateFrequency = () => {
         return;
       }
     } catch (err) {
-      cronJobError.value = "Invalid cron expression";
+      cronJobError.value = t("pipeline.invalidCronExpression");
     }
   }
 
@@ -2304,7 +2307,7 @@ const runQuery = async () => {
           notificationMsgValue.value = err.response?.data?.message || err.response?.data
         }
         else {
-          notificationMsgValue.value = "Error while getting results"
+          notificationMsgValue.value = t("pipeline.errorGettingResults")
         }
       })
       .finally(() => {

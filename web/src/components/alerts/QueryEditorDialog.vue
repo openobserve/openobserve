@@ -38,12 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-alert-back-btn"
                 class="flex justify-center items-center cursor-pointer"
                 style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
-                title="Go Back"
+                :title="t('common.goBack')"
                 @click="closeDialog"
               >
                 <q-icon name="arrow_back_ios_new" size="14px" />
               </div>
-              <span class="tw:text-[18px] tw:font-[400]">Add Conditions</span>
+              <span class="tw:text-[18px] tw:font-[400]">{{ t('alerts.addConditions') }}</span>
             </div>
             <div class="tw:flex tw:items-center">
               <q-btn
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tw:w-full tw:h-full tw:flex tw:flex-col" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
                     <!-- Toolbar: Field selector + Run Query -->
                     <div class="tw:flex tw:items-center tw:justify-between tw:pb-2 tw:pt-1 tw:flex-shrink-0">
-                      <span class="editor-text-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                      <span class="editor-text-title">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                       <div class="tw:flex tw:gap-2 tw:items-center tw:h-6">
                         <div class="tw:h-full tw:flex tw:justify-center tw:items-center o2-select-input tw:w-full col" style="padding-top: 0">
                           <q-select
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :disable="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
                           >
                             <q-icon name="search" size="20px" />
-                            <span class="tw:text-[12px] tw:font-[400]">Run Query</span>
+                            <span class="tw:text-[12px] tw:font-[400]">{{ t('alerts.runQuery') }}</span>
                           </q-btn>
                         </div>
                       </div>
@@ -143,10 +143,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #right>
                         <div v-if="streamName" class="tw:text-[12px] tw:font-semibold tw:mr-2">
-                          on <span class="tw:text-[14px] tw:font-bold">{{ streamName }}</span> stream
+                          {{ t('alerts.onStream') }} <span class="tw:text-[14px] tw:font-bold">{{ streamName }}</span> {{ t('alerts.streamLabel') }}
                         </div>
                         <div v-else class="tw:text-[12px] tw:font-semibold tw:mr-2">
-                          No Stream Selected
+                          {{ t('alerts.noStreamSelected') }}
                         </div>
                       </template>
                     </FullViewContainer>
@@ -158,9 +158,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :languages="availableLanguages"
                         :default-language="localTab"
                         :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
+                        :disable-ai="!streamName"
+                        :disable-ai-reason="t('search.selectStreamForAI')"
                         @update:query="handleQueryUpdate"
                         @language-change="handleLanguageChange"
                         @ask-ai="handleAskAI"
+                        @run-query="handleRunQuery(localTab)"
                         editor-height="100%"
                         data-test-prefix="alert"
                       />
@@ -180,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="localTab !== 'promql'" class="tw:flex-[2] tw:w-full">
                   <div class="tw:w-full tw:h-full" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
                     <div class="tw:flex tw:items-center tw:justify-between tw:pb-1 tw:pt-1">
-                      <span class="editor-text-title">VRL Editor</span>
+                      <span class="editor-text-title">{{ t('alerts.vrlEditor') }}</span>
                       <div class="tw:flex tw:gap-2 tw:items-center">
                         <div style="border: 1px solid #7980cc; border-radius: 4px; height: 32px;">
                           <q-btn
@@ -194,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <img :style="{ width: '16px', height: '16px' }" :src="getBtnO2Logo" />
                             <span class="tw:font-[400] tw:pl-[4px] tw:text-[12px] tw:pr-[6px] tw:py-[4px] tw:text-[#7980cc]">
-                              Generate VRL
+                              {{ t('nlMode.generateVRL') }}
                             </span>
                           </q-btn>
                         </div>
@@ -240,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="height: 32px;"
                           >
                             <q-icon name="search" size="18px" />
-                            <span class="tw:text-[12px] tw:font-[400]">Apply VRL</span>
+                            <span class="tw:text-[12px] tw:font-[400]">{{ t('alerts.applyVRL') }}</span>
                           </q-btn>
                         </div>
                       </div>
@@ -300,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:flex tw:items-center tw:justify-center tw:text-[12px] tw:font-semibold tw:mr-2"
                         :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#6B7280]'"
                       >
-                        Results include all multi-window additions
+                        {{ t('alerts.resultsIncludeAllWindows') }}
                       </div>
                     </template>
                   </FullViewContainer>
@@ -315,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="store.state.theme === 'dark' ? 'tw:text-[#FB923C]' : 'tw:text-[#FB923C]'"
                       />
                       <div>
-                        <span>Please click Run Query to see the output</span>
+                        <span>{{ t('alerts.runQueryForOutput') }}</span>
                       </div>
                     </div>
                   </div>
@@ -327,14 +330,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-orange-400"
                       />
                       <div>
-                        <span>{{ runPromqlError ? runPromqlError : "No results found" }}</span>
+                        <span>{{ runPromqlError ? runPromqlError : t('search.noResultsFound') }}</span>
                       </div>
                     </div>
                   </div>
                   <div v-else-if="runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)]">
                     <q-spinner-hourglass color="primary" size="40px" />
                     <div class="tw:text-sm tw:text-gray-500">
-                      Fetching Search Results...
+                      {{ t('search.fetchingResults') }}
                     </div>
                   </div>
                   <QueryEditor
@@ -386,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="store.state.theme === 'dark' ? 'tw:text-[#FB923C]' : 'tw:text-[#FB923C]'"
                       />
                       <div>
-                        <span>Please click Apply VRL to see the combined output</span>
+                        <span>{{ t('alerts.applyVRLForOutput') }}</span>
                       </div>
                     </div>
                   </div>
@@ -398,14 +401,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-orange-400"
                       />
                       <div>
-                        <span>No results found</span>
+                        <span>{{ t('search.noResultsFound') }}</span>
                       </div>
                     </div>
                   </div>
                   <div v-else-if="runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)]">
                     <q-spinner-hourglass color="primary" size="40px" />
                     <div class="tw:text-sm tw:text-gray-500">
-                      Fetching Search Results...
+                      {{ t('search.fetchingResults') }}
                     </div>
                   </div>
                   <QueryEditor
@@ -825,7 +828,7 @@ const triggerQuery = async (fn = false) => {
     });
     q.notify({
       type: "negative",
-      message: err.response?.data?.message ?? "Error while fetching results",
+      message: err.response?.data?.message ?? t('search.errorFetchingResults'),
       timeout: 1500,
     });
   }
@@ -898,7 +901,7 @@ const triggerPromqlQuery = async () => {
       outputEvents.value = JSON.stringify(res?.data?.data?.result, null, 2);
     }
   } catch (err: any) {
-    runPromqlError.value = err.response?.data?.error ?? "Something went wrong";
+    runPromqlError.value = err.response?.data?.error ?? t('search.somethingWentWrong');
   }
 };
 

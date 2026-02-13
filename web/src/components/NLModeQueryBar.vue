@@ -117,7 +117,7 @@
           <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
             <q-spinner-dots color="primary" size="1.2em" />
-            <span class="tw:text-sm">{{ aiStatusText || 'Analyzing query...' }}</span>
+            <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
           <q-input
@@ -286,6 +286,17 @@ const handleNlpModeDetected = (isNL: boolean) => {
   isNaturalLanguageDetected.value = isNL;
 };
 
+// Detect if user wants to execute the query instead of generating a new one
+const isExecutionIntent = (input: string): boolean => {
+  const normalized = input.toLowerCase().trim();
+  const executionKeywords = [
+    'run', 'run query', 'execute', 'execute query', 'search', 'go',
+    'submit', 'apply', 'show results', 'get results', 'fetch',
+    'run it', 'execute it', 'do it', 'run this', 'execute this'
+  ];
+  return executionKeywords.includes(normalized);
+};
+
 // Handle AI input field Enter key
 const handleAIInputEnter = async () => {
   if (!aiInputText.value.trim()) {
@@ -293,12 +304,21 @@ const handleAIInputEnter = async () => {
   }
 
   const naturalLanguage = aiInputText.value.trim();
+  const currentQuery = editorRef.value?.getValue ? editorRef.value.getValue() : props.query;
+
+  // Check if user wants to execute the query instead of generating a new one
+  if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
+    console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
+    aiInputText.value = ''; // Clear input
+    emit('run-query'); // Trigger query execution
+    return;
+  }
 
   // Call the CodeQueryEditor's handleGenerateSQL method directly
   if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
     console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
     try {
-      aiStatusText.value = 'Generating query...';
+      aiStatusText.value = t('search.generatingQuery');
       await editorRef.value.handleGenerateSQL(naturalLanguage);
       // Success is handled by handleGenerationSuccess event
     } catch (error) {
@@ -325,6 +345,16 @@ const handleButtonClick = async () => {
       return;
     }
 
+    const currentQuery = editorRef.value?.getValue ? editorRef.value.getValue() : props.query;
+
+    // Check if user wants to execute the query instead of generating a new one
+    if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
+      console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
+      aiInputText.value = ''; // Clear input
+      emit('run-query'); // Trigger query execution
+      return;
+    }
+
     // Turn on NLP mode if not already on
     if (!nlpMode.value) {
       nlpMode.value = true;
@@ -334,7 +364,7 @@ const handleButtonClick = async () => {
     if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
       console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
       try {
-        aiStatusText.value = 'Generating query...';
+        aiStatusText.value = t('search.generatingQuery');
         await editorRef.value.handleGenerateSQL(naturalLanguage);
         // Success is handled by handleGenerationSuccess event
       } catch (error) {
@@ -366,7 +396,7 @@ const handleGenerationSuccess = ({ type, message }: any) => {
   console.log('[NLModeQueryBar] Generation success:', { type, message });
 
   // Show success message in AI status
-  aiStatusText.value = '✓ Query generated successfully!';
+  aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');
 
   // Clear AI input text after successful generation
   setTimeout(() => {

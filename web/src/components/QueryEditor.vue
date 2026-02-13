@@ -10,11 +10,23 @@
       v-if="isAIMode"
       class="ai-input-bar tw:p-2 tw:flex-shrink-0 tw:z-10"
     >
-      <!-- Show streaming status with spinner -->
+      <!-- Show streaming status with spinner + stop button -->
       <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
         <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
         <q-spinner-dots color="primary" size="1.2em" />
-        <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || 'Analyzing query...' }}</span>
+        <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+        <q-btn
+          round
+          flat
+          dense
+          icon="stop"
+          size="sm"
+          :data-test="`${dataTestPrefix}-ai-stop-btn`"
+          @click="cancelGeneration"
+          class="ai-stop-button"
+        >
+          <q-tooltip>{{ t('common.stopGenerating') }}</q-tooltip>
+        </q-btn>
       </div>
       <!-- Normal input when not generating -->
       <div v-else class="tw:flex tw:items-center tw:gap-2">
@@ -38,13 +50,16 @@
           dense
           icon="send"
           color="primary"
-          :disable="!aiInputText.trim()"
+          :disable="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
           class="ai-send-button"
         >
-          <q-tooltip v-if="!aiInputText.trim()">
-            {{ t('search.enterPrompt') || 'Enter a prompt to generate query' }}
+          <q-tooltip v-if="props.disableAi && props.disableAiReason">
+            {{ props.disableAiReason }}
+          </q-tooltip>
+          <q-tooltip v-else-if="!aiInputText.trim()">
+            {{ t('search.enterPrompt') }}
           </q-tooltip>
         </q-btn>
         <!-- Close Button -->
@@ -58,7 +73,7 @@
           @click="dismissAIMode"
           class="ai-close-button"
         >
-          <q-tooltip>{{ t('common.close') || 'Close' }}</q-tooltip>
+          <q-tooltip>{{ t('common.close') }}</q-tooltip>
         </q-btn>
       </div>
     </div>
@@ -73,7 +88,13 @@
         :nlp-mode="nlpMode"
         :read-only="readOnly"
         :show-auto-complete="showAutoComplete"
+        :keywords="keywords"
+        :suggestions="suggestions"
+        :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
+        @run-query="emit('run-query')"
+        @focus="emit('focus')"
+        @blur="emit('blur')"
         @nlpModeDetected="handleNlpModeDetected"
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
@@ -88,11 +109,12 @@
         round
         unelevated
         size="sm"
+        :disable="props.disableAi"
         @click="nlpMode = true"
         class="ai-floating-button"
       >
-        <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px]" />
-        <q-tooltip>{{ t('nlMode.enable') }}</q-tooltip>
+        <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
+        <q-tooltip>{{ props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle') }}</q-tooltip>
       </q-btn>
     </div>
   </div>
@@ -103,7 +125,9 @@ import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
-import { getImageURL } from '@/utils/zincutils';
+import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
+import { useChatHistory } from '@/composables/useChatHistory';
+import type { ChatMessage } from '@/types/chat';
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';
 
@@ -117,9 +141,19 @@ interface Props {
   readOnly?: boolean;
   showAutoComplete?: boolean;
 
+  // Editor autocomplete (forwarded to CodeQueryEditor)
+  keywords?: any[];              // Autocomplete keywords for Monaco
+  suggestions?: any[];           // Autocomplete suggestions for Monaco
+  debounceTime?: number;         // Debounce time for query updates (ms)
+
+  // NL Mode (optional external control)
+  nlpMode?: boolean;            // External NLP mode control (undefined = internal control)
+
   // UI customization
   editorHeight?: string;
   hideNlToggle?: boolean;       // Hide floating AI icon (for pages that don't want AI)
+  disableAi?: boolean;          // Disable AI send (e.g. no stream selected)
+  disableAiReason?: string;     // Tooltip reason when AI is disabled
 
   // Testing
   dataTestPrefix?: string;
@@ -130,8 +164,14 @@ const props = withDefaults(defineProps<Props>(), {
   defaultLanguage: 'sql',
   readOnly: false,
   showAutoComplete: true,
+  keywords: () => [],
+  suggestions: () => [],
+  debounceTime: 500,
+  nlpMode: undefined,
   editorHeight: '200px',
   hideNlToggle: false,
+  disableAi: false,
+  disableAiReason: '',
   dataTestPrefix: 'query-editor',
 });
 
@@ -139,6 +179,14 @@ const emit = defineEmits<{
   'update:query': [query: string];
   'language-change': [language: Language];
   'ask-ai': [naturalLanguage: string, language: Language];
+  'run-query': [];
+  'focus': [];
+  'blur': [];
+  'update:nlpMode': [enabled: boolean];
+  'nlp-detected': [isDetected: boolean];
+  'generation-start': [];
+  'generation-end': [];
+  'generation-success': [payload: { type: string; message: string }];
 }>();
 
 const store = useStore();
@@ -147,8 +195,18 @@ const { t } = useI18n();
 // Language state
 const currentLanguage = ref<Language>(props.defaultLanguage);
 
-// NL Mode state
-const nlpMode = ref(false);
+// NL Mode state (supports external control via nlpMode prop, or internal control)
+const internalNlpMode = ref(false);
+const nlpMode = computed({
+  get: () => props.nlpMode !== undefined ? props.nlpMode : internalNlpMode.value,
+  set: (val: boolean) => {
+    if (props.nlpMode !== undefined) {
+      emit('update:nlpMode', val);
+    } else {
+      internalNlpMode.value = val;
+    }
+  }
+});
 const isNaturalLanguageDetected = ref(false);
 const isGenerating = ref(false);
 const editorRef = ref<any>(null);
@@ -158,6 +216,15 @@ const aiInputText = ref('');
 const streamingText = ref(''); // Real-time streaming response from chat_stream
 const aiStatusText = ref('');
 
+// Session tracking & cancellation (matches O2 AI Chat patterns)
+const currentSessionId = ref<string | null>(null);
+const currentAbortController = ref<AbortController | null>(null);
+
+// Chat history tracking (shared IndexedDB with O2AIChat)
+const { saveToHistory } = useChatHistory();
+const currentChatId = ref<number | null>(null);
+const chatMessages = ref<ChatMessage[]>([]);
+
 const nlpIcon = computed(() => {
   return store.state.theme === 'dark'
     ? getImageURL('images/common/ai_icon_dark.svg')
@@ -165,7 +232,17 @@ const nlpIcon = computed(() => {
 });
 
 // Computed: Is in AI mode?
-const isAIMode = computed(() => nlpMode.value || isNaturalLanguageDetected.value);
+// When externally controlled (nlpMode prop passed), only show AI bar when nlpMode is explicitly ON.
+// The parent decides when the AI bar appears (e.g., after generation success).
+// When internally controlled, auto-detection also triggers AI mode.
+const isAIMode = computed(() => {
+  if (props.nlpMode !== undefined) {
+    // External control: only nlpMode matters for showing the AI bar
+    return nlpMode.value;
+  }
+  // Internal control: nlpMode OR auto-detected NL
+  return nlpMode.value || isNaturalLanguageDetected.value;
+});
 
 // Computed: Root container style - sets overall height
 const rootStyle = computed(() => {
@@ -184,6 +261,7 @@ const handleQueryUpdate = (newQuery: string) => {
 // Handle auto-detection from editor
 const handleNlpModeDetected = (isNL: boolean) => {
   isNaturalLanguageDetected.value = isNL;
+  emit('nlp-detected', isNL);
 };
 
 // Handle AI input field Enter key - delegate to handleAIGenerate
@@ -191,70 +269,144 @@ const handleAIInputEnter = async () => {
   await handleAIGenerate();
 };
 
+// Detect if user wants to execute the query instead of generating a new one
+const isExecutionIntent = (input: string): boolean => {
+  const normalized = input.toLowerCase().trim();
+  const executionKeywords = [
+    'run', 'run query', 'execute', 'execute query', 'search', 'go',
+    'submit', 'apply', 'show results', 'get results', 'fetch',
+    'run it', 'execute it', 'do it', 'run this', 'execute this'
+  ];
+  return executionKeywords.includes(normalized);
+};
+
 // Handle AI generation (send button click)
 const handleAIGenerate = async () => {
   const userInput = aiInputText.value.trim();
 
-  if (!userInput) {
-    console.warn('[QueryEditor] No input provided for AI generation');
-    return;
-  }
+  if (!userInput || isGenerating.value) return;
 
   const currentQuery = editorRef.value?.getValue ? editorRef.value.getValue() : props.query;
+
+  // Check if user wants to execute the query instead of generating a new one
+  if (currentQuery && currentQuery.trim() && isExecutionIntent(userInput)) {
+    console.log('[QueryEditor] Execution intent detected, running query instead of generating');
+    aiInputText.value = ''; // Clear input
+    emit('run-query'); // Trigger query execution
+    return;
+  }
 
   // Build the prompt based on whether there's an existing query
   let naturalLanguage = '';
   if (currentQuery && currentQuery.trim()) {
     naturalLanguage = `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`;
-    console.log('[QueryEditor] Modifying existing query with user instruction');
   } else {
-    // No existing query, treat as new query generation
     naturalLanguage = userInput;
-    console.log('[QueryEditor] Generating new query from user input');
   }
 
-  // Call the CodeQueryEditor's handleGenerateSQL method directly
+  // Ensure session ID exists (persists across requests in same AI bar session)
+  if (!currentSessionId.value) {
+    currentSessionId.value = getUUIDv7();
+  }
+
+  // Create AbortController for this request (enables cancel)
+  currentAbortController.value = new AbortController();
+
+  // Track user message for chat history
+  chatMessages.value.push({ role: 'user', content: userInput });
+
+  // Call the CodeQueryEditor's handleGenerateSQL method with abort + session
   if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
-    console.log('[QueryEditor] Generating query from natural language:', naturalLanguage);
     try {
-      aiStatusText.value = 'Generating query...';
-      await editorRef.value.handleGenerateSQL(naturalLanguage);
-      // Success is handled by handleGenerationSuccess event
+      aiStatusText.value = t('search.generatingQuery');
+      await editorRef.value.handleGenerateSQL(
+        naturalLanguage,
+        currentAbortController.value.signal,
+        currentSessionId.value,
+      );
+
+      // Track assistant response in chat history
+      const generatedQuery = editorRef.value.getValue?.() || '';
+      chatMessages.value.push({ role: 'assistant', content: generatedQuery });
+
+      // Save to IndexedDB (shared with O2AIChat history)
+      const savedId = await saveToHistory(
+        chatMessages.value,
+        currentSessionId.value!,
+        undefined,
+        currentChatId.value,
+      );
+      if (savedId) currentChatId.value = savedId;
     } catch (error) {
-      console.error('[QueryEditor] Query generation failed:', error);
+      const isAbort = (error as Error)?.name === 'AbortError';
+
+      if (!isAbort) {
+        console.error('[QueryEditor] Query generation failed:', error);
+      }
+
+      // Save stopped/failed query to chat history so user can see it
+      const statusMsg = isAbort
+        ? t('search.queryGenerationStopped')
+        : t('search.queryGenerationFailed');
+      chatMessages.value.push({ role: 'assistant', content: statusMsg });
+
+      const savedId = await saveToHistory(
+        chatMessages.value,
+        currentSessionId.value!,
+        undefined,
+        currentChatId.value,
+      );
+      if (savedId) currentChatId.value = savedId;
+
       aiStatusText.value = '';
     }
-  } else {
-    console.error('[QueryEditor] Editor ref not found or handleGenerateSQL not available');
   }
+
+  // Clean up abort controller after completion
+  currentAbortController.value = null;
 
   // Emit event for parent components
   emit('ask-ai', naturalLanguage, currentLanguage.value);
 };
 
-// Dismiss AI mode (close button)
+// Cancel in-flight AI request
+const cancelGeneration = () => {
+  if (currentAbortController.value) {
+    currentAbortController.value.abort();
+    currentAbortController.value = null;
+  }
+  isGenerating.value = false;
+  aiStatusText.value = '';
+  streamingText.value = '';
+};
+
+// Dismiss AI mode (close button) - also cancels and resets session
 const dismissAIMode = () => {
+  cancelGeneration();
   nlpMode.value = false;
   isNaturalLanguageDetected.value = false;
   aiInputText.value = '';
-  aiStatusText.value = '';
-  streamingText.value = '';
+  currentSessionId.value = null;
+  currentChatId.value = null;
+  chatMessages.value = [];
 };
 
 // Handle generation lifecycle events
 const handleGenerationStart = () => {
   isGenerating.value = true;
+  emit('generation-start');
 };
 
 const handleGenerationEnd = () => {
   isGenerating.value = false;
+  emit('generation-end');
 };
 
 const handleGenerationSuccess = ({ type, message }: any) => {
   console.log('[QueryEditor] Generation success:', { type, message });
 
   // Show success message in AI status
-  aiStatusText.value = '✓ Query generated successfully!';
+  aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');
 
   // Clear AI input text after successful generation
   setTimeout(() => {
@@ -262,11 +414,17 @@ const handleGenerationSuccess = ({ type, message }: any) => {
     aiStatusText.value = '';
   }, 2000);
 
-  // After successful generation, turn off NLP mode
+  // After successful generation: only auto-turn-off NLP mode when internally controlled.
+  // When externally controlled (nlpMode prop is passed), let the parent decide.
   if (type === 'sql' || type === 'promql' || type === 'vrl' || type === 'javascript') {
-    nlpMode.value = false;
+    if (props.nlpMode === undefined) {
+      // Internal control: turn off NLP mode after generation
+      nlpMode.value = false;
+    }
     isNaturalLanguageDetected.value = false;
   }
+
+  emit('generation-success', { type, message });
 };
 
 // Watch for language prop changes
@@ -347,6 +505,16 @@ defineExpose({
     currentLanguage.value = lang;
   },
 
+  // Layout
+  resetEditorLayout: () => {
+    if (editorRef.value?.resetEditorLayout) {
+      editorRef.value.resetEditorLayout();
+    }
+  },
+
+  // State (for parent components that need to read generation status)
+  isGenerating: computed(() => isGenerating.value),
+
   // Streaming response (for AI status display)
   streamingResponse: computed(() => editorRef.value?.streamingResponse),
 });
@@ -364,16 +532,15 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Floating AI Button (top-right corner) */
+/* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
 .ai-floating-button {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 100;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: transparent !important;
   color: white !important;
-  box-shadow: 0 2px 8px 0 rgba(102, 126, 234, 0.4) !important;
-  transition: all 0.3s ease !important;
+  transition: background 0.3s ease !important;
   width: 32px !important;
   height: 32px !important;
   min-width: 32px !important;
@@ -381,17 +548,17 @@ defineExpose({
 }
 
 .ai-floating-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px 0 rgba(102, 126, 234, 0.6) !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  box-shadow: 0 2px 8px 0 rgba(102, 126, 234, 0.4) !important;
 }
 
-.ai-floating-button.ai-floating-active {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
-  box-shadow: 0 2px 12px 0 rgba(118, 75, 162, 0.6) !important;
+/* AI icon rotation on hover - matches MainLayout ai-icon */
+.ai-floating-button .ai-icon {
+  transition: transform 0.6s ease;
 }
 
-.ai-floating-button:active {
-  transform: translateY(0);
+.ai-floating-button:hover .ai-icon {
+  transform: rotate(180deg);
 }
 
 /* AI Send Button (arrow icon inside input bar) */
@@ -417,6 +584,16 @@ defineExpose({
 .ai-send-button[disabled] {
   opacity: 0.4 !important;
   background: #ccc !important;
+}
+
+/* AI Stop Button (shown during generation) */
+.ai-stop-button {
+  color: #e74c3c !important;
+  transition: all 0.2s ease !important;
+}
+
+.ai-stop-button:hover {
+  background: rgba(231, 76, 60, 0.1) !important;
 }
 
 /* AI Close Button */
