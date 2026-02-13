@@ -948,10 +948,13 @@ export default defineComponent({
         );
         searchObj.loading = false;
 
-        // Set clear_cache flag before calling getQueryData
+        // Only update histogram for patterns mode, don't fetch logs data
+        // Patterns have their own separate state and don't need logs data
         searchObj.meta.clearCache = clear_cache;
         searchObj.meta.refreshHistogram = true;
-        await getQueryData();
+
+        // Fetch histogram data only (not logs) for patterns mode
+        await getHistogramData();
         refreshHistogramChart();
         console.log("[Index] Patterns extracted successfully");
       } catch (error) {
