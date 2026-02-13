@@ -144,7 +144,7 @@ export default defineComponent({
       {
         name: "correlation_reason",
         field: "correlation_reason",
-        label: "Corelation Reason",
+        label: "Correlation Reason",
         align: "right",
         sortable: false,
         style: "width: 150px",
