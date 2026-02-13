@@ -93,8 +93,14 @@ vi.mock('@/services/search', () => ({
 }));
 
 vi.mock('@/utils/zincutils', () => ({
-  b64DecodeUnicode: vi.fn((str) => decodeURIComponent(str)),
-  b64EncodeUnicode: vi.fn((str) => encodeURIComponent(str)),
+  b64DecodeUnicode: vi.fn((str) => str),
+  b64EncodeUnicode: vi.fn((str) => str),
+  useLocalOrganization: vi.fn(() => ({})),
+  useLocalCurrentUser: vi.fn(() => ({})),
+  useLocalTimezone: vi.fn(() => "UTC"),
+  formatLargeNumber: vi.fn((num) => num.toString()),
+  getImageURL: vi.fn(() => "test-image-url"),
+  generateTraceContext: vi.fn(() => ({ traceId: "test-trace-id" })),
 }));
 
 // Mock async components

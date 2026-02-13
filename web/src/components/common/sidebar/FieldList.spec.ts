@@ -19,6 +19,12 @@ vi.mock('@/services/stream', () => ({
 vi.mock('@/utils/zincutils', () => ({
   formatLargeNumber: vi.fn((num) => num.toString()),
   getImageURL: vi.fn(() => 'test-image-url'),
+  useLocalOrganization: vi.fn(() => ({})),
+  useLocalCurrentUser: vi.fn(() => ({})),
+  useLocalTimezone: vi.fn(() => "UTC"),
+  b64EncodeUnicode: vi.fn((str) => str),
+  b64DecodeUnicode: vi.fn((str) => str),
+  generateTraceContext: vi.fn(() => ({ traceId: "test-trace-id" })),
 }));
 
 // Mock quasar
