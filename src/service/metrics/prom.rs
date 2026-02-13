@@ -107,9 +107,9 @@ pub async fn remote_write(
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
-        .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {}", e.to_string()))?;
+        .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {}", e))?;
     let request = prometheus_rpc::WriteRequest::decode(bytes::Bytes::from(decoded))
-        .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e.to_string()))?;
+        .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e))?;
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
