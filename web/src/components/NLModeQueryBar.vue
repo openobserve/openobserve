@@ -22,9 +22,9 @@
     <template v-else>
       <!-- NL Mode Toggle Bar -->
       <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-        <!-- NL Mode Toggle (always visible when AI enabled) -->
+        <!-- NL Mode Toggle (always visible when AI enabled and enterprise) -->
         <div
-          v-if="store.state.zoConfig.ai_enabled"
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           class="toolbar-toggle-container element-box-shadow"
         >
           <q-toggle
@@ -162,6 +162,7 @@ import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import { getImageURL } from '@/utils/zincutils';
+import config from '@/aws-exports';
 
 interface Props {
   // Query props
