@@ -18,16 +18,63 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
+/// Maximum Base64-encoded image size (~2 MB of raw data ≈ 2.8 MB Base64)
+const MAX_IMAGE_B64_LEN: usize = 3 * 1024 * 1024;
+
+/// Allowed MIME types for image attachments
+const ALLOWED_IMAGE_TYPES: &[&str] = &["image/png", "image/jpeg"];
+
 /// Image attachment for multimodal AI chat
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct ImageAttachment {
-    /// Base64-encoded image data
+    /// Base64-encoded image data (max ~2 MB)
+    #[serde(deserialize_with = "deserialize_bounded_b64")]
     pub data: String,
     /// MIME type (image/png or image/jpeg)
+    #[serde(deserialize_with = "deserialize_mime_type")]
     pub mime_type: String,
     /// Optional filename
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
+}
+
+impl std::fmt::Debug for ImageAttachment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ImageAttachment")
+            .field("data_len", &self.data.len())
+            .field("mime_type", &self.mime_type)
+            .field("filename", &self.filename)
+            .finish()
+    }
+}
+
+fn deserialize_bounded_b64<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.len() > MAX_IMAGE_B64_LEN {
+        return Err(serde::de::Error::custom(format!(
+            "image data exceeds maximum size ({} bytes, limit {})",
+            s.len(),
+            MAX_IMAGE_B64_LEN
+        )));
+    }
+    Ok(s)
+}
+
+fn deserialize_mime_type<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if !ALLOWED_IMAGE_TYPES.contains(&s.as_str()) {
+        return Err(serde::de::Error::custom(format!(
+            "unsupported image type '{}', allowed: {:?}",
+            s, ALLOWED_IMAGE_TYPES
+        )));
+    }
+    Ok(s)
 }
 
 /// AI chat request for conversational interactions with the OpenObserve AI assistant.
