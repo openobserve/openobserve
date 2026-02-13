@@ -91,8 +91,14 @@ vi.mock("@/services/search", () => ({
 // Mock utility functions
 vi.mock("@/utils/zincutils", () => ({
   formatDuration: vi.fn((ms) => `${Math.floor(ms / 1000)}s`),
-  b64DecodeUnicode: vi.fn((str) => atob(str)),
-  b64EncodeUnicode: vi.fn((str) => btoa(str)),
+  b64DecodeUnicode: vi.fn((str) => str),
+  b64EncodeUnicode: vi.fn((str) => str),
+  useLocalOrganization: vi.fn(() => ({})),
+  useLocalCurrentUser: vi.fn(() => ({})),
+  useLocalTimezone: vi.fn(() => "UTC"),
+  formatLargeNumber: vi.fn((num) => num.toString()),
+  getImageURL: vi.fn(() => "test-image-url"),
+  generateTraceContext: vi.fn(() => ({ traceId: "test-trace-id" })),
 }));
 
 vi.mock("@/utils/date", () => ({
