@@ -62,8 +62,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: playwright
           cache-workspace-crates: true
+          cache-all-crates: true
+          shared-key: "ui-test"
 
       - name: Install Protoc
         run: |
@@ -87,7 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
+          path: target/x86_64-unknown-linux-gnu/test-release/openobserve
           retention-days: 1
 
   ui_integration_tests:
