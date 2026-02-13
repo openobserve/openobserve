@@ -2959,7 +2959,7 @@ async fn run_maintenance() -> Result<()> {
 
     // Release advisory lock
     if let Err(e) = sqlx::query("SELECT pg_advisory_unlock($1)")
-        .bind(lock_key)
+        .bind(lock_id)
         .execute(&pool)
         .await
     {
