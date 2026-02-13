@@ -1568,7 +1568,7 @@ export default defineComponent({
         correlationError.value =
           error?.response?.data?.message ||
           error?.message ||
-          "Failed to load correlated telemetry";
+          t("correlation.failedToLoad");
       } finally {
         correlationLoading.value = false;
       }
