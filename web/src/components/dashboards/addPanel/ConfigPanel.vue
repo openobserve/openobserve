@@ -95,8 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- NEW: Panel Time Configuration -->
     <div class="q-mb-sm">
-      <div class="text-bold q-mb-sm">
+      <div class="text-bold q-mb-sm row items-center">
         {{ t("dashboard.panelTimeSettings") }}
+        <q-btn no-caps padding="xs" size="sm" flat icon="info_outline">
+          <q-tooltip>
+            {{ t("dashboard.panelTimeSettingsTooltip") }}
+          </q-tooltip>
+        </q-btn>
       </div>
 
       <!-- Toggle to enable panel-level time -->
@@ -115,9 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Show mode selection when enabled -->
-      <div v-if="panelTimeEnabled" class="q-mt-sm q-ml-lg">
+      <div v-if="panelTimeEnabled" class="tw:mt-1">
         <!-- Using individual q-radio components for better data-test support -->
-        <div class="q-gutter-sm">
+        <div class="q-gutter-none">
+          <label class="tw:text-gray-500 tw:font-semibold">{{ t("dashboard.panelTimeMode") }}</label>
           <q-radio
             v-model="panelTimeMode"
             val="global"
@@ -125,7 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             data-test="dashboard-config-panel-time-mode-global"
             @update:model-value="onPanelTimeModeChange"
-          />
+          >
+            <q-icon name="info" size="16px" class="q-ml-xs">
+              <q-tooltip>{{ t("dashboard.panelTimeGlobalHint") }}</q-tooltip>
+            </q-icon>
+          </q-radio>
           <q-radio
             v-model="panelTimeMode"
             val="individual"
@@ -133,22 +143,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             data-test="dashboard-config-panel-time-mode-individual"
             @update:model-value="onPanelTimeModeChange"
-          />
+          >
+            <q-icon name="info" size="16px" class="q-ml-xs">
+              <q-tooltip>{{
+                t("dashboard.panelTimeIndividualHint")
+              }}</q-tooltip>
+            </q-icon>
+          </q-radio>
         </div>
-
-        <div class="text-caption text-grey-7 q-mt-xs">
-          <q-icon name="info" size="14px" />
-          <span v-if="panelTimeMode === 'global'">
-            {{ t("dashboard.panelTimeGlobalHint") }}
-          </span>
-          <span v-else>
-            {{ t("dashboard.panelTimeIndividualHint") }}
-          </span>
-        </div>
-
         <!-- NEW: Date Time Picker for Individual Panel Time -->
-        <div v-if="panelTimeMode === 'individual'" class="q-mt-md">
-          <div class="text-caption text-weight-medium q-mb-sm">
+        <div v-if="panelTimeMode === 'individual'" class="q-mt-xs">
+          <div class="q-mb-sm">
             {{ t("dashboard.panelTimeRange") }}
             <q-icon name="info" size="14px">
               <q-tooltip>{{ t("dashboard.panelTimeRangeTooltip") }}</q-tooltip>
@@ -161,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-panel-time-picker"
           />
         </div>
+        <q-separator class="q-my-sm" />
       </div>
     </div>
 
