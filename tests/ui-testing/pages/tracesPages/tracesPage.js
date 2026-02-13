@@ -171,12 +171,12 @@ export class TracesPage {
       await this.page.keyboard.press('Enter');
     }
 
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async runTraceSearch() {
     await this.page.locator(this.refreshButton).click();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async resetAllFilters() {
@@ -206,7 +206,7 @@ export class TracesPage {
       try {
         if (await selector.isVisible({ timeout: 3000 })) {
           await selector.click();
-          await this.page.waitForLoadState('networkidle').catch(() => {});
+          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
           // Wait for trace details to render
           await this.page.locator(this.traceDetailsTree).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
           return;
@@ -228,7 +228,7 @@ export class TracesPage {
     const backButton = this.page.locator(this.traceDetailsBackButton);
     if (await backButton.isVisible({ timeout: 3000 }).catch(() => false)) {
       await backButton.click();
-      await this.page.waitForLoadState('networkidle').catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       return true;
     }
 
@@ -276,7 +276,7 @@ export class TracesPage {
 
   async switchToServiceMaps() {
     await this.page.locator(this.serviceMapsToggle).click();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async switchToSearchView() {
@@ -289,7 +289,7 @@ export class TracesPage {
 
   async refreshServiceGraph() {
     await this.page.locator(this.serviceGraphRefreshButton).click();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async expectErrorMessage(errorText) {
@@ -611,7 +611,7 @@ export class TracesPage {
     const streamSelector = this.page.locator(this.streamSelect);
     if (await streamSelector.isVisible({ timeout: 5000 })) {
       await this.selectTraceStream(streamName);
-      await this.page.waitForLoadState('networkidle').catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     // Set time range to 15 minutes
@@ -741,7 +741,7 @@ export class TracesPage {
         await this.page.waitForTimeout(2000);
 
         // Wait for potential URL change or trace details to load
-        await this.page.waitForLoadState('networkidle').catch(() => {});
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         return;
       } catch {
         continue;
@@ -1376,7 +1376,7 @@ export class TracesPage {
    */
   async reloadPage() {
     await this.page.reload();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   /**

@@ -356,7 +356,7 @@ test.describe("Logs Regression Bugs", () => {
     await page.waitForTimeout(2000);
 
     // Get initial pagination text (shows total count) - using POM method
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(1000); // Extra wait for pagination to update
 
     const initialPaginationText = await pm.logsPage.getPaginationText();
