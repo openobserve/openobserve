@@ -162,8 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs"
-name="warning" class="q-mr-xs" />
+              <q-icon size="xs" name="warning" class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -546,14 +545,18 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (
+      props.columns?.length &&
+      tableRows.value?.length &&
+      window.shouldHighlight
+    ) {
       processHitsInChunks(
         tableRows.value,
         props.columns,
         true,
         props.highlightQuery,
         200,
-        selectedStreamFtsKeys.value
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -572,14 +575,18 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (
+      props.columns?.length &&
+      tableRows.value?.length &&
+      window.shouldHighlight
+    ) {
       processHitsInChunks(
         tableRows.value,
         props.columns,
         false,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value
+        selectedStreamFtsKeys.value,
       );
     }
 
