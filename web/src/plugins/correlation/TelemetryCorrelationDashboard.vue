@@ -457,9 +457,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card
       v-model="activeTab"
       animated
-      class="correlation-content tw:flex-1 tw:overflow-auto"
+      class="correlation-content tw:flex-1"
+      style="display: flex; flex-direction: column; overflow: auto;"
     >
-      <div v-if="activeTab == 'logs'" class="tw:h-full">
+      <div v-if="activeTab == 'logs'" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
         <!-- Refresh Button -->
         <div
           v-if="logsDashboardData"
@@ -480,7 +481,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-3"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3"
+          style="flex: 1; min-height: 300px;"
         >
           <q-spinner color="primary" size="md" />
           <div class="tw:text-sm tw:opacity-70">
