@@ -936,6 +936,10 @@ export default defineComponent({
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
 
+      if (!searchObj.data.stream.selectedStream.value) {
+        searchObj.data.stream.selectedStream.value = effectiveStreamName.value;
+      }
+
       // If embedded mode with span list provided, skip fetching
       if (props.mode === "embedded" && props.spanListProp.length > 0) {
         // Use provided span list directly

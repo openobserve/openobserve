@@ -201,7 +201,9 @@ const useTraces = () => {
     const date = searchObj.data.datetime;
     const query: any = {};
 
-    query["stream"] = searchObj.data.stream.selectedStream.value;
+    query["stream"] =
+      searchObj.data.stream.selectedStream.value ||
+      router.currentRoute.value.query.stream;
 
     if (date.type === "relative" && !getShareLink) {
       query["period"] = date.relativeTimePeriod;
