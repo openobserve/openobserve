@@ -67,6 +67,7 @@ export function useNLQuery() {
    *
    * @param text - The text to analyze
    * @param language - Current editor language (sql, promql, vrl, javascript)
+   * @param depth - Internal parameter to prevent unbounded recursion (max 10 levels)
    * @returns true if text is natural language, false if it's valid query syntax
    *
    * Detection logic:
@@ -74,7 +75,14 @@ export function useNLQuery() {
    * - Returns false if matches language-specific syntax patterns
    * - Returns true otherwise (natural language)
    */
-  const detectNaturalLanguage = (text: string, language: string = 'sql'): boolean => {
+  const detectNaturalLanguage = (text: string, language: string = 'sql', depth: number = 0): boolean => {
+    // Prevent stack overflow from deeply nested expressions like ((((expr))))
+    const MAX_RECURSION_DEPTH = 10;
+    if (depth >= MAX_RECURSION_DEPTH) {
+      console.warn('[NL2Q] Maximum recursion depth reached in detectNaturalLanguage, treating as natural language');
+      return true; // Assume natural language if too deeply nested
+    }
+
     const trimmed = text.trim();
 
     // Empty text is not natural language
@@ -141,9 +149,9 @@ export function useNLQuery() {
       if (wrappedExpression.test(trimmed)) {
         // Check if content inside looks like PromQL
         const innerContent = trimmed.slice(1, -1).trim();
-        // Recursively check inner content
+        // Recursively check inner content with depth tracking
         if (innerContent) {
-          const isInnerNL = detectNaturalLanguage(innerContent, lang);
+          const isInnerNL = detectNaturalLanguage(innerContent, lang, depth + 1);
           if (!isInnerNL) {
             return false; // Inner content is PromQL, so outer is also PromQL
           }
@@ -403,30 +411,31 @@ export function useNLQuery() {
 
       console.log('[NL2Q] Starting to read streaming response...');
 
-      while (true) {
-        const { done, value } = await reader.read();
-        chunkCount++;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          chunkCount++;
 
-        if (done) {
-          console.log('[NL2Q] Streaming complete after', chunkCount, 'chunks');
-          break;
-        }
+          if (done) {
+            console.log('[NL2Q] Streaming complete after', chunkCount, 'chunks');
+            break;
+          }
 
-        const chunk = decoder.decode(value, { stream: true });
-        console.log('[NL2Q] Received chunk', chunkCount, ':', chunk.substring(0, 100));
+          const chunk = decoder.decode(value, { stream: true });
+          console.log('[NL2Q] Received chunk', chunkCount, ':', chunk.substring(0, 100));
 
-        // Parse SSE format: data: {...}\n\n
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.substring(6));
+          // Parse SSE format: data: {...}\n\n
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.substring(6));
 
-              // Handle different event types
-              if (data.type === 'status') {
-                // Status event (processing, etc.)
-                console.log('[NL2Q] Status:', data.message);
-                streamingResponse.value = data.message || 'Processing...';
+                // Handle different event types
+                if (data.type === 'status') {
+                  // Status event (processing, etc.)
+                  console.log('[NL2Q] Status:', data.message);
+                  streamingResponse.value = data.message || 'Processing...';
               } else if (data.type === 'message') {
                 // Message event (AI planning/explanation text)
                 console.log('[NL2Q] Message:', data.content?.substring(0, 100));
@@ -485,120 +494,124 @@ export function useNLQuery() {
               } else if (data.type === 'title') {
                 // Title event (ignore for now)
                 console.log('[NL2Q] Title event:', data.title);
-              } else if (data.content) {
-                // Content event (regular text)
-                generatedQuery += data.content;
-                streamingResponse.value = data.content;
+                } else if (data.content) {
+                  // Content event (regular text)
+                  generatedQuery += data.content;
+                  streamingResponse.value = data.content;
+                }
+              } catch (e) {
+                console.warn('[NL2Q] Failed to parse chunk JSON:', e);
               }
-            } catch (e) {
-              console.warn('[NL2Q] Failed to parse chunk JSON:', e);
             }
           }
         }
-      }
 
-      const rawResponse = generatedQuery.trim();
-      console.log('[NL2Q] Full AI response received:', {
-        length: rawResponse.length,
-        preview: rawResponse.substring(0, 200),
-        toolCalls: toolCalls.length,
-        hasError
-      });
-
-      // Check for error first
-      if (hasError) {
-        console.error('[NL2Q] Response contains error:', errorMessage);
-        return null;
-      }
-
-      if (!rawResponse && toolCalls.length === 0) {
-        console.warn('[NL2Q] AI assistant returned empty response');
-        return null;
-      }
-
-      // PRIORITY 1: Try to extract SQL from AI response first
-      console.log('[NL2Q] Attempting to extract SQL from response...');
-      const extractedSQL = extractSQLFromResponse(rawResponse);
-
-      // If SQL was successfully extracted, return it (this is the primary goal)
-      if (extractedSQL) {
-        console.log('[NL2Q] Successfully generated SQL query:', extractedSQL);
-        return extractedSQL;
-      }
-
-      // PRIORITY 2: Check if this is a non-SQL action (dashboard/alert creation)
-      if (toolCalls.length > 0) {
-        console.log('[NL2Q] Tool calls detected but no SQL found:', toolCalls);
-
-        // Use lastMessageContent if available (has formatted response with URLs)
-        const responseToReturn = lastMessageContent || rawResponse;
-
-        // Check for successful dashboard creation (case-insensitive)
-        const dashboardTool = toolCalls.find(tc => {
-          const toolLower = tc.tool.toLowerCase();
-          return (
-            (toolLower === 'createdashboard' ||
-             toolLower === 'create_dashboard' ||
-             toolLower.includes('dashboard')) &&
-            tc.success !== false // Only if not explicitly failed
-          );
+        const rawResponse = generatedQuery.trim();
+        console.log('[NL2Q] Full AI response received:', {
+          length: rawResponse.length,
+          preview: rawResponse.substring(0, 200),
+          toolCalls: toolCalls.length,
+          hasError
         });
 
-        if (dashboardTool) {
-          console.log('[NL2Q] Dashboard created successfully');
-          return '✓ DASHBOARD_CREATED: ' + responseToReturn;
+        // Check for error first
+        if (hasError) {
+          console.error('[NL2Q] Response contains error:', errorMessage);
+          return null;
         }
 
-        // Check for successful alert creation (case-insensitive)
-        const alertTool = toolCalls.find(tc => {
-          const toolLower = tc.tool.toLowerCase();
-          return (
-            (toolLower === 'createalert' ||
-             toolLower === 'create_alert' ||
-             toolLower.includes('alert')) &&
-            tc.success !== false
-          );
-        });
-
-        if (alertTool) {
-          console.log('[NL2Q] Alert created successfully');
-          return '✓ ALERT_CREATED: ' + responseToReturn;
+        if (!rawResponse && toolCalls.length === 0) {
+          console.warn('[NL2Q] AI assistant returned empty response');
+          return null;
         }
 
-        // Check if any tool succeeded
-        const hasSuccessfulTool = toolCalls.some(tc => tc.success === true);
+        // PRIORITY 1: Try to extract SQL from AI response first
+        console.log('[NL2Q] Attempting to extract SQL from response...');
+        const extractedSQL = extractSQLFromResponse(rawResponse);
 
-        if (hasSuccessfulTool) {
-          console.log('[NL2Q] Tool execution completed successfully');
-          return '✓ ACTION_COMPLETED: ' + responseToReturn;
+        // If SQL was successfully extracted, return it (this is the primary goal)
+        if (extractedSQL) {
+          console.log('[NL2Q] Successfully generated SQL query:', extractedSQL);
+          return extractedSQL;
         }
 
-        // All tools failed
-        console.warn('[NL2Q] All tool executions failed');
+        // PRIORITY 2: Check if this is a non-SQL action (dashboard/alert creation)
+        if (toolCalls.length > 0) {
+          console.log('[NL2Q] Tool calls detected but no SQL found:', toolCalls);
+
+          // Use lastMessageContent if available (has formatted response with URLs)
+          const responseToReturn = lastMessageContent || rawResponse;
+
+          // Check for successful dashboard creation (case-insensitive)
+          const dashboardTool = toolCalls.find(tc => {
+            const toolLower = tc.tool.toLowerCase();
+            return (
+              (toolLower === 'createdashboard' ||
+               toolLower === 'create_dashboard' ||
+               toolLower.includes('dashboard')) &&
+              tc.success !== false // Only if not explicitly failed
+            );
+          });
+
+          if (dashboardTool) {
+            console.log('[NL2Q] Dashboard created successfully');
+            return '✓ DASHBOARD_CREATED: ' + responseToReturn;
+          }
+
+          // Check for successful alert creation (case-insensitive)
+          const alertTool = toolCalls.find(tc => {
+            const toolLower = tc.tool.toLowerCase();
+            return (
+              (toolLower === 'createalert' ||
+               toolLower === 'create_alert' ||
+               toolLower.includes('alert')) &&
+              tc.success !== false
+            );
+          });
+
+          if (alertTool) {
+            console.log('[NL2Q] Alert created successfully');
+            return '✓ ALERT_CREATED: ' + responseToReturn;
+          }
+
+          // Check if any tool succeeded
+          const hasSuccessfulTool = toolCalls.some(tc => tc.success === true);
+
+          if (hasSuccessfulTool) {
+            console.log('[NL2Q] Tool execution completed successfully');
+            return '✓ ACTION_COMPLETED: ' + responseToReturn;
+          }
+
+          // All tools failed
+          console.warn('[NL2Q] All tool executions failed');
+          return null;
+        }
+
+        // Only if SQL extraction failed, check if AI is asking questions
+        const questionPatterns = [
+          /what is your organization/i,
+          /I need to check/i,
+          /I need the organization/i,
+          /which stream/i,
+          /what stream/i,
+          /could you provide/i,
+          /can you specify/i,
+        ];
+
+        const isQuestion = questionPatterns.some(pattern => pattern.test(rawResponse));
+
+        if (isQuestion) {
+          console.error('[NL2Q] AI returned questions instead of query. Context may be incomplete:', rawResponse);
+          return null;
+        }
+
+        // No SQL, no tool calls, no questions - ambiguous response
+        console.warn('[NL2Q] Could not determine response type. Full response:', rawResponse);
         return null;
+      } finally {
+        // Always release the reader to prevent memory leaks
+        reader.releaseLock();
       }
-
-      // Only if SQL extraction failed, check if AI is asking questions
-      const questionPatterns = [
-        /what is your organization/i,
-        /I need to check/i,
-        /I need the organization/i,
-        /which stream/i,
-        /what stream/i,
-        /could you provide/i,
-        /can you specify/i,
-      ];
-
-      const isQuestion = questionPatterns.some(pattern => pattern.test(rawResponse));
-
-      if (isQuestion) {
-        console.error('[NL2Q] AI returned questions instead of query. Context may be incomplete:', rawResponse);
-        return null;
-      }
-
-      // No SQL, no tool calls, no questions - ambiguous response
-      console.warn('[NL2Q] Could not determine response type. Full response:', rawResponse);
-      return null;
 
     } catch (error) {
       console.error('[NL2Q] Error generating SQL:', error);
