@@ -153,9 +153,9 @@ alt="SQL Mode" class="toolbar-icon" />
             </q-tooltip>
           </q-toggle>
         </div>
-        <!-- NLP Mode Toggle - Only show when AI is enabled -->
+        <!-- NLP Mode Toggle - Only show when AI is enabled and enterprise -->
         <div
-          v-if="store.state.zoConfig.ai_enabled"
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           class="toolbar-toggle-container element-box-shadow"
         >
           <q-toggle

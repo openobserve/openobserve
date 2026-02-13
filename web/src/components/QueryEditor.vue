@@ -104,7 +104,7 @@
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <q-btn
-        v-if="store.state.zoConfig.ai_enabled && !hideNlToggle && !isAIMode"
+        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && !hideNlToggle && !isAIMode"
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         round
         unelevated
@@ -128,6 +128,7 @@ import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/types/chat';
+import config from '@/aws-exports';
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';
 
