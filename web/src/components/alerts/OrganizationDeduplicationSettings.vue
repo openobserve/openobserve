@@ -257,14 +257,14 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
-    // Sanitize: convert empty/NaN time_window_minutes to null
+    // Sanitize: convert empty string/NaN time_window_minutes to null
+    const rawWindow = localConfig.value.time_window_minutes;
     const configToSave = {
       ...localConfig.value,
       time_window_minutes:
-        localConfig.value.time_window_minutes != null &&
-        !isNaN(Number(localConfig.value.time_window_minutes))
-          ? Number(localConfig.value.time_window_minutes) || null
-          : null,
+        rawWindow == null || rawWindow === "" || isNaN(Number(rawWindow))
+          ? null
+          : Number(rawWindow),
     };
     await alertsService.setOrganizationDeduplicationConfig(
       props.orgId,

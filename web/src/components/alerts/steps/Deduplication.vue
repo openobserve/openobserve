@@ -170,7 +170,7 @@ export default defineComponent({
     const sanitizeTimeWindow = (val: any): number | undefined => {
       if (val == null || val === "") return undefined;
       const num = Number(val);
-      return isNaN(num) || num <= 0 ? undefined : num;
+      return isNaN(num) ? undefined : num;
     };
 
     const emitUpdate = () => {
