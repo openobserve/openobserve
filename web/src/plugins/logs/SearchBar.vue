@@ -1086,24 +1086,13 @@ class="q-pr-sm q-pt-xs" />
                   </q-btn>
                 </template>
 
-                <!-- NLP Mode: AI actions menu -->
+                <!-- NLP Mode: No additional options -->
                 <template v-else>
-                  <!-- Only show menu when SQL is detected -->
-                  <template v-if="hasSQLInNLPMode">
-                    <q-list class="tw:min-w-[140px]">
-                      <q-item clickable v-close-popup @click="handleAddToDashboard" data-test="nlp-dropdown-add-to-dashboard" class="tw:py-2">
-                        <q-item-section>
-                          <q-item-label class="tw:text-sm">Add to Dashboard</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                      <q-separator />
-                      <q-item clickable v-close-popup @click="handleCreateAlert" data-test="nlp-dropdown-create-alert" class="tw:py-2">
-                        <q-item-section>
-                          <q-item-label class="tw:text-sm">Create Alert</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </template>
+                  <q-list class="tw:min-w-[140px] tw:p-2">
+                    <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
+                      {{ t('nlMode.noAdditionalOptions') }}
+                    </q-item-label>
+                  </q-list>
                 </template>
               </q-btn-dropdown>
               </div>
@@ -1167,24 +1156,13 @@ class="q-pr-sm q-pt-xs" />
                     </q-btn>
                   </template>
 
-                  <!-- NL detected, AI bar not open: AI actions menu -->
+                  <!-- NL detected, AI bar not open: No additional options -->
                   <template v-else>
-                    <!-- Only show menu when SQL is detected -->
-                    <template v-if="hasSQLInNLPMode">
-                      <q-list class="tw:min-w-[140px]">
-                        <q-item clickable v-close-popup @click="handleAddToDashboard" data-test="nlp-dropdown-add-to-dashboard-2" class="tw:py-2">
-                          <q-item-section>
-                            <q-item-label class="tw:text-sm">Add to Dashboard</q-item-label>
-                          </q-item-section>
-                        </q-item>
-                        <q-separator />
-                        <q-item clickable v-close-popup @click="handleCreateAlert" data-test="nlp-dropdown-create-alert-2" class="tw:py-2">
-                          <q-item-section>
-                            <q-item-label class="tw:text-sm">Create Alert</q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </q-list>
-                    </template>
+                    <q-list class="tw:min-w-[140px] tw:p-2">
+                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
+                        {{ t('nlMode.noAdditionalOptions') }}
+                      </q-item-label>
+                    </q-list>
                   </template>
                 </q-btn-dropdown>
               </div>
@@ -2199,19 +2177,6 @@ export default defineComponent({
 
     // Natural Language Query composable for SQL detection
     const { detectNaturalLanguage } = useNLQuery();
-
-    // Computed property to check if SQL is present in NLP mode
-    const hasSQLInNLPMode = computed(() => {
-      if (!searchObj.meta.nlpMode) return false;
-      const query = searchObj.data.editorValue || '';
-      const trimmedQuery = query.trim();
-
-      // If query is empty, don't show dropdown
-      if (!trimmedQuery) return false;
-
-      // If detectNaturalLanguage returns false, it means it's SQL
-      return !detectNaturalLanguage(trimmedQuery);
-    });
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
@@ -4297,66 +4262,6 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Build context-rich prompt for AI Chat with query and metadata
-     */
-    const buildAIChatPrompt = (action: 'dashboard' | 'alert') => {
-      const query = searchObj.data.editorValue || '';
-      const streamName = searchObj.data.stream.selectedStream[0] || '';
-      const streamType = searchObj.data.stream.streamType || 'logs';
-
-      // Format time range
-      const datetime = searchObj.data.datetime;
-      let timeRange = '';
-      if (datetime.type === 'relative') {
-        timeRange = `Last ${datetime.relativeTimePeriod || datetime.value}${datetime.relativeTimeUnit || 'Minutes'}`;
-      } else {
-        timeRange = `${datetime.startTime || datetime.tab} to ${datetime.endTime || 'now'}`;
-      }
-
-      // Build prompt based on action
-      if (action === 'dashboard') {
-        return `Using this SQL query, add it to a dashboard:
-
-Stream: ${streamType}/${streamName}
-Time Range: ${timeRange}
-
-Query:
-\`\`\`sql
-${query}
-\`\`\``;
-      } else if (action === 'alert') {
-        return `Using this SQL query, create an alert:
-
-Stream: ${streamType}/${streamName}
-Time Range: ${timeRange}
-
-Query:
-\`\`\`sql
-${query}
-\`\`\``;
-      }
-      return '';
-    };
-
-    /**
-     * Handle "Add to Dashboard" action
-     * Opens AI Chat with context-rich prompt
-     */
-    const handleAddToDashboard = () => {
-      const prompt = buildAIChatPrompt('dashboard');
-      emit('sendToAiChat', prompt, true);
-    };
-
-    /**
-     * Handle "Create Alert" action
-     * Opens AI Chat with context-rich prompt
-     */
-    const handleCreateAlert = () => {
-      const prompt = buildAIChatPrompt('alert');
-      emit('sendToAiChat', prompt, true);
-    };
-
     const onLogsVisualizeToggleUpdate = (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
@@ -4930,9 +4835,6 @@ ${query}
       handleGenerationEnd,
       handleGenerationSuccess,
       handleGenerateSQLQuery,
-      hasSQLInNLPMode,
-      handleAddToDashboard,
-      handleCreateAlert,
       isGeneratingSQL,
       isNaturalLanguageDetected,
       hasInteractedWithAI,
