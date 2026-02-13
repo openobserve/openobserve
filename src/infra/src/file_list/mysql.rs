@@ -34,7 +34,7 @@ use sqlx::{Executor, MySql, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, delete_index},
+        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, delete_index, drop_column},
     },
     errors::{DbError, Error, Result},
     file_list::FileRecord,
@@ -118,8 +118,8 @@ impl super::FileList for MysqlFileList {
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list"])
             .inc();
-        if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
+        if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
         .bind(&dump_file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -133,7 +133,6 @@ impl super::FileList for MysqlFileList {
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
-        .bind(now_ts)
         .bind(now_ts)
         .execute(&pool)
         .await {
@@ -1899,8 +1898,8 @@ impl MysqlFileList {
         DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
         match  sqlx::query(
             format!(r#"
-INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
         .bind(account)
@@ -1916,7 +1915,6 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
-        .bind(now_ts)
         .bind(now_ts)
         .execute(&pool)
         .await {
@@ -1944,7 +1942,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str(),
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
@@ -1970,7 +1968,6 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened)
-                        .push_bind(now_ts)
                         .push_bind(now_ts);
                 });
                 DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
@@ -2084,7 +2081,6 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -2110,7 +2106,6 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -2239,11 +2234,7 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     )
     .await?;
 
-    // create column created_at and updated_at for version >= 0.14.7
-    let column = "created_at";
-    let data_type = "BIGINT default 0 not null";
-    add_column("file_list", column, data_type).await?;
-    add_column("file_list_history", column, data_type).await?;
+    // create column updated_at for version >= 0.14.7
     let column = "updated_at";
     let data_type = "BIGINT default 0 not null";
     add_column("file_list", column, data_type).await?;
@@ -2256,6 +2247,10 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
         "BOOLEAN default false not null",
     )
     .await?;
+
+    // removed created_at column for version <= 0.60.0
+    drop_column("file_list", "created_at").await?;
+    drop_column("file_list_history", "created_at").await?;
 
     Ok(())
 }
@@ -2459,7 +2454,6 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
-                created_at BIGINT not null,
                 updated_at BIGINT not null
             )
             "#,
@@ -2484,7 +2478,6 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
-                created_at BIGINT not null,
                 updated_at BIGINT not null
             )
             "#,
@@ -3174,7 +3167,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "Requires test database setup"]
     async fn test_batch_add_with_timestamps() {
-        // Test that batch_add now includes created_at and updated_at timestamps
+        // Test that batch_add now includes updated_at timestamps
         let pool = setup_test_db().await;
         cleanup_test_data(&pool).await;
 
@@ -3196,7 +3189,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify that files were added with timestamps
-        // In the actual implementation, created_at and updated_at should be set to now_micros()
+        // In the actual implementation, updated_at should be set to now_micros()
         for file in &files {
             let exists = mysql_list.contains(&file.key).await;
             assert!(exists.is_ok());
