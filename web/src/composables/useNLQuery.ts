@@ -319,7 +319,7 @@ export function useNLQuery() {
    * // Returns: "SELECT * FROM logs WHERE level = 'error' AND _timestamp > now() - INTERVAL '1 hour'"
    * ```
    */
-  const generateSQL = async (prompt: string, orgId: string): Promise<string | null> => {
+  const generateSQL = async (prompt: string, orgId: string, abortSignal?: AbortSignal, sessionId?: string): Promise<string | null> => {
     if (!prompt.trim()) {
       console.warn('[NL2Q] Empty prompt provided');
       return null;
@@ -370,18 +370,23 @@ export function useNLQuery() {
         messages,
         '', // Use default model from server config
         orgId,
-        undefined, // No abort signal
+        abortSignal, // Abort signal for request cancellation
         context, // Explicit context with agent_type
-        undefined // No session ID needed for single query generation
+        sessionId // Session ID for tracking across requests
       );
 
-      if (!response || !response.ok) {
-        console.error('[NL2Q] AI assistant returned error:', response?.status);
+      if (!response || (response as any).cancelled) {
+        console.log('[NL2Q] Request was cancelled');
+        return null;
+      }
+
+      if (!(response as Response).ok) {
+        console.error('[NL2Q] AI assistant returned error:', (response as Response).status);
         return null;
       }
 
       // Read streaming response
-      const reader = response.body?.getReader();
+      const reader = (response as Response).body?.getReader();
       if (!reader) {
         console.error('[NL2Q] No reader available from response');
         return null;
