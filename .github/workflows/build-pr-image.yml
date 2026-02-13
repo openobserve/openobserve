@@ -9,7 +9,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.run_id }}
+  group: ${{ github.workflow }}-${{ inputs.branch }}
   cancel-in-progress: true
 
 env:
