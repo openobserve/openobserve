@@ -100,9 +100,6 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
-vortex.workspace = true
-vortex-datafusion.workspace = true
-vortex-btrblocks.workspace = true
 env_logger.workspace = true
 faststr.workspace = true
 flate2.workspace = true
@@ -320,11 +317,6 @@ arrow-json = "57.2.0"
 arrow-schema = { version = "57.2.0", features = ["serde"] }
 parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-vortex = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83", features = [
-    "tokio",
-] }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83" }
-vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83" }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.3"
 dotenvy = "0.15.7"

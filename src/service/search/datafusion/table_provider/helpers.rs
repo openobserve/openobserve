@@ -32,8 +32,8 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use hashbrown::HashMap;
-use vortex::{buffer::Buffer, scan::Selection};
-use vortex_datafusion::VortexAccessPlan;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::vortex::generate_vortex_access_plan;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
 
@@ -44,7 +44,10 @@ pub fn generate_access_plan(
     let file_format = FileFormat::from_extension(file.path().as_ref())?;
     match file_format {
         FileFormat::Parquet => generate_parquet_access_plan(file, segment_ids),
+        #[cfg(feature = "enterprise")]
         FileFormat::Vortex => generate_vortex_access_plan(segment_ids),
+        #[cfg(not(feature = "enterprise"))]
+        FileFormat::Vortex => None,
     }
 }
 
@@ -118,20 +121,6 @@ fn generate_parquet_access_plan(
         file.path().as_ref()
     );
     Some(Arc::new(access_plan))
-}
-
-fn generate_vortex_access_plan(
-    row_ids: Arc<BitVec>,
-) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-    let indices: Vec<u64> = row_ids
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, bit)| if *bit { Some(idx as u64) } else { None })
-        .collect();
-
-    let buffer = Buffer::from(indices);
-    let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(buffer));
-    Some(Arc::new(selection))
 }
 
 pub fn apply_projection(

@@ -6,6 +6,7 @@ license.workspace = true
 
 [features]
 default = ["gxhash"]
+enterprise = []
 gxhash = ["dep:gxhash"]
 
 [dependencies]
@@ -90,8 +91,9 @@ roaring.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing-opentelemetry.workspace = true
-vortex.workspace = true
-vortex-btrblocks.workspace = true
+vortex = { git = "https://github.com/openobserve/vortex", rev = "7f3491d604b1e298b9162e174a20a15cf863ff83", features = [
+    "tokio",
+] }
 
 [dev-dependencies]
 expect-test.workspace = true
