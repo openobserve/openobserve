@@ -34,7 +34,9 @@ use sqlx::{Executor, MySql, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, delete_index, drop_column},
+        mysql::{
+            CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, delete_index, drop_column,
+        },
     },
     errors::{DbError, Error, Result},
     file_list::FileRecord,

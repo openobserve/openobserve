@@ -806,8 +806,8 @@ pub struct Common {
     pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
-    #[env_config(name = "ZO_META_PARTITION_MODEL", default = "auto")]
-    pub meta_partition_model: String, // "auto" or "manual"
+    #[env_config(name = "ZO_META_PARTITION_MODE", default = "auto")]
+    pub meta_partition_mode: String, // "auto" or "manual"
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -2644,9 +2644,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    // check meta partition model
-    if cfg.common.meta_partition_model != "manual" {
-        cfg.common.meta_partition_model = "auto".to_string();
+    // check meta partition mode
+    if cfg.common.meta_partition_mode != "manual" {
+        cfg.common.meta_partition_mode = "auto".to_string();
     }
 
     // Print MySQL deprecation warning (logger not initialized yet at this stage)

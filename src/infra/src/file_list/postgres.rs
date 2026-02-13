@@ -2009,7 +2009,7 @@ async fn ensure_file_list_partition(
     }
 
     let cfg = get_config();
-    if cfg.common.meta_partition_model == "manual" {
+    if cfg.common.meta_partition_mode == "manual" {
         // Manual mode: check existence, cache result, do not create
         let exists = check_partition_exists(pool, &partition_name).await?;
         PARTITION_CACHE.insert(partition_name.clone());
@@ -2159,15 +2159,13 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
         .fetch_one(pool)
         .await?;
     if row_count > FILE_LIST_MIGRATION_LIMIT {
-        log::error!(
-            "[POSTGRES] Table {table} has {row_count} rows, automatic migration is not supported."
+        log::warn!(
+            "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
+            automatic migration is not supported for large tables. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
         );
-        log::error!("[POSTGRES] Please follow the manual migration guide.");
-        log::error!("[POSTGRES] After manual migration is complete, restart OpenObserve.");
         loop {
-            log::error!(
-                "[POSTGRES] Maintenance hold: waiting for manual migration completion. Table={table}."
-            );
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }
     }
@@ -2180,15 +2178,13 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     if let Some(ref md) = max_date
         && md > &today_str
     {
-        log::error!("[POSTGRES] Table {table} contains data with future dates (max: {md}).");
-        log::error!(
-            "[POSTGRES] This indicates data anomaly. Automatic migration is not supported."
+        log::warn!(
+            "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
+            automatic migration is not supported. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
         );
-        log::error!("[POSTGRES] Please follow the manual migration guide.");
         loop {
-            log::error!(
-                "[POSTGRES] Maintenance hold: waiting for manual migration completion. Table={table}."
-            );
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }
     }
@@ -2235,17 +2231,17 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // 2. Rename existing indexes
     sqlx::query(&format!(
-        "ALTER INDEX IF EXISTS {table}_stream_file_idx RENAME TO default_{table}_stream_file_idx"
+        "ALTER INDEX IF EXISTS {table}_stream_file_idx RENAME TO {table}_default_stream_file_idx"
     ))
     .execute(&mut *tx)
     .await?;
     sqlx::query(&format!(
-        "ALTER INDEX IF EXISTS {table}_stream_ts_idx RENAME TO default_{table}_stream_ts_idx"
+        "ALTER INDEX IF EXISTS {table}_stream_ts_idx RENAME TO {table}_default_stream_ts_idx"
     ))
     .execute(&mut *tx)
     .await?;
     sqlx::query(&format!(
-        "ALTER INDEX IF EXISTS {table}_stream_date_idx RENAME TO default_{table}_stream_date_idx"
+        "ALTER INDEX IF EXISTS {table}_stream_date_idx RENAME TO {table}_default_stream_date_idx"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2351,11 +2347,14 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
         .fetch_one(pool)
         .await?;
     if row_count > FILE_LIST_MIGRATION_LIMIT {
-        log::error!(
-            "[POSTGRES] Table {table} has {row_count} rows, automatic migration is not supported."
+        log::warn!(
+            "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
+            automatic migration is not supported for large tables. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
         );
         loop {
-            log::error!(
+            log::warn!(
                 "[POSTGRES] Maintenance hold: waiting for manual migration completion. Table={table}."
             );
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2370,9 +2369,14 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     if let Some(ref md) = max_date
         && md > &today_str
     {
-        log::error!("[POSTGRES] Table {table} contains data with future dates (max: {md}).");
+        log::warn!(
+            "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
+            automatic migration is not supported. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+        );
         loop {
-            log::error!(
+            log::warn!(
                 "[POSTGRES] Maintenance hold: waiting for manual migration completion. Table={table}."
             );
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2394,7 +2398,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     log::info!("[POSTGRES] Table {table} start renaming indexes.");
 
     // 2. Rename existing indexes
-    sqlx::query("ALTER INDEX IF EXISTS file_list_dump_stats_stream_file_idx RENAME TO default_file_list_dump_stats_stream_file_idx")
+    sqlx::query("ALTER INDEX IF EXISTS file_list_dump_stats_stream_file_idx RENAME TO file_list_dump_stats_default_stream_file_idx")
         .execute(&mut *tx)
         .await?;
 
@@ -2529,14 +2533,19 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let cfg = get_config();
 
-    // Handle file_list and file_list_history
-    for table in &["file_list", "file_list_history"] {
+    // Handle file_list, file_list_history, and file_list_dump_stats
+    let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+    for table in &tables {
         let relkind = get_table_relkind(pool, table).await?;
         match relkind.as_deref() {
             None => {
                 // Fresh install: create partitioned table directly
                 log::info!("[POSTGRES] Fresh install: creating partitioned table {table}");
-                create_partitioned_file_list_table(pool, table).await?;
+                if *table == "file_list_dump_stats" {
+                    create_partitioned_dump_stats_table(pool).await?;
+                } else {
+                    create_partitioned_file_list_table(pool, table).await?;
+                }
             }
             Some("p") => {
                 // Already partitioned: just ensure partitions exist
@@ -2544,12 +2553,25 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             }
             Some("r") => {
                 // Regular table: needs migration
-                if cfg.common.meta_partition_model != "manual" {
-                    migrate_file_list_table(pool, table).await?;
+                if cfg.common.meta_partition_mode != "manual" {
+                    if *table == "file_list_dump_stats" {
+                        migrate_dump_stats_table(pool).await?;
+                    } else {
+                        migrate_file_list_table(pool, table).await?;
+                    }
                 } else {
                     log::warn!(
-                        "[POSTGRES] Table {table} is not partitioned but mode is manual. Skipping auto-migration."
+                        "[POSTGRES] Table {table} is a regular table and needs to be converted to a partitioned table. \
+                        Since ZO_PG_PARTITION_MODE is set to 'manual', auto-migration is skipped. \
+                        Please migrate the table manually and then restart the node. \
+                        Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
                     );
+                    loop {
+                        log::warn!(
+                            "[POSTGRES] Maintenance hold: waiting for manual migration completion."
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                    }
                 }
             }
             Some(k) => {
@@ -2558,32 +2580,8 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
         }
     }
 
-    // Handle file_list_dump_stats
-    let relkind = get_table_relkind(pool, "file_list_dump_stats").await?;
-    match relkind.as_deref() {
-        None => {
-            log::info!("[POSTGRES] Fresh install: creating partitioned table file_list_dump_stats");
-            create_partitioned_dump_stats_table(pool).await?;
-        }
-        Some("p") => {
-            log::info!("[POSTGRES] Table file_list_dump_stats already partitioned");
-        }
-        Some("r") => {
-            if cfg.common.meta_partition_model != "manual" {
-                migrate_dump_stats_table(pool).await?;
-            } else {
-                log::warn!(
-                    "[POSTGRES] Table file_list_dump_stats is not partitioned but mode is manual."
-                );
-            }
-        }
-        Some(k) => {
-            log::warn!("[POSTGRES] Unexpected relkind '{k}' for table file_list_dump_stats");
-        }
-    }
-
     // Pre-create partitions for upcoming dates
-    if cfg.common.meta_partition_model != "manual" {
+    if cfg.common.meta_partition_mode != "manual" {
         precreate_partitions(pool).await?;
     }
 
@@ -2781,7 +2779,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .await?;
 
     // Phase 1: Autovacuum tuning + column width compatibility
-    if cfg.common.meta_partition_model == "auto" {
+    if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;
     }
@@ -2914,7 +2912,7 @@ pub async fn create_table_index() -> Result<()> {
 pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> {
     tokio::task::spawn(async move {
         let cfg = get_config();
-        if cfg.common.meta_store != "postgres" || cfg.common.meta_partition_model == "manual" {
+        if cfg.common.meta_store != "postgres" || cfg.common.meta_partition_mode == "manual" {
             return;
         }
 
