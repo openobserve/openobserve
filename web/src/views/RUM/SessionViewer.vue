@@ -113,6 +113,7 @@ import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
+import useStreamingSearch from "@/composables/useStreamingSearch";
 
 import { date } from "quasar";
 import { getUUID } from "@/utils/zincutils";
@@ -143,6 +144,7 @@ const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const errorCount = ref(10);
 const { performanceState } = usePerformance();
+const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 
 const session_start_time = 1692884313968;
 const session_end_time = 1692884769270;
@@ -333,7 +335,7 @@ const getSessionSegments = () => {
 
   const queryPayload: any = {
     from: 0,
-    size: 1000,
+    size: -1,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
       startTime:
@@ -347,44 +349,64 @@ const getSessionSegments = () => {
   };
 
   const req = buildQueryPayload(queryPayload);
+  req.query["quick_mode"] = false;
   req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by start asc`;
   delete req.aggs;
   isLoading.value.push(true);
-  searchService
-    .search(
-      {
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: req,
-        page_type: "logs",
+
+  const traceId = getUUID();
+  let hasReceivedFirstSegment = false;
+
+  fetchQueryDataWithHttpStream(
+    {
+      queryReq: req,
+      type: "search",
+      traceId: traceId,
+      org_id: store.state.selectedOrganization.identifier,
+      pageType: "RUM",
+      searchType: "ui",
+    },
+    {
+      data: (_data: any, response: any) => {
+        // Process hits as they arrive from the stream
+        if (response?.content?.results?.hits) {
+          const newSegments: any[] = [];
+          response.content.results.hits.forEach((hit: any) => {
+            const segment = JSON.parse(hit.segment);
+            segments.value.push(segment);
+            newSegments.push(segment);
+          });
+
+          // Add new segments to player incrementally without disrupting playback
+          if (newSegments.length > 0) {
+            videoPlayerRef.value?.addSegmentEvents(newSegments);
+
+            // Stop loading indicator after first segment arrives
+            if (!hasReceivedFirstSegment) {
+              hasReceivedFirstSegment = true;
+              isLoading.value.pop();
+            }
+          }
+        }
       },
-      "RUM",
-    )
-    .then((res) => {
-      // const segmentsCopy = [];
-      // const viewIds = [];
-      res.data.hits.forEach((hit: any) => {
-        segments.value.push(JSON.parse(hit.segment));
-      });
-
-      // res.data.hits.forEach((hit: any) => {
-      //   if (!viewIds.includes(hit.view_id)) viewIds.push(hit.view_id);
-      // });
-
-      // // loop over view_id Group ( array of array) segments from view_id and sort each group by start_time
-      // viewIds.forEach((view_id) => {
-      //   const group = res.data.hits
-      //     .filter((hit: any) => hit.view_id === view_id)
-      //     .sort((a, b) => a.start - b.start);
-
-      //   segmentsCopy.push(group.map((hit: any) => JSON.parse(hit.segment)));
-      // });
-
-      // segments.value = segmentsCopy.flat();
-    })
-    .catch((error) => {
-      console.error("Failed to fetch session events:", error);
-    })
-    .finally(() => isLoading.value.pop());
+      error: (_data: any, error: any) => {
+        console.error("Failed to fetch session segments:", error);
+        // Only pop if we haven't already done so
+        if (!hasReceivedFirstSegment) {
+          isLoading.value.pop();
+        }
+      },
+      complete: (_data: any, _response: any) => {
+        // All segments loaded - only pop if we haven't already
+        if (!hasReceivedFirstSegment) {
+          isLoading.value.pop();
+        }
+      },
+      reset: (_data: any, _traceId?: string) => {
+        // Handle reset if needed
+      },
+    },
+  );
 };
 
 const getSessionEvents = () => {

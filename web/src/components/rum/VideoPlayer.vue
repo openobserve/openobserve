@@ -353,7 +353,7 @@ const setupSession = async () => {
   let sessionHeight: number = 0;
 
   session.value.every((segment: any) => {
-    if (segment.data.height && segment.data.width) {
+    if (segment?.data?.height && segment?.data?.width) {
       sessionWidth = segment.data.width;
       sessionHeight = segment.data.height;
       return false;
@@ -425,6 +425,8 @@ const setupSession = async () => {
 
 const updatePlayerState = () => {
   const playerMeta = player.value?.getMetaData();
+  console.log("Player Meta -------- ", playerMeta);
+  if (!playerMeta) return;
   playerState.value.startTime = playerMeta.startTime;
   playerState.value.endTime = playerMeta.endTime;
   playerState.value.totalTime = playerMeta.totalTime;
@@ -436,6 +438,57 @@ const updatePlayerState = () => {
   // calculate width of progress bar
   playerState.value.width = playbackBarWidth;
   player.value.triggerResize();
+};
+
+const refreshPlayer = async () => {
+  // Destroy existing player to force recreation with new segments
+  if (player.value) {
+    player.value.removeEventListener("ui-update-current-time", updateProgressBar);
+    player.value.removeEventListener("finish", () => {});
+    player.value.removeEventListener("error", () => {});
+    player.value = null;
+  }
+  // Recreate player with all segments
+  await setupSession();
+};
+
+const addSegmentEvents = (newSegments: any[]) => {
+  // Process new segments and add their events to the existing player
+  if (!player.value) return;
+
+  newSegments.forEach((segment: any) => {
+    segment.records.forEach((record: any) => {
+      let segCopy = cloneDeep(record);
+
+      // Same processing as in setupSession
+      if (segCopy.type === 8) {
+        const seg = {
+          ...segCopy,
+          data: {
+            payload: {
+              ...segCopy.data,
+            },
+            tag: "viewport",
+          },
+          type: 5,
+        };
+        segCopy = seg;
+      }
+
+      // Add event to session array
+      session.value.push(segCopy);
+
+      // Add event to player (rrweb player supports addEvent)
+      try {
+        player.value?.addEvent(segCopy);
+      } catch (e) {
+        console.error("Error adding event to player:", e);
+      }
+    });
+  });
+
+  // Update player state with new metadata
+  updatePlayerState();
 };
 
 const getEventMarkerClass = (event: any) => {
@@ -591,6 +644,8 @@ defineExpose({
   toggleSkipInactive,
   playerState,
   updatePlayerState,
+  refreshPlayer,
+  addSegmentEvents,
 });
 </script>
 
