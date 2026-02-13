@@ -396,6 +396,12 @@ impl ExecutablePipeline {
             anyhow!("[Pipeline] error collecting job failed: {}", e)
         })? {
             let stream_params = self.get_source_stream_params();
+            log::info!(
+                "[Pipeline] id: {}, name: {}, node_errors: {:?}",
+                pipeline_errors.pipeline_id,
+                pipeline_errors.pipeline_name,
+                pipeline_errors.node_errors
+            );
             let error_data = ErrorData {
                 _timestamp: Utc::now().timestamp_micros(),
                 stream_params,

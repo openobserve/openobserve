@@ -502,7 +502,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -512,6 +512,9 @@ pub async fn search_multi(
                         org_id,
                         &stream_names,
                     );
+                    if let Some(e) = err {
+                        log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
+                    }
                     ret_val
                         .as_array()
                         .unwrap()
@@ -534,11 +537,12 @@ pub async fn search_multi(
                         })
                         .collect()
                 } else {
-                    multi_res
+                    let mut error = "".to_string();
+                    let res = multi_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -548,10 +552,17 @@ pub async fn search_multi(
                                 org_id,
                                 &stream_names,
                             );
+                            if let Some(e) = err {
+                                error = e;
+                            }
                             (!ret_val.is_null())
                                 .then_some(config::utils::flatten::flatten(ret_val).unwrap())
                         })
-                        .collect()
+                        .collect();
+                    if !error.is_empty() {
+                        log::error!("[trace_id {trace_id}] Error applying vrl function: {error}");
+                    }
+                    res
                 }
             }
             None => multi_res.hits,
