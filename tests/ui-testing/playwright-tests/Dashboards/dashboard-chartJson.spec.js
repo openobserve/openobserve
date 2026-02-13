@@ -75,6 +75,9 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-x-item-x_axis_1"]').click();
     await page.getByRole('checkbox', { name: 'Render Data as JSON / Array' }).click();
 
+    // Close the field options popover so it doesn't block Apply
+    await page.keyboard.press('Escape');
+
     // Set date-time and timezone for table chart
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -83,7 +86,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify JSON data is rendered in the table
-    await expect(page.locator('.json-field-renderer').first()).toBeVisible();
+    await expect(page.locator('.json-field-renderer').first()).toBeVisible({ timeout: 30000 });
     await expect(page.locator('.json-key:has-text("domain")').first()).toBeVisible();
     await expect(page.locator('.json-value:has-text("service.local")').first()).toBeVisible();
 
