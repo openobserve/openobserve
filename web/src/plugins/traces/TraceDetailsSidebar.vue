@@ -1356,9 +1356,6 @@ export default defineComponent({
 
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
-        console.log(
-          "[TraceDetailsSidebar] Correlation feature requires enterprise license",
-        );
         correlationError.value =
           "Correlation feature requires enterprise license";
         return;
@@ -1441,11 +1438,6 @@ export default defineComponent({
             }
           }
 
-          console.log(
-            "[TraceDetailsSidebar] Raw span dimensions for log queries:",
-            rawSpanDimensions,
-          );
-
           // Use filters from logStreams[0] as matchedDimensions — these contain
           // the correct field names for the log stream (e.g., k8s_namespace_name)
           // instead of semantic IDs (k8s-namespace) or trace field names
@@ -1474,11 +1466,6 @@ export default defineComponent({
               endTime: spanEndUs + bufferUs,
             },
           };
-
-          console.log(
-            "[TraceDetailsSidebar] Correlation successful:",
-            correlationProps.value,
-          );
         } else {
           correlationError.value =
             "No related services found for this trace span";
