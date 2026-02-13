@@ -1,84 +1,143 @@
 <!-- eslint-disable no-useless-escape -->
 <template>
   <div class="q-pa-md kubernetes-config-section">
-    <div class="text-subtitle1 q-pl-xs q-mt-md">Install cert-manager</div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.0/cert-manager.yaml"
-    />
+    <!-- Quick Install Section -->
+    <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
+      <div class="tw:flex tw:items-start tw:gap-3">
+        <q-icon name="rocket_launch" size="md" color="primary" />
+        <div class="tw:flex-1">
+          <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">Quick Install (Recommended)</h6>
+          <p class="tw:text-sm tw:m-0 tw:mb-3" :class="descriptionClass">
+            Install OpenObserve collector with a single command. Just set your cluster name and run.
+          </p>
 
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Wait for 2 minutes after installing cert-manger for the webhook to be
-      ready.
+          <div class="tw:mb-3">
+            <q-input
+              v-model="clusterName"
+              label="Cluster Name"
+              placeholder="e.g., production, staging, dev"
+              filled
+              dense
+              class="tw:max-w-md"
+              data-test="kubernetes-cluster-name-input"
+            >
+              <template #prepend>
+                <q-icon name="dns" />
+              </template>
+            </q-input>
+          </div>
+
+          <div v-if="config.isCloud != 'true'" class="tw:mb-3">
+            <q-tabs v-model="installType" dense no-caps>
+              <q-tab name="external" label="External Endpoint" />
+              <q-tab name="internal" label="Internal Endpoint">
+                <q-tooltip>Use this if OpenObserve is in the same cluster</q-tooltip>
+              </q-tab>
+            </q-tabs>
+          </div>
+
+          <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
+
+          <div class="tw:mt-2 tw:text-xs" :class="hintClass">
+            <q-icon name="info" size="xs" class="tw:mr-1" />
+            This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
-    <ContentCopy class="q-mt-sm" :content="helmUpdateCmd" />
+    <q-separator class="tw:mb-6" />
 
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Install Prometheus operator CRDs(Required by Opentelemetry operator)
-    </div>
-    <ContentCopy class="q-mt-sm" :content="crdCommand" />
-
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Install OpenTelemetry operator
-    </div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="kubectl apply -f https://raw.githubusercontent.com/openobserve/openobserve-helm-chart/refs/heads/main/opentelemetry-operator.yaml"
-    />
-
-    <div class="text-subtitle1 q-pl-xs q-mt-md">Create namespace</div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="kubectl create ns openobserve-collector"
-    />
-
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Install OpenObserve collector
-    </div>
-    <div v-if="config.isCloud == 'true'">
-      <ContentCopy class="q-mt-sm" :content="collectorCmd" />
-    </div>
-    <div v-else>
-      <q-tabs v-model="tab" horizontalalign="left" no-caps>
-        <q-tab
-          data-test="kubernetes-default-tab"
-          name="external"
-          :label="t('ingestion.external')"
+    <!-- Advanced/Manual Install Section -->
+    <q-expansion-item
+      v-model="showAdvancedInstall"
+      label="Advanced Installation (Manual Steps)"
+      caption="For custom configurations or step-by-step installation"
+      header-class="text-primary"
+      data-test="kubernetes-advanced-install-toggle"
+    >
+      <div class="tw:mt-4">
+        <div class="text-subtitle1 q-pl-xs q-mt-md">Install cert-manager</div>
+        <ContentCopy
+          class="q-mt-sm"
+          content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.0/cert-manager.yaml"
         />
-        <q-tab
-          data-test="kubernetes-this-tab"
-          name="internal"
-          :label="t('ingestion.internal')"
-        >
-          <q-tooltip>
-            {{ t("ingestion.internalLabel") }}
-          </q-tooltip>
-        </q-tab>
-      </q-tabs>
-      <q-separator />
-      <q-tab-panels
-        v-model="tab"
-        animated
-        swipeable
-        vertical
-        transition-prev="jump-up"
-        transition-next="jump-up"
-      >
-        <q-tab-panel name="internal" data-test="kubernetes-tab-panels-this">
-          <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
-          <pre>
-Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local 
-Make changes accordingly to the above URL.
-          </pre>
-        </q-tab-panel>
 
-        <q-tab-panel name="external" data-test="kubernetes-tab-panels-default">
+        <div class="text-subtitle1 q-pl-xs q-mt-md">
+          Wait for 2 minutes after installing cert-manger for the webhook to be
+          ready.
+        </div>
+
+        <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
+        <ContentCopy class="q-mt-sm" :content="helmUpdateCmd" />
+
+        <div class="text-subtitle1 q-pl-xs q-mt-md">
+          Install Prometheus operator CRDs(Required by Opentelemetry operator)
+        </div>
+        <ContentCopy class="q-mt-sm" :content="crdCommand" />
+
+        <div class="text-subtitle1 q-pl-xs q:mt-md">
+          Install OpenTelemetry operator
+        </div>
+        <ContentCopy
+          class="q-mt-sm"
+          content="kubectl apply -f https://raw.githubusercontent.com/openobserve/openobserve-helm-chart/refs/heads/main/opentelemetry-operator.yaml"
+        />
+
+        <div class="text-subtitle1 q-pl-xs q-mt-md">Create namespace</div>
+        <ContentCopy
+          class="q-mt-sm"
+          content="kubectl create ns openobserve-collector"
+        />
+
+        <div class="text-subtitle1 q-pl-xs q-mt-md">
+          Install OpenObserve collector
+        </div>
+        <div v-if="config.isCloud == 'true'">
           <ContentCopy class="q-mt-sm" :content="collectorCmd" />
-        </q-tab-panel>
-      </q-tab-panels>
-    </div>
+        </div>
+        <div v-else>
+          <q-tabs v-model="tab" horizontalalign="left" no-caps>
+            <q-tab
+              data-test="kubernetes-default-tab"
+              name="external"
+              :label="t('ingestion.external')"
+            />
+            <q-tab
+              data-test="kubernetes-this-tab"
+              name="internal"
+              :label="t('ingestion.internal')"
+            >
+              <q-tooltip>
+                {{ t("ingestion.internalLabel") }}
+              </q-tooltip>
+            </q-tab>
+          </q-tabs>
+          <q-separator />
+          <q-tab-panels
+            v-model="tab"
+            animated
+            swipeable
+            vertical
+            transition-prev="jump-up"
+            transition-next="jump-up"
+          >
+            <q-tab-panel name="internal" data-test="kubernetes-tab-panels-this">
+              <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
+              <pre>
+Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local
+Make changes accordingly to the above URL.
+              </pre>
+            </q-tab-panel>
+
+            <q-tab-panel name="external" data-test="kubernetes-tab-panels-default">
+              <ContentCopy class="q-mt-sm" :content="collectorCmd" />
+            </q-tab-panel>
+          </q-tab-panels>
+        </div>
+      </div>
+    </q-expansion-item>
+
     <br />
     <hr />
     <div class="text-subtitle1 q-pl-xs q-mt-md">
@@ -172,6 +231,9 @@ const endpoint: any = ref({
 
 const ingestionURL = getIngestionURL();
 const tab = ref("external");
+const installType = ref("external");
+const clusterName = ref("cluster1");
+const showAdvancedInstall = ref(false);
 const { t } = useI18n();
 
 endpoint.value = getEndPoint(ingestionURL);
@@ -182,24 +244,68 @@ const accessKey = computed(() => {
   );
 });
 
+// Computed class for styling based on theme
+const quickInstallBgClass = computed(() => {
+  return store.state.theme === 'dark'
+    ? 'tw:bg-gray-800 tw:border tw:border-gray-700'
+    : 'tw:bg-blue-50 tw:border tw:border-blue-200';
+});
+
+const descriptionClass = computed(() => {
+  return store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700';
+});
+
+const hintClass = computed(() => {
+  return store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600';
+});
+
+// Quick install command
+const quickInstallCmd = computed(() => {
+  const baseCmd = 'curl -sSL https://raw.githubusercontent.com/openobserve/o2-datasource/main/k8s/install.sh | bash -s --';
+
+  if (config.isCloud === 'true') {
+    // Cloud version - external endpoint only
+    return `${baseCmd} \\
+  --cluster-name=${clusterName.value} \\
+  --o2-url=${endpoint.value.url} \\
+  --org-id=${props.currOrgIdentifier} \\
+  --access-key=${accessKey.value}`;
+  } else {
+    // Self-hosted version - support both internal and external
+    if (installType.value === 'internal') {
+      return `${baseCmd} \\
+  --cluster-name=${clusterName.value} \\
+  --org-id=${props.currOrgIdentifier} \\
+  --access-key=${accessKey.value} \\
+  --internal-endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080`;
+    } else {
+      return `${baseCmd} \\
+  --cluster-name=${clusterName.value} \\
+  --o2-url=${endpoint.value.url} \\
+  --org-id=${props.currOrgIdentifier} \\
+  --access-key=${accessKey.value}`;
+    }
+  }
+});
+
 const collectorCmd = computed(() => {
   return `helm --namespace openobserve-collector \\
   upgrade --install o2c openobserve/openobserve-collector \\
-  --set k8sCluster=cluster1  \\
+  --set k8sCluster=${clusterName.value}  \\
   --set exporters.'otlphttp/openobserve'.endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
-  --set exporters.'otlphttp/openobserve'.headers.Authorization='Basic [BASIC_PASSCODE]'  \\
+  --set exporters.'otlphttp/openobserve'.headers.Authorization='Basic ${accessKey.value}'  \\
   --set exporters.'otlphttp/openobserve_k8s_events'.endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
-  --set exporters.'otlphttp/openobserve_k8s_events'.headers.Authorization='Basic [BASIC_PASSCODE]'`;
+  --set exporters.'otlphttp/openobserve_k8s_events'.headers.Authorization='Basic ${accessKey.value}'`;
 });
 
 const collectorCmdThisCluster = computed(() => {
   return `helm --namespace openobserve-collector \\
   upgrade --install o2c openobserve/openobserve-collector \\
-  --set k8sCluster=cluster1  \\
+  --set k8sCluster=${clusterName.value}  \\
   --set exporters.'otlphttp/openobserve'.endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
-  --set exporters.'otlphttp/openobserve'.headers.Authorization='Basic [BASIC_PASSCODE]'  \\
+  --set exporters.'otlphttp/openobserve'.headers.Authorization='Basic ${accessKey.value}'  \\
   --set exporters.'otlphttp/openobserve_k8s_events'.endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
-  --set exporters.'otlphttp/openobserve_k8s_events'.headers.Authorization='Basic [BASIC_PASSCODE]'`;
+  --set exporters.'otlphttp/openobserve_k8s_events'.headers.Authorization='Basic ${accessKey.value}'`;
 });
 
 const crdCommand = computed(() => {
