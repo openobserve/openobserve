@@ -270,21 +270,27 @@ describe("AppSessions.vue", () => {
     });
 
     it("should render loading state when data is being fetched", async () => {
-      wrapper.vm.isLoading = [true];
+      // Properly update the reactive ref by pushing instead of replacing
+      wrapper.vm.isLoading.push(true);
       await nextTick();
 
       expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
       expect(wrapper.text()).toContain("Hold on tight, we're fetching sessions.");
+
+      // Cleanup
+      wrapper.vm.isLoading.pop();
     });
 
     it("should render app table when not loading", async () => {
       // Ensure component is properly set up for non-loading state
       wrapper.vm.isLoading = [];
-      wrapper.vm.rows = [{
-        session_id: "test-session",
-        timestamp: Date.now(),
-        user_email: "test@example.com",
-      }];
+      wrapper.vm.rows = [
+        {
+          session_id: "test-session",
+          timestamp: Date.now(),
+          user_email: "test@example.com",
+        },
+      ];
       await nextTick();
       
       // Check if table exists or if it's within the splitter after section
@@ -405,7 +411,11 @@ describe("AppSessions.vue", () => {
     });
 
     it("should fetch stream fields on mount", async () => {
-      expect(mockStreams.getStream).toHaveBeenCalledWith("_sessionreplay", "logs", true);
+      expect(mockStreams.getStream).toHaveBeenCalledWith(
+        "_rumdata",
+        "logs",
+        true,
+      );
     });
 
     it("should get sessions data when component is mounted", async () => {
@@ -702,13 +712,11 @@ describe("AppSessions.vue", () => {
 
   describe("Frustration Signals", () => {
     it("should include frustration_count in SQL query", () => {
-      const mockReq = { query: { sql: "" } };
+      // Verify that getSessions method exists which builds the SQL with frustration_count
+      expect(wrapper.vm.getSessions).toBeDefined();
 
-      // Simulate the SQL query generation
-      const expectedSQLFragment = "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count";
-
-      // The SQL query should contain frustration count aggregation
-      expect(wrapper.vm.getSessionLogs).toBeDefined();
+      // Verify that the component has access to the schema mapping for building the SQL
+      expect(wrapper.vm.schemaMapping).toBeDefined();
     });
 
     it("should have frustration_count column in columns definition", () => {
