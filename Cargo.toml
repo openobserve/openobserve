@@ -43,7 +43,8 @@ inherits = "release"
 debug = false
 strip = false
 lto = "off"
-incremental = true
+codegen-units = 128
+
 
 [profile.release]
 debug = false
