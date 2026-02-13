@@ -43,7 +43,7 @@ export class UserPage {
         
         // Now safely interact with the element
         await roleField.dblclick({ force: true });
-        await this.page.waitForLoadState("networkidle");
+        await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
         await roleField.pressSequentially(role, { delay: 100 });
         await this.page.getByRole('option', { name: role }).click({ force: true });
       }

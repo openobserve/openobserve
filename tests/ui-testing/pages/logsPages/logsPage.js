@@ -351,7 +351,7 @@ export class LogsPage {
         const orgId = process.env.ORGNAME;
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch((e) => {
+        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((e) => {
             testLogger.warn(`selectIndexAndStreamJoinUnion: Navigation timeout, continuing... ${e.message}`);
         });
         await this.page.waitForTimeout(2000);
@@ -495,7 +495,7 @@ export class LogsPage {
         const orgId = process.env.ORGNAME;
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
         await this.page.waitForTimeout(3000);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -590,7 +590,7 @@ export class LogsPage {
                     await this.page.waitForTimeout(5000); // Wait before retry for stream to be indexed
 
                     // Navigate to logs page again to refresh stream list
-                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
                 }
 
@@ -600,7 +600,7 @@ export class LogsPage {
 
                 if (attempt < maxRetries) {
                     await this.page.waitForTimeout(5000);
-                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
                 }
             }

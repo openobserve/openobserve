@@ -1,6 +1,6 @@
 // dashLogin.js
 export const login = async (page) => {  
-    await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
+    await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "domcontentloaded" });
     
     if (await page.getByText('Login as internal user').isVisible()) {
       await page.getByText('Login as internal user').click();
@@ -23,6 +23,6 @@ export const login = async (page) => {
     await waitForLogin;
   
     await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
     });
   }
