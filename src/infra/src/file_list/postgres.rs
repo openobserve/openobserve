@@ -2072,7 +2072,7 @@ async fn ensure_file_list_partition(
 async fn precreate_partitions(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let cfg = get_config();
     let today = Utc::now();
-    let past_days = (cfg.limit.ingest_allowed_upto / 24) + 1;
+    let past_days = std::cmp::min(30, (cfg.limit.ingest_allowed_upto / 24) + 1);
     let start_date = today - Duration::days(past_days);
     let end_date = today + Duration::days(FILE_LIST_POST_PARTITION_DAYS);
 
@@ -2114,9 +2114,9 @@ async fn create_partitioned_file_list_table(
         .await?;
 
     // Create indexes on parent
-    sqlx::query(&file_list_partition_index_ddl(table))
-        .execute(pool)
-        .await?;
+    for ddl in file_list_partition_index_ddl(table) {
+        sqlx::query(&ddl).execute(pool).await?;
+    }
 
     // Create DEFAULT partition
     let default_name = format!("{table}_default");
@@ -2136,9 +2136,9 @@ async fn create_partitioned_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Res
         .await?;
 
     // Create indexes on parent
-    sqlx::query(&file_list_dump_stats_partition_index_ddl())
-        .execute(pool)
-        .await?;
+    for ddl in file_list_dump_stats_partition_index_ddl() {
+        sqlx::query(&ddl).execute(pool).await?;
+    }
 
     // Create DEFAULT partition
     sqlx::query(
@@ -2171,6 +2171,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }
     }
+    log::info!("[POSTGRES] Table {table} has {row_count} rows.");
 
     let today_str = Utc::now().format("%Y/%m/%d/23").to_string();
     let max_date: Option<String> = sqlx::query_scalar(&format!("SELECT MAX(date) FROM {table}"))
@@ -2191,9 +2192,12 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }
     }
+    log::info!("[POSTGRES] Table {table} has max date {:?}.", max_date);
 
     // Build the migration SQL as a single transaction
     let default_name = format!("{table}_default");
+
+    log::info!("[POSTGRES] Table {table} start checking columns.");
 
     // Execute migration in a transaction
     let mut tx = pool.begin().await?;
@@ -2227,6 +2231,8 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start renaming indexes.");
+
     // 2. Rename existing indexes
     sqlx::query(&format!(
         "ALTER INDEX IF EXISTS {table}_stream_file_idx RENAME TO default_{table}_stream_file_idx"
@@ -2243,6 +2249,8 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     ))
     .execute(&mut *tx)
     .await?;
+
+    log::info!("[POSTGRES] Table {table} start dropping unused indexes/columns.");
 
     // 3. Drop unused indexes/columns
     sqlx::query(&format!("DROP INDEX IF EXISTS {table}_org_idx"))
@@ -2263,6 +2271,8 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start removing IDENTITY and PRIMARY KEY.");
+
     // 4. Remove IDENTITY and PRIMARY KEY
     sqlx::query(&format!(
         "ALTER TABLE {table} ALTER COLUMN id DROP IDENTITY IF EXISTS"
@@ -2275,20 +2285,28 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start renaming old table.");
+
     // 5. Rename old table
     sqlx::query(&format!("ALTER TABLE {table} RENAME TO {default_name}"))
         .execute(&mut *tx)
         .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating new partitioned parent table.");
 
     // 6. Create new partitioned parent table
     sqlx::query(&file_list_partition_ddl(table))
         .execute(&mut *tx)
         .await?;
 
+    log::info!("[POSTGRES] Table {table} start creating indexes on parent.");
+
     // 7. Create indexes on parent
-    sqlx::query(&file_list_partition_index_ddl(table))
-        .execute(&mut *tx)
-        .await?;
+    for ddl in file_list_partition_index_ddl(table) {
+        sqlx::query(&ddl).execute(&mut *tx).await?;
+    }
+
+    log::info!("[POSTGRES] Table {table} start attaching old table as DEFAULT partition.");
 
     // 8. Attach old table as DEFAULT partition
     sqlx::query(&format!(
@@ -2297,6 +2315,8 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start adding date index on DEFAULT partition.");
+
     // 9. Add date index on DEFAULT partition
     sqlx::query(&format!(
         "CREATE INDEX IF NOT EXISTS {default_name}_date_idx ON {default_name} (date)"
@@ -2304,14 +2324,20 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start creating future date partitions.");
+
     // 10. Create future date partitions
     create_future_partitions(&mut tx, table).await?;
+
+    log::info!("[POSTGRES] Table {table} start aligning identity sequence.");
 
     // 11. Align identity sequence
     align_identity_sequence(&mut tx, table).await?;
 
     tx.commit().await?;
-    log::info!("[POSTGRES] Partition migration for {table} completed successfully");
+
+    log::info!("[POSTGRES] Table {table} migration completed successfully");
+
     Ok(())
 }
 
@@ -2335,6 +2361,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }
     }
+    log::info!("[POSTGRES] Table {table} has {row_count} rows.");
 
     let today_str = Utc::now().format("%Y/%m/%d/23").to_string();
     let max_date: Option<String> = sqlx::query_scalar(&format!("SELECT MAX(date) FROM {table}"))
@@ -2351,6 +2378,9 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }
     }
+    log::info!("[POSTGRES] Table {table} has max date {:?}.", max_date);
+
+    log::info!("[POSTGRES] Table {table} start checking columns.");
 
     let mut tx = pool.begin().await?;
 
@@ -2361,15 +2391,21 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start renaming indexes.");
+
     // 2. Rename existing indexes
     sqlx::query("ALTER INDEX IF EXISTS file_list_dump_stats_stream_file_idx RENAME TO default_file_list_dump_stats_stream_file_idx")
         .execute(&mut *tx)
         .await?;
 
+    log::info!("[POSTGRES] Table {table} start dropping unused indexes.");
+
     // 3. Drop unused indexes
     sqlx::query("DROP INDEX IF EXISTS file_list_dump_stats_org_idx")
         .execute(&mut *tx)
         .await?;
+
+    log::info!("[POSTGRES] Table {table} start removing IDENTITY and PRIMARY KEY.");
 
     // 4. Remove IDENTITY and PRIMARY KEY
     sqlx::query(&format!(
@@ -2383,20 +2419,28 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start renaming old table.");
+
     // 5. Rename old table
     sqlx::query(&format!("ALTER TABLE {table} RENAME TO {table}_default"))
         .execute(&mut *tx)
         .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating new partitioned parent table.");
 
     // 6. Create new partitioned parent table
     sqlx::query(&file_list_dump_stats_partition_ddl())
         .execute(&mut *tx)
         .await?;
 
+    log::info!("[POSTGRES] Table {table} start creating indexes on parent.");
+
     // 7. Create indexes on parent
-    sqlx::query(&file_list_dump_stats_partition_index_ddl())
-        .execute(&mut *tx)
-        .await?;
+    for ddl in file_list_dump_stats_partition_index_ddl() {
+        sqlx::query(&ddl).execute(&mut *tx).await?;
+    }
+
+    log::info!("[POSTGRES] Table {table} start attaching old table as DEFAULT partition.");
 
     // 8. Attach old table as DEFAULT partition
     sqlx::query(
@@ -2405,31 +2449,33 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     .execute(&mut *tx)
     .await?;
 
+    log::info!("[POSTGRES] Table {table} start adding date index on DEFAULT partition.");
+
     // 9. Add date index on DEFAULT partition
     sqlx::query("CREATE INDEX IF NOT EXISTS file_list_dump_stats_default_date_idx ON file_list_dump_stats_default (date)")
         .execute(&mut *tx)
         .await?;
 
+    log::info!("[POSTGRES] Table {table} start creating future date partitions.");
+
     // 10. Create future date partitions
     create_future_partitions(&mut tx, table).await?;
+
+    log::info!("[POSTGRES] Table {table} start aligning identity sequence.");
 
     // 11. Align identity sequence
     align_identity_sequence(&mut tx, table).await?;
 
     tx.commit().await?;
-    log::info!("[POSTGRES] Partition migration for {table} completed successfully");
+
+    log::info!("[POSTGRES] Table {table} migration completed successfully");
+
     Ok(())
 }
 
 /// Apply autovacuum tuning to all file_list tables.
 async fn apply_autovacuum_tuning(pool: &sqlx::Pool<Postgres>) -> Result<()> {
-    let tables = [
-        "file_list",
-        "file_list_history",
-        "file_list_deleted",
-        "file_list_dump_stats",
-        "file_list_jobs",
-    ];
+    let tables = ["file_list_deleted", "file_list_jobs"];
     for table in &tables {
         // Check if autovacuum is already tuned
         let reloptions: Option<String> = sqlx::query_scalar(
@@ -2546,16 +2592,14 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 
 /// Return the CREATE TABLE DDL for a partitioned file_list / file_list_history table.
 /// Return the CREATE INDEX DDL for a partitioned file_list / file_list_history table.
-fn file_list_partition_index_ddl(table: &str) -> String {
-    format!(
-        r#"
-CREATE UNIQUE INDEX {table}_stream_file_idx ON {table} (stream, date, file);
-CREATE INDEX {table}_id_idx ON {table} (id);
-CREATE INDEX {table}_stream_ts_idx ON {table} (stream, max_ts, min_ts);
-CREATE INDEX {table}_stream_date_idx ON {table} (stream, date);
-CREATE INDEX {table}_updated_at_idx ON {table} (updated_at);
-        "#
-    )
+fn file_list_partition_index_ddl(table: &str) -> Vec<String> {
+    vec![
+        format!("CREATE UNIQUE INDEX {table}_stream_file_idx ON {table} (stream, date, file)"),
+        format!("CREATE INDEX {table}_id_idx ON {table} (id)"),
+        format!("CREATE INDEX {table}_stream_ts_idx ON {table} (stream, max_ts, min_ts)"),
+        format!("CREATE INDEX {table}_stream_date_idx ON {table} (stream, date)"),
+        format!("CREATE INDEX {table}_updated_at_idx ON {table} (updated_at)"),
+    ]
 }
 
 fn file_list_partition_ddl(table: &str) -> String {
@@ -2613,12 +2657,11 @@ async fn align_identity_sequence(conn: &mut PgConnection, table: &str) -> Result
 
 /// Return the CREATE TABLE DDL for a partitioned file_list_dump_stats table.
 /// Return the CREATE INDEX DDL for the partitioned file_list_dump_stats table.
-fn file_list_dump_stats_partition_index_ddl() -> String {
-    r#"
-CREATE UNIQUE INDEX file_list_dump_stats_stream_file_idx ON file_list_dump_stats (stream, date, file);
-CREATE INDEX file_list_dump_stats_id_idx ON file_list_dump_stats (id);
-    "#
-    .to_string()
+fn file_list_dump_stats_partition_index_ddl() -> Vec<String> {
+    vec![
+        "CREATE UNIQUE INDEX file_list_dump_stats_stream_file_idx ON file_list_dump_stats (stream, date, file)".to_string(),
+        "CREATE INDEX file_list_dump_stats_id_idx ON file_list_dump_stats (id)".to_string(),
+    ]
 }
 
 fn file_list_dump_stats_partition_ddl() -> String {
