@@ -915,27 +915,21 @@ export default defineComponent({
      * Handles validation, loading states, and error handling
      */
     const extractPatternsForCurrentQuery = async (clear_cache = false) => {
-      console.log("[Index] Extracting patterns for current query");
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
 
       try {
         const queryReq = buildSearch(false, false);
         if (!queryReq) {
-          console.log("[Index] No query request available");
           searchObj.loading = false;
           return;
         }
 
         // Set size to -1 to let backend determine sampling size based on config
-        console.log(
-          "[Patterns] Using default sampling from backend configuration",
-        );
         queryReq.query.size = -1;
 
         const streamName = searchObj.data.stream.selectedStream[0];
         if (!streamName) {
-          console.log("[Index] No stream selected");
           searchObj.loading = false;
           showErrorNotification("Please select a stream to extract patterns");
           return;
