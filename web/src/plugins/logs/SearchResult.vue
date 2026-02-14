@@ -154,6 +154,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             @update:model-value="getPageData('recordsPerPage')"
           ></q-select>
+          <!-- Wrap Content Button -->
+          <q-btn
+            v-if="searchObj.meta.logsVisualizeToggle === 'logs'"
+            data-test="logs-search-result-wrap-table-content-btn"
+            icon="wrap_text"
+            flat
+            dense
+            class="wrap-content-btn float-right"
+            :class="{ 'wrap-content-btn--active': searchObj.meta.toggleSourceWrap }"
+            @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+          >
+            <q-tooltip>
+              {{ t("search.messageWrapContent") }}
+            </q-tooltip>
+          </q-btn>
         </div>
       </div>
       <div
