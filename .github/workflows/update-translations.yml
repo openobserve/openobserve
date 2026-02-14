@@ -101,7 +101,7 @@ jobs:
 
       - name: Configure AWS Credentials with IAM Role
         if: steps.check_en_json.outputs.changed == 'true'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
           role-session-name: GitHubActions-TranslationWorkflow
