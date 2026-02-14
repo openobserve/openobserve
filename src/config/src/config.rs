@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 30;
+pub const DB_SCHEMA_VERSION: u64 = 31;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -802,6 +802,8 @@ pub struct Common {
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
+    #[env_config(name = "ZO_META_PARTITION_MODE", default = "auto")]
+    pub meta_partition_mode: String, // "auto" or "manual"
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -2628,6 +2630,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
         ));
+    }
+
+    if cfg.common.meta_store.starts_with("mysql") {
+        return Err(anyhow::anyhow!("We don't support MySQL anymore."));
+    }
+
+    // check meta partition mode
+    if cfg.common.meta_partition_mode != "manual" {
+        cfg.common.meta_partition_mode = "auto".to_string();
     }
 
     // If the default scrape interval is less than 5s, raise an error

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -89,6 +89,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         file_list::LOCAL_CACHE.create_table_index().await?;
     }
     file_list::local_cache_gc().await?;
+    if cfg.common.meta_store == "postgres" {
+        file_list::postgres::spawn_maintenance_task().await?;
+    }
     if !config::is_local_disk_storage() {
         storage::test_remote_config().await?;
     }
