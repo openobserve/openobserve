@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod mysql;
 mod postgres;
 mod sqlite;
 
 use async_trait::async_trait;
-pub use mysql::MysqlAdapter;
 pub use postgres::PostgresAdapter;
 pub use sqlite::SqliteAdapter;
 
@@ -122,7 +120,6 @@ pub trait DbAdapter: Send + Sync {
 pub async fn create_adapter(db_type: &str) -> Result<Box<dyn DbAdapter>, anyhow::Error> {
     match db_type.to_lowercase().as_str() {
         "sqlite" => Ok(Box::new(SqliteAdapter::connect().await?)),
-        "mysql" => Ok(Box::new(MysqlAdapter::connect().await?)),
         "postgresql" | "postgres" => Ok(Box::new(PostgresAdapter::connect().await?)),
         _ => Err(anyhow::anyhow!("Unsupported database type: {}", db_type)),
     }
