@@ -823,7 +823,7 @@ mod tests {
         // Verify the schema has the expected fields
         let schema = FILE_LIST_SCHEMA.clone();
 
-        assert_eq!(schema.fields().len(), 16);
+        assert_eq!(schema.fields().len(), 15);
 
         // Check key field names and types
         assert_eq!(schema.field(0).name(), "id");
@@ -976,7 +976,6 @@ mod tests {
             ("original_size", DataType::Int64),
             ("compressed_size", DataType::Int64),
             ("index_size", DataType::Int64),
-            ("created_at", DataType::Int64),
             ("updated_at", DataType::Int64),
         ];
 

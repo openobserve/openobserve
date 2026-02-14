@@ -929,7 +929,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 15);
     }
 
     #[test]
@@ -958,7 +958,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 15);
 
         // Verify column values
         let id_col = batch
