@@ -53,9 +53,8 @@ async fn set_updated_at_for_existing_rows(manager: &SchemaManager<'_>) -> Result
         .to_owned();
 
     let (sql, values) = match backend {
-        sea_orm::DatabaseBackend::MySql => update_query.build(MysqlQueryBuilder),
         sea_orm::DatabaseBackend::Postgres => update_query.build(PostgresQueryBuilder),
-        sea_orm::DatabaseBackend::Sqlite => update_query.build(SqliteQueryBuilder),
+        _ => update_query.build(SqliteQueryBuilder),
     };
     let statement = Statement::from_sql_and_values(backend, sql, values);
     let ret = db.execute(statement).await?;
@@ -72,9 +71,8 @@ async fn truncate_stream_stats_table(manager: &SchemaManager<'_>) -> Result<(), 
     log::debug!("[FILE_LIST_MIGRATION] Truncating stream_stats table");
 
     let truncate_query = match backend {
-        sea_orm::DatabaseBackend::MySql => "TRUNCATE TABLE stream_stats".to_string(),
         sea_orm::DatabaseBackend::Postgres => "TRUNCATE TABLE stream_stats".to_string(),
-        sea_orm::DatabaseBackend::Sqlite => "DELETE FROM stream_stats".to_string(),
+        _ => "DELETE FROM stream_stats".to_string(),
     };
 
     let statement = Statement::from_string(backend, truncate_query);

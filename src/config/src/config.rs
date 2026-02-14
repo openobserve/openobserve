@@ -800,10 +800,6 @@ pub struct Common {
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
-    #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
-    pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
-    #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
-    pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
@@ -2623,36 +2619,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if !cfg.common.local_mode
-        && !cfg.common.meta_store.starts_with("postgres")
-        && !cfg.common.meta_store.starts_with("mysql")
-    {
+    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
         return Err(anyhow::anyhow!(
-            "Meta store only support mysql or postgres in cluster mode."
+            "Meta store only supports postgres in cluster mode."
         ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
         return Err(anyhow::anyhow!(
             "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
         ));
-    }
-    if cfg.common.meta_store.starts_with("mysql") && cfg.common.meta_mysql_dsn.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Meta store is MySQL, you must set ZO_META_MYSQL_DSN"
-        ));
-    }
-
-    // Print MySQL deprecation warning (logger not initialized yet at this stage)
-    if cfg.common.meta_store.starts_with("mysql") {
-        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
-        eprintln!(
-            "║                              ⚠️  WARNING  ⚠️                                 ║"
-        );
-        eprintln!("║                                                                            ║");
-        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
-        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
-        eprintln!("║                                                                            ║");
-        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
     }
 
     // If the default scrape interval is less than 5s, raise an error

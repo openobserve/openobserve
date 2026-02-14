@@ -207,7 +207,7 @@ pub enum DimensionRelationship {
     Equal,
 
     /// Some dimensions match, some don't (ambiguous)
-    /// Example: existing={ns:prod, db:postgres}, new={ns:prod, db:mysql}
+    /// Example: existing={ns:prod, db:postgres}, new={ns:prod, db:redis}
     /// Action: CREATE separate incident
     PartialOverlap,
 
