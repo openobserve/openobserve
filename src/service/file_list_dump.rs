@@ -54,7 +54,6 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("original_size", DataType::Int64, false),
         Field::new("compressed_size", DataType::Int64, false),
         Field::new("index_size", DataType::Int64, false),
-        Field::new("created_at", DataType::Int64, false),
         Field::new("updated_at", DataType::Int64, false),
     ]))
 });
