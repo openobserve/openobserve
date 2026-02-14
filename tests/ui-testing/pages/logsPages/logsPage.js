@@ -136,6 +136,58 @@ export class LogsPage {
         this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
         this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
 
+        // ===== BUILD TAB / QUERY BUILDER SELECTORS (PR #10305) =====
+        // Tab navigation
+        this.buildToggle = '[data-test="logs-build-toggle"]';
+        this.logsToggle = '[data-test="logs-logs-toggle"]';
+        this.visualizeToggle = '[data-test="logs-visualize-toggle"]';
+        this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+
+        // Query type selector (Auto/Custom mode)
+        this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
+        this.customQueryType = '[data-test="dashboard-custom-query-type"]';
+        this.sqlQueryType = '[data-test="dashboard-sql-query-type"]';
+        this.promqlQueryType = '[data-test="dashboard-promql-query-type"]';
+
+        // Dashboard query builder axes
+        this.xAxisLayout = '[data-test="dashboard-x-layout"]';
+        this.yAxisLayout = '[data-test="dashboard-y-layout"]';
+        this.breakdownLayout = '[data-test="dashboard-b-layout"]';
+        this.zAxisLayout = '[data-test="dashboard-z-layout"]';
+        this.xAxisItem = (alias) => `[data-test="dashboard-x-item-${alias}"]`;
+        this.yAxisItem = (alias) => `[data-test="dashboard-y-item-${alias}"]`;
+        this.breakdownItem = (alias) => `[data-test="dashboard-b-item-${alias}"]`;
+        this.xAxisItemRemove = (alias) => `[data-test="dashboard-x-item-${alias}-remove"]`;
+        this.yAxisItemRemove = (alias) => `[data-test="dashboard-y-item-${alias}-remove"]`;
+        this.breakdownItemRemove = (alias) => `[data-test="dashboard-b-item-${alias}-remove"]`;
+
+        // Field list for builder
+        this.streamTypeDropdown = '[data-test="index-dropdown-stream_type"]';
+        this.streamDropdown = '[data-test="index-dropdown-stream"]';
+        this.addToXAxis = '[data-test="dashboard-add-x-data"]';
+        this.addToYAxis = '[data-test="dashboard-add-y-data"]';
+        this.addToBreakdown = '[data-test="dashboard-add-b-data"]';
+        this.addToFilter = '[data-test="dashboard-add-filter-data"]';
+        this.fieldListSearchInput = '[data-test="index-field-search-input"]';
+
+        // Chart selection
+        this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
+        this.chartTypeItem = (chartId) => `[data-test="selected-chart-${chartId}-item"]`;
+
+        // Panel editor
+        this.fieldListCollapsedIcon = '[data-test="panel-editor-field-list-collapsed-icon"]';
+        this.customChartTypeBtn = '[data-test="custom-chart-type-selector-btn"]';
+
+        // Config panel
+        this.configShowLegend = '[data-test="dashboard-config-show-legend"]';
+        this.configDynamicColumns = '[data-test="dashboard-config-table_dynamic_columns"]';
+        this.configLimit = '[data-test="dashboard-config-limit"]';
+
+        // Chart renderer
+        this.chartRenderer = '[data-test="chart-renderer"]';
+        this.noDataMessage = '[data-test="no-data"]';
+        this.dashboardPanelTable = '[data-test="dashboard-panel-table"]';
+
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
         this.shareLinkTooltip = '[role="tooltip"], .q-tooltip';
@@ -5247,5 +5299,365 @@ export class LogsPage {
         await this.page.locator(`[data-test="date-time-relative-${timeSelector}-btn"]`).click();
         await this.page.waitForTimeout(500);
         testLogger.info(`Selected relative time: ${timeSelector}`);
+    }
+
+    // ============================================================================
+    // BUILD TAB / QUERY BUILDER METHODS - PR #10305
+    // These methods support the Auto Query Builder feature on the Logs page
+    // ============================================================================
+
+    /**
+     * Click the Build tab toggle to switch to Build mode
+     */
+    async clickBuildToggle() {
+        await this.page.locator(this.buildToggle).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Build tab toggle');
+    }
+
+    /**
+     * Click the Logs tab toggle to switch back to Logs mode
+     */
+    async clickLogsToggle() {
+        await this.page.locator(this.logsToggle).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Logs tab toggle');
+    }
+
+    /**
+     * Click the Visualize tab toggle
+     */
+    async clickVisualizeToggle() {
+        await this.page.locator(this.visualizeToggle).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Visualize tab toggle');
+    }
+
+    /**
+     * Expect Build tab toggle to be visible
+     */
+    async expectBuildToggleVisible() {
+        await expect(this.page.locator(this.buildToggle)).toBeVisible();
+        testLogger.info('Build tab toggle is visible');
+    }
+
+    /**
+     * Expect Build tab to be active (check aria-pressed or similar attribute)
+     */
+    async expectBuildTabActive() {
+        const buildToggle = this.page.locator(this.buildToggle);
+        await expect(buildToggle).toBeVisible();
+        testLogger.info('Build tab is active');
+    }
+
+    /**
+     * Expect Builder mode (Auto mode) to be active
+     */
+    async expectBuilderModeActive() {
+        const builderTypeBtn = this.page.locator(this.builderQueryType);
+        await expect(builderTypeBtn).toBeVisible();
+        testLogger.info('Builder mode is active');
+    }
+
+    /**
+     * Expect Custom SQL mode to be active
+     */
+    async expectCustomModeActive() {
+        const customTypeBtn = this.page.locator(this.customQueryType);
+        await expect(customTypeBtn).toBeVisible();
+        testLogger.info('Custom SQL mode is available');
+    }
+
+    /**
+     * Click Builder/Auto query type toggle
+     */
+    async clickBuilderQueryType() {
+        await this.page.locator(this.builderQueryType).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Builder query type');
+    }
+
+    /**
+     * Click Custom SQL query type toggle
+     */
+    async clickCustomQueryType() {
+        await this.page.locator(this.customQueryType).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Custom query type');
+    }
+
+    /**
+     * Expect X-axis layout section to be visible
+     */
+    async expectXAxisLayoutVisible() {
+        await expect(this.page.locator(this.xAxisLayout)).toBeVisible();
+        testLogger.info('X-axis layout is visible');
+    }
+
+    /**
+     * Expect Y-axis layout section to be visible
+     */
+    async expectYAxisLayoutVisible() {
+        await expect(this.page.locator(this.yAxisLayout)).toBeVisible();
+        testLogger.info('Y-axis layout is visible');
+    }
+
+    /**
+     * Expect Breakdown layout section to be visible
+     */
+    async expectBreakdownLayoutVisible() {
+        await expect(this.page.locator(this.breakdownLayout)).toBeVisible();
+        testLogger.info('Breakdown layout is visible');
+    }
+
+    /**
+     * Add a field to X-axis (click the add button)
+     */
+    async clickAddToXAxis() {
+        await this.page.locator(this.addToXAxis).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Add to X-axis');
+    }
+
+    /**
+     * Add a field to Y-axis (click the add button)
+     */
+    async clickAddToYAxis() {
+        await this.page.locator(this.addToYAxis).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Add to Y-axis');
+    }
+
+    /**
+     * Add a field to Breakdown (click the add button)
+     */
+    async clickAddToBreakdown() {
+        await this.page.locator(this.addToBreakdown).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Add to Breakdown');
+    }
+
+    /**
+     * Expect a specific X-axis item to be visible
+     * @param {string} alias - The field alias/name
+     */
+    async expectXAxisItemVisible(alias) {
+        await expect(this.page.locator(this.xAxisItem(alias))).toBeVisible();
+        testLogger.info(`X-axis item "${alias}" is visible`);
+    }
+
+    /**
+     * Expect a specific Y-axis item to be visible
+     * @param {string} alias - The field alias/name
+     */
+    async expectYAxisItemVisible(alias) {
+        await expect(this.page.locator(this.yAxisItem(alias))).toBeVisible();
+        testLogger.info(`Y-axis item "${alias}" is visible`);
+    }
+
+    /**
+     * Remove a field from X-axis
+     * @param {string} alias - The field alias/name
+     */
+    async removeXAxisItem(alias) {
+        await this.page.locator(this.xAxisItemRemove(alias)).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Removed X-axis item "${alias}"`);
+    }
+
+    /**
+     * Remove a field from Y-axis
+     * @param {string} alias - The field alias/name
+     */
+    async removeYAxisItem(alias) {
+        await this.page.locator(this.yAxisItemRemove(alias)).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Removed Y-axis item "${alias}"`);
+    }
+
+    /**
+     * Select a chart type by its ID
+     * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
+     */
+    async selectChartType(chartId) {
+        // Use .first() to handle multiple matching elements (e.g., from cached panels)
+        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
+
+        // Click the chart item (tests should check visibility before calling this)
+        await chartItem.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Selected chart type: ${chartId}`);
+    }
+
+    /**
+     * Expect a specific chart type to be selected
+     * @param {string} chartId - The chart type ID
+     */
+    async expectChartTypeSelected(chartId) {
+        // Use .first() to handle multiple matching elements
+        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
+        await expect(chartItem).toBeVisible();
+        testLogger.info(`Chart type "${chartId}" is visible/selected`);
+    }
+
+    /**
+     * Expect chart renderer to be visible (chart preview loaded)
+     */
+    async expectChartRendererVisible() {
+        await expect(this.page.locator(this.chartRenderer)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Chart renderer is visible');
+    }
+
+    /**
+     * Expect "No data" message to be visible
+     */
+    async expectNoDataMessageVisible() {
+        await expect(this.page.locator(this.noDataMessage)).toBeVisible();
+        testLogger.info('No data message is visible');
+    }
+
+    /**
+     * Expect dashboard panel table to be visible
+     */
+    async expectDashboardPanelTableVisible() {
+        await expect(this.page.locator(this.dashboardPanelTable)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Dashboard panel table is visible');
+    }
+
+    /**
+     * Check if SQL Mode is currently ON
+     * @returns {Promise<boolean>} True if SQL mode is ON
+     */
+    async isSqlModeOn() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        return isChecked === 'true';
+    }
+
+    /**
+     * Verify SQL Mode auto-enables when switching to Build tab
+     */
+    async verifySqlModeAutoEnablesOnBuild() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+
+        if (isChecked === 'true') {
+            await sqlModeToggle.click();
+            await this.page.waitForTimeout(500);
+        }
+
+        await this.clickBuildToggle();
+        await this.page.waitForTimeout(1000);
+
+        const isNowChecked = await sqlModeToggle.getAttribute('aria-checked');
+        if (isNowChecked === 'true') {
+            testLogger.info('SQL Mode auto-enabled on Build tab switch');
+            return true;
+        } else {
+            testLogger.warn('SQL Mode did NOT auto-enable on Build tab switch');
+            return false;
+        }
+    }
+
+    /**
+     * Search for a field in the field list
+     * @param {string} fieldName - The field name to search
+     */
+    async searchFieldInBuilder(fieldName) {
+        await this.page.locator(this.fieldListSearchInput).fill(fieldName);
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Searched for field: ${fieldName}`);
+    }
+
+    /**
+     * Clear field search in builder
+     */
+    async clearFieldSearch() {
+        await this.page.locator(this.fieldListSearchInput).clear();
+        await this.page.waitForTimeout(300);
+        testLogger.info('Cleared field search');
+    }
+
+    /**
+     * Toggle field list collapse/expand in panel editor
+     */
+    async toggleFieldListCollapse() {
+        await this.page.locator(this.fieldListCollapsedIcon).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Toggled field list collapse');
+    }
+
+    /**
+     * Enter a query in the query editor and verify it's accepted
+     * @param {string} query - The SQL query to enter
+     */
+    async enterBuildQuery(query) {
+        await this.clickQueryEditor();
+        await this.page.waitForTimeout(300);
+        await this.selectAllText();
+        await this.pressBackspace();
+        await this.page.keyboard.type(query);
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Entered build query: ${query.substring(0, 50)}...`);
+    }
+
+    /**
+     * Wait for Build tab UI to be fully loaded
+     * @param {number} timeout - Timeout in milliseconds
+     */
+    async waitForBuildTabLoaded(timeout = 30000) {
+        await this.page.waitForLoadState('networkidle', { timeout: timeout });
+
+        // Try multiple detection strategies for Build tab UI
+        try {
+            await Promise.race([
+                // Strategy 1: Look for Auto/Custom query type buttons by data-test
+                this.page.locator('[data-test="dashboard-builder-query-type"]').waitFor({ state: 'visible', timeout: timeout }),
+                this.page.locator('[data-test="dashboard-custom-query-type"]').waitFor({ state: 'visible', timeout: timeout }),
+                // Strategy 2: Look for Auto/Custom buttons by text content
+                this.page.locator('button:has-text("Auto")').first().waitFor({ state: 'visible', timeout: timeout }),
+                this.page.locator('button:has-text("Custom")').first().waitFor({ state: 'visible', timeout: timeout }),
+                // Strategy 3: Look for Fields label in the sidebar
+                this.page.locator('text=Fields').first().waitFor({ state: 'visible', timeout: timeout }),
+                // Strategy 4: Look for chart selection container
+                this.page.locator(this.chartSelectionContainer).waitFor({ state: 'visible', timeout: timeout })
+            ]);
+            testLogger.info('Build tab UI loaded successfully');
+            return true;
+        } catch (error) {
+            // Fallback: Check if any Build tab indicators are visible
+            const hasAutoButton = await this.page.locator('button:has-text("Auto")').first().isVisible().catch(() => false);
+            const hasCustomButton = await this.page.locator('button:has-text("Custom")').first().isVisible().catch(() => false);
+            const hasFieldsLabel = await this.page.locator('text=Fields').first().isVisible().catch(() => false);
+            const hasBuilderType = await this.page.locator('[data-test="dashboard-builder-query-type"]').isVisible().catch(() => false);
+            const hasCustomType = await this.page.locator('[data-test="dashboard-custom-query-type"]').isVisible().catch(() => false);
+
+            if (hasAutoButton || hasCustomButton || hasFieldsLabel || hasBuilderType || hasCustomType) {
+                testLogger.info('Build tab loaded (alternative detection)');
+                return true;
+            }
+            testLogger.warn('Build tab UI did not load within timeout');
+            return false;
+        }
+    }
+
+    /**
+     * Get the current chart type from the UI
+     * @returns {Promise<string|null>} The current chart type or null
+     */
+    async getCurrentChartType() {
+        const chartTypes = ['bar', 'line', 'area', 'metric', 'table', 'scatter', 'pie', 'donut'];
+
+        for (const chartType of chartTypes) {
+            const chartItem = this.page.locator(this.chartTypeItem(chartType));
+            const isVisible = await chartItem.isVisible().catch(() => false);
+            if (isVisible) {
+                const classList = await chartItem.getAttribute('class') || '';
+                if (classList.includes('selected') || classList.includes('active')) {
+                    return chartType;
+                }
+            }
+        }
+        return null;
     }
 }

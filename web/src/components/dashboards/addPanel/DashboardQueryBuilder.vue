@@ -742,6 +742,7 @@ export default defineComponent({
     PromQLBuilderOptions,
   },
   props: ["dashboardData"],
+  emits: ["customChartTemplateSelected"],
   setup(props) {
     const showXAxis = ref(true);
     const panelName = ref("");
@@ -965,8 +966,16 @@ export default defineComponent({
             return;
           }
 
+          // In custom query mode, use the field's alias/column (which matches the SQL column name)
+          // instead of the raw field name from args, since custom mode fields represent SQL result columns
+          const isCustomQuery = dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery;
+
           const fieldObj = {
-            name: firstFieldTypeArg.field,
+            name: isCustomQuery
+              ? (dragElement?.alias || firstFieldTypeArg.field)
+              : firstFieldTypeArg.field,
             streamAlias: firstFieldTypeArg.streamAlias,
           };
 

@@ -102,6 +102,7 @@ export const DEFAULT_LOGS_CONFIG = {
   },
   meta: {
     logsVisualizeToggle: "logs" as const,
+    buildModeQueryEditorDisabled: false, // true when in build mode and customQuery is false
     refreshInterval: 0 as number,
     refreshIntervalLabel: "Off",
     refreshHistogram: false,

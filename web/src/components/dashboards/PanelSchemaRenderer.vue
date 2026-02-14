@@ -905,6 +905,8 @@ export default defineComponent({
     });
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
+    // Use immediate: true to set the initial loading state (true) when component mounts,
+    // preventing premature clearing of fieldsExtractionLoading in logs visualize mode.
     watch(loading, (updatedLoadingValue) => {
       if (variablesAndPanelsDataLoadingState) {
         // update the loading state of the current panel
@@ -913,7 +915,7 @@ export default defineComponent({
           [panelSchema?.value?.id]: updatedLoadingValue,
         };
       }
-    });
+    }, { immediate: true });
     //watch trace id and add in the searchRequestTraceIds
     watch(searchRequestTraceIds, (updatedSearchRequestTraceIds) => {
       if (variablesAndPanelsDataLoadingState) {
