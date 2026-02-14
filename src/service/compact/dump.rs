@@ -837,7 +837,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_compressed_size = Int64Builder::with_capacity(batch_size);
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
-    let mut field_created_at = Int64Builder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
 
     for file in files {
@@ -875,7 +874,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_original_size.finish()),
             Arc::new(field_compressed_size.finish()),
             Arc::new(field_index_size.finish()),
-            Arc::new(field_created_at.finish()),
             Arc::new(field_updated_at.finish()),
         ],
     )?;
@@ -1166,7 +1164,6 @@ mod tests {
             "original_size",
             "compressed_size",
             "index_size",
-            "created_at",
             "updated_at",
         ];
 
