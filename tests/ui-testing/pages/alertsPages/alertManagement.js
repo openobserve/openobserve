@@ -26,14 +26,14 @@ export class AlertManagement {
      */
     async updateAlert(alertName) {
         await this.page.locator(this.locators.alertUpdateButton.replace('{alertName}', alertName)).first().click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Opened alert for editing', { alertName });
 
         await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
         await this.page.waitForTimeout(1000);
 
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
 
@@ -48,12 +48,12 @@ export class AlertManagement {
 
         // Real-time alerts wizard: Step 2 -> Step 4 -> Step 6 (last)
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 4: Alert Settings');
 
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 6: Advanced (last step)');
 
@@ -86,7 +86,7 @@ export class AlertManagement {
      * @param {string} alertName - Name of the alert to pause
      */
     async pauseAlert(alertName) {
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         const alertSelector = `[data-test="alert-list-${alertName}-pause-start-alert"]`;
@@ -116,7 +116,7 @@ export class AlertManagement {
         await pauseButton.click();
 
         await expect(this.page.getByText('Alert Paused Successfully')).toBeVisible({ timeout: 10000 });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Successfully paused alert', { alertName });
     }
@@ -128,7 +128,7 @@ export class AlertManagement {
     async resumeAlert(alertName) {
         testLogger.info('Starting resumeAlert', { alertName });
 
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         const alertSelector = `[data-test="alert-list-${alertName}-pause-start-alert"]`;
@@ -159,7 +159,7 @@ export class AlertManagement {
         testLogger.info('Clicked resume button', { alertName });
 
         await expect(this.page.getByText('Alert Resumed Successfully')).toBeVisible({ timeout: 15000 });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Successfully resumed alert', { alertName });
     }
@@ -474,7 +474,7 @@ export class AlertManagement {
         await this.page.waitForTimeout(waitTimeMs);
 
         await this.page.locator('[data-test="menu-link-\\/logs-item"]').click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         try {

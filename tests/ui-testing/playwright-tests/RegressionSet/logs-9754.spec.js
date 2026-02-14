@@ -153,7 +153,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Logs highlighting regression test setup completed');
   });
 
@@ -185,14 +185,14 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select the test stream
     await pm.logsPage.selectStream(STREAM_NAME);
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible
@@ -224,7 +224,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select the test stream
     await pm.logsPage.selectStream(STREAM_NAME);
@@ -236,7 +236,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     await pm.logsPage.typeQuery("match_all('spec')");
 
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible with results
@@ -266,14 +266,14 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select the test stream
     await pm.logsPage.selectStream(STREAM_NAME);
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible
@@ -311,7 +311,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select the test stream and search for file path content
     await pm.logsPage.selectStream(STREAM_NAME);
@@ -322,7 +322,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     await pm.logsPage.typeQuery("match_all('.ts')");
 
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Get table content
@@ -354,7 +354,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select the test stream
     await pm.logsPage.selectStream(STREAM_NAME);
@@ -365,7 +365,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     await pm.logsPage.typeQuery("match_all('second')");
 
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Get table content

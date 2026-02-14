@@ -437,7 +437,7 @@ export class PipelinesPage {
     }
     async deleteEnrichmentTableByName(fileName) {
         // First ensure we search for the specific file
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         const searchBox = this.page.getByPlaceholder('Search Enrichment Table');
         await searchBox.waitFor({ state: 'visible' });
         await searchBox.clear();

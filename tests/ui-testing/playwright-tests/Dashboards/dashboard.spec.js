@@ -58,10 +58,7 @@ test.describe("dashboard UI testcases", () => {
 
     //create a new dashboard and duplicate it
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-
-    await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-      timeout: 30000,
-    });
+    // Toast is already validated inside createDashboard() and auto-dismisses before we get here
     await pm.dashboardCreate.backToDashboardList();
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
@@ -557,9 +554,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Create Dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await expect(page.getByText("Dashboard added successfully.")).toHaveText(
-      "Dashboard added successfully."
-    );
+    // Toast is already validated inside createDashboard() and auto-dismisses before we get here
 
     // Add Panel
     await pm.dashboardCreate.addPanel();

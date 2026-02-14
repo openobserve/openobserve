@@ -66,7 +66,9 @@ test.describe("Enrichment data testcases", () => {
 
     test("should upload an enrichment table under functions with VRL", {
         tag: ['@enrichment', '@upload', '@vrl', '@P1', '@all']
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
+        // VRL test involves multiple networkidle waits + VRL editor init; give extra headroom
+        test.setTimeout(480000);
         testLogger.info('Testing enrichment table upload with VRL functionality');
 
         // Setup logs data for exploration

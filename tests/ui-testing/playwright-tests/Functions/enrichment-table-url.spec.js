@@ -421,7 +421,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Table created with protocols.csv');
 
         // Step 2: Verify table exists (wait for page to be ready)
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
         testLogger.info('Table found in list');
@@ -431,10 +431,10 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.verifyUpdateMode();
         testLogger.info('Edit form opened');
 
-        // Step 4: Select "Add new URL" mode to show the URL input field
+        // Step 4: Select "Replace all URLs" mode to show the URL input field
         // Default mode is "reload" which doesn't show URL input
-        await enrichmentPage.selectUpdateMode('append');
-        testLogger.info('Selected "Add new URL" update mode');
+        await enrichmentPage.selectUpdateMode('replace');
+        testLogger.info('Selected "Replace all URLs" update mode');
 
         // Step 5: Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
         // enrichment_info.csv has 11 different columns, which will fail schema validation
@@ -444,7 +444,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Step 6: Save the changes
         await enrichmentPage.clickSaveButton();
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Save clicked - job processing async');
 
         // Step 7: Wait for job to complete (poll until buttons appear or warning icon shows)
@@ -514,7 +514,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Test table created');
 
         // Wait for table to appear and navigate to list
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await enrichmentPage.page.waitForTimeout(2000);
 
         // Step 2: Test search functionality using POM method

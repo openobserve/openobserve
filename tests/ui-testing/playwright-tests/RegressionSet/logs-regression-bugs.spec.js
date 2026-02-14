@@ -23,7 +23,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Attempt data ingestion but don't fail test if it errors (global setup already ingested data)
     try {
@@ -43,12 +43,12 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify scroll maintains content visibility (Bug #9996)');
 
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible before scroll
@@ -85,7 +85,7 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     const initialCallCount = searchApiCalls.length;
     testLogger.info(`Initial API calls: ${initialCallCount}`);
 
@@ -98,7 +98,7 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     // Now click Run Query
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Search API should be called after clicking run query
@@ -120,7 +120,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify loading indicator during query (Bug #9533)');
 
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
 
@@ -135,7 +135,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.clickRefreshButton();
 
     // Wait for query to complete
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Button should be enabled after query completes
@@ -155,10 +155,10 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify search bar UI consistency (Bug #8928)');
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Stream selector must be visible
@@ -181,16 +181,16 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify histogram renders correctly (Bug #8928)');
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Toggle histogram on
     await pm.logsPage.enableHistogram();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Histogram should be visible

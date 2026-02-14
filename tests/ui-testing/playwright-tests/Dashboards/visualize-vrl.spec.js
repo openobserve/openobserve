@@ -54,7 +54,7 @@ test.describe("VRL visualization support testcases", () => {
 
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"] ?? "defaultorg"}`;
     await page.goto(logsUrl);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     const pm = new PageManager(page);
     await pm.logsVisualise.logsApplyQueryButton();

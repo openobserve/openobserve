@@ -253,7 +253,7 @@ export class LogsPage {
         let retries = 5;
 
         while (fnEditorExists === 0 && retries > 0) {
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             fnEditorExists = await this.page.locator('#fnEditor').count();
 
             if (fnEditorExists === 0) {
@@ -270,7 +270,7 @@ export class LogsPage {
             currentUrl.searchParams.set('vrl', 'true'); // Try alternative parameter
 
             await this.page.goto(currentUrl.toString());
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
             fnEditorExists = await this.page.locator('#fnEditor').count();
 
@@ -351,7 +351,7 @@ export class LogsPage {
         const orgId = process.env.ORGNAME;
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch((e) => {
+        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((e) => {
             testLogger.warn(`selectIndexAndStreamJoinUnion: Navigation timeout, continuing... ${e.message}`);
         });
         await this.page.waitForTimeout(2000);
@@ -495,7 +495,7 @@ export class LogsPage {
         const orgId = process.env.ORGNAME;
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
         await this.page.waitForTimeout(3000);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -590,7 +590,7 @@ export class LogsPage {
                     await this.page.waitForTimeout(5000); // Wait before retry for stream to be indexed
 
                     // Navigate to logs page again to refresh stream list
-                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
                 }
 
@@ -600,7 +600,7 @@ export class LogsPage {
 
                 if (attempt < maxRetries) {
                     await this.page.waitForTimeout(5000);
-                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
                 }
             }
@@ -1205,7 +1205,7 @@ export class LogsPage {
             await this.page.locator(this.exploreButton).first().waitFor({ state: 'attached', timeout: 10000 });
             
             await Promise.all([
-                this.page.waitForLoadState('networkidle'),
+                this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}),
                 this.page.locator(this.exploreButton).first().click()
             ]);
             
@@ -1224,7 +1224,7 @@ export class LogsPage {
             await this.timestampColumnMenu.scrollIntoViewIfNeeded();
             
             await Promise.all([
-                this.page.waitForLoadState('networkidle'),
+                this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}),
                 this.timestampColumnMenu.click({ force: true })
             ]);
             
@@ -2244,7 +2244,7 @@ export class LogsPage {
 
     async clickBarChartCanvas() {
         // Wait for network idle to ensure chart data has loaded
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         const canvasLocator = this.page.locator(this.barChartCanvas);
 
@@ -2774,14 +2774,14 @@ export class LogsPage {
         const logsPage = this.page.locator(this.qPageContainer);
 
         // Wait for the page to stabilize and check for "No events found" condition
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // If no data is available, trigger a refresh and wait
         const pageText = await logsPage.textContent();
         if (pageText.includes('No events found')) {
             testLogger.debug('No events found, attempting to refresh...');
             await this.clickRefreshButton();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             // Wait additional time for data to load
             await this.page.waitForTimeout(3000);
         }

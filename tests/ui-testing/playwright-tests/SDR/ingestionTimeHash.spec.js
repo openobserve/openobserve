@@ -16,7 +16,7 @@ async function closeStreamDetailSidebar(page) {
 async function navigateToLogsQuick(page) {
   // Quick navigation to logs without VRL editor wait
   await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   testLogger.info('Navigated to Logs (fast - no VRL wait)');
 }
 
@@ -247,11 +247,11 @@ test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () 
     const originalNavigateToLogs = pm.logsPage.navigateToLogs.bind(pm.logsPage);
     pm.logsPage.navigateToLogs = async function() {
       await this.logsMenuItem.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       testLogger.info('Navigated to Logs (skipped VRL editor wait)');
     };
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Combined ingestion time hash test setup completed');
   });
 

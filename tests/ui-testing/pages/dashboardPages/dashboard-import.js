@@ -131,7 +131,7 @@ export default class DashboardImport {
       await dashboardRow.waitFor({ state: "detached", timeout: 10000 });
     } catch {
       try {
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
       } catch {
         try {
           await dashboardRow.waitFor({ state: "hidden", timeout: 5000 });

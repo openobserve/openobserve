@@ -56,7 +56,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 3: Verify function appears in list
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(1000);
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
@@ -88,9 +88,9 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 3: Navigate away and back, verify type persists
       await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       const functionType = await pm.functionsPage.openFunctionAndCheckType(functionName);
@@ -266,7 +266,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 1: Default org - JS hidden, VRL visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=default`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton('default');
@@ -278,7 +278,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 2: Switch to _meta org - JS visible, VRL visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton('_meta');
@@ -290,7 +290,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 3: Switch back to default - JS hidden again, VRL still visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=default`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton('default');

@@ -24,7 +24,7 @@ export class AlertBulkOperations {
      */
     async selectMultipleAlerts(alertNames) {
         // Wait for page to stabilize
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         for (const alertName of alertNames) {
@@ -153,7 +153,7 @@ export class AlertBulkOperations {
 
         // Click move button and verify success message
         await this.page.locator(this.locators.moveButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // The success message is the authoritative confirmation that the move succeeded
         await expect(this.page.getByText(this.locators.alertsMovedMessage)).toBeVisible({ timeout: 15000 });
@@ -175,7 +175,7 @@ export class AlertBulkOperations {
     async deleteAllAlertsInFolder() {
         testLogger.info('Starting to delete all alerts in current folder');
 
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         let totalDeleted = 0;
@@ -201,7 +201,7 @@ export class AlertBulkOperations {
                 totalDeleted++;
             }
 
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(1000);
         }
 

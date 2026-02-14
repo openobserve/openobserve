@@ -50,7 +50,7 @@ export class AlertTemplatesPage {
         const maxRetries = 2; // Maximum number of retry attempts
         
         try {
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 10000 });
             await this.page.locator(this.settingsMenuItem).click();
             await this.page.waitForTimeout(2000);
@@ -60,7 +60,7 @@ export class AlertTemplatesPage {
             await this.page.waitForTimeout(2000);
 
             // Wait for templates page to load
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         } catch (error) {
             testLogger.error('Error navigating to templates', { error: error.message });
@@ -72,7 +72,7 @@ export class AlertTemplatesPage {
             
             // Try to recover by reloading the page
             await this.page.reload();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
             
             // Retry navigation with incremented retry count
@@ -111,7 +111,7 @@ export class AlertTemplatesPage {
         
         // Refresh the page to ensure list is updated
         await this.page.reload();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Try to find the template with retry logic
@@ -140,7 +140,7 @@ export class AlertTemplatesPage {
                 }
                 testLogger.info('Template not found, retrying', { attempts });
                 await this.page.reload();
-                await this.page.waitForLoadState('networkidle');
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
             }
         }

@@ -84,14 +84,14 @@ export class ReportsPage {
 
   async createReportFolderInput() {
     await this.folderInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.folderInput.pressSequentially('de', { delay: 100 });
     await this.page.getByRole('option', { name: 'default' }).click({ force: true });
   }
 
   async createReportDashboardInput(dashboardName) {
     await this.dashboardInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.dashboardInput.fill(dashboardName);
     await this.page.waitForTimeout(2000);
     await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
@@ -99,7 +99,7 @@ export class ReportsPage {
 
   async createReportDashboardTabInput() {
     await this.dashboardTabInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
     await this.page.getByRole('option', { name: 'default' }).click({ force: true });
   }
@@ -153,7 +153,7 @@ export class ReportsPage {
   async createReportZone() {
 
     await this.zoneInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.zoneInput.pressSequentially('UTC', { delay: 1000 });
     await this.page.getByRole('option', { name: 'UTC', exact: true }).waitFor({ state: 'visible' });
     await this.page.getByRole('option', { name: 'UTC', exact: true }).click();
@@ -198,7 +198,7 @@ export class ReportsPage {
 
     // Navigate to reports list to verify report exists
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Search for the report
     await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
@@ -215,15 +215,15 @@ export class ReportsPage {
     await this.reportNameInput.fill("rreport1");
     await this.page.waitForTimeout(5000);
     await this.folderInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.folderInput.pressSequentially('de', { delay: 100 });
     await this.page.getByRole('option', { name: 'default' }).click({ force: true });
     await this.dashboardInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.dashboardInput.fill(dashboardName);
     await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
     await this.dashboardTabInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
     await this.page.getByRole('option', { name: 'default' }).click({ force: true });
     await this.continueButtonStep1.click({ force: true });

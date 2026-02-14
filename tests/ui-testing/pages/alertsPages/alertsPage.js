@@ -552,7 +552,7 @@ export class AlertsPage {
         const nameToVerify = alertName || this.currentAlertName;
 
         // Wait for page to stabilize
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // First try to find the alert directly (in case we're already on the right page)
@@ -563,7 +563,7 @@ export class AlertsPage {
             // If not found, navigate to alerts page and search
             testLogger.info('Alert not immediately visible, navigating to alerts and searching', { alertName: nameToVerify });
             await this.page.locator(this.locators.alertMenuItem).click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
 
             // Search for the alert
@@ -614,7 +614,7 @@ export class AlertsPage {
 
     async verifyInvalidAlertCreation() {
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.alertNameInput).click();
@@ -630,7 +630,7 @@ export class AlertsPage {
 
     async verifyFieldRequiredValidation() {
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.alertNameInput).click();
@@ -680,7 +680,7 @@ export class AlertsPage {
 
     async verifyCloneAlertUIValidation(alertName) {
         await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.cloneSubmitButton).click();
@@ -1790,7 +1790,7 @@ export class AlertsPage {
         await addAlertBtn.waitFor({ state: 'visible', timeout: 10000 });
         await expect(addAlertBtn).toBeEnabled({ timeout: 15000 });
         await addAlertBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Clicked Add Alert button');
     }
 
@@ -1861,7 +1861,7 @@ export class AlertsPage {
      */
     async clickContinueButton() {
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
     }
 
@@ -1870,7 +1870,7 @@ export class AlertsPage {
      */
     async clickBackButton() {
         await this.page.locator(this.locators.alertBackButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     /**
@@ -2006,7 +2006,7 @@ export class AlertsPage {
     async clickAlertUpdateButton(alertName) {
         const updateBtn = this.page.locator(`[data-test="alert-list-${alertName}-update-alert"]`);
         await updateBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked update button for alert', { alertName });
     }

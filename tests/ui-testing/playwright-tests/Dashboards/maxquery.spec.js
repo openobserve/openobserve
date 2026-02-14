@@ -25,7 +25,7 @@ test.describe("dashboard max query testcases", () => {
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
 
     await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   });
   test.skip("should correctly display max query range error message when max query range is exceeded.", async ({
     page,
