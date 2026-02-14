@@ -808,6 +808,12 @@ import {
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { getConsumableRelativeTime } from "@/utils/date";
+import {
+  getPanelTimeFromURL,
+  convertPanelTimeRangeToPicker,
+  convertTimeObjToPickerFormat,
+} from "@/utils/dashboard/panelTimeUtils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -1385,6 +1391,30 @@ export default defineComponent({
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
+
+      // In edit mode, check if panel has panel-level time configured
+      // If it does, use that instead of global time for the date picker
+      if (editMode.value && route.query.panelId) {
+        const panelId = route.query.panelId as string;
+        let panelTimeValue = null;
+
+        // Priority 1: Check URL params for panel-level time (pt-{panelId})
+        const urlPanelTime = getPanelTimeFromURL(panelId, route.query);
+        if (urlPanelTime) {
+          panelTimeValue = urlPanelTime;
+        }
+        // Priority 2: Check panel config for panel_time_range
+        else if (dashboardPanelData.data.config?.panel_time_range) {
+          panelTimeValue = convertPanelTimeRangeToPicker(
+            dashboardPanelData.data.config.panel_time_range
+          );
+        }
+
+        // If panel has its own time, update the selectedDate to show it in the picker
+        if (panelTimeValue) {
+          selectedDate.value = panelTimeValue;
+        }
+      }
     };
 
     const isInitialDashboardPanelData = () => {
@@ -1491,6 +1521,50 @@ export default defineComponent({
       updateDateTime(selectedDate.value);
       // console.timeEnd("watch:selectedDate");
     });
+
+    // Watch for panel-level time configuration changes and update URL
+    watch(
+      () => dashboardPanelData.data.config?.panel_time_range,
+      (newPanelTime) => {
+        // Get panel ID (only in edit mode)
+        const panelId = route.query.panelId as string;
+        if (!panelId) {
+          // In create mode, don't update URL with panel time params yet
+          // Panel time will be saved with the panel config
+          return;
+        }
+
+        if (!newPanelTime) {
+          // Panel time removed - clear panel time params from URL
+          const query = { ...route.query };
+          delete query[`pt-period.${panelId}`];
+          delete query[`pt-from.${panelId}`];
+          delete query[`pt-to.${panelId}`];
+          router.replace({ query });
+          return;
+        }
+
+        // Update URL with panel time parameters
+        const query = { ...route.query };
+
+        if (newPanelTime.type === 'relative' && newPanelTime.relativeTimePeriod) {
+          // Relative time: pt-period.{panelId}={relativeTimePeriod}
+          query[`pt-period.${panelId}`] = newPanelTime.relativeTimePeriod;
+          // Remove absolute time params if they exist
+          delete query[`pt-from.${panelId}`];
+          delete query[`pt-to.${panelId}`];
+        } else if (newPanelTime.type === 'absolute' && newPanelTime.startTime && newPanelTime.endTime) {
+          // Absolute time: pt-from.{panelId}={startTime}&pt-to.{panelId}={endTime}
+          query[`pt-from.${panelId}`] = newPanelTime.startTime.toString();
+          query[`pt-to.${panelId}`] = newPanelTime.endTime.toString();
+          // Remove relative time param if it exists
+          delete query[`pt-period.${panelId}`];
+        }
+
+        router.replace({ query });
+      },
+      { deep: true }
+    );
 
     // resize the chart when config panel is opened and closed
     watch(
@@ -1639,17 +1713,75 @@ export default defineComponent({
 
     const updateDateTime = (value: object) => {
       if (selectedDate.value && dateTimePickerRef?.value) {
-        const date = dateTimePickerRef.value?.getConsumableDateTime();
+        // CRITICAL FIX (Issue 4): Check if panel has its own time configured
+        // Priority 1: Check URL params (highest priority)
+        // Priority 2: Use panel's configured time range
+        // Priority 3: Use global time
+        const panelId = route.query.panelId as string;
+        let effectiveTime;
 
-        dashboardPanelData.meta.dateTime = {
-          start_time: new Date(date.startTime),
-          end_time: new Date(date.endTime),
-        };
+        // Priority 1: URL params (only in edit mode)
+        if (panelId) {
+          const urlPanelTime = getPanelTimeFromURL(panelId, route.query);
+          if (urlPanelTime) {
+            if (urlPanelTime.valueType === 'relative' && urlPanelTime.relativeTimePeriod) {
+              const result = getConsumableRelativeTime(urlPanelTime.relativeTimePeriod);
+              if (result) {
+                effectiveTime = {
+                  start_time: new Date(result.startTime),
+                  end_time: new Date(result.endTime),
+                };
+              }
+            } else if (urlPanelTime.valueType === 'absolute') {
+              effectiveTime = {
+                start_time: new Date(urlPanelTime.startTime),
+                end_time: new Date(urlPanelTime.endTime),
+              };
+            }
+          }
+        }
 
+        // Priority 2: Panel's configured time range
+        if (!effectiveTime) {
+          const panelTimeRange = dashboardPanelData.data.config?.panel_time_range;
+          const pickerValue = convertPanelTimeRangeToPicker(panelTimeRange);
+
+          if (pickerValue) {
+            if (pickerValue.valueType === 'relative' && pickerValue.relativeTimePeriod) {
+              const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
+              if (result) {
+                effectiveTime = {
+                  start_time: new Date(result.startTime),
+                  end_time: new Date(result.endTime),
+                };
+              }
+            } else if (pickerValue.valueType === 'absolute') {
+              effectiveTime = {
+                start_time: new Date(pickerValue.startTime),
+                end_time: new Date(pickerValue.endTime),
+              };
+            }
+          }
+        }
+
+        // Priority 3: If panel doesn't have its own time or conversion failed, use global time
+        if (!effectiveTime) {
+          const date = dateTimePickerRef.value?.getConsumableDateTime();
+          effectiveTime = {
+            start_time: new Date(date.startTime),
+            end_time: new Date(date.endTime),
+          };
+        }
+
+        // Set the effective time for chart rendering
+        dashboardPanelData.meta.dateTime = effectiveTime;
+
+        // Use global time for variables (as variables should use global time context)
         dateTimeForVariables.value = {
           start_time: new Date(selectedDate.value.startTime),
           end_time: new Date(selectedDate.value.endTime),
         };
+
         router.replace({
           query: {
             ...route.query,

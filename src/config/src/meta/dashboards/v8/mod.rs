@@ -442,6 +442,12 @@ pub struct PanelConfig {
     table_pagination: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pagination_rows_per_page: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    panel_time_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    panel_time_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    panel_time_range: Option<PanelTimeRange>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -635,6 +641,20 @@ pub struct Variables {
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct DateTimeOptions {
+    #[serde(rename = "type")]
+    pub typee: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relative_time_period: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<i64>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelTimeRange {
     #[serde(rename = "type")]
     pub typee: String,
     #[serde(skip_serializing_if = "Option::is_none")]
