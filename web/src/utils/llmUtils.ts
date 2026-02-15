@@ -84,21 +84,21 @@ function hasValue(value: any): boolean {
 export function isLLMTrace(data: any): boolean {
   if (!data) return false;
 
-  // Check OTEL Gen-AI fields
+  // Check OTEL Gen-AI fields (new)
   if (hasValue(data['gen_ai.system'])) return true;
   if (hasValue(data['gen_ai.response.model'])) return true;
   if (hasValue(data['gen_ai.request.model'])) return true;
 
-  // Check custom llm.* fields
+  // Check custom llm.* fields (new)
   if (hasValue(data['llm.input'])) return true;
   if (hasValue(data['llm.output'])) return true;
   if (hasValue(data['llm.observation.type'])) return true;
 
-  // Check usage fields (OTEL standard)
+  // Check usage fields (OTEL standard, new)
   if (hasValue(data['gen_ai.usage.input_tokens'])) return true;
   if (hasValue(data['gen_ai.usage.output_tokens'])) return true;
 
-  // Check custom usage fields
+  // Check custom usage fields (new)
   if (hasValue(data['llm.usage.tokens'])) return true;
 
   // Backward compatibility: Check legacy _o2_llm_* fields
@@ -108,7 +108,6 @@ export function isLLMTrace(data: any): boolean {
   if (hasValue(data._o2_llm_usage_details_input)) return true;
   if (hasValue(data._o2_llm_usage_details_output)) return true;
   if (hasValue(data._o2_llm_usage_details_total)) return true;
-
 
   return false;
 }
