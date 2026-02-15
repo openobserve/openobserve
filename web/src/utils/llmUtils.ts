@@ -84,21 +84,21 @@ function hasValue(value: any): boolean {
 export function isLLMTrace(data: any): boolean {
   if (!data) return false;
 
-  // Check OTEL Gen-AI fields (new)
+  // Check OTEL Gen-AI fields
   if (hasValue(data['gen_ai.system'])) return true;
   if (hasValue(data['gen_ai.response.model'])) return true;
   if (hasValue(data['gen_ai.request.model'])) return true;
 
-  // Check custom llm.* fields (new)
+  // Check custom llm.* fields
   if (hasValue(data['llm.input'])) return true;
   if (hasValue(data['llm.output'])) return true;
   if (hasValue(data['llm.observation.type'])) return true;
 
-  // Check usage fields (OTEL standard, new)
+  // Check usage fields (OTEL standard)
   if (hasValue(data['gen_ai.usage.input_tokens'])) return true;
   if (hasValue(data['gen_ai.usage.output_tokens'])) return true;
 
-  // Check custom usage fields (new)
+  // Check custom usage fields
   if (hasValue(data['llm.usage.tokens'])) return true;
 
   // Backward compatibility: Check legacy _o2_llm_* fields
@@ -108,6 +108,7 @@ export function isLLMTrace(data: any): boolean {
   if (hasValue(data._o2_llm_usage_details_input)) return true;
   if (hasValue(data._o2_llm_usage_details_output)) return true;
   if (hasValue(data._o2_llm_usage_details_total)) return true;
+
 
   return false;
 }
@@ -158,7 +159,7 @@ export function parseCostDetails(value: any): CostDetails {
   try {
     const data = typeof value === 'string' ? JSON.parse(value) : value || {};
 
-    // Parse from llm.usage.cost bundle (new) or legacy _o2_llm_cost_details_* fields
+    // Parse from llm.usage.cost bundle or legacy _o2_llm_cost_details_* fields
     const input = data.input || data._o2_llm_cost_details_input || 0;
     const output = data.output || data._o2_llm_cost_details_output || 0;
     const total = data.total || data._o2_llm_cost_details_total || input + output;
@@ -384,7 +385,7 @@ export function truncateLLMContent(
  * Parse evaluation scores from span attributes
  */
 export function parseEvaluationScores(data: any): EvaluationScores | null {
-  // Use OTEL-compliant llm.evaluation.* attributes (new) with fallback to legacy _o2_llm_* names
+  // Use OTEL-compliant llm.evaluation.* attributes with fallback to legacy _o2_llm_* names
   const quality = data['llm.evaluation.quality_score'] || data._o2_llm_evaluation_quality;
   const relevance = data['llm.evaluation.relevance'] || data._o2_llm_evaluation_relevance;
   const completeness = data['llm.evaluation.completeness'] || data._o2_llm_evaluation_completeness;
@@ -490,7 +491,7 @@ export function extractLLMData(span: any): LLMData | null {
     return null;
   }
 
-  // Parse using OTEL-compliant attribute names (new) with legacy fallbacks
+  // Parse using OTEL-compliant attribute names with legacy fallbacks
   const modelParams = parseModelParameters(
     span['llm.request.parameters'] || span._o2_llm_model_parameters
   );
