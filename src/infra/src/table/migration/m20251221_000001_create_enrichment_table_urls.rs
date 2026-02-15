@@ -142,34 +142,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_enrichment_table_urls_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `enrichment_table_urls` (
-                `id` bigint AUTO_INCREMENT PRIMARY KEY,
-                `org` varchar(256) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `url` varchar(2048) NOT NULL,
-                `status` smallint NOT NULL,
-                `error_message` text,
-                `created_at` bigint NOT NULL,
-                `updated_at` bigint NOT NULL,
-                `total_bytes_fetched` bigint NOT NULL,
-                `total_records_processed` bigint NOT NULL,
-                `retry_count` int NOT NULL,
-                `append_data` bool NOT NULL,
-                `last_byte_position` bigint NOT NULL DEFAULT 0,
-                `supports_range` bool NOT NULL DEFAULT FALSE
-            )"#
-        );
-
-        collapsed_eq!(
-            &create_enrichment_table_urls_index_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `enrichment_table_urls_org_name_idx` ON `enrichment_table_urls` (`org`, `name`)"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_enrichment_table_urls_statement().to_string(SqliteQueryBuilder),

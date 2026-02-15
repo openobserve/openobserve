@@ -394,12 +394,12 @@ rustls = { version = "0.23.20", default-features = false, features = [
 rustls-native-certs = "0.8"
 webpki-roots = "0.26"
 sea-orm = { version = "1.1.19", features = [
-    "sqlx-all",
+    "sqlx-postgres",
+    "sqlx-sqlite",
     "runtime-tokio-rustls",
     "macros",
 ] }
 sea-orm-migration = { version = "1.1.19", features = [
-    "sqlx-mysql",
     "sqlx-postgres",
     "sqlx-sqlite",
     "runtime-tokio-rustls",
@@ -414,7 +414,6 @@ snap = "1"
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio-rustls",
     "postgres",
-    "mysql",
     "sqlite",
     "chrono",
 ] }
