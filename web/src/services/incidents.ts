@@ -66,7 +66,7 @@ export interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "trace_based" | "scope_match" | "workload_match" | "alert_id";
+  correlation_reason: "service_discovery" | "scope_match" | "workload_match" | "alert_id";
   created_at: number;
 }
 
@@ -231,26 +231,6 @@ const incidents = {
     };
   },
 
-  /**
-   * Extract trace_id from incident's first alert
-   *
-   * Attempts to find a trace_id dimension in the incident's stable_dimensions.
-   * This can be used as a fallback correlation method.
-   *
-   * @param incident The incident to extract trace_id from
-   * @returns trace_id if found, undefined otherwise
-   */
-  extractTraceId: (incident: Incident): string | undefined => {
-    const dimensions = incident.stable_dimensions;
-
-    // Check common trace_id field variations
-    return (
-      dimensions["trace_id"] ||
-      dimensions["traceId"] ||
-      dimensions["trace.id"] ||
-      dimensions["TraceId"]
-    );
-  },
 };
 
 export default incidents;
