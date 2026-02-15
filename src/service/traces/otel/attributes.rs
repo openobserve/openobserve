@@ -381,7 +381,10 @@ mod tests {
         assert_eq!(O2Attributes::PROMPT_NAME, "gen_ai.prompt.name");
         assert_eq!(O2Attributes::TOOL_NAME, "gen_ai.tool.name");
         assert_eq!(O2Attributes::TOOL_CALL_ID, "gen_ai.tool.call.id");
-        assert_eq!(O2Attributes::TOOL_CALL_ARGUMENTS, "gen_ai.tool.call.arguments");
+        assert_eq!(
+            O2Attributes::TOOL_CALL_ARGUMENTS,
+            "gen_ai.tool.call.arguments"
+        );
         assert_eq!(O2Attributes::TOOL_CALL_RESULT, "gen_ai.tool.call.result");
         assert_eq!(O2Attributes::USER_ID, "user.id");
         assert_eq!(O2Attributes::SESSION_ID, "session.id");
@@ -393,17 +396,41 @@ mod tests {
         assert_eq!(O2Attributes::MODEL_PARAMETERS, "llm.request.parameters");
         assert_eq!(O2Attributes::USAGE_DETAILS, "llm.usage.tokens");
         assert_eq!(O2Attributes::COST_DETAILS, "llm.usage.cost");
-        assert_eq!(O2Attributes::COMPLETION_START_TIME, "llm.completion.start_time");
+        assert_eq!(
+            O2Attributes::COMPLETION_START_TIME,
+            "llm.completion.start_time"
+        );
 
         // Evaluation attributes (OTEL-compliant llm.evaluation.* namespace)
-        assert_eq!(O2Attributes::EVALUATION_QUALITY, "llm.evaluation.quality_score");
-        assert_eq!(O2Attributes::EVALUATION_RELEVANCE, "llm.evaluation.relevance");
-        assert_eq!(O2Attributes::EVALUATION_COMPLETENESS, "llm.evaluation.completeness");
-        assert_eq!(O2Attributes::EVALUATION_TOOL_EFFECTIVENESS, "llm.evaluation.tool_effectiveness");
-        assert_eq!(O2Attributes::EVALUATION_GROUNDEDNESS, "llm.evaluation.groundedness");
+        assert_eq!(
+            O2Attributes::EVALUATION_QUALITY,
+            "llm.evaluation.quality_score"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_RELEVANCE,
+            "llm.evaluation.relevance"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_COMPLETENESS,
+            "llm.evaluation.completeness"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_TOOL_EFFECTIVENESS,
+            "llm.evaluation.tool_effectiveness"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_GROUNDEDNESS,
+            "llm.evaluation.groundedness"
+        );
         assert_eq!(O2Attributes::EVALUATION_SAFETY, "llm.evaluation.safety");
-        assert_eq!(O2Attributes::EVALUATION_DURATION_MS, "llm.evaluation.duration_ms");
-        assert_eq!(O2Attributes::EVALUATION_COMMENTARY, "llm.evaluation.commentary");
+        assert_eq!(
+            O2Attributes::EVALUATION_DURATION_MS,
+            "llm.evaluation.duration_ms"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_COMMENTARY,
+            "llm.evaluation.commentary"
+        );
         assert_eq!(O2Attributes::EVALUATOR_NAME, "llm.evaluator.name");
         assert_eq!(O2Attributes::EVALUATOR_VERSION, "llm.evaluator.version");
         assert_eq!(O2Attributes::EVALUATOR_TYPE, "llm.evaluator.type");
