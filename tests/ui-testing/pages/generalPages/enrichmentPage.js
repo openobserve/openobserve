@@ -228,7 +228,7 @@ class EnrichmentPage {
     async navigateToEnrichmentTable() {
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.locator(this.enrichmentTableTab).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for the enrichment tables list to be visible
         await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 10000 });
     }
@@ -249,7 +249,7 @@ class EnrichmentPage {
 
         // Click on 'Save'
         await this.page.getByText(this.saveButton).click({ force: true });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Wait for the form to disappear (indicates save completed and returned to list)
         await this.page.getByText('Add Enrichment Table').waitFor({ state: 'hidden', timeout: 15000 });
@@ -260,13 +260,13 @@ class EnrichmentPage {
 
     async searchForEnrichmentTable(fileName) {
         await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     // Exploration Methods
     async exploreEnrichmentTable() {
         await this.page.getByRole('button', { name: this.exploreButton }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async clickTimestampColumn() {
@@ -275,7 +275,7 @@ class EnrichmentPage {
 
     async closeLogDialog() {
         await this.page.locator(this.closeDialog).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async clickDateTimeButton() {
@@ -297,11 +297,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         try {
             // Wait for logs page to be fully loaded and stable
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
-            
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
             // Wait for VRL editor to be fully initialized (addressing the race condition)
             // The original working code had a 3-second wait after "Explore" click for editor initialization
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             
             // Ensure VRL functions panel is available if needed
             try {
@@ -331,7 +331,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             // Critical: Wait for VRL query validation and processing before proceeding
             // The VRL editor needs time to parse and validate the query syntax
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         } catch (error) {
             throw new Error(`VRL Query filling failed: ${error.message}`);
         }
@@ -340,7 +340,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async applyQuery() {
         // Wait for refresh button to be ready
         await this.page.waitForSelector(this.refreshButton, { state: 'visible' });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Click on the run query button and wait for response
         const search = this.page.waitForResponse("**/api/**/_search**");
@@ -351,7 +351,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await expect.poll(async () => response.status()).toBe(200);
         
         // Wait for results to render and process
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     }
 
     async waitForVRLEditorReady() {
@@ -373,12 +373,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await refreshButton.click({ force: true });
             if (i < 3) { // Wait between clicks except after last click
                 await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForLoadState('networkidle', { timeout: 1000 });
+                await this.page.waitForLoadState('networkidle', { timeout: 1000 }).catch(() => {});
             }
         }
         
         // Wait for query execution to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async verifyNoQueryWarning() {
@@ -390,7 +390,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForLoadState('networkidle', { timeout: 60000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Additional run query clicks to ensure VRL enrichment is fully processed
@@ -400,7 +400,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 await refreshButton.click({ force: true });
                 await this.page.waitForLoadState('domcontentloaded');
                 await this.page.waitForTimeout(2000);
-                await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             }
         }
         
@@ -437,7 +437,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         });
         
         // Wait for table to be stable after file upload
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Try to find the file with retries (table might still be loading in CI)
         let fileFound = false;
@@ -464,7 +464,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             if (!fileFound) {
                 attempts++;
                 if (attempts < maxAttempts) {
-                    await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+                    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
                 }
             }
         }
@@ -495,9 +495,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async appendDataToTable(filePath) {
         const inputFile = await this.page.locator(this.fileInput);
         await inputFile.setInputFiles(filePath);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.getByRole('button', { name: this.saveButton }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     // Complete workflow methods
@@ -538,11 +538,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Click on 'Save'
         await this.page.getByText(this.saveButton).click({ force: true });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Search for the uploaded file name
         await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Verify the file name in the enrichment table
         await this.verifyFileInTable(fileName);
@@ -553,14 +553,14 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.getByRole("button", { name: this.exploreButton }).waitFor({ state: 'visible' });
         
         // Wait for navigation response before clicking
-        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 30000 });
+        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.getByRole("button", { name: this.exploreButton }).click();
         await navigationPromise;
         
         // Ensure we're on the logs page with additional wait
         await this.page.waitForLoadState('domcontentloaded');
         // Wait for VRL editor initialization to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Verify we're on the correct page before proceeding
         await this.page.waitForSelector(this.refreshButton, { 
@@ -585,7 +585,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             // Navigate to the modified URL
             await this.page.goto(newUrl);
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             testLogger.debug('Navigated to URL with VRL editor enabled');
         }
         
@@ -627,7 +627,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.applyQueryMultipleClicks();
 
         // Wait for query results to load
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Check if error occurred and retry with additional wait
@@ -640,7 +640,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
             // Retry the query
             await this.applyQueryMultipleClicks();
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
 
             // Check again if error persists
@@ -698,11 +698,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Click on 'Save'
         await this.page.getByText(this.saveButton).click({ force: true });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Search and explore the uploaded table
         await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async exploreAndVerifyInitialData() {
@@ -711,7 +711,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await expect(this.page.getByRole('cell', { name: this.startTimeCell })).toBeVisible();
         await this.page.locator(this.timestampColumn).click();
         await this.page.locator(this.closeDialog).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async navigateAndAppendData(fileName, filePath) {
@@ -727,15 +727,15 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Upload the CSV again for appending
         const inputFile = await this.page.locator(this.fileInput);
         await inputFile.setInputFiles(filePath);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.getByRole('button', { name: this.saveButton }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async verifyAppendedData(fileName) {
         // Verify appended data
         await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.getByRole("button", { name: this.exploreButton }).click();
 
         // Verify row count increased
@@ -761,7 +761,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async clickCancelButton() {
         await this.page.getByRole('button', { name: 'Cancel' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async verifyBackOnEnrichmentList() {
@@ -771,7 +771,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async searchEnrichmentTableInList(tableName) {
         // Wait for page to stabilize
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Use getByPlaceholder which works reliably with Quasar q-input components
         // Directly wait for search input instead of title - search input visibility indicates page is ready
@@ -784,7 +784,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Fill the search input with table name to filter results
         await searchInput.fill(tableName);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Wait for search to process
         await this.page.waitForTimeout(1000);
@@ -800,7 +800,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
         // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
         await row.locator('button').nth(1).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async verifySchemaModalVisible() {
@@ -831,7 +831,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const editBtn = buttons.nth(editBtnIndex);
         await editBtn.waitFor({ state: 'visible', timeout: 10000 });
         await editBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for edit form to start loading
         await this.page.waitForTimeout(1000);
         testLogger.debug('Edit button clicked');
@@ -842,7 +842,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Wait for the update form with longer timeout for CI environments
         await this.page.getByText('Update Enrichment Table').waitFor({ state: 'visible', timeout: 30000 });
         // Wait for form to fully load
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Additional wait for form elements to render (radio buttons, inputs, etc.)
         await this.page.waitForTimeout(3000);
         // Verify at least one form element is present (Name field or radio group)
@@ -895,7 +895,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async clickDeleteOK() {
         await this.page.getByRole('button', { name: 'OK' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     // ============================================================================
@@ -981,7 +981,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Save button clicked');
 
         // Wait for save to complete
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Wait for form to close (returned to list)
         await this.page.locator(this.addEnrichmentTableTitle).waitFor({ state: 'hidden', timeout: 15000 });
@@ -992,7 +992,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Hard reload the page to ensure fresh API data
         // This is more reliable than menu navigation in CI environments
-        await this.page.reload({ waitUntil: 'networkidle' });
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
         testLogger.debug('Page reloaded for fresh data');
 
         // Wait for the enrichment tables list to be visible after reload
@@ -1060,7 +1060,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.debug(`Polling attempt ${attempts}, elapsed: ${elapsed}ms`);
 
             // Reload page to get fresh DOM state from server
-            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
 
             // Find the row with table name
             const row = this.page.locator('tbody tr').filter({ hasText: tableName });
@@ -1160,7 +1160,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Selecting update mode: ${mode}`);
 
         // Wait for form to fully load - the update mode options may take time to render in CI
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // First, ensure we're on the Update form (wait for title with longer timeout for CI)
         const updateTitle = this.page.getByText('Update Enrichment Table');
@@ -1212,11 +1212,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 'Re-process existing URLs',
                 'Re-process'
             ],
-            append: [
-                'Add new URL',
-                'Add URL',
-                'Append URL',
-                'Append'
+            replaceFailed: [
+                'Replace failed URL only',
+                'Replace failed URL',
+                'Replace failed',
             ],
             replace: [
                 'Replace all URLs',
@@ -1291,7 +1290,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Canceling enrichment table form');
 
         await this.page.getByRole('button', { name: 'Cancel' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         testLogger.debug('Form canceled');
     }
@@ -1457,7 +1456,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Saving update mode changes');
 
         await this.page.getByRole('button', { name: 'Save' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Wait for form to close (returned to list)
         await this.page.locator(this.updateEnrichmentTableTitle).waitFor({ state: 'hidden', timeout: 15000 });
@@ -1467,7 +1466,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForTimeout(3000);
 
         // Reload page to ensure fresh data
-        await this.page.reload({ waitUntil: 'networkidle' });
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
 
         // Wait for the enrichment tables list to be visible after reload
         await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
@@ -1500,7 +1499,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Waiting for logs page navigation');
 
         await this.page.waitForURL(/.*logs.*stream_type=enrichment_tables.*/);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         testLogger.debug('Navigated to logs page');
     }
@@ -1733,7 +1732,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async clickSaveButton() {
         testLogger.debug('Clicking Save button');
         await this.page.getByRole('button', { name: 'Save' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.debug('Save button clicked');
     }
 
@@ -1787,7 +1786,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             try {
                 // Use click with shorter timeout and handle detachment gracefully
                 await cancelBtn.click({ timeout: 5000 });
-                await this.page.waitForLoadState('networkidle');
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                 testLogger.debug('Clicked Cancel button to navigate back');
             } catch (clickError) {
                 // Element may have been detached (form auto-closed) - this is okay
@@ -1831,7 +1830,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await searchInput.clear();
             await this.page.waitForTimeout(1000);
             await searchInput.fill(tableName);
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
 
             // Use isVisible with catch instead of expect to avoid race condition
@@ -1846,7 +1845,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             if (attempt < maxAttempts) {
                 testLogger.info('Table not found yet, waiting and retrying...');
                 await this.page.waitForTimeout(5000);
-                await this.page.reload({ waitUntil: 'networkidle' });
+                await this.page.reload({ waitUntil: 'domcontentloaded' });
                 await this.waitForEnrichmentTablesList();
             }
         }
@@ -1878,19 +1877,27 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
         await row.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Find the Type cell that contains "Url" text and click the icon next to it
-        // The icon can be: clock (processing), warning (failed), check_circle (completed)
+        // The Vue template has @click="showUrlJobsDialog" on two elements:
+        // 1. <span class="cursor-pointer"> containing "Url" text (always present for URL tables)
+        // 2. <q-icon name="warning" class="cursor-pointer"> (only when job failed)
+        // The <td> cell itself does NOT have the @click handler, so we must click the span.
         const typeCell = row.locator('td').filter({ hasText: 'Url' });
         await typeCell.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Click on the icon within the Type cell
-        const statusIcon = typeCell.locator('i, .q-icon, svg').first();
-        if (await statusIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await statusIcon.click();
+        // Click the "Url" text span which always has the @click handler
+        const urlSpan = typeCell.locator('span.cursor-pointer').first();
+        if (await urlSpan.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await urlSpan.click();
         } else {
-            // Fallback: click on the cell itself
-            testLogger.debug('No icon found, clicking on Type cell');
-            await typeCell.click();
+            // Fallback: try the icon (warning/check_circle) which also has @click
+            const statusIcon = typeCell.locator('i.cursor-pointer, .q-icon.cursor-pointer').first();
+            if (await statusIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await statusIcon.click();
+            } else {
+                // Last resort: click the "Url" text directly
+                testLogger.debug('No cursor-pointer element found, clicking Url text');
+                await typeCell.getByText('Url').first().click();
+            }
         }
 
         await this.page.waitForLoadState('domcontentloaded');
@@ -1984,7 +1991,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             const elapsed = Math.round((Date.now() - startTime) / 1000);
 
             // Reload to get fresh status
-            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
             await this.waitForEnrichmentTablesList();
             await this.searchEnrichmentTableInList(tableName);
 
@@ -2035,7 +2042,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Adding URL in edit mode: ${newUrl}`);
 
         // Wait for update form to be ready
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Try multiple strategies to find and fill the URL input
@@ -2123,7 +2130,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         for (let i = 0; i < maxAttempts; i++) {
             await this.page.waitForTimeout(pollInterval);
-            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
             await this.waitForEnrichmentTablesList();
             await this.searchEnrichmentTableInList(tableName);
 
@@ -2220,7 +2227,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
             await searchInput.clear();
             await searchInput.fill(tableName);
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(1000);
 
             // Check if table exists

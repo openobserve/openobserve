@@ -33,7 +33,7 @@ export class AlertCreationWizard {
         this.currentAlertName = randomAlertName;
 
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Starting alert creation wizard', { alertName: randomAlertName });
 
         // ==================== STEP 1: ALERT SETUP ====================
@@ -64,7 +64,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.addConditionButton).first().click();
@@ -102,7 +102,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Set silence notification to 0 for immediate alerts
@@ -145,7 +145,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         // ==================== SUBMIT ====================
@@ -168,7 +168,7 @@ export class AlertCreationWizard {
         this.currentAlertName = randomAlertName;
 
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Starting alert creation wizard', { alertName: randomAlertName });
 
         // ==================== STEP 1: ALERT SETUP ====================
@@ -196,7 +196,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Add condition - different buttons may be visible depending on state
@@ -229,7 +229,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Set silence notification to 0 for immediate alerts
@@ -266,7 +266,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         // ==================== SUBMIT ====================
@@ -275,7 +275,7 @@ export class AlertCreationWizard {
         testLogger.info('Successfully created alert with defaults', { alertName: randomAlertName });
 
         // Wait for navigation back to alerts list
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         return randomAlertName;
@@ -293,7 +293,7 @@ export class AlertCreationWizard {
         this.currentAlertName = randomAlertName;
 
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Starting scheduled alert creation wizard', { alertName: randomAlertName });
 
         // ==================== STEP 1: ALERT SETUP ====================
@@ -324,7 +324,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS (SQL) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         const sqlTab = this.page.locator('[data-test="tab-sql"]');
@@ -335,7 +335,7 @@ export class AlertCreationWizard {
         const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
         await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
         await viewEditorBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         const sqlEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.inputarea');
@@ -343,7 +343,7 @@ export class AlertCreationWizard {
         await sqlEditor.fill('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
 
         await this.page.locator(this.locators.runQueryButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Close SQL editor dialog
@@ -358,12 +358,12 @@ export class AlertCreationWizard {
             testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // ==================== STEP 3: COMPARE WITH PAST ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Add 30-minute time range comparison
@@ -377,7 +377,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         const thresholdOperator = this.page.locator(this.locators.stepAlertConditionsQSelect).first();
@@ -422,12 +422,12 @@ export class AlertCreationWizard {
 
         // ==================== STEP 5: DEDUPLICATION (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         // ==================== SUBMIT ====================
@@ -451,7 +451,7 @@ export class AlertCreationWizard {
 
         // Click Add Alert button to start wizard
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Starting multi-condition alert creation', { alertName: randomAlertName });
 
         // ==================== STEP 1: ALERT SETUP ====================
@@ -481,7 +481,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS (Multiple) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
 
@@ -567,7 +567,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
 
@@ -610,7 +610,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         // ==================== SUBMIT ALERT ====================
@@ -619,7 +619,7 @@ export class AlertCreationWizard {
         testLogger.info('Successfully created multi-condition alert', { alertName: randomAlertName });
 
         // Wait for page to navigate back to alerts list after creation
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         return randomAlertName;
@@ -647,7 +647,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
         testLogger.info('Add alert dialog opened');
 
@@ -680,7 +680,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS (SQL) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
 
@@ -693,7 +693,7 @@ export class AlertCreationWizard {
         const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
         await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
         await viewEditorBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Opened SQL Editor dialog');
 
@@ -703,7 +703,7 @@ export class AlertCreationWizard {
         testLogger.info('Entered SQL query');
 
         await this.page.locator(this.locators.runQueryButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
@@ -719,19 +719,19 @@ export class AlertCreationWizard {
             testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Closed SQL Editor dialog');
 
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 3: Compare with Past (skipping)');
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
 
@@ -783,7 +783,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 5: DEDUPLICATION ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 5: Deduplication');
 
@@ -829,7 +829,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 6: Advanced (skipping)');
 
@@ -852,7 +852,7 @@ export class AlertCreationWizard {
 
         // Start creating an alert
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Fill Step 1: Alert Setup
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
@@ -875,7 +875,7 @@ export class AlertCreationWizard {
 
         // Navigate to Step 2: Conditions
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Add first condition
@@ -946,7 +946,7 @@ export class AlertCreationWizard {
 
         // Cancel alert creation
         await this.page.locator(this.locators.alertBackButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         return { toggleSuccessful, message };
     }
@@ -1053,7 +1053,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
         testLogger.info('Add alert dialog opened');
 
@@ -1086,7 +1086,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS (SQL) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
 
@@ -1099,7 +1099,7 @@ export class AlertCreationWizard {
         const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
         await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
         await viewEditorBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Opened SQL Editor dialog');
 
@@ -1112,7 +1112,7 @@ export class AlertCreationWizard {
         testLogger.info('Entered SQL query', { sqlQuery });
 
         await this.page.locator(this.locators.runQueryButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
@@ -1129,7 +1129,7 @@ export class AlertCreationWizard {
             testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // Verify SQL editor dialog is closed by waiting for it to be hidden
@@ -1144,7 +1144,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 3: COMPARE WITH PAST ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 3: Compare with Past');
 
@@ -1162,7 +1162,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
 
@@ -1225,7 +1225,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 5: DEDUPLICATION ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 5: Deduplication');
 
@@ -1265,7 +1265,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 6: Advanced (skipping)');
 
@@ -1314,13 +1314,13 @@ export class AlertCreationWizard {
         if (await addAlertBtn.isDisabled()) {
             testLogger.info('Add Alert button disabled, reloading page to fetch destinations');
             await this.page.reload();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await addAlertBtn.waitFor({ state: 'visible', timeout: 10000 });
         }
 
         await expect(addAlertBtn).toBeEnabled({ timeout: 15000 });
         await addAlertBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
         testLogger.info('Add alert dialog opened');
 
@@ -1356,7 +1356,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS (PromQL) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
 
@@ -1371,7 +1371,7 @@ export class AlertCreationWizard {
         const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
         await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
         await viewEditorBtn.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Opened PromQL Editor dialog');
 
@@ -1383,7 +1383,7 @@ export class AlertCreationWizard {
 
         // Run the query
         await this.page.locator(this.locators.runQueryButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran PromQL query');
 
@@ -1399,19 +1399,19 @@ export class AlertCreationWizard {
             testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Closed PromQL Editor dialog');
 
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 3: Compare with Past (skipping)');
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
 
@@ -1498,13 +1498,13 @@ export class AlertCreationWizard {
 
         // ==================== STEP 5: DEDUPLICATION (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 5: Deduplication (skipping)');
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 6: Advanced (skipping)');
 

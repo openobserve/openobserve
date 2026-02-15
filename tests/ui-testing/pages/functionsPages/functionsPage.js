@@ -35,7 +35,7 @@ class FunctionsPage {
     // Functions is under Pipeline menu
     const targetOrg = org || process.env.ORGID;
     await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${targetOrg}`);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(2000);
   }
 
@@ -58,7 +58,7 @@ class FunctionsPage {
       // Navigate to functions page (uses provided org or current URL's org)
       const targetOrg = org || this.getCurrentOrgFromUrl() || process.env.ORGID;
       await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${targetOrg}`);
-      await this.page.waitForLoadState('networkidle');
+      await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await this.page.waitForTimeout(1000);
     }
 
@@ -304,7 +304,7 @@ class FunctionsPage {
       // Navigate back to functions list with correct org
       const targetOrg = org || process.env.ORGID;
       await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${targetOrg}`);
-      await this.page.waitForLoadState('networkidle');
+      await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await this.page.waitForTimeout(2000);
     }
 
@@ -338,7 +338,7 @@ class FunctionsPage {
     await this.clickFunctionByName(functionName);
 
     // Wait for the editor to load after clicking the function
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(2000);
 
     // Wait for radio buttons to be visible
