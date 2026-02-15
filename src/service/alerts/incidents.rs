@@ -66,9 +66,8 @@ fn extract_service_name_from_dimensions(
 /// Called after deduplication, before notification.
 ///
 /// Correlation priority:
-/// 1. trace_id (if present) - groups all alerts from same distributed trace
-/// 2. Service Discovery hash - uses pre-computed correlation_key from service_streams table
-/// 3. Manual extraction - computes blake3 hash from stable dimensions
+/// 1. Service Discovery hash - uses pre-computed correlation_key from service_streams table
+/// 2. Manual extraction - computes blake3 hash from stable dimensions
 ///
 /// Returns the incident ID if the alert was correlated to an existing or new incident.
 pub async fn correlate_alert_to_incident(
@@ -76,7 +75,6 @@ pub async fn correlate_alert_to_incident(
     result_row: &Map<String, Value>,
     triggered_at: i64,
     _service_name_hint: Option<&str>,
-    trace_id: Option<&str>,
 ) -> Result<Option<(String, String)>, anyhow::Error> {
     // Semantic groups from system_settings — the single source of truth,
     // configured via /settings/v2/semantic_field_groups API.
@@ -148,7 +146,6 @@ pub async fn correlate_alert_to_incident(
         service_discovery_result
             .as_ref()
             .map(|r| r.correlation_key.as_str()),
-        trace_id,
         &semantic_groups,
     );
 

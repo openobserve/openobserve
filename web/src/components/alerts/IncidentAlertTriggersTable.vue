@@ -90,7 +90,7 @@ interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "trace_based" | "scope_match" | "workload_match" | "alert_id";
+  correlation_reason: "service_discovery" | "scope_match" | "workload_match" | "alert_id";
   created_at: number;
 }
 
@@ -162,8 +162,6 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return "blue";
-        case "trace_based":
-          return "teal";
         case "scope_match":
           return "purple";
         case "workload_match":
@@ -179,8 +177,6 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return t("alerts.incidents.correlationServiceDiscovery");
-        case "trace_based":
-          return t("alerts.incidents.correlationTraceBased");
         case "scope_match":
           return t("alerts.incidents.correlationScopeMatch");
         case "workload_match":
@@ -196,8 +192,6 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return t("alerts.incidents.correlationServiceDiscoveryTooltip");
-        case "trace_based":
-          return t("alerts.incidents.correlationTraceBasedTooltip");
         case "scope_match":
           return t("alerts.incidents.correlationScopeMatchTooltip");
         case "workload_match":

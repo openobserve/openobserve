@@ -856,19 +856,11 @@ async fn handle_alert_triggers(
                 .or_else(|| first_row.get("service_name"))
                 .and_then(json::Value::as_str);
 
-            // Extract trace_id for trace-based correlation
-            let trace_id = first_row
-                .get("trace_id")
-                .or_else(|| first_row.get("traceId"))
-                .or_else(|| first_row.get("TraceId"))
-                .and_then(json::Value::as_str);
-
             match crate::service::alerts::incidents::correlate_alert_to_incident(
                 &alert,
                 first_row,
                 triggered_at,
                 service_name,
-                trace_id,
             )
             .await
             {

@@ -92,8 +92,6 @@ impl std::str::FromStr for IncidentSeverity {
 pub enum CorrelationReason {
     /// Correlation key from Service Discovery
     ServiceDiscovery,
-    /// Correlated via shared distributed trace ID
-    TraceBased,
     /// Correlated by matching environment scope dimensions (cluster, region, namespace)
     ScopeMatch,
     /// Correlated by matching workload identity dimensions (service, deployment)
@@ -106,7 +104,6 @@ impl std::fmt::Display for CorrelationReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ServiceDiscovery => write!(f, "service_discovery"),
-            Self::TraceBased => write!(f, "trace_based"),
             Self::ScopeMatch => write!(f, "scope_match"),
             Self::WorkloadMatch => write!(f, "workload_match"),
             Self::AlertId => write!(f, "alert_id"),
@@ -120,7 +117,6 @@ impl TryFrom<&str> for CorrelationReason {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "service_discovery" => Ok(Self::ServiceDiscovery),
-            "trace_based" => Ok(Self::TraceBased),
             "scope_match" => Ok(Self::ScopeMatch),
             "workload_match" => Ok(Self::WorkloadMatch),
             "alert_id" => Ok(Self::AlertId),
@@ -134,7 +130,7 @@ impl TryFrom<&str> for CorrelationReason {
 /// Hierarchy: AlertId (weakest) → Workload → Scope (strongest)
 /// Upgrades only move UP the hierarchy, never down.
 ///
-/// Key format: `[KIND]:[key]` where KIND is SCOPE, WORKLOAD, SD, TRACE, or ALERT.
+/// Key format: `[KIND]:[key]` where KIND is SCOPE, WORKLOAD, SD, or ALERT.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum KeyType {
@@ -151,10 +147,7 @@ pub enum KeyType {
 
 impl KeyType {
     pub fn classify(correlation_key: &str) -> Self {
-        if correlation_key.starts_with("SCOPE:")
-            || correlation_key.starts_with("SD:")
-            || correlation_key.starts_with("TRACE:")
-        {
+        if correlation_key.starts_with("SCOPE:") || correlation_key.starts_with("SD:") {
             Self::Scope
         } else if correlation_key.starts_with("WORKLOAD:") {
             Self::Workload
@@ -593,7 +586,6 @@ mod tests {
             CorrelationReason::ServiceDiscovery.to_string(),
             "service_discovery"
         );
-        assert_eq!(CorrelationReason::TraceBased.to_string(), "trace_based");
         assert_eq!(CorrelationReason::ScopeMatch.to_string(), "scope_match");
         assert_eq!(
             CorrelationReason::WorkloadMatch.to_string(),
@@ -635,7 +627,10 @@ mod tests {
             CorrelationReason::ServiceDiscovery,
             CorrelationReason::ScopeMatch
         );
-        assert_ne!(CorrelationReason::ScopeMatch, CorrelationReason::TraceBased);
+        assert_ne!(
+            CorrelationReason::ScopeMatch,
+            CorrelationReason::WorkloadMatch
+        );
     }
 
     #[test]
@@ -729,12 +724,6 @@ mod tests {
     fn test_key_type_classify_alert_id() {
         let key = "ALERT:2QxZj9K0d6XYz8wN3sF5pL4mT7v";
         assert_eq!(KeyType::classify(key), KeyType::AlertId);
-    }
-
-    #[test]
-    fn test_key_type_classify_trace() {
-        let key = "TRACE:4bf92f3577b34da6a3ce929d0e0e4736";
-        assert_eq!(KeyType::classify(key), KeyType::Scope);
     }
 
     #[test]
