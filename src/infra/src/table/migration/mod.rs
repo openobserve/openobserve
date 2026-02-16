@@ -97,7 +97,6 @@ mod m20260212_000001_widen_incident_correlation_key;
 mod m20260216_000001_create_anomaly_detection_config_table;
 mod m20260216_000002_create_anomaly_detection_models_table;
 
-
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -182,7 +181,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20260212_000001_widen_incident_correlation_key::Migration),
             Box::new(m20260216_000001_create_anomaly_detection_config_table::Migration),
             Box::new(m20260216_000002_create_anomaly_detection_models_table::Migration),
-
         ]
     }
 }
