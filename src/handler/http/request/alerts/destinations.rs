@@ -127,9 +127,7 @@ async fn test_email_destination(org_id: &str, test_req: &TestDestinationRequest)
                 success: false,
                 status_code: None,
                 response_body: None,
-                error: Some(
-                    "Email destination requires at least one recipient".to_string(),
-                ),
+                error: Some("Email destination requires at least one recipient".to_string()),
             });
         }
     };
@@ -181,8 +179,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
     }
 
     // Build HTTP client
-    let mut client_builder =
-        reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
+    let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
 
     if skip_tls_verify {
         client_builder = client_builder.danger_accept_invalid_certs(true);
