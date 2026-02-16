@@ -30,6 +30,7 @@ import type {
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import useNotifications from "@/composables/useNotifications";
 
 /**
  * Options for usePanelEditor composable
@@ -55,6 +56,8 @@ export interface UsePanelEditorOptions {
   dateTimePickerRef?: Ref<any>;
   /** Selected date value */
   selectedDate?: Ref<any>;
+  /** Validate panel fields (from useDashboardPanelData) */
+  validatePanel?: (errors: string[], isFieldsValidationRequired?: boolean) => void;
 }
 
 /**
@@ -73,9 +76,11 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     updateCommittedVariables,
     dateTimePickerRef,
     selectedDate,
+    validatePanel,
   } = options;
 
   const store = useStore();
+  const { showErrorNotification } = useNotifications();
 
   // ============================================================================
   // State Refs
@@ -307,6 +312,21 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const runQuery = (withoutCache = false): void => {
     try {
+      // Validate panel fields before running query (matches main branch AddPanel.vue behavior)
+      // Uses validatePanel from useDashboardPanelData which checks all field requirements
+      if (validatePanel) {
+        const errors = errorData.errors;
+        errors.splice(0);
+        validatePanel(errors, true);
+
+        if (errors.length) {
+          showErrorNotification(
+            "There are some errors, please fix them and try again",
+          );
+          // Do not return early — query still fires to allow partial results
+        }
+      }
+
       // Set cache flag
       shouldRefreshWithoutCache.value = withoutCache;
 

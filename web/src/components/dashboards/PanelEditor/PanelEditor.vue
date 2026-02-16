@@ -732,7 +732,7 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery } =
+const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
   useDashboardPanelData(pageKey.value);
 
 // Provide page key for child components
@@ -799,6 +799,7 @@ const {
   updateCommittedVariables: undefined, // Will be provided by parent
   dateTimePickerRef: undefined, // Managed by parent
   selectedDate: undefined, // Managed by parent
+  validatePanel,
 });
 
 // ============================================================================

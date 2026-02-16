@@ -58,6 +58,17 @@ export const convertPanelData = async (
     case "scatter":
     case "metric":
     case "gauge": {
+      // Skip conversion if no fields are selected in builder mode
+      // (prevents echarts errors like "axis.getAxesOnZeroOf is not a function")
+      const query = panelSchema?.queries?.[0];
+      if (
+        !query?.fields?.x?.length &&
+        !query?.fields?.y?.length &&
+        !query?.fields?.breakdown?.length
+      ) {
+        return {};
+      }
+
       if (
         // panelSchema?.fields?.stream_type == "metrics" &&
         // panelSchema?.customQuery &&
