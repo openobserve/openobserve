@@ -52,7 +52,6 @@ interface Props {
   showQuotes?: boolean;
   queryString?: string;
   simpleMode?: boolean; // Only highlighting, no semantic colorization
-  disableTruncation?: boolean; // Disable truncation for expanded/detail views
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -60,7 +59,6 @@ const props = withDefaults(defineProps<Props>(), {
   showQuotes: false,
   queryString: "",
   simpleMode: false,
-  disableTruncation: false,
 });
 
 const store = useStore();
@@ -77,8 +75,7 @@ const colorizedJson = computed((): string => {
     props.showBraces,
     props.showQuotes,
     props.queryString,
-    props.simpleMode,
-    props.disableTruncation
+    props.simpleMode
   );
 });
 </script>

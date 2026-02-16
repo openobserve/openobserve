@@ -295,7 +295,6 @@ size="lg" color="primary" />
             :data="{ [key]: value[key] }"
             :show-braces="false"
             :query-string="highlightQuery"
-            :disable-truncation="true"
           /><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>

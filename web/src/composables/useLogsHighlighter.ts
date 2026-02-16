@@ -289,9 +289,7 @@ export function useLogsHighlighter() {
   const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
     if (typeof data === "string") {
       if (data.length > maxSize) {
-        const sizeInKB = Math.round(data.length / 1024);
-        const truncatedSizeKB = Math.round(maxSize / 1024);
-        return data.substring(0, maxSize) + `\n\n... [Content truncated for display: showing first ${truncatedSizeKB}KB of ${sizeInKB}KB. Use the Copy button to get the complete log.]`;
+        return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
       }
       return data;
     }
@@ -300,9 +298,7 @@ export function useLogsHighlighter() {
       try {
         const jsonStr = JSON.stringify(data);
         if (jsonStr.length > maxSize) {
-          const sizeInKB = Math.round(jsonStr.length / 1024);
-          const truncatedSizeKB = Math.round(maxSize / 1024);
-          return jsonStr.substring(0, maxSize) + `\n\n... [Content truncated for display: showing first ${truncatedSizeKB}KB of ${sizeInKB}KB. Use the Copy button to get the complete log.]`;
+          return jsonStr.substring(0, maxSize) + `... [truncated, original size: ${jsonStr.length} chars]`;
         }
         return jsonStr;
       } catch (error) {
@@ -356,11 +352,6 @@ export function useLogsHighlighter() {
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
-      // Truncate very large strings (>50KB) to prevent UI freeze in table view
-      if (data.length > 50000) {
-        const truncatedStr = truncateLargeContent(data, 50000);
-        return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
-      }
       return processTextWithHighlights(
         data,
         effectiveQueryString,
@@ -734,17 +725,13 @@ export function useLogsHighlighter() {
 
     const currentColors = getThemeColors(isDarkTheme);
 
-    // Apply truncation logic - use higher limit for detail views to prevent UI freeze
-    // Table view: 50KB limit (performance critical)
-    // Detail/expanded view: 500KB limit (allow larger logs but still prevent browser freeze)
-    const maxSize = disableTruncation ? 500000 : 50000;
-
-    if (typeof data === "object" && data !== null) {
+    // Apply truncation logic for list views (not expanded/detail views)
+    if (!disableTruncation && typeof data === "object" && data !== null) {
       const estimatedSize = estimateSize(data);
 
-      // Truncate very large content to prevent UI freeze
-      if (estimatedSize > maxSize) {
-        const truncatedStr = truncateLargeContent(data, maxSize);
+      // Truncate very large content (>50KB) to prevent UI freeze in list view
+      if (estimatedSize > 50000) {
+        const truncatedStr = truncateLargeContent(data, 50000);
         // After truncation, skip highlighting and use simple display
         return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
       }
@@ -753,21 +740,11 @@ export function useLogsHighlighter() {
     // Simple mode: only highlighting, no semantic colorization
     if (simpleMode) {
       const textStr = String(data);
-      // Truncate very large strings based on view mode
-      if (textStr.length > maxSize) {
-        const truncatedStr = truncateLargeContent(textStr, maxSize);
-        return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
-      }
       return simpleHighlight(textStr, queryString);
     }
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
-      // Truncate very large strings based on view mode (50KB for table, 500KB for detail)
-      if (data.length > maxSize) {
-        const truncatedStr = truncateLargeContent(data, maxSize);
-        return `<span class="log-string">${escapeHtml(truncatedStr)}</span>`;
-      }
       return processTextWithHighlights(
         data,
         queryString,
