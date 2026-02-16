@@ -199,6 +199,7 @@ jobs:
                 "dashboard-html-chart.spec.js",
                 "visualize.spec.js",
                 "visualize-vrl.spec.js",
+                "visualize-filter-parsing.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
