@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::destinations::{Destination, DestinationType, Module, Template};
+use config::{get_config, meta::destinations::{Destination, DestinationType, Email, Module, Template}};
 
 use crate::{
     common::{
@@ -255,6 +255,55 @@ pub async fn save(
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
     }
     Ok(saved)
+}
+
+/// Validates email destination configuration and sends a test email.
+/// Performs the same validations as save() for email destinations:
+/// 1. Checks SMTP is enabled
+/// 2. Validates recipients are not empty
+/// 3. Validates each recipient is a user in the org
+/// 4. Sends a test email via the shared send_email_notification function
+pub async fn test_email(
+    org_id: &str,
+    recipients: &[String],
+    body: Option<&str>,
+) -> Result<String, DestinationError> {
+    if !get_config().smtp.smtp_enabled {
+        return Err(DestinationError::SMTPUnavailable);
+    }
+
+    if recipients.is_empty() {
+        return Err(DestinationError::EmptyEmail);
+    }
+
+    // Validate each recipient is part of the org (same as save())
+    let mut validated_recipients = Vec::with_capacity(recipients.len());
+    for email in recipients {
+        let email = email.trim().to_lowercase();
+        let res = user::get(Some(org_id), &email).await;
+        if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
+            return Err(DestinationError::UserNotPermitted);
+        }
+        validated_recipients.push(email);
+    }
+
+    let default_body = "<html><body><h2>OpenObserve Test Email</h2>\
+         <p>This is a test email from OpenObserve to verify your email destination \
+         is configured correctly.</p>\
+         <p>If you received this email, your email destination is working.</p></body></html>";
+    let email_body = body.unwrap_or(default_body).to_string();
+
+    let email = Email {
+        recipients: validated_recipients,
+    };
+
+    super::alert::send_email_notification(
+        "OpenObserve - Test Email Destination",
+        &email,
+        email_body,
+    )
+    .await
+    .map_err(|e| DestinationError::EmailSendFailed(e.to_string()))
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {

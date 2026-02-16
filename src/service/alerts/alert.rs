@@ -1267,7 +1267,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
-async fn send_email_notification(
+pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
     msg: String,

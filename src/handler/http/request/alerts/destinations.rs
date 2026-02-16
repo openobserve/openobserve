@@ -32,7 +32,7 @@ use crate::{
     },
     handler::http::{
         extractors::Headers,
-        models::destinations::Destination,
+        models::destinations::{Destination, DestinationType},
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::{alerts::destinations, db::alerts::destinations::DestinationError},
@@ -41,11 +41,17 @@ use crate::{
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestDestinationRequest {
+    #[serde(default)]
     pub url: String,
     pub method: Option<String>,
     pub headers: Option<HashMap<String, String>>,
     pub body: Option<String>,
     pub skip_tls_verify: Option<bool>,
+    /// Destination type: "http" (default) or "email"
+    #[serde(rename = "type", default)]
+    pub destination_type: DestinationType,
+    /// Email recipients for email destination testing
+    pub recipients: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
@@ -77,9 +83,10 @@ impl From<DestinationError> for Response {
     tag = "Alerts",
     operation_id = "TestDestination",
     summary = "Test alert destination",
-    description = "Tests an alert destination configuration by sending a test HTTP request to the specified endpoint. \
-                   This allows users to verify that their destination configuration is correct before saving it. The \
-                   test sends a sample payload and returns the HTTP response status and body for validation.",
+    description = "Tests an alert destination configuration. For HTTP destinations, sends a test HTTP request \
+                   to the specified endpoint. For email destinations, validates SMTP configuration and recipient \
+                   permissions, then sends a test email. This allows users to verify that their destination \
+                   configuration is correct before saving it.",
     security(
         ("Authorization"= [])
     ),
@@ -97,17 +104,71 @@ impl From<DestinationError> for Response {
     )
 )]
 pub async fn test_destination(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     Json(test_req): Json<TestDestinationRequest>,
 ) -> Response {
+    match test_req.destination_type {
+        DestinationType::Email => test_email_destination(&org_id, &test_req).await,
+        DestinationType::Http => test_http_destination(&test_req).await,
+        other => MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(format!("Unsupported destination type for testing: {other}")),
+        }),
+    }
+}
+
+async fn test_email_destination(org_id: &str, test_req: &TestDestinationRequest) -> Response {
+    let recipients = match &test_req.recipients {
+        Some(r) if !r.is_empty() => r.clone(),
+        _ => {
+            return MetaHttpResponse::json(TestDestinationResponse {
+                success: false,
+                status_code: None,
+                response_body: None,
+                error: Some(
+                    "Email destination requires at least one recipient".to_string(),
+                ),
+            });
+        }
+    };
+
+    match destinations::test_email(org_id, &recipients, test_req.body.as_deref()).await {
+        Ok(msg) => MetaHttpResponse::json(TestDestinationResponse {
+            success: true,
+            status_code: None,
+            response_body: Some(msg),
+            error: None,
+        }),
+        Err(e) => MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(e.to_string()),
+        }),
+    }
+}
+
+async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
     let method = test_req
         .method
+        .clone()
         .unwrap_or_else(|| "POST".to_string())
         .to_uppercase();
     let url = &test_req.url;
-    let body = test_req.body.unwrap_or_default();
-    let headers = test_req.headers.unwrap_or_default();
+    let body = test_req.body.clone().unwrap_or_default();
+    let headers = test_req.headers.clone().unwrap_or_default();
     let skip_tls_verify = test_req.skip_tls_verify.unwrap_or(false);
+
+    if url.is_empty() {
+        return MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some("HTTP destination must have a url".to_string()),
+        });
+    }
 
     // SSRF protection: Validate URL before making request
     if let Err(error_msg) = SsrfGuard::validate_url(url) {
@@ -120,7 +181,8 @@ pub async fn test_destination(
     }
 
     // Build HTTP client
-    let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
+    let mut client_builder =
+        reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
 
     if skip_tls_verify {
         client_builder = client_builder.danger_accept_invalid_certs(true);
