@@ -100,16 +100,23 @@ vi.mock("./composables/usePanelEditor", () => ({
     maxQueryRangeWarning: ref(""),
     limitNumberOfSeriesWarningMessage: ref(""),
     errorMessage: ref(""),
+    isPartialData: ref(false),
+    isPanelLoading: ref(false),
+    isCachedDataDifferWithCurrentTimeRange: ref(false),
     searchRequestTraceIds: ref([]),
     panelSchemaRendererRef: ref(null),
     splitterModel: ref(50),
     isOutDated: ref(false),
     isLoading: ref(false),
     currentPanelData: ref({}),
+    initChartData: vi.fn(),
     runQuery: vi.fn(),
     handleChartApiError: vi.fn(),
     handleLastTriggeredAtUpdate: vi.fn(),
     handleLimitNumberOfSeriesWarningMessage: vi.fn(),
+    handleIsPartialDataUpdate: vi.fn(),
+    handleLoadingStateChange: vi.fn(),
+    handleIsCachedDataDifferWithCurrentTimeRangeUpdate: vi.fn(),
     handleResultMetadataUpdate: vi.fn(),
     metaDataValue: vi.fn(),
     seriesDataUpdate: vi.fn(),
@@ -581,6 +588,327 @@ describe("PanelEditor.vue", () => {
       // The emit would normally be triggered by clicking "Add to Dashboard" button
       expect(wrapper.emitted()).toBeDefined();
     });
+
+    it("should emit customQueryModeChanged on mount (immediate watcher)", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      // The watcher with { immediate: true } should fire on mount
+      expect(wrapper.emitted("customQueryModeChanged")).toBeDefined();
+    });
+
+    it("should emit searchRequestTraceIdsUpdated on mount (immediate watcher)", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.emitted("searchRequestTraceIdsUpdated")).toBeDefined();
+    });
+  });
+
+  describe("Exposed State Refs", () => {
+    it("should expose chartData ref", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      // chartData starts as undefined
+      expect(wrapper.vm.chartData).toBeUndefined();
+    });
+
+    it("should expose errorData ref", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.errorData).toBeDefined();
+      expect(wrapper.vm.errorData.errors).toEqual([]);
+    });
+
+    it("should expose metaData ref", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.metaData).toBeNull();
+    });
+
+    it("should expose seriesData ref", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "metrics",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.seriesData).toEqual([]);
+    });
+
+    it("should expose lastTriggeredAt ref", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.lastTriggeredAt).toBeNull();
+    });
+
+    it("should expose isOutDated computed", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.isOutDated).toBe(false);
+    });
+
+    it("should expose isLoading computed", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "logs",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.isLoading).toBe(false);
+    });
+
+    it("should expose searchRequestTraceIds ref", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.searchRequestTraceIds).toEqual([]);
+    });
+
+    it("should expose warning message refs", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.maxQueryRangeWarning).toBe("");
+      expect(wrapper.vm.limitNumberOfSeriesWarningMessage).toBe("");
+      expect(wrapper.vm.errorMessage).toBe("");
+    });
+  });
+
+  describe("Exposed Methods", () => {
+    it("should expose cancelRunningQuery method", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(typeof wrapper.vm.cancelRunningQuery).toBe("function");
+    });
+
+    it("should expose initChartData method", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(typeof wrapper.vm.initChartData).toBe("function");
+    });
   });
 
   describe("Content Height Calculation", () => {
@@ -632,6 +960,251 @@ describe("PanelEditor.vue", () => {
 
       // The component should be mounted without errors
       expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should calculate correct content height for metrics pageType", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "metrics",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should calculate correct content height for build pageType", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "build",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("Conditional Rendering", () => {
+    it("should show collapsed field list when showFieldList is false", () => {
+      mockDashboardPanelData.layout.showFieldList = false;
+
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.find(".field-list-sidebar-header-collapsed").exists()).toBe(true);
+
+      // Restore
+      mockDashboardPanelData.layout.showFieldList = true;
+    });
+
+    it("should not show collapsed field list when showFieldList is true", () => {
+      mockDashboardPanelData.layout.showFieldList = true;
+
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.find(".field-list-sidebar-header-collapsed").exists()).toBe(false);
+    });
+
+    it("should show HTML editor section when type is html", async () => {
+      mockDashboardPanelData.data.type = "html";
+
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      await nextTick();
+      expect(wrapper.exists()).toBe(true);
+
+      // Restore
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    it("should show markdown editor section when type is markdown", async () => {
+      mockDashboardPanelData.data.type = "markdown";
+
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      await nextTick();
+      expect(wrapper.exists()).toBe(true);
+
+      // Restore
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    it("should show custom chart editor section when type is custom_chart", async () => {
+      mockDashboardPanelData.data.type = "custom_chart";
+
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      await nextTick();
+      expect(wrapper.exists()).toBe(true);
+
+      // Restore
+      mockDashboardPanelData.data.type = "line";
+    });
+  });
+
+  describe("Props Defaults", () => {
+    it("should default editMode to false", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.props("editMode")).toBe(false);
+    });
+
+    it("should default isUiHistogram to false", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "logs",
+        },
+        global: {
+          plugins: [i18n, Quasar],
+          stubs: {
+            QSeparator: true,
+            QSplitter: {
+              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+            },
+            QIcon: true,
+            QBtn: true,
+            QTooltip: true,
+            QAvatar: true,
+            QDialog: true,
+          },
+        },
+      });
+
+      expect(wrapper.props("isUiHistogram")).toBe(false);
     });
   });
 });

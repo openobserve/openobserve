@@ -57,14 +57,22 @@ describe("convertPanelData", () => {
   const mockAnnotations = [];
   const mockData = [[{ field: "test", value: 100 }]];
 
+  // Fields required by the early return guard for chart types (area, bar, line, etc.)
+  // Without x/y/breakdown fields, convertPanelData returns {} early to prevent echarts errors
+  const mockQueryFields = {
+    x: [{ column: "_timestamp", color: null, isDerived: false, aggregationFunction: "histogram" }],
+    y: [{ column: "value", color: null, isDerived: false, aggregationFunction: "count" }],
+    breakdown: [],
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe("Chart Types", () => {
     const chartTypes = [
-      "area", "area-stacked", "bar", "h-bar", "stacked", 
-      "heatmap", "h-stacked", "line", "pie", "donut", 
+      "area", "area-stacked", "bar", "h-bar", "stacked",
+      "heatmap", "h-stacked", "line", "pie", "donut",
       "scatter", "metric", "gauge"
     ];
 
@@ -73,7 +81,7 @@ describe("convertPanelData", () => {
         const panelSchema = {
           type,
           queryType: "sql",
-          queries: [{ query: "SELECT * FROM test" }]
+          queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
         };
 
         const result = await convertPanelData(
@@ -97,7 +105,7 @@ describe("convertPanelData", () => {
         const panelSchema = {
           type,
           queryType: "promql",
-          queries: [{ query: "up" }]
+          queries: [{ query: "up", fields: mockQueryFields }]
         };
 
         const { convertPromQLData } = await import("./convertPromQLData");
@@ -517,12 +525,124 @@ describe("convertPanelData", () => {
     });
   });
 
+  describe("Early Return Guard", () => {
+    it("should throw error when query has no x, y, or breakdown fields", async () => {
+      const panelSchema = {
+        type: "line",
+        queryType: "sql",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      await expect(
+        convertPanelData(
+          panelSchema,
+          mockData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations
+        )
+      ).rejects.toThrow("Please select X-Axis or Y-Axis fields to render the chart");
+    });
+
+    it("should throw error when fields exist but x, y, breakdown are empty", async () => {
+      const panelSchema = {
+        type: "bar",
+        queryType: "sql",
+        queries: [{ query: "SELECT * FROM test", fields: { x: [], y: [], breakdown: [] } }]
+      };
+
+      await expect(
+        convertPanelData(
+          panelSchema,
+          mockData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations
+        )
+      ).rejects.toThrow("Please select X-Axis or Y-Axis fields to render the chart");
+    });
+
+    it("should proceed when query has x fields", async () => {
+      const panelSchema = {
+        type: "line",
+        queryType: "sql",
+        queries: [{ query: "SELECT * FROM test", fields: { x: [{ column: "time" }], y: [], breakdown: [] } }]
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("line");
+    });
+
+    it("should proceed when query has y fields only", async () => {
+      const panelSchema = {
+        type: "metric",
+        queryType: "sql",
+        queries: [{ query: "SELECT count(*) FROM test", fields: { x: [], y: [{ column: "count" }], breakdown: [] } }]
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("metric");
+    });
+
+    it("should proceed when query has breakdown fields only", async () => {
+      const panelSchema = {
+        type: "pie",
+        queryType: "sql",
+        queries: [{ query: "SELECT * FROM test", fields: { x: [], y: [], breakdown: [{ column: "category" }] } }]
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("pie");
+    });
+  });
+
   describe("Error Handling", () => {
     it("should handle SQL conversion errors gracefully", async () => {
       const panelSchema = {
         type: "bar",
         queryType: "sql",
-        queries: [{ query: "INVALID SQL" }]
+        queries: [{ query: "INVALID SQL", fields: mockQueryFields }]
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -568,7 +688,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "line",
         queryType: "sql",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
       };
 
       const result = await convertPanelData(
@@ -593,7 +713,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "area",
         queryType: "sql",
-        queries: [{ query: "SELECT time, value FROM metrics" }]
+        queries: [{ query: "SELECT time, value FROM metrics", fields: mockQueryFields }]
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -627,13 +747,13 @@ describe("convertPanelData", () => {
       const sqlPanelSchema = {
         type: "line",
         queryType: "sql",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
       };
 
       const promqlPanelSchema = {
         type: "line",
         queryType: "promql",
-        queries: [{ query: "up" }]
+        queries: [{ query: "up", fields: mockQueryFields }]
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -747,7 +867,7 @@ describe("convertPanelData", () => {
     it("should handle SQL charts without queryType specified", async () => {
       const panelSchema = {
         type: "line",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -772,7 +892,7 @@ describe("convertPanelData", () => {
         type: "gauge",
         queryType: "promql",
         fields: { stream_type: "metrics" },
-        queries: [{ query: "up" }]
+        queries: [{ query: "up", fields: mockQueryFields }]
       };
 
       const { convertPromQLData } = await import("./convertPromQLData");

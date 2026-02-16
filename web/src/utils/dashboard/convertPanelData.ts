@@ -66,7 +66,9 @@ export const convertPanelData = async (
         !query?.fields?.y?.length &&
         !query?.fields?.breakdown?.length
       ) {
-        return {};
+        throw new Error(
+          "Please select X-Axis or Y-Axis fields to render the chart",
+        );
       }
 
       if (
