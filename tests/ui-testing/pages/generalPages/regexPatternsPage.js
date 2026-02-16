@@ -36,7 +36,7 @@ export class RegexPatternsPage {
     const targetUrl = `${baseUrl}/web/settings/regex_patterns?org_identifier=${orgName}`;
     testLogger.info(`Navigating to Regex Patterns settings with org: ${orgName}`);
     await this.page.goto(targetUrl);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async verifyRegexPatternsPageLoaded() {
@@ -174,7 +174,7 @@ export class RegexPatternsPage {
 
   async waitForPatternListUpdate() {
     testLogger.info('Waiting for pattern list to update');
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async importPatternsFromFile(filePath) {
@@ -211,7 +211,7 @@ export class RegexPatternsPage {
       testLogger.warn('⚠ Success message not visible after import');
     }
 
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     return isVisible;
   }
 

@@ -37,35 +37,19 @@ impl MigrationTrait for Migration {
 #[cfg(feature = "cloud")]
 async fn add_updated_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     let end = chrono::Utc::now().timestamp_micros() + day_micros(14);
-    if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Organizations::Table)
-                    .add_column(
-                        ColumnDef::new(Organizations::TrialEndsAt)
-                            .big_integer()
-                            .not_null()
-                            .default(end),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    } else {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Organizations::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(Organizations::TrialEndsAt)
-                            .big_integer()
-                            .not_null()
-                            .default(end),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    }
+    manager
+        .alter_table(
+            Table::alter()
+                .table(Organizations::Table)
+                .add_column_if_not_exists(
+                    ColumnDef::new(Organizations::TrialEndsAt)
+                        .big_integer()
+                        .not_null()
+                        .default(end),
+                )
+                .to_owned(),
+        )
+        .await?;
 
     Ok(())
 }
