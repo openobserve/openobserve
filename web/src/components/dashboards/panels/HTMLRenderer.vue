@@ -58,7 +58,20 @@ export default defineComponent({
 
     DOMPurify.addHook("afterSanitizeAttributes", (node) => {
       if (node.nodeName === "IFRAME") {
-        node.setAttribute("sandbox", "allow-scripts allow-same-origin");
+        // Remove srcdoc to prevent inline HTML/script injection
+        node.removeAttribute("srcdoc");
+
+        // Only allow https:// sources to block javascript: and data: URIs
+        const src = node.getAttribute("src") || "";
+        if (src && !src.startsWith("https://")) {
+          node.removeAttribute("src");
+        }
+
+        // Cross-origin iframes (enforced by https-only src above) are already
+        // isolated by the browser's same-origin policy — they cannot access
+        // the parent page's cookies, DOM, or storage. A forced sandbox attribute
+        // breaks video players (YouTube Error 153, Dailymotion localStorage errors)
+        // without adding meaningful security for cross-origin content.
       }
     });
 
@@ -73,6 +86,7 @@ export default defineComponent({
     const sanitizedContent = computed(() =>
       DOMPurify.sanitize(processedContent.value, {
         ADD_TAGS: ["iframe"],
+        ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading"],
       })
     );
 

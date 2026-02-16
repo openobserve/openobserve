@@ -100,7 +100,7 @@ export default defineComponent({
     },
 
     iconComponent: {
-      type: Object,
+      type: [Object, Function],
       default: () => ({}),
     },
 
