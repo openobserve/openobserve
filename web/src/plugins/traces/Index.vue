@@ -39,6 +39,19 @@ style="min-height: auto">
           @error-only-toggled="onErrorOnlyToggled"
           @filters-reset="onFiltersReset"
         />
+
+        <!-- Color Preview Test Button (Dev Only) -->
+        <q-btn
+          flat
+          dense
+          icon="palette"
+          color="primary"
+          class="tw:ml-2"
+          @click="showColorPreview = true"
+          title="Preview Span Colors (Test)"
+        >
+          <q-tooltip>Preview Span Colors</q-tooltip>
+        </q-btn>
       </div>
 
       <!-- Service Graph Tab Content -->
@@ -178,6 +191,26 @@ color="primary" size="md" />
         </q-splitter>
       </div>
     </div>
+
+    <!-- Color Preview Dialog (Test) -->
+    <q-dialog
+      v-model="showColorPreview"
+      maximized
+      transition-show="slide-up"
+      transition-hide="slide-down"
+    >
+      <q-card class="tw:bg-[var(--o2-primary-background)]">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Span Color Palette Preview</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="tw:h-[calc(100vh-60px)] tw:overflow-auto">
+          <span-color-preview />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -226,6 +259,7 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
+const SpanColorPreview = defineAsyncComponent(() => import("@/components/traces/SpanColorPreview.vue"));
 
 const store = useStore();
 const activeTab = ref("search");
@@ -246,6 +280,7 @@ let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
 const indexListRef = ref(null);
+const showColorPreview = ref(false);
 const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
 

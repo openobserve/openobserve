@@ -16,9 +16,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="trace-details">
+    <!-- New TraceDetailsV2 View -->
+    <TraceDetailsV2
+      v-if="
+        useTraceDetailsV2 &&
+        traceTree.length &&
+        effectiveSpanList.length &&
+        !(
+          searchObj.data.traceDetails.isLoadingTraceDetails ||
+          searchObj.data.traceDetails.isLoadingTraceMeta
+        )
+      "
+      :trace-id="effectiveTraceId"
+      :spans="effectiveSpanList"
+      :show-back-button="mode === 'standalone' && showBackButton"
+      :is-loading="
+        searchObj.data.traceDetails.isLoadingTraceDetails ||
+        searchObj.data.traceDetails.isLoadingTraceMeta
+      "
+      @back="handleBackOrClose"
+      @span-selected="updateSelectedSpan"
+    />
+
+    <!-- Original View -->
     <div
       class="trace-details-content"
       v-if="
+        !useTraceDetailsV2 &&
         traceTree.length &&
         effectiveSpanList.length &&
         !(
@@ -28,80 +52,179 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="trace-combined-header-wrapper card-container">
-        <div class="full-width flex items-center toolbar flex justify-between">
-          <div class="flex items-center">
-            <!-- Back button - only show in standalone mode if explicitly enabled -->
-            <div
+        <!-- New Modern Header -->
+        <header
+          class="tw:h-14 tw:border-b tw:border-[var(--o2-border)] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
+        >
+          <div class="tw:flex tw:items-center tw:space-x-4">
+            <!-- Back button -->
+            <button
               v-if="mode === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
-              class="flex justify-center items-center q-mr-sm cursor-pointer trace-back-btn"
+              @click="handleBackOrClose"
+              class="tw:text-[var(--o2-text-secondary)] hover:tw:text-[var(--o2-text-primary)] tw:cursor-pointer"
               title="Traces List"
+            >
+              <q-icon name="arrow_back" size="20px" />
+            </button>
+
+            <div class="tw:flex">
+              <!-- Operation Name -->
+              <div
+                data-test="trace-details-operation-name"
+                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)]"
+                :title="traceTree[0]?.operationName"
+              >
+                {{ traceTree[0]?.operationName || "Loading..." }}
+              </div>
+
+              <!-- Service, Timestamp, and Trace ID -->
+              <div
+                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)]"
+              >
+                <span class="tw:text-primary tw:font-medium tw:pl-[1rem]">{{
+                  rootServiceName
+                }}</span>
+                <span>•</span>
+                <span>{{ formatTimestamp(traceStartTime) }}</span>
+                <span>•</span>
+                <span>
+                  Trace ID:
+                  <span
+                    v-if="mode === 'embedded'"
+                    data-test="trace-details-trace-id"
+                    class="tw:text-[var(--o2-text-primary)] tw:font-mono tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                    :title="`Open ${effectiveTraceId} in Traces`"
+                    @click="handleExpandToFullView"
+                  >
+                    {{ effectiveTraceId }}
+                  </span>
+                  <span
+                    v-else
+                    data-test="trace-details-trace-id"
+                    class="tw:text-[var(--o2-text-primary)] tw:font-mono"
+                    :title="effectiveTraceId"
+                  >
+                    {{ effectiveTraceId }}
+                  </span>
+                </span>
+
+                <!-- Copy Trace ID Button -->
+                <q-icon
+                  data-test="trace-details-copy-trace-id-btn"
+                  name="content_copy"
+                  size="12px"
+                  class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
+                  title="Copy Trace ID"
+                  @click="copyTraceId"
+                />
+
+                <!-- Open in new icon (embedded mode only) -->
+                <q-icon
+                  v-if="mode === 'embedded' && showExpandButton"
+                  data-test="trace-details-trace-id-open-btn"
+                  class="tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)]"
+                  size="14px"
+                  name="open_in_new"
+                  title="Open in Traces"
+                  @click="handleExpandToFullView"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="tw:flex tw:items-center tw:space-x-3">
+            <!-- Span Count Badge -->
+            <div
+              data-test="trace-details-spans-count"
+              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)]"
+            >
+              <q-icon name="hub" size="14px" />
+              <span>{{ effectiveSpanList.length }} spans</span>
+            </div>
+
+            <!-- Error Count Badge -->
+            <div
+              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)]"
+            >
+              <q-icon
+                name="error_outline"
+                size="14px"
+                :color="errorSpansCount > 0 ? 'negative' : undefined"
+              />
+              <span>{{ errorSpansCount }} errors</span>
+            </div>
+
+            <!-- Toggle View Button -->
+            <q-btn
+              flat
+              dense
+              :label="useTraceDetailsV2 ? 'Classic View' : 'New View'"
+              :icon="useTraceDetailsV2 ? 'toggle_off' : 'toggle_on'"
+              @click="useTraceDetailsV2 = !useTraceDetailsV2"
+              class="q-mr-sm"
+              color="primary"
+              size="sm"
+            >
+              <q-tooltip>
+                {{
+                  useTraceDetailsV2
+                    ? "Switch to classic trace view"
+                    : "Switch to new trace view (Beta)"
+                }}
+              </q-tooltip>
+            </q-btn>
+
+            <!-- Expand button (embedded mode) -->
+            <button
+              v-if="mode === 'embedded' && showExpandButton"
+              data-test="trace-details-expand-btn"
+              class="tw:p-1.5 hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              @click="handleExpandToFullView"
+            >
+              <q-icon name="open_in_new" size="18px" />
+              <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
+            </button>
+
+            <!-- Share button (standalone mode) -->
+            <share-button
+              v-if="mode === 'standalone' && showShareButton"
+              data-test="trace-details-share-link-btn"
+              :url="traceDetailsShareURL"
+              button-class="tw:p-1.5 hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              button-size="18px"
+            />
+
+            <!-- Close button -->
+            <button
+              v-if="mode === 'standalone' && showCloseButton"
+              data-test="trace-details-close-btn"
+              class="tw:p-1.5 hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
               @click="handleBackOrClose"
             >
-              <q-icon name="arrow_back_ios_new" size="14px" />
-            </div>
+              <q-icon name="close" size="18px" />
+              <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
+            </button>
+          </div>
+        </header>
 
-            <div
-              data-test="trace-details-operation-name"
-              class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
-              :title="traceTree[0]['operationName']"
-            >
-              {{ traceTree[0]["operationName"] }}
-            </div>
-            <div class="q-mr-lg flex items-center text-body2">
-              <span class="text-grey-7">Trace ID:</span>
+        <!-- Tabs & Search Bar -->
+        <div
+          class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white"
+        >
+          <div class="tw:flex tw:items-center tw:space-x-4">
+            <AppTabs
+              :tabs="traceTabs"
+              :active-tab="activeTab"
+              @update:active-tab="activeTab = $event"
+            />
+          </div>
 
-              <!-- Clickable trace ID (embedded mode - no ellipsis) -->
-              <div
-                v-if="mode === 'embedded'"
-                data-test="trace-details-trace-id"
-                class="toolbar-trace-id q-pl-xs cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
-                :title="`Open ${effectiveSpanList[0]['trace_id']} in Traces`"
-                @click="handleExpandToFullView"
-              >
-                {{ effectiveSpanList[0]["trace_id"] }}
-              </div>
-
-              <!-- Non-clickable with ellipsis (standalone mode) -->
-              <div
-                v-else
-                data-test="trace-details-trace-id"
-                class="toolbar-trace-id tw:m-w-[5rem] ellipsis q-pl-xs"
-                :title="effectiveSpanList[0]['trace_id']"
-              >
-                {{ effectiveSpanList[0]["trace_id"] }}
-              </div>
-
-              <!-- Open in new icon (embedded mode only) -->
-              <q-icon
-                v-if="mode === 'embedded' && showExpandButton"
-                class="cursor-pointer q-ml-xs hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
-                size="14px"
-                name="open_in_new"
-                title="Open in Traces"
-                @click="handleExpandToFullView"
-                data-test="trace-details-trace-id-open-btn"
-              />
-
-              <!-- Copy button (both modes) -->
-              <q-icon
-                data-test="trace-details-copy-trace-id-btn"
-                class="cursor-pointer trace-copy-icon q-ml-xs"
-                size="12px"
-                name="content_copy"
-                title="Copy Trace ID"
-                @click="copyTraceId"
-              />
-            </div>
-
-            <div data-test="trace-details-spans-count" class="q-pb-xs q-mr-lg">
-              Spans: {{ effectiveSpanList.length }}
-            </div>
-
-            <!-- TODO OK: Create component for this usecase multi select with button -->
+          <div class="tw:flex tw:items-center tw:space-x-2 o2-input">
+            <!-- Log Stream Selector (if enabled) -->
             <div
               v-if="showLogStreamSelector"
-              class="o2-input flex items-center trace-logs-selector"
+              class="o2-input tw:flex tw:items-center trace-logs-selector"
             >
               <q-select
                 data-test="trace-details-log-streams-select"
@@ -203,168 +326,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="redirectToSessionReplay"
               />
             </div>
-          </div>
-          <div class="flex items-center">
-            <div
-              class="o2-input flex justify-center items-center tw:pl-2 trace-search-container"
+            <q-input
+              v-model="searchQuery"
+              data-test="trace-details-search-input"
+              outlined
+              dense
+              placeholder="Find spans..."
+              clearable
+              class="tw:w-64 tw:text-[12px]!"
+              @update:model-value="handleSearchQueryChange"
             >
-              <q-input
-                data-test="trace-details-search-input"
-                v-model="searchQuery"
-                placeholder="Search..."
-                @update:model-value="handleSearchQueryChange"
-                dense
-                borderless
-                clearable
-                debounce="500"
-                class="q-mr-sm custom-height flex items-center"
-              />
+              <template v-slot:prepend>
+                <q-icon name="search" size="14px" />
+              </template>
+            </q-input>
+
+            <!-- Search Results Navigation -->
+            <div
+              v-if="searchResults"
+              class="tw:flex tw:items-center tw:space-x-1"
+            >
               <p
+                class="tw:text-[11px] tw:text-[var(--o2-text-secondary)]"
                 data-test="trace-details-search-results"
-                class="tw:mr-1"
-                v-if="searchResults"
               >
-                <small
-                  ><span>{{ currentIndex + 1 }}</span> of
-                  <span>{{ searchResults }}</span></small
-                >
+                <small>
+                  <span>{{ currentIndex + 1 }}</span> of
+                  <span>{{ searchResults }}</span>
+                </small>
               </p>
               <q-btn
                 data-test="trace-details-search-prev-btn"
-                v-if="searchResults"
                 :disable="currentIndex === 0"
-                class="tw:mr-1 download-logs-btn flex"
                 flat
                 round
-                title="Previous"
                 icon="keyboard_arrow_up"
-                @click="prevMatch"
+                size="sm"
                 dense
-                :size="`sm`"
-              />
+                @click="prevMatch"
+              >
+                <q-tooltip>Previous</q-tooltip>
+              </q-btn>
               <q-btn
                 data-test="trace-details-search-next-btn"
-                v-if="searchResults"
                 :disable="currentIndex + 1 === searchResults"
-                class="tw:mr-1 download-logs-btn flex"
                 flat
                 round
-                title="Next"
                 icon="keyboard_arrow_down"
-                @click="nextMatch"
+                size="sm"
                 dense
-                :size="`sm`"
-              />
+                @click="nextMatch"
+              >
+                <q-tooltip>Next</q-tooltip>
+              </q-btn>
             </div>
-            <!-- Expand button - for embedded mode -->
-            <q-btn
-              v-if="mode === 'embedded' && showExpandButton"
-              data-test="trace-details-expand-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
-              icon="open_in_new"
-              size="xs"
-              @click="handleExpandToFullView"
-              flat
-            >
-              <q-tooltip>
-                {{ t("traces.openInTraces") }}
-              </q-tooltip>
-            </q-btn>
-            <!-- Share button - conditional -->
-            <share-button
-              v-if="mode === 'standalone' && showShareButton"
-              data-test="trace-details-share-link-btn"
-              :url="traceDetailsShareURL"
-              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
-              button-size="xs"
-            />
-            <!-- Close button - conditional -->
-            <q-btn
-              v-if="mode === 'standalone' && showCloseButton"
-              data-test="trace-details-close-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
-              icon="cancel"
-              size="xs"
-              @click="handleBackOrClose"
-            >
-              <q-tooltip>
-                {{ t("common.cancel") }}
-              </q-tooltip>
-            </q-btn>
           </div>
         </div>
-
-        <!-- Timeline section - conditional -->
-        <template v-if="showTimeline">
-          <q-separator class="q-my-sm" />
-
-          <div class="flex justify-between items-end q-pr-sm q-pb-sm">
-            <div
-              data-test="trace-details-toggle-timeline-btn"
-              class="trace-chart-btn flex items-center no-wrap cursor-pointer"
-              @click="toggleTimeline"
-            >
-              <q-icon
-                name="expand_more"
-                :class="!isTimelineExpanded ? 'rotate-270' : ''"
-                size="22px"
-                class="cursor-pointer text-grey-10"
-              />
-              <div
-                data-test="trace-details-visual-title"
-                class="text-subtitle2 text-bold"
-              >
-                {{
-                  activeVisual === "timeline"
-                    ? "Trace Timeline"
-                    : "Trace Service Map"
-                }}
-              </div>
-            </div>
-
-            <div
-              v-if="isTimelineExpanded"
-              class="rounded-borders visual-selector-container"
-              :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-            >
-              <template v-for="visual in traceVisuals" :key="visual.value">
-                <q-btn
-                  :data-test="`trace-details-visual-${visual.value}-btn`"
-                  :color="visual.value === activeVisual ? 'primary' : ''"
-                  :flat="visual.value === activeVisual ? false : true"
-                  dense
-                  no-caps
-                  size="11px"
-                  class="q-px-sm visual-selection-btn tw:rounded-[0.25rem]"
-                  @click="activeVisual = visual.value"
-                >
-                  <q-icon><component :is="visual.icon" /></q-icon>
-                  {{ visual.label }}</q-btn
-                >
-              </template>
-            </div>
-          </div>
-          <div
-            v-show="isTimelineExpanded"
-            class="chart-container-inner q-px-sm q-pb-sm"
-            :key="isTimelineExpanded.toString()"
-          >
-            <ChartRenderer
-              data-test="trace-details-timeline-chart"
-              v-if="activeVisual === 'timeline'"
-              class="trace-details-chart trace-chart-height"
-              id="trace_details_gantt_chart"
-              :data="ChartData"
-              @updated:chart="updateChart"
-            />
-            <ChartRenderer
-              data-test="trace-details-service-map-chart"
-              v-else
-              :data="traceServiceMap"
-              class="trace-chart-height"
-            />
-          </div>
-        </template>
       </div>
       <div style="display: flex; flex: 1; min-height: 0">
         <div
@@ -376,29 +393,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="parentContainer"
         >
           <div class="trace-tree-wrapper card-container">
-            <!-- Tabs for Timeline/DAG views - DAG only shown for LLM traces -->
-            <q-tabs
-              v-if="hasLLMSpans"
-              v-model="activeTab"
-              dense
-              class="text-grey"
-              active-color="primary"
-              indicator-color="primary"
-              align="left"
-              narrow-indicator
-            >
-              <q-tab
-                name="timeline"
-                label="Timeline"
-                data-test="trace-details-timeline-tab"
-              />
-              <q-tab name="dag" label="DAG" data-test="trace-details-dag-tab" />
-            </q-tabs>
-            <q-separator v-if="hasLLMSpans" />
-
-            <!-- Timeline View - show when no LLM spans OR when timeline tab is active -->
+            <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div
-              v-if="!hasLLMSpans || activeTab === 'timeline'"
+              v-if="!hasLLMSpans || activeTab === 'waterfall'"
               style="
                 display: flex;
                 flex-direction: column;
@@ -618,6 +615,13 @@ import {
   parseCostDetails,
   isLLMTrace,
 } from "@/utils/llmUtils";
+import { formatTimestamp } from "@/composables/traces/useTraceProcessing";
+import AppTabs from "@/components/common/AppTabs.vue";
+
+// Import TraceDetailsV2
+const TraceDetailsV2 = defineAsyncComponent(
+  () => import("@/components/traces/TraceDetailsV2.vue"),
+);
 
 export default defineComponent({
   name: "TraceDetails",
@@ -699,6 +703,8 @@ export default defineComponent({
     TraceHeader,
     TraceTimelineIcon,
     ServiceMapIcon,
+    TraceDetailsV2,
+    AppTabs,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
@@ -708,7 +714,10 @@ export default defineComponent({
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const activeTab = ref("timeline");
+    const activeTab = ref("waterfall");
+
+    // Feature flag for TraceDetailsV2
+    const useTraceDetailsV2 = ref(false); // Set to true to use new view
 
     const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
@@ -903,6 +912,41 @@ export default defineComponent({
       const spans = effectiveSpanList.value;
       if (!spans || spans.length === 0) return false;
       return spans.some((span: any) => isLLMTrace(span));
+    });
+
+    // Computed properties for new header
+    const errorSpansCount = computed(() => {
+      const spans = effectiveSpanList.value;
+      if (!spans || spans.length === 0) return 0;
+      return spans.filter((span: any) => span.span_status === "ERROR").length;
+    });
+
+    const rootServiceName = computed(() => {
+      if (traceTree.value.length > 0) {
+        return traceTree.value[0]?.serviceName || "unknown";
+      }
+      return "unknown";
+    });
+
+    const traceStartTime = computed(() => {
+      const spans = effectiveSpanList.value;
+      if (!spans || spans.length === 0) return 0;
+      return Math.min(...spans.map((span: any) => span.start_time));
+    });
+
+    // Tabs configuration matching TraceDetailsV2
+    const traceTabs = computed(() => {
+      const tabs = [
+        { label: "Waterfall", value: "waterfall" },
+        { label: "Flame Graph", value: "flame-graph" },
+        { label: "Spans", value: "spans" },
+        { label: "Map", value: "map" },
+      ];
+      // Conditionally add DAG tab for LLM traces
+      if (hasLLMSpans.value) {
+        tabs.push({ label: "DAG", value: "dag" });
+      }
+      return tabs;
     });
 
     const showTraceDetails = ref(false);
@@ -2111,6 +2155,7 @@ export default defineComponent({
       router,
       t,
       activeTab,
+      useTraceDetailsV2,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -2199,6 +2244,12 @@ export default defineComponent({
       startDagResize,
       // LLM traces check
       hasLLMSpans,
+      // New header computed properties
+      errorSpansCount,
+      rootServiceName,
+      traceStartTime,
+      formatTimestamp,
+      traceTabs,
     };
   },
 });
