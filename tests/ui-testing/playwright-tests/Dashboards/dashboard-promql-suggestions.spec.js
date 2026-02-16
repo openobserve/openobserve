@@ -29,10 +29,13 @@ const waitForSuggestionsStable = async (page, suggestWidget) => {
 
 // Helper function to cleanup dashboard after test
 const cleanupDashboard = async (page, pm, dashboardName) => {
-  // Save panel first
-  await pm.dashboardPanelActions.savePanel();
+  // Save panel and wait for the save API + navigation to ViewDashboard to complete
+  await Promise.all([
+    page.waitForURL(/\/dashboards\/view\b/, { timeout: 30000 }),
+    pm.dashboardPanelActions.savePanel(),
+  ]);
 
-  // Wait for back button to be visible after save
+  // Wait for back button to be visible after navigation completes
   const backBtn = page.locator('[data-test="dashboard-back-btn"]');
   await backBtn.waitFor({ state: "visible", timeout: 10000 });
 
