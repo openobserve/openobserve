@@ -29,20 +29,26 @@ const waitForSuggestionsStable = async (page, suggestWidget) => {
 
 // Helper function to cleanup dashboard after test
 const cleanupDashboard = async (page, pm, dashboardName) => {
-  // Save panel and wait for the save API + navigation to ViewDashboard to complete
-  await Promise.all([
-    page.waitForURL(/\/dashboards\/view\b/, { timeout: 30000 }),
-    pm.dashboardPanelActions.savePanel(),
-  ]);
+  // Replace editor content with a simple valid PromQL query
+  // (tests leave invalid/partial queries like 'cpu_usage{service_name=a}')
+  const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+  const monacoEditor = queryEditor.locator('.monaco-editor');
+  await monacoEditor.click();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.type('up');
+  await page.keyboard.press('Escape'); // dismiss any autocomplete
 
-  // Wait for back button to be visible after navigation completes
-  const backBtn = page.locator('[data-test="dashboard-back-btn"]');
-  await backBtn.waitFor({ state: "visible", timeout: 10000 });
+  // Wait for Monaco's debounced model update (500ms default in CodeQueryEditor.vue)
+  // to sync editor text to Vue data model before applying
+  await page.waitForTimeout(3000);
 
-  // Click back button to go to dashboard list
-  await backBtn.click();
+  // Apply the query — save fails with "Query-1 is empty" if never applied
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelActions.waitForChartToRender();
 
-  // Delete the dashboard
+  // Save panel then navigate back to dashboard list
+  await pm.dashboardPanelActions.savePanel();
+  await pm.dashboardCreate.backToDashboardList();
   await deleteDashboard(page, dashboardName);
 };
 
