@@ -27,34 +27,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card class="analysis-dashboard-card">
       <!-- Header -->
       <q-card-section class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
-        <div class="tw:flex tw:items-center tw:gap-3">
+        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
           <q-icon name="dashboard" size="md" color="primary" />
-          <div class="tw:flex tw:flex-col tw:gap-0">
-            <span class="tw:text-lg tw:font-semibold">
-              <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
-              <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
-              <template v-else-if="props.analysisType === 'error'">{{ t('errorInsights.title') }}</template>
-            </span>
-            <span class="tw:text-xs tw:opacity-70">
-              <span v-if="props.analysisType === 'latency' && durationFilter">
-                {{ t('latencyInsights.durationLabel') }} {{ formatTimeWithSuffix(durationFilter.start) }} - {{ formatTimeWithSuffix(durationFilter.end) }}
-              </span>
-              <span v-else-if="props.analysisType === 'volume' && rateFilter">
-                <template v-if="rateFilter.timeStart && rateFilter.timeEnd">
-                  {{ t('volumeInsights.timeRangeLabel') }} {{ formatTimestamp(rateFilter.timeStart) }} - {{ formatTimestamp(rateFilter.timeEnd) }}
-                </template>
-                <template v-else>
-                  {{ t('volumeInsights.rateLabel') }} {{ rateFilter.start }} - {{ rateFilter.end }} traces/interval
-                </template>
-              </span>
-              <span v-else-if="props.analysisType === 'error' && errorFilter">
-                <template v-if="errorFilter.timeStart && errorFilter.timeEnd">
-                  {{ t('errorInsights.errorSpikePeriod') }} {{ formatTimestamp(errorFilter.timeStart) }} - {{ formatTimestamp(errorFilter.timeEnd) }}
-                </template>
-                <template v-else>
-                  {{ t('errorInsights.errorsGreaterThan') }} {{ errorFilter.start }}
-                </template>
-              </span>
+          <span class="tw:text-lg tw:font-semibold tw:whitespace-nowrap">
+            <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
+            <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
+            <template v-else-if="props.analysisType === 'error'">{{ t('errorInsights.title') }}</template>
+          </span>
+
+          <!-- Time Range Display: Inline chips -->
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+            <!-- Baseline Chip -->
+            <div class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded">
+              <span class="tw:font-semibold tw:text-[0.6rem] tw:uppercase tw:tracking-wide tw:opacity-70">Baseline</span>
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start }}</span>
+              <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end }}</span>
+            </div>
+
+            <!-- Selected Chip -->
+            <div v-if="hasSelectedTimeRange" class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded">
+              <span class="tw:font-semibold tw:text-[0.6rem] tw:uppercase tw:tracking-wide">Selected</span>
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).start }}</span>
+              <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).end }}</span>
+            </div>
+
+            <!-- Additional filter info -->
+            <span v-if="filterMetadata" class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1">
+              {{ filterMetadata }}
             </span>
           </div>
         </div>
@@ -556,6 +557,45 @@ const baselineTimeRange = computed(() => {
   return props.timeRange;
 });
 
+// Compute selected time range from filters
+const selectedTimeRangeDisplay = computed(() => {
+  // Check for time-based filter from any RED metrics panel
+  if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
+    return {
+      startTime: props.rateFilter.timeStart,
+      endTime: props.rateFilter.timeEnd
+    };
+  } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
+    return {
+      startTime: props.durationFilter.timeStart,
+      endTime: props.durationFilter.timeEnd
+    };
+  } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
+    return {
+      startTime: props.errorFilter.timeStart,
+      endTime: props.errorFilter.timeEnd
+    };
+  }
+  return null;
+});
+
+// Check if a selected time range exists (brush selection)
+const hasSelectedTimeRange = computed(() => {
+  return selectedTimeRangeDisplay.value !== null;
+});
+
+// Additional filter metadata (duration, rate, or error count)
+const filterMetadata = computed(() => {
+  if (props.analysisType === 'latency' && props.durationFilter && !props.durationFilter.timeStart) {
+    return `${t('latencyInsights.durationLabel')} ${formatTimeWithSuffix(props.durationFilter.start)} - ${formatTimeWithSuffix(props.durationFilter.end)}`;
+  } else if (props.analysisType === 'volume' && props.rateFilter && !props.rateFilter.timeStart) {
+    return `${t('volumeInsights.rateLabel')} ${props.rateFilter.start} - ${props.rateFilter.end} traces/interval`;
+  } else if (props.analysisType === 'error' && props.errorFilter && !props.errorFilter.timeStart) {
+    return `${t('errorInsights.errorsGreaterThan')} ${props.errorFilter.start}`;
+  }
+  return null;
+});
+
 const loadAnalysis = async () => {
   try {
     // Determine which filter to use based on active analysis type
@@ -675,6 +715,63 @@ const formatTimestamp = (microseconds: number) => {
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const seconds = String(date.getSeconds()).padStart(2, "0");
   return `${hours}:${minutes}:${seconds}`;
+};
+
+const formatFullTimestamp = (microseconds: number) => {
+  const date = new Date(microseconds / 1000);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+const formatCompactTimestamp = (microseconds: number) => {
+  const date = new Date(microseconds / 1000);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  // Format as MM/DD HH:MM:SS (more compact)
+  return `${month}/${day} ${hours}:${minutes}:${seconds}`;
+};
+
+// Smart timestamp formatter - shows date only once if same day
+const formatSmartTimestamp = (startMicroseconds: number, endMicroseconds: number) => {
+  const startDate = new Date(startMicroseconds / 1000);
+  const endDate = new Date(endMicroseconds / 1000);
+
+  const formatTime = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    return `${hours}:${minutes}:${seconds}`;
+  };
+
+  const formatDate = (date: Date) => {
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${month}/${day}`;
+  };
+
+  const isSameDay = startDate.toDateString() === endDate.toDateString();
+
+  if (isSameDay) {
+    // Same day: show "MM/DD HH:MM:SS" for start, only "HH:MM:SS" for end
+    return {
+      start: `${formatDate(startDate)} ${formatTime(startDate)}`,
+      end: formatTime(endDate)
+    };
+  } else {
+    // Different days: show both full timestamps
+    return {
+      start: `${formatDate(startDate)} ${formatTime(startDate)}`,
+      end: `${formatDate(endDate)} ${formatTime(endDate)}`
+    };
+  }
 };
 
 const formatTimeWithSuffix = (milliseconds: number) => {
@@ -875,6 +972,28 @@ watch(
     margin: 8px 0px;
   }
 
+  // Time range chips styling - matching chart colors
+  .time-range-chip {
+    font-size: 0.7rem;
+    line-height: 1.2;
+    transition: all 0.2s ease;
+
+    &.baseline-chip {
+      // Red background matching baseline in charts
+      background: rgba(239, 68, 68, 0.12);
+      color: rgba(0, 0, 0, 0.85);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    &.selected-chip {
+      // Orange background matching selected in charts
+      background: rgba(251, 146, 60, 0.15);
+      color: rgba(0, 0, 0, 0.85);
+      border: 1px solid rgba(251, 146, 60, 0.4);
+      font-weight: 500;
+    }
+  }
+
   .analysis-content {
     flex: 1;
     overflow: hidden; // Changed to hidden - q-splitter handles overflow
@@ -949,6 +1068,23 @@ body.body--dark {
 
     &:hover {
       background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  // Time range chips dark mode - matching chart colors
+  .time-range-chip {
+    &.baseline-chip {
+      // Red background for baseline
+      background: rgba(239, 68, 68, 0.2);
+      color: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    &.selected-chip {
+      // Orange background for selected
+      background: rgba(251, 146, 60, 0.25);
+      color: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(251, 146, 60, 0.5);
     }
   }
 }

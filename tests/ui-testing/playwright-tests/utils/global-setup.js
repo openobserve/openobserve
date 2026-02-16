@@ -81,7 +81,7 @@ async function globalSetup() {
     testLogger.debug('Login credentials submitted');
 
     // Wait for login to complete - look for navigation or success indicators
-    await page.waitForLoadState('networkidle', { timeout: 15000 });
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     
     // Verify login success by checking for a known element
     await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ 

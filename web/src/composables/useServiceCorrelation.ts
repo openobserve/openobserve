@@ -75,10 +75,8 @@ export function useServiceCorrelation() {
     error.value = null;
 
     try {
-      console.log(`[useServiceCorrelation] Loading semantic groups for org '${org}'...`);
       const response = await serviceStreamsApi.getSemanticGroups(org);
       semanticGroupsGlobalCache.set(org, response.data);
-      console.log(`[useServiceCorrelation] Loaded ${response.data.length} semantic groups for org '${org}'`);
       return response.data;
     } catch (err: any) {
       error.value = `Failed to load semantic groups: ${err.message || err}`;
@@ -128,9 +126,6 @@ export function useServiceCorrelation() {
       // UI will use matched_dimensions with actual values, additional_dimensions with _o2_all wildcard
       const dimensions = extractSemanticDimensions(context, semanticGroups, false);
 
-      console.log("[useServiceCorrelation] Context fields:", Object.keys(context.fields));
-      console.log("[useServiceCorrelation] Extracted dimensions:", dimensions);
-
       if (Object.keys(dimensions).length === 0) {
         error.value = "No recognizable dimensions found in context for correlation";
         console.error("[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.");
@@ -143,8 +138,6 @@ export function useServiceCorrelation() {
         source_type: sourceType,
         available_dimensions: dimensions,
       };
-
-      console.log("[useServiceCorrelation] Correlation request:", correlationRequest);
 
       const response = await serviceStreamsApi.correlate(orgIdentifier.value, correlationRequest);
 

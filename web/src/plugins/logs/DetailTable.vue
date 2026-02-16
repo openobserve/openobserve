@@ -316,8 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           :hide-view-related-button="true"
-          :hide-search-term-actions="true"
+          :hide-search-term-actions="false"
           :hide-dimension-filters="true"
+          :hide-reset-filters-button="true"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />

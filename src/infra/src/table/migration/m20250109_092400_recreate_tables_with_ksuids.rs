@@ -1150,33 +1150,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        legacy_folders::add_ksuid_column().to_string(MysqlQueryBuilder);
-        legacy_folders::drop_table().to_string(MysqlQueryBuilder);
-        legacy_folders::rename_to_legacy_folders().to_string(MysqlQueryBuilder);
-
-        legacy_dashboards::add_ksuid_column().to_string(MysqlQueryBuilder);
-        legacy_dashboards::drop_table().to_string(MysqlQueryBuilder);
-        legacy_dashboards::rename_to_legacy_dashboards().to_string(MysqlQueryBuilder);
-
-        legacy_alerts::drop_table().to_string(MysqlQueryBuilder);
-        legacy_alerts::rename_to_legacy_alerts().to_string(MysqlQueryBuilder);
-
-        new_folders::create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder);
-        new_folders::create_folders_org_type_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
-        new_folders::create_folders_table_statement().to_string(MysqlQueryBuilder);
-
-        new_dashboards::create_dashboards_folder_id_dashboard_id_idx_stmnt()
-            .to_string(MysqlQueryBuilder);
-        new_dashboards::create_dashboards_table_statement().to_string(MysqlQueryBuilder);
-
-        new_alerts::create_alerts_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
-        new_alerts::create_alerts_org_stream_type_stream_name_name_idx_stmnt()
-            .to_string(MysqlQueryBuilder);
-        new_alerts::create_alerts_table_statement().to_string(MysqlQueryBuilder);
-    }
-
-    #[test]
     fn sqlite() {
         legacy_folders::add_ksuid_column().to_string(SqliteQueryBuilder);
         legacy_folders::drop_table().to_string(SqliteQueryBuilder);

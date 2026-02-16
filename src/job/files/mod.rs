@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    FILE_EXT_PARQUET,
     cluster::{LOCAL_NODE, is_offline},
     ider,
     meta::stream::StreamType,
@@ -77,5 +76,6 @@ pub fn generate_storage_file_name(
     } else {
         format!("{}/{}", &file_name[..file_name_pos], id)
     };
-    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
+    let file_format = config::get_config().common.file_format.extension();
+    format!("files/{stream_key}/{file_date}/{file_name}{file_format}")
 }

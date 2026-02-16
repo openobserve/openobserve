@@ -59,7 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :color="getReasonColor(props.row.correlation_reason)"
             :label="getReasonLabel(props.row.correlation_reason)"
             outline
-          />
+          >
+            <q-tooltip>{{ getReasonTooltip(props.row.correlation_reason) }}</q-tooltip>
+          </q-badge>
         </q-td>
       </template>
 
@@ -88,7 +90,7 @@ interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "manual_extraction" | "temporal";
+  correlation_reason: "service_discovery" | "trace_based" | "scope_match" | "workload_match" | "alert_id";
   created_at: number;
 }
 
@@ -144,7 +146,7 @@ export default defineComponent({
       {
         name: "correlation_reason",
         field: "correlation_reason",
-        label: "Corelation Reason",
+        label: "Correlation Reason",
         align: "right",
         sortable: false,
         style: "width: 150px",
@@ -160,10 +162,14 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return "blue";
-        case "manual_extraction":
-          return "purple";
-        case "temporal":
+        case "trace_based":
           return "teal";
+        case "scope_match":
+          return "purple";
+        case "workload_match":
+          return "orange";
+        case "alert_id":
+          return "grey";
         default:
           return "grey";
       }
@@ -173,12 +179,33 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return t("alerts.incidents.correlationServiceDiscovery");
-        case "manual_extraction":
-          return t("alerts.incidents.correlationManualExtraction");
-        case "temporal":
-          return t("alerts.incidents.correlationTemporal");
+        case "trace_based":
+          return t("alerts.incidents.correlationTraceBased");
+        case "scope_match":
+          return t("alerts.incidents.correlationScopeMatch");
+        case "workload_match":
+          return t("alerts.incidents.correlationWorkloadMatch");
+        case "alert_id":
+          return t("alerts.incidents.correlationAlertId");
         default:
           return reason;
+      }
+    };
+
+    const getReasonTooltip = (reason: string) => {
+      switch (reason) {
+        case "service_discovery":
+          return t("alerts.incidents.correlationServiceDiscoveryTooltip");
+        case "trace_based":
+          return t("alerts.incidents.correlationTraceBasedTooltip");
+        case "scope_match":
+          return t("alerts.incidents.correlationScopeMatchTooltip");
+        case "workload_match":
+          return t("alerts.incidents.correlationWorkloadMatchTooltip");
+        case "alert_id":
+          return t("alerts.incidents.correlationAlertIdTooltip");
+        default:
+          return "";
       }
     };
 
@@ -199,6 +226,7 @@ export default defineComponent({
       formatTimestamp,
       getReasonColor,
       getReasonLabel,
+      getReasonTooltip,
       changePagination,
       onRowClick,
     };

@@ -28,7 +28,7 @@ pub struct Model {
     pub alert_fired_at: i64,
 
     pub alert_name: String,
-    /// service_discovery, manual_extraction, temporal
+    /// service_discovery, trace_based, scope_match, workload_match, alert_id
     pub correlation_reason: Option<String>,
     pub created_at: i64,
 }

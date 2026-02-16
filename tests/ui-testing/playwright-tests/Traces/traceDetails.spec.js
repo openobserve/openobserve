@@ -156,7 +156,7 @@ test.describe("Trace Details testcases", () => {
       await pm.tracesPage.viewRelatedLogs();
 
       // Should navigate to logs
-      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await pm.tracesPage.expectUrlContains(/logs/);
 
       testLogger.info('Successfully navigated to related logs');

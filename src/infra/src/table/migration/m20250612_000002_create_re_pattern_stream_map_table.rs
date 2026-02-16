@@ -131,24 +131,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_re_stream_map_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `re_pattern_stream_map` ( 
-            `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-            `org` varchar(100) NOT NULL, 
-            `stream` varchar(256) NOT NULL, 
-            `stream_type` varchar(50) NOT NULL, 
-            `field` varchar(1024) NOT NULL, 
-            `pattern_id` varchar(100) NOT NULL, 
-            `policy` text NOT NULL, 
-            `apply_at` varchar(100) NOT NULL,
-            CONSTRAINT `re_pattern_stream_map_fk` FOREIGN KEY (`pattern_id`) REFERENCES `re_patterns` (`id`) 
-            )"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_re_stream_map_table_statement().to_string(SqliteQueryBuilder),

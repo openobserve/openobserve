@@ -663,17 +663,6 @@ export default defineComponent({
           startTime: this.searchObj.data.datetime.startTime,
           endTime: this.searchObj.data.datetime.endTime,
         };
-        console.log(
-          "[Logs Volume Analysis] Stored original time range before selection:",
-          {
-            start: new Date(
-              this.originalTimeRangeBeforeSelection.startTime / 1000,
-            ).toISOString(),
-            end: new Date(
-              this.originalTimeRangeBeforeSelection.endTime / 1000,
-            ).toISOString(),
-          },
-        );
       }
 
       this.$emit("update:datetime", { start, end });
@@ -688,16 +677,7 @@ export default defineComponent({
           timeStart: start * 1000, // Convert ms to microseconds
           timeEnd: end * 1000, // Convert ms to microseconds
         };
-        console.log("[Logs Volume Analysis] Histogram selection range:", {
-          timeStart: new Date(start).toISOString(),
-          timeEnd: new Date(end).toISOString(),
-          timeStartMicros: start * 1000,
-          timeEndMicros: end * 1000,
-        });
       } else {
-        console.log(
-          "[Logs Volume Analysis] Histogram selection cleared (zoom reset)",
-        );
         this.hasHistogramSelection = false;
         this.histogramSelectionRange = {
           start: 0,
@@ -926,17 +906,8 @@ export default defineComponent({
     };
 
     const openLogDetailsWithCorrelation = (row: any) => {
-      console.log(
-        "[SearchResult] openLogDetailsWithCorrelation called with row:",
-        row,
-      );
-
       // If sidebar is already open, we already know the index
       if (searchObj.meta.showDetailTab) {
-        console.log(
-          "[SearchResult] Sidebar already open, using current index:",
-          searchObj.meta.resultGrid.navigation.currentRowIndex,
-        );
         // Just set the tab and load correlation data
         detailTableInitialTab.value = "correlated-logs";
         openCorrelationFromLog(row);
@@ -960,8 +931,6 @@ export default defineComponent({
         );
         return;
       }
-
-      console.log("[SearchResult] Found row at index:", index);
 
       // Set the initial tab to correlated-logs before opening the sidebar
       detailTableInitialTab.value = "correlated-logs";
@@ -1004,8 +973,6 @@ export default defineComponent({
           searchObj.data.stream.selectedStream[0],
         );
 
-        console.log("[SearchResult] findRelatedTelemetry result:", result);
-
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
           correlationError.value = "No matching service found for correlation";
@@ -1027,13 +994,6 @@ export default defineComponent({
           });
           return;
         }
-
-        console.log("[SearchResult] Correlation data:", {
-          serviceName: result.correlationData.service_name,
-          metricsCount: result.correlationData.related_streams.metrics.length,
-          tracesCount: result.correlationData.related_streams.traces.length,
-          logsCount: result.correlationData.related_streams.logs.length,
-        });
 
         // Prepare props for the dashboard
         // Calculate time range: ±5 minutes from log timestamp
@@ -1060,10 +1020,12 @@ export default defineComponent({
         // Use logStreams[0].filters as matchedDimensions — these contain
         // the correct field names for the log stream (e.g., k8s_namespace_name)
         // instead of semantic IDs (k8s-namespace). Same fix as 9127b6172.
-        const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
-        const actualMatchedDimensions = Object.keys(logFilters).length > 0
-          ? logFilters
-          : result.correlationData.matched_dimensions;
+        const logFilters =
+          result.correlationData.related_streams.logs?.[0]?.filters || {};
+        const actualMatchedDimensions =
+          Object.keys(logFilters).length > 0
+            ? logFilters
+            : result.correlationData.matched_dimensions;
 
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
@@ -1074,7 +1036,8 @@ export default defineComponent({
           traceStreams: result.correlationData.related_streams.traces || [],
           sourceStream: searchObj.data.stream.selectedStream[0],
           sourceType: "logs",
-          availableDimensions: logFilters, // Actual field names from the log stream filters
+          // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
+          availableDimensions: { ...logFilters, ...context.fields },
           ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
           timeRange: {
             startTime: startTimeMicros,
@@ -1099,19 +1062,8 @@ export default defineComponent({
 
         // For inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)
-        console.log(
-          "[SearchResult] showDetailTab:",
-          searchObj.meta.showDetailTab,
-        );
         if (!searchObj.meta.showDetailTab) {
-          console.log(
-            "[SearchResult] Opening correlation dialog for inline expansion",
-          );
           showCorrelation.value = true;
-        } else {
-          console.log(
-            "[SearchResult] DetailTable drawer is open, passing props to drawer tabs",
-          );
         }
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
@@ -1414,9 +1366,6 @@ export default defineComponent({
         searchObj.meta.resetPlotChart = false;
 
         // Clear histogram selection when chart is reset
-        console.log(
-          "[Logs Volume Analysis] Chart reset, clearing histogram selection",
-        );
         hasHistogramSelection.value = false;
         histogramSelectionRange.value = {
           start: 0,
@@ -1448,9 +1397,6 @@ export default defineComponent({
       (isOpen, wasOpen) => {
         // When sidebar closes, clear correlation data
         if (wasOpen && !isOpen) {
-          console.log(
-            "[SearchResult] Sidebar closed, clearing correlation data",
-          );
           correlationDashboardProps.value = null;
           correlationLoading.value = false;
           correlationError.value = null;
@@ -1486,9 +1432,6 @@ export default defineComponent({
           oldTime &&
           (newTime.start !== oldTime.start || newTime.end !== oldTime.end)
         ) {
-          console.log(
-            "[Logs Volume Analysis] Datetime changed from outside, clearing histogram selection",
-          );
           hasHistogramSelection.value = false;
           histogramSelectionRange.value = {
             start: 0,
