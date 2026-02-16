@@ -283,6 +283,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -775,8 +776,8 @@ export default defineComponent({
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
 
-      // In edit mode, check if panel has panel-level time configured
-      // If it does, use that instead of global time for the date picker
+      // In edit mode, show panel's configured time in picker initially
+      // But when running queries, use current picker value (not config)
       if (editMode.value && route.query.panelId) {
         const panelId = route.query.panelId as string;
         let panelTimeValue = null;
@@ -786,14 +787,15 @@ export default defineComponent({
         if (urlPanelTime) {
           panelTimeValue = urlPanelTime;
         }
-        // Priority 2: Check panel config for panel_time_range
+        // Priority 2: Check panel config for panel_time_range (for initial display)
         else if (dashboardPanelData.data.config?.panel_time_range) {
           panelTimeValue = convertPanelTimeRangeToPicker(
             dashboardPanelData.data.config.panel_time_range
           );
         }
 
-        // If panel has its own time, update the selectedDate to show it in the picker
+        // If panel has its own time, show it in the picker initially
+        // (User can change it, and queries will use the current picker value)
         if (panelTimeValue) {
           selectedDate.value = panelTimeValue;
         }
@@ -1021,15 +1023,20 @@ export default defineComponent({
 
     const updateDateTime = (value: object) => {
       if (selectedDate.value && dateTimePickerRef?.value) {
-        // CRITICAL FIX (Issue 4): Check if panel has its own time configured
-        // Priority 1: Check URL params (highest priority)
-        // Priority 2: Use panel's configured time range
+        // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+        // In add/edit panel mode, when time changes, this panel should always refresh
+        panelIdToBeRefreshed.value = null;
+
+        // CRITICAL FIX: In edit mode, ONLY use global time
+        // Panel-specific time (URL params or config) is for dashboard display only
+        // Priority 1: Check URL params for panel time (only when NOT in edit mode)
+        // Priority 2: Use panel's configured time range (only when NOT in edit mode)
         // Priority 3: Use global time
         const panelId = route.query.panelId as string;
         let effectiveTime;
 
-        // Priority 1: URL params (only in edit mode)
-        if (panelId) {
+        // Priority 1: URL params panel-specific time (skip in edit mode)
+        if (panelId && !editMode.value) {
           const urlPanelTime = getPanelTimeFromURL(panelId, route.query);
           if (urlPanelTime) {
             if (urlPanelTime.valueType === 'relative' && urlPanelTime.relativeTimePeriod) {
@@ -1050,7 +1057,9 @@ export default defineComponent({
         }
 
         // Priority 2: Panel's configured time range
-        if (!effectiveTime) {
+        // IMPORTANT: Only use panel config time when NOT in edit mode
+        // Config is for initial dashboard display only, not for editing
+        if (!effectiveTime && !editMode.value) {
           const panelTimeRange = dashboardPanelData.data.config?.panel_time_range;
           const pickerValue = convertPanelTimeRangeToPicker(panelTimeRange);
 
