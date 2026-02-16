@@ -237,6 +237,7 @@ import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
@@ -676,6 +677,10 @@ export default defineComponent({
     };
 
     const updateDateTime = (value: object) => {
+      // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+      // In view panel mode, when time changes, this panel should always refresh
+      panelIdToBeRefreshed.value = null;
+
       dashboardPanelData.meta.dateTime = {
         start_time: new Date(selectedDate.value.startTime),
         end_time: new Date(selectedDate.value.endTime),
