@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="disable"
             class="tw:h-[36px]"
             @hide="setTimeForVariables"
+            data-test="dashboard-global-date-time-picker"
           />
           <q-btn
             outline
@@ -1092,6 +1093,10 @@ export default defineComponent({
 
         // Set the effective time for chart rendering
         dashboardPanelData.meta.dateTime = effectiveTime;
+
+        // CRITICAL: Update chartData to trigger PanelSchemaRenderer to re-render
+        // This ensures the time change is properly propagated to the panel data loader
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 
         // Use global time for variables (as variables should use global time context)
         dateTimeForVariables.value = {
