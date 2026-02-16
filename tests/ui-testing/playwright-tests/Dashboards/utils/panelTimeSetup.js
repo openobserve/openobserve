@@ -8,6 +8,64 @@ import testLogger from '../../utils/test-logger.js';
 import { waitForDashboardPage, deleteDashboard } from './dashCreation.js';
 
 /**
+ * Start creating a panel (opens add panel form, fills basic fields) WITHOUT saving.
+ * Use this when you need to perform actions in Add Panel mode before saving.
+ * @param {Object} page - Playwright page object
+ * @param {Object} pm - PageManager instance
+ * @param {Object} config - Configuration object
+ * @param {string} config.dashboardName - Dashboard name
+ * @param {string} config.panelName - Panel name
+ * @param {string} config.stream - Stream name (optional, default: "e2e_automate")
+ * @param {string} config.streamType - Stream type (optional, default: "logs")
+ */
+export async function startPanelCreation(page, pm, config) {
+  const {
+    dashboardName,
+    panelName = 'Test Panel',
+    stream = 'e2e_automate',
+    streamType = 'logs'
+  } = config;
+
+  testLogger.info('Starting panel creation (without saving)', { dashboardName, panelName });
+
+  // Navigate to dashboards
+  await pm.dashboardList.menuItem("dashboards-item");
+  await waitForDashboardPage(page);
+  await pm.dashboardCreate.waitForDashboardUIStable();
+
+  // Create dashboard
+  await pm.dashboardCreate.createDashboard(dashboardName);
+  await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({
+    state: "visible",
+    timeout: 10000
+  });
+
+  // Click add panel
+  await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+  // Wait for AddPanel view to load
+  await page.locator('[data-test="dashboard-panel-name"]').waitFor({
+    state: "visible",
+    timeout: 10000
+  });
+
+  // Set panel name
+  await page.locator('[data-test="dashboard-panel-name"]').fill(panelName);
+  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+  // Select stream type and stream
+  await pm.chartTypeSelector.selectStreamType(streamType);
+  await pm.chartTypeSelector.selectStream(stream);
+
+  // Add fields for proper chart configuration
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
+
+  testLogger.info('Panel creation form ready (unsaved)', { dashboardName, panelName });
+}
+
+/**
  * Create a dashboard with a panel that has panel time configured
  * @param {Object} page - Playwright page object
  * @param {Object} pm - PageManager instance
@@ -498,6 +556,7 @@ export async function verifyPanelTimeConfig(page, expectedConfig) {
 }
 
 export default {
+  startPanelCreation,
   createDashboardWithPanelTime,
   addPanelWithPanelTime,
   createDashboardWithMultiplePanels,

@@ -460,4 +460,114 @@ export default class DashboardPanelTime {
     // Full screen is just the dashboard view, so use regular panel time picker
     await this.changePanelTimeInView(panelId, timeRange, clickApply);
   }
+
+  /**
+   * Get text content from global date time picker
+   * @returns {Promise<string>} - Picker text content
+   */
+  async getGlobalTimePickerText() {
+    const picker = this.page.locator('[data-test="dashboard-global-date-time-picker"]');
+    return await picker.textContent();
+  }
+
+  /**
+   * Open global time picker and select a relative time WITHOUT clicking Apply
+   * Useful for testing that changes aren't applied without clicking Apply
+   * @param {string} timeRange - e.g., "6-d", "1-w", "15-m"
+   */
+  async selectGlobalTimeWithoutApply(timeRange) {
+    await this.clickGlobalTimePicker();
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 5000 });
+    const timeOptionBtn = dateTimeDialog.locator(`[data-test="date-time-relative-${timeRange}-btn"]`);
+    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
+    await timeOptionBtn.scrollIntoViewIfNeeded();
+    await timeOptionBtn.click();
+  }
+
+  /**
+   * Dismiss the currently open date time picker by pressing Escape
+   */
+  async dismissDateTimePicker() {
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Click the Apply button in an open date time picker
+   */
+  async clickDateTimeApply() {
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    const applyBtn = dateTimeDialog.locator('[data-test="date-time-apply-btn"]');
+    await applyBtn.scrollIntoViewIfNeeded();
+    await applyBtn.click();
+    await dateTimeDialog.waitFor({ state: "hidden", timeout: 5000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  }
+
+  /**
+   * Open global time picker and switch to Absolute tab
+   */
+  async openGlobalPickerAbsoluteTab() {
+    await this.clickGlobalTimePicker();
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 5000 });
+    await dateTimeDialog.locator('[data-test="date-time-absolute-tab"]').click();
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Discard panel changes (click discard button and accept confirmation dialog)
+   */
+  async discardPanelChanges() {
+    this.page.once("dialog", async (dialog) => {
+      await dialog.accept();
+    });
+    await this.page.locator('[data-test="dashboard-panel-discard"]').click().catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+  }
+
+  /**
+   * Assert view panel date time picker is visible
+   */
+  async expectViewPanelDateTimePickerVisible() {
+    const picker = this.page.locator('[data-test="dashboard-viewpanel-date-time-picker"]');
+    await expect(picker).toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Get text content from view panel date time picker
+   * @returns {Promise<string>} - Picker text content
+   */
+  async getViewPanelDateTimePickerText() {
+    const picker = this.page.locator('[data-test="dashboard-viewpanel-date-time-picker"]');
+    return await picker.textContent();
+  }
+
+  /**
+   * Click the view panel date time picker to open it
+   */
+  async clickViewPanelDateTimePicker() {
+    const picker = this.page.locator('[data-test="dashboard-viewpanel-date-time-picker"]');
+    await picker.click();
+  }
+
+  /**
+   * Change time in view panel mode (click picker, select relative time, click apply)
+   * @param {string} timeRange - e.g., "6-d", "1-w"
+   */
+  async changeViewPanelDateTime(timeRange) {
+    await this.clickViewPanelDateTimePicker();
+    const dateTimeDialog = this.page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 5000 });
+    const timeOptionBtn = dateTimeDialog.locator(`[data-test="date-time-relative-${timeRange}-btn"]`);
+    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
+    await timeOptionBtn.scrollIntoViewIfNeeded();
+    await timeOptionBtn.click();
+    const applyBtn = dateTimeDialog.locator('[data-test="date-time-apply-btn"]');
+    await applyBtn.scrollIntoViewIfNeeded();
+    await applyBtn.click();
+    await dateTimeDialog.waitFor({ state: "hidden", timeout: 5000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  }
 }
