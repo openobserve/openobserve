@@ -1098,10 +1098,13 @@ export default defineComponent({
         // This ensures the time change is properly propagated to the panel data loader
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 
-        // Use global time for variables (as variables should use global time context)
+        // IMPORTANT: Variables use the SAME time as chart queries
+        // - Add Panel mode with panel config: Uses panel config time (from Priority 2)
+        // - Add Panel mode without config: Uses global time (from Priority 3)
+        // - Edit Panel mode: Uses global time (Priority 1 & 2 skipped, uses Priority 3)
         dateTimeForVariables.value = {
-          start_time: new Date(selectedDate.value.startTime),
-          end_time: new Date(selectedDate.value.endTime),
+          start_time: effectiveTime.start_time,
+          end_time: effectiveTime.end_time,
         };
 
         router.replace({
