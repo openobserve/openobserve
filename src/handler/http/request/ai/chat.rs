@@ -19,6 +19,8 @@
 //! but internally forward all requests to the o2-sre-agent service, which handles
 //! the actual AI processing with MCP tool integration.
 
+use std::io::Error;
+
 use actix_http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 #[cfg(feature = "enterprise")]
@@ -254,6 +256,19 @@ pub async fn chat(
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         let agent_type = get_agent_type(&context);
 
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
+                .collect()
+        });
+
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -268,6 +283,7 @@ pub async fn chat(
                 Some(history)
             },
             user_token,
+            images,
         };
 
         // Query agent with headers
@@ -553,6 +569,19 @@ pub async fn chat_stream(
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         let agent_type = get_agent_type(&context);
 
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
+                .collect()
+        });
+
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -567,6 +596,7 @@ pub async fn chat_stream(
                 Some(history)
             },
             user_token,
+            images,
         };
 
         // Report successful start to audit
@@ -615,11 +645,23 @@ pub async fn chat_stream(
                         yield Ok(web::Bytes::from(bytes.to_vec()));
                     }
                     Err(e) => {
-                        yield Err(std::io::Error::other(e));
+                        log::error!(
+                            "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                             Agent stream chunk error: {e}"
+                        );
+                        let error_event = serde_json::json!({
+                            "type": "error",
+                            "error": format!("Stream interrupted: {}", e)
+                        });
+                        yield Ok(web::Bytes::from(format!("data: {}\n\n", error_event)));
                         break;
                     }
                 }
             }
+            log::info!(
+                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                 Agent stream ended"
+            );
         };
 
         HttpResponse::Ok()
@@ -639,6 +681,134 @@ pub async fn chat_stream(
         drop(forward_headers);
         drop(in_req);
         MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+/// ConfirmAction - Proxy confirmation response to o2-sre-agent
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/confirm/{session_id}",
+    context_path = "/api",
+    tag = "Ai",
+    operation_id = "ConfirmAction",
+    summary = "Confirm or reject a destructive AI tool action",
+    description = "Forwards user confirmation or rejection to the o2-sre-agent service \
+                   for a pending destructive tool call.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Path, description = "Chat session ID")
+    ),
+    request_body(
+        content = serde_json::Value,
+        description = "Confirmation payload",
+        example = json!({"approved": true}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[post("/{org_id}/ai/confirm/{session_id}")]
+pub async fn confirm_action(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let (_org_id, session_id) = path.into_inner();
+    let body_bytes = body;
+
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
+
+        let config = get_o2_config();
+
+        if !config.ai.enabled {
+            return Ok(MetaHttpResponse::bad_request("AI is not enabled"));
+        }
+
+        if get_agent_client().is_none() {
+            return Ok(MetaHttpResponse::bad_request("Agent service not configured"));
+        }
+
+        // Extract user token for identity verification (same as chat_stream)
+        let auth_str = crate::common::utils::auth::extract_auth_str(&req).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Inject user_token into the body for identity verification by the agent
+        let mut forward_body: serde_json::Value =
+            serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}));
+        if let Some(token) = &user_token
+            && let Some(obj) = forward_body.as_object_mut()
+        {
+            obj.insert(
+                "user_token".to_string(),
+                serde_json::Value::String(token.clone()),
+            );
+        }
+        let forward_bytes = serde_json::to_vec(&forward_body).unwrap_or_default();
+
+        // Forward the confirmation to the agent's /confirm endpoint
+        let confirm_url = format!(
+            "{}/confirm/{}",
+            config.incidents.rca_agent_url.trim_end_matches('/'),
+            session_id
+        );
+
+        let http_client = reqwest::Client::new();
+        match http_client
+            .post(&confirm_url)
+            .header("Content-Type", "application/json")
+            .body(forward_bytes)
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+
+                if status.is_success() {
+                    let json_value: serde_json::Value =
+                        serde_json::from_str(&response_body)
+                            .unwrap_or(serde_json::json!({"ok": true}));
+                    return Ok(HttpResponse::Ok().json(json_value));
+                } else {
+                    log::error!(
+                        "Agent confirm endpoint returned {}: {}",
+                        status,
+                        response_body
+                    );
+                    return Ok(MetaHttpResponse::internal_error(format!(
+                        "Confirmation failed: {}",
+                        response_body
+                    )));
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to forward confirmation to agent: {e}");
+                return Ok(MetaHttpResponse::internal_error(format!("Failed to forward confirmation: {e}")));
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(session_id);
+        drop(req);
+        drop(body_bytes);
+        Ok(MetaHttpResponse::bad_request("AI chat is only available in enterprise version"))
     }
 }
 

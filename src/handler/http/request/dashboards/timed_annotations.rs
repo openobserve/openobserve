@@ -163,7 +163,9 @@ pub async fn get_annotations(
         (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete annotations", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations")]
@@ -267,7 +269,9 @@ pub async fn update_annotations(
         (status = 500, description = "Failed to remove timed annotation from panels", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Remove annotation from panel", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]

@@ -222,7 +222,9 @@ async fn set_user_setting(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete org system setting", "category": "system", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/settings/v2/{key}")]
@@ -258,7 +260,9 @@ async fn delete_org_setting(path: web::Path<(String, String)>) -> Result<HttpRes
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete user system setting", "category": "system", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/settings/v2/user/{user_id}/{key}")]

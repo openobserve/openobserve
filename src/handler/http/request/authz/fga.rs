@@ -15,15 +15,23 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
+use crate::handler::http::extractors::Headers;
+
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers},
+    crate::common::utils::auth::check_permissions,
     o2_dex::meta::auth::RoleRequest,
 };
 
-use crate::common::meta::{
-    http::HttpResponse as MetaHttpResponse,
-    user::{UserGroup, UserGroupRequest, UserRoleRequest},
+use crate::{
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            user::{UserGroup, UserGroupRequest, UserRoleRequest},
+        },
+        utils::auth::UserEmail,
+    },
+    handler::http::request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
 #[cfg(feature = "enterprise")]
@@ -114,6 +122,8 @@ pub async fn create_role(
 #[cfg(feature = "enterprise")]
 /// DeleteRole
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/roles/{role_id}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRole",
@@ -131,19 +141,120 @@ pub async fn create_role(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
 pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, role_name) = path.into_inner();
-
     match o2_openfga::authorizer::roles::delete_role(&org_id, &role_name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok(
-            serde_json::json!({"successful": "true"}),
-        )),
+        Ok(_) => Ok(MetaHttpResponse::ok(serde_json::json!({"successful": "true"}))),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
+}
+
+/// DeleteRoleBulk
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/roles/bulk",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn delete_role_bulk(
+    org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.ids {
+        if !check_permissions(
+            Some(format!("{org_id}/{name}")),
+            &org_id,
+            &user_id,
+            "roles",
+            "DELETE",
+            "",
+        )
+        .await
+        {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in &req.ids {
+        match o2_openfga::authorizer::roles::delete_role(&org_id, name).await {
+            Ok(_) => {
+                successful.push(name.clone());
+            }
+            Err(e) => {
+                log::error!("error in deleting role {org_id}/{name} : {e}");
+                unsuccessful.push(name.clone());
+                err = Some(e.to_string());
+            }
+        }
+    }
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/roles/bulk",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn delete_role_bulk(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -165,7 +276,8 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]

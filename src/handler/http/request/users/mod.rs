@@ -331,7 +331,9 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Remove user from organization", "category": "users", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]

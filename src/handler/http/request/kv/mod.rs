@@ -126,7 +126,9 @@ pub async fn set(
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete key-value pair", "category": "kv-store", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/kv/{key}")]

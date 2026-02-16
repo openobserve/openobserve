@@ -363,7 +363,9 @@ async fn delete_fields(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a stream", "category": "streams", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/streams/{stream_name}")]

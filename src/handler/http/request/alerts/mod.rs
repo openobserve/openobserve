@@ -298,7 +298,8 @@ pub async fn update_alert(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts", "requires_confirmation": true}))
     )
 )]
 #[delete("/v2/{org_id}/alerts/{alert_id}")]

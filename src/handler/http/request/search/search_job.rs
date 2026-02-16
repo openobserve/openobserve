@@ -513,7 +513,9 @@ pub async fn get_job_result(
         (status = 404, description = "Not Found", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/search_jobs/{job_id}")]

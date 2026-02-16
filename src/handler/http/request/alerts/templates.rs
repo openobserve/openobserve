@@ -240,7 +240,8 @@ async fn list_templates(
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete alert template", "category": "alerts", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/alerts/templates/{template_name}")]

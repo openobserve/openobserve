@@ -305,7 +305,9 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]

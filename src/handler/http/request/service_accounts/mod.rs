@@ -261,7 +261,9 @@ pub async fn update(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete service account", "category": "users", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/service_accounts/{email_id}")]

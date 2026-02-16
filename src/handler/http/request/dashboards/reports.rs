@@ -315,7 +315,9 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a report", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/reports/{name}")]

@@ -283,7 +283,9 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a folder by ID", "category": "folders", "requires_confirmation": true}))
     ),
 )]
 #[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
