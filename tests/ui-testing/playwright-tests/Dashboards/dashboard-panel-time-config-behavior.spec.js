@@ -23,6 +23,12 @@ import {
   assertGlobalTimeDisplay
 } from "./utils/panelTimeAssertions.js";
 import {
+  verifyQueryInspectorDateTime,
+  assertQueryInspectorHasDateTime,
+  assertQueryInspectorTimeRange,
+  closeQueryInspector,
+} from "./utils/queryInspectorHelpers.js";
+import {
   monitorVariableAPICalls,
   waitForVariableToLoad
 } from "../utils/variable-helpers.js";
@@ -342,6 +348,18 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Step 8: Verify URL changed from initial
     expect(page.url()).not.toBe(initialURL);
+
+    // Step 9: Open Query Inspector from panel dropdown menu in View Dashboard
+    await page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`).click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+    await page.waitForTimeout(1000);
+
+    // Step 10: Verify query inspector shows new time (6d, not the old 1h)
+    await assertQueryInspectorHasDateTime(page);
+    await assertQueryInspectorTimeRange(page, "6d");
+
+    // Close query inspector
+    await closeQueryInspector(page);
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
