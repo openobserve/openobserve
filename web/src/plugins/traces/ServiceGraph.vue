@@ -499,6 +499,10 @@ export default defineComponent({
       loading.value = true;
       error.value = null;
 
+      // Clear cache to force chart regeneration with fresh data
+      lastChartOptions.value = null;
+      chartKey.value++;
+
       try {
         const orgId = store.state.selectedOrganization.identifier;
 
