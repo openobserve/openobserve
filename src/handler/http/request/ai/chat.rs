@@ -734,7 +734,9 @@ pub async fn confirm_action(
         }
 
         if get_agent_client().is_none() {
-            return Ok(MetaHttpResponse::bad_request("Agent service not configured"));
+            return Ok(MetaHttpResponse::bad_request(
+                "Agent service not configured",
+            ));
         }
 
         // Extract user token for identity verification (same as chat_stream)
@@ -780,9 +782,8 @@ pub async fn confirm_action(
                 let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
 
                 if status.is_success() {
-                    let json_value: serde_json::Value =
-                        serde_json::from_str(&response_body)
-                            .unwrap_or(serde_json::json!({"ok": true}));
+                    let json_value: serde_json::Value = serde_json::from_str(&response_body)
+                        .unwrap_or(serde_json::json!({"ok": true}));
                     return Ok(HttpResponse::Ok().json(json_value));
                 } else {
                     log::error!(
@@ -798,7 +799,9 @@ pub async fn confirm_action(
             }
             Err(e) => {
                 log::error!("Failed to forward confirmation to agent: {e}");
-                return Ok(MetaHttpResponse::internal_error(format!("Failed to forward confirmation: {e}")));
+                return Ok(MetaHttpResponse::internal_error(format!(
+                    "Failed to forward confirmation: {e}"
+                )));
             }
         }
     }
@@ -808,7 +811,9 @@ pub async fn confirm_action(
         drop(session_id);
         drop(req);
         drop(body_bytes);
-        Ok(MetaHttpResponse::bad_request("AI chat is only available in enterprise version"))
+        Ok(MetaHttpResponse::bad_request(
+            "AI chat is only available in enterprise version",
+        ))
     }
 }
 

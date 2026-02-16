@@ -15,13 +15,8 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
-use crate::handler::http::extractors::Headers;
-
 #[cfg(feature = "enterprise")]
-use {
-    crate::common::utils::auth::check_permissions,
-    o2_dex::meta::auth::RoleRequest,
-};
+use {crate::common::utils::auth::check_permissions, o2_dex::meta::auth::RoleRequest};
 
 use crate::{
     common::{
@@ -31,7 +26,10 @@ use crate::{
         },
         utils::auth::UserEmail,
     },
-    handler::http::request::{BulkDeleteRequest, BulkDeleteResponse},
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
 };
 
 #[cfg(feature = "enterprise")]
@@ -149,7 +147,9 @@ pub async fn create_role(
 pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, role_name) = path.into_inner();
     match o2_openfga::authorizer::roles::delete_role(&org_id, &role_name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok(serde_json::json!({"successful": "true"}))),
+        Ok(_) => Ok(MetaHttpResponse::ok(
+            serde_json::json!({"successful": "true"}),
+        )),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }

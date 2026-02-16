@@ -299,11 +299,13 @@ pub async fn get_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespo
             _ => None,
         };
 
-    Ok(MetaHttpResponse::json(crate::handler::http::models::pipelines::Pipeline::from(
-        meta_pipeline,
-        paused_at,
-        last_error,
-    )))
+    Ok(MetaHttpResponse::json(
+        crate::handler::http::models::pipelines::Pipeline::from(
+            meta_pipeline,
+            paused_at,
+            last_error,
+        ),
+    ))
 }
 
 /// GetStreamsWithPipeline
