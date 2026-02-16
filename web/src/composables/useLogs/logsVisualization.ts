@@ -74,6 +74,7 @@ export const getBuildConfig = (dashboardPanelData: any) => {
       breakdown: currentQuery.fields?.breakdown || [],
       filter: currentQuery.fields?.filter || { filterType: "group", logicalOperator: "AND", conditions: [] },
     },
+    joins: currentQuery.joins || [],
     customQuery: currentQuery.customQuery || false,
     query: currentQuery.query || "",
   };

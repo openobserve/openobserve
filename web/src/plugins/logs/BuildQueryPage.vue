@@ -106,6 +106,8 @@ const emit = defineEmits<{
   (e: "initialized"): void;
   /** Emitted when search request trace IDs change (for cancel query functionality) */
   (e: "searchRequestTraceIdsUpdated", traceIds: string[]): void;
+  /** Emitted when fields or customQuery mode change (for URL sync) */
+  (e: "fieldsUpdated"): void;
 }>();
 
 // ============================================================================
@@ -130,11 +132,18 @@ provide("dashboardPanelDataPageKey", "build");
 // ============================================================================
 
 /**
- * Restore chart type and config from URL params (similar to visualization's preservedConfig)
- * NOTE: This only restores config/chart type, NOT fields or query.
- * Fields are always parsed from props.searchQuery on every tab switch.
+ * Restore build state from URL params.
+ * On first toggle (shared link), restores fields, customQuery, query, chart type, and config.
+ * On subsequent toggles, only config is used (chart type and fields re-derived from searchQuery).
  */
-const restoreConfigFromUrl = (): { type?: string; config?: any } => {
+const restoreConfigFromUrl = (): {
+  type?: string;
+  config?: any;
+  fields?: any;
+  joins?: any[];
+  customQuery?: boolean;
+  query?: string;
+} => {
   const buildData = router.currentRoute.value?.query?.build_data as string | undefined;
   if (!buildData) {
     return {};
@@ -149,6 +158,10 @@ const restoreConfigFromUrl = (): { type?: string; config?: any } => {
     return {
       type: decoded.type,
       config: decoded.config,
+      fields: decoded.fields,
+      joins: decoded.joins,
+      customQuery: decoded.customQuery,
+      query: decoded.query,
     };
   } catch (error) {
     console.error("Failed to restore build config from URL:", error);
@@ -185,6 +198,45 @@ const initializeFromQuery = async () => {
   if (urlConfig.type && props.isFirstToggle) {
     dashboardPanelData.data.type = urlConfig.type;
     shouldAutoSelectChartType = false;
+  }
+
+  // On FIRST toggle (shared link): if URL has saved fields, restore them directly
+  // instead of parsing searchQuery. This preserves the exact builder/custom state.
+  if (props.isFirstToggle && urlConfig.fields && (urlConfig.fields.x?.length || urlConfig.fields.y?.length || urlConfig.customQuery)) {
+    const savedFields = urlConfig.fields;
+    dashboardPanelData.data.queries[0].fields.stream = savedFields.stream || props.selectedStream || "";
+    dashboardPanelData.data.queries[0].fields.stream_type = savedFields.stream_type || "logs";
+    dashboardPanelData.data.queries[0].fields.x = savedFields.x || [];
+    dashboardPanelData.data.queries[0].fields.y = savedFields.y || [];
+    dashboardPanelData.data.queries[0].fields.breakdown = savedFields.breakdown || [];
+    if (savedFields.filter) {
+      dashboardPanelData.data.queries[0].fields.filter = savedFields.filter;
+    }
+    dashboardPanelData.data.queries[0].customQuery = urlConfig.customQuery || false;
+    if (urlConfig.joins) {
+      dashboardPanelData.data.queries[0].joins = urlConfig.joins;
+    }
+    if (urlConfig.query) {
+      dashboardPanelData.data.queries[0].query = urlConfig.query;
+    }
+
+    // Load stream fields for the query builder
+    if (dashboardPanelData.data.queries[0].fields.stream) {
+      await updateGroupedFields();
+    }
+
+    // Generate SQL query for builder mode (auto mode)
+    if (!dashboardPanelData.data.queries[0].customQuery) {
+      const generatedQuery = await makeAutoSQLQuery();
+      if (generatedQuery !== undefined) {
+        emit("queryGenerated", generatedQuery);
+      }
+    }
+
+    // Notify parent and run query
+    emit("initialized");
+    await runQuery();
+    return;
   }
 
   // If no query, use builder mode with selected stream
@@ -327,6 +379,15 @@ watch(
     }
   },
   { deep: true }
+);
+
+// Watch for field, filter, join, and customQuery changes to sync URL params via parent
+watch(
+  () => dashboardPanelData.data.queries[0],
+  () => {
+    emit("fieldsUpdated");
+  },
+  { deep: true },
 );
 
 // NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue

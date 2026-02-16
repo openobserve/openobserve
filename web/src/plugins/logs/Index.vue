@@ -336,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @queryGenerated="onBuildQueryGenerated"
               @customQueryModeChanged="onCustomQueryModeChanged"
               @initialized="onBuildInitialized"
+              @fieldsUpdated="updateUrlQueryParams(null, buildQueryPageRef?.dashboardPanelData)"
             />
           </div>
         </template>
