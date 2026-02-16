@@ -458,9 +458,8 @@ pub async fn search_multi(
 
                 multi_res.took += res.took;
 
-                if res.total > multi_res.total {
-                    multi_res.total = res.total;
-                }
+                // Sum the total matched events across all streams
+                multi_res.total += res.total;
                 multi_res.from = res.from;
                 multi_res.size += res.size;
                 multi_res.scan_files += res.scan_files;
