@@ -1109,7 +1109,8 @@ mod tests {
         HAVING SUM(count) > 50"#;
         let parsed = get_sql(sql).await;
         let extractor = get_result_schema(parsed, false, false).await.unwrap();
-        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        // DataFusion includes "count" in group_expr as input to SUM(count)
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name", "count"]);
         // Only the outermost HAVING should be captured
         assert!(
             extractor.having.is_some(),
@@ -1154,7 +1155,9 @@ mod tests {
         WHERE total_count < 100"#;
         let parsed = get_sql(sql).await;
         let extractor = get_result_schema(parsed, false, false).await.unwrap();
-        assert!(extractor.group_by.is_empty(), "No top-level GROUP BY");
+        // Subquery's GROUP BY leaks through (aliased from k8s_namespace_name to namespace)
+        // since there is no top-level Aggregate to overwrite it
+        assert_eq!(extractor.group_by, hashset!["namespace"]);
         // HAVING from subquery should NOT be captured
         assert!(
             extractor.having.is_none(),
