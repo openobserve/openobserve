@@ -214,6 +214,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Overview"
           />
           <q-tab
+            name="activity"
+            label="Activity"
+          />
+          <q-tab
             name="incidentAnalysis"
             :label="t('alerts.incidents.incidentAnalysis')"
           />
@@ -829,6 +833,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
+        <!-- Activity Tab Content -->
+        <IncidentTimeline
+          v-if="activeTab === 'activity'"
+          :org-id="store.state.selectedOrganization.identifier"
+          :incident-id="incidentDetails?.id || ''"
+          :visible="activeTab === 'activity'"
+        />
+
         <!-- Incident Analysis Tab Content -->
         <IncidentRCAAnalysis
           v-if="activeTab === 'incidentAnalysis'"
@@ -1230,6 +1242,7 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
+import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
@@ -1243,6 +1256,7 @@ export default defineComponent({
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
     IncidentRCAAnalysis,
+    IncidentTimeline,
     CustomChartRenderer,
   },
   emits: ['close', 'status-updated', 'sendToAiChat'],
