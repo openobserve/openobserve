@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'tw:prose tw:prose-sm tw:max-w-none',
         store.state?.theme === 'dark' && 'tw:prose-invert',
       ]"
-      v-html="DOMPurify.sanitize(processedContent)"
+      v-html="sanitizedContent"
       data-test="html-renderer"
     ></div>
   </div>
@@ -56,6 +56,12 @@ export default defineComponent({
   setup(props): any {
     const store = useStore();
 
+    DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+      if (node.nodeName === "IFRAME") {
+        node.setAttribute("sandbox", "allow-scripts allow-same-origin");
+      }
+    });
+
     const processedContent = computed(() => {
       const context = {
         tabId: props.tabId,
@@ -64,10 +70,17 @@ export default defineComponent({
       return processVariableContent(props.htmlContent, props.variablesData, context);
     });
 
+    const sanitizedContent = computed(() =>
+      DOMPurify.sanitize(processedContent.value, {
+        ADD_TAGS: ["iframe"],
+      })
+    );
+
     return {
       DOMPurify,
       store,
       processedContent,
+      sanitizedContent,
     };
   },
 });
