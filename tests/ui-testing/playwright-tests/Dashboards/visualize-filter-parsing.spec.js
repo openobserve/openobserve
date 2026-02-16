@@ -86,7 +86,7 @@ test.describe("Visualization filter parsing testcases", () => {
       // Open logs and fill query with Starts With filter
       await pm.logsVisualise.openLogs();
       await pm.logsVisualise.fillLogsQueryEditor(queryWithStartsWith);
-       await pm.logsVisualise.setRelative("45", "m");
+      await pm.logsVisualise.setRelative("45", "m");
       await pm.logsVisualise.logsApplyQueryButton();
 
       // Toggle to visualize tab
@@ -116,7 +116,7 @@ test.describe("Visualization filter parsing testcases", () => {
       // Open logs and fill query with Ends With filter
       await pm.logsVisualise.openLogs();
       await pm.logsVisualise.fillLogsQueryEditor(queryWithEndsWith);
-       await pm.logsVisualise.setRelative("45", "m");
+      await pm.logsVisualise.setRelative("45", "m");
       await pm.logsVisualise.logsApplyQueryButton();
 
       // Toggle to visualize tab
@@ -146,7 +146,7 @@ test.describe("Visualization filter parsing testcases", () => {
       // Open logs and fill query with NOT IN filter having multiple values
       await pm.logsVisualise.openLogs();
       await pm.logsVisualise.fillLogsQueryEditor(queryWithNotInMultipleValues);
-       await pm.logsVisualise.setRelative("45", "m");
+      await pm.logsVisualise.setRelative("45", "m");
       await pm.logsVisualise.logsApplyQueryButton();
 
       // Toggle to visualize tab
@@ -179,7 +179,7 @@ test.describe("Visualization filter parsing testcases", () => {
       // Open logs and fill query with combined filters
       await pm.logsVisualise.openLogs();
       await pm.logsVisualise.fillLogsQueryEditor(queryWithCombinedFilters);
-       await pm.logsVisualise.setRelative("45", "m");
+      await pm.logsVisualise.setRelative("45", "m");
       await pm.logsVisualise.logsApplyQueryButton();
 
       // Toggle to visualize tab
@@ -209,7 +209,7 @@ test.describe("Visualization filter parsing testcases", () => {
       // Open logs and fill query with NOT IN filter
       await pm.logsVisualise.openLogs();
       await pm.logsVisualise.fillLogsQueryEditor(queryWithNotIn);
-       await pm.logsVisualise.setRelative("45", "m");
+      await pm.logsVisualise.setRelative("45", "m");
       await pm.logsVisualise.logsApplyQueryButton();
 
       // First toggle: logs -> visualize
