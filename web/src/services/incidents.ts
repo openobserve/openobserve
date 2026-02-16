@@ -231,6 +231,24 @@ const incidents = {
     };
   },
 
+  /**
+   * Get event timeline for an incident
+   */
+  getEvents: (org_identifier: string, incident_id: string) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events`
+    );
+  },
+
+  /**
+   * Post a comment on an incident
+   */
+  postComment: (org_identifier: string, incident_id: string, comment: string) => {
+    return http().post(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events/comment`,
+      { comment }
+    );
+  },
 };
 
 export default incidents;

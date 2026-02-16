@@ -464,9 +464,261 @@ pub struct IncidentStats {
     pub alerts_per_incident_avg: f64,
 }
 
+// ==================== INCIDENT EVENTS ====================
+
+/// A single event in an incident's lifecycle timeline
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IncidentEvent {
+    /// Microseconds since epoch
+    pub timestamp: i64,
+    /// What happened
+    #[serde(flatten)]
+    pub event_type: IncidentEventType,
+}
+
+/// Tagged enum of all possible incident event types
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "type", content = "data")]
+pub enum IncidentEventType {
+    /// Incident was created
+    Created,
+
+    /// Alert correlated to this incident.
+    /// Compacted: same alert_id increments count instead of appending new event.
+    Alert {
+        alert_id: String,
+        alert_name: String,
+        count: u32,
+        first_at: i64,
+        last_at: i64,
+    },
+
+    /// Severity escalated automatically
+    SeverityUpgrade {
+        from: IncidentSeverity,
+        to: IncidentSeverity,
+        reason: String,
+    },
+
+    /// Severity changed manually by user (any direction)
+    SeverityOverride {
+        from: IncidentSeverity,
+        to: IncidentSeverity,
+        user_id: String,
+    },
+
+    /// Status changed to Acknowledged
+    Acknowledged { user_id: String },
+
+    /// Status changed to Resolved
+    Resolved {
+        /// None = auto-resolved by background job
+        user_id: Option<String>,
+    },
+
+    /// Resolved incident reopened
+    Reopened { user_id: String, reason: String },
+
+    /// Correlation key strength upgraded (e.g. Workload -> Scope)
+    DimensionsUpgraded { from_key: String, to_key: String },
+
+    /// Incident assigned/unassigned
+    AssignmentChanged {
+        from: Option<String>,
+        to: Option<String>,
+    },
+
+    /// User comment
+    Comment { user_id: String, comment: String },
+
+    /// AI/RCA analysis started
+    #[serde(rename = "ai_analysis_begin")]
+    AIAnalysisBegin,
+
+    /// AI/RCA analysis completed
+    #[serde(rename = "ai_analysis_complete")]
+    AIAnalysisComplete,
+}
+
+impl IncidentEvent {
+    fn now(event_type: IncidentEventType) -> Self {
+        Self {
+            timestamp: chrono::Utc::now().timestamp_micros(),
+            event_type,
+        }
+    }
+
+    pub fn created() -> Self {
+        Self::now(IncidentEventType::Created)
+    }
+
+    pub fn alert(
+        alert_id: impl Into<String>,
+        alert_name: impl Into<String>,
+        triggered_at: i64,
+    ) -> Self {
+        Self::now(IncidentEventType::Alert {
+            alert_id: alert_id.into(),
+            alert_name: alert_name.into(),
+            count: 1,
+            first_at: triggered_at,
+            last_at: triggered_at,
+        })
+    }
+
+    pub fn severity_upgrade(
+        from: IncidentSeverity,
+        to: IncidentSeverity,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::SeverityUpgrade {
+            from,
+            to,
+            reason: reason.into(),
+        })
+    }
+
+    pub fn severity_override(
+        from: IncidentSeverity,
+        to: IncidentSeverity,
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::SeverityOverride {
+            from,
+            to,
+            user_id: user_id.into(),
+        })
+    }
+
+    pub fn acknowledged(user_id: impl Into<String>) -> Self {
+        Self::now(IncidentEventType::Acknowledged {
+            user_id: user_id.into(),
+        })
+    }
+
+    pub fn resolved(user_id: Option<String>) -> Self {
+        Self::now(IncidentEventType::Resolved { user_id })
+    }
+
+    pub fn reopened(user_id: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self::now(IncidentEventType::Reopened {
+            user_id: user_id.into(),
+            reason: reason.into(),
+        })
+    }
+
+    pub fn dimensions_upgraded(from_key: impl Into<String>, to_key: impl Into<String>) -> Self {
+        Self::now(IncidentEventType::DimensionsUpgraded {
+            from_key: from_key.into(),
+            to_key: to_key.into(),
+        })
+    }
+
+    pub fn comment(user_id: impl Into<String>, comment: impl Into<String>) -> Self {
+        Self::now(IncidentEventType::Comment {
+            user_id: user_id.into(),
+            comment: comment.into(),
+        })
+    }
+
+    pub fn ai_analysis_begin() -> Self {
+        Self::now(IncidentEventType::AIAnalysisBegin)
+    }
+
+    pub fn ai_analysis_complete() -> Self {
+        Self::now(IncidentEventType::AIAnalysisComplete)
+    }
+
+    /// Increment alert count if this is an Alert event for the given alert_id.
+    /// No-op if not an Alert or different alert_id.
+    pub fn increment_alert(&mut self, alert_id: &str, triggered_at: i64) -> bool {
+        if let IncidentEventType::Alert {
+            alert_id: id,
+            count,
+            last_at,
+            ..
+        } = &mut self.event_type
+        {
+            if id == alert_id {
+                *count += 1;
+                *last_at = triggered_at;
+                self.timestamp = chrono::Utc::now().timestamp_micros();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if this event is an Alert for the given alert_id
+    pub fn is_alert_for(&self, alert_id: &str) -> bool {
+        matches!(
+            &self.event_type,
+            IncidentEventType::Alert { alert_id: id, .. } if id == alert_id
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_incident_event_serde_created() {
+        let event = IncidentEvent {
+            timestamp: 1000000,
+            event_type: IncidentEventType::Created,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        println!("Created: {json}");
+        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.timestamp, 1000000);
+    }
+
+    #[test]
+    fn test_incident_event_serde_alert() {
+        let event = IncidentEvent {
+            timestamp: 2000000,
+            event_type: IncidentEventType::Alert {
+                alert_id: "abc".into(),
+                alert_name: "CPU High".into(),
+                count: 5,
+                first_at: 1000000,
+                last_at: 2000000,
+            },
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        println!("Alert: {json}");
+        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.timestamp, 2000000);
+    }
+
+    #[test]
+    fn test_incident_event_serde_ai_analysis() {
+        let event = IncidentEvent::now(IncidentEventType::AIAnalysisBegin);
+        let json = serde_json::to_string(&event).unwrap();
+        println!("AIAnalysisBegin: {json}");
+        assert!(json.contains("\"type\":\"ai_analysis_begin\""));
+
+        let event2 = IncidentEvent::now(IncidentEventType::AIAnalysisComplete);
+        let json2 = serde_json::to_string(&event2).unwrap();
+        println!("AIAnalysisComplete: {json2}");
+        assert!(json2.contains("\"type\":\"ai_analysis_complete\""));
+    }
+
+    #[test]
+    fn test_incident_event_serde_comment() {
+        let event = IncidentEvent {
+            timestamp: 3000000,
+            event_type: IncidentEventType::Comment {
+                user_id: "user@test.com".into(),
+                comment: "investigating".into(),
+            },
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        println!("Comment: {json}");
+        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.timestamp, 3000000);
+    }
 
     #[test]
     fn test_incident_status_roundtrip() {
