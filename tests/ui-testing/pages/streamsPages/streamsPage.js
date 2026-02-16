@@ -138,13 +138,14 @@ export class StreamsPage {
         // First navigate to home if not already there
         if (!this.page.url().includes('web/logs')) {
             await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${process.env.ORGNAME}`);
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('domcontentloaded');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         }
-        
+
         try {
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         } catch (error) {
-            console.warn('Retry clicking streams menu:', error.message);
+            testLogger.warn('Retry clicking streams menu:', error.message);
             await this.waitForUI(2000);
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         }
@@ -162,7 +163,10 @@ export class StreamsPage {
     }
 
     async exploreStream() {
-        const streamButton = this.page.getByRole("button", { name: 'Explore' });
+        // Scope to the first table row to avoid strict mode violation when
+        // multiple streams match the search (e.g. "e2e_automate" matches 6 rows)
+        const firstRow = this.page.locator('tbody tr').first();
+        const streamButton = firstRow.getByRole("button", { name: 'Explore' });
         await expect(streamButton).toBeVisible();
         await streamButton.click({ force: true });
         await this.waitForUI(1000);

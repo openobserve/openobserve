@@ -69,8 +69,8 @@ fn create_cli_app() -> Command {
             Command::new("migrate-file-list")
                 .about("migrate file_list related tables between databases")
                 .args([
-                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql", true),
-                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql", true),
+                    arg!("from", 'f', "from", "migrate from: sqlite, postgresql", true),
+                    arg!("to", 't', "to", "migrate to: sqlite, postgresql", true),
                     Arg::new("batch-size").short('b').long("batch-size").help("batch size for migration").default_value("1000"),
                     Arg::new("tables").long("tables").help("only migrate specified tables (comma-separated)"),
                     Arg::new("exclude").long("exclude").help("exclude specified tables (comma-separated)"),
@@ -82,8 +82,8 @@ fn create_cli_app() -> Command {
             Command::new("migrate-meta")
                 .about("migrate meta tables between databases (excludes file_list tables)")
                 .args([
-                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql", true),
-                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql", true),
+                    arg!("from", 'f', "from", "migrate from: sqlite, postgresql", true),
+                    arg!("to", 't', "to", "migrate to: sqlite, postgresql", true),
                     Arg::new("batch-size").short('b').long("batch-size").help("batch size for migration").default_value("1000"),
                     Arg::new("tables").long("tables").help("only migrate specified tables (comma-separated)"),
                     Arg::new("exclude").long("exclude").help("exclude specified tables (comma-separated)"),
@@ -604,13 +604,13 @@ mod tests {
                 "--from",
                 "sqlite",
                 "--to",
-                "mysql",
+                "postgresql",
             ])
             .unwrap();
         let (name, sub_matches) = matches.subcommand().unwrap();
         assert_eq!(name, "migrate-file-list");
         assert_eq!(sub_matches.get_one::<String>("from").unwrap(), "sqlite");
-        assert_eq!(sub_matches.get_one::<String>("to").unwrap(), "mysql");
+        assert_eq!(sub_matches.get_one::<String>("to").unwrap(), "postgresql");
     }
 
     #[test]
@@ -623,13 +623,13 @@ mod tests {
                 "--from",
                 "sqlite",
                 "--to",
-                "mysql",
+                "postgresql",
             ])
             .unwrap();
         let (name, sub_matches) = matches.subcommand().unwrap();
         assert_eq!(name, "migrate-meta");
         assert_eq!(sub_matches.get_one::<String>("from").unwrap(), "sqlite");
-        assert_eq!(sub_matches.get_one::<String>("to").unwrap(), "mysql");
+        assert_eq!(sub_matches.get_one::<String>("to").unwrap(), "postgresql");
     }
 
     #[test]
@@ -1017,8 +1017,8 @@ mod tests {
     #[test]
     fn test_migration_source_target_validation() {
         // Test valid migration sources and targets
-        let valid_sources = ["sqlite", "mysql", "postgresql"];
-        let valid_targets = ["sqlite", "mysql", "postgresql"];
+        let valid_sources = ["sqlite", "postgresql"];
+        let valid_targets = ["sqlite", "postgresql"];
 
         for source in valid_sources {
             assert!(!source.is_empty());

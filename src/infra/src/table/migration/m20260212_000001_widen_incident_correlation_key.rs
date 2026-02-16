@@ -19,10 +19,7 @@ impl MigrationTrait for Migration {
                 ))
                 .await?;
             }
-            sea_orm::DbBackend::MySql => {
-                manager.alter_table(mysql_alter_statement()).await?;
-            }
-            sea_orm::DbBackend::Sqlite => {
+            _ => {
                 // SQLite does not enforce varchar lengths, no-op
             }
         }
@@ -35,35 +32,9 @@ impl MigrationTrait for Migration {
     }
 }
 
-fn mysql_alter_statement() -> TableAlterStatement {
-    Table::alter()
-        .table(AlertIncidents::Table)
-        .modify_column(
-            ColumnDef::new(AlertIncidents::CorrelationKey)
-                .string_len(128)
-                .not_null(),
-        )
-        .to_owned()
-}
-
-#[derive(DeriveIden)]
-enum AlertIncidents {
-    Table,
-    CorrelationKey,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn mysql() {
-        let statement = mysql_alter_statement();
-        assert_eq!(
-            statement.to_string(MysqlQueryBuilder),
-            "ALTER TABLE `alert_incidents` MODIFY COLUMN `correlation_key` varchar(128) NOT NULL"
-        );
-    }
 
     #[test]
     fn postgres() {

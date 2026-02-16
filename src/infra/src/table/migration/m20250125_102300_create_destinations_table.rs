@@ -127,28 +127,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_destinations_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `destinations` (
-                `id` char(27) NOT NULL PRIMARY KEY,
-                `org` varchar(100) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `module` varchar(10) NOT NULL,
-                `template_id` char(27) NULL,
-                `type` json NOT NULL,
-                CONSTRAINT `destinations_templates_fk` FOREIGN KEY (`template_id`) REFERENCES `templates` (`id`) 
-            )"#
-        );
-        assert_eq!(
-            &create_destinations_template_id_destination_id_idx_stmnt()
-                .to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `destinations_id_org_name_idx` ON `destinations` (`id`, `name`, `org`)"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_destinations_table_statement().to_string(SqliteQueryBuilder),

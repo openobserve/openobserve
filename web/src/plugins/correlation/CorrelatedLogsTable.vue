@@ -271,15 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <p class="tw:text-sm tw:text-gray-500 tw:mb-4">
             {{ t("correlation.logs.noDataDetails") }}
           </p>
-          <q-btn
-            v-if="!props.hideResetFiltersButton"
-            class="o2-secondary-button"
-            :label="t('correlation.logs.resetFilters')"
-            outline
-            icon="restart_alt"
-            @click="handleResetFilters"
-            data-test="reset-filters-btn"
-          />
         </div>
       </div>
     </div>
