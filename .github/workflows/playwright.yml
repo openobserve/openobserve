@@ -351,6 +351,7 @@ jobs:
             run_files: 
               [
                 "dashboard-table-pagination.spec.js"
+                "dashboard-panel-time-variables-behavior.spec.js",
               ]
     steps:
       - name: Clone the current repo
