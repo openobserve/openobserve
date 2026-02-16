@@ -81,6 +81,11 @@ async fn get_trace_streams() -> Result<Vec<(String, String)>, anyhow::Error> {
     let orgs = crate::service::db::organization::list(None).await?;
 
     for org in orgs {
+        // Skip internal orgs
+        if org.identifier.starts_with('_') {
+            continue;
+        }
+
         // Get trace streams for this org (using identifier, not name)
         let org_streams = crate::service::db::schema::list_streams_from_cache(
             &org.identifier,

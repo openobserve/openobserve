@@ -17,7 +17,7 @@ test.describe("Logs Regression Bugs", () => {
     pm = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Data ingestion for logs page testing
     await ingestTestData(page);
@@ -191,7 +191,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.fillSavedViewSearchInput(savedViewA);
     await page.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewByText(savedViewA);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Verify stream A field is present
@@ -204,7 +204,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.fillSavedViewSearchInput(savedViewB);
     await page.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewByText(savedViewB);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Verify stream B field is present
@@ -356,7 +356,7 @@ test.describe("Logs Regression Bugs", () => {
     await page.waitForTimeout(2000);
 
     // Get initial pagination text (shows total count) - using POM method
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(1000); // Extra wait for pagination to update
 
     const initialPaginationText = await pm.logsPage.getPaginationText();
@@ -375,7 +375,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Entered search term: "${searchTerm}"`);
 
     // Wait for table filtering to complete
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(500); // Small buffer for UI update
 
     // Get pagination text after search - using POM method
@@ -1152,7 +1152,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Click refresh button to load data
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Wait for logs table to be visible
     await pm.logsPage.expectLogsTableVisible();

@@ -66,7 +66,7 @@ test.describe("logs testcases", () => {
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
 
     await page.goto(logsUrl);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);

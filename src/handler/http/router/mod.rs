@@ -621,7 +621,6 @@ pub fn service_routes() -> Router {
         // Dashboards
         .route("/{org_id}/dashboards", get(dashboards::list_dashboards).post(dashboards::create_dashboard))
         .route("/{org_id}/dashboards/{dashboard_id}", get(dashboards::get_dashboard).put(dashboards::update_dashboard).delete(dashboards::delete_dashboard))
-        .route("/{org_id}/dashboards/{dashboard_id}/export", get(dashboards::export_dashboard))
         .route("/{org_id}/dashboards/bulk", delete(dashboards::delete_dashboard_bulk))
         .route("/{org_id}/folders/dashboards/{dashboard_id}", put(dashboards::move_dashboard))
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
@@ -708,7 +707,7 @@ pub fn service_routes() -> Router {
 
         // Pipelines
         .route("/{org_id}/pipelines", get(pipeline::list_pipelines).post(pipeline::save_pipeline).put(pipeline::update_pipeline))
-        .route("/{org_id}/pipelines/{pipeline_id}", delete(pipeline::delete_pipeline))
+        .route("/{org_id}/pipelines/{pipeline_id}", get(pipeline::get_pipeline).delete(pipeline::delete_pipeline))
         .route("/{org_id}/pipelines/bulk", delete(pipeline::delete_pipeline_bulk))
         .route("/{org_id}/pipelines/{pipeline_id}/enable", put(pipeline::enable_pipeline))
         .route("/{org_id}/pipelines/bulk/enable", post(pipeline::enable_pipeline_bulk))
@@ -773,6 +772,7 @@ pub fn service_routes() -> Router {
             // AI
             .route("/{org_id}/ai/chat", post(ai::chat::chat))
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+            .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -813,7 +813,7 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/member_subscription/{invite_token}",
-                post(organization::org::accept_org_invite),
+                put(organization::org::accept_org_invite),
             )
             .route(
                 "/{org_id}/billings/hosted_subscription_url",

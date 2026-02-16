@@ -35,35 +35,19 @@ impl MigrationTrait for Migration {
 
 // Adds the alerts's align_time column.
 async fn add_align_time_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column(
-                        ColumnDef::new(Alerts::AlignTime)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    } else {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(Alerts::AlignTime)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    }
+    manager
+        .alter_table(
+            Table::alter()
+                .table(Alerts::Table)
+                .add_column_if_not_exists(
+                    ColumnDef::new(Alerts::AlignTime)
+                        .boolean()
+                        .not_null()
+                        .default(true),
+                )
+                .to_owned(),
+        )
+        .await?;
 
     Ok(())
 }
