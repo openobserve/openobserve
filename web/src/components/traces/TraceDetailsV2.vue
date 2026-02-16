@@ -124,7 +124,11 @@
       <div class="tw:flex-1 tw:flex tw:overflow-hidden">
         <!-- Waterfall View -->
         <div
-          class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-[var(--o2-border)]"
+          v-if="activeTab === 'waterfall'"
+          ref="waterfallContainerRef"
+          class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-[var(--o2-border)] tw:outline-none"
+          tabindex="0"
+          @keydown="handleKeyDown"
         >
           <div class="tw:flex-1 tw:overflow-auto tw:bg-white">
             <!-- Table Header -->
@@ -249,6 +253,47 @@
           </div>
         </div>
 
+        <!-- Flame Graph View -->
+        <div
+          v-if="activeTab === 'flame-graph'"
+          class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-[var(--o2-border)]"
+        >
+          <FlameGraphView
+            :spans="flatSpans"
+            :selected-span-id="selectedSpanId"
+            :trace-duration="traceMetadata?.duration_ms || 0"
+            @span-selected="handleSpanSelect"
+          />
+        </div>
+
+        <!-- Spans Table View Placeholder -->
+        <div
+          v-if="activeTab === 'spans'"
+          class="tw:flex-1 tw:flex tw:items-center tw:justify-center tw:bg-white tw:border-r tw:border-[var(--o2-border)]"
+        >
+          <div class="tw:text-center tw:text-[var(--o2-text-secondary)]">
+            <q-icon name="table_chart" size="48px" class="tw:mb-4" />
+            <div class="tw:text-base tw:font-semibold tw:mb-2">
+              Spans Table View
+            </div>
+            <div class="tw:text-sm">Coming soon...</div>
+          </div>
+        </div>
+
+        <!-- Map View Placeholder -->
+        <div
+          v-if="activeTab === 'map'"
+          class="tw:flex-1 tw:flex tw:items-center tw:justify-center tw:bg-white tw:border-r tw:border-[var(--o2-border)]"
+        >
+          <div class="tw:text-center tw:text-[var(--o2-text-secondary)]">
+            <q-icon name="hub" size="48px" class="tw:mb-4" />
+            <div class="tw:text-base tw:font-semibold tw:mb-2">
+              Service Map View
+            </div>
+            <div class="tw:text-sm">Coming soon...</div>
+          </div>
+        </div>
+
         <!-- Right Sidebar - Quick Filter -->
         <aside
           class="tw:w-72 tw:flex-shrink-0 tw:bg-[var(--o2-surface)] tw:p-5 tw:overflow-auto tw:border-l tw:border-[var(--o2-border)]"
@@ -257,6 +302,7 @@
             :services="availableServices"
             :active-filters="activeFilters"
             :span-count="filteredSpanCount"
+            :service-counts="serviceCounts"
             @filter-changed="handleFilterChange"
             @filter-reset="handleFilterReset"
           />
@@ -291,6 +337,9 @@ const QuickFilterPanel = defineAsyncComponent(
 const SpanAnalyticsPanel = defineAsyncComponent(
   () => import("./SpanAnalyticsPanel.vue"),
 );
+const FlameGraphView = defineAsyncComponent(
+  () => import("./FlameGraphView.vue"),
+);
 
 // Props
 interface Props {
@@ -324,6 +373,7 @@ const activeFilters = ref<SpanFilter>({
   errorOnly: false,
   searchText: "",
 });
+const waterfallContainerRef = ref<HTMLDivElement | null>(null);
 
 // Tabs
 const tabs = [
@@ -381,6 +431,11 @@ const serviceBreakdown = computed(() => {
 
 const availableServices = computed(() => {
   return traceMetadata.value?.services || [];
+});
+
+const serviceCounts = computed(() => {
+  if (!traceMetadata.value?.service_spans) return {};
+  return Object.fromEntries(traceMetadata.value.service_spans);
 });
 
 const filteredSpans = computed(() => {

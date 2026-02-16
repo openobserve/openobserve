@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="trace-tree-wrapper card-container">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div
-              v-if="!hasLLMSpans || activeTab === 'waterfall'"
+              v-if="!hasLLMSpans && activeTab === 'waterfall'"
               style="
                 display: flex;
                 flex-direction: column;
@@ -538,6 +538,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+
+            <!-- Flame Graph View -->
+            <div
+              v-if="!hasLLMSpans && activeTab === 'flame-graph'"
+              style="display: flex; flex: 1; min-height: 0"
+              class="tw:w-full"
+            >
+              <FlameGraphView
+                :spans="flatSpans"
+                :selected-span-id="selectedSpanId"
+                :trace-duration="traceMetadata?.duration_ms || 0"
+                @span-selected="updateSelectedSpan"
+              />
+            </div>
+
+            <!-- Spans Table View Placeholder -->
+            <div
+              v-if="activeTab === 'spans'"
+              style="
+                display: flex;
+                flex: 1;
+                min-height: 0;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <div
+                style="
+                  text-align: center;
+                  color: var(--o2-text-secondary);
+                  padding: 40px;
+                "
+              >
+                <q-icon
+                  name="table_chart"
+                  size="48px"
+                  style="margin-bottom: 16px"
+                />
+                <div
+                  style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
+                >
+                  Spans Table View
+                </div>
+                <div style="font-size: 14px">Coming soon...</div>
+              </div>
+            </div>
+
+            <!-- Map View Placeholder -->
+            <div
+              v-if="activeTab === 'map'"
+              style="
+                display: flex;
+                flex: 1;
+                min-height: 0;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <div
+                style="
+                  text-align: center;
+                  color: var(--o2-text-secondary);
+                  padding: 40px;
+                "
+              >
+                <q-icon name="hub" size="48px" style="margin-bottom: 16px" />
+                <div
+                  style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
+                >
+                  Service Map View
+                </div>
+                <div style="font-size: 14px">Coming soon...</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -615,12 +689,20 @@ import {
   parseCostDetails,
   isLLMTrace,
 } from "@/utils/llmUtils";
-import { formatTimestamp } from "@/composables/traces/useTraceProcessing";
+import {
+  formatTimestamp,
+  useTraceProcessing,
+} from "@/composables/traces/useTraceProcessing";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 // Import TraceDetailsV2
 const TraceDetailsV2 = defineAsyncComponent(
   () => import("@/components/traces/TraceDetailsV2.vue"),
+);
+
+// Import FlameGraphView
+const FlameGraphView = defineAsyncComponent(
+  () => import("@/components/traces/FlameGraphView.vue"),
 );
 
 export default defineComponent({
@@ -704,6 +786,7 @@ export default defineComponent({
     TraceTimelineIcon,
     ServiceMapIcon,
     TraceDetailsV2,
+    FlameGraphView,
     AppTabs,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -905,6 +988,36 @@ export default defineComponent({
         return props.spanListProp;
       }
       return searchObj.data.traceDetails.spanList;
+    });
+
+    // Use trace processing composable for FlameGraph
+    // Pass traceTree (nested) instead of flat span list
+    const treeForFlameGraph = computed(() => traceTree.value || []);
+    const flatSpans = ref([]);
+
+    // Calculate trace metadata for FlameGraph
+    const traceMetadata = computed(() => {
+      const spans = effectiveSpanList.value;
+      if (!spans || spans.length === 0) return null;
+
+      try {
+        // Calculate trace duration from spans
+        const startTimes = spans.map((s: any) => s.start_time);
+        const endTimes = spans.map((s: any) => s.end_time);
+        const minStart = Math.min(...startTimes);
+        const maxEnd = Math.max(...endTimes);
+        const durationMs = (maxEnd - minStart) / 1000000; // Convert from nanoseconds to milliseconds
+
+        return {
+          duration_ms: durationMs,
+          total_spans: spans.length,
+          start_time: minStart,
+          end_time: maxEnd,
+        };
+      } catch (e) {
+        console.error("Error calculating trace metadata:", e);
+        return null;
+      }
     });
 
     // Check if the trace contains any LLM spans
@@ -1632,6 +1745,9 @@ export default defineComponent({
       calculateTracePosition();
       buildTraceChart();
       buildServiceTree();
+      flatSpans.value = useTraceProcessing(
+        treeForFlameGraph as any,
+      ).flatSpans.value;
     }
 
     let index = 0;
@@ -1654,6 +1770,7 @@ export default defineComponent({
         if (span.spans.length) {
           span.spans.forEach((childSpan: any) => {
             index = index + 1;
+            console.log("Add Depth", childSpan);
             childSpan.totalSpans = addSpansPositions(childSpan, depth + 1);
           });
           span.totalSpans = span.spans.reduce(
@@ -2250,6 +2367,9 @@ export default defineComponent({
       traceStartTime,
       formatTimestamp,
       traceTabs,
+      // FlameGraph data
+      flatSpans,
+      traceMetadata,
     };
   },
 });

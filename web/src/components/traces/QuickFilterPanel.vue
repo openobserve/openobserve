@@ -98,9 +98,12 @@ interface Props {
   services: string[];
   activeFilters: SpanFilter;
   spanCount: number;
+  serviceCounts?: Record<string, number>;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  serviceCounts: () => ({}),
+});
 
 const emit = defineEmits<{
   'filter-changed': [filter: Partial<SpanFilter>];
@@ -134,14 +137,7 @@ const toggleErrorOnly = () => {
 };
 
 const getServiceCount = (service: string): string => {
-  // Mock counts - would come from actual data
-  const counts: Record<string, number> = {
-    'frontend-app': 1400,
-    'api-gateway': 3300,
-    'order-service': 844,
-    'inventory-service': 240,
-  };
-  return counts[service]?.toString() || '0';
+  return props.serviceCounts?.[service]?.toString() || '0';
 };
 
 const emitFilterChange = () => {

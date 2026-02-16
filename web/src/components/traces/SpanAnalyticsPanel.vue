@@ -3,50 +3,62 @@
 -->
 <template>
   <div class="span-analytics-panel">
-    <!-- Average Duration Chart -->
+    <!-- Duration by Service Chart -->
     <div class="tw:mb-8">
       <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase tw:mb-4">
-        Average duration
+        Duration by Service
       </div>
-      <div class="tw:h-24 tw:flex tw:items-end tw:justify-between tw:space-x-1.5">
+      <div class="tw:space-y-2">
         <div
-          v-for="(bar, index) in mockDurationBars"
-          :key="index"
-          class="tw:flex-1 tw:rounded-t-sm tw:transition-colors"
-          :class="bar.isActive ? 'tw:bg-primary' : 'tw:bg-slate-200 hover:tw:bg-slate-300'"
-          :style="{ height: `${bar.height}%` }"
-        ></div>
-      </div>
-      <div class="tw:flex tw:justify-between tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:mt-2 tw:font-medium">
-        <span>7:10 AM</span>
-        <span>7:20 AM</span>
-        <span>7:30 AM</span>
+          v-for="service in topServicesByDuration"
+          :key="service.service_name"
+          class="tw:flex tw:items-center tw:space-x-2"
+        >
+          <div class="tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:w-24 tw:truncate">
+            {{ service.service_name }}
+          </div>
+          <div class="tw:flex-1 tw:h-5 tw:bg-slate-100 tw:rounded-sm tw:overflow-hidden">
+            <div
+              class="tw:h-full tw:rounded-sm tw:transition-all"
+              :style="{
+                width: `${service.percentage}%`,
+                backgroundColor: service.color,
+              }"
+            ></div>
+          </div>
+          <div class="tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:w-12 tw:text-right tw:font-mono">
+            {{ service.percentage.toFixed(0) }}%
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Throughput Chart -->
+    <!-- Spans by Service Chart -->
     <div class="tw:mb-8">
       <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase tw:mb-4">
-        Throughput (RPM)
+        Spans by Service
       </div>
-      <div class="tw:flex tw:items-center tw:space-x-4">
-        <div class="tw:text-2xl tw:font-bold tw:text-[var(--o2-text-primary)]">
-          {{ formatThroughput(throughput) }}
-        </div>
-        <div class="tw:flex-1 tw:h-10">
-          <svg
-            class="tw:w-full tw:h-full"
-            preserveAspectRatio="none"
-            viewBox="0 0 100 30"
-          >
-            <path
-              d="M0,25 Q10,5 20,20 T40,15 T60,25 T80,10 T100,20"
-              fill="none"
-              stroke="#2563EB"
-              stroke-linecap="round"
-              stroke-width="2.5"
-            />
-          </svg>
+      <div class="tw:space-y-2">
+        <div
+          v-for="service in topServicesBySpanCount"
+          :key="service.service_name"
+          class="tw:flex tw:items-center tw:space-x-2"
+        >
+          <div class="tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:w-24 tw:truncate">
+            {{ service.service_name }}
+          </div>
+          <div class="tw:flex-1 tw:h-4 tw:bg-slate-100 tw:rounded-sm tw:overflow-hidden">
+            <div
+              class="tw:h-full tw:rounded-sm tw:transition-all"
+              :style="{
+                width: `${service.spanPercentage}%`,
+                backgroundColor: service.color,
+              }"
+            ></div>
+          </div>
+          <div class="tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:w-16 tw:text-right tw:font-mono">
+            {{ service.span_count }} spans
+          </div>
         </div>
       </div>
     </div>
@@ -93,20 +105,29 @@ defineEmits<{
   'span-clicked': [spanId: string];
 }>();
 
-// Mock data for charts
-const mockDurationBars = [
-  { height: 40, isActive: false },
-  { height: 55, isActive: false },
-  { height: 45, isActive: false },
-  { height: 80, isActive: true },
-  { height: 60, isActive: false },
-  { height: 50, isActive: false },
-  { height: 35, isActive: false },
-];
+// Computed properties
+const topServicesByDuration = computed(() => {
+  if (!props.serviceBreakdown || props.serviceBreakdown.length === 0) return [];
 
-const throughput = computed(() => {
-  // Mock throughput - would be calculated from real data
-  return 1400;
+  // Sort by duration and take top 5
+  return [...props.serviceBreakdown]
+    .sort((a, b) => b.total_duration_ms - a.total_duration_ms)
+    .slice(0, 5);
+});
+
+const topServicesBySpanCount = computed(() => {
+  if (!props.serviceBreakdown || props.serviceBreakdown.length === 0) return [];
+
+  const totalSpans = props.traceMetadata?.total_spans || 1;
+
+  // Sort by span count and take top 5
+  return [...props.serviceBreakdown]
+    .sort((a, b) => b.span_count - a.span_count)
+    .slice(0, 5)
+    .map(service => ({
+      ...service,
+      spanPercentage: (service.span_count / totalSpans) * 100,
+    }));
 });
 
 const bottleneckMessage = computed(() => {
@@ -122,13 +143,6 @@ const bottleneckMessage = computed(() => {
 
   return 'No critical bottlenecks detected';
 });
-
-const formatThroughput = (value: number): string => {
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}k`;
-  }
-  return value.toString();
-};
 </script>
 
 <style scoped lang="scss">
