@@ -310,6 +310,7 @@ jobs:
                 "dashboard-panel-time-url-priority.spec.js",
                 "dashboard-panel-time-advanced-edge-cases.spec.js",
                 "dashboard-panel-time-apply-behavior.spec.js",
+                "dashboard-panel-time-variables-behavior.spec.js",
               ]
     steps:
       - name: Clone the current repo
