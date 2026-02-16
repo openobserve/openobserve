@@ -197,22 +197,15 @@ alt="Quick Mode" class="toolbar-icon" />
               <q-separator />
 
               <!-- Syntax Guide -->
-              <q-item clickable class="q-pa-sm saved-view-item" @click="openSyntaxGuide">
+              <q-item class="q-pa-sm saved-view-item">
                 <q-item-section>
-                  <q-item-label class="tw:flex tw:items-center">
-                    <div
-                      style="
-                        width: 28px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        margin-right: 8px;
-                        margin-left: 3px;
-                      "
-                    >
-                      <q-icon name="help" size="20px" />
-                    </div>
-                    {{ t("search.syntaxGuideLabel") }}
+                  <q-item-label>
+                    <syntax-guide
+                      data-test="logs-search-bar-sql-mode-toggle-btn"
+                      :sqlmode="searchObj.meta.sqlMode"
+                      no-border
+                      :label="t('search.syntaxGuideLabel')"
+                    />
                   </q-item-label>
                 </q-item-section>
               </q-item>
@@ -277,15 +270,6 @@ alt="Quick Mode" class="toolbar-icon" />
             </q-list>
           </q-menu>
         </q-btn>
-
-        <!-- Hidden syntax guide for programmatic access -->
-        <syntax-guide
-          ref="syntaxGuideRef"
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          :sqlmode="searchObj.meta.sqlMode"
-          size="0.875rem"
-          style="position: absolute; right: 10px; top: 40px"
-        />
       </div>
 
       <div class="float-right col-auto">
@@ -2718,12 +2702,6 @@ export default defineComponent({
       savedViewsListDialog.value = true;
     };
 
-    const openSyntaxGuide = () => {
-      // Programmatically click the syntax guide button
-      if (syntaxGuideRef.value && syntaxGuideRef.value.$el) {
-        syntaxGuideRef.value.$el.click();
-      }
-    };
 
     // Common function to restore visualization data and sync to URL
     const restoreVisualizationData = async (visualizationData) => {
@@ -4208,7 +4186,6 @@ export default defineComponent({
       dateTimeRef,
       fnSavedView,
       openSavedViewsList,
-      openSyntaxGuide,
       applySavedView,
       isSavedViewAction,
       savedViewName,
