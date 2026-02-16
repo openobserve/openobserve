@@ -2762,7 +2762,8 @@
       }
     },
     "viewInTraces": "トレースで表示",
-    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く"
+    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く",
+    "exportToJson": "JSON へのエクスポート"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

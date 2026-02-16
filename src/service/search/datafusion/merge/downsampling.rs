@@ -22,7 +22,7 @@ use config::{
         promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
         stream::FileMeta,
     },
-    utils::{parquet::new_parquet_writer, vortex::Utf8Compressor},
+    utils::parquet::new_parquet_writer,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -31,7 +31,7 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
-use infra::runtime::VORTEX_RUNTIME;
+use o2_enterprise::enterprise::search::vortex::{Utf8Compressor, VORTEX_RUNTIME};
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, arrow::FromArrowArray},

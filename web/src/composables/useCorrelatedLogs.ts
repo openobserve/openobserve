@@ -152,8 +152,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     // The StreamInfo.filters come from the /_correlate API (or fallback) and have the correct field names
     const exactFilters = streamInfo.filters;
 
-    console.log('[useCorrelatedLogs] Using filters from StreamInfo:', exactFilters);
-
     // Add dimension filters using exact field names from StreamInfo
     for (const [field, value] of Object.entries(exactFilters)) {
       // Skip wildcard values (SELECT_ALL_VALUE = "_o2_all_")
@@ -192,8 +190,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
     const sqlQuery = `SELECT * FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`;
 
-    console.log('[useCorrelatedLogs] Generated SQL query:', sqlQuery);
-
     return sqlQuery;
   };
 
@@ -212,20 +208,9 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     // Validate stream name
     if (!primaryStream.value) {
       console.error('[useCorrelatedLogs] No primary stream available');
-      console.log('[useCorrelatedLogs] Props:', {
-        sourceStream: props.sourceStream,
-        sourceType: props.sourceType,
-        logStreams: props.logStreams
-      });
       error.value = 'No log stream available for correlation';
       return;
     }
-
-    console.log('[useCorrelatedLogs] Starting fetch with:', {
-      primaryStream: primaryStream.value,
-      filters: currentFilters.value,
-      timeRange: currentTimeRange.value
-    });
 
     loading.value = true;
     error.value = null;
@@ -240,18 +225,11 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         pageSize.value
       );
 
-      console.log('[useCorrelatedLogs] SQL Query:', sqlQuery);
-
       // Prepare search query
       // Note: timestamps in timeRange are in microseconds
       // API expects microseconds, so NO conversion needed
       const startTimeMicros = currentTimeRange.value.startTime;
       const endTimeMicros = currentTimeRange.value.endTime;
-
-      console.log('[useCorrelatedLogs] Time range (microseconds):', {
-        startTimeMicros,
-        endTimeMicros
-      });
 
       // Generate trace context for streaming
       const traceContext = generateTraceContext();
@@ -269,9 +247,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         },
       };
 
-      console.log('[useCorrelatedLogs] Search query:', JSON.stringify(searchQuery, null, 2));
-      console.log('[useCorrelatedLogs] Trace ID:', traceId);
-
       // Execute streaming search with handlers
       await fetchQueryDataWithHttpStream(
         {
@@ -284,17 +259,12 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         },
         {
           data: (_data: any, response: any) => {
-            console.log('[useCorrelatedLogs] ===== Stream data event =====');
-            console.log('[useCorrelatedLogs] Event type:', response.type);
-            console.log('[useCorrelatedLogs] Full response:', JSON.stringify(response, null, 2));
-
             // Handle metadata event
             if (response.type === 'search_response_metadata') {
               const results = response.content?.results;
               if (results) {
                 totalHits.value = results.total || 0;
                 took.value = results.took || 0;
-                console.log(`[useCorrelatedLogs] Metadata: ${totalHits.value} total hits, ${took.value}ms`);
               }
             }
 
@@ -302,20 +272,13 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             // Raw backend response: {"hits": [{...}, {...}]}
             // After wsMapper: response.content.results = {"hits": [{...}, {...}]}
             if (response.type === 'search_response_hits') {
-              console.log('[useCorrelatedLogs] Hits response.content:', response.content);
-              console.log('[useCorrelatedLogs] Hits response.content.results:', response.content?.results);
-
               // The results object IS the hits container {"hits": [...]}
               const resultsObj = response.content?.results;
               const hits = resultsObj?.hits || [];
 
-              console.log(`[useCorrelatedLogs] Extracted hits array:`, hits);
-              console.log(`[useCorrelatedLogs] Received ${hits.length} hits`);
-
               // Append hits (streaming can send multiple chunks)
               if (hits.length > 0) {
                 searchResults.value.push(...hits);
-                console.log(`[useCorrelatedLogs] Total accumulated: ${searchResults.value.length} logs`);
               } else {
                 console.warn('[useCorrelatedLogs] No hits found in response!');
               }
@@ -329,10 +292,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             totalHits.value = 0;
           },
           complete: (_data: any) => {
-            console.log('[useCorrelatedLogs] ===== Stream complete =====');
-            console.log('[useCorrelatedLogs] Final searchResults count:', searchResults.value.length);
-            console.log('[useCorrelatedLogs] Final totalHits:', totalHits.value);
-            console.log('[useCorrelatedLogs] hasResults:', hasResults.value);
             loading.value = false;
             currentTraceId = null;
           },

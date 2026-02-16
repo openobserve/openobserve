@@ -269,42 +269,6 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
     MetaHttpResponse::json(resp_body)
 }
 
-/// ExportDashboard
-#[utoipa::path(
-    get,
-    path = "/{org_id}/dashboards/{dashboard_id}/export",
-    context_path = "/api",
-    tag = "Dashboards",
-    operation_id = "ExportDashboard",
-    summary = "Export dashboard",
-    description = "Exports a dashboard configuration in a portable format that can be imported into other organizations or instances",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("dashboard_id" = String, Path, description = "Dashboard ID"),
-        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
-    ),
-    responses(
-        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
-        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON", "category": "dashboards"}))
-    )
-)]
-pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
-    let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
-        Ok(dashboard) => dashboard,
-        Err(err) => return err.into(),
-    };
-    let resp_body: DashboardResponseBody = dashboard.into();
-    MetaHttpResponse::json(resp_body)
-}
-
 /// DeleteDashboard
 #[utoipa::path(
     delete,
@@ -330,7 +294,7 @@ pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {

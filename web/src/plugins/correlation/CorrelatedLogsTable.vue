@@ -271,15 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <p class="tw:text-sm tw:text-gray-500 tw:mb-4">
             {{ t("correlation.logs.noDataDetails") }}
           </p>
-          <q-btn
-            v-if="!props.hideResetFiltersButton"
-            class="o2-secondary-button"
-            :label="t('correlation.logs.resetFilters')"
-            outline
-            icon="restart_alt"
-            @click="handleResetFilters"
-            data-test="reset-filters-btn"
-          />
         </div>
       </div>
     </div>
@@ -785,16 +776,10 @@ const handleDimensionUpdate = ({
   value: string;
 }) => {
   pendingFilters.value[key] = value;
-  console.log("[CorrelatedLogsTable] Pending filter changed:", {
-    key,
-    value,
-    pending: pendingFilters.value,
-  });
 };
 
 // Apply pending filter changes
 const handleApplyFilters = () => {
-  console.log("[CorrelatedLogsTable] Applying filters:", pendingFilters.value);
   // Update all filters at once using batch update (triggers single API call)
   updateFilters(pendingFilters.value);
 };
@@ -827,7 +812,6 @@ const handleCopy = (log: any, copyAsJson: boolean = true) => {
 };
 
 const handleSendToAiChat = (value: any) => {
-  console.log("[CorrelatedLogsTable] Send to AI chat:", value);
   emit("sendToAiChat", value);
 };
 
@@ -845,7 +829,6 @@ const handleAddSearchTerm = (
 };
 
 const handleAddFieldToTable = (field: string) => {
-  console.log("[CorrelatedLogsTable] Add field to table:", field);
 
   // Add the field to visible columns if it's not already visible
   if (!visibleColumns.value.has(field)) {
@@ -870,7 +853,6 @@ const handleAddFieldToTable = (field: string) => {
 };
 
 const handleCloseColumn = (columnDef: any) => {
-  console.log("[CorrelatedLogsTable] Close column:", columnDef);
   const columnId = columnDef.id || columnDef.name;
 
   // Remove from visible columns
@@ -913,13 +895,8 @@ const toggleSelectAll = () => {
 const handleColumnOrderChange = (newOrder: string[]) => {
   // Prevent recursive calls
   if (isUpdatingFromTable) {
-    console.log("[CorrelatedLogsTable] Already updating from table, skipping");
     return;
   }
-
-  console.log("=== COLUMN ORDER CHANGED FROM TABLE ===");
-  console.log("[CorrelatedLogsTable] New order from table:", newOrder);
-  console.log("[CorrelatedLogsTable] Current columnOrder:", columnOrder.value);
 
   // Check if order actually changed to prevent recursive updates
   const currentOrder = JSON.stringify(columnOrder.value);
@@ -930,8 +907,6 @@ const handleColumnOrderChange = (newOrder: string[]) => {
     return;
   }
 
-  console.log("[CorrelatedLogsTable] Order changed, updating...");
-
   // Set flags to prevent recursive updates
   isUpdatingFromTable = true;
   isSaving = true;
@@ -940,12 +915,8 @@ const handleColumnOrderChange = (newOrder: string[]) => {
     // Update columnOrder to match the new order from the table
     columnOrder.value = [...newOrder];
 
-    console.log("[CorrelatedLogsTable] Updated columnOrder:", columnOrder.value);
-
     // Manually save
     saveColumnState();
-
-    console.log("=== COLUMN ORDER CHANGE END ===");
   } finally {
     // Always reset flags even if error occurs
     isSaving = false;
@@ -993,8 +964,6 @@ const handleExpandRow = (row: any) => {
 };
 
 const handleViewTrace = (log: any) => {
-  console.log("[CorrelatedLogsTable] View trace clicked:", log);
-
   // 15 mins +- from the log timestamp
   const from = log[store.state.zoConfig.timestamp_column] - 900000000;
   const to = log[store.state.zoConfig.timestamp_column] + 900000000;
@@ -1032,17 +1001,6 @@ const handleNestedCorrelation = (row: any) => {
 
 // Lifecycle
 onMounted(() => {
-  console.log("[CorrelatedLogsTable] Component mounted with props:", {
-    serviceName: props.serviceName,
-    matchedDimensions: props.matchedDimensions,
-    additionalDimensions: props.additionalDimensions,
-    logStreams: props.logStreams,
-    sourceStream: props.sourceStream,
-    sourceType: props.sourceType,
-    timeRange: props.timeRange,
-    primaryStream: primaryStream.value,
-  });
-
   // Fetch logs on mount
   fetchCorrelatedLogs();
 });

@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 pub enum MetaStore {
     Sqlite,
     Nats,
-    MySQL,
     PostgreSQL,
 }
 
@@ -29,7 +28,6 @@ impl From<&str> for MetaStore {
         match s.to_lowercase().as_str() {
             "sqlite" => Self::Sqlite,
             "nats" => Self::Nats,
-            "mysql" => Self::MySQL,
             "postgres" | "postgresql" => Self::PostgreSQL,
             _ => Self::Sqlite,
         }
@@ -47,7 +45,6 @@ impl std::fmt::Display for MetaStore {
         match self {
             Self::Sqlite => write!(f, "sqlite"),
             Self::Nats => write!(f, "nats"),
-            Self::MySQL => write!(f, "mysql"),
             Self::PostgreSQL => write!(f, "postgresql"),
         }
     }
@@ -61,7 +58,6 @@ mod tests {
     fn test_metastore_from_str() {
         assert_eq!(MetaStore::from("sqlite"), MetaStore::Sqlite);
         assert_eq!(MetaStore::from("nats"), MetaStore::Nats);
-        assert_eq!(MetaStore::from("mysql"), MetaStore::MySQL);
         assert_eq!(MetaStore::from("postgres"), MetaStore::PostgreSQL);
         assert_eq!(MetaStore::from("postgresql"), MetaStore::PostgreSQL);
 
@@ -81,7 +77,6 @@ mod tests {
     fn test_metastore_display() {
         assert_eq!(MetaStore::Sqlite.to_string(), "sqlite");
         assert_eq!(MetaStore::Nats.to_string(), "nats");
-        assert_eq!(MetaStore::MySQL.to_string(), "mysql");
         assert_eq!(MetaStore::PostgreSQL.to_string(), "postgresql");
     }
 

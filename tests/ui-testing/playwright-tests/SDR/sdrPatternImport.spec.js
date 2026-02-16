@@ -10,7 +10,7 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('SDR Pattern Import test setup completed');
   });
 

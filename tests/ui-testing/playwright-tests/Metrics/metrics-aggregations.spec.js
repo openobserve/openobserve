@@ -20,7 +20,7 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
 
     // Navigate to metrics page
     await pm.metricsPage.gotoMetricsPage();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('Test setup completed - navigated to metrics page');
   });

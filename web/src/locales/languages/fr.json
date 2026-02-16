@@ -2762,7 +2762,8 @@
       }
     },
     "viewInTraces": "Afficher dans Traces",
-    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées"
+    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées",
+    "exportToJson": "Exporter au format JSON"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

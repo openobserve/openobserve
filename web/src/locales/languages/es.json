@@ -2760,7 +2760,8 @@
       }
     },
     "viewInTraces": "Ver en Traces",
-    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados"
+    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados",
+    "exportToJson": "Exportar a JSON"
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

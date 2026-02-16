@@ -19,12 +19,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, meta::meta_store::MetaStore};
 use hashbrown::HashMap;
-use sea_orm::{DatabaseConnection, SqlxMySqlConnector, SqlxPostgresConnector, SqlxSqliteConnector};
+use sea_orm::{DatabaseConnection, SqlxPostgresConnector, SqlxSqliteConnector};
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::errors::{DbError, Error, Result};
 
-pub mod mysql;
 pub mod nats;
 pub mod postgres;
 pub mod sqlite;
@@ -44,10 +43,6 @@ pub static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
 pub async fn connect_to_orm() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
-        MetaStore::MySQL => {
-            let pool = mysql::CLIENT.clone();
-            SqlxMySqlConnector::from_sqlx_mysql_pool(pool)
-        }
         MetaStore::PostgreSQL => {
             let pool = postgres::CLIENT.clone();
             SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
@@ -61,10 +56,6 @@ pub async fn connect_to_orm() -> DatabaseConnection {
 
 pub async fn connect_to_orm_ddl() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
-        MetaStore::MySQL => {
-            let pool = mysql::CLIENT_DDL.clone();
-            SqlxMySqlConnector::from_sqlx_mysql_pool(pool)
-        }
         MetaStore::PostgreSQL => {
             let pool = postgres::CLIENT_DDL.clone();
             SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
@@ -109,7 +100,6 @@ async fn default() -> Box<dyn Db> {
     match cfg.common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Nats => Box::<nats::NatsDb>::default(),
-        MetaStore::MySQL => Box::<mysql::MysqlDb>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),
     }
 }

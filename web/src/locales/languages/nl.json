@@ -2762,7 +2762,8 @@
       }
     },
     "viewInTraces": "Bekijk in Traces",
-    "viewInTracesTooltip": "Open de pagina met sporen met het RED-metriekendashboard en alle gerelateerde sporen"
+    "viewInTracesTooltip": "Open de pagina met sporen met het RED-metriekendashboard en alle gerelateerde sporen",
+    "exportToJson": "Exporteren naar JSON"
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
