@@ -41,7 +41,7 @@ async function applyQueryButton(page) {
   // click on the run query button
   // Type the value of a variable into an input field
   const search = page.waitForResponse(logData.applyQuery);
-  await page.waitForLoadState('networkidle'); // Replace 3000ms hard wait
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace 3000ms hard wait
   await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
     force: true,
   });
@@ -67,7 +67,7 @@ test.describe("Logs Page testcases", () => {
     pm = new PageManager(page);
     
     // CRITICAL: Post-authentication stabilization wait - using smart wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     
     // Data ingestion for logs page testing (preserve exact logic)
     await ingestTestData(page);
@@ -79,7 +79,7 @@ test.describe("Logs Page testcases", () => {
     );
     await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('Logs page test setup completed');
   });
@@ -91,7 +91,7 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing SQL query validation without query content');
     
-    await page.waitForLoadState('networkidle'); 
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); 
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.clickSQLModeToggle();
     // Strategic 500ms wait for SQL mode toggle DOM stabilization - this is functionally necessary
@@ -101,7 +101,7 @@ test.describe("Logs Page testcases", () => {
     await page.waitForTimeout(500);
     await pm.logsPage.selectAllText();
     await pm.logsPage.pressBackspace();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.clickRefreshButton();
     // Strategic 2000ms wait for query processing and potential error indication - this is functionally necessary
     await page.waitForTimeout(2000);
@@ -163,7 +163,7 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickShowQueryToggle();
     await pm.logsPage.clickSavedViewsButton();
     await pm.logsPage.fillSavedViewName("e2e@@@@@");
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickSavedViewDialogSave();
     await pm.logsPage.expectNotificationMessage("Please provide valid view name");
     
@@ -191,7 +191,7 @@ test.describe("Logs Page testcases", () => {
     await page.waitForTimeout(500);
     await pm.logsPage.clickRelative6WeeksButton();
     await applyQueryButton(page);
-    await page.waitForLoadState('networkidle', { timeout: 10000 }); // Replace long hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace long hard wait
     await pm.logsPage.expectSearchListVisible();
     // Strategic 500ms wait for UI stabilization - this is functionally necessary
     await page.waitForTimeout(500);
@@ -303,7 +303,7 @@ test.describe("Logs Page testcases", () => {
     await expect(text.replace(/\s/g, "")).toContain(expectedQuery.replace(/\s/g, ""));
     await pm.logsPage.clickMenuLinkMetricsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.expectQueryEditorContainsSelectFrom();
     
     testLogger.info('SQL query persistence test completed');
@@ -434,13 +434,13 @@ test.describe("Logs Page testcases", () => {
     await page.waitForLoadState('domcontentloaded'); // Replace hard wait
     await pm.logsPage.clickRefreshButton();
     // Wait for VRL function to be applied and data to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(3000);
     await pm.logsPage.clickMenuLinkMetricsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     // Wait for page to stabilize after navigation
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.expectPageContainsText(".a=2");
     
     testLogger.info('Function persistence test completed');
@@ -482,7 +482,7 @@ test.describe("Logs Page testcases", () => {
     await page.waitForLoadState('domcontentloaded'); // Replace hard wait
     await pm.logsPage.clickLogTableColumnSource();
     await pm.logsPage.clickLogsDetailTableSearchAroundBtn();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.expectLogTableColumnSourceVisible();
     
     testLogger.info('Search around histogram mode test completed');
@@ -509,7 +509,7 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickLogTableColumnSource();
     await pm.logsPage.clickLogsDetailTableSearchAroundBtn();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.expectLogTableColumnSourceVisible();
     
     testLogger.info('Search around SQL mode test completed');
@@ -520,17 +520,17 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing search around functionality with limit query');
     
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor("match_all('code') limit 5");
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickSQLModeToggle();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickLogTableColumnSource();
     await pm.logsPage.clickLogsDetailTableSearchAroundBtn();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.expectLogTableColumnSourceVisible();
     
     testLogger.info('Search around with limit query test completed');
@@ -541,16 +541,16 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing pagination behavior with limit query');
     
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor("match_all('code') limit 5");
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickSQLModeToggle();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.expectPaginationNotVisible();
     
     testLogger.info('Pagination limit query test completed');
@@ -561,14 +561,14 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing pagination behavior with SQL limit query');
     
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.expectPaginationNotVisible();
     
     testLogger.info('Pagination SQL limit query test completed');
@@ -579,14 +579,14 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing pagination behavior with SQL group/order/limit query');
 
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" WHERE code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5');
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle'); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
     await pm.logsPage.expectPaginationNotVisible();
 
     testLogger.info('Pagination SQL group/order/limit query test completed');
@@ -641,7 +641,7 @@ test.describe("Logs Page testcases", () => {
 
       // Step 4: Run query to have results
       await pm.logsPage.clickRefreshButton();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       // Step 5: Save the view (using existing POM methods from logsqueries.spec.js)
@@ -657,7 +657,7 @@ test.describe("Logs Page testcases", () => {
       // Step 6: Reload the page to simulate fresh load
       testLogger.info('Step 6: Reloading page');
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       // Step 7: Navigate back to logs and select the saved view

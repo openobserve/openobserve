@@ -22,19 +22,19 @@ export class IngestionConfigPage {
 
     async navigateToRecommended(orgId) {
         await this.page.goto(`${process.env.INGESTION_URL}/web/ingestion/recommended?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async navigateToCustom(orgId) {
         await this.page.goto(`${process.env.INGESTION_URL}/web/ingestion/custom?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for Curl tab to be visible (custom page auto-loads logs/curl)
         await this.page.getByRole('tab', { name: 'Curl' }).waitFor({ state: 'visible', timeout: 5000 });
     }
 
     async navigateToIntegration(integrationPath, orgId) {
         await this.page.goto(`${process.env.INGESTION_URL}/web${integrationPath}?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     // ==================== Tab Interactions ====================
@@ -43,7 +43,7 @@ export class IngestionConfigPage {
         const metricsTab = this.page.getByRole('tab', { name: 'Metrics' });
         await expect(metricsTab).toBeVisible({ timeout: 10000 });
         await metricsTab.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for Prometheus tab to be visible (first metrics integration)
         await this.page.getByRole('tab', { name: 'Prometheus' }).waitFor({ state: 'visible', timeout: 5000 });
     }

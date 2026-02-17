@@ -319,7 +319,6 @@ export default defineComponent({
     const graphData = ref<any>({
       nodes: [],
       edges: [],
-      availableStreams: [],
     });
 
     const filteredGraphData = ref<any>({
@@ -371,7 +370,6 @@ export default defineComponent({
           lastChartOptions.value &&
           chartKey.value === lastChartOptions.value.key &&
           !hasActiveFilters) {
-        console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
         return {
           options: lastChartOptions.value.data.options,
           notMerge: false,
@@ -501,6 +499,10 @@ export default defineComponent({
       loading.value = true;
       error.value = null;
 
+      // Clear cache to force chart regeneration with fresh data
+      lastChartOptions.value = null;
+      chartKey.value++;
+
       try {
         const orgId = store.state.selectedOrganization.identifier;
 
@@ -514,9 +516,6 @@ export default defineComponent({
           availableStreams.value.length === 0 &&
           streamFilter.value !== "all"
         ) {
-          console.log(
-            "[ServiceGraph] Fetching all streams first to populate dropdown",
-          );
           const allStreamsResponse =
             await serviceGraphService.getCurrentTopology(orgId, {
               startTime: searchObj.data.datetime.startTime,
@@ -588,7 +587,6 @@ export default defineComponent({
         graphData.value = {
           nodes,
           edges,
-          availableStreams: rawData.availableStreams || [],
         };
 
         // Calculate stats
@@ -645,7 +643,6 @@ export default defineComponent({
     const parsePrometheusMetrics = (metricsText: string) => {
       const nodes = new Map<string, any>();
       const edges: any[] = [];
-      const availableStreams = new Set<string>();
 
       const lines = metricsText.split("\n");
 
@@ -666,11 +663,6 @@ export default defineComponent({
         }
 
         if (!labels.client || !labels.server) continue;
-
-        // Track available stream names for the stream selector
-        if (labels.stream_name) {
-          availableStreams.add(labels.stream_name);
-        }
 
         // Add nodes
         if (!nodes.has(labels.client)) {
@@ -732,7 +724,6 @@ export default defineComponent({
       return {
         nodes: Array.from(nodes.values()),
         edges,
-        availableStreams: Array.from(availableStreams).sort(),
       };
     };
 
@@ -845,11 +836,8 @@ export default defineComponent({
 
     // Side Panel Handlers
     const handleNodeClick = (params: any) => {
-      console.log('[ServiceGraph] Click event:', params);
-
       // Check if it's an edge click (for graph visualization)
       if (params.dataType === 'edge' && params.data) {
-        console.log('[ServiceGraph] Opening edge panel for edge:', params.data);
         // Close node panel when opening edge panel
         showSidePanel.value = false;
         selectedNode.value = null;
@@ -869,11 +857,9 @@ export default defineComponent({
       else if (params.dataType === 'node' && params.data) {
         // Check if clicking the same node - if so, close the panel
         if (selectedNode.value && selectedNode.value.id === params.data.id) {
-          console.log('[ServiceGraph] Clicking same node, closing side panel');
           showSidePanel.value = false;
           selectedNode.value = null;
         } else {
-          console.log('[ServiceGraph] Opening side panel for node:', params.data);
           // Close edge panel when opening node panel
           showEdgePanel.value = false;
           selectedEdge.value = null;
@@ -892,11 +878,9 @@ export default defineComponent({
         if (nodeData) {
           // Check if clicking the same node - if so, close the panel
           if (selectedNode.value && selectedNode.value.id === nodeData.id) {
-            console.log('[ServiceGraph] Clicking same tree node, closing side panel');
             showSidePanel.value = false;
             selectedNode.value = null;
           } else {
-            console.log('[ServiceGraph] Opening side panel for tree node:', params.data);
             // Close edge panel when opening node panel
             showEdgePanel.value = false;
             selectedEdge.value = null;

@@ -129,24 +129,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_pipeline_last_errors_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `pipeline_last_errors` (
-                `pipeline_id` varchar(255) NOT NULL PRIMARY KEY,
-                `org_id` varchar(255) NOT NULL,
-                `pipeline_name` varchar(255) NOT NULL,
-                `last_error_timestamp` bigint NOT NULL,
-                `error_summary` text,
-                `node_errors` json,
-                `created_at` bigint NOT NULL,
-                `updated_at` bigint NOT NULL
-            )"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_pipeline_last_errors_table_statement().to_string(SqliteQueryBuilder),

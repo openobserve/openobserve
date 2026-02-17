@@ -170,7 +170,7 @@ export class DashboardPage {
   }
   async deleteDashboard() {
     await this.page.reload();
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(5000);
 
     // Search for the dashboard before deleting

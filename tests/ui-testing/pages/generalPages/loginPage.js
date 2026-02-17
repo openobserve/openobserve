@@ -27,7 +27,7 @@ export class LoginPage {
       await loginAsInternalLink.waitFor({ state: 'visible', timeout: 10000 });
       await loginAsInternalLink.click();
       await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded",
       });
 
       // Additional wait to ensure login form is fully rendered
@@ -79,7 +79,7 @@ export class LoginPage {
     await waitForLogin;
     await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
       timeout: 60000
     });
   }
@@ -101,7 +101,7 @@ export class LoginPage {
       }
     });
 
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     console.log("ZO_BASE_URL_SC_UI", process.env["ZO_BASE_URL_SC_UI"]);
   }
 
@@ -112,7 +112,7 @@ export class LoginPage {
     if (await this.page.getByText('Login as internal user').isVisible()) {
       await this.page.getByText('Login as internal user').click();
       await this.page.waitForURL(process.env["ZO_BASE_URL_SC_UI"] + "/web/login", {
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded",
       });
     }
     
@@ -138,7 +138,7 @@ export class LoginPage {
     await waitForLogin;
     await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL_SC_UI"] + "/web/", {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
       timeout: 60000
     });
   }

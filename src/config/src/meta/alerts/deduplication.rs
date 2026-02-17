@@ -13,10 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::stats::MemorySize;
+
+/// Deserializes an optional i32, accepting null, integer, or empty string (as None).
+fn deserialize_optional_i32<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(Some(i as i32))
+            } else if let Some(f) = n.as_f64() {
+                Ok(Some(f.round() as i32))
+            } else {
+                Err(serde::de::Error::custom("invalid number for i32"))
+            }
+        }
+        serde_json::Value::String(s) if s.is_empty() => Ok(None),
+        serde_json::Value::String(s) => s.parse::<i32>().map(Some).map_err(|_| {
+            serde::de::Error::custom(format!("invalid value for time_window_minutes: '{s}'"))
+        }),
+        _ => Err(serde::de::Error::custom("expected null, number, or string")),
+    }
+}
 
 /// Organization-level deduplication configuration (Global settings)
 ///
@@ -63,8 +88,12 @@ pub struct GlobalDeduplicationConfig {
     /// Alerts with the same fingerprint within this window are suppressed.
     /// If None, defaults to 2x the alert evaluation frequency.
     /// Can be overridden per-alert.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_window_minutes: Option<i64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_i32"
+    )]
+    pub time_window_minutes: Option<i32>,
 
     /// FQN (Fully Qualified Name) priority dimensions for service correlation
     ///
@@ -114,8 +143,12 @@ pub struct DeduplicationConfig {
 
     /// Time window in minutes for deduplication
     /// If None, defaults to 2x alert frequency
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_window_minutes: Option<i64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_i32"
+    )]
+    pub time_window_minutes: Option<i32>,
 
     /// Optional alert grouping configuration
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -306,10 +306,10 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "52"
-datafusion-proto = "52"
-datafusion-functions-aggregate-common = "52"
-datafusion-functions-json = "0.52.0"
+datafusion = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-json = { git = "https://github.com/openobserve/datafusion-functions-json", rev = "f53f08cddf467d3d492425f0e50f98f6a300d2f5" }
 expect-test = "1.4"
 arrow = { version = "57.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "57.2.0"
@@ -394,12 +394,12 @@ rustls = { version = "0.23.20", default-features = false, features = [
 rustls-native-certs = "0.8"
 webpki-roots = "0.26"
 sea-orm = { version = "1.1.19", features = [
-    "sqlx-all",
+    "sqlx-postgres",
+    "sqlx-sqlite",
     "runtime-tokio-rustls",
     "macros",
 ] }
 sea-orm-migration = { version = "1.1.19", features = [
-    "sqlx-mysql",
     "sqlx-postgres",
     "sqlx-sqlite",
     "runtime-tokio-rustls",
@@ -414,7 +414,6 @@ snap = "1"
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio-rustls",
     "postgres",
-    "mysql",
     "sqlite",
     "chrono",
 ] }

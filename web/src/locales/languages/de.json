@@ -2240,7 +2240,6 @@
       "groupsLabel": "Gruppen",
       "noMatchingGroups": "Keine passenden Gruppen",
       "fqnFormulaTitle": "Identitätsformel",
-      "fqnFormulaTooltip": "Zeigt, wie die Service-Identität berechnet wird. Scope-Dimensionen (blau) werden mit '/' verkettet. Die erste Nicht-Null-Workload-Dimension (grün) wird zum Servicenamen.",
       "scopeDimension": "Scope-Dimension",
       "workloadDimension": "Workload-Dimension",
       "noFormulaConfigured": "Keine Identitätsformel konfiguriert. Fügen Sie oben Dimensionen hinzu.",
@@ -2848,7 +2847,8 @@
       }
     },
     "viewInTraces": "In Traces ansehen",
-    "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces"
+    "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces",
+    "exportToJson": "Export nach JSON"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

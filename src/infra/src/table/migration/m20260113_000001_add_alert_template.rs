@@ -28,29 +28,14 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let db_backend = manager.get_database_backend();
-
-        if matches!(db_backend, sea_orm::DbBackend::MySql) {
-            // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(Alerts::Table)
-                        .add_column(ColumnDef::new(Alerts::Template).string().null())
-                        .to_owned(),
-                )
-                .await
-        } else {
-            // PostgreSQL and SQLite support IF NOT EXISTS
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(Alerts::Table)
-                        .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().null())
-                        .to_owned(),
-                )
-                .await
-        }
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alerts::Table)
+                    .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().null())
+                    .to_owned(),
+            )
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -86,19 +71,6 @@ mod tests {
                 .to_owned()
                 .to_string(PostgresQueryBuilder),
             r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "template" varchar NULL"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
-        collapsed_eq!(
-            &Table::alter()
-                .table(Alerts::Table)
-                .add_column(ColumnDef::new(Alerts::Template).string().null())
-                .to_owned()
-                .to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `alerts` ADD COLUMN `template` varchar(255) NULL"#
         );
     }
 

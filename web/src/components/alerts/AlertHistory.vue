@@ -849,8 +849,6 @@ const fetchAlertHistory = async () => {
       query.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-    console.log("Fetching alert history with query:", query);
-
     const response = await alertsService.getHistory(org, query);
     if (response.data) {
       // Handle the response data

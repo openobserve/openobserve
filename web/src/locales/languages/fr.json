@@ -2240,7 +2240,6 @@
       "groupsLabel": "groupes",
       "noMatchingGroups": "Aucun groupe correspondant",
       "fqnFormulaTitle": "Formule d'identité",
-      "fqnFormulaTooltip": "Montre comment l'identité de service sera calculée. Les dimensions de portée (bleu) sont concaténées avec '/'. La première dimension de charge de travail non nulle (vert) devient le nom du service.",
       "scopeDimension": "Dimension de portée",
       "workloadDimension": "Dimension de charge de travail",
       "noFormulaConfigured": "Aucune formule d'identité configurée. Ajoutez des dimensions ci-dessus.",
@@ -2848,7 +2847,8 @@
       }
     },
     "viewInTraces": "Afficher dans Traces",
-    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées"
+    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées",
+    "exportToJson": "Exporter au format JSON"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
