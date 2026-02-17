@@ -4,8 +4,10 @@ export class IngestionConfigPage {
     constructor(page) {
         this.page = page;
 
-        // Recommended page selectors
-        this.recommendedSearchInput = '[data-test="recommended-list-search-input"]';
+        // Global ingestion search (moved from Recommended page to Ingestion parent)
+        this.globalSearchInput = '[data-test="ingestion-global-search"]';
+        // Recommended page tabs container
+        this.recommendedTabsContainer = '.data-sources-recommended-tabs';
 
         // Configuration content selectors
         this.copyButton = '[data-test="rum-copy-btn"]';
@@ -84,25 +86,25 @@ export class IngestionConfigPage {
     // ==================== Search Functionality ====================
 
     async getSearchInput() {
-        return this.page.locator(this.recommendedSearchInput);
+        return this.page.locator(this.globalSearchInput);
     }
 
     async verifySearchInputVisible() {
-        await expect(this.page.locator(this.recommendedSearchInput)).toBeVisible();
+        await expect(this.page.locator(this.globalSearchInput)).toBeVisible();
     }
 
     async fillSearchInput(searchText) {
-        const searchInput = this.page.locator(this.recommendedSearchInput);
+        const searchInput = this.page.locator(this.globalSearchInput);
         await searchInput.fill(searchText);
-        // Wait for search filtering to complete
-        await this.page.waitForLoadState('domcontentloaded');
+        // Wait for search/navigation to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async clearSearchInput() {
-        const searchInput = this.page.locator(this.recommendedSearchInput);
+        const searchInput = this.page.locator(this.globalSearchInput);
         await searchInput.clear();
-        // Wait for search filtering to reset
-        await this.page.waitForLoadState('domcontentloaded');
+        // Wait for search reset/navigation to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async waitForRecommendedTabs() {
@@ -122,7 +124,9 @@ export class IngestionConfigPage {
     // ==================== Assertions ====================
 
     async expectRecommendedPageLoaded() {
-        await expect(this.page.locator(this.recommendedSearchInput)).toBeVisible();
+        // Recommended page loads with the sidebar tabs container and Kubernetes as the default tab
+        await expect(this.page.locator(this.recommendedTabsContainer)).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('tab', { name: /kubernetes/i }).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async expectLogsPageLoaded() {

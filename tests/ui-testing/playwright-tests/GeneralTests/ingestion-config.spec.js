@@ -108,30 +108,39 @@ test.describe("Ingestion Configuration Tests", () => {
   });
 
   test.describe("Recommended Page Features", () => {
-    test("should search and filter recommended integrations", {
+    test("should search and navigate using global ingestion search", {
       tag: ['@ingestion', '@search', '@P2']
-    }, async () => {
-      testLogger.info('Testing search functionality in Recommended page');
+    }, async ({ page }) => {
+      testLogger.info('Testing global search functionality in ingestion page');
 
       const orgId = process.env["ORGNAME"];
       await pm.ingestionConfigPage.navigateToRecommended(orgId);
       await pm.ingestionConfigPage.verifySearchInputVisible();
 
+      // Verify the recommended tabs are loaded
       const initialCount = await pm.ingestionConfigPage.getRouteTabCount();
       testLogger.info(`Initial recommended integrations count: ${initialCount}`);
+      expect(initialCount).toBeGreaterThan(0);
 
+      // Search for 'kubernetes' using the global search — this navigates to the matching route
       await pm.ingestionConfigPage.fillSearchInput('kubernetes');
+      // Wait for navigation to settle
+      await page.waitForTimeout(1000);
 
-      const filteredCount = await pm.ingestionConfigPage.getRouteTabCount();
-      expect(filteredCount).toBeLessThanOrEqual(initialCount);
-      testLogger.info(`Filtered results count: ${filteredCount}`);
+      // Verify the page navigated to or stayed on a kubernetes-related route
+      const currentUrl = page.url();
+      testLogger.info(`URL after searching 'kubernetes': ${currentUrl}`);
+      expect(currentUrl).toContain('kubernetes');
 
+      // Clear search and verify we can navigate back
       await pm.ingestionConfigPage.clearSearchInput();
+      await pm.ingestionConfigPage.navigateToRecommended(orgId);
+      await pm.ingestionConfigPage.expectRecommendedPageLoaded();
 
       const finalCount = await pm.ingestionConfigPage.getRouteTabCount();
       expect(finalCount).toBe(initialCount);
 
-      testLogger.info('Search and filter functionality working correctly');
+      testLogger.info('Global search and navigation functionality working correctly');
     });
   });
 
