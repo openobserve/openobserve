@@ -48,127 +48,162 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ></q-btn>
   </div>
   <div
-    class="q-pb-sm q-pt-xs flex flex-wrap justify-between trace-details-toolbar-container"
+    class="trace-details-toolbar-container"
     data-test="trace-details-sidebar-header-toolbar"
   >
-    <div class="flex flex-wrap">
-      <div
-        class="q-px-sm ellipsis non-selectable"
-        :title="span.service_name"
-        style="border-right: 1px solid #cccccc; font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-service"
-      >
-        <span class="text-grey-7">Service: </span>
-        <span data-test="trace-details-sidebar-header-toolbar-service-name">{{
-          span.service_name
-        }}</span>
-      </div>
-      <div
-        class="q-px-sm ellipsis non-selectable"
-        :title="getDuration"
-        style="border-right: 1px solid #cccccc; font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-duration"
-      >
-        <span class="text-grey-7">Duration: </span>
-        <span>{{ getDuration }}</span>
+    <div class="flex items-center justify-between q-pa-xs tw:gap-2" style="overflow-x: auto; flex-wrap: nowrap;">
+      <div class="flex items-center tw:gap-2" style="flex-wrap: nowrap;">
+        <!-- Service Badge -->
+        <q-chip
+          dense
+          square
+          class="toolbar-chip service-chip"
+          :title="span.service_name"
+          data-test="trace-details-sidebar-header-toolbar-service"
+        >
+          <q-icon name="cloud_queue" size="12px" class="q-mr-xs" />
+          <span class="chip-label">Service</span>
+          <span class="chip-value" data-test="trace-details-sidebar-header-toolbar-service-name">
+            {{ span.service_name }}
+          </span>
+        </q-chip>
+
+        <!-- Duration Badge -->
+        <q-chip
+          dense
+          square
+          class="toolbar-chip duration-chip"
+          :title="getDuration"
+          data-test="trace-details-sidebar-header-toolbar-duration"
+        >
+          <q-icon name="schedule" size="12px" class="q-mr-xs" />
+          <span class="chip-label">Duration</span>
+          <span class="chip-value">{{ getDuration }}</span>
+        </q-chip>
+
+        <!-- TTFT Badge -->
+        <q-chip
+          v-if="getTTFT"
+          dense
+          square
+          class="toolbar-chip ttft-chip"
+          :title="getTTFT"
+          data-test="trace-details-sidebar-header-toolbar-ttft"
+        >
+          <q-icon name="speed" size="12px" class="q-mr-xs" />
+          <span class="chip-label">TTFT</span>
+          <span class="chip-value">{{ getTTFT }}</span>
+        </q-chip>
+
+        <!-- Start Time Badge -->
+        <q-chip
+          dense
+          square
+          class="toolbar-chip time-chip"
+          :title="getStartTime"
+          data-test="trace-details-sidebar-header-toolbar-start-time"
+        >
+          <q-icon name="access_time" size="12px" class="q-mr-xs" />
+          <span class="chip-label">Start</span>
+          <span class="chip-value">{{ getStartTime }}</span>
+        </q-chip>
+
+        <!-- LLM Metrics (conditional) -->
+        <template v-if="isLLMSpan && llmMetrics">
+          <!-- Model Chip -->
+          <q-chip
+            dense
+            square
+            class="llm-chip model-chip"
+            icon="psychology"
+            :title="span._o2_llm_model_name"
+          >
+            <span class="chip-value text-bold">{{ span._o2_llm_model_name }}</span>
+          </q-chip>
+
+          <!-- Token Usage Group -->
+          <div class="tokens-group">
+            <!-- Input Tokens -->
+            <q-chip
+              dense
+              square
+              class="llm-chip token-chip input-token-chip"
+              title="Input Tokens"
+            >
+              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
+              <span class="chip-label">In</span>
+              <span class="chip-value">{{ llmMetrics.usage.input }}</span>
+            </q-chip>
+
+            <!-- Output Tokens -->
+            <q-chip
+              dense
+              square
+              class="llm-chip token-chip output-token-chip"
+              title="Output Tokens"
+            >
+              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
+              <span class="chip-label">Out</span>
+              <span class="chip-value">{{ llmMetrics.usage.output }}</span>
+            </q-chip>
+          </div>
+
+          <!-- Cost Chip -->
+          <q-chip
+            dense
+            square
+            class="llm-chip cost-chip"
+            icon="attach_money"
+            title="Total Cost"
+          >
+            <span class="chip-value text-bold">${{ llmMetrics.cost.total }}</span>
+          </q-chip>
+        </template>
       </div>
 
-      <div
-        v-if="getTTFT"
-        class="q-px-sm ellipsis non-selectable"
-        :title="getTTFT"
-        style="border-right: 1px solid #cccccc; font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-ttft"
-      >
-        <span class="text-grey-7">TTFT: </span>
-        <span>{{ getTTFT }}</span>
-      </div>
+      <div class="flex items-center tw:gap-2">
+        <!-- Provider Badge (for LLM spans) -->
+        <q-badge
+          v-if="isLLMSpan && span._o2_llm_provider_name"
+          :label="span._o2_llm_provider_name"
+          class="provider-badge"
+        />
 
-      <div
-        class="q-px-sm ellipsis non-selectable"
-        :title="getStartTime"
-        style="font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-start-time"
-      >
-        <span class="text-grey-7">Start Time: </span>
-        <span>{{ getStartTime }}</span>
-      </div>
-    </div>
-
-    <div class="flex">
-      <div class="text-right flex items-center justify-end q-mx-sm">
-        <div
-          class="flex items-center justify-end"
+        <!-- Span ID Badge -->
+        <q-chip
+          dense
+          square
+          clickable
+          class="toolbar-chip span-id-chip"
+          :title="`Span ID: ${span.span_id}`"
+          @click="copySpanId"
           data-test="trace-details-sidebar-header-toolbar-span-id"
         >
-          <span class="text-grey-7 q-mr-xs">Span ID: </span
-          ><span class="">{{ span.span_id }}</span>
-        </div>
-        <q-icon
-          class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
-          size="12px"
-          name="content_copy"
-          title="Copy"
-          @click="copySpanId"
-          data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
-        />
+          <q-icon name="tag" size="12px" class="q-mr-xs" />
+          <span class="chip-value">{{ span.span_id }}</span>
+          <q-icon
+            name="content_copy"
+            size="10px"
+            class="q-ml-xs copy-icon"
+            data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
+          />
+        </q-chip>
+
+        <!-- View Logs Button -->
+        <q-btn
+          v-if="parentMode === 'standalone'"
+          class="view-logs-btn o2-secondary-button"
+          dense
+          unelevated
+          no-caps
+          size="sm"
+          :title="t('traces.viewLogs')"
+          @click.stop="viewSpanLogs"
+          data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+        >
+          View Logs
+        </q-btn>
       </div>
-
-      <q-btn
-        v-if="parentMode === 'standalone'"
-        class="q-mx-xs view-span-logs-btn tw:border tw:py-[0.3rem]!"
-        size="10px"
-        icon="search"
-        dense
-        padding="xs sm"
-        no-caps
-        color="primary"
-        :title="t('traces.viewLogs')"
-        @click.stop="viewSpanLogs"
-        data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
-      >
-        View Logs</q-btn
-      >
-    </div>
-  </div>
-
-  <!-- LLM Metrics Toolbar (conditional) -->
-  <div
-    v-if="isLLMSpan && llmMetrics"
-    class="llm-metrics-toolbar q-px-sm q-py-xs q-mb-xs"
-    style="border-top: 1px solid #cccccc; border-bottom: 1px solid #cccccc"
-    data-test="trace-details-sidebar-llm-metrics-toolbar"
-  >
-    <div class="flex items-center justify-between text-body2">
-      <div class="flex items-center flex-wrap">
-        <!-- Model -->
-        <div class="metric-item q-mr-md">
-          <span class="text-grey-7">Model: </span>
-          <span class="text-bold">{{ span._o2_llm_model_name }}</span>
-        </div>
-
-        <!-- Tokens -->
-        <div class="metric-item q-mr-md">
-          <q-icon name="arrow_upward" size="xs" class="text-blue" />
-          <span class="text-grey-7">In: </span>
-          <span>{{ llmMetrics.usage.input }}</span>
-        </div>
-        <div class="metric-item q-mr-md">
-          <q-icon name="arrow_downward" size="xs" class="text-green" />
-          <span class="text-grey-7">Out: </span>
-          <span>{{ llmMetrics.usage.output }}</span>
-        </div>
-
-        <!-- Cost -->
-        <div class="metric-item">
-          <q-icon name="attach_money" size="xs" class="text-orange" />
-          <span class="text-grey-7">Cost: </span>
-          <span class="text-bold">${{ llmMetrics.cost.total }}</span>
-        </div>
-      </div>
-
-      <!-- Provider Badge -->
-      <q-badge v-if="span._o2_llm_provider_name" :label="span._o2_llm_provider_name" color="primary" />
     </div>
   </div>
 
@@ -351,10 +386,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="tagColumns"
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        class="q-table trace-detail-tab-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-unified-height"
         id="schemaFieldList"
         dense
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <template v-slot:body-cell="props">
           <q-td
@@ -386,9 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="processColumns"
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table trace-detail-tab-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-unified-height"
         dense
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <template v-slot:body-cell="props">
           <q-td
@@ -414,10 +447,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-tab-panel>
     <q-tab-panel name="attributes">
       <pre
-        class="attr-text"
+        class="attr-text tab-content-unified-height"
         v-html="highlightedAttributes"
         data-test="trace-details-sidebar-attributes-table"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       ></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
@@ -429,9 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="eventColumns"
         row-key="name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
-
+        class="q-table o2-quasar-table trace-detail-tab-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-unified-height"
         dense
       >
         <template v-slot:body="props">
@@ -490,9 +520,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
       <div
-        class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         v-else
+        class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-unified-height"
         data-test="trace-details-sidebar-no-events"
       >
         No events present for this span
@@ -507,8 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="exceptionEventColumns"
         row-key="name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        class="q-table o2-quasar-table  trace-detail-tab-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-unified-height"
         dense
       >
         <template v-slot:body="props">
@@ -594,9 +622,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
       <div
-        class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         v-else
+        class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-unified-height"
         data-test="trace-details-sidebar-no-exceptions"
       >
         No exceptions present for this span
@@ -654,8 +681,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
-        class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold"
+        class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-unified-height"
         data-test="trace-details-sidebar-no-links"
       >
         No links present for this span
@@ -683,8 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading/Empty state when no data -->
       <div
         v-else
-        class="tw:flex tw:items-center tw:justify-center tw:py-20"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-unified-height"
       >
         <div class="tw:text-center">
           <q-spinner-hourglass
@@ -729,8 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading/Empty state when no data -->
       <div
         v-else
-        class="tw:flex tw:items-center tw:justify-center tw:py-20"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-unified-height"
       >
         <div class="tw:text-center">
           <q-spinner-hourglass
@@ -1894,11 +1918,289 @@ export default defineComponent({
 }
 
 // LLM-specific styles
-.llm-metrics-toolbar {
-  .metric-item {
+// Trace Details Toolbar - Modern Styling
+.trace-details-toolbar-container {
+  background: rgba(248, 249, 250, 0.5);
+  // border-bottom: 1px solid #e9ecef;
+  white-space: nowrap;
+
+  .toolbar-chip {
+    font-size: 11px;
+    height: 22px;
+    padding: 0 6px;
+    background: white;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .chip-label {
+      color: #6c757d;
+      font-size: 10px;
+      font-weight: 500;
+      margin-right: 3px;
+    }
+
+    .chip-value {
+      color: #212529;
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    &.service-chip {
+      border-left: 3px solid #0d6efd;
+      .q-icon {
+        color: #0d6efd;
+      }
+    }
+
+    &.duration-chip {
+      border-left: 3px solid #6610f2;
+      .q-icon {
+        color: #6610f2;
+      }
+    }
+
+    &.ttft-chip {
+      border-left: 3px solid #6f42c1;
+      .q-icon {
+        color: #6f42c1;
+      }
+    }
+
+    &.time-chip {
+      border-left: 3px solid #d63384;
+      .q-icon {
+        color: #d63384;
+      }
+    }
+
+    &.span-id-chip {
+      border-left: 3px solid #20c997;
+      cursor: pointer;
+
+      .q-icon {
+        color: #20c997;
+      }
+
+      .copy-icon {
+        opacity: 0.6;
+        transition: opacity 0.2s;
+      }
+
+      &:hover .copy-icon {
+        opacity: 1;
+      }
+    }
+  }
+
+  .view-logs-btn {
+    height: 24px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 10px;
+    border-radius: 4px;
+    text-transform: none;
+    flex-shrink: 0;
+  }
+
+  // Scrollbar styling for horizontal scroll
+  > div::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  > div::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  > div::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 2px;
+  }
+
+  > div::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+  }
+}
+
+// LLM Chips - Modern Styling (now integrated into toolbar)
+.trace-details-toolbar-container {
+  .llm-chip {
+    font-size: 10px;
+    height: 20px;
+    padding: 0 6px;
+    background: white;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .chip-value {
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    &.model-chip {
+      border-left: 3px solid #ab47bc;
+
+      .q-icon {
+        color: #7b1fa2;
+      }
+
+      .chip-value {
+        color: #4a148c;
+        font-weight: 600;
+      }
+    }
+
+    &.token-chip {
+      min-width: 60px;
+      justify-content: center;
+
+      .chip-label {
+        font-size: 9px;
+        font-weight: 500;
+        margin-right: 2px;
+      }
+
+      &.input-token-chip {
+        border-left: 3px solid #42a5f5;
+
+        .q-icon, .chip-label, .chip-value {
+          color: #1565c0;
+        }
+      }
+
+      &.output-token-chip {
+        border-left: 3px solid #66bb6a;
+
+        .q-icon, .chip-label, .chip-value {
+          color: #2e7d32;
+        }
+      }
+    }
+
+    &.cost-chip {
+      border-left: 3px solid #ef6c00;
+
+      .q-icon {
+        color: #ef6c00;
+      }
+
+      .chip-value {
+        color: #e65100;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .tokens-group {
     display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
+  .provider-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+}
+
+// Dark Mode Styles
+body.body--dark {
+  .trace-details-toolbar-container {
+    background: rgba(45, 55, 72, 0.5);
+    border-bottom-color: #4a5568;
+
+    .toolbar-chip {
+      background: #1a202c;
+      border-color: #4a5568;
+      color: #e2e8f0;
+
+      .chip-label {
+        color: #a0aec0;
+      }
+
+      .chip-value {
+        color: #e2e8f0;
+      }
+
+      &:hover {
+        background: #2d3748;
+      }
+    }
+  }
+
+  .trace-details-toolbar-container {
+    .llm-chip {
+      background: #1a202c;
+      border-color: #4a5568;
+
+      .chip-value {
+        color: #e2e8f0;
+      }
+
+      &.model-chip {
+        border-left: 3px solid #ab47bc;
+
+        .q-icon {
+          color: #ce93d8;
+        }
+
+        .chip-value {
+          color: #e9d8fd;
+        }
+      }
+
+      &.token-chip {
+        &.input-token-chip {
+          border-left: 3px solid #42a5f5;
+
+          .q-icon, .chip-label, .chip-value {
+            color: #90cdf4;
+          }
+        }
+
+        &.output-token-chip {
+          border-left: 3px solid #66bb6a;
+
+          .q-icon, .chip-label, .chip-value {
+            color: #9ae6b4;
+          }
+        }
+      }
+
+      &.cost-chip {
+        border-left: 3px solid #ef6c00;
+
+        .q-icon {
+          color: #ffcc80;
+        }
+
+        .chip-value {
+          color: #fed7aa;
+        }
+      }
+    }
+
+
+    .provider-badge {
+      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+    }
   }
 }
 
@@ -1915,8 +2217,8 @@ export default defineComponent({
     display: flex;
     gap: 0.5rem;
     width: 100%;
-    height: calc(100vh - 290px); // Fixed height for the container
-    max-height: calc(100vh - 290px);
+    height: calc(100vh - 266px); // Fixed height for the container (unified for all spans)
+    max-height: calc(100vh - 266px);
     align-items: stretch; // Ensure equal heights
     overflow: hidden; // Prevent scroll at outer level
   }
@@ -1931,7 +2233,7 @@ export default defineComponent({
   .llm-content-box {
     flex: 1; // Take all available space
     height: 100%; // Take full height of parent
-    max-height: calc(100vh - 338px); // Container height minus label/button height
+    max-height: calc(100vh - 314px); // Container height minus label/button height (unified)
     border: 1px solid var(--o2-border-color);
     border-radius: 4px;
     padding: 0.75rem;
@@ -2103,10 +2405,12 @@ export default defineComponent({
     }
   }
 }
-.tab-content-with-llm-metrics {
-  height: calc(100vh - 300px);
-}
-.tab-content-without-llm-metrics {
+.tab-content-unified-height {
   height: calc(100vh - 266px);
+}
+.trace-detail-tab-table{
+  th{
+    background-color: #f5f5f5 !important;
+  }
 }
 </style>
