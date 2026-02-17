@@ -1886,8 +1886,8 @@ export default defineComponent({
     display: flex;
     gap: 0.5rem;
     width: 100%;
-    height: 500px; // Fixed height for the container
-    max-height: 500px;
+    height: calc(100vh - 290px); // Fixed height for the container
+    max-height: calc(100vh - 290px);
     align-items: stretch; // Ensure equal heights
     overflow: hidden; // Prevent scroll at outer level
   }
@@ -1902,7 +1902,7 @@ export default defineComponent({
   .llm-content-box {
     flex: 1; // Take all available space
     height: 100%; // Take full height of parent
-    max-height: calc(500px - 48px); // Container height minus label/button height
+    max-height: calc(100vh - 338px); // Container height minus label/button height
     border: 1px solid var(--o2-border-color);
     border-radius: 4px;
     padding: 0.75rem;
