@@ -3768,4 +3768,38 @@ export class LogsPage {
             return '';
         }
     }
+
+    /**
+     * Disable SQL mode if currently enabled
+     * Combines getSQLModeState() check with clickSQLModeSwitch()
+     */
+    async disableSqlModeIfNeeded() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        if (isChecked === 'true') {
+            await sqlModeToggle.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('SQL mode disabled');
+        } else {
+            testLogger.info('SQL mode already disabled');
+        }
+    }
+
+    /**
+     * Get the full error dialog text including header and body
+     * Used for verifying error messages contain expected content
+     * @returns {Promise<string>} The full error dialog text
+     */
+    async getDetailedErrorDialogText() {
+        await this.clickResultErrorDetailsButton();
+        await this.page.waitForTimeout(1000);
+
+        const detailErrorMessage = this.page.locator(this.searchDetailErrorMessage);
+        await detailErrorMessage.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Get all text from the error dialog area (includes header and body)
+        const errorDialogText = await detailErrorMessage.locator('..').textContent();
+        testLogger.info(`Error dialog text: ${errorDialogText}`);
+        return errorDialogText;
+    }
 }
