@@ -12,7 +12,7 @@ const logs = [];
 
 // Helper to generate ISO timestamp
 function isoTimestamp(offset = 0) {
-    return new Date(Date.now() + offset).toISOString().replace('T', 'T').replace(/\.\d{3}Z$/, 'Z');
+    return new Date(Date.now() + offset).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
 // Kubernetes metadata templates
