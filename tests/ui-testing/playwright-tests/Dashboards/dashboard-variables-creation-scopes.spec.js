@@ -13,6 +13,7 @@ const {
   getVariableSelector,
   getEditVariableBtn,
   getTabSelector,
+  selectStreamAndField,
 } = require("../../pages/dashboardPages/dashboard-selectors.js");
 const testLogger = require("../utils/test-logger.js");
 
@@ -130,27 +131,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
     await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    // Stream select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
-    await streamSelect.click();
-    await streamSelect.locator('input').fill("e2e_automate");
-    const streamOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
-    await streamOpt.waitFor({ state: "visible", timeout: 10000 });
-    await streamOpt.click();
-
-    // Field select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
-    await fieldSelect.click();
-    await fieldSelect.locator('input').fill("kubernetes_container_name");
-    const fieldOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_container_name" }).first();
-    await fieldOpt.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOpt.click();
+    // Select stream and field using common helper
+    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_container_name");
 
     // Check dependency dropdown via filter - should NOT show panel variables
     // Add filter to check available dependency options
@@ -250,27 +232,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    // Stream select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
-    await streamSelect.click();
-    await streamSelect.locator('input').fill("e2e_automate");
-    const streamOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
-    await streamOpt.waitFor({ state: "visible", timeout: 10000 });
-    await streamOpt.click();
-
-    // Field select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
-    await fieldSelect.click();
-    await fieldSelect.locator('input').fill("kubernetes_container_name");
-    const fieldOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_container_name" }).first();
-    await fieldOpt.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOpt.click();
+    // Select stream and field using common helper
+    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_container_name");
 
     // Check dependency dropdown via filter - should NOT show Tab1's variable
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -424,27 +387,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    // Stream select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
-    await streamSelect.click();
-    await streamSelect.locator('input').fill("e2e_automate");
-    const streamOpt4 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
-    await streamOpt4.waitFor({ state: "visible", timeout: 10000 });
-    await streamOpt4.click();
-
-    // Field select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
-    await fieldSelect.click();
-    await fieldSelect.locator('input').fill("kubernetes_pod_name");
-    const fieldOpt4 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_pod_name" }).first();
-    await fieldOpt4.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOpt4.click();
+    // Select stream and field using common helper
+    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_pod_name");
 
     // Check dependency dropdown via filter - should show both global and tab variables
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -550,27 +494,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    // Stream select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
-    await streamSelect.click();
-    await streamSelect.locator('input').fill("e2e_automate");
-    const streamOpt5 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
-    await streamOpt5.waitFor({ state: "visible", timeout: 10000 });
-    await streamOpt5.click();
-
-    // Field select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
-    await fieldSelect.click();
-    await fieldSelect.locator('input').fill("kubernetes_pod_name");
-    const fieldOpt5 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_pod_name" }).first();
-    await fieldOpt5.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOpt5.click();
+    // Select stream and field using common helper
+    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_pod_name");
 
     // Check dependency dropdown via filter - should NOT show Panel1's variable
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();

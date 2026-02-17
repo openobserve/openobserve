@@ -3,6 +3,7 @@
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import { selectStreamAndField } from "./dashboard-selectors.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -35,42 +36,8 @@ export default class DashboardVariables {
     await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({timeout:5000});
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
 
-    // Select Stream Type
-    await this.page
-      .locator(
-        'div.row label:has-text("Stream Type") >> [data-test="dashboard-variable-stream-type-select"]'
-      )
-      .click();
-
-    await this.page
-      .getByRole("option", { name: streamtype, exact: true })
-      .locator("div")
-      .nth(2)
-      .click();
-
-    // Stream Select (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const streamSelect = this.page.locator(
-      '[data-test="dashboard-variable-stream-select"]'
-    ).first();
-    await streamSelect.click();
-    await streamSelect.locator('input').fill(streamName);
-    // Wait for and click the matching CommonAutoComplete option
-    const streamOption = this.page.locator('[data-test="common-auto-complete-option"]')
-      .filter({ hasText: streamName }).first();
-    await streamOption.waitFor({ state: "visible", timeout: 10000 });
-    await streamOption.click();
-
-    // Select Field (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
-    await fieldSelect.click();
-    await fieldSelect.locator('input').fill(field);
-    // Wait for and click the matching CommonAutoComplete option
-    const fieldOption = this.page.locator('[data-test="common-auto-complete-option"]')
-      .filter({ hasText: field }).first();
-    await fieldOption.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOption.click();
+    // Select Stream Type, Stream, and Field using common helper
+    await selectStreamAndField(this.page, streamtype, streamName, field);
 
     // Add Filter Configuration if provided
     if (filterConfig) {
