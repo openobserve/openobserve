@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="activeTab"
     dense
     inline-label
+    align="left"
     class="text-bold q-mx-sm span_details_tabs"
     data-test="trace-details-sidebar-tabs"
   >
