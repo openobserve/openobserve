@@ -1508,7 +1508,10 @@
     "add_template": "새 템플릿",
     "skip_tls_verify": "TLS 확인 건너뛰기",
     "action": "액션",
-    "output_format": "출력 형식"
+    "output_format": "출력 형식",
+    "separator": "분리기",
+    "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
+    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
   },
   "metrics": {
     "searchMetric": "지표 검색",

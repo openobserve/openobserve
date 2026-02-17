@@ -1508,7 +1508,10 @@
     "add_template": "Nieuw sjabloon",
     "skip_tls_verify": "TLS-verificatie overslaan",
     "action": "Actie",
-    "output_format": "Uitvoerformaat"
+    "output_format": "Uitvoerformaat",
+    "separator": "Separator",
+    "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
