@@ -3436,15 +3436,25 @@ export default defineComponent({
     };
 
     // Filter markdown headers - convert # and ## to smaller formatting
+    // This should only process actual markdown headers, not code block comments
     const filterMarkdownHeaders = (content: string): string => {
-      // Convert # and ## at start of lines to bold format for cleaner display
-      let filtered = content;
+      // First, protect code blocks by temporarily replacing them
+      const codeBlocks: string[] = [];
+      let filtered = content.replace(/```[\s\S]*?```/g, (match) => {
+        codeBlocks.push(match);
+        return `___CODE_BLOCK_${codeBlocks.length - 1}___`;
+      });
 
-      // Convert ## headers to bold with colon
+      // Convert ## headers to bold with colon (only outside code blocks)
       filtered = filtered.replace(/^## (.+)$/gm, '**$1:**');
 
-      // Convert # headers to bold with colon
+      // Convert # headers to bold with colon (only outside code blocks)
       filtered = filtered.replace(/^# (.+)$/gm, '**$1:**');
+
+      // Restore code blocks
+      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
+        return codeBlocks[parseInt(index)];
+      });
 
       return filtered;
     };
