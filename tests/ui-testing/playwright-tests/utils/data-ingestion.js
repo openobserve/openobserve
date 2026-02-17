@@ -91,4 +91,103 @@ async function sendRequest(page, url, payload, headers) {
   }, { url, headers, payload });
 }
 
-module.exports = { ingestTestData, getHeaders, getIngestionUrl, sendRequest };
+/**
+ * Ingest custom data into a stream via API
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @param {string} streamName - Name of the stream to ingest data into
+ * @param {Array} data - Array of log records to ingest
+ * @returns {Promise<object>} - API response with status and data
+ */
+async function ingestCustomData(page, streamName, data) {
+  const orgId = process.env["ORGNAME"];
+  const headers = getHeaders();
+
+  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+    const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(logData)
+    });
+
+    let data = null;
+    const contentType = fetchResponse.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const text = await fetchResponse.text();
+        data = text ? JSON.parse(text) : null;
+      } catch (e) {
+        data = { error: 'Failed to parse JSON response' };
+      }
+    }
+
+    return {
+      status: fetchResponse.status,
+      data: data
+    };
+  }, {
+    url: process.env.INGESTION_URL,
+    headers: headers,
+    orgId: orgId,
+    streamName: streamName,
+    logData: data
+  });
+
+  testLogger.debug('Custom data ingestion response', { status: response.status, streamName });
+  return response;
+}
+
+/**
+ * Enable log patterns extraction on a stream via API
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @param {string} streamName - Name of the stream
+ * @returns {Promise<object>} - API response with status and data
+ */
+async function enableLogPatternsExtraction(page, streamName) {
+  const orgId = process.env["ORGNAME"];
+  const headers = getHeaders();
+
+  const response = await page.evaluate(async ({ url, headers, orgId, streamName }) => {
+    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+
+    const settingsPayload = {
+      enable_log_patterns_extraction: true
+    };
+
+    const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/streams/${streamName}/settings?type=logs`, {
+      method: 'PUT',
+      headers: headers,
+      body: JSON.stringify(settingsPayload)
+    });
+
+    let data = null;
+    try {
+      const text = await fetchResponse.text();
+      data = text ? JSON.parse(text) : null;
+    } catch (e) {
+      data = { error: 'Failed to parse JSON response' };
+    }
+
+    return {
+      status: fetchResponse.status,
+      data: data
+    };
+  }, {
+    url: process.env.INGESTION_URL,
+    headers: headers,
+    orgId: orgId,
+    streamName: streamName
+  });
+
+  testLogger.debug('Enable log patterns extraction response', { status: response.status, streamName, data: response.data });
+  return response;
+}
+
+module.exports = {
+  ingestTestData,
+  getHeaders,
+  getIngestionUrl,
+  sendRequest,
+  ingestCustomData,
+  enableLogPatternsExtraction
+};

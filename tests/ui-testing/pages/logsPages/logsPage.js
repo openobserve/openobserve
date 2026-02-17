@@ -5273,6 +5273,22 @@ export class LogsPage {
     }
 
     // ============================================================================
+    // LOGS TABLE WAIT METHODS
+    // ============================================================================
+
+    /**
+     * Wait for logs table to load by checking for the first log row
+     * @param {number} timeout - Timeout in milliseconds (default 30000)
+     */
+    async waitForLogsTableToLoad(timeout = 30000) {
+        await this.page.locator(this.logTableColumnSource).first().waitFor({
+            state: 'visible',
+            timeout
+        }).catch(() => {});
+        testLogger.info('Logs table loaded');
+    }
+
+    // ============================================================================
     // SEARCH PATTERNS METHODS (Enterprise Feature)
     // These methods support the Search Patterns feature for log pattern analysis
     // ============================================================================
@@ -5315,11 +5331,29 @@ export class LogsPage {
      * @param {number} timeout - Timeout in milliseconds (default 30000)
      */
     async waitForPatternsToLoad(timeout = 30000) {
-        // Wait for either patterns to appear or empty state
+        // First, check if loading state appears (indicates extraction is starting)
+        // Wait a short time for loading to potentially start
+        const loadingStarted = await this.page.locator(this.patternLoadingSpinner)
+            .waitFor({ state: 'visible', timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+
+        if (loadingStarted) {
+            testLogger.info('Pattern extraction loading started, waiting for completion...');
+            // Wait for loading to complete (spinner to disappear)
+            await this.page.locator(this.patternLoadingSpinner)
+                .waitFor({ state: 'hidden', timeout: timeout - 5000 })
+                .catch(() => {});
+        }
+
+        // Give UI a moment to render the results
+        await this.page.waitForTimeout(1000);
+
+        // Now check for the actual result
         const patternsLoaded = await Promise.race([
-            this.page.locator(this.patternStatistics).waitFor({ state: 'visible', timeout }).then(() => 'statistics'),
-            this.page.locator(this.patternCard(0)).waitFor({ state: 'visible', timeout }).then(() => 'patterns'),
-            this.page.locator(this.patternEmptyState).waitFor({ state: 'visible', timeout }).then(() => 'empty')
+            this.page.locator(this.patternStatistics).waitFor({ state: 'visible', timeout: 5000 }).then(() => 'statistics'),
+            this.page.locator(this.patternCard(0)).waitFor({ state: 'visible', timeout: 5000 }).then(() => 'patterns'),
+            this.page.locator(this.patternEmptyState).waitFor({ state: 'visible', timeout: 5000 }).then(() => 'empty')
         ]).catch(() => 'timeout');
 
         testLogger.info(`Patterns loading result: ${patternsLoaded}`);
