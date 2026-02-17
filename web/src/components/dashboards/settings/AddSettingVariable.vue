@@ -255,9 +255,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-stream-type-select"
                 ></q-select>
                 <div class="col q-mt-sm">
-                  <div class="flex items-center q-pl-sm" style="display: flex; align-items: center; min-height: 20px; margin-bottom: 2px;">
-                    <span style="font-size: 12px; ">{{ t('dashboard.selectIndex') }} *</span>
-                    <q-icon name="info" size="xs" class="q-ml-xs" style="margin-left: 8px;">
+                  <div class="flex items-center q-pl-sm">
+                    <span
+                      class="tw:font-bold tw:text-sm"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-300'
+                          : 'tw:text-gray-500'
+                      "
+                      >{{ t('dashboard.selectIndex') }} *</span
+                    >
+                    <q-icon name="info" size="xs" class="q-ml-xs">
                       <q-tooltip style="width: 250px">
                         Select a stream or use a variable like
                         <span class="bg-highlight">$streamVariable</span> to
@@ -278,10 +286,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div >
-                <div class="flex items-center q-pl-sm" style="display: flex; align-items: center; min-height: 20px; margin-bottom: 2px;">
-                  <span style="font-size: 12px;">{{ t('dashboard.selectField') }} *</span>
-                  <q-icon name="info" size="xs" class="q-ml-xs" style="margin-left: 8px;">
+              <div class="tw:mt-2">
+                <div class="flex items-center">
+                  <span
+                    class="tw:font-bold tw:text-sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-gray-300'
+                        : 'tw:text-gray-500'
+                    "
+                      >{{ t('dashboard.selectField') }} *</span>
+                  <q-icon name="info" size="xs" class="q-ml-xs">
                     <q-tooltip style="width: 250px">
                       Select a field or use a variable like
                       <span class="bg-highlight">$fieldVariable</span> to
