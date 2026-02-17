@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details tw:h-[calc(100vh-2.25rem)]">
+  <div class="trace-details tw:h-[calc(100vh-2.625rem)]">
     <!-- New TraceDetailsV2 View -->
     <TraceDetailsV2
       v-if="
@@ -83,11 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)]"
               >
-                <span class="tw:text-primary tw:font-medium tw:pl-[1rem]">{{
-                  rootServiceName
+                <span class="tw:pl-[1rem]">{{
+                  formatTimestamp(traceStartTime)
                 }}</span>
-                <span>•</span>
-                <span>{{ formatTimestamp(traceStartTime) }}</span>
                 <span>•</span>
                 <span>
                   Trace ID:
@@ -146,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Error Count Badge -->
             <div
-              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)]"
+              class="tw:flex tw:items-center tw:space-x-1 tw:mr-[0.325rem] tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)]"
             >
               <q-icon
                 name="error_outline"
@@ -155,26 +153,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <span>{{ errorSpansCount }} errors</span>
             </div>
-
-            <!-- Toggle View Button -->
-            <q-btn
-              flat
-              dense
-              :label="useTraceDetailsV2 ? 'Classic View' : 'New View'"
-              :icon="useTraceDetailsV2 ? 'toggle_off' : 'toggle_on'"
-              @click="useTraceDetailsV2 = !useTraceDetailsV2"
-              class="q-mr-sm"
-              color="primary"
-              size="sm"
-            >
-              <q-tooltip>
-                {{
-                  useTraceDetailsV2
-                    ? "Switch to classic trace view"
-                    : "Switch to new trace view (Beta)"
-                }}
-              </q-tooltip>
-            </q-btn>
 
             <!-- Expand button (embedded mode) -->
             <q-btn
@@ -228,11 +206,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="tw:flex tw:items-center tw:space-x-2 o2-input">
+          <div class="tw:flex tw:items-center tw:space-x-2">
+            <div class="log-stream-search-input">
+              <q-input
+                v-model="searchQuery"
+                data-test="trace-details-search-input"
+                outlined
+                dense
+                placeholder="Search in spans"
+                clearable
+                class="tw:text-[12px]!"
+                @update:model-value="handleSearchQueryChange"
+              >
+                <template v-slot:prepend>
+                  <q-icon name="search" size="1rem" />
+                </template>
+              </q-input>
+            </div>
             <!-- Log Stream Selector (if enabled) -->
             <div
               v-if="showLogStreamSelector"
-              class="o2-input tw:flex tw:items-center trace-logs-selector"
+              class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
               <q-select
                 data-test="trace-details-log-streams-select"
@@ -254,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="selectedStreamsString"
               >
                 <template #no-option>
-                  <div class="o2-input log-stream-search-input">
+                  <div class="log-stream-search-input">
                     <q-input
                       data-test="trace-details-stream-search-input"
                       v-model="streamSearchValue"
@@ -278,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </template>
                 <template #before-options>
-                  <div class="o2-input log-stream-search-input">
+                  <div class="log-stream-search-input">
                     <q-input
                       data-test="trace-details-stream-search-input-options"
                       v-model="streamSearchValue"
@@ -301,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="trace-details-view-logs-btn"
                 v-close-popup="true"
-                class="text-bold traces-view-logs-btn tw:border! tw:border-solid! tw:border-[var(--o2-theme-color)]!"
+                class="text-bold tw:px-[0.5rem]! tw:py-0! traces-view-logs-btn tw:border! tw:border-solid! tw:border-[var(--o2-theme-color)]! tw:bg-[var(--o2-theme-color)]! tw:text-white!"
                 :label="
                   searchObj.meta.redirectedFromLogs
                     ? t('traces.backToLogs')
@@ -312,9 +306,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 outline
                 color="primary"
+                icon="search"
                 flat
                 dense
-                icon="search"
                 @click="redirectToLogs"
               />
               <q-btn
@@ -334,20 +328,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="redirectToSessionReplay"
               />
             </div>
-            <q-input
-              v-model="searchQuery"
-              data-test="trace-details-search-input"
-              outlined
-              dense
-              placeholder="Find spans..."
-              clearable
-              class="tw:w-64 tw:text-[12px]!"
-              @update:model-value="handleSearchQueryChange"
-            >
-              <template v-slot:prepend>
-                <q-icon name="search" size="14px" />
-              </template>
-            </q-input>
 
             <!-- Search Results Navigation -->
             <div
@@ -1782,7 +1762,6 @@ export default defineComponent({
         if (span.spans.length) {
           span.spans.forEach((childSpan: any) => {
             index = index + 1;
-            console.log("Add Depth", childSpan);
             childSpan.totalSpans = addSpansPositions(childSpan, depth + 1);
           });
           span.totalSpans = span.spans.reduce(
@@ -2402,7 +2381,6 @@ $traceChartCollapseHeight: 42px;
 }
 .trace-details {
   overflow: hidden;
-  height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -2478,7 +2456,7 @@ $traceChartCollapseHeight: 42px;
 }
 
 .log-stream-search-input {
-  width: 226px;
+  width: 20rem;
 
   .q-field .q-field__control {
     padding: 0px 8px;
@@ -2661,7 +2639,7 @@ html:has(.trace-details) {
     }
 
     .q-field__control {
-      border-radius: 0.5rem 0 0 0.5rem;
+      border-radius: 0.5rem 0 0 0.5rem !important;
     }
 
     .q-field__control:before,
@@ -2672,6 +2650,11 @@ html:has(.trace-details) {
 }
 
 .log-stream-search-input {
+  .q-field {
+    height: 1.875rem !important;
+    min-height: 1.875rem !important;
+  }
+
   .q-field .q-field__control {
     padding: 0px 4px;
     border-radius: 0.5rem;
@@ -2680,11 +2663,63 @@ html:has(.trace-details) {
   .q-field .q-field__control:before,
   .q-field .q-field__control:after {
     border: none !important;
+    content: none !important;
+  }
+
+  .q-field {
+    &.showLabelOnTop {
+      padding-top: 26px;
+    }
+
+    .q-field__inner {
+      align-self: center;
+      height: 1.875rem !important;
+      min-height: 1.875rem !important;
+    }
+
+    .q-field__control {
+      height: 1.875rem !important;
+      min-height: 1.875rem !important;
+      background-color: var(--o2-page-bg);
+      border: 1px solid var(--o2-border-color);
+      padding: 0 0.5rem !important;
+
+      .q-field__control-container {
+        height: calc(100% - 1px) !important;
+        padding-top: 0px;
+
+        .q-field__native {
+          min-height: calc(100% - 2px) !important;
+          height: 1.875rem !important;
+        }
+
+        .q-field__label {
+          top: 8px;
+        }
+      }
+
+      .q-field__marginal {
+        height: 1.875rem !important;
+
+        .q-icon {
+          font-size: 1.125rem;
+        }
+      }
+    }
+
+    &.q-field--dark .q-field__control {
+      background-color: var(--o2-dark-page-bg);
+    }
+
+    .q-field__bottom {
+      padding: 0.1rem 0 0;
+      min-height: fit-content !important;
+    }
   }
 }
 
 .traces-view-logs-btn {
-  height: 36px;
+  height: 1.875rem;
   margin-left: -1px;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
