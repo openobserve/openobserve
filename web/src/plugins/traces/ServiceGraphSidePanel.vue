@@ -50,21 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="panel-content">
         <!-- Action Buttons Section -->
         <div class="panel-section actions-section">
-          <q-btn
-          v-if="false"
-            outline
-            no-caps
-            size="sm"
-            label="📋 View Logs"
-            @click="handleViewLogs"
-            data-test="service-graph-side-panel-view-logs-btn"
-            class="action-btn"
-            :disable="true"
-          >
-            <q-tooltip>
-              View Logs is currently disabled
-            </q-tooltip>
-          </q-btn>
         </div>
 
         <!-- Metrics Section -->
@@ -73,31 +58,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-graph-side-panel-metrics"
         >
           <div class="section-header">
-            <div class="section-title">Metrics</div>
             <q-btn
               unelevated
               no-caps
               size="sm"
-              label="View Traces"
-              @click="handleViewTraces"
-              data-test="service-graph-side-panel-view-traces-btn"
+              label="Show telemetry"
+              @click="handleShowTelemetry"
+              data-test="service-graph-side-panel-show-telemetry-btn"
               class="view-traces-btn"
-              :disable="isAllStreamsSelected"
-            >
-              <q-tooltip v-if="isAllStreamsSelected">
-                Please select a specific stream to view traces
-              </q-tooltip>
-            </q-btn>
+              :loading="correlationLoading"
+            />
           </div>
 
           <!-- Request Rate Card (Full Width - Combined Metrics) -->
           <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
             <div class="metric-single-line">
               <div class="metric-total">
-                <span class="total-label">Total:</span>
+                <span class="total-label">Requests:</span>
                 <span class="total-value">{{ serviceMetrics.requestRateValue }}</span>
-                <span class="total-unit">req/min</span>
-                <q-tooltip>Total Requests (all requests for this service)</q-tooltip>
+                <span class="total-unit">/min</span>
               </div>
               <div class="metric-divider"></div>
               <div class="metric-inline incoming">
@@ -279,18 +258,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </transition>
+
+  <!-- Telemetry Correlation Dialog (reuses the same component as "show related" on logs page) -->
+  <TelemetryCorrelationDashboard
+    v-if="showTelemetryDialog && correlationData"
+    mode="dialog"
+    :service-name="correlationData.serviceName"
+    :matched-dimensions="correlationData.matchedDimensions"
+    :additional-dimensions="correlationData.additionalDimensions"
+    :log-streams="correlationData.logStreams"
+    :metric-streams="correlationData.metricStreams"
+    :trace-streams="correlationData.traceStreams"
+    :time-range="telemetryTimeRange"
+    @close="showTelemetryDialog = false"
+  />
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, watch, type PropType } from 'vue';
+import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropType } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
 import searchService from '@/services/search';
+import { getGroupedServices, correlate as correlateStreams } from '@/services/service_streams';
 import { escapeSingleQuotes } from '@/utils/zincutils';
+
+const TelemetryCorrelationDashboard = defineAsyncComponent(
+  () => import('@/plugins/correlation/TelemetryCorrelationDashboard.vue')
+);
 
 export default defineComponent({
   name: 'ServiceGraphSidePanel',
+  components: {
+    TelemetryCorrelationDashboard,
+  },
   props: {
     selectedNode: {
       type: Object as PropType<any>,
@@ -313,11 +314,103 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['close', 'view-logs', 'view-traces'],
+  emits: ['close'],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+
+    // Metrics Correlation State
+    const showTelemetryDialog = ref(false);
+    const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
+    const correlationData = ref<{
+      serviceName: string;
+      matchedDimensions: Record<string, string>;
+      additionalDimensions: Record<string, string>;
+      logStreams: any[];
+      metricStreams: any[];
+      traceStreams: any[];
+    } | null>(null);
+
+    const telemetryTimeRange = computed(() => ({
+      startTime: props.timeRange.startTime,
+      endTime: props.timeRange.endTime,
+    }));
+
+    const fetchCorrelatedStreams = async (force = false) => {
+      if (!props.selectedNode) return;
+      if (!force && correlationData.value) return;
+
+      correlationLoading.value = true;
+      correlationError.value = null;
+
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const serviceName = props.selectedNode.name
+          || props.selectedNode.label
+          || props.selectedNode.id;
+
+        // Step 1: Find the service's FQN from _grouped
+        const groupedResponse = await getGroupedServices(org);
+        const groups = groupedResponse.data?.groups || [];
+
+        let fqn = '';
+        for (const group of groups) {
+          if (group.services.some((s: any) => s.service_name === serviceName)) {
+            fqn = group.fqn;
+            break;
+          }
+        }
+
+        if (!fqn) {
+          correlationError.value = 'Service not found in service registry.';
+          correlationData.value = null;
+          return;
+        }
+
+        // Step 2: Send FQN to _correlate — it resolves field names per stream
+        const correlateResponse = await correlateStreams(org, {
+          source_stream: props.streamFilter || 'default',
+          source_type: 'traces',
+          available_dimensions: { 'service-fqn': fqn },
+        });
+
+        const data = correlateResponse.data;
+        if (!data) {
+          correlationError.value = 'No correlated streams found.';
+          correlationData.value = null;
+          return;
+        }
+
+        correlationData.value = {
+          serviceName: data.service_name,
+          matchedDimensions: data.matched_dimensions || {},
+          additionalDimensions: data.additional_dimensions || {},
+          logStreams: data.related_streams?.logs || [],
+          metricStreams: data.related_streams?.metrics || [],
+          traceStreams: data.related_streams?.traces || [],
+        };
+      } catch (err: any) {
+        if (err.response?.status === 403) {
+          correlationError.value = 'Service Discovery is an enterprise feature.';
+        } else {
+          correlationError.value = err.message || 'Failed to load service streams.';
+        }
+        correlationData.value = null;
+      } finally {
+        correlationLoading.value = false;
+      }
+    };
+
+    // Reset correlation data when node changes
+    watch(
+      () => props.selectedNode?.id,
+      () => {
+        correlationData.value = null;
+        correlationError.value = null;
+      }
+    );
 
     // Recent Traces State
     const recentTraces = ref<any[]>([]);
@@ -652,12 +745,18 @@ export default defineComponent({
       emit('close');
     };
 
-    const handleViewLogs = () => {
-      emit('view-logs');
-    };
-
-    const handleViewTraces = () => {
-      emit('view-traces');
+    const handleShowTelemetry = async () => {
+      await fetchCorrelatedStreams();
+      if (correlationData.value) {
+        showTelemetryDialog.value = true;
+      } else if (correlationError.value) {
+        $q.notify({
+          type: 'warning',
+          message: correlationError.value,
+          timeout: 3000,
+          position: 'bottom',
+        });
+      }
     };
 
     const handleNavigateToDashboard = () => {
@@ -748,8 +847,12 @@ export default defineComponent({
       getErrorRateClass,
       getLatencyClass,
       handleClose,
-      handleViewLogs,
-      handleViewTraces,
+      handleShowTelemetry,
+      // Telemetry Correlation
+      showTelemetryDialog,
+      correlationLoading,
+      correlationData,
+      telemetryTimeRange,
       // Recent Traces
       recentTraces,
       loadingTraces,
@@ -1027,6 +1130,11 @@ export default defineComponent({
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
+  }
+
+  .section-header-actions {
+    display: flex;
+    gap: 6px;
   }
 
   .section-title {

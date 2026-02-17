@@ -166,8 +166,6 @@
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
                 @close="handleCloseSidePanel"
-                @view-logs="handleViewLogs"
-                @view-traces="handleViewTraces"
               />
 
               <!-- Service Graph Edge Panel -->
@@ -242,7 +240,7 @@ import {
 } from "@/utils/traces/convertTraceData";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
+
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -253,7 +251,7 @@ export default defineComponent({
     ServiceGraphSidePanel,
     ServiceGraphEdgePanel,
   },
-  emits: ['view-traces'],
+  emits: [],
   setup(props, { emit }) {
     const store = useStore();
     const $q = useQuasar();
@@ -279,7 +277,7 @@ export default defineComponent({
       "serviceGraph_visualizationType",
     );
     const visualizationType = ref<"tree" | "graph">(
-      (storedVisualizationType as "tree" | "graph") || "graph",
+      (storedVisualizationType as "tree" | "graph") || "tree",
     );
 
     // Visualization tabs configuration
@@ -878,53 +876,6 @@ export default defineComponent({
       }, 300);
     };
 
-    const handleViewLogs = () => {
-      if (!selectedNode.value) return;
-
-      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
-      const escapedServiceName = escapeSingleQuotes(serviceName);
-      const escapedStream = escapeSingleQuotes(streamFilter.value);
-      const sql = `SELECT * FROM "${escapedStream}" WHERE service_name = '${escapedServiceName}' ORDER BY _timestamp DESC`;
-      const query = b64EncodeUnicode(sql);
-
-      const queryObject = {
-        stream_type: "logs",
-        stream: streamFilter.value,
-        from: searchObj.data.datetime.startTime,
-        to: searchObj.data.datetime.endTime,
-        refresh: 0,
-        sql_mode: "true",
-        query,
-        defined_schemas: "user_defined_schema",
-        org_identifier: store.state.selectedOrganization.identifier,
-        quick_mode: "false",
-        show_histogram: "true",
-        type: "service_graph_view_logs",
-      };
-
-      router.push({
-        path: "/logs",
-        query: queryObject,
-      });
-    };
-
-    const handleViewTraces = () => {
-      if (!selectedNode.value) return;
-
-      const serviceName = selectedNode.value.name || selectedNode.value.label || selectedNode.value.id;
-
-      // Emit event to parent to switch tab and apply query
-      // Parent will handle tab switching and query application
-      emit('view-traces', {
-        stream: streamFilter.value,
-        serviceName: serviceName,
-        timeRange: {
-          startTime: searchObj.data.datetime.startTime,
-          endTime: searchObj.data.datetime.endTime,
-        },
-      });
-    };
-
     // Edge Panel Handlers
     const handleCloseEdgePanel = () => {
       showEdgePanel.value = false;
@@ -972,8 +923,6 @@ export default defineComponent({
       showSidePanel,
       handleNodeClick,
       handleCloseSidePanel,
-      handleViewLogs,
-      handleViewTraces,
       // Edge panel
       selectedEdge,
       showEdgePanel,
