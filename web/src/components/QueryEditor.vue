@@ -536,21 +536,21 @@ defineExpose({
 /* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
 .ai-floating-button {
   position: absolute;
-  top: 8px;
+  top: 3px;
   right: 8px;
   z-index: 100;
   background: transparent !important;
   color: white !important;
   transition: background 0.3s ease !important;
-  width: 32px !important;
-  height: 32px !important;
-  min-width: 32px !important;
-  min-height: 32px !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
 }
 
 .ai-floating-button:hover {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  box-shadow: 0 2px 8px 0 rgba(102, 126, 234, 0.4) !important;
+  box-shadow: 0 2px 5px 0 rgba(102, 126, 234, 0.4) !important;
 }
 
 /* AI icon rotation on hover - matches MainLayout ai-icon */
