@@ -49,9 +49,10 @@ export default class DashboardVariables {
       .click();
 
     // Stream Select (CommonAutoComplete component)
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
     const streamSelect = this.page.locator(
       '[data-test="dashboard-variable-stream-select"]'
-    );
+    ).first();
     await streamSelect.click();
     await streamSelect.locator('input').fill(streamName);
     // Wait for and click the matching CommonAutoComplete option
@@ -61,7 +62,8 @@ export default class DashboardVariables {
     await streamOption.click();
 
     // Select Field (CommonAutoComplete component)
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
     await fieldSelect.click();
     await fieldSelect.locator('input').fill(field);
     // Wait for and click the matching CommonAutoComplete option
