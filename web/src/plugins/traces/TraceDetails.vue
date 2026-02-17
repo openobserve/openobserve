@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details">
+  <div class="trace-details tw:h-[calc(100vh-2.25rem)]">
     <!-- New TraceDetailsV2 View -->
     <TraceDetailsV2
       v-if="
@@ -54,19 +54,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="trace-combined-header-wrapper card-container">
         <!-- New Modern Header -->
         <header
-          class="tw:h-14 tw:border-b tw:border-[var(--o2-border)] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
+          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
         >
           <div class="tw:flex tw:items-center tw:space-x-4">
             <!-- Back button -->
-            <button
+            <q-btn
               v-if="mode === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
+              class="tw:px-1! tw:mr-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              size="xs"
+              icon="arrow_back"
               @click="handleBackOrClose"
-              class="tw:text-[var(--o2-text-secondary)] hover:tw:text-[var(--o2-text-primary)] tw:cursor-pointer"
-              title="Traces List"
             >
-              <q-icon name="arrow_back" size="20px" />
-            </button>
+              <q-tooltip>{{ t("traces.tracesList") }}</q-tooltip>
+            </q-btn>
 
             <div class="tw:flex">
               <!-- Operation Name -->
@@ -176,43 +177,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
 
             <!-- Expand button (embedded mode) -->
-            <button
+            <q-btn
               v-if="mode === 'embedded' && showExpandButton"
               data-test="trace-details-expand-btn"
-              class="tw:p-1.5 hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              class="tw:px-1! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              size="xs"
+              icon="open_in_new"
               @click="handleExpandToFullView"
             >
-              <q-icon name="open_in_new" size="18px" />
               <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
-            </button>
+            </q-btn>
 
             <!-- Share button (standalone mode) -->
             <share-button
               v-if="mode === 'standalone' && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
-              button-class="tw:p-1.5 hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
-              button-size="18px"
+              button-class="tw:px-1! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
             />
 
             <!-- Close button -->
-            <button
+            <q-btn
               v-if="mode === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
-              class="tw:p-1.5 hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              class="tw:px-1! tw:mx-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              size="xs"
+              icon="close"
               @click="handleBackOrClose"
             >
-              <q-icon name="close" size="18px" />
               <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
-            </button>
+            </q-btn>
           </div>
         </header>
-
+      </div>
+      <div
+        class="card-container tw:overflow-hidden tw:h-full"
+        style="display: flex; flex-direction: column; min-height: 0"
+      >
         <!-- Tabs & Search Bar -->
         <div
           class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white"
         >
-          <div class="tw:flex tw:items-center tw:space-x-4">
+          <div
+            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem]"
+          >
             <AppTabs
               :tabs="traceTabs"
               :active-tab="activeTab"
@@ -382,8 +390,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
-      <div style="display: flex; flex: 1; min-height: 0">
         <div
           class="histogram-spans-container"
           :class="[
@@ -392,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           ref="parentContainer"
         >
-          <div class="trace-tree-wrapper card-container">
+          <div class="trace-tree-wrapper">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div v-if="activeTab === 'waterfall'" class="tw:flex">
               <div
@@ -2409,7 +2415,7 @@ $traceChartCollapseHeight: 42px;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  padding: 0 0.75rem;
+  padding: 0.325rem 0.625rem;
   box-sizing: border-box;
 }
 .histogram-container-full {
@@ -2741,5 +2747,15 @@ html:has(.trace-details) {
   top: 0;
   bottom: 0;
   z-index: 999;
+}
+</style>
+
+<style lang="scss">
+.trace-details-view-tabs {
+  .o2-tabs .active {
+    background-color: transparent !important;
+    color: var(--q-primary) !important;
+    border-color: var(--q-primary) !important;
+  }
 }
 </style>
