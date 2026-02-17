@@ -260,68 +260,6 @@ function getTabSelector(tabTitle) {
   return `span[data-test*="dashboard-tab-"][title="${tabTitle}"]`;
 }
 
-/**
- * Common helper: Select stream type, stream name, and field for a variable.
- *
- * This is the SINGLE source of truth for the stream/field selection sequence.
- * All page objects (DashboardVariables, DashboardVariablesScoped, DashboardSettings)
- * should call this function instead of duplicating the selector logic.
- *
- * When the CommonAutoComplete component or stream/field selectors change,
- * only this function needs to be updated.
- *
- * @param {import('@playwright/test').Page} page - Playwright page object
- * @param {string} streamType - Stream type (e.g., "logs", "metrics", "traces")
- * @param {string} streamName - Stream name (e.g., "e2e_automate")
- * @param {string} field - Field name (e.g., "kubernetes_namespace_name")
- * @param {Object} options - Additional options
- * @param {number} options.timeout - Timeout for waiting on elements (default: 10000)
- * @param {number} options.fieldLoadDelay - Wait time after stream selection for fields to load (default: 0)
- */
-async function selectStreamAndField(page, streamType, streamName, field, options = {}) {
-  const { timeout = 10000, fieldLoadDelay = 0 } = options;
-
-  // 1. Select Stream Type
-  await page
-    .locator(DASHBOARD.VARIABLE_STREAM_TYPE_SELECT)
-    .click();
-  await page
-    .getByRole("option", { name: streamType, exact: true })
-    .locator("div")
-    .nth(2)
-    .click();
-
-  // 2. Select Stream (CommonAutoComplete component)
-  // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-  const streamSelect = page.locator(DASHBOARD.VARIABLE_STREAM_SELECT).first();
-  await streamSelect.click();
-  await streamSelect.locator('input').fill(streamName);
-  // Wait for and click the matching CommonAutoComplete option
-  const streamOption = page.locator(DASHBOARD.AUTO_COMPLETE_OPTION)
-    .filter({ hasText: streamName }).first();
-  await streamOption.waitFor({ state: "visible", timeout });
-  await streamOption.click();
-
-  // Optional delay for field data to load after stream selection
-  if (fieldLoadDelay > 0) {
-    await page.waitForTimeout(fieldLoadDelay);
-  }
-
-  // 3. Select Field (CommonAutoComplete component)
-  // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-  const fieldSelect = page.locator(DASHBOARD.VARIABLE_FIELD_SELECT).first();
-  if (fieldLoadDelay > 0) {
-    await fieldSelect.waitFor({ state: "visible", timeout });
-  }
-  await fieldSelect.click();
-  await fieldSelect.locator('input').fill(field);
-  // Wait for and click the matching CommonAutoComplete option
-  const fieldOption = page.locator(DASHBOARD.AUTO_COMPLETE_OPTION)
-    .filter({ hasText: field }).first();
-  await fieldOption.waitFor({ state: "visible", timeout });
-  await fieldOption.click();
-}
-
 module.exports = {
   // Selector groups
   QUASAR,
@@ -344,7 +282,4 @@ module.exports = {
   getVariableError,
   getVariableState,
   getTabSelector,
-
-  // Common helpers
-  selectStreamAndField,
 };

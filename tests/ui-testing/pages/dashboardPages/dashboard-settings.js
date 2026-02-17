@@ -2,7 +2,7 @@
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getTabSelector, selectStreamAndField } = require('./dashboard-selectors.js');
+const { getTabSelector } = require('./dashboard-selectors.js');
 
 export default class DashboardSetting {
   constructor(page) {
@@ -288,8 +288,132 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-name"]')
       .fill(variableName);
-    // Select Stream Type, Stream, and Field using common helper
-    await selectStreamAndField(this.page, streamType, Stream, field, { fieldLoadDelay: 1000 });
+    await this.page
+      .locator('[data-test="dashboard-variable-stream-type-select"]')
+      .click();
+
+    // Wait for the dropdown option to be visible before clicking
+    const streamTypeOption = this.page.getByRole("option", { name: streamType });
+    await streamTypeOption.waitFor({ state: "visible", timeout: 10000 });
+    await streamTypeOption.click();
+
+    // Click the stream selector to open and focus it
+    const streamSelector = this.page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelector.click();
+
+    // Wait for the dropdown to open
+    await this.page.waitForSelector('[role="listbox"]', { state: 'visible', timeout: 10000 });
+
+    // The stream dropdown supports search filtering via use-input
+    // Type the stream name to filter the list using keyboard
+    await this.page.keyboard.type(Stream, { delay: 50 });
+
+    // Wait a moment for filtering to complete
+    await this.page.waitForTimeout(500);
+
+    // Wait for dropdown to have options available after filtering
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000, polling: 100 }
+    );
+
+    // Select the stream from filtered dropdown options
+    let streamSelected = false;
+
+    // Strategy 1: Try exact match option
+    try {
+      const streamOption = this.page.getByRole("option", { name: Stream, exact: true });
+      await streamOption.waitFor({ state: "visible", timeout: 5000 });
+      await streamOption.click();
+      streamSelected = true;
+    } catch (e) {
+      testLogger.warn(`Stream selection strategy 1 (exact match) failed for "${Stream}": ${e.message}`);
+      // Strategy 2: Try partial match
+      try {
+        const streamOption = this.page.getByRole("option", { name: Stream, exact: false }).first();
+        await streamOption.waitFor({ state: "visible", timeout: 5000 });
+        await streamOption.click();
+        streamSelected = true;
+      } catch (e2) {
+        testLogger.warn(`Stream selection strategy 2 (partial match) failed for "${Stream}": ${e2.message}`);
+        // Strategy 3: Use keyboard navigation
+        try {
+          await this.page.keyboard.press('ArrowDown');
+          await this.page.waitForTimeout(200);
+          await this.page.keyboard.press('Enter');
+          streamSelected = true;
+        } catch (e3) {
+          testLogger.warn(`Stream selection strategy 3 (keyboard) failed for "${Stream}": ${e3.message}`);
+        }
+      }
+    }
+
+    if (!streamSelected) {
+      throw new Error(`Failed to select stream: ${Stream}`);
+    }
+
+    // Wait for field data to load after stream selection
+    await this.page.waitForTimeout(1000);
+
+    // Wait for the field select dropdown to be ready
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
+    await fieldSelect.click();
+    await fieldSelect.fill(field);
+
+    // Wait for dropdown to have options available
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000, polling: 100 }
+    );
+
+    // Try to select the field from dropdown - use multiple strategies (from dashboard-variables.js)
+    let fieldSelected = false;
+
+    // Strategy 1: Try exact match
+    try {
+      const fieldOption = this.page.getByRole("option", { name: field, exact: true });
+      await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+      await fieldOption.click();
+      fieldSelected = true;
+    } catch (e) {
+      // Strategy 2: Try partial match
+      try {
+        const fieldOption = this.page.getByRole("option", { name: field, exact: false }).first();
+        await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+        await fieldOption.click();
+        fieldSelected = true;
+      } catch (e2) {
+        // Strategy 3: Use keyboard to select the first visible option
+        try {
+          await this.page.keyboard.press('ArrowDown');
+          // Wait for selection to be highlighted
+          await this.page.waitForFunction(
+            () => {
+              const highlighted = document.querySelector('[role="option"][aria-selected="true"]') ||
+                                 document.querySelector('[role="option"].q-manual-focusable--focused') ||
+                                 document.querySelector('[role="option"].q-focusable--focused');
+              return highlighted !== null;
+            },
+            { timeout: 3000, polling: 100 }
+          );
+          await this.page.keyboard.press('Enter');
+          fieldSelected = true;
+        } catch (e3) {
+          fieldSelected = false;
+        }
+      }
+    }
+
+    if (!fieldSelected) {
+      throw new Error(`Failed to select field: ${field}`);
+    }
   }
 
   //select Constant type
