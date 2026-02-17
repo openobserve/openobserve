@@ -1319,30 +1319,40 @@ class="q-pr-sm q-pt-xs" />
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
                   >
-                    <code-query-editor
+                    <!-- Unified Query Editor (with built-in AI bar) -->
+                    <unified-query-editor
                       v-if="router.currentRoute.value.name === 'logs'"
                       data-test="logs-vrl-function-editor"
                       ref="fnEditorRef"
-                      editor-id="fnEditor"
+                      :languages="['vrl']"
+                      :default-language="'vrl'"
+                      :query="searchObj.data.tempFunctionContent"
+                      :hide-nl-toggle="false"
+                      :disable-ai="isVrlEditorDisabled"
+                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
+                      :read-only="isVrlEditorDisabled"
+                      editor-height="100%"
                       class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
-                      v-model:query="searchObj.data.tempFunctionContent"
                       :class="
                         searchObj.data.tempFunctionContent == '' &&
                         searchObj.meta.functionEditorPlaceholderFlag
                           ? 'empty-function'
                           : ''
                       "
-                      :readOnly="isVrlEditorDisabled"
+                      @update:query="searchObj.data.tempFunctionContent = $event"
                       @keydown="handleKeyDown"
-                      language="vrl"
                       @focus="
                         searchObj.meta.functionEditorPlaceholderFlag = false
                       "
                       @blur="
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
+                      @toggle-nlp-mode="handleFunctionEditorToggleNlpMode"
+                      @generation-start="handleFunctionEditorGenerationStart"
+                      @generation-end="handleFunctionEditorGenerationEnd"
+                      @generation-success="handleFunctionEditorGenerationSuccess"
                     />
                     <!-- VRL disabled warning for non-table charts -->
                     <div
@@ -1397,8 +1407,8 @@ class="q-pr-sm q-pt-xs" />
         size="10px"
         round
         @click="isFocused = !isFocused"
-        :class="searchObj.meta.showTransformEditor ? 'tw:top-[4rem]!' : 'tw:top-[5.5rem]!'"
-        class="q-pa-xs tw:absolute! tw:right-[2.4rem]! tw:z-50 fullscreen-hover-btn"
+        :class="searchObj.meta.showTransformEditor ? 'tw:right-[2.1rem]!' : 'tw:right-[2.4rem]!'"
+        class="q-pa-xs tw:absolute! tw:top-[6.5rem]! tw:z-50 fullscreen-hover-btn"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -4225,6 +4235,38 @@ export default defineComponent({
       hasInteractedWithAI.value = true;
       // NLP mode is already ON (set in handleGenerateSQLQuery) — AI bar stays visible.
       // QueryEditor manages its own AI bar success text internally.
+    };
+
+    /**
+     * Handle NLP mode toggle for VRL function editor
+     */
+    const handleFunctionEditorToggleNlpMode = () => {
+      console.log('[SearchBar] VRL Function Editor: Toggling NLP mode from AI icon');
+      // UnifiedQueryEditor manages its own NLP mode state internally
+    };
+
+    /**
+     * Handle generation start for VRL function editor
+     */
+    const handleFunctionEditorGenerationStart = () => {
+      console.log('[SearchBar] VRL Function Editor: AI generation started');
+      // Can add loading indicators here if needed
+    };
+
+    /**
+     * Handle generation end for VRL function editor
+     */
+    const handleFunctionEditorGenerationEnd = () => {
+      console.log('[SearchBar] VRL Function Editor: AI generation ended');
+      // Can remove loading indicators here if needed
+    };
+
+    /**
+     * Handle successful generation for VRL function editor
+     */
+    const handleFunctionEditorGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[SearchBar] VRL Function Editor: AI generation success:', payload.type);
+      // Function content is already updated via @update:query handler
     };
 
     /**
