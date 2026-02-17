@@ -233,8 +233,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.clickAllFieldsButton();
     await page.waitForTimeout(500);
 
-    // Write a query in the query editor
-    const testQuery = 'kubernetes_pod_id';
+    // Write a query in the query editor using a field that exists in e2e_automate stream
+    // Using 'code' field which is guaranteed to exist per log.json fixture
+    const testQuery = 'code';
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor(testQuery);
     await page.waitForTimeout(500);
@@ -244,8 +245,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info(`Query before selecting interesting field: ${queryBeforeSelection}`);
 
     // Search for a field and click on it as interesting field
-    await pm.logsPage.fillIndexFieldSearchInput("kubernetes_container_name");
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_container_name");
+    // Using 'stream' field which is guaranteed to exist per log.json fixture
+    await pm.logsPage.fillIndexFieldSearchInput("stream");
+    await pm.logsPage.clickInterestingFieldButton("stream");
     await page.waitForTimeout(500);
 
     // Get the query text after selecting interesting field
@@ -341,11 +343,10 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     const fullErrorText = errorDialogText.toLowerCase();
 
-    // STRONG ASSERTION: Error message should contain the problematic field name
-    const errorContainsField = fullErrorText.includes(nonExistentField.toLowerCase()) ||
-                               fullErrorText.includes('field') ||
-                               fullErrorText.includes('column');
-    expect(errorContainsField).toBeTruthy();
+    // STRONG ASSERTION: Error message MUST contain the exact problematic field name
+    // This ensures the error is specific and actionable, not just a generic "field not found"
+    expect(fullErrorText).toContain(nonExistentField.toLowerCase());
+    testLogger.info(`Verified error message contains the problematic field: ${nonExistentField}`);
 
     testLogger.info('✓ PASSED: Error message correctly identifies problematic field');
   });
