@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-bind="$attrs" ref="rootContainer">
+  <div
+    v-bind="$attrs"
+    ref="rootContainer"
+    :style="isSidebarOpen && { width: leftWidth + 'px' }"
+  >
     <template v-for="(span, index) in spans as any[]" :key="span.spanId">
       <div
         :style="{
@@ -26,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex span-row"
         :class="{
           'span-row-highlight': spanHoveredIndex === index,
-          'span-row-selected': span.spanId === selectedSpanId
+          'span-row-selected': span.spanId === selectedSpanId,
         }"
         :data-test="`trace-tree-span-container-${span.spanId}`"
         @mouseover="() => (spanHoveredIndex = index)"
@@ -51,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex no-wrap full-width relative-position operation-name-container"
               :class="[
                 store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-                isLLMTrace(span) ? '' : 'q-pt-sm'
+                isLLMTrace(span) ? '' : 'q-pt-sm',
               ]"
               :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
             >
@@ -103,7 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="selectSpan(span.spanId)"
                 :data-test="`trace-tree-span-select-btn-${span.spanId}`"
               >
-                <div class="ellipsis flex items-center span-name-section-content">
+                <div
+                  class="ellipsis flex items-center span-name-section-content"
+                >
                   <q-icon
                     v-if="span.spanStatus === 'ERROR'"
                     name="error"
@@ -139,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="isLLMTrace(span)"
                   class="flex items-center text-caption text-red-6"
-                  style="margin-top: -4px; margin-bottom: 2px; line-height: 1;"
+                  style="margin-top: -4px; margin-bottom: 2px; line-height: 1"
                 >
                   <span v-if="span.llm_usage?.total > 0" class="q-mr-sm">
                     <q-icon name="functions" size="10px" />
@@ -164,7 +170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></div>
           </div>
         </div>
-        <div :style="{ width: `calc(100% - ${leftWidth}px)` }">
+        <div
+          v-if="!isSidebarOpen"
+          :style="{ width: `calc(100% - ${leftWidth}px)` }"
+        >
           <span-block
             :span="span"
             :depth="depth"
@@ -245,11 +254,7 @@ import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import {
-  formatTokens,
-  formatCost,
-  isLLMTrace,
-} from "@/utils/llmUtils";
+import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceTree",
@@ -298,6 +303,10 @@ export default defineComponent({
     selectedSpanId: {
       type: String,
       default: "",
+    },
+    isSidebarOpen: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: [

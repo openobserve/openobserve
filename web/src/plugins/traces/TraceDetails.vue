@@ -394,23 +394,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="trace-tree-wrapper card-container">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
-            <div
-              v-if="!hasLLMSpans && activeTab === 'waterfall'"
-              style="
-                display: flex;
-                flex-direction: column;
-                flex: 1;
-                min-height: 0;
-              "
-            >
-              <trace-header
-                data-test="trace-details-header"
-                :baseTracePosition="baseTracePosition"
-                :splitterWidth="leftWidth"
-                @resize-start="startResize"
-              />
-              <div style="display: flex; flex: 1; min-height: 0">
-                <div class="relative-position trace-content-scroll">
+            <div v-if="activeTab === 'waterfall'" class="tw:flex">
+              <div
+                class="tw:flex tw:flex-col tw:min-h-0"
+                :style="{
+                  width: isSidebarOpen ? leftWidth + 'px' : '100%',
+                }"
+              >
+                <trace-header
+                  data-test="trace-details-header"
+                  :baseTracePosition="baseTracePosition"
+                  :splitterWidth="leftWidth"
+                  :isSidebarOpen="
+                    isSidebarOpen && (selectedSpanId || showTraceDetails)
+                  "
+                  @resize-start="startResize"
+                />
+                <div
+                  class="relative-position trace-content-scroll"
+                  :style="{
+                    width: isSidebarOpen ? leftWidth + 'px' : '100%',
+                  }"
+                >
                   <div
                     class="trace-tree-container"
                     data-test="trace-details-tree-container"
@@ -444,6 +449,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
+                        :isSidebarOpen="
+                          !!(
+                            isSidebarOpen &&
+                            (selectedSpanId || showTraceDetails)
+                          )
+                        "
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
                         @update-current-index="handleIndexUpdate"
@@ -452,32 +463,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-                <q-separator
-                  v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                  vertical
+              </div>
+              <div
+                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                class="histogram-sidebar-inner tw:border-l tw:border-l-solid tw:border-l-[var(--o2-border-color)]"
+                :class="isTimelineExpanded ? '' : 'full'"
+                :style="{
+                  width: `calc(100% - ${leftWidth}px)`,
+                }"
+              >
+                <trace-details-sidebar
+                  data-test="trace-details-sidebar"
+                  :span="spanMap[selectedSpanId as string]"
+                  :baseTracePosition="baseTracePosition"
+                  :search-query="searchQuery"
+                  :stream-name="currentTraceStreamName"
+                  :service-streams-enabled="serviceStreamsEnabled"
+                  :parent-mode="mode"
+                  @view-logs="redirectToLogs"
+                  @close="closeSidebar"
+                  @open-trace="openTraceLink"
                 />
-                <div
-                  v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                  class="histogram-sidebar-inner"
-                  :class="isTimelineExpanded ? '' : 'full'"
-                  :style="{
-                    flex: `0 0 ${sidebarWidth}`,
-                    maxWidth: sidebarWidth,
-                  }"
-                >
-                  <trace-details-sidebar
-                    data-test="trace-details-sidebar"
-                    :span="spanMap[selectedSpanId as string]"
-                    :baseTracePosition="baseTracePosition"
-                    :search-query="searchQuery"
-                    :stream-name="currentTraceStreamName"
-                    :service-streams-enabled="serviceStreamsEnabled"
-                    :parent-mode="mode"
-                    @view-logs="redirectToLogs"
-                    @close="closeSidebar"
-                    @open-trace="openTraceLink"
-                  />
-                </div>
               </div>
             </div>
 
@@ -541,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Flame Graph View -->
             <div
-              v-if="!hasLLMSpans && activeTab === 'flame-graph'"
+              v-if="activeTab === 'flame-graph'"
               style="display: flex; flex: 1; min-height: 0"
               class="tw:w-full"
             >
@@ -1052,7 +1058,7 @@ export default defineComponent({
       const tabs = [
         { label: "Waterfall", value: "waterfall" },
         { label: "Flame Graph", value: "flame-graph" },
-        { label: "Spans", value: "spans" },
+        // { label: "Spans", value: "spans" },
         { label: "Map", value: "map" },
       ];
       // Conditionally add DAG tab for LLM traces
@@ -2416,12 +2422,11 @@ $traceChartCollapseHeight: 42px;
 }
 
 .histogram-sidebar-inner {
-  flex: 0 0 $sidebarWidth;
-  max-width: $sidebarWidth;
   flex-shrink: 0;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+  transition: all 0.3s ease-in-out;
 }
 
 .histogram-spans-container {
