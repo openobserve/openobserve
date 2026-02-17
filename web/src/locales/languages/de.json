@@ -2396,7 +2396,21 @@
     "errorSavingPipeline": "Fehler beim Speichern der Pipeline",
     "cancelChangesConfirm": "Möchten Sie die Änderungen wirklich stornieren?",
     "cancel": "Stornieren",
-    "dragDropNodesHere": "Ziehen Sie Knoten hierher und legen Sie sie dort ab"
+    "dragDropNodesHere": "Ziehen Sie Knoten hierher und legen Sie sie dort ab",
+    "llmEvaluation": "LLM-Bewertung",
+    "nodeName": "Knotenname",
+    "samplingConfig": "Konfiguration der Probenentnahme",
+    "enableSampling": "Sampling aktivieren",
+    "samplingRate": "Abtastrate",
+    "samplingRateHelp": "Stichprobe eines Prozentsatzes der Spuren, um die Evaluierungskosten zu senken (0% = deaktiviert, 100% = alle auswerten)",
+    "samplingStrategy": "Probenahmestrategie",
+    "randomSampling": "Zufällig",
+    "randomSamplingDesc": "Nichtdeterministische Probenahme — jedes Mal andere Spuren",
+    "hashSampling": "Hash-basiert (empfohlen)",
+    "hashSamplingDesc": "Konsistentes Sampling pro trace_id — es werden immer dieselben Traces abgetastet",
+    "llmEvaluationInfo": "Konfiguration der LLM-Evaluierung",
+    "llmEvaluationInfoText": "Wertet Spuren mit LLM Judge aus. Die Probenahme reduziert die Kosten, da nur ein Prozentsatz der Spuren verarbeitet wird. Die Hash-Strategie gewährleistet eine konsistente Probenahme für eine zuverlässige Überwachung.",
+    "llmEvaluationNodeSaved": "Der LLM-Evaluierungsknoten wurde erfolgreich gespeichert"
   },
   "reports": {
     "header": "Berichte",

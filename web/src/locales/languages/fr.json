@@ -2396,7 +2396,21 @@
     "errorSavingPipeline": "Erreur lors de l'enregistrement du pipeline",
     "cancelChangesConfirm": "Êtes-vous sûr de vouloir annuler les modifications ?",
     "cancel": "Annuler",
-    "dragDropNodesHere": "Faites glisser et déposez les nœuds ici"
+    "dragDropNodesHere": "Faites glisser et déposez les nœuds ici",
+    "llmEvaluation": "Évaluation LLM",
+    "nodeName": "Nom du nœud",
+    "samplingConfig": "Configuration d'échantillonnage",
+    "enableSampling": "Activer l'échantillonnage",
+    "samplingRate": "Fréquence d'échantillonnage",
+    "samplingRateHelp": "Échantillonnez un pourcentage de traces pour réduire les coûts d'évaluation (0 % = désactivé, 100 % = tout évaluer)",
+    "samplingStrategy": "Stratégie d'échantillonnage",
+    "randomSampling": "Aléatoire",
+    "randomSamplingDesc": "Échantillonnage non déterministe - traces différentes à chaque fois",
+    "hashSampling": "Basé sur le hachage (recommandé)",
+    "hashSamplingDesc": "Échantillonnage cohérent par trace_id : les mêmes traces sont toujours échantillonnées",
+    "llmEvaluationInfo": "Configuration de l'évaluation LLM",
+    "llmEvaluationInfoText": "Évalue les traces à l'aide du juge LLM. L'échantillonnage réduit les coûts en ne traitant qu'un pourcentage des traces. La stratégie de hachage garantit un échantillonnage cohérent pour une surveillance fiable.",
+    "llmEvaluationNodeSaved": "Le nœud d'évaluation LLM a été enregistré avec succès"
   },
   "reports": {
     "header": "Rapports",

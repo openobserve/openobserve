@@ -2396,7 +2396,21 @@
     "errorSavingPipeline": "Erro ao salvar o pipeline",
     "cancelChangesConfirm": "Tem certeza de que deseja cancelar as alterações?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arraste e solte os nós aqui"
+    "dragDropNodesHere": "Arraste e solte os nós aqui",
+    "llmEvaluation": "Avaliação LLM",
+    "nodeName": "Nome do nó",
+    "samplingConfig": "Configuração de amostragem",
+    "enableSampling": "Ativar amostragem",
+    "samplingRate": "Taxa de amostragem",
+    "samplingRateHelp": "Amostre uma porcentagem de rastreamentos para reduzir os custos de avaliação (0% = desativado, 100% = avaliar todos)",
+    "samplingStrategy": "Estratégia de amostragem",
+    "randomSampling": "Aleatório",
+    "randomSamplingDesc": "Amostragem não determinística - traços diferentes a cada vez",
+    "hashSampling": "Baseado em hash (recomendado)",
+    "hashSamplingDesc": "Amostragem consistente por trace_id - mesmos traços sempre amostrados",
+    "llmEvaluationInfo": "Configuração de avaliação do LLM",
+    "llmEvaluationInfoText": "Avalia traços usando o juiz LLM. A amostragem reduz os custos ao processar apenas uma porcentagem dos traços. A estratégia de hash garante uma amostragem consistente para um monitoramento confiável.",
+    "llmEvaluationNodeSaved": "O nó de avaliação do LLM foi salvo com sucesso"
   },
   "reports": {
     "header": "Relatórios",

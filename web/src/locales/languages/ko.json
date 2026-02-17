@@ -2396,7 +2396,21 @@
     "errorSavingPipeline": "파이프라인을 저장하는 중 오류가 발생했습니다.",
     "cancelChangesConfirm": "정말로 변경을 취소하시겠습니까?",
     "cancel": "취소",
-    "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요"
+    "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요",
+    "llmEvaluation": "LLM 평가",
+    "nodeName": "노드 이름",
+    "samplingConfig": "샘플링 구성",
+    "enableSampling": "샘플링 활성화",
+    "samplingRate": "샘플링 속도",
+    "samplingRateHelp": "트레이스의 백분율을 샘플링하여 평가 비용 절감 (0% = 비활성화, 100% = 전체 평가)",
+    "samplingStrategy": "샘플링 전략",
+    "randomSampling": "랜덤",
+    "randomSamplingDesc": "비결정적 샘플링 - 매번 다른 트레이스",
+    "hashSampling": "해시 기반 (권장)",
+    "hashSamplingDesc": "trace_id당 일관된 샘플링 - 항상 동일한 트레이스가 샘플링됨",
+    "llmEvaluationInfo": "LLM 평가 구성",
+    "llmEvaluationInfoText": "LLM 판사를 사용하여 트레이스를 평가합니다.샘플링은 트레이스의 일정 비율만 처리하므로 비용이 절감됩니다.해시 전략은 안정적인 모니터링을 위해 일관된 샘플링을 보장합니다.",
+    "llmEvaluationNodeSaved": "LLM 평가 노드가 성공적으로 저장되었습니다."
   },
   "reports": {
     "header": "보고서",

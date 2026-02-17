@@ -2401,7 +2401,21 @@
     "errorSavingPipeline": "保存管道时出错",
     "cancelChangesConfirm": "您确定要取消更改吗？",
     "cancel": "取消",
-    "dragDropNodesHere": "将节点拖放到此处"
+    "dragDropNodesHere": "将节点拖放到此处",
+    "llmEvaluation": "LLM 评估",
+    "nodeName": "节点名称",
+    "samplingConfig": "采样配置",
+    "enableSampling": "启用采样",
+    "samplingRate": "采样率",
+    "samplingRateHelp": "对一定比例的跟踪进行采样以降低评估成本（0% = 禁用，100% = 全部评估）",
+    "samplingStrategy": "采样策略",
+    "randomSampling": "随机",
+    "randomSamplingDesc": "非确定性采样-每次都有不同的轨迹",
+    "hashSampling": "基于哈希（推荐）",
+    "hashSamplingDesc": "每个 trace_id 的采样保持一致-始终采样相同的轨迹",
+    "llmEvaluationInfo": "LLM 评估配置",
+    "llmEvaluationInfoText": "使用 LLM 判断来评估痕迹。采样仅处理一定比例的痕迹，从而降低了成本。哈希策略可确保一致的采样以实现可靠的监控。",
+    "llmEvaluationNodeSaved": "LLM 评估节点已成功保存"
   },
   "reports": {
     "header": "报表",
