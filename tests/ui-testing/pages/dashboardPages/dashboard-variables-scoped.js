@@ -1010,17 +1010,17 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<boolean>}
    */
   async hasCircularDependencyError() {
-    // The error is displayed as red text with the message "Variables has cycle:"
-    // Look for text containing "cycle" in red color
-    const errorElement = this.page.locator('div[style*="color: red"], div[style*="color:red"]').filter({ hasText: /cycle/i });
+    // The error is displayed in a .cycle-error-container div with .cycle-error-text span
+    // The text reads "Circular dependency detected: varA → varB → varA"
+    const errorContainer = this.page.locator('.cycle-error-container');
     try {
-      await errorElement.waitFor({ state: "visible", timeout: 3000 });
+      await errorContainer.waitFor({ state: "visible", timeout: 5000 });
       return true;
     } catch {
-      // Fallback: check for any text containing "Variables has cycle"
-      const fallbackError = this.page.getByText(/Variables has cycle/i);
+      // Fallback: check for any text containing "Circular dependency detected"
+      const fallbackError = this.page.getByText(/Circular dependency detected/i);
       try {
-        await fallbackError.waitFor({ state: "visible", timeout: 1000 });
+        await fallbackError.waitFor({ state: "visible", timeout: 2000 });
         return true;
       } catch {
         return false;
