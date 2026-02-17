@@ -2736,7 +2736,7 @@ pub mod query_cache_server {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4, 5")]
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4, 5, 6")]
     pub plan: ::core::option::Option<physical_plan_node::Plan>,
 }
 /// Nested message and enum types in `PhysicalPlanNode`.
@@ -2754,6 +2754,8 @@ pub mod physical_plan_node {
         TmpExec(super::TmpExecNode),
         #[prost(message, tag = "5")]
         EnrichmentExec(super::EnrichmentExecNode),
+        #[prost(message, tag = "6")]
+        DeduplicationExec(super::DeduplicationExecNode),
     }
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -2801,6 +2803,15 @@ pub struct EnrichmentExecNode {
     pub stream_name: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "4")]
     pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeduplicationExecNode {
+    #[prost(message, repeated, tag = "1")]
+    pub deduplication_columns: ::prost::alloc::vec::Vec<
+        ::datafusion_proto::protobuf::PhysicalExprNode,
+    >,
+    #[prost(uint64, tag = "2")]
+    pub max_rows: u64,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct AggregateTopkExecNode {
