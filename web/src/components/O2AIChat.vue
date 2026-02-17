@@ -357,17 +357,6 @@
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
-                      <!-- Navigation icon -->
-                      <q-icon
-                        v-if="block.navigationAction && !block.pendingConfirmation"
-                        name="open_in_new"
-                        size="14px"
-                        color="primary"
-                        class="navigation-icon"
-                        @click.stop="handleNavigationAction(block.navigationAction)"
-                      >
-                        <q-tooltip>{{ block.navigationAction.label }}</q-tooltip>
-                      </q-icon>
                       <q-icon
                         v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
@@ -598,23 +587,6 @@
                     <div v-if="block.recoverable" class="stream-error-recoverable">
                       This error may be temporary. You can try again.
                     </div>
-                  </div>
-                  <!-- Navigation block - standalone navigation button -->
-                  <div
-                    v-else-if="block.type === 'navigation' && block.navigationAction"
-                    class="navigation-block"
-                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
-                  >
-                    <q-btn
-                      dense
-                      no-caps
-                      unelevated
-                      color="primary"
-                      :icon="'open_in_new'"
-                      :label="block.navigationAction.label"
-                      class="navigation-block-btn"
-                      @click="handleNavigationAction(block.navigationAction)"
-                    />
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
@@ -956,11 +928,10 @@ import { MarkedOptions } from 'marked';
 import DOMPurify from 'dompurify';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, NavigationAction, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
@@ -1039,7 +1010,6 @@ export default defineComponent({
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore ();
-    const router = useRouter();
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     // Chat history composable
@@ -1790,7 +1760,7 @@ export default defineComponent({
                     return;
                   }
 
-                  // Handle complete events - complete any active tool call and flush navigation
+                  // Handle complete events - complete any active tool call
                   if (data && data.type === 'complete') {
                     // Capture trace_id for feedback correlation
                     if (data.trace_id) {
@@ -1812,8 +1782,6 @@ export default defineComponent({
                       }
                       activeToolCall.value = null;
                     }
-
-                    await scrollToBottom();
                     continue;
                   }
 
@@ -1829,16 +1797,6 @@ export default defineComponent({
                       response: data.response || undefined,
                     };
 
-                    // Generate navigation from tool result if applicable
-                    let navigationAction: NavigationAction | null = null;
-                    if (data.success !== false && data.call_args) {
-                      navigationAction = generateNavigationFromToolResult(
-                        data.tool,
-                        data.call_args,
-                        data
-                      );
-                    }
-
                     // If active tool call matches, complete it with result data
                     if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
                       const completedToolBlock: ContentBlock = {
@@ -1846,8 +1804,7 @@ export default defineComponent({
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        ...resultData,
-                        ...(navigationAction && { navigationAction })
+                        ...resultData
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1865,9 +1822,6 @@ export default defineComponent({
                           const block = lastMessage.contentBlocks[i];
                           if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
                             Object.assign(block, resultData);
-                            if (navigationAction) {
-                              block.navigationAction = navigationAction;
-                            }
                             break;
                           }
                         }
@@ -2234,6 +2188,55 @@ export default defineComponent({
                       pendingToolCalls.value.push(completedToolBlock);
                     }
                     activeToolCall.value = null;
+                  }
+                  continue;
+                }
+
+                // Handle tool_result events - enrich tool call with result data
+                if (data && data.type === 'tool_result') {
+                  const resultData = {
+                    success: data.success !== false,
+                    resultMessage: data.message || '',
+                    summary: data.summary || undefined,
+                    errorType: data.error_type || undefined,
+                    suggestion: data.suggestion || undefined,
+                    details: data.details || undefined,
+                  };
+
+                  if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context,
+                      ...resultData
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  } else {
+                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.contentBlocks) {
+                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
+                        const block = lastMessage.contentBlocks[i];
+                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                          Object.assign(block, resultData);
+                          break;
+                        }
+                      }
+                    }
+                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
+                      const block = pendingToolCalls.value[i];
+                      if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                        Object.assign(block, resultData);
+                        break;
+                      }
+                    }
                   }
                   continue;
                 }
@@ -4364,24 +4367,6 @@ export default defineComponent({
       previewImage,
       openImagePreview,
       closeImagePreview,
-      // AI-generated title
-      aiGeneratedTitle,
-      displayedTitle,
-      isTypingTitle,
-      // Image handling
-      pendingImages,
-      imageInputRef,
-      triggerImageUpload,
-      handleImageSelect,
-      removeImage,
-      handleDragOver,
-      handleDrop,
-      handlePaste,
-      // Image preview
-      showImagePreview,
-      previewImage,
-      openImagePreview,
-      closeImagePreview,
       // Context references
       contextReferences,
       handleReferencesUpdate,
@@ -5546,35 +5531,6 @@ export default defineComponent({
         background: rgba(251, 191, 36, 0.15);
         border: 1px solid rgba(251, 191, 36, 0.3);
       }
-    }
-  }
-
-  .navigation-icon {
-    cursor: pointer;
-    margin-left: 4px;
-    transition: transform 0.2s;
-
-    &:hover {
-      transform: scale(1.15);
-    }
-  }
-
-  .navigation-block {
-    margin: 8px 0;
-    padding: 10px 12px;
-    border-radius: 4px;
-    display: inline-block;
-
-    &.light-mode {
-      background: rgba(25, 118, 210, 0.08);
-    }
-
-    &.dark-mode {
-      background: rgba(66, 165, 245, 0.12);
-    }
-
-    .navigation-block-btn {
-      font-size: 13px;
     }
   }
 
