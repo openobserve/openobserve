@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Provider Badge -->
-      <q-badge :label="span._o2_llm_provider_name" color="primary" />
+      <q-badge v-if="span._o2_llm_provider_name" :label="span._o2_llm_provider_name" color="primary" />
     </div>
   </div>
 
