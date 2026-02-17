@@ -2,7 +2,7 @@
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getTabSelector } = require('./dashboard-selectors.js');
+const { getTabSelector, selectStreamAndField } = require('./dashboard-selectors.js');
 
 export default class DashboardSetting {
   constructor(page) {
@@ -288,40 +288,8 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-name"]')
       .fill(variableName);
-    await this.page
-      .locator('[data-test="dashboard-variable-stream-type-select"]')
-      .click();
-
-    // Wait for the dropdown option to be visible before clicking
-    const streamTypeOption = this.page.getByRole("option", { name: streamType });
-    await streamTypeOption.waitFor({ state: "visible", timeout: 10000 });
-    await streamTypeOption.click();
-
-    // Select Stream (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const streamSelector = this.page.locator('[data-test="dashboard-variable-stream-select"]').first();
-    await streamSelector.click();
-    await streamSelector.locator('input').fill(Stream);
-    // Wait for and click the matching CommonAutoComplete option
-    const streamOption = this.page.locator('[data-test="common-auto-complete-option"]')
-      .filter({ hasText: Stream }).first();
-    await streamOption.waitFor({ state: "visible", timeout: 10000 });
-    await streamOption.click();
-
-    // Wait for field data to load after stream selection
-    await this.page.waitForTimeout(1000);
-
-    // Select Field (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
-    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
-    await fieldSelect.click();
-    await fieldSelect.locator('input').fill(field);
-    // Wait for and click the matching CommonAutoComplete option
-    const fieldOption = this.page.locator('[data-test="common-auto-complete-option"]')
-      .filter({ hasText: field }).first();
-    await fieldOption.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOption.click();
+    // Select Stream Type, Stream, and Field using common helper
+    await selectStreamAndField(this.page, streamType, Stream, field, { fieldLoadDelay: 1000 });
   }
 
   //select Constant type

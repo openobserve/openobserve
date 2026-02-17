@@ -12,6 +12,7 @@ import {
   getVariableLoadingIndicator,
   getPanelRefreshBtn,
   getMenuItemByText,
+  selectStreamAndField,
 } from "./dashboard-selectors.js";
 
 export default class DashboardVariablesScoped {
@@ -494,37 +495,8 @@ export default class DashboardVariablesScoped {
       }
     }
 
-    // Select Stream Type
-    await this.page
-      .locator('[data-test="dashboard-variable-stream-type-select"]')
-      .click();
-    await this.page
-      .getByRole("option", { name: streamType, exact: true })
-      .locator("div")
-      .nth(2)
-      .click();
-
-    // Select Stream (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const streamSelect = this.page.locator('[data-test="dashboard-variable-stream-select"]').first();
-    await streamSelect.click();
-    await streamSelect.locator('input').fill(streamName);
-    // Wait for and click the matching CommonAutoComplete option
-    const streamOption = this.page.locator('[data-test="common-auto-complete-option"]')
-      .filter({ hasText: streamName }).first();
-    await streamOption.waitFor({ state: "visible", timeout: 10000 });
-    await streamOption.click();
-
-    // Select Field (CommonAutoComplete component)
-    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
-    await fieldSelect.click();
-    await fieldSelect.locator('input').fill(field);
-    // Wait for and click the matching CommonAutoComplete option
-    const fieldOption = this.page.locator('[data-test="common-auto-complete-option"]')
-      .filter({ hasText: field }).first();
-    await fieldOption.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOption.click();
+    // Select Stream Type, Stream, and Field using common helper
+    await selectStreamAndField(this.page, streamType, streamName, field);
 
     // Add dependency if specified
     if (dependsOn) {
