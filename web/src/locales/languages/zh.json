@@ -347,7 +347,9 @@
     "somethingWentWrong": "出了点问题",
     "selectStreamForAI": "先选择一个直播来使用 AI",
     "collapseFields": "折叠字段",
-    "openFields": "打开字段"
+    "openFields": "打开字段",
+    "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
+    "enterFunctionPrompt": "输入提示生成函数"
   },
   "menu": {
     "home": "主页",
@@ -993,7 +995,9 @@
     "vrlfunction": "VRL 函数",
     "jsFunctionHint": "使用 `row`对象访问和修改日志字段。示例：row.new_field = row.existing_field + 'processed';",
     "vrlFunctionHint": "使用 `.` 表示当前事件。示例：.new_field = .existing_field + “已处理”",
-    "jsErrorDetails": "脚本错误详情"
+    "jsErrorDetails": "脚本错误详情",
+    "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
+    "enterFunctionPrompt": "输入提示生成函数"
   },
   "confirmDialog": {
     "cancel": "取消",

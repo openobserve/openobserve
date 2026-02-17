@@ -347,7 +347,9 @@
     "somethingWentWrong": "Er is iets misgegaan",
     "selectStreamForAI": "Selecteer eerst een stream om AI te gebruiken",
     "collapseFields": "Velden samenvouwen",
-    "openFields": "Open velden"
+    "openFields": "Open velden",
+    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren"
   },
   "menu": {
     "home": "Home",
@@ -993,7 +995,9 @@
     "vrlfunction": "VRL-functie",
     "jsFunctionHint": "Gebruik het object `row` om logvelden te openen en te wijzigen. Voorbeeld: row.new_field = row.existing_field + 'processed';",
     "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'",
-    "jsErrorDetails": "Details van JavaScript-fouten"
+    "jsErrorDetails": "Details van JavaScript-fouten",
+    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren"
   },
   "confirmDialog": {
     "cancel": "Annuleer",

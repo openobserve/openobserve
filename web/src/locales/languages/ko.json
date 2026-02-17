@@ -347,7 +347,9 @@
     "somethingWentWrong": "뭔가 잘못됐어",
     "selectStreamForAI": "AI를 사용할 스트림을 먼저 선택하세요",
     "collapseFields": "필드 축소",
-    "openFields": "오픈 필드"
+    "openFields": "오픈 필드",
+    "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
+    "enterFunctionPrompt": "함수 생성 프롬프트 입력"
   },
   "menu": {
     "home": "홈",
@@ -993,7 +995,9 @@
     "vrlfunction": "VRL 함수",
     "jsFunctionHint": "`row` 객체를 사용하여 로그 필드에 액세스하고 수정합니다.예: row.new_field = row.기존_필드 + '처리됨';",
     "vrlFunctionHint": "`.'를 사용하여 현재 이벤트를 나타냅니다.예: .new_field = .기존_필드 + '처리됨'",
-    "jsErrorDetails": "자바스크립트 오류 세부 정보"
+    "jsErrorDetails": "자바스크립트 오류 세부 정보",
+    "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
+    "enterFunctionPrompt": "함수 생성 프롬프트 입력"
   },
   "confirmDialog": {
     "cancel": "취소",

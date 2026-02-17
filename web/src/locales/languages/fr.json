@@ -347,7 +347,9 @@
     "somethingWentWrong": "Quelque chose s'est mal passé",
     "selectStreamForAI": "Sélectionnez d'abord un flux pour utiliser l'IA",
     "collapseFields": "Effondrer les champs",
-    "openFields": "Champs ouverts"
+    "openFields": "Champs ouverts",
+    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "enterFunctionPrompt": "Entrez une invite pour générer une fonction"
   },
   "menu": {
     "home": "Accueil",
@@ -993,7 +995,9 @@
     "vrlfunction": "Fonction VRL",
     "jsFunctionHint": "Utilisez l'objet row pour accéder aux champs du journal et les modifier. Exemple : row.new_field = row.existing_field + « traité » ;",
     "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »",
-    "jsErrorDetails": "Détails de l'erreur JavaScript"
+    "jsErrorDetails": "Détails de l'erreur JavaScript",
+    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "enterFunctionPrompt": "Entrez une invite pour générer une fonction"
   },
   "confirmDialog": {
     "cancel": "Annuler",

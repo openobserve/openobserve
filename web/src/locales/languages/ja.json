@@ -347,7 +347,9 @@
     "somethingWentWrong": "何かがおかしくなった",
     "selectStreamForAI": "AI を使用するには、まずストリームを選択してください",
     "collapseFields": "フィールドを折りたたむ",
-    "openFields": "オープンフィールド"
+    "openFields": "オープンフィールド",
+    "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
+    "enterFunctionPrompt": "関数を生成するプロンプトを入力してください"
   },
   "menu": {
     "home": "ホーム",
@@ -1010,7 +1012,9 @@
     "vrlfunction": "VRL ファンクション",
     "jsFunctionHint": "`row` オブジェクトを使用して、ログフィールドにアクセスして変更します。例:row.new_field = row.existing_field + 'processed';",
     "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'",
-    "jsErrorDetails": "JavaScript エラーの詳細"
+    "jsErrorDetails": "JavaScript エラーの詳細",
+    "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
+    "enterFunctionPrompt": "関数を生成するプロンプトを入力してください"
   },
   "confirmDialog": {
     "cancel": "キャンセル",

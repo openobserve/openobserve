@@ -347,7 +347,9 @@
     "somethingWentWrong": "Bir şeyler ters gitti",
     "selectStreamForAI": "Yapay zekayı kullanmak için önce bir akış seçin",
     "collapseFields": "Alanları Daralt",
-    "openFields": "Açık Alanlar"
+    "openFields": "Açık Alanlar",
+    "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
+    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -993,7 +995,9 @@
     "vrlfunction": "VRL Fonksiyonu",
     "jsFunctionHint": "Günlük alanlarına erişmek ve değiştirmek için `row` nesnesini kullanın. Örnek: Row.new_field = Row.existing_field + 'processed';",
     "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'",
-    "jsErrorDetails": "JavaScript Hata Ayrıntıları"
+    "jsErrorDetails": "JavaScript Hata Ayrıntıları",
+    "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
+    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin"
   },
   "confirmDialog": {
     "cancel": "İptal",

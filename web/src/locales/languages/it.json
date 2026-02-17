@@ -347,7 +347,9 @@
     "somethingWentWrong": "Qualcosa è andato storto",
     "selectStreamForAI": "Seleziona prima uno stream per utilizzare l'IA",
     "collapseFields": "Comprimi campi",
-    "openFields": "Campi aperti"
+    "openFields": "Campi aperti",
+    "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
+    "enterFunctionPrompt": "Inserisci un prompt per generare la funzione"
   },
   "menu": {
     "home": "Home",
@@ -993,7 +995,9 @@
     "vrlfunction": "Funzione VRL",
     "jsFunctionHint": "Usa l'oggetto `row` per accedere e modificare i campi di registro. Esempio: row.new_field = row.existing_field + 'processato';",
     "vrlFunctionHint": "Usa il `.` per rappresentare l'evento corrente. Esempio: .new_field = .existing_field + 'processed'",
-    "jsErrorDetails": "Dettagli sull'errore JavaScript"
+    "jsErrorDetails": "Dettagli sull'errore JavaScript",
+    "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
+    "enterFunctionPrompt": "Inserisci un prompt per generare la funzione"
   },
   "confirmDialog": {
     "cancel": "Annulla",
