@@ -936,6 +936,350 @@ describe("CreateDestinationForm", () => {
     });
   });
 
+  describe("StringSeparated Output Format", () => {
+    it("should show separator field when stringseparated format is selected", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.step = 2;
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const separatorField = wrapper.find('[data-test="add-destination-separator-input"]');
+      expect(separatorField.exists()).toBe(true);
+    });
+
+    it("should hide separator field when other formats are selected", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.output_format = "json";
+      wrapper.vm.step = 2;
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const separatorField = wrapper.find('[data-test="add-destination-separator-input"]');
+      expect(separatorField.exists()).toBe(false);
+    });
+
+    it("should initialize separator as empty string", () => {
+      expect(wrapper.vm.formData.separator).toBe("");
+    });
+
+    it("should validate that separator is required for stringseparated format", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = "";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should pass validation when separator is provided for stringseparated format", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = "|";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("should allow space as separator", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = " ";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("should allow special characters as separator", async () => {
+      const specialChars = ["|", "\\n", "\\t", ",", ";", ":", "-"];
+
+      for (const char of specialChars) {
+        wrapper.vm.formData.destination_type = "custom";
+        wrapper.vm.formData.name = "test";
+        wrapper.vm.formData.url = "https://example.com";
+        wrapper.vm.formData.method = "post";
+        wrapper.vm.formData.output_format = "stringseparated";
+        wrapper.vm.formData.separator = char;
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.canProceedStep2).toBe(true);
+      }
+    });
+
+    it("should format stringseparated as nested object in payload", async () => {
+      (destinationService.create as any).mockResolvedValue({ data: {} });
+
+      wrapper.vm.formData = {
+        name: "Test StringSeparated",
+        url: "https://example.com",
+        url_endpoint: "/api/logs",
+        method: "post",
+        output_format: "stringseparated",
+        separator: "|",
+        destination_type: "custom",
+        skip_tls_verify: false,
+        template: "",
+        headers: {},
+        emails: "",
+        type: "http",
+      };
+
+      wrapper.vm.apiHeaders = [
+        { key: "Authorization", value: "Bearer token123", uuid: "123" },
+      ];
+
+      await wrapper.vm.createDestination();
+      await flushPromises();
+
+      expect(destinationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            output_format: {
+              stringseparated: {
+                separator: "|",
+              },
+            },
+          }),
+        }),
+      );
+    });
+
+    it("should format stringseparated with newline separator in payload", async () => {
+      (destinationService.create as any).mockResolvedValue({ data: {} });
+
+      wrapper.vm.formData = {
+        name: "Test StringSeparated Newline",
+        url: "https://example.com",
+        url_endpoint: "/api/logs",
+        method: "post",
+        output_format: "stringseparated",
+        separator: "\\n",
+        destination_type: "custom",
+        skip_tls_verify: false,
+        template: "",
+        headers: {},
+        emails: "",
+        type: "http",
+      };
+
+      wrapper.vm.apiHeaders = [
+        { key: "Authorization", value: "Bearer token123", uuid: "123" },
+      ];
+
+      await wrapper.vm.createDestination();
+      await flushPromises();
+
+      expect(destinationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            output_format: {
+              stringseparated: {
+                separator: "\\n",
+              },
+            },
+          }),
+        }),
+      );
+    });
+
+    it("should parse stringseparated format when editing destination", () => {
+      const destination = {
+        name: "Test Destination",
+        url: "https://example.com/api/logs",
+        method: "post",
+        output_format: {
+          stringseparated: {
+            separator: "|",
+          },
+        },
+        destination_type_name: "custom",
+        skip_tls_verify: false,
+      };
+
+      wrapper.vm.populateFormForEdit(destination);
+
+      expect(wrapper.vm.formData.output_format).toBe("stringseparated");
+      expect(wrapper.vm.formData.separator).toBe("|");
+      expect(wrapper.vm.formData.esbulk_index).toBe("");
+    });
+
+    it("should parse stringseparated with newline separator when editing", () => {
+      const destination = {
+        name: "Test Destination",
+        url: "https://example.com/api/logs",
+        method: "post",
+        output_format: {
+          stringseparated: {
+            separator: "\\n",
+          },
+        },
+        destination_type_name: "custom",
+        skip_tls_verify: false,
+      };
+
+      wrapper.vm.populateFormForEdit(destination);
+
+      expect(wrapper.vm.formData.output_format).toBe("stringseparated");
+      expect(wrapper.vm.formData.separator).toBe("\\n");
+    });
+
+    it("should handle missing separator in stringseparated object when editing", () => {
+      const destination = {
+        name: "Test Destination",
+        url: "https://example.com/api/logs",
+        method: "post",
+        output_format: {
+          stringseparated: {},
+        },
+        destination_type_name: "custom",
+        skip_tls_verify: false,
+      };
+
+      wrapper.vm.populateFormForEdit(destination);
+
+      expect(wrapper.vm.formData.output_format).toBe("stringseparated");
+      expect(wrapper.vm.formData.separator).toBe("");
+    });
+
+    it("should reset separator when format changes from stringseparated to json", async () => {
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = "|";
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.formData.output_format = "json";
+      await wrapper.vm.$nextTick();
+
+      // Separator should still have value but won't be used in payload
+      expect(wrapper.vm.formData.separator).toBe("|");
+    });
+
+    it("should clear separator when switching from stringseparated to esbulk in edit mode", () => {
+      const destination1 = {
+        name: "Test Destination",
+        url: "https://example.com/api/logs",
+        method: "post",
+        output_format: {
+          stringseparated: {
+            separator: "|",
+          },
+        },
+        destination_type_name: "custom",
+        skip_tls_verify: false,
+      };
+
+      wrapper.vm.populateFormForEdit(destination1);
+      expect(wrapper.vm.formData.separator).toBe("|");
+
+      // Now edit with esbulk format
+      const destination2 = {
+        name: "Test Destination",
+        url: "https://example.com/api/logs",
+        method: "post",
+        output_format: {
+          esbulk: {
+            index: "logs",
+          },
+        },
+        destination_type_name: "elasticsearch",
+        skip_tls_verify: false,
+      };
+
+      wrapper.vm.populateFormForEdit(destination2);
+      expect(wrapper.vm.formData.separator).toBe("");
+      expect(wrapper.vm.formData.esbulk_index).toBe("logs");
+    });
+
+    it("should reset separator field when form is reset", () => {
+      wrapper.vm.formData.separator = "|";
+      wrapper.vm.formData.output_format = "stringseparated";
+
+      wrapper.vm.resetForm();
+
+      expect(wrapper.vm.formData.separator).toBe("");
+      expect(wrapper.vm.formData.output_format).toBe("json");
+    });
+
+    it("should not include stringseparated in payload when format is json", async () => {
+      (destinationService.create as any).mockResolvedValue({ data: {} });
+
+      wrapper.vm.formData = {
+        name: "Test JSON",
+        url: "https://example.com",
+        url_endpoint: "/api/logs",
+        method: "post",
+        output_format: "json",
+        separator: "|", // This should be ignored
+        destination_type: "custom",
+        skip_tls_verify: false,
+        template: "",
+        headers: {},
+        emails: "",
+        type: "http",
+      };
+
+      wrapper.vm.apiHeaders = [
+        { key: "Authorization", value: "Bearer token123", uuid: "123" },
+      ];
+
+      await wrapper.vm.createDestination();
+      await flushPromises();
+
+      const createCall = (destinationService.create as any).mock.calls[0][0];
+      expect(createCall.data.output_format).toBe("json");
+      expect(typeof createCall.data.output_format).toBe("string");
+    });
+
+    it("should validate separator field is not null", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = null as any;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should validate separator field is not undefined", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = undefined as any;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should include String Separated in outputFormats options", () => {
+      const outputFormats = [
+        { label: "JSON", value: "json" },
+        { label: "NDJSON", value: "ndjson" },
+        { label: "NestedEvent", value: "nestedevent" },
+        { label: "ESBulk", value: "esbulk" },
+        { label: "String Separated", value: "stringseparated" },
+      ];
+
+      // Check that stringseparated option exists
+      const stringSeparatedOption = outputFormats.find(
+        (opt) => opt.value === "stringseparated"
+      );
+      expect(stringSeparatedOption).toBeDefined();
+      expect(stringSeparatedOption?.label).toBe("String Separated");
+    });
+  });
+
   describe("Destination Metadata", () => {
     it("should have metadata field available", () => {
       // Metadata may be undefined initially until destination type requires it
