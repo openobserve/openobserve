@@ -63,7 +63,7 @@
             "color": {
               "mode": "fixed",
               "fixedColor": [
-                "#A855F7"
+                "#79abfc"
               ],
               "seriesBy": "last",
               "colorBySeries": []
@@ -193,7 +193,7 @@
             "color": {
               "mode": "fixed",
               "fixedColor": [
-                "#818CF8"
+                "#79abfc"
               ],
               "seriesBy": "last",
               "colorBySeries": []
@@ -318,7 +318,7 @@
             "color": {
               "mode": "fixed",
               "fixedColor": [
-                "#FB7185"
+                "#fc7b7b"
               ],
               "seriesBy": "last",
               "colorBySeries": []

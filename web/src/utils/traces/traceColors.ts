@@ -10,7 +10,6 @@ export const LIGHT_SPAN_COLORS = [
   "#3B82F6",
   "#10B981",
   "#06B6D4",
-  "#EC4899",
   "#84CC16",
   "#6366F1",
   "#F59E0B",
@@ -27,14 +26,11 @@ export const LIGHT_SPAN_COLORS = [
   "#8B5CF6",
   "#F97316",
   "#06B6D4",
-  "#EC4899",
   "#22C55E",
   "#A855F7",
   "#FBBF24",
   "#3B82F6",
-  "#F43F5E",
   "#14B8A6",
-  "#D946EF",
   "#6366F1",
   "#FB923C",
   "#0EA5E9",
@@ -127,9 +123,9 @@ export const getSpanColorHex = (
   index: number,
   theme: "light" | "dark" = "light",
 ): string => {
-  const colors =
-    theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS.reverse();
-  const colorIndex = (index - 1) % 50;
+  const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
+  const colorIndex = LIGHT_SPAN_COLORS.length - index;
+  console.log("color Index", colorIndex);
   return colors[colorIndex];
 };
 
