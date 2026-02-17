@@ -505,7 +505,8 @@ export default class DashboardVariablesScoped {
       .click();
 
     // Select Stream (CommonAutoComplete component)
-    const streamSelect = this.page.locator('[data-test="dashboard-variable-stream-select"]');
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const streamSelect = this.page.locator('[data-test="dashboard-variable-stream-select"]').first();
     await streamSelect.click();
     await streamSelect.locator('input').fill(streamName);
     // Wait for and click the matching CommonAutoComplete option
@@ -515,7 +516,8 @@ export default class DashboardVariablesScoped {
     await streamOption.click();
 
     // Select Field (CommonAutoComplete component)
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
     await fieldSelect.click();
     await fieldSelect.locator('input').fill(field);
     // Wait for and click the matching CommonAutoComplete option
@@ -656,8 +658,9 @@ export default class DashboardVariablesScoped {
     // This maintains backward compatibility when called from addScopedVariable with just the dependency name
     if (!filterFieldName) {
       // Get the currently selected field value
-      const fieldInput = this.page.locator('[data-test="dashboard-variable-field-select"]');
-      filterFieldName = await fieldInput.inputValue();
+      // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+      const fieldInput = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
+      filterFieldName = await fieldInput.locator('input').inputValue();
 
       // If still no field, default to a common field name
       if (!filterFieldName) {

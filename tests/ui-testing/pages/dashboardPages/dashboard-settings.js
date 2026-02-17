@@ -298,7 +298,8 @@ export default class DashboardSetting {
     await streamTypeOption.click();
 
     // Select Stream (CommonAutoComplete component)
-    const streamSelector = this.page.locator('[data-test="dashboard-variable-stream-select"]');
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const streamSelector = this.page.locator('[data-test="dashboard-variable-stream-select"]').first();
     await streamSelector.click();
     await streamSelector.locator('input').fill(Stream);
     // Wait for and click the matching CommonAutoComplete option
@@ -311,7 +312,8 @@ export default class DashboardSetting {
     await this.page.waitForTimeout(1000);
 
     // Select Field (CommonAutoComplete component)
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
     await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
     await fieldSelect.click();
     await fieldSelect.locator('input').fill(field);

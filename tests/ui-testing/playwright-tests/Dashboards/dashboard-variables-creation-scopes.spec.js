@@ -135,7 +135,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.getByRole("option", { name: "logs", exact: true }).click();
 
     // Stream select (CommonAutoComplete component)
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
     await streamSelect.click();
     await streamSelect.locator('input').fill("e2e_automate");
     const streamOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
@@ -143,7 +144,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await streamOpt.click();
 
     // Field select (CommonAutoComplete component)
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
     await fieldSelect.click();
     await fieldSelect.locator('input').fill("kubernetes_container_name");
     const fieldOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_container_name" }).first();
@@ -253,7 +255,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.getByRole("option", { name: "logs", exact: true }).click();
 
     // Stream select (CommonAutoComplete component)
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
     await streamSelect.click();
     await streamSelect.locator('input').fill("e2e_automate");
     const streamOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
@@ -261,7 +264,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await streamOpt.click();
 
     // Field select (CommonAutoComplete component)
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
     await fieldSelect.click();
     await fieldSelect.locator('input').fill("kubernetes_container_name");
     const fieldOpt = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_container_name" }).first();
@@ -425,7 +429,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.getByRole("option", { name: "logs", exact: true }).click();
 
     // Stream select (CommonAutoComplete component)
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
     await streamSelect.click();
     await streamSelect.locator('input').fill("e2e_automate");
     const streamOpt4 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
@@ -433,7 +438,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await streamOpt4.click();
 
     // Field select (CommonAutoComplete component)
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
     await fieldSelect.click();
     await fieldSelect.locator('input').fill("kubernetes_pod_name");
     const fieldOpt4 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_pod_name" }).first();
@@ -549,7 +555,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.getByRole("option", { name: "logs", exact: true }).click();
 
     // Stream select (CommonAutoComplete component)
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT).first();
     await streamSelect.click();
     await streamSelect.locator('input').fill("e2e_automate");
     const streamOpt5 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "e2e_automate" }).first();
@@ -557,7 +564,8 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await streamOpt5.click();
 
     // Field select (CommonAutoComplete component)
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT).first();
     await fieldSelect.click();
     await fieldSelect.locator('input').fill("kubernetes_pod_name");
     const fieldOpt5 = page.locator(SELECTORS.AUTO_COMPLETE_OPTION).filter({ hasText: "kubernetes_pod_name" }).first();
