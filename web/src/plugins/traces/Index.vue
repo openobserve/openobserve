@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage"
-style="min-height: auto">
+  <q-page class="tracePage" id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <div
         class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
@@ -39,27 +38,20 @@ style="min-height: auto">
           @error-only-toggled="onErrorOnlyToggled"
           @filters-reset="onFiltersReset"
         />
-
-        <!-- Color Preview Test Button (Dev Only) -->
-        <q-btn
-          flat
-          dense
-          icon="palette"
-          color="primary"
-          class="tw:ml-2"
-          @click="showColorPreview = true"
-          title="Preview Span Colors (Test)"
-        >
-          <q-tooltip>Preview Span Colors</q-tooltip>
-        </q-btn>
       </div>
 
       <!-- Service Graph Tab Content -->
       <div
-        v-if="activeTab === 'service-graph' && store.state.zoConfig.service_graph_enabled"
+        v-if="
+          activeTab === 'service-graph' &&
+          store.state.zoConfig.service_graph_enabled
+        "
         class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
-        <service-graph class="tw:h-full" @view-traces="handleServiceGraphViewTraces" />
+        <service-graph
+          class="tw:h-full"
+          @view-traces="handleServiceGraphViewTraces"
+        />
       </div>
 
       <!-- Search Tab Content -->
@@ -92,11 +84,19 @@ style="min-height: auto">
           <template #separator>
             <q-btn
               data-test="logs-search-field-list-collapse-btn"
-              :icon="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'"
-              :title="
-                searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+              :icon="
+                searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
               "
-              :class="searchObj.meta.showFields ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+              :title="
+                searchObj.meta.showFields
+                  ? t('traces.collapseFields')
+                  : t('traces.openFields')
+              "
+              :class="
+                searchObj.meta.showFields
+                  ? 'splitter-icon-collapse'
+                  : 'splitter-icon-expand'
+              "
               color="primary"
               size="sm"
               dense
@@ -105,9 +105,7 @@ style="min-height: auto">
             />
           </template>
           <template #after>
-            <div
-              class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
-            >
+            <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
               <div class="card-container tw:h-full">
                 <div
                   v-if="
@@ -160,7 +158,7 @@ style="min-height: auto">
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noStreamSelectedMessage") }}
-                </div>
+                  </div>
                 </div>
                 <div
                   data-test="logs-search-result-not-found-text"
@@ -171,8 +169,7 @@ style="min-height: auto">
                   "
                   class="text-center tw:mx-[10%] tw:py-[40px] tw:text-[20px]"
                 >
-                  <q-icon name="info"
-color="primary" size="md" />
+                  <q-icon name="info" color="primary" size="md" />
                   {{ t("search.applySearch") }}
                 </div>
 
@@ -259,7 +256,9 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
-const SpanColorPreview = defineAsyncComponent(() => import("@/components/traces/SpanColorPreview.vue"));
+const SpanColorPreview = defineAsyncComponent(
+  () => import("@/components/traces/SpanColorPreview.vue"),
+);
 
 const store = useStore();
 const activeTab = ref("search");
@@ -1073,13 +1072,13 @@ onBeforeMount(async () => {
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === 'service-graph') {
+  if (queryParams.tab === "service-graph") {
     // Only allow service-graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = 'service-graph';
+      activeTab.value = "service-graph";
     } else {
       // If service graph is disabled, default to search tab
-      activeTab.value = 'search';
+      activeTab.value = "search";
     }
   }
   await importSqlParser();
@@ -1413,7 +1412,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  activeTab.value = 'search';
+  activeTab.value = "search";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1458,13 +1457,13 @@ watch(updateSelectedColumns, () => {
 // Watch for active tab changes and update URL
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
-  if (newTab === 'service-graph') {
+  if (newTab === "service-graph") {
     // Only set service-graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = 'service-graph';
+      query.tab = "service-graph";
     } else {
       // If service graph is disabled, force back to search tab
-      activeTab.value = 'search';
+      activeTab.value = "search";
       delete query.tab;
     }
   } else {

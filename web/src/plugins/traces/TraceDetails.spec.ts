@@ -235,10 +235,12 @@ describe("TraceDetails", () => {
     });
 
     it("should display span count", () => {
-      const spanCount = wrapper.find('[data-test="trace-details-spans-count"]');
+      const spanCount = wrapper
+        .find('[data-test="trace-details-spans-count"]')
+        .find('[data-test="span-count-text"]');
       expect(spanCount.exists()).toBe(true);
       expect(spanCount.text()).toContain(
-        `Spans: ${tracesMockData.tracesDetails.traceSpans.hits.length}`,
+        `${tracesMockData.tracesDetails.traceSpans.hits.length} spans`,
       );
     });
 
@@ -310,59 +312,6 @@ describe("TraceDetails", () => {
         await prevBtn.trigger("click");
         expect(wrapper.vm.traceTreeRef.prevMatch).toHaveBeenCalled();
       }
-    });
-  });
-
-  describe("Timeline and chart functionality", () => {
-    it("should toggle timeline expansion", async () => {
-      const toggleBtn = wrapper.find(
-        '[data-test="trace-details-toggle-timeline-btn"]',
-      );
-      expect(toggleBtn.exists()).toBe(true);
-
-      await toggleBtn.trigger("click");
-      expect(wrapper.vm.isTimelineExpanded).toBe(true);
-    });
-
-    it("should switch between timeline and service map views", async () => {
-      wrapper.vm.isTimelineExpanded = true;
-      await wrapper.vm.$nextTick();
-
-      const serviceMapBtn = wrapper.find(
-        '[data-test="trace-details-visual-service_map-btn"]',
-      );
-      if (serviceMapBtn.exists()) {
-        await serviceMapBtn.trigger("click");
-        expect(wrapper.vm.activeVisual).toBe("service_map");
-      }
-    });
-
-    it("should display visual title correctly", () => {
-      const visualTitle = wrapper.find(
-        '[data-test="trace-details-visual-title"]',
-      );
-      expect(visualTitle.exists()).toBe(true);
-      expect(visualTitle.text()).toContain("Trace Timeline");
-    });
-
-    it("should render service map chart when service map is selected", async () => {
-      wrapper.vm.isTimelineExpanded = true;
-      wrapper.vm.activeVisual = "service_map";
-      await wrapper.vm.$nextTick();
-
-      const chart = wrapper.find(
-        '[data-test="trace-details-service-map-chart"]',
-      );
-      expect(chart.exists()).toBe(true);
-    });
-
-    it("should render chart when timeline is expanded", async () => {
-      wrapper.vm.isTimelineExpanded = true;
-      wrapper.vm.activeVisual = "timeline";
-      await wrapper.vm.$nextTick();
-
-      const chart = wrapper.find('[data-test="trace-details-timeline-chart"]');
-      expect(chart.exists()).toBe(true);
     });
   });
 
@@ -535,7 +484,9 @@ describe("TraceDetails", () => {
       });
 
       it("should not show expand button in standalone mode", () => {
-        const expandBtn = wrapper.find('[data-test="trace-details-expand-btn"]');
+        const expandBtn = wrapper.find(
+          '[data-test="trace-details-expand-btn"]',
+        );
         expect(expandBtn.exists()).toBe(false);
       });
 
@@ -606,7 +557,8 @@ describe("TraceDetails", () => {
                 emits: ["resize-start"],
               },
               "trace-details-sidebar": {
-                template: '<div data-test="trace-details-sidebar">Sidebar</div>',
+                template:
+                  '<div data-test="trace-details-sidebar">Sidebar</div>',
                 props: [
                   "span",
                   "baseTracePosition",
@@ -669,7 +621,7 @@ describe("TraceDetails", () => {
           '[data-test="trace-details-trace-id"]',
         );
         if (traceId.exists()) {
-          expect(traceId.classes()).toContain("cursor-pointer");
+          expect(traceId.classes()).toContain("tw:cursor-pointer");
         }
       });
 
@@ -697,8 +649,7 @@ describe("TraceDetails", () => {
       });
 
       it("should emit spanSelected event when span is selected in embedded mode", async () => {
-        const spanId =
-          tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+        const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
         embeddedWrapper.vm.updateSelectedSpan(spanId);
         await embeddedWrapper.vm.$nextTick();
         expect(embeddedWrapper.emitted("spanSelected")).toBeTruthy();
@@ -873,44 +824,6 @@ describe("TraceDetails", () => {
         );
         expect(backBtn.exists()).toBe(false);
         wrapperNoBack.unmount();
-      });
-    });
-
-    describe("showTimeline prop", () => {
-      it("should show timeline section when true (default)", () => {
-        const timeline = wrapper.find(
-          '[data-test="trace-details-toggle-timeline-btn"]',
-        );
-        expect(timeline.exists()).toBe(true);
-      });
-
-      it("should hide timeline section when false", async () => {
-        const wrapperNoTimeline = mount(TraceDetails, {
-          attachTo: "#app",
-          props: {
-            showTimeline: false,
-          },
-          global: {
-            plugins: [i18n, router],
-            provide: { store },
-            stubs: {
-              "q-resize-observer": true,
-              "chart-renderer": {
-                template: '<div data-test="chart-renderer">Chart</div>',
-              },
-              "trace-tree": { template: "<div>Tree</div>" },
-              "trace-header": { template: "<div>Header</div>" },
-              "trace-details-sidebar": { template: "<div>Sidebar</div>" },
-            },
-          },
-        });
-
-        await flushPromises();
-        const timeline = wrapperNoTimeline.find(
-          '[data-test="trace-details-toggle-timeline-btn"]',
-        );
-        expect(timeline.exists()).toBe(false);
-        wrapperNoTimeline.unmount();
       });
     });
 
@@ -1488,7 +1401,9 @@ describe("TraceDetails", () => {
 
       // After reset and setup, these should be reset
       expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe("");
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(false);
+      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(
+        false,
+      );
     });
   });
 

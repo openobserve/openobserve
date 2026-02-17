@@ -80,10 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="span.hasChildSpans"
-                class="span-count-box cursor-pointer"
+                class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]!"
                 :ref="(el) => setBadgeRef(span.spanId, el)"
                 :style="{
-                  borderColor: span.style.color,
                   color: span.style.color,
                 }"
                 @click.stop="toggleSpanCollapse(span.spanId)"
@@ -429,7 +428,7 @@ export default defineComponent({
                 y1: parentY,
                 x2: parentX,
                 y2: lastChildY,
-                color: span.style.color,
+                color: "#e6e6e6",
                 children: childPositions,
               };
             }
@@ -615,10 +614,10 @@ export default defineComponent({
 }
 
 .span-count-box {
-  min-width: 1.5rem;
-  height: 1.25rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
   padding: 0 0.25rem;
-  border-radius: 0.25rem;
+  border-radius: 50%;
   border: 0.0625rem solid;
   display: flex;
   align-items: center;

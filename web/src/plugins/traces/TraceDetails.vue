@@ -136,15 +136,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Span Count Badge -->
             <div
               data-test="trace-details-spans-count"
-              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)]"
+              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
             >
               <q-icon name="hub" size="14px" />
-              <span>{{ effectiveSpanList.length }} spans</span>
+              <span data-test="span-count-text"
+                >{{ effectiveSpanList.length }} spans</span
+              >
             </div>
 
             <!-- Error Count Badge -->
             <div
-              class="tw:flex tw:items-center tw:space-x-1 tw:mr-[0.325rem] tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)]"
+              class="tw:flex tw:items-center tw:space-x-1 tw:mr-[0.325rem] tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
             >
               <q-icon
                 name="error_outline"
@@ -194,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Tabs & Search Bar -->
         <div
-          class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white"
+          class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white tw:bg-[var(--o2-card-bg)]!"
         >
           <div
             class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem]"
@@ -380,7 +382,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="trace-tree-wrapper">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
-            <div v-if="activeTab === 'waterfall'" class="tw:flex">
+            <div
+              v-if="activeTab === 'waterfall'"
+              class="tw:flex tw:h-full tw:bg-[var(--o2-card-bg)]!"
+            >
               <div
                 class="tw:flex tw:flex-col tw:min-h-0"
                 :style="{
@@ -403,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                 >
                   <div
-                    class="trace-tree-container"
+                    class="trace-tree-container tw:bg-[var(--o2-card-bg)]!"
                     data-test="trace-details-tree-container"
                   >
                     <div class="position-relative">
@@ -432,6 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :spanMap="spanMap"
                         :leftWidth="leftWidth"
                         ref="traceTreeRef"
+                        class="tw:bg-[var(--o2-card-bg)]!"
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
@@ -535,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="activeTab === 'flame-graph'"
               style="display: flex; flex: 1; min-height: 0"
-              class="tw:w-full"
+              class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
             >
               <FlameGraphView
                 :spans="flatSpans"
@@ -589,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div
-                style="text-align: center; color: var(--o2-text-secondary)"
+                style="text-align: center"
                 class="tw:w-full tw:h-full tw:p-[0.625rem]"
               >
                 <ChartRenderer
@@ -659,6 +665,7 @@ import {
   convertTimelineData,
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
+import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -876,7 +883,7 @@ export default defineComponent({
     });
 
     const serviceColorIndex = ref(0);
-    const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
+    const colors = ref(getAllSpanColors());
 
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
@@ -2620,7 +2627,7 @@ html:has(.trace-details) {
 
 .trace-logs-selector {
   .q-field {
-    border-radius: 0.5rem 0 0 0.5rem;
+    border-radius: 0.2rem 0 0 0.2rem;
 
     span {
       display: inline-block;
@@ -2632,7 +2639,7 @@ html:has(.trace-details) {
     }
 
     .q-field__control {
-      border-radius: 0.5rem 0 0 0.5rem !important;
+      border-radius: 0.2rem 0 0 0.2rem !important;
     }
 
     .q-field__control:before,
@@ -2650,7 +2657,7 @@ html:has(.trace-details) {
 
   .q-field .q-field__control {
     padding: 0px 4px;
-    border-radius: 0.5rem;
+    border-radius: 0.2rem;
   }
 
   .q-field .q-field__control:before,
@@ -2716,8 +2723,8 @@ html:has(.trace-details) {
   margin-left: -1px;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 0.5rem !important;
-  border-bottom-right-radius: 0.5rem !important;
+  border-top-right-radius: 0.2rem !important;
+  border-bottom-right-radius: 0.2rem !important;
 }
 
 .traces-view-logs-btn,
