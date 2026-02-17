@@ -256,7 +256,7 @@ macro_rules! _get_variables {
                     // FE uses $ to reference variables,
                     // stream name itself can come from variable
                     // so we skip it if it starts with $
-                    if qd.stream.starts_with("$"){
+                    if qd.stream.starts_with("$") {
                         continue;
                     }
                     $map.entry((qd.stream.clone(), qd.stream_type))
