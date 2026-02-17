@@ -1336,7 +1336,7 @@ class="q-pr-sm q-pt-xs" />
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
                       editor-height="100%"
-                      class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
+                      class="monaco-editor"
                       :class="
                         searchObj.data.tempFunctionContent == '' &&
                         searchObj.meta.functionEditorPlaceholderFlag
