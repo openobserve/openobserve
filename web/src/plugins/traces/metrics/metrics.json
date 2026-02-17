@@ -61,9 +61,9 @@
             "table_transpose": false,
             "table_dynamic_columns": false,
             "color": {
-              "mode": "palette-classic-by-series",
+              "mode": "fixed",
               "fixedColor": [
-                "#53ca53"
+                "#A855F7"
               ],
               "seriesBy": "last",
               "colorBySeries": []
@@ -191,9 +191,9 @@
             "table_transpose": false,
             "table_dynamic_columns": false,
             "color": {
-              "mode": "palette-classic-by-series",
+              "mode": "fixed",
               "fixedColor": [
-                "#53ca53"
+                "#818CF8"
               ],
               "seriesBy": "last",
               "colorBySeries": []
@@ -318,7 +318,7 @@
             "color": {
               "mode": "fixed",
               "fixedColor": [
-                "#ff0000"
+                "#FB7185"
               ],
               "seriesBy": "last",
               "colorBySeries": []
