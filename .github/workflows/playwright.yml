@@ -193,7 +193,7 @@ jobs:
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
                 "visualize.spec.js",
-                # "visualization-vrl.spec.js"
+                "visualize-vrl.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
