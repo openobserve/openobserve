@@ -23,6 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-bind="$attrs"
       :id="editorId"
     />
+    <!-- AI Icon Button -->
+    <q-btn
+      v-if="showAiIcon && !disableAi"
+      round
+      flat
+      size="sm"
+      class="ai-icon-button"
+      :class="nlpMode ? 'ai-icon-active' : ''"
+      @click="toggleNlpMode"
+      data-test="query-editor-ai-icon-btn"
+    >
+      <q-icon size="20px">
+        <img :src="aiIcon" alt="AI" class="ai-icon-img" />
+      </q-icon>
+      <q-tooltip>
+        {{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}
+      </q-tooltip>
+    </q-btn>
   </div>
 </template>
 
@@ -59,6 +77,7 @@ import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   inheritAttrs: false,
@@ -107,8 +126,20 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAiIcon: {
+      type: Boolean,
+      default: false,
+    },
+    disableAi: {
+      type: Boolean,
+      default: false,
+    },
+    disableAiReason: {
+      type: String,
+      default: '',
+    },
   },
-  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end", "generation-success"],
+  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end", "generation-success", "toggle-nlp-mode"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
@@ -964,6 +995,18 @@ export default defineComponent({
       }
     });
 
+    // Computed property for AI icon based on theme
+    const aiIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg");
+    });
+
+    // Toggle NLP mode
+    const toggleNlpMode = () => {
+      emit('toggle-nlp-mode');
+    };
+
     return {
       editorRef,
       editorObj,
@@ -982,6 +1025,8 @@ export default defineComponent({
       handleGenerateSQL,
       streamingResponse,
       t,
+      aiIcon,
+      toggleNlpMode,
     };
   },
 });
@@ -998,6 +1043,36 @@ export default defineComponent({
   position: relative;
   width: 100%;
   height: 100%;
+}
+
+/* AI Icon Button Styling */
+.ai-icon-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  background-color: var(--o2-bg-primary);
+  border: 1px solid var(--o2-border-color);
+  transition: all 0.2s ease;
+}
+
+.ai-icon-button:hover {
+  background-color: var(--o2-hover-accent);
+  border-color: var(--o2-color-primary);
+}
+
+.ai-icon-button.ai-icon-active {
+  background-color: var(--o2-color-primary-light);
+  border-color: var(--o2-color-primary);
+}
+
+.ai-icon-img {
+  width: 18px;
+  height: 18px;
+}
+
+.q-dark .ai-icon-img {
+  filter: brightness(1.2);
 }
 .monaco-editor,
 .monaco-diff-editor .synthetic-focus,
