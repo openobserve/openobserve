@@ -858,6 +858,15 @@
             <div v-else class="tw:w-8"></div>
 
             <div class="tw:flex tw:items-center tw:gap-2">
+              <!-- Elapsed timer - shown when loading/streaming -->
+              <span v-if="isLoading" class="elapsed-timer">
+                {{ formattedElapsedTime }}
+              </span>
+              <!-- Completed time - shown briefly after completion -->
+              <span v-else-if="lastCompletionTime" class="elapsed-timer completed">
+                {{ lastCompletionTime }}
+              </span>
+
               <!-- Send button - shown when not loading -->
               <q-btn
                 v-if="!isLoading"
@@ -1070,6 +1079,13 @@ export default defineComponent({
     // Context references for rich text input chips
     const contextReferences = ref<ReferenceChip[]>([]);
 
+    // Elapsed timer state
+    const queryStartTime = ref<number | null>(null);
+    const elapsedSeconds = ref(0);
+    const elapsedTimerInterval = ref<ReturnType<typeof setInterval> | null>(null);
+    const lastCompletionTime = ref<string>('');
+    const completionTimeFadeTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
+
     // Component readiness tracking
     const componentReady = ref(false);
     const pendingChips = ref<ReferenceChip[]>([]);
@@ -1117,6 +1133,63 @@ export default defineComponent({
       if (analyzingRotationInterval.value) {
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
+      }
+    };
+
+    /**
+     * Format elapsed seconds into a human-readable string (e.g., "12s", "1m 23s")
+     */
+    const formattedElapsedTime = computed(() => {
+      const s = elapsedSeconds.value;
+      const minutes = Math.floor(s / 60);
+      const seconds = s % 60;
+      if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+      }
+      return `${seconds}s`;
+    });
+
+    /**
+     * Start the elapsed timer when a query is sent
+     */
+    const startElapsedTimer = () => {
+      // Clear any previous completion time display
+      lastCompletionTime.value = '';
+      if (completionTimeFadeTimeout.value) {
+        clearTimeout(completionTimeFadeTimeout.value);
+        completionTimeFadeTimeout.value = null;
+      }
+
+      queryStartTime.value = Date.now();
+      elapsedSeconds.value = 0;
+      elapsedTimerInterval.value = setInterval(() => {
+        if (queryStartTime.value) {
+          elapsedSeconds.value = Math.floor((Date.now() - queryStartTime.value) / 1000);
+        }
+      }, 1000);
+    };
+
+    /**
+     * Stop the elapsed timer and show completion time briefly
+     */
+    const stopElapsedTimer = () => {
+      if (elapsedTimerInterval.value) {
+        clearInterval(elapsedTimerInterval.value);
+        elapsedTimerInterval.value = null;
+      }
+      if (queryStartTime.value) {
+        const elapsed = Math.floor((Date.now() - queryStartTime.value) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        lastCompletionTime.value = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+        queryStartTime.value = null;
+        elapsedSeconds.value = 0;
+
+        // Auto-clear the completion time after 10 seconds
+        completionTimeFadeTimeout.value = setTimeout(() => {
+          lastCompletionTime.value = '';
+          completionTimeFadeTimeout.value = null;
+        }, 10000);
       }
     };
 
@@ -2717,6 +2790,7 @@ export default defineComponent({
       currentTextSegment.value = '';
       resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
+      startElapsedTimer(); // Start elapsed time tracking
 
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
@@ -2792,10 +2866,11 @@ export default defineComponent({
       isLoading.value = false;
       activeToolCall.value = null;
       stopAnalyzingRotation();
+      stopElapsedTimer(); // Stop elapsed time tracking and show completion time
 
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
-      
+
       await scrollToBottom();
     };
 
@@ -3375,6 +3450,16 @@ export default defineComponent({
         titleIntervalId = null;
       }
 
+      // Clean up elapsed timer
+      if (elapsedTimerInterval.value) {
+        clearInterval(elapsedTimerInterval.value);
+        elapsedTimerInterval.value = null;
+      }
+      if (completionTimeFadeTimeout.value) {
+        clearTimeout(completionTimeFadeTimeout.value);
+        completionTimeFadeTimeout.value = null;
+      }
+
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
       //so we need to make sure that the currentChatTimestamp is set to the correct chatId
@@ -3936,6 +4021,9 @@ export default defineComponent({
       cancelCurrentRequest,
       currentAbortController,
       activeToolCall,
+      // Elapsed timer
+      formattedElapsedTime,
+      lastCompletionTime,
       truncateQuery,
       formatContextKey,
       expandedToolCalls,
@@ -4555,6 +4643,32 @@ export default defineComponent({
     box-shadow: 0 2px 10px 0 rgba(102, 126, 234, 0.3) !important;
   }
 
+}
+
+// Elapsed timer styling
+.elapsed-timer {
+  font-size: 12px;
+  color: #fbbf24;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-weight: 500;
+
+  &.completed {
+    color: #888;
+    font-weight: 400;
+  }
+}
+
+.dark-mode .elapsed-timer.completed {
+  color: #999;
+}
+
+.light-mode .elapsed-timer {
+  color: #d97706;
+
+  &.completed {
+    color: #666;
+  }
 }
 
 // Stop button gradient styling
