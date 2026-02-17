@@ -2627,7 +2627,7 @@ html:has(.trace-details) {
 
 .trace-logs-selector {
   .q-field {
-    border-radius: 0.5rem 0 0 0.5rem;
+    border-radius: 0.2rem 0 0 0.2rem;
 
     span {
       display: inline-block;
@@ -2639,7 +2639,7 @@ html:has(.trace-details) {
     }
 
     .q-field__control {
-      border-radius: 0.5rem 0 0 0.5rem !important;
+      border-radius: 0.2rem 0 0 0.2rem !important;
     }
 
     .q-field__control:before,
@@ -2657,7 +2657,7 @@ html:has(.trace-details) {
 
   .q-field .q-field__control {
     padding: 0px 4px;
-    border-radius: 0.5rem;
+    border-radius: 0.2rem;
   }
 
   .q-field .q-field__control:before,
@@ -2723,8 +2723,8 @@ html:has(.trace-details) {
   margin-left: -1px;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 0.5rem !important;
-  border-bottom-right-radius: 0.5rem !important;
+  border-top-right-radius: 0.2rem !important;
+  border-bottom-right-radius: 0.2rem !important;
 }
 
 .traces-view-logs-btn,
