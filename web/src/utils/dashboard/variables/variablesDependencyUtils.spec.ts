@@ -524,6 +524,7 @@ describe("Variables Dependency Utils", () => {
   describe("Dependency Detection for Stream and Field References", () => {
     it("should detect dependencies in query_data.stream", () => {
       const variables = [
+        { name: "streamVar", type: "constant", query_data: null },
         {
           name: "fieldVar",
           type: "query_values",
@@ -533,7 +534,6 @@ describe("Variables Dependency Utils", () => {
             filter: [],
           },
         },
-        { name: "streamVar", type: "constant", query_data: null },
       ];
 
       const graph = buildVariablesDependencyGraph(variables);
@@ -544,6 +544,7 @@ describe("Variables Dependency Utils", () => {
 
     it("should detect dependencies in query_data.field", () => {
       const variables = [
+        { name: "fieldVar", type: "constant", query_data: null },
         {
           name: "dataVar",
           type: "query_values",
@@ -553,7 +554,6 @@ describe("Variables Dependency Utils", () => {
             filter: [],
           },
         },
-        { name: "fieldVar", type: "constant", query_data: null },
       ];
 
       const graph = buildVariablesDependencyGraph(variables);
@@ -609,6 +609,7 @@ describe("Variables Dependency Utils", () => {
 
     it("should handle stream with embedded variable in string", () => {
       const variables = [
+        { name: "environment", type: "constant", query_data: null },
         {
           name: "dynamicStream",
           type: "query_values",
@@ -618,7 +619,6 @@ describe("Variables Dependency Utils", () => {
             filter: [],
           },
         },
-        { name: "environment", type: "constant", query_data: null },
       ];
 
       const graph = buildVariablesDependencyGraph(variables);
@@ -629,17 +629,17 @@ describe("Variables Dependency Utils", () => {
 
     it("should handle field with multiple variables", () => {
       const variables = [
+        { name: "prefix", type: "constant", query_data: null },
+        { name: "suffix", type: "constant", query_data: null },
         {
           name: "multiFieldVar",
           type: "query_values",
           query_data: {
             stream: "logs",
-            field: "$prefix_$suffix",
+            field: "$prefix.$suffix",
             filter: [],
           },
         },
-        { name: "prefix", type: "constant", query_data: null },
-        { name: "suffix", type: "constant", query_data: null },
       ];
 
       const graph = buildVariablesDependencyGraph(variables);
@@ -815,6 +815,7 @@ describe("Variables Dependency Utils", () => {
 
     it("should be backward compatible with filter-only dependencies", () => {
       const variables = [
+        { name: "env", type: "constant", query_data: null },
         {
           name: "region",
           type: "query_values",
@@ -824,7 +825,6 @@ describe("Variables Dependency Utils", () => {
             filter: [{ value: "environment='$env'" }],
           },
         },
-        { name: "env", type: "constant", query_data: null },
       ];
 
       const graph = buildVariablesDependencyGraph(variables);
