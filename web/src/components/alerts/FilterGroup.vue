@@ -101,9 +101,9 @@
             color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
-            <span class="text-bold">Condition</span>
+            <span class="text-bold">{{ t('alerts.conditions.condition') }}</span>
             <q-tooltip :delay="300">
-              Add a new condition to this group
+              {{ t('alerts.conditions.addConditionTooltip') }}
             </q-tooltip>
         </q-btn>
         <q-btn
@@ -119,12 +119,12 @@
             color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
-            <span class="text-bold">Condition Group</span>
+            <span class="text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <q-tooltip v-if="depth < 2" :delay="300">
-              Add a nested condition group (max depth: 2)
+              {{ t('alerts.conditions.addConditionGroupTooltip') }}
             </q-tooltip>
             <q-tooltip v-else :delay="300">
-              Maximum nesting depth reached
+              {{ t('alerts.conditions.maxDepthReachedTooltip') }}
             </q-tooltip>
         </q-btn>
         <q-btn
@@ -160,6 +160,7 @@
     import { computed, ref, watch } from 'vue';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
+    import { useI18n } from 'vue-i18n';
     import { getUUID } from '@/utils/zincutils';
     import AppTabs from '../common/AppTabs.vue';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -233,6 +234,7 @@
   const showPreview = ref(true);
 
   const store = useStore();
+  const { t } = useI18n();
 
   // V2: Use logicalOperator (AND/OR) instead of label (and/or)
   const label = ref(props.group.logicalOperator?.toLowerCase() || 'and');

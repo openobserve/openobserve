@@ -1469,6 +1469,154 @@
       "searchField": "필드 검색",
       "savedFunctions": "저장된 함수",
       "autoUsesCheckInterval": "자동 (검사 간격 사용)"
+    },
+    "steps": {
+      "alertSetup": "알림 설정",
+      "conditions": "조건",
+      "compareWithPast": "과거와 비교하기",
+      "alertSettings": "알림 설정",
+      "deduplication": "중복 제거",
+      "advanced": "고급"
+    },
+    "stepCaptions": {
+      "alertSetup": "알림 단계 설정",
+      "conditions": "알림을 트리거해야 하는 항목",
+      "compareWithPast": "현재 결과를 다른 기간의 데이터와 비교",
+      "alertSettings": "알림 규칙을 설정하고 알림 수신 방법을 선택하세요.",
+      "deduplication": "비슷한 알림을 그룹화하여 동일한 알림을 여러 번 전송하지 마십시오.",
+      "advanced": "컨텍스트 변수, 설명 및 행 템플릿"
+    },
+    "template": "템플릿 오버라이드",
+    "searchDestinationType": "목적지 유형 검색...",
+    "customDestination": "커스텀 데스티네이션",
+    "customDestinationDescription": "사용자 지정 HTTP 엔드포인트 또는 이메일 대상 구성",
+    "noDestinationTypesFound": "목적지 유형을 찾을 수 없습니다",
+    "clearSearch": "검색 지우기",
+    "popular": "인기",
+    "testIdleMessage": "'테스트'를 클릭하여 대상 구성을 확인합니다.",
+    "destinationPreview": "목적지 미리 보기",
+    "testSuccessMessage": "테스트 성공!목적지가 올바르게 구성되었습니다.",
+    "testFailedMessage": "테스트에 실패했습니다.구성을 확인하고 다시 시도하세요.",
+    "testInProgress": "테스트 대상...",
+    "sendingNotification": "연결 확인을 위한 테스트 알림 전송",
+    "testErrorDNS": "DNS 확인에 실패했습니다.웹후크 URL 또는 호스트 이름을 확인하십시오.",
+    "testErrorConnection": "연결이 거부되었습니다.URL을 확인하고 서비스에 연결할 수 있는지 확인하십시오.",
+    "testErrorTimeout": "요청 시간이 초과되었습니다.대상 서비스가 느리거나 연결이 불가능할 수 있습니다.",
+    "testErrorSSL": "SSL/TLS 인증서 오류가 발생했습니다.인증서를 확인하거나 SSL 인증을 비활성화하세요.",
+    "testErrorGeneric": "오류가 발생하여 테스트에 실패했습니다.아래 세부 정보를 확인하세요.",
+    "testErrorClientError": "클라이언트 오류 (4xx).자격 증명과 구성을 확인하십시오.",
+    "testErrorServerError": "서버 오류 (5xx).대상 서비스에 문제가 있습니다.",
+    "viewDetails": "세부 정보 보기",
+    "error": "오류",
+    "httpStatus": "HTTP 상태",
+    "responseBody": "응답 바디",
+    "responseHeaders": "응답 헤더",
+    "retry": "재시도",
+    "suggestCheckUrl": "웹후크 URL이 정확하고 연결할 수 있는지 확인하십시오.",
+    "suggestCheckFirewall": "방화벽 설정을 확인하고 대상 서비스에 액세스할 수 있는지 확인하십시오.",
+    "suggestCheckCredentials": "API 자격 증명이 올바른지 확인하십시오.",
+    "suggestCheckPermissions": "자격 증명에 필요한 권한이 있는지 확인하십시오.",
+    "suggestCheckEndpoint": "엔드포인트 URL이 올바른지 확인하십시오.",
+    "suggestRateLimit": "속도 제한을 초과했습니다.다시 시도하기 전에 잠시 기다려 주세요.",
+    "suggestServerIssue": "대상 서비스에 문제가 있습니다.나중에 다시 시도하세요.",
+    "discord": "디스코드",
+    "msteams": "마이크로소프트 팀즈",
+    "pagerduty": "페이저 듀티",
+    "opsgenie": "옵스제니",
+    "servicenow": "서비스 나우",
+    "saveAlert": "알림 저장",
+    "aggregation_threshold": "그룹이 있는 경우 경고",
+    "thresholdDynamic": {
+      "alertMeWhen": "언제 알려줘",
+      "metricTypes": {
+        "resultsPassedFilter": "결과 통과 필터",
+        "distinctGroupsAffected": "별개의 그룹이 영향을 받음",
+        "metricsMatchCriteria": "지표 일치 기준",
+        "matchingLogsFound": "일치하는 로그가 발견됨",
+        "groupsPassFilter": "그룹이 필터 기준을 통과함",
+        "distinctGroups": "별개의 그룹이 발견됨",
+        "resultRows": "결과 행 반환",
+        "timeSeries": "활성 시계열이 발견됨",
+        "matchingRecords": "일치하는 레코드를 찾았습니다",
+        "groupsWithHaving": "그룹 일치 조건",
+        "uniqueGroups": "고유 그룹",
+        "events": "이벤트 일치 조건",
+        "aggregatedValue": "경기 조건"
+      },
+      "contextLabels": {
+        "groupedBy": "그룹화 기준:",
+        "havingConditions": "조건 있음:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "경고 이름",
+      "sqlQuery": "SQL 쿼리",
+      "promqlQuery": "프롬큐 쿼리",
+      "conditions": "조건",
+      "copy": "복사",
+      "noCondition": "조건 없음",
+      "noDescription": "설명 없음",
+      "evaluationHistory": "평가 기록",
+      "loadingHistory": "기록 로드 중...",
+      "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다.",
+      "results": "결과"
+    },
+    "historyTable": {
+      "timestamp": "타임스탬프",
+      "status": "상태",
+      "evaluationTime": "평가 (들)",
+      "queryTime": "쿼리 (밀리초)",
+      "error": "오류"
+    },
+    "back": "뒤로",
+    "continue": "계속",
+    "wouldTrigger": "트리거할 것이다",
+    "wouldNotTrigger": "트리거하지 않을 것입니다",
+    "queryBuilder": "건축업자",
+    "groupByHelp": {
+      "description": "집계된 데이터를 특정 필드별로 그룹화하여 각 고유 값에 대해 별도의 알림을 생성합니다.",
+      "example": "예: “호스트 이름”별로 그룹화하여 서버당 개별 알림을 가져오거나 “status_code”별로 그룹화하여 오류를 개별적으로 추적합니다."
+    },
+    "conditions": {
+      "condition": "상태",
+      "conditionGroup": "조건 그룹",
+      "addConditionTooltip": "이 그룹에 새 조건 추가",
+      "addConditionGroupTooltip": "중첩된 조건 그룹 추가 (최대 깊이: 2)",
+      "maxDepthReachedTooltip": "최대 중첩 깊이에 도달했습니다."
+    },
+    "compareWithPast": {
+      "alertSetFor": "에 대한 경고 설정",
+      "currentWindow": "현재 창",
+      "cycle": "사이클",
+      "cycleTooltip": "이전 주기의 동일한 시간과 결과를 비교합니다.",
+      "runningFor": "모든 {빈도} 간격으로 {기간} 동안 실행",
+      "currentWindowCannotBeDeleted": "현재 창을 삭제할 수 없습니다.",
+      "comparingWith": "비교 대상",
+      "referenceWindow": "레퍼런스 윈도우",
+      "timeFrame": "타임 프레임",
+      "timeFrameTooltip": "쿼리의 시간 범위.",
+      "comparingText": "현재 윈도우 쿼리 결과를 이전 {offset} 의 쿼리 결과와 비교합니다.",
+      "addComparisonWindow": "비교 창 추가",
+      "goToConditions": "조건으로 이동",
+      "goToConditionsTooltip": "“조건으로 이동”을 클릭하여 선택한 비교 창의 이벤트를 확인합니다."
+    },
+    "alertSettings": {
+      "cronSchedule": "크론 스케줄",
+      "addNewDestination": "새 목적지 추가",
+      "cooldownTooltip": "경고가 트리거되면 다른 알림을 보내기 전에 얼마나 기다려야 합니까? 예를 들어 경보가 오후 4시에 트리거되고 무음 알림이 10분으로 설정된 경우 경고가 1분이 지난 후에도 오후 4시 10분까지는 다른 알림을 보내지 않습니다.이는 사용자에게 알림을 스팸으로 보내는 것을 방지하기 위한 것입니다.",
+      "thresholdTooltip": "이벤트 수 또는 집계된 값을 기반으로 알림이 트리거되는 시기를 정의합니다.예: “> 100\"으로 설정하면 이벤트 수가 100개를 초과할 때 알림이 트리거됩니다.",
+      "periodTooltip": "쿼리를 실행해야 하는 기간. 예를 들어 10분은 쿼리가 실행될 때마다 최근 10분의 데이터를 사용한다는 의미입니다.",
+      "frequencyTooltipMinutes": "작업 실행 빈도 (예: 5분마다)",
+      "frequencyTooltipCron": "공백으로 구분된 5개의 필드가 있는 표준 UNIX 크론 형식: [분 0-59] [시간 0-23] [월 1-31] [월 1-12일 또는 1월 12월] [요일 0-7 또는 '1L-7L', 일요일의 경우 0 및 7].",
+      "timezoneWarning": "경고: 표시된 시간대는 대략적인 시간대입니다.정확한 시간대를 수동으로 확인하고 선택하십시오.",
+      "destinationsTooltip": "경고 알림을 보낼 대상을 하나 이상 선택합니다.",
+      "templateTooltip": "선택 사항: 이 알림의 모든 대상에 사용할 템플릿을 선택합니다.템플릿을 사용하여 경고 메시지의 형식을 사용자 지정할 수 있습니다.선택하지 않을 경우 각 대상에서는 자체적으로 구성된 템플릿을 사용합니다."
+    },
+    "advanced": {
+      "addVariable": "변수 추가",
+      "variablesTooltip": "변수는 알림에서 대상으로 데이터를 전달하는 데 사용됩니다.",
+      "rowTemplateTooltip": "행 템플릿은 경고 메시지의 형식을 지정하는 데 사용됩니다.",
+      "templateType": "템플릿 유형:"
     }
   },
   "alert_templates": {
@@ -2063,7 +2211,8 @@
     "showLegends": "쇼 레전드"
   },
   "alert_list": {
-    "alert_details": "경고 세부 정보"
+    "alert_details": "경고 세부 정보",
+    "alert_history": "알림 기록"
   },
   "latencyInsights": {
     "title": "인사이트",

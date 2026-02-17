@@ -1479,6 +1479,154 @@
       "searchField": "フィールドを検索する",
       "savedFunctions": "保存済み機能",
       "autoUsesCheckInterval": "自動 (チェック間隔を使用)"
+    },
+    "steps": {
+      "alertSetup": "アラート設定",
+      "conditions": "条件",
+      "compareWithPast": "過去と比較",
+      "alertSettings": "アラート設定",
+      "deduplication": "重複排除",
+      "advanced": "上級者向け"
+    },
+    "stepCaptions": {
+      "alertSetup": "アラートのステージを設定する",
+      "conditions": "アラートをトリガーするもの",
+      "compareWithPast": "現在の結果を別の期間のデータと比較する",
+      "alertSettings": "アラートルールを設定し、通知方法を選択します。",
+      "deduplication": "類似のアラートをグループ化して、同じアラートを複数回送信しないようにします。",
+      "advanced": "コンテキスト変数、説明、行テンプレート"
+    },
+    "template": "テンプレートオーバーライド",
+    "searchDestinationType": "送信先タイプを検索...",
+    "customDestination": "カスタム目的地",
+    "customDestinationDescription": "カスタム HTTP エンドポイントまたは E メール送信先を設定する",
+    "noDestinationTypesFound": "目的地のタイプが見つかりません",
+    "clearSearch": "検索をクリア",
+    "popular": "人気",
+    "testIdleMessage": "[テスト] をクリックして、送信先の設定を確認します",
+    "destinationPreview": "デスティネーションプレビュー",
+    "testSuccessMessage": "テストが成功しました！目的地は正しく設定されています。",
+    "testFailedMessage": "テストが失敗しました。設定を確認して、もう一度試してください。",
+    "testInProgress": "送信先をテスト中...",
+    "sendingNotification": "接続を確認するためのテスト通知の送信",
+    "testErrorDNS": "DNS 解決が失敗しました。ウェブフック URL またはホスト名を確認してください。",
+    "testErrorConnection": "接続が拒否されました。URL を確認し、サービスにアクセスできることを確認してください。",
+    "testErrorTimeout": "リクエストがタイムアウトしました。送信先のサービスが遅いか、アクセスできない可能性があります。",
+    "testErrorSSL": "SSL/TLS 証明書エラーです。証明書を確認するか、SSL 検証を無効にしてください。",
+    "testErrorGeneric": "テストはエラーで失敗しました。以下の詳細を確認してください。",
+    "testErrorClientError": "クライアントエラー (4xx)。認証情報と設定を確認してください。",
+    "testErrorServerError": "サーバーエラー (5xx)。送信先サービスで問題が発生しています。",
+    "viewDetails": "詳細を表示",
+    "error": "[エラー]",
+    "httpStatus": "HTTP ステータス",
+    "responseBody": "レスポンスボディ",
+    "responseHeaders": "レスポンスヘッダー",
+    "retry": "リトライ",
+    "suggestCheckUrl": "Webhook URL が正しく、アクセス可能であることを確認してください。",
+    "suggestCheckFirewall": "ファイアウォールの設定を確認して、宛先サービスにアクセスできることを確認してください。",
+    "suggestCheckCredentials": "API 認証情報が正しいことを確認してください。",
+    "suggestCheckPermissions": "認証情報に必要な権限があることを確認してください。",
+    "suggestCheckEndpoint": "エンドポイント URL が正しいことを確認してください。",
+    "suggestRateLimit": "レート制限を超えました。しばらく待ってから再試行してください。",
+    "suggestServerIssue": "送信先サービスで問題が発生しています。後でもう一度試してください。",
+    "discord": "不和",
+    "msteams": "マイクロソフトチーム",
+    "pagerduty": "ポケットベル・デューティ",
+    "opsgenie": "オプスゲニー",
+    "servicenow": "サービスナウ",
+    "saveAlert": "アラートを保存",
+    "aggregation_threshold": "グループがある場合はアラート",
+    "thresholdDynamic": {
+      "alertMeWhen": "次の場合に通知する",
+      "metricTypes": {
+        "resultsPassedFilter": "フィルターを通過した結果",
+        "distinctGroupsAffected": "個別のグループが影響を受ける",
+        "metricsMatchCriteria": "メトリックス一致基準",
+        "matchingLogsFound": "一致するログが見つかりました",
+        "groupsPassFilter": "グループはフィルター条件に合格します",
+        "distinctGroups": "異なるグループが見つかりました",
+        "resultRows": "結果行が返されました",
+        "timeSeries": "アクティブな時系列が見つかりました",
+        "matchingRecords": "一致するレコードが見つかりました",
+        "groupsWithHaving": "グループ一致条件",
+        "uniqueGroups": "ユニークグループ",
+        "events": "イベント一致条件",
+        "aggregatedValue": "マッチ条件"
+      },
+      "contextLabels": {
+        "groupedBy": "グループ化:",
+        "havingConditions": "条件がある:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "アラート名",
+      "sqlQuery": "SQL クエリー",
+      "promqlQuery": "プロムQL クエリ",
+      "conditions": "条件",
+      "copy": "[コピー]",
+      "noCondition": "条件なし",
+      "noDescription": "説明なし",
+      "evaluationHistory": "評価履歴",
+      "loadingHistory": "履歴をロード中...",
+      "noHistoryAvailable": "このアラートの評価履歴はありません",
+      "results": "結果"
+    },
+    "historyTable": {
+      "timestamp": "タイムスタンプ",
+      "status": "ステータス",
+      "evaluationTime": "評価 (s)",
+      "queryTime": "クエリ (ミリ秒)",
+      "error": "[エラー]"
+    },
+    "back": "戻る",
+    "continue": "続行",
+    "wouldTrigger": "トリガーする",
+    "wouldNotTrigger": "トリガーされない",
+    "queryBuilder": "ビルダー",
+    "groupByHelp": {
+      "description": "集計されたデータを特定のフィールドでグループ化し、一意の値ごとに個別のアラートを作成します。",
+      "example": "例:「hostname」でグループ化してサーバーごとに個別のアラートを取得するか、「status_code」でグループ化してエラーを個別に追跡します。"
+    },
+    "conditions": {
+      "condition": "コンディション",
+      "conditionGroup": "条件グループ",
+      "addConditionTooltip": "このグループに新しい条件を追加",
+      "addConditionGroupTooltip": "ネストされた条件グループの追加 (最大深度:2)",
+      "maxDepthReachedTooltip": "最大ネスティング深度に達しました"
+    },
+    "compareWithPast": {
+      "alertSetFor": "アラート設定",
+      "currentWindow": "現在のウィンドウ",
+      "cycle": "サイクル",
+      "cycleTooltip": "結果を前のサイクルの同じ時間と比較します。",
+      "runningFor": "毎回 {頻度} の間隔で {period} 実行中",
+      "currentWindowCannotBeDeleted": "現在のウィンドウは削除できません",
+      "comparingWith": "との比較",
+      "referenceWindow": "リファレンスウィンドウ",
+      "timeFrame": "タイムフレーム",
+      "timeFrameTooltip": "クエリの時間範囲。",
+      "comparingText": "現在のウィンドウのクエリ結果と前の {offset} のクエリ結果を比較します。",
+      "addComparisonWindow": "比較ウィンドウを追加",
+      "goToConditions": "条件に移動",
+      "goToConditionsTooltip": "「条件に移動」をクリックして、選択した比較ウィンドウのイベントを確認してください"
+    },
+    "alertSettings": {
+      "cronSchedule": "クローンスケジュール",
+      "addNewDestination": "新しい目的地を追加",
+      "cooldownTooltip": "アラートがトリガーされた場合、次の通知を送信するまでどのくらい待つ必要があります。たとえば、アラートが午後 4 時にトリガーされ、サイレンス通知が 10 分に設定されている場合、アラートが 1 分経っても午後 4 時 10 分まで別の通知は送信されません。これは、ユーザーに迷惑メールが送信されないようにするためです。",
+      "thresholdTooltip": "イベント数または集計値に基づいて、アラートをトリガーするタイミングを定義します。例:「> 100」に設定すると、イベント数が 100 イベントを超えたときにアラートがトリガーされます。",
+      "periodTooltip": "クエリの実行期間。たとえば、10 分ということは、クエリが実行されるたびに、直近の 10 分間のデータが使用されることを意味します。",
+      "frequencyTooltipMinutes": "タスクを実行する頻度 (例:5 分ごと)",
+      "frequencyTooltipCron": "5 つのフィールドをスペースで区切った標準 UNIX cron 形式:[分 0 ～ 59 分] [時間 0 ～ 23] [月 1 ～ 31 日] [月 1 ～ 12 月、または 1 月から 12 月] [曜日 0 ～ 7 日、日曜日は 0 と 7 日]。",
+      "timezoneWarning": "警告:表示されているタイムゾーンはおおよそのものです。正しいタイムゾーンを手動で確認して選択してください。",
+      "destinationsTooltip": "アラート通知を送信する宛先を 1 つ以上選択します。",
+      "templateTooltip": "オプション:このアラートのすべての宛先に使用するテンプレートを選択してください。テンプレートを使用すると、アラートメッセージの形式をカスタマイズできます。選択しない場合、各宛先は独自の構成済みテンプレートを使用します。"
+    },
+    "advanced": {
+      "addVariable": "[変数を追加]",
+      "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
+      "rowTemplateTooltip": "行テンプレートはアラートメッセージのフォーマットに使用されます。",
+      "templateType": "テンプレートタイプ:"
     }
   },
   "alert_templates": {
@@ -2056,7 +2204,8 @@
     "showLegends": "レジェンドを表示"
   },
   "alert_list": {
-    "alert_details": "アラートの詳細"
+    "alert_details": "アラートの詳細",
+    "alert_history": "アラート履歴"
   },
   "latencyInsights": {
     "title": "インサイト",

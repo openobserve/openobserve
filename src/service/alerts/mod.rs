@@ -211,29 +211,35 @@ impl QueryConditionExt for QueryCondition {
                     );
                     return Ok(eval_results);
                 };
-                // TODO calculate the sample in a row, suddenly a sample can be ignored
-                let value = value
-                    .into_iter()
-                    .filter(|f| f.samples.len() >= trigger_condition.threshold as usize)
-                    .collect::<Vec<_>>();
-                if !value.is_empty() {
-                    eval_results.data = Some(
-                        value
-                            .iter()
-                            .map(|v| {
-                                let mut val = Map::with_capacity(v.labels.len() + 2);
-                                val.extend(v.labels.iter().map(|label| {
-                                    (label.name.to_string(), label.value.to_string().into())
-                                }));
+                let values: Vec<_> =
+                    value
+                        .iter()
+                        .map(|v| {
+                            let mut val = Map::with_capacity(v.labels.len() + 2);
+                            val.extend(v.labels.iter().map(|label| {
+                                (label.name.to_string(), label.value.to_string().into())
+                            }));
 
-                                let last_sample = v.samples.last().unwrap();
-                                val.insert("_timestamp".to_string(), last_sample.timestamp.into());
-                                val.insert("value".to_string(), last_sample.value.into());
-                                val
-                            })
-                            .collect(),
-                    );
-                }
+                            let last_sample = v.samples.last().unwrap();
+                            val.insert("_timestamp".to_string(), last_sample.timestamp.into());
+                            val.insert("value".to_string(), last_sample.value.into());
+                            val
+                        })
+                        .collect();
+
+                let threshold = trigger_condition.threshold as usize;
+                eval_results.data = match trigger_condition.operator {
+                    Operator::EqualTo => (values.len() == threshold).then_some(values),
+                    Operator::NotEqualTo => (values.len() != threshold).then_some(values),
+                    Operator::GreaterThan => (values.len() > threshold).then_some(values),
+                    Operator::GreaterThanEquals => (values.len() >= threshold).then_some(values),
+                    Operator::LessThan => (values.len() < threshold).then_some(values),
+                    Operator::LessThanEquals => (values.len() <= threshold).then_some(values),
+                    _ => None,
+                };
+                log::info!(
+                    "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned response after filtering: {eval_results:?}"
+                );
                 return Ok(eval_results);
             }
         };

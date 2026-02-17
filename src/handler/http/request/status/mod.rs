@@ -153,6 +153,7 @@ struct ConfigResponse<'a> {
     query_values_default_num: i64,
     mysql_deprecated_warning: bool,
     #[cfg(feature = "enterprise")]
+    alert_preview_timerange_minutes: i64,
     service_graph_enabled: bool,
     #[cfg(not(feature = "enterprise"))]
     service_graph_enabled: bool,
@@ -437,6 +438,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         ingestion_quota_used,
         query_values_default_num: cfg.limit.query_values_default_num,
         mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
+        alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         service_graph_enabled,
         service_streams_enabled,
         #[cfg(feature = "enterprise")]

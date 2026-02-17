@@ -2982,6 +2982,29 @@ export const convertSQLData = async (
     panelSchema?.config?.color?.colorBySeries,
     store.state.theme,
   );
+    // Merge custom chart options if provided (e.g., for alert preview tooltip customization)
+  if (panelSchema.config?.custom_chart_options) {
+    const customOptions = panelSchema.config.custom_chart_options;
+
+    // Deep merge custom tooltip options if provided
+    if (customOptions.tooltip && options.tooltip) {
+      options.tooltip = {
+        ...options.tooltip,
+        ...customOptions.tooltip,
+      };
+    }
+
+    // Merge any other custom options
+    Object.keys(customOptions).forEach(key => {
+      if (key !== 'tooltip' && customOptions[key]) {
+        options[key] = {
+          ...(options[key] || {}),
+          ...customOptions[key],
+        };
+      }
+    });
+  }
+
   return {
     options,
     extras: {
