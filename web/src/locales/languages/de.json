@@ -116,9 +116,7 @@
     "set": "+ Satz",
     "copy": "Kopieren",
     "copySuccess": "In die Zwischenablage kopiert",
-    "copyError": "Fehler beim Kopieren in die Zwischenablage",
-    "goBack": "Geh zurück",
-    "stopGenerating": "Generieren beenden"
+    "copyError": "Fehler beim Kopieren in die Zwischenablage"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -131,7 +129,7 @@
     "source": "_Quelle",
     "noResult": "Kein Ergebnis",
     "syntaxGuide": "Leitfaden zur Syntax",
-    "rowsPerPage": "Datensätze pro Seite",
+    "recordsPerPage": "Datensätze pro Seite",
     "showing": "Wird angezeigt",
     "of": "von",
     "rowDetail": "Angaben zur Quelle",
@@ -322,37 +320,7 @@
     "buildQuery": "Bauen",
     "enableSqlModeForBuild": "Bitte aktivieren Sie den SQL-Modus und wählen Sie einen einzelnen Stream aus, um den Query Builder zu verwenden",
     "applyToSearch": "Für die Suche bewerben",
-    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus.",
-    "nlpModeLabel": "Modus für natürliche Sprache",
-    "generateSQL": "Generieren Sie SQL",
-    "generateQuery": "Abfrage generieren",
-    "generateSQLTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache (Strg/Cmd + Enter)",
-    "generateQueryTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache",
-    "generating": "Generieren...",
-    "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
-    "nlQueryGenerationSuccess": "Die Abfrage wurde erfolgreich generiert!",
-    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden",
-    "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
-    "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
-    "askAI": "Frag KI",
-    "askAITooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage",
-    "enterPrompt": "Geben Sie eine Aufforderung ein, um eine Abfrage zu generieren",
-    "analyzingQuery": "Abfrage wird analysiert...",
-    "generatingQuery": "Abfrage wird generiert...",
-    "queryGeneratedSuccess": "Die Abfrage wurde erfolgreich generiert!",
-    "queryGenerationStopped": "Die Generierung der Abfrage wurde gestoppt.",
-    "queryGenerationFailed": "Die Generierung der Abfrage ist fehlgeschlagen.",
-    "fetchingResults": "Suchergebnisse werden abgerufen...",
-    "noResultsFound": "Keine Ergebnisse gefunden",
-    "errorFetchingResults": "Fehler beim Abrufen der Ergebnisse",
-    "somethingWentWrong": "Etwas ist schief gelaufen",
-    "selectStreamForAI": "Wählen Sie zuerst einen Stream aus, um KI zu verwenden",
-    "collapseFields": "Felder ausblenden",
-    "openFields": "Felder öffnen",
-    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
-    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
-    "recordsPerPage": "Datensätze pro Seite",
-    "searchDimension": "Dimensionen suchen"
+    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus."
   },
   "menu": {
     "home": "Startseite",
@@ -997,10 +965,7 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL-Funktion",
     "jsFunctionHint": "Verwenden Sie das Objekt `row`, um auf Protokollfelder zuzugreifen und diese zu ändern. Beispiel: row.new_field = row.existing_field + 'verarbeitet';",
-    "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'",
-    "jsErrorDetails": "JavaScript-Fehlerdetails",
-    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
-    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren"
+    "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",
@@ -1452,13 +1417,6 @@
     "columnsDefaultOrder": "Die Spalten werden in ihrer Standardreihenfolge angezeigt",
     "moveUp": "Steigen Sie auf",
     "moveDown": "Gehe nach unten",
-    "toggleFunctionEditor": "Funktionseditor umschalten",
-    "useSavedFunction": "Verwenden Sie die Funktion Gespeichert",
-    "showQueryResults": "Abfrageergebnisse anzeigen",
-    "hideQueryResults": "Abfrageergebnisse ausblenden",
-    "vrlExtractionTooltip": "Um extrahierte VRL-Felder im Diagramm zu verwenden, schreiben Sie eine VRL-Funktion und klicken Sie auf die Schaltfläche Anwenden. Die Felder werden extrahiert, sodass Sie sie zum Erstellen des Diagramms verwenden können.",
-    "errorFetchingFunctions": "Fehler beim Abrufen von Funktionen",
-    "functionAppliedSuccess": "Die Funktion {name} wurde erfolgreich angewendet.",
     "connectNullValuesTooltip": "Verbinde Datenpunkte über fehlende Werte mit einer Linie.",
     "panelTimeSettings": "Zeiteinstellungen für das Panel",
     "panelTimeEnabled": "Zeit auf Panelebene zulassen",
@@ -2056,20 +2014,7 @@
       "variablesTooltip": "Variablen werden verwendet, um Daten von der Warnung an das Ziel zu übergeben.",
       "rowTemplateTooltip": "Die Zeilenvorlage wird verwendet, um die Warnmeldung zu formatieren.",
       "templateType": "Vorlagentyp:"
-    },
-    "addConditions": "Bedingungen hinzufügen",
-    "sqlEditor": "SQL-Editor",
-    "promqlEditor": "PromQL Editor",
-    "vrlEditor": "VRL-Redakteur",
-    "generateVRL": "VRL generieren",
-    "applyVRL": "VRL anwenden",
-    "runQuery": "Abfrage ausführen",
-    "onStream": "auf",
-    "streamLabel": "fließen",
-    "noStreamSelected": "Kein Stream ausgewählt",
-    "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
-    "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
-    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen"
+    }
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2327,7 +2272,6 @@
       "groupsLabel": "Gruppen",
       "noMatchingGroups": "Keine passenden Gruppen",
       "fqnFormulaTitle": "Identitätsformel",
-      "fqnFormulaTooltip": "Zeigt, wie die Service-Identität berechnet wird. Scope-Dimensionen (blau) werden mit '/' verkettet. Die erste Nicht-Null-Workload-Dimension (grün) wird zum Servicenamen.",
       "scopeDimension": "Scope-Dimension",
       "workloadDimension": "Workload-Dimension",
       "noFormulaConfigured": "Keine Identitätsformel konfiguriert. Fügen Sie oben Dimensionen hinzu.",
@@ -2485,10 +2429,20 @@
     "cancelChangesConfirm": "Möchten Sie die Änderungen wirklich stornieren?",
     "cancel": "Stornieren",
     "dragDropNodesHere": "Ziehen Sie Knoten hierher und legen Sie sie dort ab",
-    "promqlOnlyForMetrics": "PromQL ist nur für den Metrik-Stream-Typ verfügbar",
-    "invalidCronExpression": "Ungültiger Cron-Ausdruck",
-    "thresholdShouldNotBeEmpty": "Der Schwellenwert sollte nicht leer sein",
-    "errorGettingResults": "Fehler beim Abrufen der Ergebnisse"
+    "llmEvaluation": "LLM-Bewertung",
+    "nodeName": "Knotenname",
+    "samplingConfig": "Konfiguration der Probenentnahme",
+    "enableSampling": "Sampling aktivieren",
+    "samplingRate": "Abtastrate",
+    "samplingRateHelp": "Stichprobe eines Prozentsatzes der Spuren, um die Evaluierungskosten zu senken (0% = deaktiviert, 100% = alle auswerten)",
+    "samplingStrategy": "Probenahmestrategie",
+    "randomSampling": "Zufällig",
+    "randomSamplingDesc": "Nichtdeterministische Probenahme — jedes Mal andere Spuren",
+    "hashSampling": "Hash-basiert (empfohlen)",
+    "hashSamplingDesc": "Konsistentes Sampling pro trace_id — es werden immer dieselben Traces abgetastet",
+    "llmEvaluationInfo": "Konfiguration der LLM-Evaluierung",
+    "llmEvaluationInfoText": "Wertet Spuren mit LLM Judge aus. Die Probenahme reduziert die Kosten, da nur ein Prozentsatz der Spuren verarbeitet wird. Die Hash-Strategie gewährleistet eine konsistente Probenahme für eine zuverlässige Überwachung.",
+    "llmEvaluationNodeSaved": "Der LLM-Evaluierungsknoten wurde erfolgreich gespeichert"
   },
   "reports": {
     "header": "Berichte",
@@ -2547,18 +2501,7 @@
     "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
     "fetchingMoreTraces": "Weitere Spuren werden abgerufen...",
     "showErrorOnly": "Nur Fehler anzeigen",
-    "openInTraces": "In Traces öffnen",
-    "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten.",
-    "fetchingTraces": "Halt dich fest, wir suchen deine Spuren.",
-    "noTracesFoundAdjust": "Keine Spuren gefunden. Bitte passen Sie die Filter an und versuchen Sie es erneut.",
-    "tracesTitle": "SPUREN",
-    "tracesFound": "Spuren gefunden",
-    "error": "FEHLER",
-    "errors": "FEHLER",
-    "success": "ERFOLG",
-    "today": "Heute",
-    "yesterday": "Gestern",
-    "spanColorPalettePreview": "Vorschau der Span-Farbpalette"
+    "openInTraces": "In Traces öffnen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -2956,8 +2899,7 @@
     "tracesErrorDetails": "Beim Abrufen der Trace-Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     "metricsError": "Metriken können nicht geladen werden",
     "metricsErrorDetails": "Beim Abrufen der Metrikdaten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
-    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden.",
-    "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten."
+    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",
@@ -3006,10 +2948,5 @@
     "invalidFormat": "Ungültiges Format",
     "mustBeGreaterThan": "Muss größer als {value} sein",
     "mustBeLessThan": "Muss kleiner als {value} sein"
-  },
-  "nlMode": {
-    "toggle": "Modus für natürliche Sprache",
-    "noAdditionalOptions": "Keine zusätzlichen Optionen",
-    "generateVRL": "VRL generieren"
   }
 }
