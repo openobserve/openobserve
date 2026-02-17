@@ -309,13 +309,7 @@ const fnSavedFunctionDialog = () => {
 
 const getTransformLabelTooltip = computed(() => {
 
-  if (!isActionsEnabled.value) return t("search.toggleFunctionEditor");
-
-  const editorType = searchObj.data.transformType === "action"
-    ? t("search.actionLabel")
-    : searchObj.data.transformType === "function"
-      ? t("search.functionLabel")
-      : t("search.transformLabel");
+  if (!isActionsEnabled.value) return "Toggle Function Editor";
 
   return searchObj.meta.showTransformEditor
     ? "Hide"
