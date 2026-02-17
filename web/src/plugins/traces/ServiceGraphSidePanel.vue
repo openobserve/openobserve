@@ -34,41 +34,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </h2>
         </div>
-        <q-btn
-          flat
-          dense
-          round
-          icon="cancel"
-          size="sm"
-          @click="handleClose"
-          data-test="service-graph-side-panel-close-btn"
-          class="close-btn"
-        />
+        <div class="panel-header-actions">
+          <q-btn
+            unelevated
+            no-caps
+            dense
+            size="sm"
+            label="Show telemetry"
+            icon="manage_search"
+            @click="handleShowTelemetry"
+            data-test="service-graph-side-panel-show-telemetry-btn"
+            class="telemetry-btn"
+            :loading="correlationLoading"
+          />
+          <q-btn
+            flat
+            dense
+            round
+            icon="cancel"
+            size="sm"
+            @click="handleClose"
+            data-test="service-graph-side-panel-close-btn"
+            class="close-btn"
+          />
+        </div>
       </div>
 
       <!-- Content Scrollable Area -->
       <div class="panel-content">
-        <!-- Action Buttons Section -->
-        <div class="panel-section actions-section">
-        </div>
-
         <!-- Metrics Section -->
         <div
           class="panel-section metrics-section"
           data-test="service-graph-side-panel-metrics"
         >
-          <div class="section-header">
-            <q-btn
-              unelevated
-              no-caps
-              size="sm"
-              label="Show telemetry"
-              @click="handleShowTelemetry"
-              data-test="service-graph-side-panel-show-telemetry-btn"
-              class="view-traces-btn"
-              :loading="correlationLoading"
-            />
-          </div>
 
           <!-- Request Rate Card (Full Width - Combined Metrics) -->
           <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
@@ -974,6 +972,29 @@ export default defineComponent({
           color: #f97316;
         }
       }
+    }
+  }
+
+  .panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .telemetry-btn {
+    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+    color: #fff !important;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: all 0.2s;
+
+    &:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
     }
   }
 
