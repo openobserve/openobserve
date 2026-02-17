@@ -13,7 +13,6 @@ const {
   getVariableSelector,
   getEditVariableBtn,
   getTabSelector,
-  selectStreamAndField,
 } = require("../../pages/dashboardPages/dashboard-selectors.js");
 const testLogger = require("../utils/test-logger.js");
 
@@ -131,8 +130,21 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
     await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
 
-    // Select stream and field using common helper
-    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_container_name");
+    // Select stream and field
+    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_container_name");
+    // Wait for options to load
+    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(SELECTORS.ROLE_OPTION).first().click();
 
     // Check dependency dropdown via filter - should NOT show panel variables
     // Add filter to check available dependency options
@@ -155,12 +167,12 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Small wait for dropdown to potentially appear - if no options, listbox won't show
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Check if dropdown appears with CommonAutoComplete options
-    const hasOptions = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).first().isVisible().catch(() => false);
+    // Check if dropdown appears (it might not if there are no valid options)
+    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
 
-    if (hasOptions) {
+    if (hasListbox) {
       // If dropdown appears, verify panel variable is NOT in the list
-      const options = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).allTextContents();
+      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
       expect(options).not.toContain(panelVar);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
@@ -232,8 +244,21 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).click();
 
-    // Select stream and field using common helper
-    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_container_name");
+    // Select stream and field
+    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_container_name");
+    // Wait for options to load
+    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(SELECTORS.ROLE_OPTION).first().click();
 
     // Check dependency dropdown via filter - should NOT show Tab1's variable
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -255,12 +280,12 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Small wait for dropdown to potentially appear - if no options, listbox won't show
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Check if dropdown appears with CommonAutoComplete options
-    const hasOptions = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).first().isVisible().catch(() => false);
+    // Check if dropdown appears (it might not if there are no valid options)
+    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
 
-    if (hasOptions) {
+    if (hasListbox) {
       // If dropdown appears, verify tab1's variable is NOT in the list
-      const options = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).allTextContents();
+      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
       expect(options).not.toContain(tab1Var);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
@@ -387,8 +412,21 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).click();
 
-    // Select stream and field using common helper
-    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_pod_name");
+    // Select stream and field
+    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_pod_name");
+    // Wait for options to load
+    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(SELECTORS.ROLE_OPTION).first().click();
 
     // Check dependency dropdown via filter - should show both global and tab variables
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -494,8 +532,21 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).click();
 
-    // Select stream and field using common helper
-    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_pod_name");
+    // Select stream and field
+    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_pod_name");
+    // Wait for options to load
+    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(SELECTORS.ROLE_OPTION).first().click();
 
     // Check dependency dropdown via filter - should NOT show Panel1's variable
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -517,12 +568,12 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Small wait for dropdown to potentially appear - if no options, listbox won't show
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Check if dropdown appears with CommonAutoComplete options
-    const hasOptions = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).first().isVisible().catch(() => false);
+    // Check if dropdown appears (it might not if there are no valid options)
+    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
 
-    if (hasOptions) {
+    if (hasListbox) {
       // If dropdown appears, verify panel1's variable is NOT in the list
-      const options = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).allTextContents();
+      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
       expect(options).not.toContain(panel1Var);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)

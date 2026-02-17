@@ -254,69 +254,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-type-select"
                 ></q-select>
-                <div class="col q-mt-sm">
-                  <div class="flex items-center q-pl-sm">
-                    <span
-                      class="tw:font-bold tw:text-sm"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'tw:text-gray-300'
-                          : 'tw:text-gray-500'
-                      "
-                      >{{ t('dashboard.selectIndex') }} *</span
-                    >
-                    <q-icon name="info" size="xs" class="q-ml-xs">
-                      <q-tooltip style="width: 250px">
-                        Select a stream or use a variable like
-                        <span class="bg-highlight">$streamVariable</span> to
-                        dynamically choose the stream based on another variable's value.
-                      </q-tooltip>
-                    </q-icon>
-                  </div>
-                  <CommonAutoComplete
-                    v-model="variableData.query_data.stream"
-                    :items="streamOptionsWithVariables"
-                    searchRegex="(?:^|[^$])\$?(\w+)"
-                    @select="streamUpdated"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    data-test="dashboard-variable-stream-select"
-                    class="no-case"
-                    style="width: 100%"
-                    placeholder="Select stream or type variable"
-                  />
-                </div>
-              </div>
-              <div class="tw:mt-2">
-                <div class="flex items-center">
-                  <span
-                    class="tw:font-bold tw:text-sm"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-300'
-                        : 'tw:text-gray-500'
-                    "
-                      >{{ t('dashboard.selectField') }} *</span>
-                  <q-icon name="info" size="xs" class="q-ml-xs">
-                    <q-tooltip style="width: 250px">
-                      Select a field or use a variable like
-                      <span class="bg-highlight">$fieldVariable</span> to
-                      dynamically choose the field based on another variable's value.
-                      <br><br>
-                      <strong>Note:</strong> If stream uses a variable, field list will be empty - type field name manually.
-                    </q-tooltip>
-                  </q-icon>
-                </div>
-                <CommonAutoComplete
-                  v-model="variableData.query_data.field"
-                  :items="fieldOptionsWithVariables"
-                  searchRegex="(?:^|[^$])\$?(\w+)"
+                <q-select
+                  v-model="variableData.query_data.stream"
+                  :label="t('dashboard.selectIndex') + ' *'"
+                  :options="mergedStreamsFilteredOptions"
+                  input-debounce="0"
+                  behavior="menu"
+                  use-input
+                  borderless
+                  hide-bottom-space
+                  dense
+                  stack-label
+                  @filter="mergedStreamsFilterFn"
+                  @update:model-value="streamUpdated"
+                  option-value="name"
+                  option-label="name"
+                  emit-value
+                  class="showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']"
-                  data-test="dashboard-variable-field-select"
-                  class="no-case"
-                  style="max-width: 100%; width: 100%"
-                  placeholder="Select field or type variable"
-                />
+                  data-test="dashboard-variable-stream-select"
+                >
+                  <q-tooltip>
+                    Select a stream or use a variable like $streamVariable to
+                    dynamically choose the stream based on another variable's
+                    value.
+                  </q-tooltip>
+                  <template v-slot:option="scope">
+                    <q-item v-bind="scope.itemProps">
+                      <q-item-section>
+                        <q-item-label>
+                          {{ scope.opt.name }}
+                          <span
+                            v-if="scope.opt.name?.startsWith('$')"
+                            class="text-grey-6 text-caption"
+                          >
+                            (variable)
+                          </span>
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </template>
+                </q-select>
               </div>
+              <q-select
+                v-model="variableData.query_data.field"
+                :label="t('dashboard.selectField') + ' *'"
+                stack-label
+                use-input
+                borderless
+                dense
+                hide-selected
+                fill-input
+                behavior="menu"
+                input-debounce="0"
+                :options="mergedFieldsFilteredOptions"
+                @filter="mergedFieldsFilterFn"
+                class="showLabelOnTop no-case"
+                option-value="name"
+                option-label="name"
+                emit-value
+                :rules="[(val: any) => !!val || 'Field is required!']"
+                data-test="dashboard-variable-field-select"
+              >
+                <q-tooltip>
+                  Select a field or use a variable like $fieldVariable.
+                  If stream uses a variable, field list will be empty -
+                  type field name manually.
+                </q-tooltip>
+                <template v-slot:option="scope">
+                  <q-item v-bind="scope.itemProps">
+                    <q-item-section>
+                      <q-item-label>
+                        {{ scope.opt.name }}
+                        <span
+                          v-if="scope.opt.name?.startsWith('$')"
+                          class="text-grey-6 text-caption"
+                        >
+                          (variable)
+                        </span>
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
               <div>
                 <q-input
                   class="showLabelOnTop"
@@ -1698,55 +1718,29 @@ export default defineComponent({
       }));
     });
 
-    // Computed property: Merge stream options with available variables
-    const streamOptionsWithVariables = computed(() => {
-      console.log("[Variable Config] Computing streamOptionsWithVariables");
-
-      // Get variable options with $ prefix (already has $ in value)
-      const variableOptions = dashboardVariablesFilterItems.value.map((v: any) => ({
-        label: v.value, // Show $variableName
-        value: v.value, // Value is $variableName
-      }));
-      console.log("[Variable Config] Variable options for stream:", variableOptions);
-
-      // Get stream options
-      const streamOptions = streamsFilteredOptions.value.map((stream: any) => ({
-        label: stream.name || stream,
-        value: stream.name || stream,
-      }));
-      console.log("[Variable Config] Stream options:", streamOptions.length, "streams");
-
-      // Combine variables and streams into a single list
-      const combined = [...variableOptions, ...streamOptions];
-
-      console.log("[Variable Config] Total stream options:", combined.length);
-      return combined;
+    // Merged stream options: variables + streams for q-select
+    const mergedStreamOptions = computed(() => {
+      const variableItems = dashboardVariablesFilterItems.value.map(
+        (v: any) => ({ name: v.value }),
+      );
+      return [...variableItems, ...(data.streams || [])];
     });
+    const {
+      filterFn: mergedStreamsFilterFn,
+      filteredOptions: mergedStreamsFilteredOptions,
+    } = useSelectAutoComplete(mergedStreamOptions, "name");
 
-    // Computed property: Merge field options with available variables
-    const fieldOptionsWithVariables = computed(() => {
-      console.log("[Variable Config] Computing fieldOptionsWithVariables");
-
-      // Get variable options with $ prefix (already has $ in value)
-      const variableOptions = dashboardVariablesFilterItems.value.map((v: any) => ({
-        label: v.value, // Show $variableName
-        value: v.value, // Value is $variableName
-      }));
-      console.log("[Variable Config] Variable options for field:", variableOptions);
-
-      // Get field options
-      const fieldOptions = fieldsFilteredOptions.value.map((field: any) => ({
-        label: field.name || field,
-        value: field.name || field,
-      }));
-      console.log("[Variable Config] Field options:", fieldOptions.length, "fields");
-
-      // Combine variables and fields into a single list
-      const combined = [...variableOptions, ...fieldOptions];
-
-      console.log("[Variable Config] Total field options:", combined.length);
-      return combined;
+    // Merged field options: variables + fields for q-select
+    const mergedFieldOptions = computed(() => {
+      const variableItems = dashboardVariablesFilterItems.value.map(
+        (v: any) => ({ name: v.value }),
+      );
+      return [...variableItems, ...(data.currentFieldsList || [])];
     });
+    const {
+      filterFn: mergedFieldsFilterFn,
+      filteredOptions: mergedFieldsFilteredOptions,
+    } = useSelectAutoComplete(mergedFieldOptions, "name");
 
     // Add new custom value to the array
     const addCustomValue = () => {
@@ -1836,8 +1830,10 @@ export default defineComponent({
       filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
-      streamOptionsWithVariables,
-      fieldOptionsWithVariables,
+      mergedStreamsFilterFn,
+      mergedStreamsFilteredOptions,
+      mergedFieldsFilterFn,
+      mergedFieldsFilteredOptions,
       addCustomValue,
       removeCustomValue,
       onCheckboxClick,

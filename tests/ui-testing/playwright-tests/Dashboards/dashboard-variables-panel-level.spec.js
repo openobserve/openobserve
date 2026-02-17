@@ -14,7 +14,6 @@ const {
   getVariableSelector,
   getEditVariableBtn,
   getTabSelector,
-  selectStreamAndField,
 } = require("../../pages/dashboardPages/dashboard-selectors.js");
 const testLogger = require("../utils/test-logger.js");
 
@@ -401,8 +400,20 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await page.keyboard.press('Escape');
     await safeWaitForNetworkIdle(page, { timeout: 2000 });
 
-    // Select stream and field using common helper
-    await selectStreamAndField(page, "logs", "e2e_automate", "kubernetes_container_name");
+    // Select stream type, stream, and field
+    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_container_name");
+    await page.locator(SELECTORS.OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(SELECTORS.OPTION).first().click();
 
     // Add a filter to check dependency dropdown - panel variables should NOT be in the list
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -422,8 +433,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await autoComplete.click();
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Get all available variable options (CommonAutoComplete options)
-    const options = page.locator(SELECTORS.AUTO_COMPLETE_OPTION);
+    // Get all available variable options
+    const options = page.locator(SELECTORS.OPTION);
     const optionTexts = await options.allTextContents();
 
     // Panel1's variable should NOT be in the list
