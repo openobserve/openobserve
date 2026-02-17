@@ -277,12 +277,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(500);
 
     // Ensure SQL mode is disabled
-    const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
-    const isSqlEnabled = await sqlModeToggle.getAttribute('aria-checked');
-    if (isSqlEnabled === 'true') {
-      await sqlModeToggle.click();
-      await page.waitForTimeout(500);
-    }
+    await pm.logsPage.disableSqlModeIfNeeded();
 
     // Set time range to ensure we have enough data
     await pm.logsPage.clickDateTimeButton();
@@ -298,8 +293,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.expectLogsTableVisible();
 
     // STRONG ASSERTION: Result pagination should be visible
-    const resultPagination = page.locator('[data-test="logs-search-result-pagination"]');
-    await expect(resultPagination).toBeVisible({ timeout: 10000 });
+    await pm.logsPage.expectResultPaginationVisible();
     testLogger.info('Result pagination is visible');
 
     // STRONG ASSERTION: SQL pagination should NOT be visible when SQL mode is off
@@ -341,18 +335,8 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.expectErrorMessageVisible();
     testLogger.info('Error message is visible');
 
-    // Click on "Click for error details" button to see detailed error
-    const errorDetailsBtn = page.locator('[data-test="logs-page-result-error-details-btn"]');
-    await errorDetailsBtn.waitFor({ state: 'visible', timeout: 5000 });
-    await errorDetailsBtn.click();
-    await page.waitForTimeout(1000);
-
-    // Get the detailed error message
-    const detailErrorMessage = page.locator('[data-test="logs-search-detail-error-message"]');
-    await detailErrorMessage.waitFor({ state: 'visible', timeout: 5000 });
-
-    // Get all text from the error dialog area (includes header and body)
-    const errorDialogText = await detailErrorMessage.locator('..').textContent();
+    // Get the detailed error message using page object method
+    const errorDialogText = await pm.logsPage.getDetailedErrorDialogText();
     testLogger.info(`Full error dialog text: ${errorDialogText}`);
 
     const fullErrorText = errorDialogText.toLowerCase();
