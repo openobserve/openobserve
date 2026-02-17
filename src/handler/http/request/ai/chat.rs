@@ -180,20 +180,6 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let org_id_str = org_id.as_str();
         let config = get_o2_config();
 
-        // Create root span for AI tracing if enabled
-        let span = if config.ai.tracing_enabled {
-            tracing::info_span!(
-                "http.request",
-                http.method = "POST",
-                http.route = "/api/{org_id}/ai/chat",
-                http.target = format!("/api/{org_id_str}/ai/chat"),
-                otel.kind = "server",
-            )
-        } else {
-            Span::none()
-        };
-        let _guard = span.enter();
-
         // Check if AI/agent is enabled
         if !config.ai.enabled {
             return MetaHttpResponse::bad_request("AI is not enabled");
@@ -519,20 +505,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let config = get_o2_config();
         let org_id_str = org_id.clone();
 
-        // Create root span for AI tracing if enabled
-        let span = if config.ai.tracing_enabled {
-            tracing::info_span!(
-                "http.request",
-                http.method = "POST",
-                http.route = "/api/{org_id}/ai/chat_stream",
-                http.target = format!("/api/{}/ai/chat_stream", org_id_str),
-                otel.kind = "server",
-            )
-        } else {
-            Span::none()
-        };
-        let _guard = span.enter();
-
         let mut code = StatusCode::OK.as_u16();
         let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
 
@@ -672,7 +644,30 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         } else {
             Some(forward_headers)
         };
-        let s = stream! {
+
+        // Create root span for AI tracing (but don't enter it yet)
+        let chat_span = if config.ai.tracing_enabled {
+            tracing::info_span!(
+                "ai.chat_stream",
+                http.method = "POST",
+                http.route = "/api/{org_id}/ai/chat_stream",
+                http.target = format!("/api/{}/ai/chat_stream", org_id_str),
+                otel.kind = "server",
+                trace_id = %trace_id,
+                user_id = %user_id,
+                org_id = %org_id_str,
+            )
+        } else {
+            Span::none()
+        };
+
+        let s = async_stream::stream! {
+            // THIS IS THE KEY: Create a guard inside the stream
+            // This ensures the span is "active" for the duration of the generator.
+            // When the stream ends (or the client disconnects), this guard drops,
+            // and the span finally exports to the trace collector.
+            let _guard = chat_span.enter();
+
             // Call the agent service with forwarded headers
             let response = match client.query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref()).await {
                 Ok(r) => r,
@@ -716,6 +711,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
                  Agent stream ended"
             );
+            // The span closes when this generator completes (guard drops)
         };
 
         axum::http::Response::builder()
