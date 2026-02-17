@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Horizontal Divider -->
             <div class="metric-horizontal-divider"></div>
 
-            <!-- Error Rate and P95 Latency (Bottom Row) -->
+            <!-- Error Rate and Latency Percentiles (Bottom Rows) -->
             <div class="metric-bottom-row">
               <div class="metric-inline-item error-rate-card" :class="getErrorRateClass()" data-test="service-graph-side-panel-error-rate">
                 <q-icon name="error_outline" size="14px" />
@@ -124,10 +124,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="metric-value">{{ serviceMetrics.errorRate }}</span>
               </div>
               <div class="metric-row-divider"></div>
-              <div class="metric-inline-item latency-card" :class="getLatencyClass()" data-test="service-graph-side-panel-p95-latency">
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p95Latency)" data-test="service-graph-side-panel-p95-latency">
                 <q-icon name="speed" size="14px" />
                 <span class="metric-label">P95 Latency:</span>
                 <span class="metric-value">{{ serviceMetrics.p95Latency }}</span>
+              </div>
+            </div>
+            <div class="metric-horizontal-divider"></div>
+            <div class="metric-bottom-row">
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p50Latency)" data-test="service-graph-side-panel-p50-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P50:</span>
+                <span class="metric-value">{{ serviceMetrics.p50Latency }}</span>
+              </div>
+              <div class="metric-row-divider"></div>
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p99Latency)" data-test="service-graph-side-panel-p99-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P99:</span>
+                <span class="metric-value">{{ serviceMetrics.p99Latency }}</span>
               </div>
             </div>
           </div>
@@ -359,7 +373,9 @@ export default defineComponent({
           incomingRequests: 0,
           outgoingRequests: 0,
           errorRate: 'N/A',
+          p50Latency: 'N/A',
           p95Latency: 'N/A',
+          p99Latency: 'N/A',
         };
       }
 
@@ -388,11 +404,19 @@ export default defineComponent({
       const errors = props.selectedNode.errors || 0;
       const errorRate = totalRequests > 0 ? (errors / totalRequests) * 100 : 0;
 
-      // Calculate P95 latency from incoming edges
+      // Calculate latency percentiles from incoming edges
+      let p50Latency = 0;
       let p95Latency = 0;
+      let p99Latency = 0;
       if (incomingEdges.length > 0) {
+        p50Latency = Math.max(
+          ...incomingEdges.map((edge: any) => edge.p50_latency_ns || 0)
+        );
         p95Latency = Math.max(
           ...incomingEdges.map((edge: any) => edge.p95_latency_ns || 0)
+        );
+        p99Latency = Math.max(
+          ...incomingEdges.map((edge: any) => edge.p99_latency_ns || 0)
         );
       }
 
@@ -413,7 +437,9 @@ export default defineComponent({
         incomingRequests: incomingRequests,
         outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + '%',
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : 'N/A',
         p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : 'N/A',
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : 'N/A',
       };
     });
 
@@ -694,8 +720,7 @@ export default defineComponent({
     };
 
     // Get color class for latency card
-    const getLatencyClass = (): string => {
-      const latencyStr = serviceMetrics.value.p95Latency;
+    const getLatencyClass = (latencyStr: string): string => {
       if (latencyStr === 'N/A') return 'status-unknown';
 
       // Parse latency value (could be "125ms" or "1.5s")

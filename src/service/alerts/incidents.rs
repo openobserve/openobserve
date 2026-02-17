@@ -908,7 +908,7 @@ pub async fn enrich_with_topology(
                 };
 
                 let has_sg_edge = sg_topo_edges.iter().any(|e| {
-                    e.from == topology.nodes[prev_idx].service_name
+                    e.from.as_deref() == Some(&*topology.nodes[prev_idx].service_name)
                         && e.to == topology.nodes[current_node_index].service_name
                 });
 
