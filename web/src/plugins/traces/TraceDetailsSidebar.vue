@@ -248,95 +248,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LLM Preview Tab Panel -->
     <q-tab-panel v-if="isLLMSpan" name="preview" class="llm-preview-panel q-pa-md">
       <div class="llm-preview-container">
-        <!-- Input Section -->
-        <div class="q-mb-md">
-          <div class="section-label text-bold q-mb-xs flex items-center justify-between">
-            <div>Input</div>
-            <div class="flex items-center gap-xs">
-              <q-btn-toggle
-                v-model="inputViewMode"
-                dense
-                no-caps
-                size="sm"
-                toggle-color="primary"
-                :options="[
-                  { label: 'Formatted', value: 'formatted' },
-                  { label: 'JSON', value: 'json' }
-                ]"
+        <!-- Input and Output Side by Side -->
+        <div class="flex q-col-gutter-md io-container" :class="{ 'io-container-dark': isDarkMode }" ref="ioContainerRef">
+          <!-- Input Section -->
+          <div class="col-6 io-section">
+            <div class="section-label text-bold q-mb-xs flex items-center justify-between">
+              <div>Input</div>
+              <div class="flex items-center gap-xs">
+                <q-btn
+                  outline
+                  class="q-px-sm q-ml-sm"
+                  size="sm"
+                  no-caps
+                  :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                  :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
+                  @click="toggleFullscreen"
+                />
+                <q-btn
+                  flat
+                  dense
+                  size="sm"
+                  icon="content_copy"
+                  title="Copy input"
+                  @click="copyContent(span._o2_llm_input, 'input')"
+                  :disable="!hasContent(span._o2_llm_input)"
+                />
+              </div>
+            </div>
+            <div class="llm-content-box">
+              <div v-if="!hasContent(span._o2_llm_input)" class="no-data-message">
+                No data available
+              </div>
+              <LLMContentRenderer
+                v-else
+                :content="span._o2_llm_input"
+                :observation-type="span._o2_llm_observation_type"
+                content-type="input"
+                :span="span"
+                view-mode="formatted"
               />
-              <q-btn
-                flat
-                dense
-                size="sm"
-                icon="content_copy"
-                @click="copyContent(span._o2_llm_input, 'input')"
-                title="Copy input"
-              >
-                <q-tooltip>Copy Input</q-tooltip>
-              </q-btn>
             </div>
           </div>
-          <div class="llm-content-box" :class="{ 'expanded': inputExpanded }">
-            <LLMContentRenderer
-              :content="span._o2_llm_input"
-              :observation-type="span._o2_llm_observation_type"
-              :span="span"
-              content-type="input"
-              :view-mode="inputViewMode"
-            />
-          </div>
-          <div
-            v-if="getInputCharCount() > 0"
-            class="expand-toggle q-mt-xs text-left opacity-50 cursor-pointer"
-            @click="inputExpanded = !inputExpanded"
-          >
-            {{ inputExpanded ? '...collapse' : `...expand (${getInputCharCount()} more characters)` }}
-          </div>
-        </div>
 
-        <!-- Output Section -->
-        <div>
-          <div class="section-label text-bold q-mb-xs flex items-center justify-between">
-            <div>Output</div>
-            <div class="flex items-center gap-xs">
-              <q-btn-toggle
-                v-model="outputViewMode"
-                dense
-                no-caps
-                size="sm"
-                toggle-color="primary"
-                :options="[
-                  { label: 'Formatted', value: 'formatted' },
-                  { label: 'JSON', value: 'json' }
-                ]"
-              />
-              <q-btn
-                flat
-                dense
-                size="sm"
-                icon="content_copy"
-                @click="copyContent(span._o2_llm_output, 'output')"
-                title="Copy output"
-              >
-                <q-tooltip>Copy Output</q-tooltip>
-              </q-btn>
+          <!-- Output Section -->
+          <div class="col-6 io-section">
+            <div class="section-label text-bold q-mb-xs flex items-center justify-between">
+              <div>Output</div>
+              <div class="flex items-center gap-xs">
+                <q-btn
+                  outline
+                  class="q-px-sm q-ml-sm"
+                  size="sm"
+                  no-caps
+                  :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                  :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
+                  @click="toggleFullscreen"
+                />
+                <q-btn
+                  flat
+                  dense
+                  size="sm"
+                  icon="content_copy"
+                  title="Copy output"
+                  @click="copyContent(span._o2_llm_output, 'output')"
+                  :disable="!hasContent(span._o2_llm_output)"
+                />
+              </div>
             </div>
-          </div>
-          <div class="llm-content-box" :class="{ 'expanded': outputExpanded }">
-            <LLMContentRenderer
-              :content="span._o2_llm_output"
-              :observation-type="span._o2_llm_observation_type"
-              :span="span"
-              content-type="output"
-              :view-mode="outputViewMode"
-            />
-          </div>
-          <div
-            v-if="getOutputCharCount() > 0"
-            class="expand-toggle q-mt-xs text-left opacity-50 cursor-pointer"
-            @click="outputExpanded = !outputExpanded"
-          >
-            {{ outputExpanded ? '...collapse' : `...expand (${getOutputCharCount()} more characters)` }}
+            <div class="llm-content-box">
+              <div v-if="!hasContent(span._o2_llm_output)" class="no-data-message">
+                No data available
+              </div>
+              <LLMContentRenderer
+                v-else
+                :content="span._o2_llm_output"
+                :observation-type="span._o2_llm_observation_type"
+                content-type="output"
+                :span="span"
+                view-mode="formatted"
+              />
+            </div>
           </div>
         </div>
 
@@ -760,7 +751,7 @@ import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
-import { onMounted, defineAsyncComponent } from "vue";
+import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -826,13 +817,12 @@ export default defineComponent({
     const tags: Ref<{ [key: string]: string }> = ref({});
     const processes: Ref<{ [key: string]: string }> = ref({});
 
-    // LLM content expand/collapse state
-    const inputExpanded = ref(false);
-    const outputExpanded = ref(false);
+    // Ref for fullscreen container (parent container with both Input and Output)
+    const ioContainerRef = ref<HTMLElement | null>(null);
 
-    // LLM view mode state: 'formatted' (default) or 'json'
-    const inputViewMode = ref<'formatted' | 'json'>('formatted');
-    const outputViewMode = ref<'formatted' | 'json'>('formatted');
+    // Track fullscreen state
+    const isFullscreen = ref(false);
+
     const closeSidebar = () => {
       emit("close");
     };
@@ -1043,6 +1033,10 @@ export default defineComponent({
     });
 
     const store = useStore();
+
+    // Get current theme from store
+    const isDarkMode = computed(() => store.state.theme === "dark");
+
     const expandedEvents: any = ref({});
     const eventColumns = ref([
       {
@@ -1555,31 +1549,75 @@ export default defineComponent({
       }
     };
 
+    // Helper function to check if content exists
+    const hasContent = (content: any) => {
+      // Check for null, undefined
+      if (content === null || content === undefined) return false;
+
+      // Check for empty or "null" string (case insensitive)
+      if (typeof content === 'string') {
+        const trimmed = content.trim();
+        if (trimmed === '' || trimmed.toLowerCase() === 'null') return false;
+      }
+
+      // Check for empty arrays
+      if (Array.isArray(content) && content.length === 0) return false;
+
+      // Check for empty objects (but not arrays or objects with properties)
+      if (typeof content === 'object' && !Array.isArray(content) && Object.keys(content).length === 0) return false;
+
+      // Check if JSON stringified content is null/empty
+      try {
+        const stringified = JSON.stringify(content);
+        if (stringified === 'null' || stringified === '{}' || stringified === '[]') return false;
+      } catch (e) {
+        // If stringify fails, continue with other checks
+      }
+
+      return true;
+    };
+
+    // Toggle fullscreen for both Input and Output side by side
+    const toggleFullscreen = () => {
+      if (ioContainerRef.value) {
+        q.fullscreen.toggle(ioContainerRef.value)
+          .then(() => {
+            // Check if this specific element is now fullscreen
+            nextTick(() => {
+              isFullscreen.value = document.fullscreenElement === ioContainerRef.value;
+            });
+          })
+          .catch((err: any) => {
+            console.error('Failed to toggle fullscreen:', err);
+          });
+      }
+    };
+
+    // Listen for fullscreen changes (e.g., when user presses Escape)
+    onMounted(() => {
+      const handleFullscreenChange = () => {
+        // Check if the IO container is in fullscreen
+        isFullscreen.value = document.fullscreenElement === ioContainerRef.value;
+      };
+
+      // Listen to fullscreen change events
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+      // Cleanup listeners on unmount
+      onUnmounted(() => {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      });
+    });
+
     // Format model parameters for display
     const formatModelParams = (params: any) => {
       return formatModelParameters(params);
-    };
-
-    // Get character count for input content
-    const getInputCharCount = () => {
-      if (!props.span._o2_llm_input) return 0;
-      const content = typeof props.span._o2_llm_input === 'string'
-        ? props.span._o2_llm_input
-        : JSON.stringify(props.span._o2_llm_input);
-      // Estimate ~20 chars per line, 15 lines visible = 300 chars visible
-      const visibleChars = 1500; // rough estimate
-      return Math.max(0, content.length - visibleChars);
-    };
-
-    // Get character count for output content
-    const getOutputCharCount = () => {
-      if (!props.span._o2_llm_output) return 0;
-      const content = typeof props.span._o2_llm_output === 'string'
-        ? props.span._o2_llm_output
-        : JSON.stringify(props.span._o2_llm_output);
-      // Estimate ~20 chars per line, 15 lines visible = 300 chars visible
-      const visibleChars = 1500; // rough estimate
-      return Math.max(0, content.length - visibleChars);
     };
 
     return {
@@ -1623,12 +1661,11 @@ export default defineComponent({
       copyContent,
       formatModelParams,
       getObservationTypeColor,
-      inputExpanded,
-      outputExpanded,
-      inputViewMode,
-      outputViewMode,
-      getInputCharCount,
-      getOutputCharCount,
+      hasContent,
+      ioContainerRef,
+      isFullscreen,
+      toggleFullscreen,
+      isDarkMode,
     };
   },
 });
@@ -1837,32 +1874,125 @@ export default defineComponent({
 }
 
 .llm-preview-panel {
+  overflow: hidden; // Prevent scroll at panel level
+
   .section-label {
     color: var(--o2-text-primary);
     font-size: 14px;
     margin-bottom: 0.5rem;
   }
 
+  .io-container {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+    height: 500px; // Fixed height for the container
+    max-height: 500px;
+    align-items: stretch; // Ensure equal heights
+    overflow: hidden; // Prevent scroll at outer level
+  }
+
+  .io-section {
+    flex: 0 0 calc(50% - 0.4rem); // Fixed 50% width minus half the gap
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
   .llm-content-box {
+    flex: 1; // Take all available space
+    height: 100%; // Take full height of parent
+    max-height: calc(500px - 48px); // Container height minus label/button height
     border: 1px solid var(--o2-border-color);
     border-radius: 4px;
     padding: 0.75rem;
+    overflow-y: auto; // Enable scroll inside the box
+    overflow-x: hidden;
     background-color: var(--o2-code-bg);
-    max-height: 300px; // ~15 lines at 20px per line
-    overflow-y: auto;
-    transition: max-height 0.3s ease;
 
-    &.expanded {
-      max-height: 800px; // Larger height when expanded
+    // Enhance hover visibility for code/text content (exclude VueJsonPretty)
+    ::v-deep {
+      .plain-text-content {
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.04) !important;
+        }
+      }
+
+      // Don't apply hover to VueJsonPretty elements
+      .vjs-tree {
+        * {
+          &:hover {
+            background-color: transparent !important;
+          }
+        }
+      }
     }
   }
 
-  .expand-toggle {
-    font-size: 12px;
-    transition: opacity 0.2s ease;
+  // No data message styling
+  .no-data-message {
+    color: var(--o2-text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+    font-size: 14px;
+  }
 
-    &:hover {
-      opacity: 1 !important;
+  // Fullscreen styles for the entire IO container (both Input and Output side by side)
+  .io-container:fullscreen {
+    background-color: #f5f5f5;
+    padding-bottom: 1rem;
+    height: 100vh; // Full viewport height in fullscreen
+    max-height: 100vh;
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+
+    .io-section {
+      flex: 1; // Equal split in fullscreen
+      display: flex;
+      flex-direction: column;
+
+      .section-label {
+        background: #f5f5f5;
+        border-radius: 4px;
+      }
+
+      .llm-content-box {
+        height: calc(100vh - 80px); // Full height minus header in fullscreen
+        max-height: unset; // Remove max-height constraint in fullscreen
+        min-height: unset;
+      }
+    }
+  }
+
+  // Dark mode fullscreen
+  .io-container-dark:fullscreen {
+    background: #1e1e1e; // Dark background for dark mode
+
+    .io-section .section-label {
+      background: #1e1e1e;
+      color: #e0e0e0; // Ensure text is visible in dark mode
+    }
+  }
+
+  // Dark mode hover visibility
+  .io-container-dark .llm-content-box {
+    ::v-deep {
+      .plain-text-content {
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+      }
+
+      // Don't apply hover to VueJsonPretty elements in dark mode
+      .vjs-tree {
+        * {
+          &:hover {
+            background-color: transparent !important;
+          }
+        }
+      }
     }
   }
 
