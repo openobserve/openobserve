@@ -139,7 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)]"
             >
               <q-icon name="hub" size="14px" />
-              <span>{{ effectiveSpanList.length }} spans</span>
+              <span data-test="span-count-text"
+                >{{ effectiveSpanList.length }} spans</span
+              >
             </div>
 
             <!-- Error Count Badge -->
