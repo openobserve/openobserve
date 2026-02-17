@@ -9,7 +9,7 @@ class ChangeOrgPage {
     async validateHomePageDefault(pageManager) {
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.reload();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await pageManager.homePage.homePageValidation();
         await pageManager.homePage.gotoHomePage();
         await pageManager.homePage.homePageValidation();
@@ -145,7 +145,7 @@ class ChangeOrgPage {
     async validateAlertsPageDefault(pageManager) {
         await pageManager.commonActions.navigateToAlerts();
         await pageManager.homePage.clickDefaultOrg();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await pageManager.homePage.homePageURLValidationDefaultOrg();
         await pageManager.alertsPage.alertsURLValidation();
     }

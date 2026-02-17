@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 30;
+pub const DB_SCHEMA_VERSION: u64 = 31;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -800,12 +800,10 @@ pub struct Common {
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
-    #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
-    pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
-    #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
-    pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
+    #[env_config(name = "ZO_META_PARTITION_MODE", default = "auto")]
+    pub meta_partition_mode: String, // "auto" or "manual"
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -1486,6 +1484,12 @@ pub struct Limit {
     pub alert_schedule_concurrency: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
+    #[env_config(
+        name = "ZO_ALERT_PREVIEW_TIMERANGE_MINUTES",
+        default = 0,
+        help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."
+    )]
+    pub alert_preview_timerange_minutes: i64,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
@@ -2623,12 +2627,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if !cfg.common.local_mode
-        && !cfg.common.meta_store.starts_with("postgres")
-        && !cfg.common.meta_store.starts_with("mysql")
-    {
+    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
         return Err(anyhow::anyhow!(
-            "Meta store only support mysql or postgres in cluster mode."
+            "Meta store only supports postgres in cluster mode."
         ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
@@ -2636,23 +2637,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
         ));
     }
-    if cfg.common.meta_store.starts_with("mysql") && cfg.common.meta_mysql_dsn.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Meta store is MySQL, you must set ZO_META_MYSQL_DSN"
-        ));
+
+    if cfg.common.meta_store.starts_with("mysql") {
+        return Err(anyhow::anyhow!("We don't support MySQL anymore."));
     }
 
-    // Print MySQL deprecation warning (logger not initialized yet at this stage)
-    if cfg.common.meta_store.starts_with("mysql") {
-        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
-        eprintln!(
-            "║                              ⚠️  WARNING  ⚠️                                 ║"
-        );
-        eprintln!("║                                                                            ║");
-        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
-        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
-        eprintln!("║                                                                            ║");
-        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
+    // check meta partition mode
+    if cfg.common.meta_partition_mode != "manual" {
+        cfg.common.meta_partition_mode = "auto".to_string();
     }
 
     // If the default scrape interval is less than 5s, raise an error

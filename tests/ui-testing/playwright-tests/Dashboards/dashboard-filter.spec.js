@@ -722,7 +722,7 @@ test.describe("dashboard filter testcases", () => {
       true  // showMultipleValues
     );
 
-    // await page.waitForLoadState('networkidle');
+    // await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -750,7 +750,7 @@ test.describe("dashboard filter testcases", () => {
     const searchTerms = ["zi", "zio", "ziox"];
     for (const term of searchTerms) {
       await variableInput.fill(term);
-      await page.waitForLoadState('networkidle'); // Allow API calls to complete
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Allow API calls to complete
     }
 
     // Select the final value
@@ -759,7 +759,7 @@ test.describe("dashboard filter testcases", () => {
     await option.click();
 
     // Wait for any remaining network activity to settle
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Assert that we captured at least one _values API call
     expect(valuesResponses.length).toBeGreaterThan(0);

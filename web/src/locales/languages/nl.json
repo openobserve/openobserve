@@ -1891,7 +1891,101 @@
     "msteams": "Microsoft Teams",
     "pagerduty": "PagerDuty",
     "opsgenie": "Opsgenie",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Waarschuwing opslaan",
+    "aggregation_threshold": "Waarschuwing als er groepen zijn",
+    "thresholdDynamic": {
+      "alertMeWhen": "Waarschuw me wanneer",
+      "metricTypes": {
+        "resultsPassedFilter": "resultaten geslaagd: filters",
+        "distinctGroupsAffected": "verschillende groepen worden getroffen",
+        "metricsMatchCriteria": "statistieken komen overeen met criteria",
+        "matchingLogsFound": "overeenkomende logboeken gevonden",
+        "groupsPassFilter": "groepen voldoen aan filtercriteria",
+        "distinctGroups": "verschillende groepen gevonden",
+        "resultRows": "resultaatrijen geretourneerd",
+        "timeSeries": "actieve tijdreeksen gevonden",
+        "matchingRecords": "overeenkomende records gevonden",
+        "groupsWithHaving": "wedstrijdvoorwaarden voor groepen",
+        "uniqueGroups": "unieke groepen",
+        "events": "wedstrijdvoorwaarden voor evenementen",
+        "aggregatedValue": "wedstrijdvoorwaarden"
+      },
+      "contextLabels": {
+        "groupedBy": "Gegroepeerd op:",
+        "havingConditions": "De voorwaarden met betrekking tot:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Naam van de waarschuwing",
+      "sqlQuery": "SQL-zoekopdracht",
+      "promqlQuery": "ProMQL-zoekopdracht",
+      "conditions": "Voorwaarden",
+      "copy": "Kopiëren",
+      "noCondition": "Geen voorwaarde",
+      "noDescription": "Geen beschrijving",
+      "evaluationHistory": "Geschiedenis van de evaluatie",
+      "loadingHistory": "Geschiedenis wordt geladen...",
+      "noHistoryAvailable": "Geen evaluatiegeschiedenis beschikbaar voor deze waarschuwing",
+      "results": "Resultaten"
+    },
+    "historyTable": {
+      "timestamp": "Tijdstempel",
+      "status": "Status",
+      "evaluationTime": "Evaluatie (s)",
+      "queryTime": "Zoekopdracht (ms)",
+      "error": "Fout"
+    },
+    "back": "Terug",
+    "continue": "Ga verder",
+    "wouldTrigger": "ZOU TRIGGEREN",
+    "wouldNotTrigger": "ZOU NIET ACTIVEREN",
+    "queryBuilder": "Bouwer",
+    "groupByHelp": {
+      "description": "Groepeer de geaggregeerde gegevens op specifieke velden om afzonderlijke waarschuwingen te creëren voor elke unieke waarde.",
+      "example": "Voorbeeld: groepeer op „hostnaam” om individuele meldingen per server te ontvangen, of op „status_code” om fouten afzonderlijk bij te houden."
+    },
+    "conditions": {
+      "condition": "Conditie",
+      "conditionGroup": "Conditiegroep",
+      "addConditionTooltip": "Een nieuwe voorwaarde aan deze groep toevoegen",
+      "addConditionGroupTooltip": "Een geneste conditiegroep toevoegen (maximale diepte: 2)",
+      "maxDepthReachedTooltip": "Maximale nestdiepte bereikt"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Waarschuwing ingesteld voor",
+      "currentWindow": "Huidig venster",
+      "cycle": "Cyclus",
+      "cycleTooltip": "Vergelijk de resultaten met dezelfde periode in de vorige cyclus.",
+      "runningFor": "Hardlopen gedurende {periode} in het interval van elke {frequentie}",
+      "currentWindowCannotBeDeleted": "Het huidige venster kan niet worden verwijderd",
+      "comparingWith": "Vergelijken met",
+      "referenceWindow": "Referentievenster",
+      "timeFrame": "Tijdsbestek",
+      "timeFrameTooltip": "Tijdbereik voor uw vraag.",
+      "comparingText": "Vergelijking van het huidige vensterqueryresultaat met het queryresultaat van de vorige {offset}.",
+      "addComparisonWindow": "Vergelijkingsvenster toevoegen",
+      "goToConditions": "Ga naar de voorwaarden",
+      "goToConditionsTooltip": "Klik op „Ga naar de voorwaarden” om de gebeurtenissen voor geselecteerde vergelijkingsvensters te verifiëren"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron-schema",
+      "addNewDestination": "Nieuwe bestemming toevoegen",
+      "cooldownTooltip": "Als de waarschuwing wordt geactiveerd, hoe lang moet het dan wachten voordat een nieuwe melding wordt verzonden. Als de waarschuwing bijvoorbeeld om 16.00 uur wordt geactiveerd en de stiltemelding is ingesteld op 10 minuten, dan wordt er pas om 16.10 uur nog een melding gestuurd, zelfs als de waarschuwing na 1 minuut nog steeds duurt. Dit is om te voorkomen dat de gebruiker wordt gespamd met meldingen.",
+      "thresholdTooltip": "Definieert wanneer de waarschuwing moet worden geactiveerd op basis van het aantal gebeurtenissen of de geaggregeerde waarde. Voorbeeld: Indien ingesteld op „> 100\", wordt de waarschuwing geactiveerd wanneer het aantal meer dan 100 gebeurtenissen bedraagt.",
+      "periodTooltip": "Periode gedurende welke de query moet worden uitgevoerd. Bijvoorbeeld 10 minuten betekent dat telkens wanneer de query wordt uitgevoerd, de laatste 10 minuten aan gegevens worden gebruikt.",
+      "frequencyTooltipMinutes": "Hoe vaak de taak moet worden uitgevoerd. bijv. elke 5 minuten.",
+      "frequencyTooltipCron": "Standaard UNIX cron-formaat met 5 velden gescheiden door spaties: [Minuut 0-59] [Uur 0-23] [Dag van maand 1-31] [Maand 1-12 of JAN-DEC] [Dag van week 0-7 of '1L-7L', 0 en 7 voor zondag].",
+      "timezoneWarning": "Waarschuwing: De weergegeven tijdzone is bij benadering. Controleer en selecteer handmatig de juiste tijdzone.",
+      "destinationsTooltip": "Selecteer een of meer bestemmingen om waarschuwingsmeldingen te verzenden.",
+      "templateTooltip": "Optioneel: Selecteer een sjabloon om te gebruiken voor alle bestemmingen in deze waarschuwing. Met sjablonen kunt u de indeling van waarschuwingsberichten aanpassen. Indien niet geselecteerd, zal elke bestemming zijn eigen geconfigureerde sjabloon gebruiken."
+    },
+    "advanced": {
+      "addVariable": "Variabele toevoegen",
+      "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
+      "rowTemplateTooltip": "Rijsjabloon wordt gebruikt om het waarschuwingsbericht op te maken.",
+      "templateType": "Sjabloontype:"
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2599,7 +2693,8 @@
     "showLegends": "Legendes weergeven"
   },
   "alert_list": {
-    "alert_details": "Details van de waarschuwing"
+    "alert_details": "Details van de waarschuwing",
+    "alert_history": "Waarschuwingsgeschiedenis"
   },
   "latencyInsights": {
     "title": "Inzichten",

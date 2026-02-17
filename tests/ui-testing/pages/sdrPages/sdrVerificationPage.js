@@ -23,7 +23,9 @@ export class SDRVerificationPage {
 
   async navigateToLogsQuick() {
     await this.page.locator(this.logsMenuItem).click();
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
+    // Use short networkidle with catch — Logs page may have persistent connections
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to Logs (fast - no VRL wait)');
   }
 

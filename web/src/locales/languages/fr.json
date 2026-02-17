@@ -1891,7 +1891,101 @@
     "msteams": "Microsoft Teams",
     "pagerduty": "Tâche du téléavertisseur",
     "opsgenie": "Opsgénie",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Enregistrer l'alerte",
+    "aggregation_threshold": "Alerter s'il y a des groupes",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avertissez-moi quand",
+      "metricTypes": {
+        "resultsPassedFilter": "les résultats ont passé les filtres",
+        "distinctGroupsAffected": "des groupes distincts sont touchés",
+        "metricsMatchCriteria": "les métriques correspondent aux critères",
+        "matchingLogsFound": "journaux correspondants trouvés",
+        "groupsPassFilter": "les groupes répondent aux critères de filtrage",
+        "distinctGroups": "groupes distincts trouvés",
+        "resultRows": "lignes de résultats renvoyées",
+        "timeSeries": "série chronologique active trouvée",
+        "matchingRecords": "enregistrements correspondants trouvés",
+        "groupsWithHaving": "conditions des matchs de groupe",
+        "uniqueGroups": "groupes uniques",
+        "events": "conditions de match des événements",
+        "aggregatedValue": "conditions du match"
+      },
+      "contextLabels": {
+        "groupedBy": "Regroupés par :",
+        "havingConditions": "CONDITIONS D'UTILISATION :"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nom de l'alerte",
+      "sqlQuery": "Requête SQL",
+      "promqlQuery": "Requête ProMQL",
+      "conditions": "Conditions",
+      "copy": "Copier",
+      "noCondition": "Aucune condition",
+      "noDescription": "Aucune description",
+      "evaluationHistory": "Historique de l'évaluation",
+      "loadingHistory": "Historique de chargement...",
+      "noHistoryAvailable": "Aucun historique d'évaluation disponible pour cette alerte",
+      "results": "Résultats"
+    },
+    "historyTable": {
+      "timestamp": "Horodatage",
+      "status": "État",
+      "evaluationTime": "Évaluation (s)",
+      "queryTime": "Requête (ms)",
+      "error": "Erreur"
+    },
+    "back": "Retour",
+    "continue": "Continuer",
+    "wouldTrigger": "DÉCLENCHERAIT",
+    "wouldNotTrigger": "NE DÉCLENCHERAIT PAS",
+    "queryBuilder": "Constructeur",
+    "groupByHelp": {
+      "description": "Regroupez les données agrégées par champs spécifiques afin de créer des alertes distinctes pour chaque valeur unique.",
+      "example": "Exemple : regroupez par « nom d'hôte » pour obtenir des alertes individuelles par serveur, ou par « status_code » pour suivre les erreurs séparément."
+    },
+    "conditions": {
+      "condition": "État",
+      "conditionGroup": "Groupe de conditions",
+      "addConditionTooltip": "Ajouter une nouvelle condition à ce groupe",
+      "addConditionGroupTooltip": "Ajouter un groupe de conditions imbriqué (profondeur maximale : 2)",
+      "maxDepthReachedTooltip": "Profondeur de nidification maximale atteinte"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Alerte définie pour",
+      "currentWindow": "Fenêtre actuelle",
+      "cycle": "Cycle",
+      "cycleTooltip": "Comparez les résultats avec ceux du cycle précédent à la même période.",
+      "runningFor": "Courir pendant {période} dans l'intervalle de chaque {fréquence}",
+      "currentWindowCannotBeDeleted": "La fenêtre actuelle ne peut pas être supprimée",
+      "comparingWith": "Comparaison avec",
+      "referenceWindow": "Fenêtre de référence",
+      "timeFrame": "Échéancier",
+      "timeFrameTooltip": "Plage de temps pour votre requête.",
+      "comparingText": "Comparaison du résultat de la requête de la fenêtre en cours avec le résultat de la requête du {offset} précédent.",
+      "addComparisonWindow": "Ajouter une fenêtre de comparaison",
+      "goToConditions": "Accédez aux conditions",
+      "goToConditionsTooltip": "Cliquez sur « Accéder aux conditions » pour vérifier les événements pour les fenêtres de comparaison sélectionnées"
+    },
+    "alertSettings": {
+      "cronSchedule": "Calendrier Cron",
+      "addNewDestination": "Ajouter une nouvelle destination",
+      "cooldownTooltip": "Si l'alerte se déclenche, combien de temps doit-elle attendre avant d'envoyer une autre notification ? Par exemple, si l'alerte se déclenche à 16 h 00 et que la notification de silence est réglée sur 10 minutes, elle n'enverra pas d'autre notification avant 16 h 10, même si l'alerte est toujours là après 1 minute. Cela permet d'éviter de spammer l'utilisateur avec des notifications.",
+      "thresholdTooltip": "Définit le moment où l'alerte doit se déclencher en fonction du nombre d'événements ou de la valeur agrégée. Exemple : si elle est réglée sur « > 100 », l'alerte se déclenche lorsque le nombre dépasse 100 événements.",
+      "periodTooltip": "Période pendant laquelle la requête doit être exécutée. Par exemple, 10 minutes signifient que chaque fois que la requête sera exécutée, elle utilisera les 10 dernières minutes de données.",
+      "frequencyTooltipMinutes": "À quelle fréquence la tâche doit-elle être exécutée. Par exemple toutes les 5 minutes.",
+      "frequencyTooltipCron": "Format cron UNIX standard avec 5 champs séparés par des espaces : [Minute 0-59] [Heure 0-23] [Jour du mois 1-31] [Mois 1-12 ou JANVIER-DÉCEMBRE] [Jour de la semaine 0-7 ou « 1L-7L », 0 et 7 pour le dimanche].",
+      "timezoneWarning": "Avertissement : Le fuseau horaire affiché est approximatif. Vérifiez et sélectionnez manuellement le fuseau horaire correct.",
+      "destinationsTooltip": "Sélectionnez une ou plusieurs destinations pour envoyer des notifications d'alerte.",
+      "templateTooltip": "Facultatif : sélectionnez un modèle à utiliser pour toutes les destinations de cette alerte. Les modèles vous permettent de personnaliser le format des messages d'alerte. Si cette option n'est pas sélectionnée, chaque destination utilisera son propre modèle configuré."
+    },
+    "advanced": {
+      "addVariable": "Ajouter une variable",
+      "variablesTooltip": "Les variables sont utilisées pour transmettre les données de l'alerte à la destination.",
+      "rowTemplateTooltip": "Le modèle de ligne est utilisé pour mettre en forme le message d'alerte.",
+      "templateType": "Type de modèle :"
+    }
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2599,7 +2693,8 @@
     "showLegends": "Afficher les légendes"
   },
   "alert_list": {
-    "alert_details": "Détails de l'alerte"
+    "alert_details": "Détails de l'alerte",
+    "alert_history": "Historique des alertes"
   },
   "latencyInsights": {
     "title": "Perspectives",

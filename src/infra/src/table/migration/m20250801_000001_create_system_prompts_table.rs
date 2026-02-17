@@ -85,19 +85,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_system_prompts_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `system_prompts` (
-                `type` varchar(27) NOT NULL PRIMARY KEY,
-                `content` text NOT NULL,
-                `updated_at` bigint NOT NULL DEFAULT 0
-            )"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_system_prompts_table_statement().to_string(SqliteQueryBuilder),
