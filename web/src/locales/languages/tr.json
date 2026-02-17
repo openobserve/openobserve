@@ -2396,7 +2396,21 @@
     "errorSavingPipeline": "Boru hattını kaydederken hata",
     "cancelChangesConfirm": "Değişiklikleri iptal etmek istediğinizden emin misiniz?",
     "cancel": "İptal",
-    "dragDropNodesHere": "Düğümleri buraya sürükleyip bırakın"
+    "dragDropNodesHere": "Düğümleri buraya sürükleyip bırakın",
+    "llmEvaluation": "LLM Değerlendirmesi",
+    "nodeName": "Bağlantı Noktası Adı",
+    "samplingConfig": "Örnekleme Yapılandırması",
+    "enableSampling": "Örneklemeyi Etkinleştir",
+    "samplingRate": "Örnekleme Oranı",
+    "samplingRateHelp": "Değerlendirme maliyetlerini azaltmak için izleme yüzdesini örnekleme yapın (%0 = devre dışı, %100 = tümünü değerlendirin)",
+    "samplingStrategy": "Örnekleme Stratejisi",
+    "randomSampling": "Rastgele",
+    "randomSamplingDesc": "Deterministik olmayan örnekleme - her seferinde farklı izler",
+    "hashSampling": "Hash tabanlı (Önerilen)",
+    "hashSamplingDesc": "Trace_id başına tutarlı örnekleme - aynı izler her zaman örneklenir",
+    "llmEvaluationInfo": "LLM Değerlendirme Yapılandırması",
+    "llmEvaluationInfoText": "LLM yargıcı kullanarak izleri değerlendirir. Örnekleme, izlerin yalnızca bir yüzdesini işleyerek maliyetleri azaltır. Hash stratejisi, güvenilir izleme için tutarlı örnekleme sağlar.",
+    "llmEvaluationNodeSaved": "LLM Değerlendirme düğümü başarıyla kaydedildi"
   },
   "reports": {
     "header": "Raporlar",

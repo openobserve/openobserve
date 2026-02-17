@@ -2394,7 +2394,21 @@
     "errorSavingPipeline": "Error al guardar la canalización",
     "cancelChangesConfirm": "¿Estás seguro de que deseas cancelar los cambios?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arrastra y suelta los nodos aquí"
+    "dragDropNodesHere": "Arrastra y suelta los nodos aquí",
+    "llmEvaluation": "Evaluación de LLM",
+    "nodeName": "Nombre del nodo",
+    "samplingConfig": "Configuración de muestreo",
+    "enableSampling": "Habilitar el muestreo",
+    "samplingRate": "Frecuencia de muestreo",
+    "samplingRateHelp": "Muestre un porcentaje de las trazas para reducir los costos de evaluación (0% = deshabilitado, 100% = evaluar todo)",
+    "samplingStrategy": "Estrategia de muestreo",
+    "randomSampling": "Aleatorio",
+    "randomSamplingDesc": "Muestreo no determinista: trazas diferentes cada vez",
+    "hashSampling": "Basado en hash (recomendado)",
+    "hashSamplingDesc": "Muestreo uniforme por trace_id: siempre se muestrean las mismas trazas",
+    "llmEvaluationInfo": "Configuración de evaluación de LLM",
+    "llmEvaluationInfoText": "Evalúa las trazas mediante LLM Judge. El muestreo reduce los costos al procesar solo un porcentaje de las trazas. La estrategia de hash garantiza un muestreo consistente para un monitoreo confiable.",
+    "llmEvaluationNodeSaved": "El nodo de evaluación de LLM se guardó correctamente"
   },
   "reports": {
     "header": "Informes",

@@ -2396,7 +2396,21 @@
     "errorSavingPipeline": "Fout tijdens het opslaan van de pijplijn",
     "cancelChangesConfirm": "Weet je zeker dat je wijzigingen wilt annuleren?",
     "cancel": "Annuleer",
-    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten"
+    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
+    "llmEvaluation": "LLM-evaluatie",
+    "nodeName": "Naam van het knooppunt",
+    "samplingConfig": "Configuratie van de steekproef",
+    "enableSampling": "Sampling inschakelen",
+    "samplingRate": "Bemonsteringssnelheid",
+    "samplingRateHelp": "Neem een steekproef van een percentage van de sporen om de evaluatiekosten te verlagen (0% = uitgeschakeld, 100% = alles evalueren)",
+    "samplingStrategy": "Bemonsteringsstrategie",
+    "randomSampling": "Willekeurig",
+    "randomSamplingDesc": "Niet-deterministische steekproeven - telkens verschillende sporen",
+    "hashSampling": "Gebaseerd op hash (aanbevolen)",
+    "hashSamplingDesc": "Consistente bemonstering per trace_id - altijd dezelfde sporen bemonsterd",
+    "llmEvaluationInfo": "Configuratie van de LLM-evaluatie",
+    "llmEvaluationInfoText": "Evalueert sporen met behulp van de LLM-rechter. Bemonstering verlaagt de kosten door slechts een percentage van de sporen te verwerken. De hash-strategie zorgt voor consistente bemonstering voor betrouwbare monitoring.",
+    "llmEvaluationNodeSaved": "LLM-evaluatieknooppunt succesvol opgeslagen"
   },
   "reports": {
     "header": "Rapporten",
