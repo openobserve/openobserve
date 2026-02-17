@@ -1333,6 +1333,7 @@ class="q-pr-sm q-pt-xs" />
                       :disable-ai="isVrlEditorDisabled"
                       :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
+                      :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
                       editor-height="100%"
                       class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
