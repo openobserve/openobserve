@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             clearable
             class="tw:max-w-sm q-ml-md q-mb-xs right float-right indexlist-search-input"
-            data-test="ingestion-global-search"
+            data-test="recommended-list-search-input"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
