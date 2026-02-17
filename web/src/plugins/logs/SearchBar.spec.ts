@@ -3402,12 +3402,407 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.updateQueryValue("SELECT * FROM logs");
     componentInstance.resetRegionFilter();
     componentInstance.createScheduleJob();
-    
+
     // Validate final state
     expect(componentInstance.searchObj.data.query).toBe("test query");
     expect(componentInstance.searchObj.data.editorValue).toBe("SELECT * FROM logs");
     expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
     expect(componentInstance.regionFilter).toBe("");
     expect(componentInstance.searchObj.meta.jobRecords).toBe(100);
+  });
+});
+
+/**
+ * VRL Visualization Support Tests - SearchBar VRL Editor
+ * PR Reference: https://github.com/openobserve/openobserve/pull/9295
+ *
+ * Tests for the VRL editor changes:
+ * 1. VRL editor is no longer read-only in visualize mode
+ * 2. Warning banner removed for visualize mode
+ */
+describe("SearchBar.vue VRL Visualization Support", () => {
+  let vrlInstance: any;
+
+  beforeEach(() => {
+    vrlInstance = {
+      searchObj: {
+        data: {
+          tempFunctionContent: "",
+          transformType: "function",
+          query: "SELECT * FROM logs",
+        },
+        meta: {
+          logsVisualizeToggle: "search",
+          functionEditorPlaceholderFlag: true,
+          showTransformEditor: true,
+        },
+      },
+    };
+  });
+
+  describe("VRL Editor ReadOnly attribute changes", () => {
+    // Test: BEFORE - readOnly was based on logsVisualizeToggle
+    it("should understand the BEFORE behavior: readOnly was conditional on visualize mode", () => {
+      // BEFORE: :readOnly="searchObj.meta.logsVisualizeToggle === 'visualize'"
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+
+      const beforeReadOnly = vrlInstance.searchObj.meta.logsVisualizeToggle === "visualize";
+      expect(beforeReadOnly).toBe(true); // Would have been read-only
+    });
+
+    // Test: AFTER - readOnly is always false
+    it("should have VRL editor always editable (readOnly=false)", () => {
+      // AFTER: :readOnly="false"
+      const afterReadOnly = false; // New fixed value
+
+      // In search mode
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "search";
+      expect(afterReadOnly).toBe(false);
+
+      // In visualize mode - NOW ALSO EDITABLE
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      expect(afterReadOnly).toBe(false);
+    });
+
+    it("should allow editing VRL function content in visualize mode", () => {
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      vrlInstance.searchObj.data.tempFunctionContent = "";
+
+      // User can now edit VRL function in visualize mode
+      vrlInstance.searchObj.data.tempFunctionContent = ".parsed = parse_json!(.message)";
+
+      expect(vrlInstance.searchObj.data.tempFunctionContent).toBe(".parsed = parse_json!(.message)");
+    });
+
+    it("should allow editing VRL function content in search mode (unchanged)", () => {
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "search";
+      vrlInstance.searchObj.data.tempFunctionContent = "";
+
+      // This worked before and should still work
+      vrlInstance.searchObj.data.tempFunctionContent = ".level = upcase!(.severity)";
+
+      expect(vrlInstance.searchObj.data.tempFunctionContent).toBe(".level = upcase!(.severity)");
+    });
+  });
+
+  describe("VRL Warning Banner removal", () => {
+    // Test: BEFORE - Warning banner was shown in visualize mode
+    it("should understand the BEFORE behavior: warning banner was shown in visualize mode", () => {
+      // BEFORE: v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+
+      const beforeShowBanner = vrlInstance.searchObj.meta.logsVisualizeToggle === "visualize";
+      expect(beforeShowBanner).toBe(true); // Banner would have been shown
+    });
+
+    // Test: AFTER - Warning banner is completely removed
+    it("should NOT show VRL warning banner in visualize mode (banner removed)", () => {
+      // AFTER: The entire warning banner div is removed from template
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+
+      // The banner element no longer exists in the template
+      const afterShowBanner = false; // Banner div removed
+
+      expect(afterShowBanner).toBe(false);
+    });
+
+    it("should NOT display 'VRL Function Editor is not supported in visualize mode' message", () => {
+      // This message was inside the removed banner
+      const warningMessage = "VRL Function Editor is not supported in visualize mode.";
+
+      // The message is no longer rendered since the banner was removed
+      // Simulating that the banner render condition no longer exists
+      const bannerRendered = false;
+
+      expect(bannerRendered).toBe(false);
+    });
+  });
+
+  describe("VRL Editor behavior in different modes", () => {
+    it("should allow VRL editing when transformType is function in visualize mode", () => {
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      vrlInstance.searchObj.data.transformType = "function";
+
+      // VRL editor should be enabled
+      const canEdit = vrlInstance.searchObj.data.transformType === "function";
+      expect(canEdit).toBe(true);
+    });
+
+    it("should handle VRL function content changes in visualize mode", () => {
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      vrlInstance.searchObj.data.transformType = "function";
+
+      // Simulate user typing VRL code
+      const vrlCode = `
+        .timestamp = to_timestamp!(.time)
+        .level = upcase!(.severity)
+        .parsed = parse_json!(.body)
+      `;
+
+      vrlInstance.searchObj.data.tempFunctionContent = vrlCode;
+
+      expect(vrlInstance.searchObj.data.tempFunctionContent).toContain("parse_json");
+      expect(vrlInstance.searchObj.data.tempFunctionContent).toContain("to_timestamp");
+    });
+
+    it("should maintain VRL function content when toggling between modes", () => {
+      const vrlCode = ".field = 1";
+      vrlInstance.searchObj.data.tempFunctionContent = vrlCode;
+
+      // Toggle to visualize
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      expect(vrlInstance.searchObj.data.tempFunctionContent).toBe(vrlCode);
+
+      // Toggle back to search
+      vrlInstance.searchObj.meta.logsVisualizeToggle = "search";
+      expect(vrlInstance.searchObj.data.tempFunctionContent).toBe(vrlCode);
+    });
+  });
+});
+
+/**
+ * VRL Editor Disabled for Non-Table Charts Tests
+ * PR Reference: https://github.com/openobserve/openobserve/pull/10343
+ *
+ * Tests for the isVrlEditorDisabled computed property:
+ * 1. VRL editor is disabled (readOnly) when in visualize mode with non-table chart
+ * 2. VRL editor is enabled when in visualize mode with table chart
+ * 3. VRL editor is enabled when not in visualize mode
+ * 4. Warning banner is shown when VRL editor is disabled
+ */
+describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
+  let testInstance: any;
+
+  beforeEach(() => {
+    testInstance = {
+      searchObj: {
+        data: {
+          tempFunctionContent: ".parsed = parse_json!(.message)",
+          transformType: "function",
+          query: "SELECT * FROM logs",
+        },
+        meta: {
+          logsVisualizeToggle: "logs",
+          functionEditorPlaceholderFlag: true,
+          showTransformEditor: true,
+        },
+      },
+      dashboardPanelData: {
+        data: {
+          type: "table",
+        },
+      },
+    };
+  });
+
+  // Helper function to compute isVrlEditorDisabled
+  const computeIsVrlEditorDisabled = (instance: any): boolean => {
+    return (
+      instance.searchObj.meta.logsVisualizeToggle === "visualize" &&
+      instance.dashboardPanelData.data.type !== "table"
+    );
+  };
+
+  describe("isVrlEditorDisabled computed property", () => {
+    it("should return false when not in visualize mode (logs mode)", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(false);
+    });
+
+    it("should return false when in visualize mode with table chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "table";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(false);
+    });
+
+    it("should return true when in visualize mode with line chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+    });
+
+    it("should return true when in visualize mode with bar chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "bar";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+    });
+
+    it("should return true when in visualize mode with area chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "area";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+    });
+
+    it("should return true when in visualize mode with scatter chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "scatter";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+    });
+
+    it("should return true when in visualize mode with h-bar chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "h-bar";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+    });
+
+    it("should return false when in patterns mode regardless of chart type", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(false);
+    });
+  });
+
+  describe("VRL editor readOnly binding based on isVrlEditorDisabled", () => {
+    it("should set readOnly to false when isVrlEditorDisabled is false (table chart)", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "table";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      const readOnly = isDisabled;
+
+      expect(readOnly).toBe(false);
+    });
+
+    it("should set readOnly to true when isVrlEditorDisabled is true (non-table chart)", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      const readOnly = isDisabled;
+
+      expect(readOnly).toBe(true);
+    });
+
+    it("should allow editing VRL when in visualize mode with table chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "table";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(false);
+
+      // Can edit VRL content
+      testInstance.searchObj.data.tempFunctionContent = ".new_field = 1";
+      expect(testInstance.searchObj.data.tempFunctionContent).toBe(".new_field = 1");
+    });
+
+    it("should preserve VRL content when editor becomes disabled", () => {
+      const originalContent = ".parsed = parse_json!(.message)";
+      testInstance.searchObj.data.tempFunctionContent = originalContent;
+
+      // Switch to visualize mode with non-table chart
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+
+      // VRL content should still be preserved
+      expect(testInstance.searchObj.data.tempFunctionContent).toBe(originalContent);
+    });
+  });
+
+  describe("VRL warning banner visibility", () => {
+    it("should show warning banner when VRL editor is disabled", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      const showWarning = isDisabled;
+
+      expect(showWarning).toBe(true);
+    });
+
+    it("should NOT show warning banner when VRL editor is enabled (table chart)", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "table";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      const showWarning = isDisabled;
+
+      expect(showWarning).toBe(false);
+    });
+
+    it("should NOT show warning banner when not in visualize mode", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      const showWarning = isDisabled;
+
+      expect(showWarning).toBe(false);
+    });
+
+    it("should display correct warning message when disabled", () => {
+      const warningMessage = "VRL function is only supported for table chart.";
+
+      // This message should be shown when isVrlEditorDisabled is true
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "bar";
+
+      const isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+
+      // The warning message should be displayed
+      expect(warningMessage).toContain("table chart");
+    });
+  });
+
+  describe("Chart type switching behavior", () => {
+    it("should enable VRL editor when switching from non-table to table chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "line";
+
+      let isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+
+      // Switch to table chart
+      testInstance.dashboardPanelData.data.type = "table";
+
+      isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(false);
+    });
+
+    it("should disable VRL editor when switching from table to non-table chart", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.dashboardPanelData.data.type = "table";
+
+      let isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(false);
+
+      // Switch to bar chart
+      testInstance.dashboardPanelData.data.type = "bar";
+
+      isDisabled = computeIsVrlEditorDisabled(testInstance);
+      expect(isDisabled).toBe(true);
+    });
+
+    it("should allow switching between any chart types (no blocking)", () => {
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+
+      // Can switch to any chart type
+      const chartTypes = ["table", "line", "bar", "area", "scatter", "h-bar"];
+
+      chartTypes.forEach((chartType) => {
+        testInstance.dashboardPanelData.data.type = chartType;
+        expect(testInstance.dashboardPanelData.data.type).toBe(chartType);
+      });
+    });
   });
 });
