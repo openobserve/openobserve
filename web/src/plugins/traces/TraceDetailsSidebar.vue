@@ -2413,4 +2413,12 @@ body.body--dark {
     background-color: #f5f5f5 !important;
   }
 }
+
+.body--dark {
+  .trace-detail-tab-table{
+    th{
+      background-color: #424242 !important;
+    }
+  }
+}
 </style>
