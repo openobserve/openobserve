@@ -12,7 +12,6 @@ import {
   getVariableLoadingIndicator,
   getPanelRefreshBtn,
   getMenuItemByText,
-  selectStreamAndField,
 } from "./dashboard-selectors.js";
 
 export default class DashboardVariablesScoped {
@@ -495,8 +494,50 @@ export default class DashboardVariablesScoped {
       }
     }
 
-    // Select Stream Type, Stream, and Field using common helper
-    await selectStreamAndField(this.page, streamType, streamName, field);
+    // Select Stream Type
+    await this.page
+      .locator('[data-test="dashboard-variable-stream-type-select"]')
+      .click();
+    await this.page
+      .getByRole("option", { name: streamType, exact: true })
+      .locator("div")
+      .nth(2)
+      .click();
+
+    // Select Stream
+    const streamSelect = this.page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelect.click();
+    await streamSelect.fill(streamName);
+    await this.page.getByRole("option", { name: streamName, exact: true }).click();
+
+    // Select Field
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await this.page.keyboard.type(field, { delay: 100 });
+    await this.page.waitForFunction(
+      () => document.querySelectorAll('[role="option"]').length > 0,
+      { timeout: 10000, polling: 100 }
+    );
+
+    // Select field using multiple strategies
+    let fieldSelected = false;
+    try {
+      await this.page.getByRole("option", { name: field, exact: true }).click({ timeout: 5000 });
+      fieldSelected = true;
+    } catch (e) {
+      try {
+        await this.page.getByRole("option", { name: field, exact: false }).first().click({ timeout: 5000 });
+        fieldSelected = true;
+      } catch (e2) {
+        await this.page.keyboard.press("ArrowDown");
+        await this.page.keyboard.press("Enter");
+        fieldSelected = true;
+      }
+    }
+
+    if (!fieldSelected) {
+      throw new Error(`Failed to select field: ${field}`);
+    }
 
     // Add dependency if specified
     if (dependsOn) {
@@ -630,9 +671,8 @@ export default class DashboardVariablesScoped {
     // This maintains backward compatibility when called from addScopedVariable with just the dependency name
     if (!filterFieldName) {
       // Get the currently selected field value
-      // Use .first() because CommonAutoComplete renders data-test on both root div and q-input
-      const fieldInput = this.page.locator('[data-test="dashboard-variable-field-select"]').first();
-      filterFieldName = await fieldInput.locator('input').inputValue();
+      const fieldInput = this.page.locator('[data-test="dashboard-variable-field-select"]');
+      filterFieldName = await fieldInput.inputValue();
 
       // If still no field, default to a common field name
       if (!filterFieldName) {
@@ -982,17 +1022,17 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<boolean>}
    */
   async hasCircularDependencyError() {
-    // The error is displayed in a .cycle-error-container div with .cycle-error-text span
-    // The text reads "Circular dependency detected: varA → varB → varA"
-    const errorContainer = this.page.locator('.cycle-error-container');
+    // The error is displayed as red text with the message "Variables has cycle:"
+    // Look for text containing "cycle" in red color
+    const errorElement = this.page.locator('div[style*="color: red"], div[style*="color:red"]').filter({ hasText: /cycle/i });
     try {
-      await errorContainer.waitFor({ state: "visible", timeout: 5000 });
+      await errorElement.waitFor({ state: "visible", timeout: 3000 });
       return true;
     } catch {
-      // Fallback: check for any text containing "Circular dependency detected"
-      const fallbackError = this.page.getByText(/Circular dependency detected/i);
+      // Fallback: check for any text containing "Variables has cycle"
+      const fallbackError = this.page.getByText(/Variables has cycle/i);
       try {
-        await fallbackError.waitFor({ state: "visible", timeout: 2000 });
+        await fallbackError.waitFor({ state: "visible", timeout: 1000 });
         return true;
       } catch {
         return false;
