@@ -589,19 +589,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div
-                style="
-                  text-align: center;
-                  color: var(--o2-text-secondary);
-                  padding: 40px;
-                "
+                style="text-align: center; color: var(--o2-text-secondary)"
+                class="tw:w-full tw:h-full tw:p-[0.625rem]"
               >
-                <q-icon name="hub" size="48px" style="margin-bottom: 16px" />
-                <div
-                  style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
-                >
-                  Service Map View
-                </div>
-                <div style="font-size: 14px">Coming soon...</div>
+                <ChartRenderer
+                  data-test="trace-details-service-map-chart"
+                  :data="traceServiceMap"
+                  class="trace-chart-height tw:h-full! tw:w-full!"
+                />
               </div>
             </div>
           </div>
@@ -769,14 +764,11 @@ export default defineComponent({
     },
   },
   components: {
-    SpanRenderer,
     ShareButton,
     TraceDetailsSidebar,
     TraceTree,
     TraceDAG,
     TraceHeader,
-    TraceTimelineIcon,
-    ServiceMapIcon,
     TraceDetailsV2,
     FlameGraphView,
     AppTabs,
