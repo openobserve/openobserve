@@ -153,33 +153,6 @@ alt="SQL Mode" class="toolbar-icon" />
             </q-tooltip>
           </q-toggle>
         </div>
-        <!-- NLP Mode Toggle - Only show when AI is enabled and enterprise -->
-        <div
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          class="toolbar-toggle-container element-box-shadow"
-        >
-          <q-toggle
-            data-test="logs-search-bar-nlp-mode-toggle-btn"
-            v-model="searchObj.meta.nlpMode"
-            :disable="isSqlModeDisabled"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-            <img :src="nlpIcon" alt="Natural Language Mode" class="toolbar-icon" />
-            <q-tooltip v-if="isSqlModeDisabled">
-              {{ t("search.nlpModeDisabledForVisualization") }}
-            </q-tooltip>
-            <q-tooltip v-else>
-              {{ t("search.nlpModeLabel") }}
-            </q-tooltip>
-          </q-toggle>
-        </div>
         <!-- Explain Query Button -->
         <q-btn
           v-if="!store.state.isAiChatEnabled && searchObj.meta.sqlMode"
@@ -1289,11 +1262,12 @@ class="q-pr-sm q-pt-xs" />
                 :suggestions="autoCompleteSuggestions"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
-                :hide-nl-toggle="true"
-                :disable-ai="!searchObj.data.stream.selectedStream.length"
-                :disable-ai-reason="t('search.selectStreamForAI')"
+                :show-ai-icon="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
+                :disable-ai-reason="!searchObj.data.stream.selectedStream.length ? t('search.selectStreamForAI') : t('search.nlpModeDisabledForVisualization')"
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
+                @toggle-nlp-mode="handleToggleNlpMode"
                 :style="editorWidthToggleFunction"
                 :class="
                   searchObj.data.editorValue == '' &&
@@ -4211,6 +4185,20 @@ export default defineComponent({
     };
 
     /**
+     * Handle toggle NLP mode from AI icon in CodeQueryEditor
+     */
+    const handleToggleNlpMode = () => {
+      console.log('[SearchBar] Toggling NLP mode from AI icon');
+      searchObj.meta.nlpMode = !searchObj.meta.nlpMode;
+
+      // If enabling NLP mode, disable SQL mode (mutually exclusive)
+      if (searchObj.meta.nlpMode) {
+        searchObj.meta.sqlMode = false;
+        isNaturalLanguageDetected.value = false;
+      }
+    };
+
+    /**
      * Handle generation start event from CodeQueryEditor
      */
     const handleGenerationStart = () => {
@@ -4831,6 +4819,7 @@ export default defineComponent({
       createScheduledSearchIcon,
       listScheduledSearchIcon,
       handleNlpModeDetected,
+      handleToggleNlpMode,
       handleGenerationStart,
       handleGenerationEnd,
       handleGenerationSuccess,
