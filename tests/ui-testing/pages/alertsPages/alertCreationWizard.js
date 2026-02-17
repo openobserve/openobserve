@@ -1278,6 +1278,208 @@ export class AlertCreationWizard {
     }
 
     /**
+     * Create a scheduled alert with aggregation enabled in Builder mode
+     * PR #10470 moved aggregation from Step 4 (AlertSettings) to Step 2 (QueryConfig)
+     *
+     * Wizard flow: Step 1 (Setup) -> Step 2 (Conditions + Aggregation) -> Step 3 (Compare) -> Step 4 (Settings) -> Step 5 (Dedup) -> Step 6 (Advanced) -> Submit
+     *
+     * @param {string} streamName - Name of the log stream
+     * @param {string} destinationName - Name of the destination
+     * @param {string} randomValue - Random string for unique naming
+     */
+    async createScheduledAlertWithAggregation(streamName, destinationName, randomValue) {
+        const randomAlertName = 'auto_agg_alert_' + randomValue;
+        this.currentAlertName = randomAlertName;
+
+        testLogger.info('Creating scheduled alert with aggregation', {
+            streamName, destinationName, alertName: randomAlertName
+        });
+
+        // ==================== STEP 1: ALERT SETUP ====================
+        await this.page.locator(this.locators.addAlertButton).click();
+        await this.page.waitForLoadState('networkidle');
+
+        await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+
+        await this.page.locator(this.locators.streamTypeDropdown).click();
+        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.locators.streamNameDropdown).click();
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            await this.page.locator(this.locators.streamNameDropdown).click();
+            await this.page.waitForTimeout(1000);
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        }
+        await this.page.getByText(streamName, { exact: true }).click();
+
+        // Select Scheduled alert type
+        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        testLogger.info('Step 1 complete: Setup');
+
+        // ==================== STEP 2: CONDITIONS + AGGREGATION ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 2');
+
+        // Builder tab should be active by default for logs
+        // Add a condition first
+        await this.page.locator(this.locators.addConditionButton).first().click();
+        await this.page.waitForTimeout(500);
+
+        // Select a known string column to avoid type_coercion errors
+        // (picking an Int64 column like _timestamp with "Contains"/LIKE causes DataFusion errors)
+        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
+        await columnSelect.click();
+        await this.page.waitForTimeout(500);
+        const visibleMenu = this.page.locator('.q-menu:visible');
+        const levelOption = visibleMenu.locator('.q-item').filter({ hasText: 'level' });
+        await expect(levelOption.first()).toBeVisible({ timeout: 5000 });
+        await levelOption.first().click();
+        await this.page.waitForTimeout(500);
+
+        // Select operator
+        await this.page.locator(this.locators.operatorSelect).first().click();
+        await this.page.getByText('Contains', { exact: true }).click();
+        await this.page.waitForTimeout(300);
+
+        // Fill condition value
+        await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill('test');
+        testLogger.info('Added condition');
+
+        // Toggle aggregation ON (it's in Step 2 after PR #10470)
+        // The aggregation section has a q-toggle — it's the only toggle in step-query-config
+        const queryConfigSection = this.page.locator('.step-query-config');
+        const aggregationToggle = queryConfigSection.locator('.q-toggle').first();
+        await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
+        await aggregationToggle.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Toggled aggregation ON');
+
+        // Select first available group-by field
+        const groupBySection = this.page.getByText('Group by').first().locator('..');
+        const groupBySelect = groupBySection.locator('.q-select').first();
+        await groupBySelect.waitFor({ state: 'visible', timeout: 5000 });
+        await groupBySelect.click();
+        await this.page.waitForTimeout(500);
+        const groupByMenu = this.page.locator('.q-menu:visible');
+        await expect(groupByMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        await groupByMenu.locator('.q-item').first().click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Selected group-by field');
+
+        // Configure aggregation threshold
+        // i18n key "alerts.aggregation_threshold" renders as "Alert If Any Groups *"
+        const aggThresholdSection = this.page.getByText('Alert If Any Groups').first().locator('..');
+        const aggFunctionSelect = aggThresholdSection.locator('.q-select').first();
+        await aggFunctionSelect.waitFor({ state: 'visible', timeout: 5000 });
+        await aggFunctionSelect.click();
+        await this.page.waitForTimeout(500);
+        const functionMenu = this.page.locator('.q-menu:visible');
+        await functionMenu.locator('.q-item').filter({ hasText: 'count' }).first().click();
+        await this.page.waitForTimeout(300);
+        testLogger.info('Selected aggregation function: count');
+
+        // Column select for aggregation threshold (second q-select)
+        const aggColumnSelect = aggThresholdSection.locator('.q-select').nth(1);
+        await aggColumnSelect.click();
+        await this.page.waitForTimeout(500);
+        const aggColumnMenu = this.page.locator('.q-menu:visible');
+        await expect(aggColumnMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        await aggColumnMenu.locator('.q-item').first().click();
+        await this.page.waitForTimeout(300);
+
+        // Operator for aggregation threshold (third q-select)
+        const aggOperatorSelect = aggThresholdSection.locator('.q-select').nth(2);
+        await aggOperatorSelect.click();
+        await this.page.waitForTimeout(500);
+        const aggOperatorMenu = this.page.locator('.q-menu:visible');
+        await aggOperatorMenu.locator('.q-item').filter({ hasText: '>=' }).first().click();
+        await this.page.waitForTimeout(300);
+
+        // Value input for aggregation threshold
+        const aggValueInput = aggThresholdSection.locator('input[type="number"]').first();
+        await aggValueInput.fill('1');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Configured aggregation threshold');
+
+        // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+
+        // ==================== STEP 4: ALERT SETTINGS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 4: Settings');
+
+        // Threshold (non-aggregation threshold for trigger condition)
+        const stepContainer = this.page.locator('.step-alert-conditions');
+        const thresholdOperator = stepContainer.locator('.q-select').first();
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
+        await thresholdOperator.click();
+        await this.page.waitForTimeout(500);
+        const thresholdMenu = this.page.locator('.q-menu:visible');
+        await thresholdMenu.locator('.q-item').filter({ hasText: '>=' }).first().click();
+        await this.page.waitForTimeout(300);
+
+        const thresholdInput = stepContainer.locator('input[type="number"]').first();
+        await thresholdInput.fill('1');
+
+        // Period
+        const periodInput = stepContainer.locator('input[type="number"]').nth(1);
+        if (await periodInput.isVisible({ timeout: 3000 })) {
+            await periodInput.fill('15');
+        }
+
+        // Destination
+        const destinationRow = this.page.locator('.alert-settings-row').filter({ hasText: /Destination/ });
+        const destinationDropdown = destinationRow.locator('.q-select').first();
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await destinationDropdown.click();
+        await this.page.waitForTimeout(1000);
+
+        const visibleDestMenu = this.page.locator('.q-menu:visible');
+        await expect(visibleDestMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+
+        const destOption = visibleDestMenu.locator('.q-item').filter({ hasText: destinationName }).first();
+        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await destOption.click();
+        } else {
+            await visibleDestMenu.locator('.q-item').first().click();
+            testLogger.warn('Selected first available destination (fallback)');
+        }
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Configured alert settings');
+
+        // ==================== STEP 5: DEDUPLICATION (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+
+        // ==================== STEP 6: ADVANCED (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+
+        // ==================== SUBMIT ====================
+        await this.page.locator(this.locators.alertSubmitButton).click();
+        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Successfully created scheduled alert with aggregation', { alertName: randomAlertName });
+
+        return randomAlertName;
+    }
+
+    /**
      * Create a scheduled alert with PromQL query for metrics streams
      * This tests the fix for bug #9967 - cannot save alert when selecting PromQL mode
      *
@@ -1361,7 +1563,7 @@ export class AlertCreationWizard {
         testLogger.info('Navigated to Step 2: Conditions');
 
         // Click PromQL tab (only visible for metrics streams)
-        const promqlTab = this.page.locator('[data-test="tab-promql"]');
+        const promqlTab = this.page.locator(this.locators.tabPromql);
         await promqlTab.waitFor({ state: 'visible', timeout: 10000 });
         await promqlTab.click();
         await this.page.waitForTimeout(1000);
@@ -1403,6 +1605,33 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
         testLogger.info('Closed PromQL Editor dialog');
 
+        // Fill PromQL trigger condition (now in Step 2 - QueryConfig.vue)
+        // "Trigger if the value is *" section with operator select + value input
+        const queryConfigSection = this.page.locator('.step-query-config');
+        const promqlConditionLabel = queryConfigSection.getByText('Trigger if the value is').first();
+        await promqlConditionLabel.waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('PromQL trigger condition section visible in Step 2');
+
+        // The outer flex container holds both the label div and controls div as siblings
+        // (QueryConfig.vue line 285: div.flex.justify-start.items-start)
+        const promqlConditionRow = promqlConditionLabel.locator('..');
+
+        // Select operator
+        const promqlOperatorSelect = promqlConditionRow.locator('.q-select').first();
+        await promqlOperatorSelect.click();
+        await this.page.waitForTimeout(500);
+        const visibleMenu = this.page.locator('.q-menu:visible');
+        await visibleMenu.locator('.q-item').filter({ hasText: operator }).first().click();
+        await this.page.waitForTimeout(300);
+        testLogger.info('Set PromQL condition operator', { operator });
+
+        // Set value (q-input has debounce="300")
+        const promqlValueInput = promqlConditionRow.locator('input[type="number"]');
+        await promqlValueInput.clear();
+        await promqlValueInput.fill(String(conditionValue));
+        await this.page.waitForTimeout(500);
+        testLogger.info('Set PromQL condition value', { value: conditionValue });
+
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -1415,37 +1644,9 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
 
-        // *** BUG FIX TEST: Fill PromQL condition (Trigger if the value is) ***
-        // This is the new field added by PR #9970 to fix bug #9967
-        const promqlConditionRow = this.page.locator('.alert-settings-row').filter({ hasText: 'Trigger if the value is' });
-        await promqlConditionRow.waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('PromQL condition row is visible - bug fix verified');
-
-        // Select operator for promql_condition
-        const promqlOperatorSelect = promqlConditionRow.locator('.q-select').first();
-        await promqlOperatorSelect.click();
-        await this.page.waitForTimeout(500);
-        // Select from the visible dropdown menu (not just any text on page)
-        const visibleMenu = this.page.locator('.q-menu:visible');
-        await visibleMenu.locator(`.q-item`).filter({ hasText: operator }).first().click();
-        await this.page.waitForTimeout(300);
-        testLogger.info('Set PromQL condition operator', { operator });
-
-        // Set value for promql_condition
-        // Note: The q-input has debounce="300", so we must wait after filling
-        const promqlValueInput = promqlConditionRow.locator('input[type="number"]');
-        await promqlValueInput.clear();
-        await promqlValueInput.fill(String(conditionValue));
-        await this.page.waitForTimeout(500); // Wait for debounce to complete (300ms + buffer)
-        testLogger.info('Set PromQL condition value', { value: conditionValue });
-
-        // Set threshold (still required for PromQL alerts)
-        // IMPORTANT: For PromQL alerts, there are TWO sets of operator/value fields:
-        // 1. First: PromQL condition (promql_condition.operator, promql_condition.value)
-        // 2. Second: Threshold (trigger_condition.operator, trigger_condition.threshold)
-        // Use nth(1) to target the SECOND q-select on the step (the threshold operator)
+        // Set threshold (trigger_condition)
         const stepContainer = this.page.locator('.step-alert-conditions');
-        const thresholdOperator = stepContainer.locator('.q-select').nth(1); // Second q-select is threshold
+        const thresholdOperator = stepContainer.locator('.q-select').first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdOperator.click();
         await this.page.waitForTimeout(500);
@@ -1454,20 +1655,17 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(300);
         testLogger.info('Set threshold operator: >=');
 
-        // The threshold value input is the SECOND number input after promql value
-        // But it shares a row with a "events" label, so we need to find the right one
-        // Looking at the UI structure: promql value is first, threshold value is second
-        const thresholdInput = stepContainer.locator('input[type="number"]').nth(1);
+        const thresholdInput = stepContainer.locator('input[type="number"]').first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');
 
-        // Set period - period input is third number input on the step
-        const periodInput = stepContainer.locator('input[type="number"]').nth(2);
+        // Set period
+        const periodInput = stepContainer.locator('input[type="number"]').nth(1);
         await this.page.waitForTimeout(500);
         if (await periodInput.isVisible({ timeout: 3000 })) {
-            await periodInput.fill('1');
-            testLogger.info('Set period: 1 minute');
+            await periodInput.fill('15');
+            testLogger.info('Set period: 15 minutes');
         }
 
         // Select destination
