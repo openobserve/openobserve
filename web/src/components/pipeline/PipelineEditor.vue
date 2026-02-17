@@ -379,6 +379,14 @@ const nodeTypes: any = [
     isSectionHeader: false,
   },
   {
+    label: "LLM Evaluation",
+    subtype: "llm_evaluation",
+    io_type: "default",
+    icon: "img:" + llmEvaluationImage,
+    tooltip: "LLM Evaluation Node",
+    isSectionHeader: false,
+  },
+  {
     label: "Destination",
     icon: "input",
     isSectionHeader: true,
