@@ -4,16 +4,13 @@
       <!-- Top row with search and control buttons -->
       <div class="row items-center q-col-gutter-sm q-mb-md">
         <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
-          <!-- Stream selector - always show, populated once streams are discovered -->
+          <!-- Stream selector - synced from traces page, no "All Streams" -->
           <q-select
             v-model="streamFilter"
             :options="
               availableStreams.length > 0
-                ? [
-                    { label: 'All Streams', value: 'all' },
-                    ...availableStreams.map((s) => ({ label: s, value: s })),
-                  ]
-                : [{ label: 'All Streams', value: 'all' }]
+                ? availableStreams.map((s) => ({ label: s, value: s }))
+                : []
             "
             dense
             borderless
@@ -89,7 +86,7 @@
             />
           </div>
 
-          <!-- 4. Layout dropdown -->
+          <!-- 4. Layout dropdown (only meaningful for tree view) -->
           <q-select
             v-model="layoutType"
             :options="layoutOptions"
@@ -99,6 +96,7 @@
             emit-value
             map-options
             @update:model-value="setLayout"
+            :disable="visualizationType === 'graph'"
           />
         </div>
       </div>
@@ -282,8 +280,8 @@ export default defineComponent({
 
     // Visualization tabs configuration
     const visualizationTabs = [
-      { label: "Graph View", value: "graph" },
       { label: "Tree View", value: "tree" },
+      { label: "Graph View", value: "graph" },
     ];
 
     // Initialize layout type based on visualization type
@@ -297,11 +295,12 @@ export default defineComponent({
 
     const searchFilter = ref("");
 
-    // Stream filter
+    // Stream filter — synced from traces page selected stream
+    const tracesStream = searchObj.data.stream?.selectedStream?.value || '';
     const storedStreamFilter = localStorage.getItem(
       "serviceGraph_streamFilter",
     );
-    const streamFilter = ref(storedStreamFilter || "all");
+    const streamFilter = ref(tracesStream || storedStreamFilter || "default");
     const availableStreams = ref<string[]>([]);
 
     const graphData = ref<any>({
@@ -334,12 +333,10 @@ export default defineComponent({
         return [
           { label: "Horizontal", value: "horizontal" },
           { label: "Vertical", value: "vertical" },
-          { label: "Radial", value: "radial" },
         ];
       } else {
         return [
           { label: "Force Directed", value: "force" },
-          { label: "Circular", value: "circular" },
         ];
       }
     });
