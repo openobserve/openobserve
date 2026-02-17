@@ -1891,7 +1891,101 @@
     "msteams": "Microsoft Ekipleri",
     "pagerduty": "Pager Görevi",
     "opsgenie": "Opsignia",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Uyarıyı Kaydet",
+    "aggregation_threshold": "Herhangi Bir Grup Varsa Uyarı",
+    "thresholdDynamic": {
+      "alertMeWhen": "Ne zaman beni uyar",
+      "metricTypes": {
+        "resultsPassedFilter": "sonuçlar filtreleri geçti",
+        "distinctGroupsAffected": "Farklı gruplar etkilenir",
+        "metricsMatchCriteria": "metrikler eşleştirme kriterleri",
+        "matchingLogsFound": "eşleşen günlükler bulundu",
+        "groupsPassFilter": "gruplar filtre kriterlerini geçer",
+        "distinctGroups": "farklı gruplar bulundu",
+        "resultRows": "döndürülen sonuç satırları",
+        "timeSeries": "aktif zaman serileri bulundu",
+        "matchingRecords": "eşleşen kayıtlar bulundu",
+        "groupsWithHaving": "gruplar maç koşulları",
+        "uniqueGroups": "benzersiz gruplar",
+        "events": "etkinlikler maç koşulları",
+        "aggregatedValue": "maç koşulları"
+      },
+      "contextLabels": {
+        "groupedBy": "Şunlara göre gruplandırılmıştır:",
+        "havingConditions": "SAHIP olma koşulları:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Uyarı Adı",
+      "sqlQuery": "SQL Sorgu",
+      "promqlQuery": "PromQL Sorgulama",
+      "conditions": "Koşullar",
+      "copy": "Kopyalama",
+      "noCondition": "Koşulsuz",
+      "noDescription": "Açıklama yok",
+      "evaluationHistory": "Değerlendirme Geçmişi",
+      "loadingHistory": "Geçmiş yükleniyor...",
+      "noHistoryAvailable": "Bu uyarı için değerlendirme geçmişi mevcut değil",
+      "results": "Sonuçlar"
+    },
+    "historyTable": {
+      "timestamp": "Zaman damgası",
+      "status": "Durum",
+      "evaluationTime": "Değerlendirme (lar)",
+      "queryTime": "Sorgu (ms)",
+      "error": "Hata"
+    },
+    "back": "Geri",
+    "continue": "Devamı",
+    "wouldTrigger": "TETİKLEYECEKTİ",
+    "wouldNotTrigger": "TETİKLEMEYECEK",
+    "queryBuilder": "inşaatçı",
+    "groupByHelp": {
+      "description": "Her benzersiz değer için ayrı uyarılar oluşturmak için toplanan verileri belirli alanlara göre gruplandırın.",
+      "example": "Örnek: Sunucu başına ayrı uyarılar almak için “ana bilgisayar adı” ya da hataları ayrı ayrı izlemek için “status_code” ile gruplayın."
+    },
+    "conditions": {
+      "condition": "Durum",
+      "conditionGroup": "Durum Grubu",
+      "addConditionTooltip": "Bu gruba yeni bir koşul ekle",
+      "addConditionGroupTooltip": "İç içe geçmiş bir koşul grubu ekleyin (maksimum derinlik: 2)",
+      "maxDepthReachedTooltip": "Maksimum yuvalama derinliğine ulaşıldı"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Uyarı ayarlı",
+      "currentWindow": "Geçerli pencere",
+      "cycle": "Döngü",
+      "cycleTooltip": "Sonuçları önceki döngüdeki aynı zamanla karşılaştırın.",
+      "runningFor": "Her {frekans} aralığında {dönem} boyunca çalışıyor",
+      "currentWindowCannotBeDeleted": "Geçerli pencere silinemiyor",
+      "comparingWith": "İle karşılaştırmak",
+      "referenceWindow": "Referans Penceresi",
+      "timeFrame": "Zaman Çerçevesi",
+      "timeFrameTooltip": "Sorgunuz için zaman aralığı.",
+      "comparingText": "Geçerli pencere sorgu sonucunu önceki {offset} sorgu sonucuyla karşılaştırma.",
+      "addComparisonWindow": "Karşılaştırma Penceresi Ekle",
+      "goToConditions": "Koşullara git",
+      "goToConditionsTooltip": "Seçilen karşılaştırma pencereleri için olayları doğrulamak için “Koşullara Git” e tıklayın"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron Programı",
+      "addNewDestination": "Yeni Hedef Ekle",
+      "cooldownTooltip": "Uyarı tetiklenirse, başka bir bildirim göndermeden önce ne kadar beklemelidir. örneğin, uyarı saat 16:00 'da tetiklenirse ve sessizlik bildirimi 10 dakikaya ayarlanırsa, uyarı 1 dakika sonra hala olsa bile 16:10'a kadar başka bir bildirim göndermez. Bu, kullanıcıya bildirimlerle spam göndermekten kaçınmak içindir.",
+      "thresholdTooltip": "Olay sayısına veya toplanan değere göre uyarının ne zaman tetiklenmesi gerektiğini tanımlar. Örnek: “> 100\" olarak ayarlanırsa, sayım 100 olayı aştığında uyarı tetiklenir.",
+      "periodTooltip": "Sorgunun çalıştırılması gereken süre. Örneğin 10 dakika, sorgu her çalıştırıldığında verinin son 10 dakikasını kullanacağı anlamına gelir.",
+      "frequencyTooltipMinutes": "Görevin ne sıklıkta yürütülmesi gerekir. örneğin her 5 dakikada bir.",
+      "frequencyTooltipCron": "Boşlukla ayrılmış 5 alan içeren standart UNIX cron formatı: [Dakika 0-59] [Saat 0-23] [1-31 Ayın Günü] [1-12 Ay veya JAN-DEC] [Haftanın Günü 0-7 veya '1L-7L', Pazar için 0 ve 7].",
+      "timezoneWarning": "Uyarı: Görüntülenen saat dilimi yaklaşıktır. Doğru saat dilimini manuel olarak doğrulayın ve seçin.",
+      "destinationsTooltip": "Uyarı bildirimleri göndermek için bir veya daha fazla hedef seçin.",
+      "templateTooltip": "İsteğe bağlı: Bu uyarıdaki tüm hedefler için kullanılacak bir şablon seçin. Şablonlar, uyarı mesajlarının biçimini özelleştirmenize olanak tanır. Seçilmezse, her hedef kendi yapılandırılmış şablonunu kullanır."
+    },
+    "advanced": {
+      "addVariable": "Değişken Ekle",
+      "variablesTooltip": "Değişkenler, verileri uyarıdan hedefe iletmek için kullanılır.",
+      "rowTemplateTooltip": "Satır Şablonu uyarı mesajını biçimlendirmek için kullanılır.",
+      "templateType": "Şablon Türü:"
+    }
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2599,7 +2693,8 @@
     "showLegends": "Efsaneleri Göster"
   },
   "alert_list": {
-    "alert_details": "Uyarı Ayrıntıları"
+    "alert_details": "Uyarı Ayrıntıları",
+    "alert_history": "Uyarı Geçmişi"
   },
   "latencyInsights": {
     "title": "İçgörüler",
