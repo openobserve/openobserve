@@ -1200,16 +1200,12 @@ class="q-pr-sm q-pt-xs" />
                     <!-- VRL disabled warning for non-table charts -->
                     <div
                       v-if="isVrlEditorDisabled"
-                      class="tw:absolute tw:bottom-0 tw:w-full"
-                      :style="{
-                        marginTop: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        backgroundColor:
-                          store.state.theme == 'dark'
-                            ? 'rgba(255, 255, 255, 0.1)'
-                            : 'rgba(0, 0, 0, 0.1)',
-                      }"
+                      class="tw-absolute tw-bottom-0 tw-w-full tw-mt-3 tw-flex tw-items-center"
+                      :class="
+                        store.state.theme == 'dark'
+                          ? 'tw-bg-white tw-bg-opacity-10'
+                          : 'tw-bg-black tw-bg-opacity-10'
+                      "
                       data-test="vrl-editor-disabled-warning"
                     >
                       <q-icon
@@ -1219,8 +1215,7 @@ class="q-pr-sm q-pt-xs" />
                         class="q-mx-sm"
                       />
                       <span
-                        class="text-negative q-pa-sm"
-                        style="font-weight: 600; font-size: 14px"
+                        class="text-negative q-pa-sm tw-font-semibold tw-text-sm"
                         >VRL function is only supported for table chart.</span
                       >
                     </div>
