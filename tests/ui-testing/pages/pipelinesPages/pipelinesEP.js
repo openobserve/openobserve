@@ -52,6 +52,27 @@ export class PipelinesEP {
         await this.page.locator(this.pipelineMoreOptionsButton(name)).waitFor({ state: 'visible', timeout: 30000 });
     }
 
+    /**
+     * Verify that a scheduled pipeline displays the cron expression in the Frequency column
+     * Bug fix: Cron expression used to not display in the list
+     * @param {string} name - Pipeline name
+     */
+    async expectScheduledPipelineCronDisplayed(name) {
+        // Find the row containing this pipeline by its more-options button
+        const row = this.page.locator(`tr:has([data-test="pipeline-list-${name}-more-options"])`);
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Get the Frequency column (6th column based on table structure: #, Name, Type, Stream Name, Stream Type, Frequency, Period, Cron, Actions)
+        const frequencyCell = row.locator('td').nth(5);
+        const frequencyText = await frequencyCell.textContent();
+
+        // Verify cron expression is displayed (not blank or "--")
+        expect(frequencyText.trim()).not.toBe('');
+        expect(frequencyText.trim()).not.toBe('--');
+        // Cron expressions typically contain spaces and asterisks (e.g., "10 56 * * *")
+        expect(frequencyText.trim()).toMatch(/[\d\s\*]+/);
+    }
+
     async openFunctionStreamTab() {
 
         await this.page.waitForSelector(this.functionStreamTab);

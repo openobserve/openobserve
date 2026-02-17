@@ -199,6 +199,29 @@ export class LogsPage {
         // Note: Narrowed from [class*="error"] to avoid false positives like "error-free"
         this.errorIndicators = '.q-notification--negative, .q-notification__message--error, .text-negative, [class^="error-"], [class$="-error"]';
         this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
+
+        // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
+        // Toggle button to switch to patterns view
+        this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+        // Statistics summary
+        this.patternStatistics = '[data-test="pattern-statistics"]';
+        // Pattern cards (dynamic selectors with index)
+        this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
+        this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
+        this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
+        this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
+        this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
+        this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
+        this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
+        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}-details-icon"]`;
+        // Pattern details dialog
+        this.closePatternDialog = '[data-test="close-pattern-dialog"]';
+        this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
+        this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
+        // Pattern list states
+        this.patternLoadingSpinner = '.q-spinner-hourglass';
+        this.patternLoadingText = 'text=Extracting patterns from logs...';
+        this.patternEmptyState = 'text=No patterns found';
     }
 
 
@@ -5247,5 +5270,266 @@ export class LogsPage {
         await this.page.locator(`[data-test="date-time-relative-${timeSelector}-btn"]`).click();
         await this.page.waitForTimeout(500);
         testLogger.info(`Selected relative time: ${timeSelector}`);
+    }
+
+    // ============================================================================
+    // SEARCH PATTERNS METHODS (Enterprise Feature)
+    // These methods support the Search Patterns feature for log pattern analysis
+    // ============================================================================
+
+    /**
+     * Click the Patterns toggle button to switch to patterns view
+     * Note: This feature is only available in Enterprise edition
+     */
+    async clickPatternsToggle() {
+        await this.page.locator(this.patternsToggle).click();
+        testLogger.info('Clicked Patterns toggle button');
+    }
+
+    /**
+     * Assert that the Patterns toggle button is visible (Enterprise only)
+     */
+    async expectPatternsToggleVisible() {
+        await expect(this.page.locator(this.patternsToggle)).toBeVisible();
+        testLogger.info('Patterns toggle button is visible');
+    }
+
+    /**
+     * Assert that the Patterns toggle button is NOT visible (non-Enterprise)
+     */
+    async expectPatternsToggleNotVisible() {
+        await expect(this.page.locator(this.patternsToggle)).not.toBeVisible();
+        testLogger.info('Patterns toggle button is not visible (expected for non-Enterprise)');
+    }
+
+    /**
+     * Assert that the Patterns toggle is in selected state
+     */
+    async expectPatternsToggleSelected() {
+        await expect(this.page.locator(this.patternsToggle)).toHaveClass(/selected/);
+        testLogger.info('Patterns toggle is in selected state');
+    }
+
+    /**
+     * Wait for patterns to load (after clicking toggle)
+     * @param {number} timeout - Timeout in milliseconds (default 30000)
+     */
+    async waitForPatternsToLoad(timeout = 30000) {
+        // Wait for either patterns to appear or empty state
+        const patternsLoaded = await Promise.race([
+            this.page.locator(this.patternStatistics).waitFor({ state: 'visible', timeout }).then(() => 'statistics'),
+            this.page.locator(this.patternCard(0)).waitFor({ state: 'visible', timeout }).then(() => 'patterns'),
+            this.page.locator(this.patternEmptyState).waitFor({ state: 'visible', timeout }).then(() => 'empty')
+        ]).catch(() => 'timeout');
+
+        testLogger.info(`Patterns loading result: ${patternsLoaded}`);
+        return patternsLoaded;
+    }
+
+    /**
+     * Assert that pattern statistics are visible
+     */
+    async expectPatternStatisticsVisible() {
+        await expect(this.page.locator(this.patternStatistics)).toBeVisible();
+        testLogger.info('Pattern statistics are visible');
+    }
+
+    /**
+     * Get the pattern statistics text
+     * @returns {Promise<string>} The statistics text
+     */
+    async getPatternStatisticsText() {
+        const text = await this.page.locator(this.patternStatistics).textContent();
+        testLogger.info(`Pattern statistics: ${text}`);
+        return text;
+    }
+
+    /**
+     * Assert that at least one pattern card is visible
+     */
+    async expectPatternCardsVisible() {
+        await expect(this.page.locator(this.patternCard(0))).toBeVisible();
+        testLogger.info('At least one pattern card is visible');
+    }
+
+    /**
+     * Assert that the empty state message is visible
+     */
+    async expectPatternEmptyStateVisible() {
+        await expect(this.page.locator(this.patternEmptyState)).toBeVisible();
+        testLogger.info('Pattern empty state is visible');
+    }
+
+    /**
+     * Get the number of visible pattern cards
+     * @returns {Promise<number>} Number of pattern cards
+     */
+    async getPatternCardCount() {
+        // Count pattern cards by checking sequential indices
+        let count = 0;
+        let maxCheck = 100; // Reasonable upper limit
+
+        for (let i = 0; i < maxCheck; i++) {
+            const isVisible = await this.page.locator(this.patternCard(i)).isVisible().catch(() => false);
+            if (!isVisible) break;
+            count++;
+        }
+
+        testLogger.info(`Pattern card count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Click on a pattern card to open details
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternCard(index = 0) {
+        await this.page.locator(this.patternCard(index)).click();
+        testLogger.info(`Clicked pattern card at index ${index}`);
+    }
+
+    /**
+     * Get the template text from a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} The template text
+     */
+    async getPatternCardTemplateText(index = 0) {
+        const text = await this.page.locator(this.patternCardTemplate(index)).textContent();
+        testLogger.info(`Pattern ${index} template: ${text}`);
+        return text;
+    }
+
+    /**
+     * Get the frequency from a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} The frequency text
+     */
+    async getPatternCardFrequency(index = 0) {
+        const text = await this.page.locator(this.patternCardFrequency(index)).textContent();
+        testLogger.info(`Pattern ${index} frequency: ${text}`);
+        return text;
+    }
+
+    /**
+     * Get the percentage from a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} The percentage text
+     */
+    async getPatternCardPercentage(index = 0) {
+        const text = await this.page.locator(this.patternCardPercentage(index)).textContent();
+        testLogger.info(`Pattern ${index} percentage: ${text}`);
+        return text;
+    }
+
+    /**
+     * Check if a pattern card has an anomaly badge
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<boolean>} True if anomaly badge is visible
+     */
+    async isPatternAnomaly(index = 0) {
+        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible().catch(() => false);
+        testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
+        return isAnomaly;
+    }
+
+    /**
+     * Click the include button on a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternIncludeBtn(index = 0) {
+        await this.page.locator(this.patternCardIncludeBtn(index)).click();
+        testLogger.info(`Clicked include button on pattern ${index}`);
+    }
+
+    /**
+     * Click the exclude button on a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternExcludeBtn(index = 0) {
+        await this.page.locator(this.patternCardExcludeBtn(index)).click();
+        testLogger.info(`Clicked exclude button on pattern ${index}`);
+    }
+
+    /**
+     * Click the details icon on a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternDetailsIcon(index = 0) {
+        await this.page.locator(this.patternCardDetailsIcon(index)).click();
+        testLogger.info(`Clicked details icon on pattern ${index}`);
+    }
+
+    /**
+     * Assert that the pattern details dialog is open
+     */
+    async expectPatternDetailsDialogOpen() {
+        await expect(this.page.locator(this.closePatternDialog)).toBeVisible();
+        testLogger.info('Pattern details dialog is open');
+    }
+
+    /**
+     * Close the pattern details dialog
+     */
+    async closePatternDetailsDialog() {
+        await this.page.locator(this.closePatternDialog).click();
+        testLogger.info('Closed pattern details dialog');
+    }
+
+    /**
+     * Click the previous button in pattern details dialog
+     */
+    async clickPatternDetailPreviousBtn() {
+        await this.page.locator(this.patternDetailPreviousBtn).click();
+        testLogger.info('Clicked previous button in pattern details');
+    }
+
+    /**
+     * Click the next button in pattern details dialog
+     */
+    async clickPatternDetailNextBtn() {
+        await this.page.locator(this.patternDetailNextBtn).click();
+        testLogger.info('Clicked next button in pattern details');
+    }
+
+    /**
+     * Assert that the previous button is enabled in pattern details dialog
+     */
+    async expectPatternDetailPreviousBtnEnabled() {
+        await expect(this.page.locator(this.patternDetailPreviousBtn)).toBeEnabled();
+        testLogger.info('Previous button is enabled');
+    }
+
+    /**
+     * Assert that the previous button is disabled in pattern details dialog
+     */
+    async expectPatternDetailPreviousBtnDisabled() {
+        await expect(this.page.locator(this.patternDetailPreviousBtn)).toBeDisabled();
+        testLogger.info('Previous button is disabled');
+    }
+
+    /**
+     * Assert that the next button is enabled in pattern details dialog
+     */
+    async expectPatternDetailNextBtnEnabled() {
+        await expect(this.page.locator(this.patternDetailNextBtn)).toBeEnabled();
+        testLogger.info('Next button is enabled');
+    }
+
+    /**
+     * Assert that the next button is disabled in pattern details dialog
+     */
+    async expectPatternDetailNextBtnDisabled() {
+        await expect(this.page.locator(this.patternDetailNextBtn)).toBeDisabled();
+        testLogger.info('Next button is disabled');
+    }
+
+    /**
+     * Wait for pattern details dialog to show specific pattern index
+     * @param {number} expectedIndex - The expected pattern index (1-based for display)
+     */
+    async waitForPatternDetailIndex(expectedIndex) {
+        // Pattern detail shows "Pattern X of Y" in the header
+        await this.page.getByText(`Pattern ${expectedIndex} of`).waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info(`Pattern details showing pattern ${expectedIndex}`);
     }
 }
