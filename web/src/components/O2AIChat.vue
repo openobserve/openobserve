@@ -4026,24 +4026,9 @@ export default defineComponent({
       previewImage,
       openImagePreview,
       closeImagePreview,
-      // AI-generated title
-      aiGeneratedTitle,
-      displayedTitle,
-      isTypingTitle,
-      // Image handling
-      pendingImages,
-      imageInputRef,
-      triggerImageUpload,
-      handleImageSelect,
-      removeImage,
-      handleDragOver,
-      handleDrop,
-      handlePaste,
-      // Image preview
-      showImagePreview,
-      previewImage,
-      openImagePreview,
-      closeImagePreview,
+      // Context references
+      contextReferences,
+      handleReferencesUpdate,
     }
   }
 });

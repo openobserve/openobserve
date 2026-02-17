@@ -149,6 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="pipelineObj.dialog.name === 'remote_stream'"
         @cancel:hideform="resetDialog"
       />
+      <LlmEvaluation
+        v-if="pipelineObj.dialog.name === 'llm_evaluation'"
+        @cancel:hideform="resetDialog"
+      />
     </div>
   </q-dialog>
   <q-dialog
@@ -210,6 +214,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
+import LlmEvaluation from "@/components/pipeline/NodeForm/LlmEvaluation.vue";
 import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
@@ -224,6 +229,7 @@ const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
+const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
@@ -370,6 +376,14 @@ const nodeTypes: any = [
     io_type: "default",
     icon: "img:" + conditionImage,
     tooltip: "Condition Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "LLM Evaluation",
+    subtype: "llm_evaluation",
+    io_type: "default",
+    icon: "img:" + llmEvaluationImage,
+    tooltip: "LLM Evaluation Node",
     isSectionHeader: false,
   },
   {
