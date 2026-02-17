@@ -354,23 +354,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
         id="schemaFieldList"
         dense
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left tw:text-[0.85rem]!"
+            class="text-left tw:text-[0.85rem]! cell-with-max-height"
             :class="
               props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
             "
           >
-            <span
-              v-if="props.col.name === 'value'"
-              v-html="
-                highlightTextMatch(props.row[props.col.name], searchQuery)
-              "
-            />
-            <span v-else>
-              {{ props.row[props.col.name] }}
-            </span>
+            <div class="cell-content">
+              <span
+                v-if="props.col.name === 'value'"
+                v-html="
+                  highlightTextMatch(props.row[props.col.name], searchQuery)
+                "
+              />
+              <span v-else>
+                {{ props.row[props.col.name] }}
+              </span>
+            </div>
           </q-td>
         </template>
       </q-table>
@@ -385,23 +388,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows-per-page-options="[0]"
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
         dense
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left tw:text-[0.85rem]!"
+            class="text-left tw:text-[0.85rem]! cell-with-max-height"
             :class="
               props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
             "
           >
-            <span
-              v-if="props.col.name === 'value'"
-              v-html="
-                highlightTextMatch(props.row[props.col.name], searchQuery)
-              "
-            />
-            <span v-else>
-              {{ props.row[props.col.name] }}
-            </span>
+            <div class="cell-content">
+              <span
+                v-if="props.col.name === 'value'"
+                v-html="
+                  highlightTextMatch(props.row[props.col.name], searchQuery)
+                "
+              />
+              <span v-else>
+                {{ props.row[props.col.name] }}
+              </span>
+            </div>
           </q-td>
         </template>
       </q-table>
@@ -411,6 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="attr-text"
         v-html="highlightedAttributes"
         data-test="trace-details-sidebar-attributes-table"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       ></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
@@ -423,8 +430,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         :rows-per-page-options="[0]"
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+
         dense
-        style="max-height: 400px"
       >
         <template v-slot:body="props">
           <q-tr
@@ -482,7 +490,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
       <div
-        class="full-width text-center q-pt-lg text-bold"
+        class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         v-else
         data-test="trace-details-sidebar-no-events"
       >
@@ -499,8 +508,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         :rows-per-page-options="[0]"
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         dense
-        style="max-height: 400px"
       >
         <template v-slot:body="props">
           <q-tr
@@ -585,7 +594,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
       <div
-        class="full-width text-center q-pt-lg text-bold"
+        class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         v-else
         data-test="trace-details-sidebar-no-exceptions"
       >
@@ -644,7 +654,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else
-        class="full-width text-center q-pt-lg text-bold"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold"
         data-test="trace-details-sidebar-no-links"
       >
         No links present for this span
@@ -672,7 +683,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading/Empty state when no data -->
       <div
         v-else
-        class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
+        class="tw:flex tw:items-center tw:justify-center tw:py-20"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <div class="tw:text-center">
           <q-spinner-hourglass
@@ -717,7 +729,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading/Empty state when no data -->
       <div
         v-else
-        class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
+        class="tw:flex tw:items-center tw:justify-center tw:py-20"
+        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <div class="tw:text-center">
           <q-spinner-hourglass
@@ -1834,6 +1847,21 @@ export default defineComponent({
   }
 }
 
+// Cell with max-height and scroll
+.cell-with-max-height {
+  vertical-align: top;
+
+  .cell-content {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: block;
+    word-break: break-word;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+}
+
 .thead-sticky tr > *,
 .tfoot-sticky tr > * {
   position: sticky;
@@ -2074,5 +2102,11 @@ export default defineComponent({
       border-right: 1px solid rgba(100, 100, 120, 0.3);
     }
   }
+}
+.tab-content-with-llm-metrics {
+  height: calc(100vh - 300px);
+}
+.tab-content-without-llm-metrics {
+  height: calc(100vh - 266px);
 }
 </style>
