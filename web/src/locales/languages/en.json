@@ -2298,7 +2298,10 @@
     "customWebhook": "Custom (Webhook)",
     "customEmail": "Custom (Email)",
     "customAction": "Custom (Action)",
-    "custom": "Custom"
+    "custom": "Custom",
+    "separator": "Separator",
+    "separator_placeholder": "Enter separator (e.g., |, \\n, \\t, space)",
+    "separator_hint": "Separator string to use between records (spaces allowed)"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
