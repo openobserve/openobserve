@@ -1354,9 +1354,8 @@ class="q-pr-sm q-pt-xs" />
         dense
         size="10px"
         round
-        color="primary"
         @click="isFocused = !isFocused"
-        class="q-pa-xs tw:absolute! tw:top-[3.3rem]! tw:right-[1.2rem]! tw:z-50"
+        class="q-pa-xs tw:absolute! tw:top-[6rem]! tw:right-[2.4rem]! tw:z-50 fullscreen-hover-btn"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -5167,6 +5166,15 @@ export default defineComponent({
 .logs-search-splitter {
   :deep(.q-splitter__separator) {
     height: 100%;
+  }
+}
+
+.fullscreen-hover-btn:hover {
+  background-color: var(--q-primary) !important;
+  color: white !important;
+
+  svg {
+    color: white !important;
   }
 }
 </style>
