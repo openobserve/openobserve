@@ -6,6 +6,9 @@
  * - #9796: Logs page load data without clicking run query
  * - #9533: Loading icon missing when run query for long duration
  * - #8928: UI revamp issues (sidebar, search bar, histogram)
+ * - Quick mode query removed when selecting interesting field
+ * - Pagination not showing with histogram and SQL disabled
+ * - Error message should identify problematic field
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -206,6 +209,161 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.expectHistogramVisible();
 
     testLogger.info('✓ PASSED: Histogram rendering verified');
+  });
+
+  // ==========================================================================
+  // Bug: Quick mode query removed when selecting interesting field
+  // ==========================================================================
+  test("should preserve quick mode query when selecting a new interesting field @quickMode @P0 @regression", async ({ page }) => {
+    testLogger.info('Test: Verify quick mode query is preserved when selecting new interesting field');
+
+    // Navigate to logs page
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select stream
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Enable quick mode if not already enabled
+    await pm.logsPage.enableQuickModeIfDisabled();
+    await page.waitForTimeout(500);
+
+    // Click all fields button to show field list
+    await pm.logsPage.clickAllFieldsButton();
+    await page.waitForTimeout(500);
+
+    // Write a query in the query editor
+    const testQuery = 'kubernetes_pod_id';
+    await pm.logsPage.clickQueryEditor();
+    await pm.logsPage.typeInQueryEditor(testQuery);
+    await page.waitForTimeout(500);
+
+    // Get the query text before selecting interesting field
+    const queryBeforeSelection = await pm.logsPage.getQueryEditorText();
+    testLogger.info(`Query before selecting interesting field: ${queryBeforeSelection}`);
+
+    // Search for a field and click on it as interesting field
+    await pm.logsPage.fillIndexFieldSearchInput("kubernetes_container_name");
+    await pm.logsPage.clickInterestingFieldButton("kubernetes_container_name");
+    await page.waitForTimeout(500);
+
+    // Get the query text after selecting interesting field
+    const queryAfterSelection = await pm.logsPage.getQueryEditorText();
+    testLogger.info(`Query after selecting interesting field: ${queryAfterSelection}`);
+
+    // STRONG ASSERTION: The original query should still be present in the editor
+    expect(queryAfterSelection).toContain(testQuery);
+
+    testLogger.info('✓ PASSED: Quick mode query preserved when selecting interesting field');
+  });
+
+  // ==========================================================================
+  // Bug: Pagination not showing with histogram & SQL disabled
+  // ==========================================================================
+  test("should show pagination when histogram and SQL mode are disabled @pagination @P0 @regression", async ({ page }) => {
+    testLogger.info('Test: Verify pagination shows when histogram and SQL mode are disabled');
+
+    // Navigate to logs page
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select stream
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Disable histogram if enabled
+    await pm.logsPage.ensureHistogramToggleState(false);
+    await page.waitForTimeout(500);
+
+    // Ensure SQL mode is disabled
+    const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
+    const isSqlEnabled = await sqlModeToggle.getAttribute('aria-checked');
+    if (isSqlEnabled === 'true') {
+      await sqlModeToggle.click();
+      await page.waitForTimeout(500);
+    }
+
+    // Set time range to ensure we have enough data
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+    await page.waitForTimeout(500);
+
+    // Run query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Wait for logs table to be visible
+    await pm.logsPage.expectLogsTableVisible();
+
+    // STRONG ASSERTION: Result pagination should be visible
+    const resultPagination = page.locator('[data-test="logs-search-result-pagination"]');
+    await expect(resultPagination).toBeVisible({ timeout: 10000 });
+    testLogger.info('Result pagination is visible');
+
+    // STRONG ASSERTION: SQL pagination should NOT be visible when SQL mode is off
+    await pm.logsPage.expectSQLPaginationNotVisible();
+
+    testLogger.info('✓ PASSED: Pagination shows correctly when histogram and SQL mode are disabled');
+  });
+
+  // ==========================================================================
+  // Bug: Error message should identify problematic field
+  // ==========================================================================
+  test("should show correct error message identifying the problematic field @errorMessage @P0 @regression", async ({ page }) => {
+    testLogger.info('Test: Verify error message correctly identifies the problematic field');
+
+    // Navigate to logs page
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select stream
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Enable SQL mode to write custom query
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(500);
+
+    // Write a query with a non-existent field
+    const nonExistentField = 'nonexistent_field_xyz_12345';
+    const query = `SELECT ${nonExistentField} FROM "e2e_automate"`;
+    await pm.logsPage.clearAndFillQueryEditor(query);
+    await page.waitForTimeout(500);
+
+    // Run query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    // STRONG ASSERTION: Error message should be visible
+    await pm.logsPage.expectErrorMessageVisible();
+    testLogger.info('Error message is visible');
+
+    // Click on "Click for error details" button to see detailed error
+    const errorDetailsBtn = page.locator('[data-test="logs-page-result-error-details-btn"]');
+    await errorDetailsBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await errorDetailsBtn.click();
+    await page.waitForTimeout(1000);
+
+    // Get the detailed error message
+    const detailErrorMessage = page.locator('[data-test="logs-search-detail-error-message"]');
+    await detailErrorMessage.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Get all text from the error dialog area (includes header and body)
+    const errorDialogText = await detailErrorMessage.locator('..').textContent();
+    testLogger.info(`Full error dialog text: ${errorDialogText}`);
+
+    const fullErrorText = errorDialogText.toLowerCase();
+
+    // STRONG ASSERTION: Error message should contain the problematic field name
+    const errorContainsField = fullErrorText.includes(nonExistentField.toLowerCase()) ||
+                               fullErrorText.includes('field') ||
+                               fullErrorText.includes('column');
+    expect(errorContainsField).toBeTruthy();
+
+    testLogger.info('✓ PASSED: Error message correctly identifies problematic field');
   });
 
   test.afterEach(async () => {
