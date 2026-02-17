@@ -92,7 +92,7 @@ async function sendRequest(page, url, payload, headers) {
 }
 
 /**
- * Ingest custom data into a stream via API
+ * Ingest custom data into a stream via API using Node.js context (secure)
  * @param {import('@playwright/test').Page} page - Playwright page object
  * @param {string} streamName - Name of the stream to ingest data into
  * @param {Array} data - Array of log records to ingest
@@ -101,44 +101,40 @@ async function sendRequest(page, url, payload, headers) {
 async function ingestCustomData(page, streamName, data) {
   const orgId = process.env["ORGNAME"];
   const headers = getHeaders();
+  const baseUrl = process.env.INGESTION_URL.endsWith('/')
+    ? process.env.INGESTION_URL.slice(0, -1)
+    : process.env.INGESTION_URL;
 
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-    const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
+  try {
+    // Use Playwright's request API to keep credentials in Node.js context
+    const response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
-      body: JSON.stringify(logData)
+      data: data
     });
 
-    let data = null;
-    const contentType = fetchResponse.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      try {
-        const text = await fetchResponse.text();
-        data = text ? JSON.parse(text) : null;
-      } catch (e) {
-        data = { error: 'Failed to parse JSON response' };
-      }
+    let responseData = null;
+    try {
+      responseData = await response.json();
+    } catch (e) {
+      responseData = { error: 'Failed to parse JSON response' };
     }
 
+    testLogger.debug('Custom data ingestion response', { status: response.status(), streamName });
     return {
-      status: fetchResponse.status,
-      data: data
+      status: response.status(),
+      data: responseData
     };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logData: data
-  });
-
-  testLogger.debug('Custom data ingestion response', { status: response.status, streamName });
-  return response;
+  } catch (e) {
+    testLogger.debug('Custom data ingestion error', { error: e.message, streamName });
+    return {
+      status: 500,
+      data: { error: e.message }
+    };
+  }
 }
 
 /**
- * Enable log patterns extraction on a stream via API
+ * Enable log patterns extraction on a stream via API using Node.js context (secure)
  * @param {import('@playwright/test').Page} page - Playwright page object
  * @param {string} streamName - Name of the stream
  * @returns {Promise<object>} - API response with status and data
@@ -146,41 +142,40 @@ async function ingestCustomData(page, streamName, data) {
 async function enableLogPatternsExtraction(page, streamName) {
   const orgId = process.env["ORGNAME"];
   const headers = getHeaders();
+  const baseUrl = process.env.INGESTION_URL.endsWith('/')
+    ? process.env.INGESTION_URL.slice(0, -1)
+    : process.env.INGESTION_URL;
 
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName }) => {
-    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+  const settingsPayload = {
+    enable_log_patterns_extraction: true
+  };
 
-    const settingsPayload = {
-      enable_log_patterns_extraction: true
-    };
-
-    const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/streams/${streamName}/settings?type=logs`, {
-      method: 'PUT',
+  try {
+    // Use Playwright's request API to keep credentials in Node.js context
+    const response = await page.request.put(`${baseUrl}/api/${orgId}/streams/${streamName}/settings?type=logs`, {
       headers: headers,
-      body: JSON.stringify(settingsPayload)
+      data: settingsPayload
     });
 
-    let data = null;
+    let responseData = null;
     try {
-      const text = await fetchResponse.text();
-      data = text ? JSON.parse(text) : null;
+      responseData = await response.json();
     } catch (e) {
-      data = { error: 'Failed to parse JSON response' };
+      responseData = { error: 'Failed to parse JSON response' };
     }
 
+    testLogger.debug('Enable log patterns extraction response', { status: response.status(), streamName, data: responseData });
     return {
-      status: fetchResponse.status,
-      data: data
+      status: response.status(),
+      data: responseData
     };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName
-  });
-
-  testLogger.debug('Enable log patterns extraction response', { status: response.status, streamName, data: response.data });
-  return response;
+  } catch (e) {
+    testLogger.debug('Enable log patterns extraction error', { error: e.message, streamName });
+    return {
+      status: 500,
+      data: { error: e.message }
+    };
+  }
 }
 
 module.exports = {

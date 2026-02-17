@@ -5329,10 +5329,12 @@ export class LogsPage {
     /**
      * Wait for patterns to load (after clicking toggle)
      * @param {number} timeout - Timeout in milliseconds (default 30000)
+     * @returns {Promise<'statistics'|'patterns'|'empty'|'timeout'>}
      */
     async waitForPatternsToLoad(timeout = 30000) {
+        const startTime = Date.now();
+
         // First, check if loading state appears (indicates extraction is starting)
-        // Wait a short time for loading to potentially start
         const loadingStarted = await this.page.locator(this.patternLoadingSpinner)
             .waitFor({ state: 'visible', timeout: 5000 })
             .then(() => true)
@@ -5340,24 +5342,42 @@ export class LogsPage {
 
         if (loadingStarted) {
             testLogger.info('Pattern extraction loading started, waiting for completion...');
-            // Wait for loading to complete (spinner to disappear)
+            const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 1000);
             await this.page.locator(this.patternLoadingSpinner)
-                .waitFor({ state: 'hidden', timeout: timeout - 5000 })
+                .waitFor({ state: 'hidden', timeout: remainingTimeout })
                 .catch(() => {});
         }
 
         // Give UI a moment to render the results
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForTimeout(500);
 
-        // Now check for the actual result
-        const patternsLoaded = await Promise.race([
-            this.page.locator(this.patternStatistics).waitFor({ state: 'visible', timeout: 5000 }).then(() => 'statistics'),
-            this.page.locator(this.patternCard(0)).waitFor({ state: 'visible', timeout: 5000 }).then(() => 'patterns'),
-            this.page.locator(this.patternEmptyState).waitFor({ state: 'visible', timeout: 5000 }).then(() => 'empty')
-        ]).catch(() => 'timeout');
+        // Check for result states with explicit timeout handling
+        const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 5000);
+        const checkInterval = 500;
+        const maxChecks = Math.ceil(remainingTimeout / checkInterval);
 
-        testLogger.info(`Patterns loading result: ${patternsLoaded}`);
-        return patternsLoaded;
+        for (let i = 0; i < maxChecks; i++) {
+            // Check each state synchronously to avoid Promise.race resource leaks
+            if (await this.page.locator(this.patternStatistics).isVisible().catch(() => false)) {
+                testLogger.info('Patterns loading result: statistics');
+                return 'statistics';
+            }
+            if (await this.page.locator(this.patternCard(0)).isVisible().catch(() => false)) {
+                testLogger.info('Patterns loading result: patterns');
+                return 'patterns';
+            }
+            if (await this.page.locator(this.patternEmptyState).isVisible().catch(() => false)) {
+                testLogger.info('Patterns loading result: empty');
+                return 'empty';
+            }
+
+            if (i < maxChecks - 1) {
+                await this.page.waitForTimeout(checkInterval);
+            }
+        }
+
+        testLogger.info('Patterns loading result: timeout');
+        return 'timeout';
     }
 
     /**
@@ -5399,15 +5419,9 @@ export class LogsPage {
      * @returns {Promise<number>} Number of pattern cards
      */
     async getPatternCardCount() {
-        // Count pattern cards by checking sequential indices
-        let count = 0;
-        let maxCheck = 100; // Reasonable upper limit
-
-        for (let i = 0; i < maxCheck; i++) {
-            const isVisible = await this.page.locator(this.patternCard(i)).isVisible().catch(() => false);
-            if (!isVisible) break;
-            count++;
-        }
+        // Use efficient CSS selector to count all pattern cards at once
+        // Pattern cards have data-test attribute: pattern-card-{index}
+        const count = await this.page.locator('[data-test^="pattern-card-"]:not([data-test*="-template"]):not([data-test*="-frequency"]):not([data-test*="-percentage"]):not([data-test*="-include"]):not([data-test*="-exclude"]):not([data-test*="-details"]):not([data-test*="-anomaly"])').count().catch(() => 0);
 
         testLogger.info(`Pattern card count: ${count}`);
         return count;
