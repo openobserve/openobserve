@@ -88,6 +88,7 @@ pub enum DestinationType {
     Http(Endpoint),
     Email(Email),
     Sns(AwsSns),
+    LlmEvaluation(LlmEvaluation),
 }
 
 impl Default for DestinationType {
@@ -128,6 +129,33 @@ pub struct Endpoint {
 pub struct AwsSns {
     pub sns_topic_arn: String,
     pub aws_region: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct LlmEvaluation {
+    /// Agent URL (e.g., http://sre-agent:8000)
+    pub agent_url: String,
+    /// Batch size for processing traces
+    #[serde(default = "default_batch_size")]
+    pub batch_size: usize,
+    /// Timeout for evaluation requests in seconds
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: u64,
+    /// Enable LLM judge for evaluations (None = use server default)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_llm_judge: Option<bool>,
+    /// Additional metadata for evaluation context
+    #[serde(default)]
+    pub metadata: HashMap<String, String>,
+}
+
+fn default_batch_size() -> usize {
+    10
+}
+
+fn default_timeout_secs() -> u64 {
+    60
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]

@@ -1168,6 +1168,9 @@ async fn send_notification(
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
         DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
         DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
+        DestinationType::LlmEvaluation(_) => Err(anyhow::anyhow!(
+            "LLM Evaluation destinations are not supported for alert notifications"
+        )),
     }
 }
 

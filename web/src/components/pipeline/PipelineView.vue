@@ -63,6 +63,7 @@ const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
 const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
+const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
 
   
   export default defineComponent({
@@ -134,6 +135,14 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     io_type: "default",
     icon: "img:" + conditionImage,
     tooltip: "Condition Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "LLM Evaluation",
+    subtype: "llm_evaluation",
+    io_type: "default",
+    icon: "img:" + llmEvaluationImage,
+    tooltip: "LLM Evaluation Node",
     isSectionHeader: false,
   },
   {

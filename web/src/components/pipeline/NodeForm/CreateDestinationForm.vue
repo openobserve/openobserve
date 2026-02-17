@@ -109,7 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             ></q-input>
 
+            <!-- Hide URL field for LLM evaluation (uses internal URL) -->
             <q-input
+              v-if="formData.destination_type !== 'llm_evaluation'"
               data-test="add-destination-url-input"
               v-model="formData.url"
               :label="t('alert_destinations.url') + ' *'"
@@ -190,7 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Endpoint Path field - shown for all destination types -->
+            <!-- Hide endpoint field for LLM evaluation -->
             <q-input
+              v-if="formData.destination_type !== 'llm_evaluation'"
               data-test="add-destination-url-endpoint-input"
               v-model="formData.url_endpoint"
               :label="
@@ -222,9 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
             </q-input>
-            <!-- Method field - only shown for Custom destination type -->
+            <!-- Method field - only shown for Custom destination type, hidden for LLM evaluation -->
             <q-select
-              v-if="formData.destination_type === 'custom'"
+              v-if="formData.destination_type === 'custom' && formData.destination_type !== 'llm_evaluation'"
               data-test="add-destination-method-select"
               v-model="formData.method"
               :label="t('alert_destinations.method') + ' *'"
@@ -239,8 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
 
-            <!-- Output Format field - disabled for all except Custom -->
+            <!-- Output Format field - disabled for all except Custom, hidden for LLM evaluation -->
             <q-select
+              v-if="formData.destination_type !== 'llm_evaluation'"
               data-test="add-destination-output-format-select"
               v-model="formData.output_format"
               :label="t('alert_destinations.output_format') + ' *'"
@@ -439,9 +444,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:hint> Hostname for Datadog logs </template>
               </q-input>
             </template>
+
+            <!-- LLM Evaluation Metadata Fields -->
+            <template v-if="formData.destination_type === 'llm_evaluation'">
+              <q-input
+                data-test="add-destination-metadata-batch-size-input"
+                v-model.number="formData.metadata!.batch_size"
+                type="number"
+                :label="'Batch Size'"
+                :placeholder="'10'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !val || val > 0 || 'Must be greater than 0',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Number of traces to process together
+                </template>
+              </q-input>
+
+              <q-input
+                data-test="add-destination-metadata-timeout-input"
+                v-model.number="formData.metadata!.timeout_secs"
+                type="number"
+                :label="'Timeout (seconds)'"
+                :placeholder="'60'"
+                class="no-border showLabelOnTop q-mt-sm"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !val || val > 0 || 'Must be greater than 0',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Maximum time to wait for evaluation
+                </template>
+              </q-input>
+
+              <q-checkbox
+                data-test="add-destination-metadata-llm-judge-checkbox"
+                v-model="formData.metadata!.enable_llm_judge"
+                :label="'Enable LLM Judge'"
+                class="q-mt-md"
+                tabindex="0"
+              />
+            </template>
           </div>
 
-          <div class="q-gutter-sm">
+          <!-- Hide headers section for LLM evaluation -->
+          <div v-if="formData.destination_type !== 'llm_evaluation'" class="q-gutter-sm">
             <div class="col-12 tw:text-[14px] tw:font-bold header-label">
               Headers
             </div>
@@ -507,7 +568,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="col-12 q-mt-md tw:inline-flex">
+          <!-- Hide skip TLS verify for LLM evaluation -->
+          <div v-if="formData.destination_type !== 'llm_evaluation'" class="col-12 q-mt-md tw:inline-flex">
             <q-toggle
               data-test="add-destination-skip-tls-verify-toggle"
               class="o2-toggle-button-xs q-mt-sm tw:inline-flex"
@@ -716,6 +778,12 @@ const destinationTypes = [
     value: "custom",
     icon: "settings",
     image: getImageURL("images/pipeline/custom.png"),
+  },
+  {
+    label: "LLM Evaluation",
+    value: "llm_evaluation",
+    icon: "psychology",
+    image: getImageURL("images/pipeline/llm_evaluation.png"),
   },
 ];
 
@@ -1015,9 +1083,15 @@ watch(
   },
 );
 
-const isValidDestination = computed(
-  () => formData.value.name && formData.value.url && formData.value.method,
-);
+const isValidDestination = computed(() => {
+  // LLM evaluation only requires name
+  if (formData.value.destination_type === "llm_evaluation") {
+    return !!(formData.value.name && isValidResourceName(formData.value.name));
+  }
+
+  // Other destination types require name, url, and method
+  return !!(formData.value.name && formData.value.url && formData.value.method);
+});
 
 // Default URL endpoints for different destination types (shown as hint)
 const defaultUrlEndpoint = computed(() => {
@@ -1043,7 +1117,7 @@ const defaultUrlEndpoint = computed(() => {
 
 // Show metadata fields for specific destination types
 const showMetadataFields = computed(() => {
-  return ["splunk", "datadog"].includes(formData.value.destination_type);
+  return ["splunk", "datadog", "llm_evaluation"].includes(formData.value.destination_type);
 });
 
 // Watch to ensure metadata is initialized when needed
@@ -1064,12 +1138,43 @@ watch([openobserveOrg, openobserveStream], ([org, stream]) => {
   }
 });
 
+// Initialize LLM evaluation metadata with defaults when selected
+watch(
+  () => formData.value.destination_type,
+  (newType) => {
+    if (newType === "llm_evaluation") {
+      if (!formData.value.metadata) {
+        formData.value.metadata = {};
+      }
+      // Set defaults if not already set
+      if (!formData.value.metadata.batch_size) {
+        formData.value.metadata.batch_size = 10;
+      }
+      if (!formData.value.metadata.timeout_secs) {
+        formData.value.metadata.timeout_secs = 60;
+      }
+      if (formData.value.metadata.enable_llm_judge === undefined) {
+        formData.value.metadata.enable_llm_judge = true;
+      }
+    }
+  },
+  { immediate: true },
+);
+
 // Step validation
 const canProceedStep1 = computed(() => {
   return !!formData.value.destination_type;
 });
 
 const canProceedStep2 = computed(() => {
+  // LLM evaluation has different validation requirements
+  if (formData.value.destination_type === "llm_evaluation") {
+    return !!(
+      formData.value.name &&
+      isValidResourceName(formData.value.name)
+    );
+  }
+
   const basicValidation =
     formData.value.name &&
     isValidResourceName(formData.value.name) &&
@@ -1261,7 +1366,13 @@ const createDestination = () => {
   });
 
   // Merge URL + URL endpoint for all destination types
-  const fullUrl = formData.value.url + (formData.value.url_endpoint || "");
+  // Special handling for LLM evaluation - use internal URL
+  let fullUrl: string;
+  if (formData.value.destination_type === "llm_evaluation") {
+    fullUrl = "internal://llm-evaluation";
+  } else {
+    fullUrl = formData.value.url + (formData.value.url_endpoint || "");
+  }
 
   // Handle output format - for esbulk, format as JSON object with index
   // For stringseparated, format as JSON object with separator
@@ -1297,7 +1408,16 @@ const createDestination = () => {
   };
 
   // Add metadata as JSON object
-  if (
+  if (formData.value.destination_type === "llm_evaluation") {
+    // For LLM evaluation, convert metadata to strings (no agent_url needed)
+    payload.metadata = {};
+
+    if (formData.value.metadata) {
+      for (const [key, value] of Object.entries(formData.value.metadata)) {
+        payload.metadata[key] = String(value);
+      }
+    }
+  } else if (
     formData.value.metadata &&
     Object.keys(formData.value.metadata).length > 0
   ) {
