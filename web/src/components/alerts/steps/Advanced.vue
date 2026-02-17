@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="info_outline"
           >
             <q-tooltip>
-              Variables are used to pass data from the alert to the destination.
+              {{ t('alerts.advanced.variablesTooltip') }}
             </q-tooltip>
           </q-btn>
         </div>
@@ -46,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             @click="addVariable"
           >
-            <q-icon name="add" />
-            <span>Add Variable</span>
+            <span>{{ t('alerts.advanced.addVariable') }}</span>
           </q-btn>
         </template>
         <template v-else>
@@ -146,12 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="info_outline"
             >
               <q-tooltip>
-                Row Template is used to format the alert message.
+                {{ t('alerts.advanced.rowTemplateTooltip') }}
               </q-tooltip>
             </q-btn>
           </div>
           <div class="flex items-center">
-            <span class="text-caption q-mr-sm">Template Type:</span>
+            <span class="text-caption q-mr-sm">{{ t('alerts.advanced.templateType') }}</span>
             <q-btn-toggle
               data-test="add-alert-row-template-type-toggle"
               v-model="localRowTemplateType"
