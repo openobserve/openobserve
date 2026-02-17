@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="trace-tree-wrapper">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
-            <div v-if="activeTab === 'waterfall'" class="tw:flex">
+            <div v-if="activeTab === 'waterfall'" class="tw:flex tw:h-full">
               <div
                 class="tw:flex tw:flex-col tw:min-h-0"
                 :style="{
