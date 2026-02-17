@@ -750,34 +750,33 @@ export default defineComponent({
     const resolveVariableValue = (value: string): string => {
       if (!value || typeof value !== 'string') return value;
 
-      // Check if value contains variable references ($variableName)
-      const variableRegex = /\$([a-zA-Z0-9_-]+)/g;
-      let resolvedValue = value;
-      let match: RegExpExecArray | null;
+      // Replace all variable references ($variableName) with their resolved values
+      // Using replace callback avoids regex exec loop risks and handles
+      // special replacement patterns ($1, $&, etc.) safely
+      const resolvedValue = value.replace(
+        /\$([a-zA-Z0-9_-]+)/g,
+        (fullMatch, varName) => {
+          // Find the variable in variablesData.values
+          const referencedVar = variablesData.values.find(
+            (v: any) => v.name === varName,
+          );
 
-      while ((match = variableRegex.exec(value)) !== null) {
-        const varName = match[1];
-        console.log(`[Variable Resolution] Found reference to variable: ${varName}`);
+          if (referencedVar) {
+            let varValue = referencedVar.value;
 
-        // Find the variable in variablesData.values
-        const referencedVar = variablesData.values.find((v: any) => v.name === varName);
+            // Handle array values (multi-select)
+            if (Array.isArray(varValue)) {
+              varValue = varValue.map(String).join(',');
+            }
 
-        if (referencedVar) {
-          let varValue = referencedVar.value;
-
-          // Handle array values (multi-select)
-          if (Array.isArray(varValue)) {
-            varValue = varValue.join(',');
+            return varValue ?? '';
           }
 
-          console.log(`[Variable Resolution] Resolving $${varName} to: ${varValue}`);
-          resolvedValue = resolvedValue.replace(match[0], varValue || '');
-        } else {
-          console.warn(`[Variable Resolution] ⚠️ Variable ${varName} not found or has no value`);
-        }
-      }
+          // Keep original reference if variable not found
+          return fullMatch;
+        },
+      );
 
-      console.log(`[Variable Resolution] Final resolved value: ${resolvedValue}`);
       return resolvedValue;
     };
 
