@@ -17,6 +17,7 @@ use std::fmt;
 
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,6 +82,8 @@ pub struct Endpoint {
     pub headers: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<HTTPOutputFormat>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -138,6 +141,46 @@ impl fmt::Display for TemplateType {
             TemplateType::Http => write!(f, "http"),
             TemplateType::Email { .. } => write!(f, "email"),
             TemplateType::Sns => write!(f, "sns"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HTTPOutputFormat {
+    #[default]
+    JSON,
+    NDJSON,
+    StringSeparated {
+        separator: String,
+    },
+}
+
+impl HTTPOutputFormat {
+    pub fn get_content_type(&self) -> &'static str {
+        match self {
+            Self::JSON => "application/json",
+            Self::NDJSON => "application/x-ndjson",
+            // this is not a json anymore, the handler must process it as a string
+            Self::StringSeparated { .. } => "text/plain",
+        }
+    }
+
+    pub fn get_body_from_data<T: AsRef<Value> + Serialize>(&self, data: &[T]) -> Vec<u8> {
+        match self {
+            Self::JSON => serde_json::to_vec(&data).unwrap(),
+            Self::NDJSON => data
+                .iter()
+                .map(|x| x.as_ref().to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes(),
+            Self::StringSeparated { separator } => data
+                .iter()
+                .map(|x| x.as_ref().to_string())
+                .collect::<Vec<_>>()
+                .join(separator)
+                .into_bytes(),
         }
     }
 }

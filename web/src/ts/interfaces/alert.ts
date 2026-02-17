@@ -91,6 +91,8 @@ export interface Destination {
   emails?: string;
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
+  output_format?: string | any;
+  separator?: string;
 }
 
 export interface DestinationPayload {
@@ -103,6 +105,8 @@ export interface DestinationPayload {
   emails?: string[];
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
+  output_format?: string | any;
+  separator?: string;
 }
 
 // Destination object which is modified in frontend to display in table and form
