@@ -2315,6 +2315,7 @@ $traceChartCollapseHeight: 42px;
 }
 
 .dag-right-panel {
+  height: calc(100vh - 200px);
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;

@@ -174,6 +174,13 @@ export default defineComponent({
       });
 
       edgesData.forEach((edge) => {
+        // Only process edges whose parent node exists in the data set.
+        // If the parent span_id isn't in our nodes (e.g., browser/frontend span
+        // that wasn't exported to the trace backend), skip this edge so the
+        // child is correctly treated as a root node instead of being orphaned
+        // at position {0,0}.
+        if (!nodeMap.has(edge.from)) return;
+
         const parentChildren = children.get(edge.from) || [];
         parentChildren.push(edge.to);
         children.set(edge.from, parentChildren);
@@ -325,18 +332,24 @@ export default defineComponent({
     const edges = computed(() => {
       if (!dagData.value) return [];
 
-      return dagData.value.edges.map((edge) => ({
-        id: `${edge.from}-${edge.to}`,
-        source: edge.from,
-        target: edge.to,
-        type: "default",
-        animated: false,
-        markerEnd: MarkerType.ArrowClosed,
-        style: {
-          strokeWidth: 1,
-          stroke: "#888",
-        },
-      }));
+      // Build a set of valid node IDs so we only render edges where both
+      // source and target nodes exist (prevents VueFlow rendering errors)
+      const nodeIds = new Set(dagData.value.nodes.map((n) => n.span_id));
+
+      return dagData.value.edges
+        .filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to))
+        .map((edge) => ({
+          id: `${edge.from}-${edge.to}`,
+          source: edge.from,
+          target: edge.to,
+          type: "default",
+          animated: false,
+          markerEnd: MarkerType.ArrowClosed,
+          style: {
+            strokeWidth: 1,
+            stroke: "#888",
+          },
+        }));
     });
 
     const fetchDAG = async () => {

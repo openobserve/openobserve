@@ -54,7 +54,7 @@ export class HomePage {
         // ===== PAGE LOAD INDICATORS (for verifying navigation completed) =====
         this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="log-table-column-0-source"]')).first();
         this.streamsPageIndicator = page.locator('[data-test="streams-search-stream-input"]').or(page.locator('[data-test="stream-add-stream-btn"]')).first();
-        this.dashboardsPageIndicator = page.locator('[data-test="dashboard-add"]').or(page.getByText('Dashboards')).first();
+        this.dashboardsPageIndicator = page.locator('[data-test="dashboard-new"]').or(page.getByText('Dashboards')).first();
         this.alertsPageIndicator = page.locator('[data-test="alerts-page"]').or(page.getByRole('tab', { name: 'Alerts' })).first();
         this.metricsPageIndicator = page.locator('[data-test="metrics-search-bar-refresh-btn"]').or(page.getByText('Query')).first();
         this.tracesPageIndicator = page.locator('[data-test="traces-search-bar-refresh-btn"]').or(page.getByText('Query')).first();
@@ -679,7 +679,7 @@ export class HomePage {
      * Validate Dashboards page UI elements
      */
     async validateDashboardsPageElements() {
-        await expect(this.page.locator('[data-test="dashboard-add"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="dashboard-new"]')).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator('[data-test="dashboard-search"]')).toBeVisible({ timeout: 5000 });
         await expect(this.page.locator('[data-test="dashboard-import"]')).toBeVisible({ timeout: 5000 });
         await expect(this.page.locator('[data-test="dashboard-table"]')).toBeVisible({ timeout: 5000 });
