@@ -30,11 +30,8 @@ export default class DashboardLegendsCopy {
    * @returns {import('@playwright/test').Locator}
    */
   getShowLegendsButton() {
-    // The button uses icon "format_list_bulleted" and has tooltip "Show Legends"
-    // It appears in the panel hover toolbar area
-    return this.page.locator('button:has(> .q-icon:text("format_list_bulleted"))').or(
-      this.page.getByRole('button').filter({ has: this.page.locator('.q-icon:text("format_list_bulleted")') })
-    ).first();
+    // The button renders icon "format_list_bulleted" as text content via Quasar's q-icon
+    return this.page.getByRole('button').filter({ hasText: 'format_list_bulleted' }).first();
   }
 
   /**
@@ -53,8 +50,7 @@ export default class DashboardLegendsCopy {
       await chartArea.hover();
     }
 
-    await this.page.waitForTimeout(500); // Wait for hover toolbar to appear
-
+    // Wait for the Show Legends button to appear in hover toolbar
     const legendsBtn = this.getShowLegendsButton();
     await legendsBtn.waitFor({ state: 'visible', timeout: 10000 });
     await legendsBtn.click();
@@ -109,8 +105,8 @@ export default class DashboardLegendsCopy {
   async copyLegend(index) {
     const item = this.getLegendItem(index);
     await item.hover(); // Hover to reveal copy button
-    await this.page.waitForTimeout(300);
     const copyBtn = item.locator('.copy-btn');
+    await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     await copyBtn.click();
     testLogger.info(`Copied legend at index ${index}`);
   }
@@ -180,7 +176,9 @@ export default class DashboardLegendsCopy {
         scrollContainer.scrollTop = 0;
       }
     });
-    await this.page.waitForTimeout(500);
+    // Wait for data cells to be attached after scroll reset
+    await this.dashboardTable.locator('td.copy-cell-td').first()
+      .waitFor({ state: 'attached', timeout: 10000 });
   }
 
   /**
@@ -218,9 +216,9 @@ export default class DashboardLegendsCopy {
       await cell.scrollIntoViewIfNeeded();
       await cell.hover({ force: true });
     }
-    await this.page.waitForTimeout(500); // Wait for copy button opacity transition
-
+    // Wait for copy button to become visible (opacity transition from 0 to 1 on hover)
     const copyBtn = cell.locator('.copy-btn');
+    await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     await copyBtn.click({ force: true });
 
     testLogger.info(`Copied table cell at row ${rowIndex}, col ${colIndex}`);
@@ -272,8 +270,13 @@ export default class DashboardLegendsCopy {
       await cell.scrollIntoViewIfNeeded();
       await cell.hover({ force: true });
     }
-    await this.page.waitForTimeout(500); // Wait for opacity transition
+    // Wait briefly for opacity transition, then check visibility
     const copyBtn = cell.locator('.copy-btn');
-    return await copyBtn.isVisible();
+    try {
+      await copyBtn.waitFor({ state: 'visible', timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

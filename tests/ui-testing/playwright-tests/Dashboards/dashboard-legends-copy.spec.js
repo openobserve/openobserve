@@ -63,9 +63,7 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Hover over the chart renderer to reveal the toolbar
-      // ChartRenderer.vue uses data-test="chart-renderer"
       await pm.dashboardLegendsCopy.chartRenderer.first().hover();
-      await page.waitForTimeout(500);
 
       // Verify the Show Legends button is visible (icon: format_list_bulleted)
       const showLegendsBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
@@ -117,8 +115,9 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
 
       // Open the legends popup - hover over chart renderer to reveal toolbar
       await pm.dashboardLegendsCopy.chartRenderer.first().hover();
-      await page.waitForTimeout(500);
-      await pm.dashboardLegendsCopy.getShowLegendsButton().click();
+      const legendsBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
+      await legendsBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await legendsBtn.click();
 
       // Verify popup is visible
       await pm.dashboardLegendsCopy.waitForPopupVisible();
@@ -244,8 +243,9 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
 
       // Open legends popup - hover over chart renderer to reveal toolbar
       await pm.dashboardLegendsCopy.chartRenderer.first().hover();
-      await page.waitForTimeout(500);
-      await pm.dashboardLegendsCopy.getShowLegendsButton().click();
+      const legendsBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
+      await legendsBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await legendsBtn.click();
       await pm.dashboardLegendsCopy.waitForPopupVisible();
 
       // Get the first legend text
@@ -316,8 +316,9 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
 
       // Open legends popup - hover over chart renderer to reveal toolbar
       await pm.dashboardLegendsCopy.chartRenderer.first().hover();
-      await page.waitForTimeout(500);
-      await pm.dashboardLegendsCopy.getShowLegendsButton().click();
+      const legendsBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
+      await legendsBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await legendsBtn.click();
       await pm.dashboardLegendsCopy.waitForPopupVisible();
 
       // Click "Copy all"
@@ -378,8 +379,9 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
 
       // Open the legends popup - hover over chart renderer to reveal toolbar
       await pm.dashboardLegendsCopy.chartRenderer.first().hover();
-      await page.waitForTimeout(500);
-      await pm.dashboardLegendsCopy.getShowLegendsButton().click();
+      const legendsBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
+      await legendsBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await legendsBtn.click();
       await pm.dashboardLegendsCopy.waitForPopupVisible();
 
       // Close the popup
@@ -434,14 +436,11 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
       await streamPromise;
       await pm.chartTypeSelector.waitForTableDataLoad();
 
-      // Hover over the table area
+      // Hover over the table area and verify Show Legends button is NOT visible
       const tableArea = pm.dashboardLegendsCopy.dashboardTable.first();
       await tableArea.hover();
-      await page.waitForTimeout(500);
-
-      // Verify Show Legends button is NOT visible
       const showLegendsBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
-      await expect(showLegendsBtn).not.toBeVisible({ timeout: 3000 });
+      await expect(showLegendsBtn).not.toBeVisible({ timeout: 5000 });
 
       testLogger.info(
         "Show Legends button correctly hidden for table chart type"
@@ -497,25 +496,20 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
       const isCopied = await pm.dashboardLegendsCopy.isTableCellCopied(0, 0);
       expect(isCopied).toBeTruthy();
 
-      // Wait 3+ seconds for the icon to revert
-      await page.waitForTimeout(3500);
-
-      // Re-hover to see the button again using page object method
-      await pm.dashboardLegendsCopy.ensureTableDataVisible();
-      const cell = pm.dashboardLegendsCopy.getTableCell(0, 0);
-      const box = await cell.boundingBox();
-      if (box) {
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      }
-      await page.waitForTimeout(500);
-
-      // The copy button should now show "content_copy" icon again (not "check")
-      const copyBtn = cell.locator('.copy-btn .q-icon');
-      const isVisible = await copyBtn.isVisible();
-      if (isVisible) {
-        const iconText = await copyBtn.textContent();
+      // Poll for the icon to revert from "check" back to "content_copy" (3s timer in source)
+      await expect(async () => {
+        // Re-hover to reveal the copy button
+        await pm.dashboardLegendsCopy.ensureTableDataVisible();
+        const cell = pm.dashboardLegendsCopy.getTableCell(0, 0);
+        const box = await cell.boundingBox();
+        if (box) {
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        }
+        const copyBtn = cell.locator('.copy-btn');
+        await copyBtn.waitFor({ state: 'visible', timeout: 2000 });
+        const iconText = await copyBtn.locator('.q-icon').textContent();
         expect(iconText).toContain("content_copy");
-      }
+      }).toPass({ timeout: 10000, intervals: [1000, 1000, 1000, 1000] });
 
       testLogger.info("Table cell copy icon revert test completed");
 
