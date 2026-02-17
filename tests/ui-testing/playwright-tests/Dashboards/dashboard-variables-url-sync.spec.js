@@ -69,12 +69,9 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(SELECTORS.REFRESH_BTN).click();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Wait for URL to be updated with variable parameter (avoids race condition)
-    const expectedParam = `var-${variableName}=`;
-    await page.waitForURL((url) => url.toString().includes(expectedParam), { timeout: 10000 });
-
     // Verify URL contains var-{variable}={value}
     const currentURL = page.url();
+    const expectedParam = `var-${variableName}=`;
     expect(currentURL).toContain(expectedParam);
     expect(currentURL).toContain(encodeURIComponent(selectedValue));
 
