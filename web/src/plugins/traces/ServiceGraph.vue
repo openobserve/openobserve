@@ -298,7 +298,6 @@ export default defineComponent({
     const chartRendererRef = ref<any>(null);
 
     const searchFilter = ref("");
-    const connectionTypeFilter = ref("all");
 
     // Stream filter
     const storedStreamFilter = localStorage.getItem(
@@ -306,15 +305,6 @@ export default defineComponent({
     );
     const streamFilter = ref(storedStreamFilter || "all");
     const availableStreams = ref<string[]>([]);
-
-    // Connection type tabs configuration
-    const connectionTypeTabs = [
-      { label: "All", value: "all" },
-      { label: "Standard", value: "standard" },
-      { label: "Database", value: "database" },
-      { label: "Messaging", value: "messaging" },
-      { label: "Virtual", value: "virtual" },
-    ];
 
     const graphData = ref<any>({
       nodes: [],
@@ -361,8 +351,8 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      // Don't use cache if filters are active (search or connection type)
-      const hasActiveFilters = searchFilter.value?.trim() || connectionTypeFilter.value !== "all";
+      // Don't use cache if filters are active (search filter)
+      const hasActiveFilters = searchFilter.value?.trim();
 
       // Use cached options if chartKey hasn't changed (prevents double rendering)
       // BUT only if no filters are active
@@ -575,7 +565,6 @@ export default defineComponent({
             id: `${edge.from}->${edge.to}`,
             from: edge.from,
             to: edge.to,
-            connection_type: edge.connection_type || "standard",
             total_requests: edge.total_requests || 0,
             failed_requests: edge.failed_requests || 0,
             error_rate: edge.error_rate || 0,
@@ -690,7 +679,6 @@ export default defineComponent({
               id: edgeId,
               from: labels.client,
               to: labels.server,
-              connection_type: labels.connection_type || "standard",
               total_requests: 0,
               failed_requests: 0,
             };
@@ -710,7 +698,6 @@ export default defineComponent({
               id: edgeId,
               from: labels.client,
               to: labels.server,
-              connection_type: labels.connection_type || "standard",
               total_requests: 0,
               failed_requests: 0,
             };
@@ -751,19 +738,6 @@ export default defineComponent({
 
         edges = edges.filter(
           (e) => matchingNodeIds.has(e.from) || matchingNodeIds.has(e.to),
-        );
-
-        const usedNodeIds = new Set([
-          ...edges.map((e) => e.from),
-          ...edges.map((e) => e.to),
-        ]);
-        nodes = nodes.filter((n) => usedNodeIds.has(n.id));
-      }
-
-      // Filter by connection type
-      if (connectionTypeFilter.value !== "all") {
-        edges = edges.filter(
-          (e) => e.connection_type === connectionTypeFilter.value,
         );
 
         const usedNodeIds = new Set([
@@ -976,8 +950,6 @@ export default defineComponent({
       searchFilter,
       streamFilter,
       availableStreams,
-      connectionTypeFilter,
-      connectionTypeTabs,
       visualizationType,
       visualizationTabs,
       layoutType,

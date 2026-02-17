@@ -234,11 +234,61 @@ export const convertServiceGraphToTree = (
     (n: any) => !nodesWithIncoming.has(n.id),
   );
 
+  // --- Compute adaptive baselines from the full dataset ---
+  const percentile = (sorted: number[], p: number): number => {
+    if (sorted.length === 0) return 0;
+    const idx = (p / 100) * (sorted.length - 1);
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  };
+
+  // Node error rates (from node-level data)
+  const allErrorRates = graphData.nodes
+    .map((n: any) => n.error_rate ?? (n.requests > 0 ? (n.errors / n.requests) * 100 : 0))
+    .filter((r: number) => r > 0)
+    .sort((a: number, b: number) => a - b);
+
+  // Edge P95 latencies in ms
+  const allLatenciesMs = graphData.edges
+    .map((e: any) => (e.p95_latency_ns ?? 0) / 1000000)
+    .filter((l: number) => l > 0)
+    .sort((a: number, b: number) => a - b);
+
+  const errP50 = percentile(allErrorRates, 50);
+  const errP75 = percentile(allErrorRates, 75);
+  const errP90 = percentile(allErrorRates, 90);
+
+  const latP50 = percentile(allLatenciesMs, 50);
+  const latP75 = percentile(allLatenciesMs, 75);
+  const latP90 = percentile(allLatenciesMs, 90);
+
+  const green = isDarkMode ? "#10b981" : "#52c41a";
+
+  // Node color: error rate relative to the tree's error baseline
+  const getNodeColor = (errRate: number): string => {
+    if (allErrorRates.length === 0 || errRate === 0) return green;
+    if (errRate >= errP90) return "#f5222d";  // Red — top 10%
+    if (errRate >= errP75) return "#faad14";  // Orange — top 25%
+    if (errRate >= errP50) return "#ffc069";  // Light orange — above median
+    return green;
+  };
+
+  // Edge color: latency relative to the tree's latency baseline
+  const getEdgeColor = (p95Ms: number): string => {
+    if (allLatenciesMs.length === 0 || p95Ms === 0) return isDarkMode ? "#4a5568" : "#d9d9d9";
+    if (p95Ms >= latP90) return "#f5222d";  // Red — top 10%
+    if (p95Ms >= latP75) return "#ff7875";  // Light red — top 25%
+    if (p95Ms >= latP50) return "#ffc069";  // Light orange — above median
+    return green; // Below median — healthy
+  };
+
   // Track all visited nodes across all trees to find orphaned components
   const globalVisited = new Set<string>();
 
   // Helper to build tree recursively
-  const buildTree = (nodeId: string, visited = new Set<string>()): any => {
+  // incomingEdge: the edge that led to this node (for direction-aware metrics)
+  const buildTree = (nodeId: string, visited = new Set<string>(), incomingEdge: any = null): any => {
     if (visited.has(nodeId)) return null; // Prevent cycles
     visited.add(nodeId);
     globalVisited.add(nodeId);
@@ -248,39 +298,40 @@ export const convertServiceGraphToTree = (
 
     const outgoingEdges = edgesMap.get(nodeId) || [];
     const children = outgoingEdges
-      .map((edge: any) => buildTree(edge.to, new Set(visited)))
+      .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
 
-    // Use node's own request count from backend (authoritative source)
-    // This ensures consistency with the graph view
-    const totalRequests = node.requests ?? 0;
-    const failedRequests = node.errors ?? 0;
-    const errorRate =
-      totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
+    // Direction-aware metrics based on tree position
+    let totalRequests: number;
+    let failedRequests: number;
+    let errorRate: number;
 
-    // Calculate connections count
-    const incomingEdges = incomingEdgesMap.get(nodeId) || [];
-    const connectionCount = incomingEdges.length + outgoingEdges.length;
-
-    // Border color based on error rate (theme-aware) - matches graph view
-    let borderColor: string;
-    if (isDarkMode) {
-      // Dark mode colors
-      borderColor = "#10b981"; // Green (healthy)
-      if (errorRate > 10)
-        borderColor = "#ef4444"; // Red (critical)
-      else if (errorRate > 5)
-        borderColor = "#f97316"; // Orange (warning)
-      else if (errorRate > 1) borderColor = "#fbbf24"; // Yellow (degraded)
+    if (incomingEdge) {
+      // Non-root: show traffic via this specific edge from parent
+      totalRequests = incomingEdge.total_requests ?? 0;
+      failedRequests = incomingEdge.failed_requests ?? 0;
+      errorRate = incomingEdge.error_rate ?? 0;
     } else {
-      // Light mode colors
-      borderColor = "#52c41a"; // Green (healthy)
-      if (errorRate > 10)
-        borderColor = "#f5222d"; // Red (critical)
-      else if (errorRate > 5)
-        borderColor = "#fa8c16"; // Orange (warning)
-      else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
+      // Root: sum of outgoing edges
+      totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
+      failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
+
+      // If no edges, fall back to node's own metrics
+      if (totalRequests === 0 && node.requests !== undefined) {
+        totalRequests = node.requests;
+        failedRequests = node.errors ?? 0;
+      }
+
+      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
     }
+
+    // Node border: colored by this node's error rate relative to baseline
+    const nodeErrorRate = node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
+    const borderColor = getNodeColor(nodeErrorRate);
+
+    // Edge line: colored by this edge's P95 latency relative to baseline
+    const edgeP95Ms = incomingEdge ? (incomingEdge.p95_latency_ns || 0) / 1000000 : 0;
+    const edgeColor = incomingEdge ? getEdgeColor(edgeP95Ms) : (isDarkMode ? "#4a5568" : "#d9d9d9");
 
     // Fixed size for tree view to prevent overlapping
     const symbolSize = 45;
@@ -289,6 +340,10 @@ export const convertServiceGraphToTree = (
       name: node.label || node.id,
       value: totalRequests,
       symbolSize: symbolSize,
+      lineStyle: {
+        color: edgeColor,
+        width: incomingEdge ? Math.max(1, Math.min(4, 1 + (totalRequests || 0) / 150)) : 1.5,
+      },
       itemStyle: {
         color: isDarkMode ? "#1a1f2e" : "#ffffff",
         borderColor: borderColor,
@@ -336,12 +391,22 @@ export const convertServiceGraphToTree = (
       },
       tooltip: {
         formatter: (params: any) => {
+          const formatLatency = (ns: number) => {
+            if (!ns || ns === 0) return 'N/A';
+            const ms = ns / 1000000;
+            return ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : ms.toFixed(2) + 'ms';
+          };
+
+          const p50 = incomingEdge ? formatLatency(incomingEdge.p50_latency_ns || 0) : 'N/A';
+          const p95 = incomingEdge ? formatLatency(incomingEdge.p95_latency_ns || 0) : 'N/A';
+          const p99 = incomingEdge ? formatLatency(incomingEdge.p99_latency_ns || 0) : 'N/A';
+
           return `
-            <strong>${params.name}</strong><br/>
-            Requests: ${formatNumber(totalRequests)}<br/>
-            Errors: ${failedRequests}<br/>
-            Error Rate: ${errorRate.toFixed(2)}%<br/>
-            Connections: ${connectionCount}
+            <strong>Requests:</strong> ${formatNumber(totalRequests)}<br/>
+            <strong>Errors:</strong> ${failedRequests} (${errorRate.toFixed(2)}%)<br/>
+            <strong>P50:</strong> ${p50}<br/>
+            <strong>P95:</strong> ${p95}<br/>
+            <strong>P99:</strong> ${p99}
           `;
         },
       },
@@ -725,8 +790,7 @@ export const convertServiceGraphToNetwork = (
           <strong>${node.label || node.id}</strong><br/>
           Requests: ${formatNumber(metrics.requests)}<br/>
           Errors: ${formatNumber(metrics.errors)}<br/>
-          Error Rate: ${errorRate.toFixed(2)}%<br/>
-          Connections: ${metrics.connections}
+          Error Rate: ${errorRate.toFixed(2)}%
         `,
       },
     };

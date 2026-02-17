@@ -122,7 +122,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         {
           from: "service-a",
           to: "service-b",
-          connection_type: "standard",
           total_requests: 1000,
           failed_requests: 10,
           error_rate: 1.0,
@@ -909,104 +908,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       expect(wrapper.vm.filteredGraphData.nodes.length).toBe(0);
       expect(wrapper.vm.filteredGraphData.edges.length).toBe(0);
-    });
-  });
-
-  describe("Connection Type Filtering", () => {
-    it("should filter edges by connection type", async () => {
-      const multiTypeResponse = {
-        data: {
-          nodes: [
-            { id: "a", label: "A", requests: 100, errors: 0, error_rate: 0 },
-            { id: "b", label: "B", requests: 100, errors: 0, error_rate: 0 },
-            { id: "c", label: "C", requests: 100, errors: 0, error_rate: 0 },
-          ],
-          edges: [
-            { from: "a", to: "b", connection_type: "database", total_requests: 100 },
-            { from: "b", to: "c", connection_type: "standard", total_requests: 100 },
-          ],
-          availableStreams: ["default"],
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        multiTypeResponse
-      );
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.connectionTypeFilter = "database";
-      wrapper.vm.applyFilters();
-
-      // Should only show database edges
-      expect(wrapper.vm.filteredGraphData.edges.length).toBe(1);
-      expect(wrapper.vm.filteredGraphData.edges[0].connection_type).toBe("database");
-    });
-
-    it("should filter nodes connected by filtered edges", async () => {
-      const multiTypeResponse = {
-        data: {
-          nodes: [
-            { id: "a", label: "A", requests: 100, errors: 0, error_rate: 0 },
-            { id: "b", label: "B", requests: 100, errors: 0, error_rate: 0 },
-            { id: "c", label: "C", requests: 100, errors: 0, error_rate: 0 },
-          ],
-          edges: [
-            { from: "a", to: "b", connection_type: "database", total_requests: 100 },
-            { from: "b", to: "c", connection_type: "standard", total_requests: 100 },
-          ],
-          availableStreams: ["default"],
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        multiTypeResponse
-      );
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.connectionTypeFilter = "database";
-      wrapper.vm.applyFilters();
-
-      // Should only show nodes connected by database edges (a and b)
-      const nodeIds = wrapper.vm.filteredGraphData.nodes.map((n: any) => n.id);
-      expect(nodeIds).toContain("a");
-      expect(nodeIds).toContain("b");
-      expect(nodeIds).not.toContain("c");
-    });
-
-    it("should show all edges when connection type is 'all'", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const allEdges = wrapper.vm.graphData.edges.length;
-
-      wrapper.vm.connectionTypeFilter = "all";
-      wrapper.vm.applyFilters();
-
-      expect(wrapper.vm.filteredGraphData.edges.length).toBe(allEdges);
-    });
-
-    it("should combine search and connection type filters", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.searchFilter = "service-a";
-      wrapper.vm.connectionTypeFilter = "standard";
-      wrapper.vm.applyFilters();
-
-      // Both filters should be applied
-      expect(wrapper.vm.filteredGraphData.nodes.length).toBeGreaterThanOrEqual(0);
     });
   });
 
