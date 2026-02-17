@@ -4,12 +4,12 @@
 -->
 <template>
   <div
-    class="flame-graph-view tw:flex tw:flex-col tw:h-full tw:bg-white tw:w-full"
+    class="flame-graph-view tw:flex tw:flex-col tw:h-full tw:bg-white tw:w-full tw:bg-[var(--o2-card-bg)]!"
     style="min-height: 400px; height: 100%"
   >
     <!-- Controls Bar -->
     <div
-      class="tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
+      class="tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-[var(--o2-card-bg)]!"
     >
       <div class="tw:flex tw:items-center tw:space-x-4">
         <div class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-secondary)]">
@@ -25,7 +25,7 @@
     <!-- ECharts Container -->
     <div
       ref="chartContainerRef"
-      class="tw:flex-1 tw:w-full"
+      class="tw:flex-1 tw:w-full tw:pt-[0.625rem]"
       style="min-height: 300px; position: relative"
     ></div>
 
