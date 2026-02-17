@@ -62,18 +62,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw:border-[1px] tw:border-gray-200"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
                   >
-                    <UnifiedQueryEditor
+                    <!-- Unified Query Editor (with built-in AI bar) -->
+                    <unified-query-editor
                       data-test-prefix="function-vrl"
                       ref="editorRef"
                       :languages="['vrl', 'javascript']"
                       :default-language="formData.transType === '1' ? 'javascript' : 'vrl'"
                       :query="formData.function"
+                      :hide-nl-toggle="false"
+                      :disable-ai="false"
+                      :disable-ai-reason="''"
+                      :ai-placeholder="t('function.askAIFunctionPlaceholder')"
+                      editor-height="300px"
                       @update:query="handleFunctionUpdate"
                       @language-change="handleLanguageChange"
-                      @ask-ai="handleAskAI"
-                      editor-height="300px"
+                      @toggle-nlp-mode="handleToggleNlpMode"
+                      @generation-start="handleGenerationStart"
+                      @generation-end="handleGenerationEnd"
+                      @generation-success="handleGenerationSuccess"
                     />
                   </div>
                   <div class="text-subtitle2">
@@ -512,6 +520,38 @@ export default defineComponent({
       formData.value.transType = newLanguage === 'javascript' ? '1' : '0';
     };
 
+    /**
+     * Handle NLP mode toggle from AI icon in editor
+     */
+    const handleToggleNlpMode = () => {
+      console.log('[AddFunction] Toggling NLP mode from AI icon');
+      // UnifiedQueryEditor manages its own NLP mode state internally
+    };
+
+    /**
+     * Handle generation start event from UnifiedQueryEditor
+     */
+    const handleGenerationStart = () => {
+      console.log('[AddFunction] AI generation started');
+      // Can add loading indicators here if needed
+    };
+
+    /**
+     * Handle generation end event from UnifiedQueryEditor
+     */
+    const handleGenerationEnd = () => {
+      console.log('[AddFunction] AI generation ended');
+      // Can remove loading indicators here if needed
+    };
+
+    /**
+     * Handle successful generation from UnifiedQueryEditor
+     */
+    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[AddFunction] AI generation success:', payload.type);
+      // Function code is already updated via @update:query handler
+    };
+
     // Unified Query Editor: Handle Ask AI
     const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
       console.log('[AddFunction] Ask AI for language:', language, 'input:', naturalLanguage);
@@ -565,7 +605,10 @@ export default defineComponent({
       aiChatInputContext,
       handleFunctionUpdate,
       handleLanguageChange,
-      handleAskAI,
+      handleToggleNlpMode,
+      handleGenerationStart,
+      handleGenerationEnd,
+      handleGenerationSuccess,
     };
   },
   created() {

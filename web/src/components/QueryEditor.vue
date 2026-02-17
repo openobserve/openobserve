@@ -34,7 +34,7 @@
           v-model="aiInputText"
           dense
           borderless
-          :placeholder="t('search.askAIPlaceholder')"
+          :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
           class="ai-input-field tw:flex-1"
           :data-test="`${dataTestPrefix}-ai-input-field`"
           @keydown.enter="handleAIInputEnter"
@@ -155,6 +155,7 @@ interface Props {
   hideNlToggle?: boolean;       // Hide floating AI icon (for pages that don't want AI)
   disableAi?: boolean;          // Disable AI send (e.g. no stream selected)
   disableAiReason?: string;     // Tooltip reason when AI is disabled
+  aiPlaceholder?: string;       // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
 
   // Testing
   dataTestPrefix?: string;
