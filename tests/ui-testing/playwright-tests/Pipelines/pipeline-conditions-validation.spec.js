@@ -48,7 +48,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
     pageManager = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Setup download directory
     downloadDir = await pageManager.logsPage.setupDownloadDirectory();

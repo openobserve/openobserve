@@ -506,7 +506,7 @@ test.describe("Share Link Test Cases", () => {
     // Select a stream and run query to load results
     await pm.logsPage.selectStream(TEST_STREAM);
     await pm.logsPage.clickRefresh();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('Logs page loaded with mocked config');
 

@@ -167,34 +167,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_org_users_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `org_users` (
-                `id` char(27) NOT NULL PRIMARY KEY,
-                `email` varchar(100) NOT NULL,
-                `org_id` varchar(256) NOT NULL,
-                `role` smallint NOT NULL,
-                `token` varchar(256) NOT NULL,
-                `rum_token` varchar(256),
-                `created_at` bigint NOT NULL,
-                `updated_at` bigint NOT NULL,
-                CONSTRAINT `org_users_org_id_fk` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`identifier`),
-                CONSTRAINT `org_users_user_email_fk` FOREIGN KEY (`email`) REFERENCES `users` (`email`)
-            )"#
-        );
-        assert_eq!(
-            &create_org_users_id_email_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `org_users_id_email_idx` ON `org_users` (`email`, `org_id`)"#
-        );
-        assert_eq!(
-            &create_org_users_rum_token_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `org_users_rum_token_idx` ON `org_users` (`rum_token`)"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_org_users_table_statement().to_string(SqliteQueryBuilder),

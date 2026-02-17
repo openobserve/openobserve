@@ -1891,7 +1891,101 @@
     "msteams": "Microsoft-Teams",
     "pagerduty": "Pager Duty",
     "opsgenie": "Opsgenie",
-    "servicenow": "Service jetzt"
+    "servicenow": "Service jetzt",
+    "saveAlert": "Warnung speichern",
+    "aggregation_threshold": "Bei Gruppen benachrichtigen",
+    "thresholdDynamic": {
+      "alertMeWhen": "Informiere mich, wenn",
+      "metricTypes": {
+        "resultsPassedFilter": "Ergebnisse haben Filter bestanden",
+        "distinctGroupsAffected": "verschiedene Gruppen sind betroffen",
+        "metricsMatchCriteria": "Metriken entsprechen den Kriterien",
+        "matchingLogsFound": "passende Logs gefunden",
+        "groupsPassFilter": "Gruppen erfüllen die Filterkriterien",
+        "distinctGroups": "verschiedene Gruppen gefunden",
+        "resultRows": "Ergebniszeilen zurückgegeben",
+        "timeSeries": "aktive Zeitreihe gefunden",
+        "matchingRecords": "passende Datensätze gefunden",
+        "groupsWithHaving": "Spielbedingungen für Gruppen",
+        "uniqueGroups": "einzigartige Gruppen",
+        "events": "Ereignisse entsprechen den Bedingungen",
+        "aggregatedValue": "Spielbedingungen"
+      },
+      "contextLabels": {
+        "groupedBy": "Gruppiert nach:",
+        "havingConditions": "UNTER FOLGENDEN BEDINGUNGEN:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Name der Warnung",
+      "sqlQuery": "SQL-Abfrage",
+      "promqlQuery": "PromQL-Abfrage",
+      "conditions": "Bedingungen",
+      "copy": "Kopieren",
+      "noCondition": "Keine Bedingung",
+      "noDescription": "Keine Beschreibung",
+      "evaluationHistory": "Verlauf der Evaluierung",
+      "loadingHistory": "Verlauf wird geladen...",
+      "noHistoryAvailable": "Für diese Warnung ist kein Bewertungsverlauf verfügbar",
+      "results": "Ergebnisse"
+    },
+    "historyTable": {
+      "timestamp": "Zeitstempel",
+      "status": "Status",
+      "evaluationTime": "Bewertung (en)",
+      "queryTime": "Anfrage (ms)",
+      "error": "Fehler"
+    },
+    "back": "Zurück",
+    "continue": "Weiter",
+    "wouldTrigger": "WÜRDE AUSLÖSEN",
+    "wouldNotTrigger": "WÜRDE NICHT AUSLÖSEN",
+    "queryBuilder": "Baumeister",
+    "groupByHelp": {
+      "description": "Gruppieren Sie die aggregierten Daten nach bestimmten Feldern, um separate Warnungen für jeden eindeutigen Wert zu erstellen.",
+      "example": "Beispiel: Gruppiere nach „Hostname“, um individuelle Benachrichtigungen pro Server zu erhalten, oder nach „status_code“, um Fehler separat zu verfolgen."
+    },
+    "conditions": {
+      "condition": "Zustand",
+      "conditionGroup": "Konditionsgruppe",
+      "addConditionTooltip": "Fügt dieser Gruppe eine neue Bedingung hinzu",
+      "addConditionGroupTooltip": "Fügen Sie eine verschachtelte Bedingungsgruppe hinzu (maximale Tiefe: 2)",
+      "maxDepthReachedTooltip": "Maximale Nisttiefe erreicht"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Warnung eingestellt für",
+      "currentWindow": "Aktuelles Fenster",
+      "cycle": "Zyklus",
+      "cycleTooltip": "Vergleichen Sie die Ergebnisse mit der gleichen Zeit im vorherigen Zyklus.",
+      "runningFor": "Läuft für {Zeitraum} im Intervall jeder {Frequenz}",
+      "currentWindowCannotBeDeleted": "Das aktuelle Fenster kann nicht gelöscht werden",
+      "comparingWith": "Im Vergleich zu",
+      "referenceWindow": "Referenzfenster",
+      "timeFrame": "Zeitrahmen",
+      "timeFrameTooltip": "Zeitraum für Ihre Anfrage.",
+      "comparingText": "Vergleich des aktuellen Fensterabfrageergebnisses mit dem Abfrageergebnis des vorherigen {offset}.",
+      "addComparisonWindow": "Vergleichsfenster hinzufügen",
+      "goToConditions": "Gehe zu den Bedingungen",
+      "goToConditionsTooltip": "Klicken Sie auf „Gehe zu den Bedingungen“, um die Ereignisse für ausgewählte Vergleichsfenster zu überprüfen"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron-Zeitplan",
+      "addNewDestination": "Neues Ziel hinzufügen",
+      "cooldownTooltip": "Wenn die Warnung ausgelöst wird, wie lange sollte dann gewartet werden, bevor eine weitere Benachrichtigung gesendet wird. Wenn z. B. die Warnung um 16:00 Uhr ausgelöst wird und die Stummmelbenachrichtigung auf 10 Minuten eingestellt ist, wird erst um 16:10 Uhr eine weitere Benachrichtigung gesendet, auch wenn die Warnung nach 1 Minute noch nicht abgeschlossen ist. Dies dient dazu, den Benutzer nicht mit Benachrichtigungen zu spammen.",
+      "thresholdTooltip": "Definiert, wann die Warnung auf der Grundlage der Anzahl der Ereignisse oder des aggregierten Werts ausgelöst werden soll. Beispiel: Wenn der Wert auf „> 100“ gesetzt ist, wird die Warnung ausgelöst, wenn die Anzahl 100 Ereignisse überschreitet.",
+      "periodTooltip": "Zeitraum, für den die Abfrage ausgeführt werden soll. Beispiel: 10 Minuten bedeuten, dass bei jeder Ausführung der Abfrage die Daten der letzten 10 Minuten verwendet werden.",
+      "frequencyTooltipMinutes": "Wie oft die Aufgabe ausgeführt werden soll. z.B. alle 5 Minuten.",
+      "frequencyTooltipCron": "Standard-UNIX-Cronformat mit 5 durch Leerzeichen getrennten Feldern: [Minute 0-59] [Stunde 0-23] [Tag des Monats 1-31] [Monat 1-12 oder JAN-DEC] [Wochentag 0-7 oder '1L-7L', 0 und 7 für Sonntag].",
+      "timezoneWarning": "Warnung: Die angezeigte Zeitzone ist eine ungefähre Angabe. Überprüfen Sie die richtige Zeitzone und wählen Sie sie manuell aus.",
+      "destinationsTooltip": "Wählen Sie ein oder mehrere Ziele aus, um Warnmeldungen zu senden.",
+      "templateTooltip": "Optional: Wählen Sie eine Vorlage aus, die für alle Ziele in dieser Warnung verwendet werden soll. Mithilfe von Vorlagen können Sie das Format von Warnmeldungen anpassen. Wenn nicht ausgewählt, verwendet jedes Ziel seine eigene konfigurierte Vorlage."
+    },
+    "advanced": {
+      "addVariable": "Variable hinzufügen",
+      "variablesTooltip": "Variablen werden verwendet, um Daten von der Warnung an das Ziel zu übergeben.",
+      "rowTemplateTooltip": "Die Zeilenvorlage wird verwendet, um die Warnmeldung zu formatieren.",
+      "templateType": "Vorlagentyp:"
+    }
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2599,7 +2693,8 @@
     "showLegends": "Legends anzeigen"
   },
   "alert_list": {
-    "alert_details": "Details zur Warnung"
+    "alert_details": "Details zur Warnung",
+    "alert_history": "Verlauf der Warnmeldungen"
   },
   "latencyInsights": {
     "title": "Einblicke",
