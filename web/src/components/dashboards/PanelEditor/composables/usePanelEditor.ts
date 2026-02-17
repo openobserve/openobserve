@@ -734,6 +734,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     } else {
       chartData.value = {};
     }
+
   };
 
   // ============================================================================

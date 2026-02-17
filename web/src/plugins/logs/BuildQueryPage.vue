@@ -370,16 +370,6 @@ const addPanelToDashboard = () => {
 // Watchers
 // ============================================================================
 
-// Watch for datetime changes from parent
-watch(
-  () => props.selectedDateTime,
-  (newDateTime) => {
-    if (newDateTime) {
-      dashboardPanelData.meta.dateTime = { ...newDateTime };
-    }
-  },
-  { deep: true }
-);
 
 // Watch for field, filter, join, and customQuery changes to sync URL params via parent
 watch(
@@ -429,6 +419,11 @@ onMounted(() => {
  * Run the query in PanelEditor
  */
 const runQuery = async (withoutCache?: boolean) => {
+  // Sync latest datetime from parent before running the query
+  if (props.selectedDateTime) {
+    dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
+  }
+
   // Ensure stream fields are loaded before running query in builder mode
   if (!dashboardPanelData.data.queries[0].customQuery) {
     if (!dashboardPanelData.meta.streamFields?.groupedFields?.length) {
