@@ -59,7 +59,7 @@
             {{ props.disableAiReason }}
           </q-tooltip>
           <q-tooltip v-else-if="!aiInputText.trim()">
-            {{ t('search.enterPrompt') }}
+            {{ props.aiTooltip || t("search.enterPrompt") }}
           </q-tooltip>
         </q-btn>
         <!-- Close Button -->
@@ -156,6 +156,7 @@ interface Props {
   disableAi?: boolean;          // Disable AI send (e.g. no stream selected)
   disableAiReason?: string;     // Tooltip reason when AI is disabled
   aiPlaceholder?: string;       // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
+  aiTooltip?: string;           // Custom tooltip for AI send button (default: 'search.enterPrompt')
 
   // Testing
   dataTestPrefix?: string;
@@ -527,6 +528,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
+  outline-color: transparent; /* Remove focus outline from root container */  
 }
 
 /* Editor container - clips Monaco but keeps floating button visible */
