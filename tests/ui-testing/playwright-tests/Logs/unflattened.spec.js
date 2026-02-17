@@ -500,9 +500,13 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Verifying timestamp field is visible (final verification)');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-    await page.waitForTimeout(500);
 
-    await pageManager.unflattenedPage.timestampDropdown.waitFor();
+    testLogger.info('Waiting for log detail panel to load');
+    await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Looking for timestamp dropdown in log details');
+    await pageManager.unflattenedPage.timestampDropdown.waitFor({ state: "visible", timeout: 10000 });
     await pageManager.unflattenedPage.timestampDropdown.click();
     testLogger.info('Test completed successfully');
 });
