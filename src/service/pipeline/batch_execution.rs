@@ -525,6 +525,7 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::Function(_) => write!(f, "function"),
             NodeData::Condition(_) => write!(f, "condition"),
             NodeData::RemoteStream(_) => write!(f, "remote_stream"),
+            NodeData::LlmEvaluation(_) => write!(f, "llm_evaluation"),
         }
     }
 }
@@ -1199,6 +1200,16 @@ async fn process_node(
                     "[Pipeline({pipeline_id})]: DestinationNode failed sending errors for collection caused by: {send_err}"
                 );
             }
+        }
+        NodeData::LlmEvaluation(_) => {
+            // LLM evaluation is handled by the enterprise pipeline
+            // In OSS, just pass through records to children
+            log::debug!("[Pipeline]: LLM evaluation node {node_idx} (passthrough in OSS)");
+            while let Some(pipeline_item) = receiver.recv().await {
+                send_to_children(&mut child_senders, pipeline_item, "LlmEvaluationNode").await;
+                count += 1;
+            }
+            log::debug!("[Pipeline]: LLM evaluation node {node_idx} done processing {count} records");
         }
     }
 
