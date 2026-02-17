@@ -428,15 +428,52 @@ export class AlertManagement {
     }
 
     /**
-     * Close the alert history drawer
+     * Close the alert history drawer (legacy) or details dialog (PR #10470)
      */
     async closeAlertHistoryDrawer() {
+        // Try new dialog close button first (PR #10470)
+        const newCloseBtn = this.page.locator('[data-test="alert-details-close-btn"]');
+        if (await newCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await newCloseBtn.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Closed alert details dialog (new)');
+            return;
+        }
+        // Fallback to legacy drawer close
         const closeBtn = this.page.locator('[data-test="alert-history-drawer-close-btn"]');
-        if (await closeBtn.isVisible({ timeout: 2000 })) {
+        if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await closeBtn.click();
             await this.page.waitForTimeout(500);
-            testLogger.info('Closed alert history drawer');
+            testLogger.info('Closed alert history drawer (legacy)');
+            return;
         }
+        // Last resort: Escape key
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Closed dialog via Escape key');
+    }
+
+    /**
+     * Open alert details dialog by clicking alert name in the list (PR #10470)
+     * The new AlertHistoryDrawer is rendered inside a q-dialog
+     * @param {string} alertName - Name of the alert
+     */
+    async openAlertDetailsDialog(alertName) {
+        testLogger.info('Opening alert details dialog', { alertName });
+
+        await this.searchAlert(alertName);
+        await this.page.waitForTimeout(1000);
+
+        const alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
+        await alertRow.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Click the alert name cell (2nd column) to open details dialog
+        const alertNameCell = alertRow.locator('td').nth(1);
+        await alertNameCell.click();
+        await this.page.waitForTimeout(1500);
+
+        // Wait for the new dialog to appear
+        await expect(this.page.locator('[data-test="alert-details-dialog"]')).toBeVisible({ timeout: 10000 });
+        testLogger.info('Alert details dialog opened', { alertName });
     }
 
     /**
