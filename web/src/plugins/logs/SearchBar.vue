@@ -1397,7 +1397,8 @@ class="q-pr-sm q-pt-xs" />
         size="10px"
         round
         @click="isFocused = !isFocused"
-        class="q-pa-xs tw:absolute! tw:top-[6rem]! tw:right-[2.4rem]! tw:z-50 fullscreen-hover-btn"
+        :class="searchObj.meta.showTransformEditor ? 'tw:top-[4rem]!' : 'tw:top-[5.5rem]!'"
+        class="q-pa-xs tw:absolute! tw:right-[2.4rem]! tw:z-50 fullscreen-hover-btn"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -1886,6 +1887,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 import { useNLQuery } from "@/composables/useNLQuery";
+import { isFunction } from "@tanstack/vue-table";
 
 const defaultValue: any = () => {
   return {
