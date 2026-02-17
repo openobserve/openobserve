@@ -1812,6 +1812,7 @@
     "move": "Move alert",
     "name": "Name",
     "save": "Save",
+    "saveAlert": "Save Alert",
     "actions": "Actions",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -1837,7 +1838,30 @@
     "trigger": "Trigger",
     "period": "Look back window",
     "frequency": "Check every",
-    "threshold": "Alert when count is",
+    "threshold": "Alert if ",
+    "aggregation_threshold": "Alert If Any Groups",
+    "thresholdDynamic": {
+      "alertMeWhen": "Alert me when",
+      "metricTypes": {
+        "resultsPassedFilter": "results passed filters",
+        "distinctGroupsAffected": "distinct groups are affected",
+        "metricsMatchCriteria": "series match criteria",
+        "matchingLogsFound": "matching logs found",
+        "groupsPassFilter": "groups pass filter criteria",
+        "distinctGroups": "distinct groups found",
+        "resultRows": "result rows returned",
+        "timeSeries": "active time series found",
+        "matchingRecords": "matching records found",
+        "groupsWithHaving": "groups match conditions",
+        "uniqueGroups": "unique groups",
+        "events": "events match conditions",
+        "aggregatedValue": "match conditions"
+      },
+      "contextLabels": {
+        "groupedBy": "Grouped by:",
+        "havingConditions": "HAVING conditions:"
+      }
+    },
     "interval": "Check every",
     "silenceNotification": "Cooldown period",
     "multiWindow": "Compare with past",
@@ -1966,6 +1990,8 @@
       "minutes": "minutes",
       "hour": "hour",
       "hours": "hours",
+      "configuringRealTime": "Configuring a real-time alert for",
+      "configuringScheduled": "Configuring a scheduled alert for",
       "plainEnglish": {
         "realTime": "Alert me immediately when matching events occur in real-time",
         "eventsPlural": "events",
@@ -2151,6 +2177,76 @@
       "firedTimes": "Fired {count} time(s)",
       "incidentAnalysis": "Incident Analysis",
       "noAlertActivityData": "No alert activity data"
+    },
+    "alertDetails": {
+      "alertName": "Alert Name",
+      "sqlQuery": "SQL Query",
+      "promqlQuery": "PromQL Query",
+      "conditions": "Conditions",
+      "copy": "Copy",
+      "noCondition": "No condition",
+      "noDescription": "No description",
+      "evaluationHistory": "Evaluation History",
+      "loadingHistory": "Loading history...",
+      "noHistoryAvailable": "No evaluation history available for this alert",
+      "results":"Results"
+    },
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Evaluation (s)",
+      "queryTime": "Query (ms)",
+      "error":"Error"
+    },
+    "back": "Back",
+    "continue": "Continue",
+    "wouldTrigger": "WOULD TRIGGER",
+    "wouldNotTrigger": "WOULD NOT TRIGGER",
+    "queryBuilder": "Builder",
+    "groupByHelp": {
+      "description": "Group the aggregated data by specific fields to create separate alerts for each unique value.",
+      "example": "Example: Group by \"hostname\" to get individual alerts per server, or by \"status_code\" to track errors separately."
+    },
+    "conditions": {
+      "condition": "Condition",
+      "conditionGroup": "Condition Group",
+      "addConditionTooltip": "Add a new condition to this group",
+      "addConditionGroupTooltip": "Add a nested condition group (max depth: 2)",
+      "maxDepthReachedTooltip": "Maximum nesting depth reached"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Alert set for",
+      "currentWindow": "Current window",
+      "cycle": "Cycle",
+      "cycleTooltip": "Compare results with the same time in the previous cycle.",
+      "runningFor": "Running for {period} in the interval of every {frequency}",
+      "currentWindowCannotBeDeleted": "Current window cannot be deleted",
+      "comparingWith": "Comparing with",
+      "referenceWindow": "Reference Window",
+      "timeFrame": "Time Frame",
+      "timeFrameTooltip": "Time range for your query.",
+      "comparingText": "Comparing current window query result with query result from previous {offset}.",
+      "addComparisonWindow": "Add Comparison Window",
+      "goToConditions": "Go to Conditions",
+      "goToConditionsTooltip": "Click on \"Go to Conditions\" to verify the events for selected comparison windows"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron Schedule",
+      "addNewDestination": "Add New Destination",
+      "cooldownTooltip": "If the alert triggers then how long should it wait before sending another notification. e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user with notifications.",
+      "thresholdTooltip": "Defines when the alert should trigger based on the event count or aggregated value. Example: If set to \"> 100\", the alert triggers when the count exceeds 100 events.",
+      "periodTooltip": "Period for which the query should run. e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data.",
+      "frequencyTooltipMinutes": "How often the task should be executed. e.g. every 5 minutes.",
+      "frequencyTooltipCron": "Standard UNIX cron format with 5 fields separated by space: [Minute 0-59] [Hour 0-23] [Day of Month 1-31] [Month 1-12 or JAN-DEC] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].",
+      "timezoneWarning": "Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.",
+      "destinationsTooltip": "Select one or more destinations to send alert notifications.",
+      "templateTooltip": "Optional: Select a template to use for all destinations in this alert. Templates allow you to customize the format of alert messages. If not selected, each destination will use its own configured template."
+    },
+    "advanced": {
+      "addVariable": "Add Variable",
+      "variablesTooltip": "Variables are used to pass data from the alert to the destination.",
+      "rowTemplateTooltip": "Row Template is used to format the alert message.",
+      "templateType": "Template Type:"
     }
   },
   "alert_templates": {
@@ -2265,7 +2361,7 @@
     "claimParserFunctionInputDescription": "The function receives a JSON object containing claims mapped in Dex from your SSO/LDAP provider (e.g., email, name, groups, roles).",
     "claimParserFunctionOutputTitle": "Output Format:",
     "claimParserFunctionOutputDescription": "The function must return one of these formats:",
-    "claimParserFunctionOutputExample1": "• Success: Return an array of objects, each with 'org' (string) and 'role' (string) fields",
+    "claimParserFunctionOutputExample1": "• Success: Return an array of objects, each with 'org' (string, the organization identifier - not the name - must be pre-existing) and 'role' (string) fields",
     "claimParserFunctionOutputExample2": "• Deny: Return an object with 'deny' (boolean true) and 'reason' (string) fields",
     "claimParserRecentErrors": "Recent Errors (Last 24 Hours)",
     "noRecentErrors": "No errors found in the last 24 hours",
@@ -2830,7 +2926,8 @@
     "showLegends": "Show Legends"
   },
   "alert_list":{
-    "alert_details":"Alert Details"
+    "alert_details":"Alert Details",
+    "alert_history":"Alert History"
   },
   "sreChat": {
     "emptyMessage": "Ask me anything about your alerts and incidents",
