@@ -3802,4 +3802,58 @@ export class LogsPage {
         testLogger.info(`Error dialog text: ${errorDialogText}`);
         return errorDialogText;
     }
+
+    /**
+     * Click relative 1 hour button, fallback to 15 min if not available
+     * @returns {Promise<string>} The time range selected
+     */
+    async clickRelative1HourOrFallback() {
+        const oneHourButton = this.page.getByText('Last 1 hour');
+        if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await oneHourButton.click();
+            return 'Last 1 hour';
+        } else {
+            await this.clickRelative15MinButton();
+            return 'Last 15 minutes';
+        }
+    }
+
+    /**
+     * Expect stream selector to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectStreamSelectorVisible() {
+        const selector = this.page.locator(this.indexDropDown);
+        await expect(selector).toBeVisible({ timeout: 10000 });
+        testLogger.info('Stream selector is visible');
+    }
+
+    /**
+     * Enable histogram if not already enabled
+     * Bug #8928 - Histogram rendering
+     */
+    async enableHistogram() {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        const isPressed = await histogramToggle.getAttribute('aria-pressed').catch(() => 'false');
+        if (isPressed === 'false') {
+            await histogramToggle.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Histogram enabled');
+        }
+    }
+
+    /**
+     * Enable SQL mode if not already enabled
+     */
+    async enableSqlModeIfNeeded() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        if (isChecked !== 'true') {
+            await sqlModeToggle.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('SQL mode enabled');
+        } else {
+            testLogger.info('SQL mode already enabled');
+        }
+    }
 }
