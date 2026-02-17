@@ -1187,9 +1187,7 @@ class="q-pr-sm q-pt-xs" />
                           ? 'empty-function'
                           : ''
                       "
-                      :readOnly="
-                        searchObj.meta.logsVisualizeToggle === 'visualize'
-                      "
+                      :readOnly="isVrlEditorDisabled"
                       @keydown="handleKeyDown"
                       language="vrl"
                       @focus="
@@ -1199,30 +1197,29 @@ class="q-pr-sm q-pt-xs" />
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
                     />
+                    <!-- VRL disabled warning for non-table charts -->
+                    <div
+                      v-if="isVrlEditorDisabled"
+                      class="tw-absolute tw-bottom-0 tw-w-full tw-mt-3 tw-flex tw-items-center"
+                      :class="
+                        store.state.theme == 'dark'
+                          ? 'tw-bg-white tw-bg-opacity-10'
+                          : 'tw-bg-black tw-bg-opacity-10'
+                      "
+                      data-test="vrl-editor-disabled-warning"
+                    >
+                      <q-icon
+                        name="warning"
+                        color="warning"
+                        size="20px"
+                        class="q-mx-sm"
+                      />
+                      <span
+                        class="text-negative q-pa-sm tw-font-semibold tw-text-sm"
+                        >VRL function is only supported for table chart.</span
+                      >
+                    </div>
                   </div>
-                </div>
-                <div
-                  v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
-                  :class="
-                    store.state.theme == 'dark'
-                      ? 'tw-bg-white tw-bg-opacity-10'
-                      : 'tw-bg-black tw-bg-opacity-10'
-                  "
-                  class="tw-absolute tw-bottom-0 tw-w-full"
-                  style="margin-top: 12px; display: flex; align-items: center; flex"
-                >
-                  <q-icon
-                    name="warning"
-                    color="warning"
-                    size="20px"
-                    class="q-mx-sm"
-                  />
-                  <span
-                    class="text-negative q-pa-sm"
-                    style="font-weight: semibold; font-size: 14px"
-                    >VRL Function Editor is not supported in visualize
-                    mode.</span
-                  >
                 </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
@@ -2050,6 +2047,14 @@ export default defineComponent({
       if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
 
       return searchObj.data.transformType === "function";
+    });
+
+    // Check if VRL editor should be disabled (in visualize mode with non-table chart)
+    const isVrlEditorDisabled = computed(() => {
+      return (
+        searchObj.meta.logsVisualizeToggle === "visualize" &&
+        dashboardPanelData.data.type !== "table"
+      );
     });
 
     watch(
@@ -4387,6 +4392,7 @@ export default defineComponent({
       actionEditorQuery,
       isActionsEnabled,
       showFunctionEditor,
+      isVrlEditorDisabled,
       closeSocketWithError,
       histogram_svg,
       visualizeIcon,
