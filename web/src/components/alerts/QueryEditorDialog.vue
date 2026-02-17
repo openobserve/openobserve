@@ -256,22 +256,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label-class="'tw:ml-2'"
                       class="tw:mt-1"
                     ></FullViewContainer>
-                    <QueryEditor
-                      data-test="scheduled-alert-vrl-function-editor"
-                      ref="fnEditorRef"
-                      editor-id="fnEditor-dialog"
-                      class="tw:w-full tw:h-[calc(100%-80px)]"
-                      :debounceTime="300"
-                      v-model:query="vrlFunctionContent"
-                      :class="[
-                        vrlFunctionContent == '' && functionEditorPlaceholderFlag ? 'empty-function' : '',
-                        store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'
-                      ]"
-                      @update:query="updateVrlFunction"
-                      @focus="functionEditorPlaceholderFlag = false"
-                      @blur="onBlurFunctionEditor"
-                      style="min-height: 15rem;"
-                    />
+                    <div class="tw:border-[1px] tw:border-gray-200 tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full">
+                      <!-- Unified Query Editor (with built-in AI bar) -->
+                      <unified-query-editor
+                        data-test="scheduled-alert-vrl-function-editor"
+                        ref="fnEditorRef"
+                        :languages="['vrl']"
+                        :default-language="'vrl'"
+                        :query="vrlFunctionContent"
+                        :hide-nl-toggle="false"
+                        :disable-ai="false"
+                        :disable-ai-reason="''"
+                        :ai-placeholder="t('search.askAIFunctionPlaceholder')"
+                        :ai-tooltip="t('search.enterFunctionPrompt')"
+                        :debounce-time="300"
+                        editor-height="calc(100% - 80px)"
+                        class="tw:w-full"
+                        :class="[
+                          vrlFunctionContent == '' && functionEditorPlaceholderFlag ? 'empty-function' : '',
+                          store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'
+                        ]"
+                        @update:query="updateVrlFunction"
+                        @focus="functionEditorPlaceholderFlag = false"
+                        @blur="onBlurFunctionEditor"
+                        @toggle-nlp-mode="handleAlertFunctionEditorToggleNlpMode"
+                        @generation-start="handleAlertFunctionEditorGenerationStart"
+                        @generation-end="handleAlertFunctionEditorGenerationEnd"
+                        @generation-success="handleAlertFunctionEditorGenerationSuccess"
+                        style="min-height: 15rem;"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -675,6 +689,37 @@ const onBlurQueryEditor = debounce(() => {
 
 const onBlurFunctionEditor = () => {
   functionEditorPlaceholderFlag.value = vrlFunctionContent.value === '';
+};
+
+/**
+ * Handle NLP mode toggle from AI icon in alert function editor
+ */
+const handleAlertFunctionEditorToggleNlpMode = () => {
+  // UnifiedQueryEditor manages its own NLP mode state internally
+};
+
+/**
+ * Handle generation start event from alert function editor
+ */
+const handleAlertFunctionEditorGenerationStart = () => {
+  // Can add loading indicators here if needed
+};
+
+/**
+ * Handle generation end event from alert function editor
+ */
+const handleAlertFunctionEditorGenerationEnd = () => {
+  // Can remove loading indicators here if needed
+};
+
+/**
+ * Handle successful generation from alert function editor
+ */
+const handleAlertFunctionEditorGenerationSuccess = (payload: {
+  type: string;
+  message: string;
+}) => {
+  // Function code is already updated via @update:query handler
 };
 
 // Column and function selection
