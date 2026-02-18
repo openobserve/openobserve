@@ -176,12 +176,12 @@ export const convertTraceServiceMapData = (
       {
         type: "tree",
         data: data,
-        symbolSize: 20,
+        symbolSize: 30,
         initialTreeDepth: treeDepth,
         label: {
           position: "bottom",
           verticalAlign: "bottom",
-          distance: 25,
+          distance: 26,
           fontSize: 12,
         },
       },

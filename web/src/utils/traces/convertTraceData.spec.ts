@@ -340,7 +340,7 @@ describe("convertTraceData", () => {
       expect(result.options.series[0].orient).toBe("TB"); // vertical = TB
     });
 
-    it("should convert service graph to tree with radial layout", () => {
+    it("should convert service graph to tree (radial removed, defaults to orthogonal)", () => {
       const graphData = {
         nodes: [{ id: "service-a", label: "Service A" }],
         edges: [],
@@ -349,7 +349,8 @@ describe("convertTraceData", () => {
 
       const result = convertServiceGraphToTree(graphData, layoutType);
 
-      expect(result.options.series[0].layout).toBe("radial");
+      // Radial layout removed — always uses orthogonal now
+      expect(result.options.series[0].layout).toBe("orthogonal");
     });
 
     it("should handle empty graph data", () => {
@@ -583,7 +584,7 @@ describe("convertTraceData", () => {
     expect(result.options.series[0].orient).toBe('TB');
   });
 
-  it('should handle radial layout', () => {
+  it('should handle radial layout (removed, falls back to orthogonal)', () => {
     const graphData = {
       nodes: [{ id: 'node', label: 'node', requests: 100, errors: 0, error_rate: 0 }],
       edges: []
@@ -591,7 +592,8 @@ describe("convertTraceData", () => {
 
     const result = convertServiceGraphToTree(graphData, 'radial');
 
-    expect(result.options.series[0].layout).toBe('radial');
+    // Radial layout removed in favor of orthogonal only
+    expect(result.options.series[0].layout).toBe('orthogonal');
   });
 
   it('should handle empty data gracefully', () => {
