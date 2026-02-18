@@ -256,9 +256,6 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
-const SpanColorPreview = defineAsyncComponent(
-  () => import("@/components/traces/SpanColorPreview.vue"),
-);
 
 const store = useStore();
 const activeTab = ref("search");

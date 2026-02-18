@@ -16,33 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="trace-details tw:h-[calc(100vh-2.625rem)]">
-    <!-- New TraceDetailsV2 View -->
-    <TraceDetailsV2
-      v-if="
-        useTraceDetailsV2 &&
-        traceTree.length &&
-        effectiveSpanList.length &&
-        !(
-          searchObj.data.traceDetails.isLoadingTraceDetails ||
-          searchObj.data.traceDetails.isLoadingTraceMeta
-        )
-      "
-      :trace-id="effectiveTraceId"
-      :spans="effectiveSpanList"
-      :show-back-button="mode === 'standalone' && showBackButton"
-      :is-loading="
-        searchObj.data.traceDetails.isLoadingTraceDetails ||
-        searchObj.data.traceDetails.isLoadingTraceMeta
-      "
-      @back="handleBackOrClose"
-      @span-selected="updateSelectedSpan"
-    />
-
     <!-- Original View -->
     <div
       class="trace-details-content"
       v-if="
-        !useTraceDetailsV2 &&
         traceTree.length &&
         effectiveSpanList.length &&
         !(
@@ -695,11 +672,6 @@ import {
 } from "@/composables/traces/useTraceProcessing";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-// Import TraceDetailsV2
-const TraceDetailsV2 = defineAsyncComponent(
-  () => import("@/components/traces/TraceDetailsV2.vue"),
-);
-
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
   () => import("@/components/traces/FlameGraphView.vue"),
@@ -782,7 +754,6 @@ export default defineComponent({
     TraceTree,
     TraceDAG,
     TraceHeader,
-    TraceDetailsV2,
     FlameGraphView,
     AppTabs,
     ChartRenderer: defineAsyncComponent(
@@ -795,9 +766,6 @@ export default defineComponent({
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
     const activeTab = ref("waterfall");
-
-    // Feature flag for TraceDetailsV2
-    const useTraceDetailsV2 = ref(false); // Set to true to use new view
 
     const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
@@ -2268,7 +2236,6 @@ export default defineComponent({
       router,
       t,
       activeTab,
-      useTraceDetailsV2,
       traceTree,
       collapseMapping,
       traceRootSpan,
