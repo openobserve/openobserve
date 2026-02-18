@@ -90,9 +90,20 @@
                     size="5px"
                     title="Include Term"
                     round
-                    @click="addSearchTerm(`${row.name}='${value.key}'`)"
+                    @click="
+                      addSearchTerm(
+                        row.name === 'duration'
+                          ? `${row.name}>=${value.key}`
+                          : `${row.name}='${value.key}'`,
+                      )
+                    "
                   >
-                    <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
+                    <q-icon
+                      v-if="row.name === 'duration'"
+                      :name="outlinedArrowForwardIos"
+                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                    />
+                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
                       <EqualIcon></EqualIcon>
                     </q-icon>
                   </q-btn>
@@ -101,9 +112,20 @@
                     size="5px"
                     title="Exclude Term"
                     round
-                    @click="addSearchTerm(`${row.name}!='${value.key}'`)"
+                    @click="
+                      addSearchTerm(
+                        row.name === 'duration'
+                          ? `${row.name}<=${value.key}`
+                          : `${row.name}!='${value.key}'`,
+                      )
+                    "
                   >
-                    <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
+                    <q-icon
+                      v-if="row.name === 'duration'"
+                      :name="outlinedArrowBackIos"
+                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                    />
+                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
                       <NotEqualIcon></NotEqualIcon>
                     </q-icon>
                   </q-btn>
@@ -126,7 +148,11 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedAdd,
+  outlinedArrowBackIos,
+  outlinedArrowForwardIos,
+} from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps({
   row: {

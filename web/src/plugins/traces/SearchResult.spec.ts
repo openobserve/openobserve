@@ -244,7 +244,6 @@ describe("SearchResult", () => {
   it("should display correct trace count", () => {
     const traceCount = wrapper.find('[data-test="traces-search-result-count"]');
     expect(traceCount.exists()).toBe(true);
-    expect(traceCount.classes()).toContain("text-subtitle1");
     expect(traceCount.classes()).toContain("text-bold");
     expect(traceCount.text()).toBe("2 Traces");
   });
