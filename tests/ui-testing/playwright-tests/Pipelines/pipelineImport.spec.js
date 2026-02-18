@@ -131,6 +131,10 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
         await pipelinesEP.importJsonButtonPipeline();
         // Wait for pipeline to appear in the list after import
         await pipelinesEP.waitForPipelineInList(randomPipeline);
+
+        // Verify cron expression is displayed in the Frequency column (bug fix verification)
+        await pipelinesEP.expectScheduledPipelineCronDisplayed(randomPipeline);
+
         await pipelinesEP.downloadPipeline(randomPipeline);
         await pipelinesEP.deletePipeline(randomPipeline);
         await page.waitForTimeout(1000);
@@ -163,6 +167,10 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
         await pipelinesEP.importJsonButtonPipeline();
         // Wait for pipeline to appear in the list after import
         await pipelinesEP.waitForPipelineInList(randomPipeline);
+
+        // Verify cron expression is displayed in the Frequency column (bug fix verification)
+        await pipelinesEP.expectScheduledPipelineCronDisplayed(randomPipeline);
+
         await pipelinesEP.downloadPipeline(randomPipeline);
         await pipelinesEP.deletePipeline(randomPipeline);
         await page.waitForTimeout(1000);
