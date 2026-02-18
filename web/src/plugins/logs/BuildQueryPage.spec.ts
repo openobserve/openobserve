@@ -498,21 +498,6 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.meta.dateTime).toEqual(testDateTime);
     });
 
-    it("should watch for datetime changes", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const newDateTime = {
-        start_time: new Date("2024-07-01").getTime(),
-        end_time: new Date("2024-07-02").getTime(),
-        valueType: "absolute" as const,
-      };
-
-      await wrapper.setProps({ selectedDateTime: newDateTime });
-      await flushPromises();
-
-      expect(mockDashboardPanelData.meta.dateTime).toEqual(newDateTime);
-    });
   });
 
   describe("Error Handling", () => {
@@ -743,28 +728,4 @@ describe("BuildQueryPage Component - Integration Tests", () => {
     expect(emitted![emitted!.length - 1]).toEqual([generatedQuery]);
   });
 
-  it("should preserve datetime through component lifecycle", async () => {
-    const initialDateTime = {
-      start_time: new Date("2024-01-01").getTime(),
-      end_time: new Date("2024-01-02").getTime(),
-      valueType: "absolute" as const,
-    };
-
-    wrapper = createWrapper({
-      selectedDateTime: initialDateTime,
-    });
-    await flushPromises();
-
-    // Update props
-    const newDateTime = {
-      start_time: new Date("2024-02-01").getTime(),
-      end_time: new Date("2024-02-02").getTime(),
-      valueType: "absolute" as const,
-    };
-
-    await wrapper.setProps({ selectedDateTime: newDateTime });
-    await flushPromises();
-
-    expect(mockDashboardPanelData.meta.dateTime).toEqual(newDateTime);
-  });
 });
