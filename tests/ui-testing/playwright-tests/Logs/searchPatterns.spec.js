@@ -122,7 +122,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -159,7 +159,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -211,7 +211,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -263,7 +263,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -284,7 +284,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             if (cardCount > 0) {
                 // Click on first pattern card's details icon
                 await pm.logsPage.clickPatternDetailsIcon(0);
-                await page.waitForTimeout(500);
 
                 // STRONG ASSERTION: Details dialog should be open
                 await pm.logsPage.expectPatternDetailsDialogOpen();
@@ -313,7 +312,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -334,7 +333,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             if (cardCount >= 2) {
                 // Open first pattern details
                 await pm.logsPage.clickPatternDetailsIcon(0);
-                await page.waitForTimeout(500);
                 await pm.logsPage.expectPatternDetailsDialogOpen();
 
                 // STRONG ASSERTION: Previous should be disabled on first pattern
@@ -345,7 +343,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Navigate to next pattern
                 await pm.logsPage.clickPatternDetailNextBtn();
-                await page.waitForTimeout(300);
 
                 // Verify we're on pattern 2
                 await pm.logsPage.waitForPatternDetailIndex(2);
@@ -355,7 +352,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Navigate back
                 await pm.logsPage.clickPatternDetailPreviousBtn();
-                await page.waitForTimeout(300);
 
                 // Verify we're back on pattern 1
                 await pm.logsPage.waitForPatternDetailIndex(1);
@@ -382,7 +378,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -405,7 +401,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Click include button
                 await pm.logsPage.clickPatternIncludeBtn(0);
-                await page.waitForTimeout(500);
+                await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
                 testLogger.info(`Clicked include on pattern: ${templateText.substring(0, 50)}...`);
             } else {
@@ -428,7 +424,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -451,7 +447,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Click exclude button
                 await pm.logsPage.clickPatternExcludeBtn(0);
-                await page.waitForTimeout(500);
+                await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
                 testLogger.info(`Clicked exclude on pattern: ${templateText.substring(0, 50)}...`);
             } else {
@@ -479,7 +475,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.setTimeToPast30Seconds();
         await pm.logsPage.clickRefreshButton();
@@ -513,7 +509,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
@@ -534,7 +530,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             if (cardCount > 0) {
                 // Click details icon
                 await pm.logsPage.clickPatternDetailsIcon(0);
-                await page.waitForTimeout(500);
 
                 // STRONG ASSERTION: Details dialog should be open
                 await pm.logsPage.expectPatternDetailsDialogOpen();
