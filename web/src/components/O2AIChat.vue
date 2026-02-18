@@ -937,6 +937,7 @@ import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, NavigationAction, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
+import RichTextInput from '@/components/RichTextInput.vue';
 
 const { fetchAiChat } = useAiChat();
 const {
