@@ -677,34 +677,29 @@ describe("AddSettingVariable", () => {
       await nextTick();
     });
 
-    it("should have streamOptionsWithVariables computed property", () => {
-      expect(wrapper.vm.streamOptionsWithVariables).toBeDefined();
-      expect(Array.isArray(wrapper.vm.streamOptionsWithVariables)).toBe(true);
+    it("should have mergedStreamsFilteredOptions computed property", () => {
+      expect(wrapper.vm.mergedStreamsFilteredOptions).toBeDefined();
+      expect(Array.isArray(wrapper.vm.mergedStreamsFilteredOptions)).toBe(true);
     });
 
-    it("should have fieldOptionsWithVariables computed property", () => {
-      expect(wrapper.vm.fieldOptionsWithVariables).toBeDefined();
-      expect(Array.isArray(wrapper.vm.fieldOptionsWithVariables)).toBe(true);
+    it("should have mergedFieldsFilteredOptions computed property", () => {
+      expect(wrapper.vm.mergedFieldsFilteredOptions).toBeDefined();
+      expect(Array.isArray(wrapper.vm.mergedFieldsFilteredOptions)).toBe(true);
     });
 
-    it("should include variable options with $ prefix in streamOptionsWithVariables", () => {
+    it("should have dashboardVariablesFilterItems that produces $ prefixed options", () => {
       // dashboardVariablesFilterItems should produce items like {label: "var1", value: "$var1"}
-      const streamOptions = wrapper.vm.streamOptionsWithVariables;
-      // Check that variable options are included (they have $ prefix in value)
-      const variableOptions = streamOptions.filter((opt: any) =>
-        typeof opt.value === 'string' && opt.value.startsWith('$')
-      );
-      // Should have some variable options since dashboardVariablesList has entries
-      expect(variableOptions.length).toBeGreaterThanOrEqual(0);
+      const filterItems = wrapper.vm.dashboardVariablesFilterItems;
+      expect(Array.isArray(filterItems)).toBe(true);
+      // Variable options should have $ prefix in their value
+      filterItems.forEach((item: any) => {
+        expect(item.value).toMatch(/^\$/);
+      });
     });
 
-    it("should include variable options with $ prefix in fieldOptionsWithVariables", () => {
-      const fieldOptions = wrapper.vm.fieldOptionsWithVariables;
-      // Check that variable options are included
-      const variableOptions = fieldOptions.filter((opt: any) =>
-        typeof opt.value === 'string' && opt.value.startsWith('$')
-      );
-      expect(variableOptions.length).toBeGreaterThanOrEqual(0);
+    it("should expose mergedStreamsFilterFn and mergedFieldsFilterFn for autocomplete", () => {
+      expect(wrapper.vm.mergedStreamsFilterFn).toBeDefined();
+      expect(wrapper.vm.mergedFieldsFilterFn).toBeDefined();
     });
 
     it("should skip schema fetch when stream is a variable reference", async () => {
