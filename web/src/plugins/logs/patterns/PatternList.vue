@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PatternCard
           :pattern="pattern"
           :index="index"
+          :wrap="wrap"
           @click="$emit('open-details', pattern, index)"
           @include="$emit('add-to-search', pattern, 'include')"
           @exclude="$emit('add-to-search', pattern, 'exclude')"
@@ -127,6 +128,7 @@ defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;
+  wrap?: boolean;
 }>();
 
 defineEmits<{

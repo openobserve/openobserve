@@ -23,8 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Pattern Column -->
     <div class="tw:flex-1 tw:min-w-0 tw:px-2">
       <div
-        class="tw:truncate pattern-template-text"
-        :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
+        class="pattern-template-text"
+        :class="[
+          wrap ? 'tw:break-all' : 'tw:truncate',
+          store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
+        ]"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
@@ -112,6 +115,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 defineProps<{
   pattern: any;
   index: number;
+  wrap?: boolean;
 }>();
 
 defineEmits<{
