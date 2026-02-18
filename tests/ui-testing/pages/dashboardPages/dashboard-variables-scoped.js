@@ -13,6 +13,14 @@ import {
   getPanelRefreshBtn,
   getMenuItemByText,
 } from "./dashboard-selectors.js";
+import {
+  selectStreamFromDropdown,
+  selectFieldFromDropdown,
+  selectStreamType,
+  verifyDropdownContainsVariable,
+  verifyFieldDropdownEmptyOrVariablesOnly as _verifyFieldDropdownEmpty,
+  hasErrorNotification,
+} from "./dashboard-stream-field-utils.js";
 
 export default class DashboardVariablesScoped {
   constructor(page) {
@@ -494,50 +502,10 @@ export default class DashboardVariablesScoped {
       }
     }
 
-    // Select Stream Type
-    await this.page
-      .locator('[data-test="dashboard-variable-stream-type-select"]')
-      .click();
-    await this.page
-      .getByRole("option", { name: streamType, exact: true })
-      .locator("div")
-      .nth(2)
-      .click();
-
-    // Select Stream
-    const streamSelect = this.page.locator('[data-test="dashboard-variable-stream-select"]');
-    await streamSelect.click();
-    await streamSelect.fill(streamName);
-    await this.page.getByRole("option", { name: streamName, exact: true }).click();
-
-    // Select Field
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
-    await fieldSelect.click();
-    await this.page.keyboard.type(field, { delay: 100 });
-    await this.page.waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
-      { timeout: 10000, polling: 100 }
-    );
-
-    // Select field using multiple strategies
-    let fieldSelected = false;
-    try {
-      await this.page.getByRole("option", { name: field, exact: true }).click({ timeout: 5000 });
-      fieldSelected = true;
-    } catch (e) {
-      try {
-        await this.page.getByRole("option", { name: field, exact: false }).first().click({ timeout: 5000 });
-        fieldSelected = true;
-      } catch (e2) {
-        await this.page.keyboard.press("ArrowDown");
-        await this.page.keyboard.press("Enter");
-        fieldSelected = true;
-      }
-    }
-
-    if (!fieldSelected) {
-      throw new Error(`Failed to select field: ${field}`);
-    }
+    // Select Stream Type, Stream, and Field using shared utilities
+    await selectStreamType(this.page, streamType);
+    await selectStreamFromDropdown(this.page, streamName);
+    await selectFieldFromDropdown(this.page, field);
 
     // Add dependency if specified
     if (dependsOn) {
@@ -1679,5 +1647,235 @@ export default class DashboardVariablesScoped {
     await this.page.locator(SELECTORS.MENU).waitFor({ state: "hidden", timeout: 3000 });
 
     return count;
+  }
+
+  // ==========================================
+  // Stream & Field Variable Support Methods
+  // For the new feature where variables can
+  // reference other variables in stream/field
+  // ==========================================
+
+  /**
+   * Select a stream (real name or $variable reference) using shared utils
+   * @param {string} streamNameOrVar - Stream name or $variable reference
+   */
+  async selectStream(streamNameOrVar) {
+    await selectStreamFromDropdown(this.page, streamNameOrVar);
+  }
+
+  /**
+   * Select a field (real name or $variable reference) using shared utils
+   * @param {string} fieldNameOrVar - Field name or $variable reference
+   */
+  async selectField(fieldNameOrVar) {
+    await selectFieldFromDropdown(this.page, fieldNameOrVar);
+  }
+
+  /**
+   * Verify that $variableName appears in the stream dropdown with "(variable)" label
+   * @param {string} variableName - Variable name (without $ prefix)
+   * @returns {Promise<{found: boolean, hasVariableLabel: boolean}>}
+   */
+  async verifyStreamDropdownContainsVariable(variableName) {
+    return await verifyDropdownContainsVariable(
+      this.page,
+      SELECTORS.VARIABLE_STREAM_SELECT,
+      variableName
+    );
+  }
+
+  /**
+   * Verify that $variableName appears in the field dropdown with "(variable)" label
+   * @param {string} variableName - Variable name (without $ prefix)
+   * @returns {Promise<{found: boolean, hasVariableLabel: boolean}>}
+   */
+  async verifyFieldDropdownContainsVariable(variableName) {
+    return await verifyDropdownContainsVariable(
+      this.page,
+      SELECTORS.VARIABLE_FIELD_SELECT,
+      variableName
+    );
+  }
+
+  /**
+   * Verify field dropdown is empty or only contains variable references
+   * (expected when stream is a $variable reference with no known schema)
+   * @returns {Promise<boolean>}
+   */
+  async verifyFieldDropdownEmptyOrVariablesOnly() {
+    return await _verifyFieldDropdownEmpty(this.page);
+  }
+
+  /**
+   * Verify no error notification appeared (e.g., "Failed to get stream fields")
+   * @param {number} waitMs - Time to wait for notification (default: 3000)
+   * @returns {Promise<boolean>} true if NO error notification is visible (test passes)
+   */
+  async verifyNoErrorNotification(waitMs = 3000) {
+    const hasError = await hasErrorNotification(this.page, waitMs);
+    return !hasError;
+  }
+
+  /**
+   * Edit an existing variable by clicking its edit button in the settings list
+   * @param {string} variableName - Variable name
+   */
+  async editVariable(variableName) {
+    const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`);
+    await editBtn.waitFor({ state: "visible", timeout: 10000 });
+    await editBtn.click();
+
+    // Wait for form to be visible
+    const nameInput = this.page.locator(SELECTORS.VARIABLE_NAME);
+    await nameInput.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /**
+   * Get the cycle error text displayed on the form
+   * @returns {Promise<string|null>} The error text or null if not visible
+   */
+  async getCycleErrorText() {
+    // Look for red-colored text containing "cycle"
+    const errorElement = this.page.locator('div[style*="color: red"], div[style*="color:red"], .text-negative, .text-red').filter({ hasText: /cycle/i });
+    try {
+      await errorElement.waitFor({ state: "visible", timeout: 3000 });
+      return await errorElement.textContent();
+    } catch {
+      // Fallback: search for any text with "Variables has cycle"
+      const fallback = this.page.getByText(/Variables has cycle/i);
+      try {
+        await fallback.waitFor({ state: "visible", timeout: 1000 });
+        return await fallback.textContent();
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Verify that cycle error is NOT visible (cleared after fix)
+   * @returns {Promise<boolean>} true if no cycle error is visible
+   */
+  async verifyCycleErrorCleared() {
+    const errorText = await this.getCycleErrorText();
+    return errorText === null;
+  }
+
+  /**
+   * Add a query_values variable that supports $variable references in stream and/or field.
+   * This is the primary method for the new stream/field variable feature tests.
+   *
+   * @param {string} name - Variable name
+   * @param {string} streamType - Stream type (logs, metrics, traces)
+   * @param {string} streamNameOrVar - Real stream name or $variable reference
+   * @param {string} fieldNameOrVar - Real field name or $variable reference
+   * @param {Object} options - Additional options
+   * @param {string} options.scope - 'global', 'tabs', 'panels'
+   * @param {Object} options.filterConfig - Filter configuration {filterName, operator, value}
+   * @param {boolean} options.expectCycleError - If true, don't wait for save success (expect error)
+   * @param {boolean} options.skipSave - If true, don't click save button
+   */
+  async addQueryValuesVariable(name, streamType, streamNameOrVar, fieldNameOrVar, options = {}) {
+    const {
+      scope = "global",
+      filterConfig = null,
+      expectCycleError = false,
+      skipSave = false,
+    } = options;
+
+    // Navigate to variable tab
+    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+    await variableTab.waitFor({ state: "visible", timeout: 10000 });
+    await variableTab.click();
+    await this.page.waitForTimeout(500);
+
+    // Click Add Variable
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
+
+    // Fill variable name
+    await this.page.locator(SELECTORS.VARIABLE_NAME).fill(name);
+
+    // Select scope
+    const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
+    const scopeUIText = { 'global': 'Global', 'tabs': 'Selected Tabs', 'panels': 'Selected Panels' };
+    await this.page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
+    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+
+    // Select stream type
+    await selectStreamType(this.page, streamType);
+
+    // Select stream (real or $variable)
+    await selectStreamFromDropdown(this.page, streamNameOrVar);
+
+    // Select field (real or $variable)
+    await selectFieldFromDropdown(this.page, fieldNameOrVar);
+
+    // Add filter if specified
+    if (filterConfig) {
+      await this.addFilterToVariable(filterConfig);
+    }
+
+    if (skipSave) return;
+
+    // Save
+    const saveBtn = this.page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
+
+    if (expectCycleError) {
+      // Wait briefly for error to appear, don't expect save success
+      await this.page.waitForTimeout(1000);
+      return;
+    }
+
+    // Wait for save to complete
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    const addVariableBtn = this.page.locator(SELECTORS.ADD_VARIABLE_BTN);
+    const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
+    try {
+      await Promise.race([
+        addVariableBtn.waitFor({ state: "visible", timeout: 8000 }),
+        editBtn.waitFor({ state: "visible", timeout: 8000 })
+      ]);
+    } catch {
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Update the stream selection on an already-open variable edit form
+   * @param {string} streamNameOrVar - New stream name or $variable reference
+   */
+  async updateStream(streamNameOrVar) {
+    // Clear the current stream selection and select new one
+    const streamSelect = this.page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+    await streamSelect.click();
+    await streamSelect.fill("");
+    await selectStreamFromDropdown(this.page, streamNameOrVar);
+  }
+
+  /**
+   * Update the field selection on an already-open variable edit form
+   * @param {string} fieldNameOrVar - New field name or $variable reference
+   */
+  async updateField(fieldNameOrVar) {
+    const fieldSelect = this.page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+    await fieldSelect.click();
+    // Clear current field
+    await this.page.keyboard.press("Control+A");
+    await this.page.keyboard.press("Backspace");
+    await selectFieldFromDropdown(this.page, fieldNameOrVar);
+  }
+
+  /**
+   * Change variable type on an open edit form (e.g., from query_values to constant)
+   * @param {string} typeName - Type name (e.g., "Constant", "Query Values", "Custom", "Textbox")
+   */
+  async changeVariableType(typeName) {
+    await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await this.page.getByRole("option", { name: typeName, exact: true }).click();
+    await this.page.waitForTimeout(500);
   }
 }
