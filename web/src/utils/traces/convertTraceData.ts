@@ -291,28 +291,20 @@ export const convertServiceGraphToTree = (
       .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
 
-    // Direction-aware metrics based on tree position
+    // Direction-aware request count based on tree position
     let totalRequests: number;
-    let failedRequests: number;
-    let errorRate: number;
 
     if (incomingEdge) {
       // Non-root: show traffic via this specific edge from parent
       totalRequests = incomingEdge.total_requests ?? 0;
-      failedRequests = incomingEdge.failed_requests ?? 0;
-      errorRate = incomingEdge.error_rate ?? 0;
     } else {
       // Root: sum of outgoing edges
       totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
-      failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
 
       // If no edges, fall back to node's own metrics
       if (totalRequests === 0 && node.requests !== undefined) {
         totalRequests = node.requests;
-        failedRequests = node.errors ?? 0;
       }
-
-      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
     }
 
     // Node border: colored by this node's error rate relative to baseline
@@ -323,8 +315,9 @@ export const convertServiceGraphToTree = (
     const edgeP95Ms = incomingEdge ? (incomingEdge.p95_latency_ns || 0) / 1000000 : 0;
     const edgeColor = incomingEdge ? getEdgeColor(edgeP95Ms) : (isDarkMode ? "#4a5568" : "#d9d9d9");
 
-    // Fixed size for tree view to prevent overlapping
-    const symbolSize = 45;
+    // Dynamic size based on request volume — matches graph view formula
+    const nodeRequests = node.requests ?? totalRequests;
+    const symbolSize = Math.max(40, Math.min(80, Math.log10(nodeRequests + 1) * 20));
 
     return {
       name: node.label || node.id,
@@ -374,30 +367,25 @@ export const convertServiceGraphToTree = (
       },
       label: {
         show: true,
-        position: layoutType === 'vertical' ? 'top' : 'left',
+        position: 'inside',
         formatter: (params: any) => {
-          return `${params.name}\n${formatNumber(totalRequests)} req`;
+          return `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`;
         },
-      },
-      tooltip: {
-        formatter: (params: any) => {
-          const formatLatency = (ns: number) => {
-            if (!ns || ns === 0) return 'N/A';
-            const ms = ns / 1000000;
-            return ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : ms.toFixed(2) + 'ms';
-          };
-
-          const p50 = incomingEdge ? formatLatency(incomingEdge.p50_latency_ns || 0) : 'N/A';
-          const p95 = incomingEdge ? formatLatency(incomingEdge.p95_latency_ns || 0) : 'N/A';
-          const p99 = incomingEdge ? formatLatency(incomingEdge.p99_latency_ns || 0) : 'N/A';
-
-          return `
-            <strong>Requests:</strong> ${formatNumber(totalRequests)}<br/>
-            <strong>Errors:</strong> ${failedRequests} (${errorRate.toFixed(2)}%)<br/>
-            <strong>P50:</strong> ${p50}<br/>
-            <strong>P95:</strong> ${p95}<br/>
-            <strong>P99:</strong> ${p99}
-          `;
+        rich: {
+          name: {
+            fontSize: 11,
+            fontWeight: '500',
+            color: isDarkMode ? '#e4e7eb' : '#333',
+            align: 'center',
+            lineHeight: 14,
+          },
+          requests: {
+            fontSize: 9,
+            fontWeight: 'normal',
+            color: isDarkMode ? '#9ca3af' : '#666',
+            align: 'center',
+            lineHeight: 12,
+          },
         },
       },
       children: children.length > 0 ? children : undefined,
@@ -428,7 +416,7 @@ export const convertServiceGraphToTree = (
         data: graphData.nodes.map((node: any) => ({
           name: node.label || node.id,
           value: 0,
-          symbolSize: 45,
+          symbolSize: Math.max(40, Math.min(80, Math.log10((node.requests || 0) + 1) * 20)),
           itemStyle: {
             color: isDarkMode ? '#1a1f2e' : '#ffffff',
             borderColor: '#9E9E9E',
@@ -440,14 +428,12 @@ export const convertServiceGraphToTree = (
         layout: 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         initialTreeDepth: -1,
-        symbolSize: 45,
+        symbolSize: 50,
         roam: true, // Enable panning and zooming
         selectedMode: 'single', // Enable single node selection
         label: {
-          position: layoutType === 'vertical' ? 'bottom' : 'right',
-          verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
-          distance: 15,
-          fontSize: 12,
+          position: 'inside',
+          fontSize: 11,
         },
       }],
     };
@@ -467,11 +453,7 @@ export const convertServiceGraphToTree = (
   const options = {
     backgroundColor: 'transparent', // Make chart background transparent to match graph view
     tooltip: {
-      show: true,
-      trigger: 'item',
-      triggerOn: 'mousemove',
-      hideDelay: 0, // Hide immediately when mouse leaves
-      enterable: false, // Prevent mouse from entering tooltip
+      show: false, // Disabled — custom edge tooltips in ServiceGraph.vue handle this
     },
     series: [
       {
@@ -479,24 +461,26 @@ export const convertServiceGraphToTree = (
         data: finalTreeData,
         layout: 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
+        // Maximize layout space so siblings spread further apart
+        left: layoutType === 'vertical' ? '1%' : '3%',
+        right: layoutType === 'vertical' ? '1%' : '3%',
+        top: layoutType === 'vertical' ? '3%' : '1%',
+        bottom: layoutType === 'vertical' ? '3%' : '1%',
         initialTreeDepth: -1,
         symbol: 'circle',
-        symbolSize: 45,
+        symbolSize: 50, // Default; each node overrides with dynamic size
         roam: true, // Enable panning and zooming
         selectedMode: 'single', // Enable single node selection
         label: {
-          position: layoutType === 'vertical' ? 'top' : 'left',
-          verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
-          distance: 15,
-          fontSize: 12,
-          rotate: 0, // Keep text horizontal, no rotation
+          position: 'inside',
+          fontSize: 11,
+          rotate: 0,
         },
         leaves: {
           label: {
-            position: layoutType === 'vertical' ? 'top' : 'left',
-            verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
-            distance: 15,
-            rotate: 0, // Keep text horizontal, no rotation
+            position: 'inside',
+            fontSize: 11,
+            rotate: 0,
           },
         },
         expandAndCollapse: false, // Disable collapse on click - clicking only selects the node
