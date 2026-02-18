@@ -500,20 +500,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- show error if filter has cycle -->
-                <div v-show="filterCycleError" class="cycle-error-container">
-                  <div class="flex items-center">
-                    <q-icon name="error" color="negative" size="sm" />
-                    <span class="cycle-error-text">{{ filterCycleError }}</span>
-                  </div>
-                  <div class="cycle-error-details">
-                    <strong>Variables can reference each other in:</strong>
-                    <ul>
-                      <li>Stream selection (e.g., <code>$streamVariable</code>)</li>
-                      <li>Field selection (e.g., <code>$fieldVariable</code>)</li>
-                      <li>Filter values (e.g., <code>status='$statusVariable'</code>)</li>
-                    </ul>
-                    <em>Ensure no circular dependencies exist.</em>
-                  </div>
+                <div v-show="filterCycleError" style="color: red">
+                  {{ filterCycleError }}
                 </div>
               </div>
             </div>
@@ -1501,9 +1489,9 @@ export default defineComponent({
         const hasCycle = isGraphHasCycle(variablesDependencyGraph);
         if (hasCycle) {
           // filter has cycle, so show error and return
-          filterCycleError.value = `Circular dependency detected: ${hasCycle.join(
-            " → ",
-          )} → ${hasCycle[0]}`;
+          filterCycleError.value = `Variables has cycle: ${hasCycle.join(
+            "->",
+          )} -> ${hasCycle[0]}`;
           return true;
         }
 
@@ -1867,68 +1855,6 @@ export default defineComponent({
 
 .theme-light .bg-highlight {
   background-color: #e7e6e6;
-}
-
-.cycle-error-container {
-  background-color: #fee;
-  border: 1px solid #fcc;
-  border-radius: 4px;
-  padding: 12px;
-  margin-top: 8px;
-}
-
-.cycle-error-text {
-  color: #c00;
-  font-weight: 600;
-  margin-left: 8px;
-}
-
-.cycle-error-details {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #666;
-
-  ul {
-    margin: 4px 0 0 20px;
-    padding: 0;
-  }
-
-  li {
-    margin: 2px 0;
-  }
-
-  code {
-    background-color: #f5f5f5;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-family: monospace;
-    font-size: 11px;
-  }
-
-  strong {
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  em {
-    display: block;
-    margin-top: 8px;
-    font-style: italic;
-  }
-}
-
-.theme-dark .cycle-error-container {
-  background-color: #3d1a1a;
-  border-color: #5a2a2a;
-}
-
-.theme-dark .cycle-error-details {
-  color: #ccc;
-
-  code {
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-  }
 }
 
 .multi-select-default-value-toggle {
