@@ -417,10 +417,6 @@ export function parseEvaluationScores(data: any): EvaluationScores | null {
       }
     : null;
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 2308d5218 (changes)
   return {
     qualityScore: quality != null ? Number(quality) : null,
     relevance: relevance != null ? Number(relevance) : null,
