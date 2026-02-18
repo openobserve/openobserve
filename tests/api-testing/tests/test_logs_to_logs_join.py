@@ -849,3 +849,66 @@ class TestLogsToLogsJoin:
             assert "response_time_ms" in hit, f"Should have response_time_ms: {hit}"
 
         logging.info(f"✓ Subquery with ORDER/LIMIT returned {len(hits)} results")
+
+    # ==================== STREAM.FIELD SYNTAX TESTS ====================
+
+    def test_30_join_with_stream_field_syntax(self):
+        """Test JOIN using stream.field syntax without aliases (like default.field)."""
+        # Using stream name directly with dot notation for fields
+        small = self.small_stream
+        large = self.large_stream
+
+        sql = f"""
+            SELECT {small}.kubernetes_container_name,
+                   {small}.kubernetes_namespace_name,
+                   {large}.log,
+                   {large}.response_time_ms
+            FROM {small}
+            JOIN {large}
+            ON {small}.kubernetes_container_name = {large}.kubernetes_container_name
+            LIMIT 20
+        """
+
+        response = self._run_search(sql)
+
+        assert response.status_code == 200, \
+            f"JOIN with stream.field syntax should succeed: {response.status_code} - {response.text[:500]}"
+
+        hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with stream.field syntax should return results"
+
+        for hit in hits:
+            assert "kubernetes_container_name" in hit, f"Should have container name: {hit}"
+
+        logging.info(f"✓ JOIN with stream.field syntax returned {len(hits)} results")
+
+    def test_31_join_with_stream_field_and_multiple_conditions(self):
+        """Test JOIN using stream.field syntax with multiple ON conditions."""
+        small = self.small_stream
+        large = self.large_stream
+
+        sql = f"""
+            SELECT {small}.kubernetes_container_name,
+                   {small}.kubernetes_pod_name,
+                   {large}.log,
+                   {large}.level,
+                   {large}.response_time_ms
+            FROM {small}
+            JOIN {large}
+            ON {small}.kubernetes_container_name = {large}.kubernetes_container_name
+            AND {small}.kubernetes_namespace_name = {large}.kubernetes_namespace_name
+            LIMIT 20
+        """
+
+        response = self._run_search(sql)
+
+        assert response.status_code == 200, \
+            f"JOIN with stream.field and multiple conditions should succeed: {response.status_code} - {response.text[:500]}"
+
+        hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with stream.field and multiple conditions should return results"
+
+        for hit in hits:
+            assert "kubernetes_container_name" in hit, f"Should have container name: {hit}"
+
+        logging.info(f"✓ JOIN with stream.field and multiple conditions returned {len(hits)} results")
