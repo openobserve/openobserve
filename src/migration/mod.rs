@@ -53,17 +53,38 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
         DB_SCHEMA_VERSION
     );
 
-    infra::db_init().await?;
+    // acquire lock for 1 hour for init or migration db
+    let lock = infra::dist_lock::lock("/database/init", 3600).await?;
+
+    if let Err(e) = infra::db_init().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
+
     // we initialize both clients here to avoid potential deadlock afterwards
     ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
 
     // migrate infra_sea_orm
-    infra::table::migrate().await?;
-    infra::set_db_schema_version().await?;
+    if let Err(e) = infra::table::migrate().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
+    if let Err(e) = infra::set_db_schema_version().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
 
     // cloud-related migrations
     #[cfg(feature = "cloud")]
-    o2_enterprise::enterprise::cloud::migrate().await?;
+    if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
+
+    // release lock
+    infra::dist_lock::unlock(&lock).await?;
+
+    log::info!("DB upgrade completed to version {}", DB_SCHEMA_VERSION);
 
     Ok(())
 }

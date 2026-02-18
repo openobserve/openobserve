@@ -153,17 +153,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
+            <q-spinner
               color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
+              size="md"
             />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
-              {{ t("correlation.loadingLogs") }}
-            </div>
+            <div class="tw:text-sm tw:opacity-70">{{ t("correlation.loadingLogs") }}</div>
           </div>
 
           <!-- Logs Dashboard -->
@@ -182,15 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="article"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{ t("correlation.service", { service: serviceName }) }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">{{ t("correlation.noLogsFound") }}</div>
+            <div class="tw:text-sm tw:opacity-70">
+              {{ t("correlation.noLogsDescription") }}
             </div>
           </div>
         </q-tab-panel>
@@ -234,15 +224,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
+            <q-spinner
               color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
+              size="md"
             />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+            <div class="tw:text-sm tw:opacity-70">
               {{
                 t("correlation.loadingMetrics", {
                   count: selectedMetricStreams.length,
@@ -256,21 +244,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="error"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
-              {{ t("correlation.failedToLoad") }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.metricsError") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+            <div class="tw:text-sm tw:opacity-70 tw:mb-4">{{ error || t("correlation.metricsErrorDetails") }}</div>
             <q-btn
-              outline
+              flat
               color="primary"
+              icon="refresh"
               :label="t('correlation.retryButton')"
-              class="tw:mt-4"
               @click="loadDashboard"
             />
           </div>
@@ -292,13 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="info_outline"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">{{ t("correlation.noMetrics") }}</div>
+            <div class="tw:text-sm tw:opacity-70">{{ t("correlation.noMetricsDescription") }}</div>
           </div>
         </q-tab-panel>
 
@@ -309,14 +286,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
+            <q-spinner
               color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
+              size="md"
             />
-            <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
+            <div class="tw:text-sm tw:opacity-70">{{ t("correlation.loadingTraces") }}</div>
           </div>
 
           <!-- Error State -->
@@ -324,21 +300,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="tracesError"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
               {{ t("correlation.tracesError") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
+            <div class="tw:text-sm tw:opacity-70 tw:mb-4">{{ tracesError || t("correlation.tracesErrorDetails") }}</div>
             <q-btn
-              outline
+              flat
               color="primary"
+              icon="refresh"
               :label="t('correlation.retryButton')"
-              class="tw:mt-4"
               @click="loadCorrelatedTraces"
             />
           </div>
@@ -361,6 +331,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :span-list-prop="traceSpanList"
               :start-time-prop="computedTraceStartTime"
               :end-time-prop="computedTraceEndTime"
+              :correlated-log-stream="
+                logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+              "
               :show-back-button="false"
               :show-timeline="false"
               :show-log-stream-selector="false"
@@ -407,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-xs"
                   >
                     <q-tooltip>
-                      {{ t("correlation.viewInTracesTooltip") }}
+                      {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
                   </q-btn>
                   <q-chip dense color="primary" text-color="white">
@@ -440,17 +413,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="traceCorrelationMode !== null"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="search_off"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{
-                t("correlation.noTracesDescription", { service: serviceName })
-              }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">{{ t("correlation.noTracesFound") }}</div>
+            <div class="tw:text-sm tw:opacity-70">
+              {{ t("correlation.noTracesDescription") }}
             </div>
           </div>
 
@@ -459,16 +424,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="account_tree"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
               {{ t("correlation.correlatedTraces") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
+            <div class="tw:text-sm tw:opacity-70">
               {{
                 t("correlation.correlatedTracesFor", { service: serviceName })
               }}
@@ -498,9 +457,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card
       v-model="activeTab"
       animated
-      class="correlation-content tw:flex-1 tw:overflow-auto"
+      class="correlation-content tw:flex-1"
+      style="display: flex; flex-direction: column; overflow: auto;"
     >
-      <div v-if="activeTab == 'logs'" class="tw:p-0">
+      <div v-if="activeTab == 'logs'" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
         <!-- Refresh Button -->
         <div
           v-if="logsDashboardData"
@@ -521,11 +481,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3"
+          style="flex: 1; min-height: 300px;"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
-          <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+          <q-spinner color="primary" size="md" />
+          <div class="tw:text-sm tw:opacity-70">
             {{ t("correlation.loadingLogs") }}
           </div>
         </div>
@@ -546,15 +506,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="article"
-            size="3.75rem"
-            color="grey-6"
-            class="tw:mb-4"
-          />
-          <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-            {{ t("correlation.service", { service: serviceName }) }}
+          <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">{{ t("correlation.noLogsFound") }}</div>
+          <div class="tw:text-sm tw:opacity-70">
+            {{ t("correlation.noLogsDescription") }}
           </div>
         </div>
       </div>
@@ -593,15 +547,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
+            <q-spinner
               color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
+              size="md"
             />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+            <div class="tw:text-sm tw:opacity-70">
               {{
                 t("correlation.loadingMetrics", {
                   count: selectedMetricStreams.length,
@@ -615,21 +567,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="error"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
-              {{ t("correlation.failedToLoad") }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.metricsError") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+            <div class="tw:text-sm tw:opacity-70 tw:mb-4">{{ error || t("correlation.metricsErrorDetails") }}</div>
             <q-btn
-              outline
+              flat
               color="primary"
+              icon="refresh"
               :label="t('correlation.retryButton')"
-              class="tw:mt-4"
               @click="loadDashboard"
             />
           </div>
@@ -650,13 +596,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="info_outline"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">{{ t("correlation.noMetrics") }}</div>
+            <div class="tw:text-sm tw:opacity-70">{{ t("correlation.noMetricsDescription") }}</div>
           </div>
         </div>
       </div>
@@ -711,6 +652,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :span-list-prop="traceSpanList"
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
+            :correlated-log-stream="
+              logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+            "
             :show-back-button="false"
             :show-timeline="false"
             :show-log-stream-selector="false"
@@ -760,7 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                 >
                   <q-tooltip>
-                    {{ t("correlation.viewInTracesTooltip") }}
+                    {{ t("correlation.viewInTraces") }}
                   </q-tooltip>
                 </q-btn>
               </div>
@@ -1998,55 +1942,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
 };
 
 /**
- * Get service field names from the "service" semantic group
- * Falls back to common field names if semantic groups not loaded yet
- */
-const getServiceFieldNames = (): string[] => {
-  // Try to find the "service" semantic group
-  const serviceGroup = semanticGroups.value.find(
-    (group) => group.id === "service" || group.id?.toLowerCase() === "service",
-  );
-
-  if (serviceGroup && serviceGroup.fields.length > 0) {
-    return serviceGroup.fields;
-  }
-
-  // Fallback to common service field names if semantic groups not loaded
-  return [
-    "service_name",
-    "service",
-    "svc",
-    "app",
-    "application",
-    "app_name",
-    "attributes_service_name",
-    "resource_service_name",
-    "resource_attributes_service_name",
-    "service_service_name",
-    "job",
-  ];
-};
-
-/**
- * Find the service field name and value from StreamInfo filters
- * Uses semantic groups to get the list of possible service field names
- */
-const findServiceFilter = (
-  filters: Record<string, string> | undefined,
-): { fieldName: string; value: string } | null => {
-  if (!filters) return null;
-
-  const serviceFieldNames = getServiceFieldNames();
-  for (const fieldName of serviceFieldNames) {
-    if (filters[fieldName]) {
-      return { fieldName, value: filters[fieldName] };
-    }
-  }
-  return null;
-};
-
-/**
- * Fetch traces via dimension-based correlation (service name match)
+ * Fetch traces via dimension-based correlation
  */
 const fetchTracesByDimensions = async () => {
   if (!props.traceStreams?.length) {
@@ -2056,36 +1952,15 @@ const fetchTracesByDimensions = async () => {
   const traceStreamInfo = props.traceStreams[0];
   const streamName = traceStreamInfo.stream_name;
 
-  // Build filter using the service field from the trace stream's filters
-  // This uses the exact field name from the trace data (e.g., 'service_name', 'service', etc.)
+  // Build filter using ALL filters from the trace stream's filters
+  // This uses all the filters coming from the correlation API
   const filterParts: string[] = [];
 
-  // Find the service field from StreamInfo filters (using semantic group field names)
-  const serviceFilter = findServiceFilter(traceStreamInfo.filters);
-  if (serviceFilter) {
-    filterParts.push(`${serviceFilter.fieldName}='${serviceFilter.value}'`);
-  }
-
-  // Fallback: if no service field in filters, try activeDimensions
-  if (filterParts.length === 0) {
-    const serviceFieldNames = getServiceFieldNames();
-    for (const fieldName of serviceFieldNames) {
-      const normalizedKey = fieldName.replace(/-/g, "_");
-      if (activeDimensions.value[fieldName]) {
-        filterParts.push(`${fieldName}='${activeDimensions.value[fieldName]}'`);
-        break;
-      } else if (activeDimensions.value[normalizedKey]) {
-        filterParts.push(
-          `${normalizedKey}='${activeDimensions.value[normalizedKey]}'`,
-        );
-        break;
-      }
+  // Use all filters from traceStreamInfo.filters
+  if (traceStreamInfo.filters) {
+    for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
+      filterParts.push(`${fieldName}='${value}'`);
     }
-  }
-
-  // Last resort: use the service name from props (FQN) with default field name
-  if (filterParts.length === 0 && props.serviceName) {
-    filterParts.push(`service_name='${props.serviceName}'`);
   }
 
   const filter = filterParts.join(" AND ");
@@ -2116,17 +1991,28 @@ const openTraceInNewWindow = (trace) => {
 
   const org = store.state.selectedOrganization.identifier;
   const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+  const logStream = props.logStreams?.[0]?.stream_name;
 
-  // Build the URL with sql_mode and just trace_id filter
+  const queryParams: any = {
+    stream: traceStream,
+    trace_id: targetTraceId,
+    from: trace?.trace_start_time
+      ? trace.trace_start_time - 10000000
+      : props.timeRange.startTime.toString(),
+    to: trace?.trace_end_time
+      ? trace.trace_end_time + 10000000
+      : props.timeRange.endTime.toString(),
+    org_identifier: org,
+  };
+
+  // Add log_stream parameter if available for auto-selection in trace details
+  if (logStream) {
+    queryParams.log_stream = logStream;
+  }
+
   const route = router.resolve({
     name: "traceDetails",
-    query: {
-      stream: traceStream,
-      trace_id: targetTraceId,
-      from: trace.trace_start_time - 10000000,
-      to: trace.trace_end_time + 10000000,
-      org_identifier: org,
-    },
+    query: queryParams,
   });
 
   // Open in new window/tab
@@ -2140,8 +2026,17 @@ const openTracesPage = () => {
   const org = store.state.selectedOrganization.identifier;
   const traceStream = props.traceStreams?.[0]?.stream_name || "default";
 
-  // Build filter query for service_name
-  const filterQuery = `service_name='${props.serviceName}'`;
+  // Build filter query using all filters from trace stream
+  const filterParts: string[] = [];
+  const traceStreamInfo = props.traceStreams?.[0];
+
+  if (traceStreamInfo?.filters) {
+    for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
+      filterParts.push(`${fieldName}='${value}'`);
+    }
+  }
+
+  const filterQuery = filterParts.join(" AND ");
 
   // Build the URL to open traces page with filters
   const route = router.resolve({
@@ -2195,7 +2090,7 @@ const loadCorrelatedTraces = async () => {
       tracesForDimensions.value = await fetchTracesByDimensions();
     }
   } catch (err: any) {
-    tracesError.value = err.message || "Failed to load traces";
+    tracesError.value = err.message || t("correlation.tracesError");
     showErrorNotification(tracesError.value);
   } finally {
     tracesLoading.value = false;

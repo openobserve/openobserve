@@ -54,6 +54,17 @@ pub enum FunctionDeleteError {
 }
 
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+    if func.name.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(
+            "Function name cannot be empty",
+        ));
+    }
+    if func.function.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(
+            "Function body cannot be empty",
+        ));
+    }
+
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
         return Ok(MetaHttpResponse::bad_request(
@@ -185,8 +196,8 @@ async fn test_run_vrl_function(
             &[String::new()],
         );
 
-        if err.is_some() {
-            return Ok(MetaHttpResponse::bad_request(err.unwrap()));
+        if let Some(err) = err {
+            return Ok(MetaHttpResponse::bad_request(err));
         }
 
         ret_val
@@ -327,6 +338,17 @@ pub async fn update_function(
     fn_name: &str,
     mut func: Transform,
 ) -> Result<HttpResponse, Error> {
+    if func.name.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(
+            "Function name cannot be empty",
+        ));
+    }
+    if func.function.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(
+            "Function body cannot be empty",
+        ));
+    }
+
     let existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {

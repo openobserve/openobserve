@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 #[cfg(feature = "enterprise")]
 use config::utils::parquet::read_recordbatch_from_bytes;
 use config::{
-    FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
+    FileFormat, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
@@ -63,7 +63,10 @@ use super::worker::{MergeBatch, MergeSender};
 use crate::service::{
     db, file_list,
     schema::generate_schema_for_defined_schema_fields,
-    search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
+    search::datafusion::{
+        exec::TableBuilder,
+        merge::{self, MergeParquetResult},
+    },
     tantivy::create_tantivy_index,
 };
 
@@ -155,8 +158,7 @@ pub async fn generate_job_by_stream(
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMPACTOR] add file_list_jobs failed: {}",
-            e
+            "[COMPACTOR] add file_list_jobs failed: {e}"
         ));
     }
 
@@ -252,8 +254,7 @@ pub async fn generate_old_data_job_by_stream(
         let column = hour.split('/').collect::<Vec<_>>();
         if column.len() != 4 {
             return Err(anyhow::anyhow!(
-                "Unexpected hour format in {}, Expected format YYYY/MM/DD/HH",
-                hour
+                "Unexpected hour format in {hour}, Expected format YYYY/MM/DD/HH",
             ));
         }
         let offset = DateTime::parse_from_rfc3339(&format!(
@@ -267,8 +268,7 @@ pub async fn generate_old_data_job_by_stream(
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
-                "[COMPACTOR] add file_list_jobs for old data failed: {}",
-                e
+                "[COMPACTOR] add file_list_jobs for old data failed: {e}"
             ));
         }
     }
@@ -296,8 +296,8 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!(
-            "/compact/downsampling/{}/{}/{}/{}/{}",
-            org_id, stream_type, stream_name, rule.0, rule.1
+            "/compact/downsampling/{org_id}/{stream_type}/{stream_name}/{}/{}",
+            rule.0, rule.1
         );
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
@@ -366,8 +366,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // generate downsampling job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[DOWNSAMPLING] add file_list_jobs failed: {}",
-            e
+            "[DOWNSAMPLING] add file_list_jobs failed: {e}"
         ));
     }
 
@@ -443,15 +442,10 @@ pub async fn merge_by_stream(
     let files =
         file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
             .await
-            .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        date_start,
-        date_end,
+        "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
         files.len(),
     );
 
@@ -751,7 +745,7 @@ pub async fn merge_files(
     );
     let min_ts = if min_ts == i64::MAX { 0 } else { min_ts };
     let max_ts = if max_ts == i64::MIN { 0 } else { max_ts };
-    let mut new_file_meta = FileMeta {
+    let new_file_meta = FileMeta {
         min_ts,
         max_ts,
         records: total_records,
@@ -790,9 +784,9 @@ pub async fn merge_files(
             index_original_data,
             index_all_values,
         );
-        latest_schema.schema().as_ref().clone()
+        latest_schema.schema().clone()
     } else {
-        latest_schema
+        Arc::new(latest_schema)
     };
 
     // read schema from parquet file and group files by schema
@@ -806,7 +800,9 @@ pub async fn merge_files(
             &file.key
         );
         let buf = file_data::get(&file.account, &file.key, None).await?;
-        let schema = read_schema_from_bytes(&buf).await?;
+        let file_format = FileFormat::from_extension(&file.key)
+            .ok_or_else(|| anyhow::anyhow!("invalid file format: {}", file.key))?;
+        let schema = read_schema_from_bytes(file_format, &buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {
@@ -814,19 +810,12 @@ pub async fn merge_files(
         }
     }
 
-    // generate the final schema
+    // generate the parquet schema
     let all_fields = schemas
         .values()
         .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
         .collect::<HashSet<_>>();
-    // Keep original schema for index generation (has all stream fields)
-    let stream_schema_for_index = Arc::new(latest_schema.clone());
-    // Create filtered schema for parquet merging (only fields in parquet files)
-    let latest_schema = Arc::new(latest_schema.retain(all_fields));
-    let mut latest_schema_fields = HashMap::with_capacity(latest_schema.fields().len());
-    for field in latest_schema.fields() {
-        latest_schema_fields.insert(field.name(), field);
-    }
+    let schema = Arc::new(latest_schema.retain(all_fields));
 
     // generate datafusion tables
     let trace_id = ider::generate();
@@ -837,33 +826,29 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
-    let table = match TableBuilder::new()
+    let tables = match TableBuilder::new()
         .sorted_by_time(true)
-        .build(session, files.clone(), latest_schema.clone())
+        .build(session, files.clone(), schema.clone())
         .await
     {
-        Ok(table) => table,
+        Ok(tables) => tables,
         Err(e) => {
-            log::error!(
-                "create_parquet_table err: {e}, files: {files:?}, schema: {latest_schema:?}"
-            );
+            log::error!("create_parquet_table err: {e}, files: {files:?}, schema: {schema:?}");
             return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
         }
     };
 
     let merge_result = {
         let stream_name = stream_name.to_string();
-        let latest_schema = latest_schema.clone();
-        let new_file_meta = new_file_meta.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
-                exec::merge_parquet_files(
+                merge::merge_parquet_files(
                     stream_type,
                     &stream_name,
-                    latest_schema,
-                    vec![table],
+                    schema,
+                    tables,
                     &bloom_filter_fields,
-                    &new_file_meta,
+                    new_file_meta,
                     false,
                 )
                 .await
@@ -875,12 +860,10 @@ pub async fn merge_files(
     crate::service::search::datafusion::storage::file_list::clear(&trace_id);
 
     let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-    let (_new_schema, buf) = match merge_result {
+    let buf = match merge_result {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
-                "merge_parquet_files err: {e}, files: {files:?}, schema: {latest_schema:?}"
-            );
+            log::error!("merge_parquet_files err: {e}, files: {files:?}");
             return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
         }
     };
@@ -897,7 +880,11 @@ pub async fn merge_files(
                 || stream_type == StreamType::Metrics
                 || stream_type == StreamType::Traces)
         {
-            // Apply two-tier sampling to ensure fair processing across all streams
+            // Get stream count for this type (cached, 5-min TTL — counts rarely change).
+            let stream_count =
+                crate::service::db::schema::get_stream_count_cached(org_id, stream_type).await;
+
+            // Apply adaptive two-tier sampling with per-type rate equalization
             // Use the first file key as identifier for this merge operation
             let file_identifier = files.first().map(|f| f.as_str()).unwrap_or("unknown");
             let should_process =
@@ -906,18 +893,19 @@ pub async fn merge_files(
                     stream_type,
                     stream_name,
                     file_identifier,
+                    stream_count,
                 );
 
             if should_process {
                 // Process the merged data for service discovery
                 // Works with all stream types (same as ingester mode)
+                let file_format = get_config().common.file_format;
                 if let Err(e) =
-                    process_service_streams_from_parquet(org_id, stream_name, stream_type, &buf)
+                    process_service_streams(org_id, stream_name, stream_type, file_format, &buf)
                         .await
                 {
                     log::warn!(
-                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {}",
-                        e
+                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {e}",
                     );
                 }
             }
@@ -939,8 +927,7 @@ pub async fn merge_files(
 
     let mut new_files = Vec::new();
     match buf {
-        MergeParquetResult::Single(buf) => {
-            new_file_meta.compressed_size = buf.len() as i64;
+        MergeParquetResult::Single(buf, mut new_file_meta) => {
             if new_file_meta.compressed_size == 0 {
                 return Err(anyhow::anyhow!(
                     "merge_parquet_files error: compressed_size is 0"
@@ -948,11 +935,11 @@ pub async fn merge_files(
             }
 
             let id = ider::generate_file_name();
-            let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
+            let file_format = get_config().common.file_format.extension();
+            let new_file_key = format!("{prefix}/{id}{file_format}");
             log::info!(
-                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
-                new_file_key,
                 new_file_meta.original_size,
                 new_file_meta.compressed_size,
                 start.elapsed().as_millis(),
@@ -979,7 +966,7 @@ pub async fn merge_files(
                     &index_fields,
                     &retain_file_list,
                     &mut new_file_meta,
-                    stream_schema_for_index.clone(),
+                    latest_schema.clone(),
                     &buf,
                 )
                 .await?;
@@ -997,7 +984,8 @@ pub async fn merge_files(
                 }
 
                 let id = ider::generate_file_name();
-                let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
+                let file_format = get_config().common.file_format.extension();
+                let new_file_key = format!("{prefix}/{id}{file_format}");
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
@@ -1020,7 +1008,7 @@ pub async fn merge_files(
                         &index_fields,
                         &retain_file_list,
                         &mut new_file_meta,
-                        stream_schema_for_index.clone(),
+                        latest_schema.clone(),
                         &buf,
                     )
                     .await?;
@@ -1054,7 +1042,8 @@ async fn generate_inverted_index(
     latest_schema: Arc<Schema>,
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
-    let (_parquet_schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
+    let file_format = get_config().common.file_format;
+    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
         new_file_key,
@@ -1066,10 +1055,7 @@ async fn generate_inverted_index(
     .await
     .map_err(|e| {
         anyhow::anyhow!(
-            "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
-            new_file_key,
-            e,
-            retain_file_list
+            "create_tantivy_index_on_compactor for file: {new_file_key}, error: {e}, need delete files: {retain_file_list:?}",
         )
     })?;
     new_file_meta.index_size = index_size as i64;
@@ -1352,36 +1338,38 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
 
 /// Process service streams from merged parquet data (compactor mode)
 #[cfg(feature = "enterprise")]
-async fn process_service_streams_from_parquet(
+async fn process_service_streams(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    parquet_result: &exec::MergeParquetResult,
+    file_format: FileFormat,
+    parquet_result: &MergeParquetResult,
 ) -> Result<(), anyhow::Error> {
     let parquet_bytes = match parquet_result {
-        exec::MergeParquetResult::Single(buf) => buf,
-        exec::MergeParquetResult::Multiple { bufs, .. } => {
+        MergeParquetResult::Single(buf, _) => buf,
+        MergeParquetResult::Multiple { bufs, .. } => {
             // For multiple files, process each one
             for buf in bufs {
-                process_single_parquet_buffer(org_id, stream_name, stream_type, buf).await?;
+                process_single_buffer(org_id, stream_name, stream_type, file_format, buf).await?;
             }
             return Ok(());
         }
     };
 
-    process_single_parquet_buffer(org_id, stream_name, stream_type, parquet_bytes).await
+    process_single_buffer(org_id, stream_name, stream_type, file_format, parquet_bytes).await
 }
 
 #[cfg(feature = "enterprise")]
-async fn process_single_parquet_buffer(
+async fn process_single_buffer(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    file_format: FileFormat,
     parquet_bytes: &[u8],
 ) -> Result<(), anyhow::Error> {
-    // Read record batches from parquet bytes
+    // Read record batches from bytes
     let bytes = Bytes::from(parquet_bytes.to_vec());
-    let (_schema, batches) = read_recordbatch_from_bytes(&bytes).await?;
+    let (_schema, batches) = read_recordbatch_from_bytes(file_format, &bytes).await?;
 
     if batches.is_empty() {
         return Ok(());

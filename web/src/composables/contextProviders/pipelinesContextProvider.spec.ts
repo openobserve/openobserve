@@ -19,7 +19,7 @@ describe('createPipelinesContextProvider', () => {
   it('should create a context provider for creating new pipeline', () => {
     const pipelineObj = {
       currentSelectedPipeline: {
-        id: 'pipeline-123',
+        pipeline_id: 'pipeline-123',
         name: 'Test Pipeline'
       },
       isEditPipeline: false
@@ -46,7 +46,7 @@ describe('createPipelinesContextProvider', () => {
   it('should create a context provider for editing existing pipeline', () => {
     const pipelineObj = {
       currentSelectedPipeline: {
-        id: 'pipeline-789',
+        pipeline_id: 'pipeline-789',
         name: 'Updated Pipeline'
       },
       isEditPipeline: true

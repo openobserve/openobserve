@@ -29,7 +29,6 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::Deserialize;
-use tracing::Span;
 
 /// Agent type for general chat/copilot requests (SQL help, observability questions, etc.)
 #[cfg(feature = "enterprise")]
@@ -180,27 +179,13 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let org_id_str = org_id.as_str();
         let config = get_o2_config();
 
-        // Create root span for AI tracing if enabled
-        let span = if config.ai.tracing_enabled {
-            tracing::info_span!(
-                "http.request",
-                http.method = "POST",
-                http.route = "/api/{org_id}/ai/chat",
-                http.target = format!("/api/{org_id_str}/ai/chat"),
-                otel.kind = "server",
-            )
-        } else {
-            Span::none()
-        };
-        let _guard = span.enter();
-
         // Check if AI/agent is enabled
         if !config.ai.enabled {
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        if !config.incidents.rca_enabled || config.incidents.rca_agent_url.is_empty() {
-            return MetaHttpResponse::bad_request("Agent service not configured");
+        if config.incidents.rca_agent_url.is_empty() {
+            return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
         // Extract user token from cookie/header for per-user MCP auth
@@ -276,6 +261,19 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Must be done before context is moved into QueryRequest
         let agent_type = get_agent_type(&context);
 
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
+                .collect()
+        });
+
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -290,6 +288,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 Some(history)
             },
             user_token,
+            images,
         };
 
         // Query agent with headers
@@ -428,6 +427,52 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     let trace_id = auth_data.get_trace_id();
     let user_id = auth_data.user_id.clone();
 
+    // Create OTel span for AI tracing using the OpenTelemetry API directly.
+    // We avoid the tracing-opentelemetry bridge here because it has issues with
+    // span lifecycle management in async generators (spans created via tracing::info_span!
+    // don't get properly exported when held inside async_stream::stream!).
+    #[cfg(feature = "enterprise")]
+    let otel_chat_span = {
+        let config = get_o2_config();
+        if config.ai.tracing_enabled {
+            use opentelemetry::trace::{SpanKind, TraceContextExt, Tracer};
+
+            // Extract parent context from incoming traceparent header
+            let parent_cx = opentelemetry::global::get_text_map_propagator(|propagator| {
+                propagator.extract(&crate::common::utils::http::RequestHeaderExtractor::new(
+                    &parts.headers,
+                ))
+            });
+
+            // Create the span as a child of the incoming request
+            let tracer = opentelemetry::global::tracer("openobserve");
+            let span = tracer
+                .span_builder("ai.chat_stream")
+                .with_kind(SpanKind::Server)
+                .with_attributes(vec![
+                    opentelemetry::KeyValue::new("http.method", "POST"),
+                    opentelemetry::KeyValue::new("http.route", "/api/{org_id}/ai/chat_stream"),
+                    opentelemetry::KeyValue::new(
+                        "http.target",
+                        format!("/api/{}/ai/chat_stream", org_id),
+                    ),
+                    opentelemetry::KeyValue::new("trace_id", trace_id.clone()),
+                    opentelemetry::KeyValue::new("user_id", user_id.clone()),
+                    opentelemetry::KeyValue::new("org_id", org_id.clone()),
+                ])
+                .start_with_context(&tracer, &parent_cx);
+
+            // Build the context with this span so we can inject a traceparent for downstream
+            let span_cx = parent_cx.with_span(span);
+            Some(span_cx)
+        } else {
+            None
+        }
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let otel_chat_span: Option<opentelemetry::Context> = None;
+
     let mut forward_headers = std::collections::HashMap::new();
 
     // Extract and validate session ID (UUID v7 format: 8-4-4-4-12 hex digits)
@@ -444,9 +489,25 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         }
     }
 
-    if let Some(traceparent) = &auth_data.traceparent
+    // Generate a new traceparent from the ai.chat_stream span's context.
+    // This ensures the agent sees ai.chat_stream as its parent (not the frontend span).
+    if let Some(ref span_cx) = otel_chat_span {
+        let mut injected_headers = std::collections::HashMap::new();
+        opentelemetry::global::get_text_map_propagator(|propagator| {
+            propagator.inject_context(span_cx, &mut injected_headers);
+        });
+        if let Some(tp) = injected_headers.remove("traceparent") {
+            log::info!(
+                "[trace_id:{}] Forwarding traceparent from ai.chat_stream span: {}",
+                trace_id,
+                tp
+            );
+            forward_headers.insert("traceparent".to_string(), tp);
+        }
+    } else if let Some(traceparent) = &auth_data.traceparent
         && !traceparent.is_empty()
     {
+        // Fallback: forward original traceparent when tracing is disabled
         forward_headers.insert("traceparent".to_string(), traceparent.clone());
     }
 
@@ -498,26 +559,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
     #[cfg(feature = "enterprise")]
     {
-        use async_stream::stream;
         use futures::StreamExt;
         use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, get_agent_client};
 
         let config = get_o2_config();
         let org_id_str = org_id.clone();
-
-        // Create root span for AI tracing if enabled
-        let span = if config.ai.tracing_enabled {
-            tracing::info_span!(
-                "http.request",
-                http.method = "POST",
-                http.route = "/api/{org_id}/ai/chat_stream",
-                http.target = format!("/api/{}/ai/chat_stream", org_id_str),
-                otel.kind = "server",
-            )
-        } else {
-            Span::none()
-        };
-        let _guard = span.enter();
 
         let mut code = StatusCode::OK.as_u16();
         let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
@@ -608,6 +654,19 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Must be done before context is moved into QueryRequest
         let agent_type = get_agent_type(&context);
 
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
+                .collect()
+        });
+
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -622,6 +681,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 Some(history)
             },
             user_token,
+            images,
         };
 
         // Report successful start to audit
@@ -644,9 +704,17 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         } else {
             Some(forward_headers)
         };
-        let s = stream! {
+
+        // Move the OTel span context into the stream so it stays alive for the
+        // full streaming duration. When the stream completes, the span is explicitly
+        // ended. We use the OpenTelemetry API directly (not the tracing bridge) to
+        // ensure reliable span export from async generators.
+        let s = async_stream::stream! {
             // Call the agent service with forwarded headers
-            let response = match client.query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref()).await {
+            let response = match client
+                .query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref())
+                .await
+            {
                 Ok(r) => r,
                 Err(e) => {
                     log::error!(
@@ -658,6 +726,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                         "error": format!("Agent query failed: {}", e)
                     });
                     yield Ok(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
+                    // End span on error path too
+                    if let Some(span_cx) = otel_chat_span {
+                        use opentelemetry::trace::TraceContextExt;
+                        span_cx.span().end();
+                    }
                     return;
                 }
             };
@@ -665,16 +738,37 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             // Forward the streaming response from agent
             let mut agent_stream = response.bytes_stream();
 
+            // Poll the stream with proper instrumentation
+            // Each chunk is traced within the context of ai.chat_stream
             while let Some(chunk_result) = agent_stream.next().await {
                 match chunk_result {
                     Ok(bytes) => {
-                        yield Ok(bytes);
+                        yield Ok::<bytes::Bytes, std::io::Error>(bytes);
                     }
                     Err(e) => {
-                        yield Err(std::io::Error::other(e));
+                        log::error!(
+                            "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                             Agent stream chunk error: {e}"
+                        );
+                        let error_event = serde_json::json!({
+                            "type": "error",
+                            "error": format!("Stream interrupted: {}", e)
+                        });
+                        yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
                         break;
                     }
                 }
+            }
+            log::info!(
+                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                 Agent stream ended"
+            );
+            // Explicitly end the OTel span when the stream completes.
+            // This is critical: the span must be ended before it can be exported
+            // by the BatchSpanProcessor.
+            if let Some(span_cx) = otel_chat_span {
+                use opentelemetry::trace::TraceContextExt;
+                span_cx.span().end();
             }
         };
 
@@ -697,6 +791,143 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         drop(trace_id);
         drop(user_id);
         drop(prompt_body);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+/// ConfirmAction - Proxy confirmation response to o2-sre-agent
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/confirm/{session_id}",
+    context_path = "/api",
+    tag = "Ai",
+    operation_id = "ConfirmAction",
+    summary = "Confirm or reject a destructive AI tool action",
+    description = "Forwards user confirmation or rejection to the o2-sre-agent service \
+                   for a pending destructive tool call.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Path, description = "Chat session ID")
+    ),
+    request_body(
+        content = serde_json::Value,
+        description = "Confirmation payload",
+        example = json!({"approved": true}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn confirm_action(
+    Path((_org_id, session_id)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    let (parts, body) = in_req.into_parts();
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
+
+        let config = get_o2_config();
+
+        if !config.ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        if get_agent_client().is_none() {
+            return MetaHttpResponse::bad_request("Agent service not configured");
+        }
+
+        // Extract user token for identity verification (same as chat_stream)
+        let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Inject user_token into the body for identity verification by the agent
+        let mut forward_body: serde_json::Value =
+            serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}));
+        if let Some(token) = &user_token
+            && let Some(obj) = forward_body.as_object_mut()
+        {
+            obj.insert(
+                "user_token".to_string(),
+                serde_json::Value::String(token.clone()),
+            );
+        }
+        let forward_bytes = serde_json::to_vec(&forward_body).unwrap_or_default();
+
+        // Forward the confirmation to the agent's /confirm endpoint
+        let confirm_url = format!(
+            "{}/confirm/{}",
+            config.incidents.rca_agent_url.trim_end_matches('/'),
+            session_id
+        );
+
+        let http_client = reqwest::Client::new();
+        match http_client
+            .post(&confirm_url)
+            .header("Content-Type", "application/json")
+            .body(forward_bytes)
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+
+                if status.is_success() {
+                    (
+                        StatusCode::OK,
+                        axum::Json(
+                            serde_json::from_str::<serde_json::Value>(&response_body)
+                                .unwrap_or(serde_json::json!({"ok": true})),
+                        ),
+                    )
+                        .into_response()
+                } else {
+                    log::error!(
+                        "Agent confirm endpoint returned {}: {}",
+                        status,
+                        response_body
+                    );
+                    MetaHttpResponse::internal_error(format!(
+                        "Confirmation failed: {}",
+                        response_body
+                    ))
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to forward confirmation to agent: {e}");
+                MetaHttpResponse::internal_error(format!("Failed to forward confirmation: {e}"))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(session_id);
+        drop(parts);
+        drop(body_bytes);
         MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
     }
 }

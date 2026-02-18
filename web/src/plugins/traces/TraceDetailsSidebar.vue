@@ -675,6 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hide-view-related-button="true"
         :hide-search-term-actions="false"
         :hide-dimension-filters="true"
+        :hide-reset-filters-button="true"
       />
       <!-- Loading/Empty state when no data -->
       <div
@@ -1355,9 +1356,6 @@ export default defineComponent({
 
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
-        console.log(
-          "[TraceDetailsSidebar] Correlation feature requires enterprise license",
-        );
         correlationError.value =
           "Correlation feature requires enterprise license";
         return;
@@ -1440,41 +1438,41 @@ export default defineComponent({
             }
           }
 
-          console.log(
-            "[TraceDetailsSidebar] Raw span dimensions for log queries:",
-            rawSpanDimensions,
-          );
+          // Use filters from logStreams[0] as matchedDimensions — these contain
+          // the correct field names for the log stream (e.g., k8s_namespace_name)
+          // instead of semantic IDs (k8s-namespace) or trace field names
+          // (service_k8s_namespace_name). Same fix as 9127b6172 for incidents.
+          const logFilters =
+            correlationData.related_streams.logs?.[0]?.filters || {};
+          const actualMatchedDimensions =
+            Object.keys(logFilters).length > 0
+              ? logFilters
+              : correlationData.matched_dimensions;
 
           correlationProps.value = {
             serviceName: correlationData.service_name,
-            matchedDimensions: correlationData.matched_dimensions,
-            additionalDimensions: correlationData.additional_dimensions || {},
+            matchedDimensions: actualMatchedDimensions,
+            additionalDimensions: {},
             metricStreams: correlationData.related_streams.metrics,
             logStreams: correlationData.related_streams.logs,
             traceStreams: correlationData.related_streams.traces,
             sourceStream: props.streamName,
             sourceType: "traces",
-            // Use raw span attributes as availableDimensions for log query filters
-            availableDimensions: rawSpanDimensions,
+            // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
+            availableDimensions: { ...logFilters, ...context.fields },
             ftsFields: [],
             timeRange: {
               startTime: spanStartUs - bufferUs,
               endTime: spanEndUs + bufferUs,
             },
           };
-
-          console.log(
-            "[TraceDetailsSidebar] Correlation successful:",
-            correlationProps.value,
-          );
         } else {
-          correlationError.value =
-            "No related services found for this trace span";
+          correlationError.value = t("correlation.noLogsFound");
         }
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
         correlationError.value =
-          err.message || "Failed to load correlation data";
+          err.message || t("correlation.failedToLoad");
       } finally {
         correlationLoading.value = false;
       }

@@ -31,6 +31,7 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_viewer_delete_dest_',
         'rbac_viewer_update_dest_',
         'incident_e2e_dest_',
+        'e2e_incid_',              // alerts-incident-correlation.spec.js (incident correlation tests)
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
@@ -50,10 +51,11 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_viewer_delete_tmpl_',
         'rbac_viewer_update_tmpl_',
         'incident_e2e_template_',
+        'e2e_incid_',              // alerts-incident-correlation.spec.js (incident correlation tests)
         'e2e_promql_'              // alerts-regression.spec.js (Bug #9967 PromQL tests)
       ],
       // Folder prefixes to clean up
-      ['auto_', 'incident_e2e_folder_']
+      ['auto_', 'incident_e2e_folder_', 'E2E Incidents ']
     );
 
     // Clean up all reports owned by automation user
@@ -259,6 +261,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
         /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
         /^e2e_apostrophe_/,            // e2e_apostrophe_* (Bug #9475 apostrophe test streams from logs-regression.spec.js)
+        /^e2e_highlighting_test$/,     // e2e_highlighting_test (Bug #9754 logs highlighting test stream from logs-9754.spec.js)
         /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
         /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
         /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)

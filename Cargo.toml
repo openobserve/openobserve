@@ -79,14 +79,14 @@ blake3 = { version = "1.8", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
-clap = { version = "4.1", default-features = false, features = [
+clap = { version = "4.5", default-features = false, features = [
     "std",
     "help",
     "usage",
     "suggestions",
     "cargo",
 ] }
-cloudevents-sdk = { version = "0.8.0", features = ["axum"] }
+cloudevents-sdk = { version = "0.9", features = ["axum"] }
 cron.workspace = true
 csv = "1.3"
 dashmap.workspace = true
@@ -109,12 +109,12 @@ hashbrown.workspace = true
 hex.workspace = true
 http-auth-basic = "0.3"
 itertools.workspace = true
-jsonwebtoken = "10.3"
+jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
 log.workspace = true
 maxminddb = "0.27"
 md5.workspace = true
 memchr.workspace = true
-mimalloc = { version = "0.1.43", default-features = false, optional = true }
+mimalloc = { version = "0.1.46", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
@@ -135,7 +135,7 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
-rust-embed-for-web = "11.2.1"
+rust-embed-for-web = "11.3"
 rustls.workspace = true
 rustls-pemfile.workspace = true
 rustls-native-certs.workspace = true
@@ -210,8 +210,8 @@ tokio-stream.workspace = true
 mime = "0.3.17"
 pin-project-lite.workspace = true
 futures-core = "0.3.31"
-derive_more = { version = "2.0.1", features = ["full"] }
-brotli = "8.0.1"
+derive_more = { version = "2.0.2", features = ["full"] }
+brotli = "8.0.2"
 tokio-rustls.workspace = true
 roaring.workspace = true
 flight.workspace = true
@@ -306,10 +306,10 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "52"
-datafusion-proto = "52"
-datafusion-functions-aggregate-common = "52"
-datafusion-functions-json = "0.52.0"
+datafusion = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
+datafusion-functions-json = { git = "https://github.com/openobserve/datafusion-functions-json", rev = "f53f08cddf467d3d492425f0e50f98f6a300d2f5" }
 expect-test = "1.4"
 arrow = { version = "57.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "57.2.0"
@@ -318,7 +318,7 @@ arrow-schema = { version = "57.2.0", features = ["serde"] }
 parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
-dotenv_config = "0.2.2"
+dotenv_config = "0.2.3"
 dotenvy = "0.15.7"
 env_logger = "0.11.8"
 faststr = { version = "0.2", features = ["serde"] }
@@ -328,7 +328,7 @@ local-ip-address = "0.6"
 hashlink = "0.10"
 hashbrown = { version = "0.16.0", features = ["serde"] }
 hex = "0.4"
-indexmap = { version = "2.7", features = ["serde"] }
+indexmap = { version = "2.8", features = ["serde"] }
 itertools = "0.14"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
@@ -384,7 +384,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "brotli",
     "deflate",
 ] }
-roaring = "0.11.2"
+roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
 rustls-pemfile = "2"
 rustls = { version = "0.23.20", default-features = false, features = [
@@ -394,12 +394,12 @@ rustls = { version = "0.23.20", default-features = false, features = [
 rustls-native-certs = "0.8"
 webpki-roots = "0.26"
 sea-orm = { version = "1.1.19", features = [
-    "sqlx-all",
+    "sqlx-postgres",
+    "sqlx-sqlite",
     "runtime-tokio-rustls",
     "macros",
 ] }
 sea-orm-migration = { version = "1.1.19", features = [
-    "sqlx-mysql",
     "sqlx-postgres",
     "sqlx-sqlite",
     "runtime-tokio-rustls",
@@ -414,7 +414,6 @@ snap = "1"
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio-rustls",
     "postgres",
-    "mysql",
     "sqlite",
     "chrono",
 ] }
@@ -436,21 +435,21 @@ tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
 tonic-prost = "0.14"
-tracing = "0.1.40"
-tracing-appender = "0.2.3"
+tracing = "0.1.44"
+tracing-appender = "0.2.4"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.32"
-tracing-subscriber = { version = "0.3.20", features = [
+tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
     "json",
     "registry",
 ] }
 url = "2.5"
 urlencoding = "2.1"
-utoipa = { version = "5", features = ["axum_extras", "openapi_extensions"] }
+utoipa = { version = "5.4", features = ["axum_extras", "openapi_extensions"] }
 utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
-uuid = { version = "1.18.1", features = ["v7"] }
+uuid = { version = "1.20", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.51" }
 vrl = { version = "0.28.1", features = [
     "arbitrary",

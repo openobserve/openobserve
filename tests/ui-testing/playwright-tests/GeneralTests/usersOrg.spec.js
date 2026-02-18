@@ -77,7 +77,7 @@ test.describe("Users and Organizations", () => {
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
         await pageManager.userPage.verifySuccessMessage('User added successfully.');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await pageManager.userPage.gotoIamPage();
         await pageManager.userPage.addUser(duplicateEmail);
         await pageManager.userPage.selectUserRole('Admin');

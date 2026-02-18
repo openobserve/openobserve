@@ -531,7 +531,7 @@ pub async fn get_job_result(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_job(

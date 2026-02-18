@@ -1179,6 +1179,9 @@
     "wraptext": "랩 테이블 셀",
     "tableTranspose": "전치",
     "tableDynamicColumns": "동적 열 허용",
+    "pagination": "페이지네이션",
+    "rowsPerPage": "페이지당 행 수",
+    "rowsPerPageTooltip": "페이지당 표시할 기본 레코드 수를 설정합니다",
     "showBorder": "축 테두리 표시",
     "currencyDollar": "통화 - 달러 ($)",
     "currencyEuro": "통화 - 유로 (€)",
@@ -1888,7 +1891,101 @@
     "msteams": "마이크로소프트 팀즈",
     "pagerduty": "페이저 듀티",
     "opsgenie": "옵스제니",
-    "servicenow": "서비스 나우"
+    "servicenow": "서비스 나우",
+    "saveAlert": "알림 저장",
+    "aggregation_threshold": "그룹이 있는 경우 경고",
+    "thresholdDynamic": {
+      "alertMeWhen": "언제 알려줘",
+      "metricTypes": {
+        "resultsPassedFilter": "결과 통과 필터",
+        "distinctGroupsAffected": "별개의 그룹이 영향을 받음",
+        "metricsMatchCriteria": "지표 일치 기준",
+        "matchingLogsFound": "일치하는 로그가 발견됨",
+        "groupsPassFilter": "그룹이 필터 기준을 통과함",
+        "distinctGroups": "별개의 그룹이 발견됨",
+        "resultRows": "결과 행 반환",
+        "timeSeries": "활성 시계열이 발견됨",
+        "matchingRecords": "일치하는 레코드를 찾았습니다",
+        "groupsWithHaving": "그룹 일치 조건",
+        "uniqueGroups": "고유 그룹",
+        "events": "이벤트 일치 조건",
+        "aggregatedValue": "경기 조건"
+      },
+      "contextLabels": {
+        "groupedBy": "그룹화 기준:",
+        "havingConditions": "조건 있음:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "경고 이름",
+      "sqlQuery": "SQL 쿼리",
+      "promqlQuery": "프롬큐 쿼리",
+      "conditions": "조건",
+      "copy": "복사",
+      "noCondition": "조건 없음",
+      "noDescription": "설명 없음",
+      "evaluationHistory": "평가 기록",
+      "loadingHistory": "기록 로드 중...",
+      "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다.",
+      "results": "결과"
+    },
+    "historyTable": {
+      "timestamp": "타임스탬프",
+      "status": "상태",
+      "evaluationTime": "평가 (들)",
+      "queryTime": "쿼리 (밀리초)",
+      "error": "오류"
+    },
+    "back": "뒤로",
+    "continue": "계속",
+    "wouldTrigger": "트리거할 것이다",
+    "wouldNotTrigger": "트리거하지 않을 것입니다",
+    "queryBuilder": "건축업자",
+    "groupByHelp": {
+      "description": "집계된 데이터를 특정 필드별로 그룹화하여 각 고유 값에 대해 별도의 알림을 생성합니다.",
+      "example": "예: “호스트 이름”별로 그룹화하여 서버당 개별 알림을 가져오거나 “status_code”별로 그룹화하여 오류를 개별적으로 추적합니다."
+    },
+    "conditions": {
+      "condition": "상태",
+      "conditionGroup": "조건 그룹",
+      "addConditionTooltip": "이 그룹에 새 조건 추가",
+      "addConditionGroupTooltip": "중첩된 조건 그룹 추가 (최대 깊이: 2)",
+      "maxDepthReachedTooltip": "최대 중첩 깊이에 도달했습니다."
+    },
+    "compareWithPast": {
+      "alertSetFor": "에 대한 경고 설정",
+      "currentWindow": "현재 창",
+      "cycle": "사이클",
+      "cycleTooltip": "이전 주기의 동일한 시간과 결과를 비교합니다.",
+      "runningFor": "모든 {빈도} 간격으로 {기간} 동안 실행",
+      "currentWindowCannotBeDeleted": "현재 창을 삭제할 수 없습니다.",
+      "comparingWith": "비교 대상",
+      "referenceWindow": "레퍼런스 윈도우",
+      "timeFrame": "타임 프레임",
+      "timeFrameTooltip": "쿼리의 시간 범위.",
+      "comparingText": "현재 윈도우 쿼리 결과를 이전 {offset} 의 쿼리 결과와 비교합니다.",
+      "addComparisonWindow": "비교 창 추가",
+      "goToConditions": "조건으로 이동",
+      "goToConditionsTooltip": "“조건으로 이동”을 클릭하여 선택한 비교 창의 이벤트를 확인합니다."
+    },
+    "alertSettings": {
+      "cronSchedule": "크론 스케줄",
+      "addNewDestination": "새 목적지 추가",
+      "cooldownTooltip": "경고가 트리거되면 다른 알림을 보내기 전에 얼마나 기다려야 합니까? 예를 들어 경보가 오후 4시에 트리거되고 무음 알림이 10분으로 설정된 경우 경고가 1분이 지난 후에도 오후 4시 10분까지는 다른 알림을 보내지 않습니다.이는 사용자에게 알림을 스팸으로 보내는 것을 방지하기 위한 것입니다.",
+      "thresholdTooltip": "이벤트 수 또는 집계된 값을 기반으로 알림이 트리거되는 시기를 정의합니다.예: “> 100\"으로 설정하면 이벤트 수가 100개를 초과할 때 알림이 트리거됩니다.",
+      "periodTooltip": "쿼리를 실행해야 하는 기간. 예를 들어 10분은 쿼리가 실행될 때마다 최근 10분의 데이터를 사용한다는 의미입니다.",
+      "frequencyTooltipMinutes": "작업 실행 빈도 (예: 5분마다)",
+      "frequencyTooltipCron": "공백으로 구분된 5개의 필드가 있는 표준 UNIX 크론 형식: [분 0-59] [시간 0-23] [월 1-31] [월 1-12일 또는 1월 12월] [요일 0-7 또는 '1L-7L', 일요일의 경우 0 및 7].",
+      "timezoneWarning": "경고: 표시된 시간대는 대략적인 시간대입니다.정확한 시간대를 수동으로 확인하고 선택하십시오.",
+      "destinationsTooltip": "경고 알림을 보낼 대상을 하나 이상 선택합니다.",
+      "templateTooltip": "선택 사항: 이 알림의 모든 대상에 사용할 템플릿을 선택합니다.템플릿을 사용하여 경고 메시지의 형식을 사용자 지정할 수 있습니다.선택하지 않을 경우 각 대상에서는 자체적으로 구성된 템플릿을 사용합니다."
+    },
+    "advanced": {
+      "addVariable": "변수 추가",
+      "variablesTooltip": "변수는 알림에서 대상으로 데이터를 전달하는 데 사용됩니다.",
+      "rowTemplateTooltip": "행 템플릿은 경고 메시지의 형식을 지정하는 데 사용됩니다.",
+      "templateType": "템플릿 유형:"
+    }
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2143,7 +2240,6 @@
       "groupsLabel": "그룹",
       "noMatchingGroups": "일치하는 그룹 없음",
       "fqnFormulaTitle": "식별자 공식",
-      "fqnFormulaTooltip": "서비스 식별자가 어떻게 계산되는지 보여줍니다. 범위 차원(파란색)은 '/'로 연결됩니다. 첫 번째 non-null 워크로드 차원(녹색)이 서비스 이름이 됩니다.",
       "scopeDimension": "범위 차원",
       "workloadDimension": "워크로드 차원",
       "noFormulaConfigured": "식별자 공식이 구성되지 않았습니다. 위에 차원을 추가하십시오.",
@@ -2532,7 +2628,8 @@
     "sql_query": "SQL 쿼리",
     "resuls": "결과",
     "wrapText": "줄 바꿈 텍스트",
-    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다."
+    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다.",
+    "results": "결과"
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",
@@ -2596,7 +2693,8 @@
     "showLegends": "쇼 레전드"
   },
   "alert_list": {
-    "alert_details": "경고 세부 정보"
+    "alert_details": "경고 세부 정보",
+    "alert_history": "알림 기록"
   },
   "latencyInsights": {
     "title": "인사이트",
@@ -2623,7 +2721,8 @@
     "analyzeButtonLabel": "분석",
     "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
     "customSQLFieldsDisabled": "사용자 지정 SQL 쿼리에는 필드 선택을 사용할 수 없습니다.차원은 쿼리 결과에서 추출됩니다.",
-    "timeRangeSelected": "시간 범위 선택"
+    "timeRangeSelected": "시간 범위 선택",
+    "dimensionsSelected": "치수 선택"
   },
   "volumeInsights": {
     "title": "인사이트",
@@ -2748,7 +2847,13 @@
       }
     },
     "viewInTraces": "트레이스에서 보기",
-    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기"
+    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기",
+    "exportToJson": "JSON으로 내보내기",
+    "noLogsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 로그를 찾을 수 없습니다.",
+    "tracesErrorDetails": "추적 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
+    "metricsError": "지표를 로드할 수 없음",
+    "metricsErrorDetails": "지표 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
+    "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

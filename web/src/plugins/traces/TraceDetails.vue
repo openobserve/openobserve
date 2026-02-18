@@ -376,65 +376,159 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="parentContainer"
         >
           <div class="trace-tree-wrapper card-container">
-            <trace-header
-              data-test="trace-details-header"
-              :baseTracePosition="baseTracePosition"
-              :splitterWidth="leftWidth"
-              @resize-start="startResize"
-            />
-            <div style="display: flex; flex: 1; min-height: 0">
-              <div class="relative-position trace-content-scroll">
-                <div
-                  class="trace-tree-container"
-                  data-test="trace-details-tree-container"
-                >
-                  <div class="position-relative">
-                    <div
-                      :style="{
-                        width: '1px',
-                        left: `${leftWidth}px`,
-                        backgroundColor:
-                          store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
-                        zIndex: 999,
-                        top: '-28px',
-                        height: `${spanPositionList.length * spanDimensions.height + 28}px`,
-                        cursor: 'col-resize',
-                      }"
-                      class="absolute resize"
-                      @mousedown="startResize"
-                    />
-                    <trace-tree
-                      data-test="trace-details-tree"
-                      :collapseMapping="collapseMapping"
-                      :spans="spanPositionList"
-                      :baseTracePosition="baseTracePosition"
-                      :spanDimensions="spanDimensions"
-                      :spanMap="spanMap"
-                      :leftWidth="leftWidth"
-                      ref="traceTreeRef"
-                      :search-query="searchQuery"
-                      :spanList="spanList"
-                      :selectedSpanId="selectedSpanId"
-                      @toggle-collapse="toggleSpanCollapse"
-                      @select-span="updateSelectedSpan"
-                      @update-current-index="handleIndexUpdate"
-                      @search-result="handleSearchResult"
-                    />
+            <!-- Tabs for Timeline/DAG views - DAG only shown for LLM traces -->
+            <q-tabs
+              v-if="hasLLMSpans"
+              v-model="activeTab"
+              dense
+              class="text-grey"
+              active-color="primary"
+              indicator-color="primary"
+              align="left"
+              narrow-indicator
+            >
+              <q-tab
+                name="timeline"
+                label="Timeline"
+                data-test="trace-details-timeline-tab"
+              />
+              <q-tab name="dag" label="DAG" data-test="trace-details-dag-tab" />
+            </q-tabs>
+            <q-separator v-if="hasLLMSpans" />
+
+            <!-- Timeline View - show when no LLM spans OR when timeline tab is active -->
+            <div
+              v-if="!hasLLMSpans || activeTab === 'timeline'"
+              style="
+                display: flex;
+                flex-direction: column;
+                flex: 1;
+                min-height: 0;
+              "
+            >
+              <trace-header
+                data-test="trace-details-header"
+                :baseTracePosition="baseTracePosition"
+                :splitterWidth="leftWidth"
+                @resize-start="startResize"
+              />
+              <div style="display: flex; flex: 1; min-height: 0">
+                <div class="relative-position trace-content-scroll">
+                  <div
+                    class="trace-tree-container"
+                    data-test="trace-details-tree-container"
+                  >
+                    <div class="position-relative">
+                      <div
+                        :style="{
+                          width: '1px',
+                          left: `${leftWidth}px`,
+                          backgroundColor:
+                            store.state.theme === 'dark'
+                              ? '#3c3c3c'
+                              : '#ececec',
+                          zIndex: 999,
+                          top: '-28px',
+                          height: `${spanPositionList.length * spanDimensions.height + 28}px`,
+                          cursor: 'col-resize',
+                        }"
+                        class="absolute resize"
+                        @mousedown="startResize"
+                      />
+                      <trace-tree
+                        data-test="trace-details-tree"
+                        :collapseMapping="collapseMapping"
+                        :spans="spanPositionList"
+                        :baseTracePosition="baseTracePosition"
+                        :spanDimensions="spanDimensions"
+                        :spanMap="spanMap"
+                        :leftWidth="leftWidth"
+                        ref="traceTreeRef"
+                        :search-query="searchQuery"
+                        :spanList="spanList"
+                        :selectedSpanId="selectedSpanId"
+                        @toggle-collapse="toggleSpanCollapse"
+                        @select-span="updateSelectedSpan"
+                        @update-current-index="handleIndexUpdate"
+                        @search-result="handleSearchResult"
+                      />
+                    </div>
                   </div>
                 </div>
+                <q-separator
+                  v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                  vertical
+                />
+                <div
+                  v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                  class="histogram-sidebar-inner"
+                  :class="isTimelineExpanded ? '' : 'full'"
+                  :style="{
+                    flex: `0 0 ${sidebarWidth}`,
+                    maxWidth: sidebarWidth,
+                  }"
+                >
+                  <trace-details-sidebar
+                    data-test="trace-details-sidebar"
+                    :span="spanMap[selectedSpanId as string]"
+                    :baseTracePosition="baseTracePosition"
+                    :search-query="searchQuery"
+                    :stream-name="currentTraceStreamName"
+                    :service-streams-enabled="serviceStreamsEnabled"
+                    :parent-mode="mode"
+                    @view-logs="redirectToLogs"
+                    @close="closeSidebar"
+                    @open-trace="openTraceLink"
+                  />
+                </div>
               </div>
-              <q-separator
-                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                vertical
-              />
+            </div>
+
+            <!-- DAG View - only for LLM traces -->
+            <div
+              v-if="hasLLMSpans && activeTab === 'dag'"
+              style="display: flex; flex: 1; min-height: 0"
+            >
+              <div
+                class="dag-left-panel"
+                :style="{
+                  width:
+                    isSidebarOpen && (selectedSpanId || showTraceDetails)
+                      ? `${dagLeftWidth}%`
+                      : '100%',
+                  minWidth: '200px',
+                }"
+              >
+                <TraceDAG
+                  data-test="trace-details-dag"
+                  :traceId="effectiveSpanList[0]?.trace_id || ''"
+                  :streamName="currentTraceStreamName || 'default'"
+                  :startTime="effectiveTimeRange.from || 0"
+                  :endTime="effectiveTimeRange.to || 0"
+                  :sidebarOpen="
+                    isSidebarOpen && (!!selectedSpanId || showTraceDetails)
+                  "
+                  @node-click="handleDAGNodeClick"
+                />
+              </div>
+              <!-- Resizable divider -->
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="histogram-sidebar-inner"
-                :class="isTimelineExpanded ? '' : 'full'"
-                :style="{ flex: `0 0 ${sidebarWidth}`, maxWidth: sidebarWidth }"
+                class="dag-resizer"
+                @mousedown="startDagResize"
+              >
+                <div class="dag-resizer-line"></div>
+              </div>
+              <div
+                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                class="dag-right-panel"
+                :style="{
+                  width: `${100 - dagLeftWidth}%`,
+                  minWidth: '300px',
+                }"
               >
                 <trace-details-sidebar
-                  data-test="trace-details-sidebar"
+                  data-test="trace-details-dag-sidebar"
                   :span="spanMap[selectedSpanId as string]"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
@@ -492,6 +586,7 @@ import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
+import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
 import {
@@ -521,6 +616,7 @@ import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
   parseCostDetails,
+  isLLMTrace,
 } from "@/utils/llmUtils";
 
 export default defineComponent({
@@ -553,6 +649,10 @@ export default defineComponent({
     endTimeProp: {
       type: Number,
       default: 0,
+    },
+    correlatedLogStream: {
+      type: String,
+      default: "",
     },
 
     // UI visibility controls
@@ -595,6 +695,7 @@ export default defineComponent({
     ShareButton,
     TraceDetailsSidebar,
     TraceTree,
+    TraceDAG,
     TraceHeader,
     TraceTimelineIcon,
     ServiceMapIcon,
@@ -607,6 +708,8 @@ export default defineComponent({
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
+    const activeTab = ref("timeline");
+
     const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
@@ -680,10 +783,16 @@ export default defineComponent({
 
     const throttledResizing = ref<any>(null);
 
+    // DAG panel resize state
+    const dagLeftWidth: Ref<number> = ref(50); // percentage
+    const dagInitialX: Ref<number> = ref(0);
+    const dagInitialWidth: Ref<number> = ref(0);
+    const throttledDagResizing = ref<any>(null);
+
     // Calculate sidebar width based on leftWidth
     // Sidebar should take ~84% of the remaining space after left panel
     const sidebarWidth = computed(() => {
-      if (!parentContainer.value) return '84%';
+      if (!parentContainer.value) return "84%";
       const containerWidth = parentContainer.value.clientWidth || 1200;
       const remainingWidth = containerWidth - leftWidth.value;
       const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
@@ -787,6 +896,13 @@ export default defineComponent({
         return props.spanListProp;
       }
       return searchObj.data.traceDetails.spanList;
+    });
+
+    // Check if the trace contains any LLM spans
+    const hasLLMSpans = computed(() => {
+      const spans = effectiveSpanList.value;
+      if (!spans || spans.length === 0) return false;
+      return spans.some((span: any) => isLLMTrace(span));
     });
 
     const showTraceDetails = ref(false);
@@ -905,10 +1021,29 @@ export default defineComponent({
             JSON.stringify(logStreams.value),
           );
 
-          if (!searchObj.data.traceDetails.selectedLogStreams.length)
-            searchObj.data.traceDetails.selectedLogStreams.push(
-              logStreams.value[0],
-            );
+          if (!searchObj.data.traceDetails.selectedLogStreams.length) {
+            // Check if log_stream query parameter exists (from correlation navigation)
+            const logStreamQueryValue =
+              router.currentRoute.value.query.log_stream;
+            const logStreamFromQuery = Array.isArray(logStreamQueryValue)
+              ? logStreamQueryValue[0]
+              : logStreamQueryValue;
+
+            if (
+              logStreamFromQuery &&
+              logStreams.value.includes(logStreamFromQuery)
+            ) {
+              // Auto-select the correlated log stream from query parameter
+              searchObj.data.traceDetails.selectedLogStreams.push(
+                logStreamFromQuery,
+              );
+            } else if (logStreams.value.length > 0) {
+              // Default: select the first available log stream
+              searchObj.data.traceDetails.selectedLogStreams.push(
+                logStreams.value[0],
+              );
+            }
+          }
         })
         .catch(() => Promise.reject())
         .finally(() => {});
@@ -1097,7 +1232,7 @@ export default defineComponent({
       req.query.end_time = trace.to;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
+        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
       ) as string;
 
       return req;
@@ -1587,7 +1722,7 @@ export default defineComponent({
       // Parse usage details from split fields
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
-      
+
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
@@ -1751,6 +1886,33 @@ export default defineComponent({
       document.body.classList.remove("no-select");
     };
 
+    // DAG panel resize handlers
+    const startDagResize = (event: MouseEvent) => {
+      dagInitialX.value = event.clientX;
+      dagInitialWidth.value = dagLeftWidth.value;
+
+      throttledDagResizing.value = throttle(dagResizing, 16);
+      window.addEventListener("mousemove", throttledDagResizing.value);
+      window.addEventListener("mouseup", stopDagResize);
+      document.body.classList.add("no-select");
+    };
+
+    const dagResizing = (event: MouseEvent) => {
+      if (!parentContainer.value) return;
+      const containerWidth = parentContainer.value.clientWidth;
+      const deltaX = event.clientX - dagInitialX.value;
+      const deltaPercent = (deltaX / containerWidth) * 100;
+      const newWidth = dagInitialWidth.value + deltaPercent;
+      // Constrain between 20% and 80%
+      dagLeftWidth.value = Math.max(20, Math.min(80, newWidth));
+    };
+
+    const stopDagResize = () => {
+      window.removeEventListener("mousemove", throttledDagResizing.value);
+      window.removeEventListener("mouseup", stopDagResize);
+      document.body.classList.remove("no-select");
+    };
+
     const toggleTimeline = () => {
       isTimelineExpanded.value = !isTimelineExpanded.value;
     };
@@ -1831,7 +1993,10 @@ export default defineComponent({
     };
 
     const redirectToSessionReplay = () => {
-      if (!firstRumSessionData.value.rum_session_id) {
+      if (
+        !firstRumSessionData.value ||
+        !firstRumSessionData.value.rum_session_id
+      ) {
         return;
       }
 
@@ -1872,6 +2037,10 @@ export default defineComponent({
       }
     };
 
+    const handleDAGNodeClick = (spanId: string) => {
+      updateSelectedSpan(spanId);
+    };
+
     const handleBackOrClose = () => {
       if (props.mode === "embedded") {
         emit("close");
@@ -1892,10 +2061,23 @@ export default defineComponent({
         org_identifier: effectiveOrgIdentifier.value,
       };
 
-      router.push({
-        name: "traces",
+      // Add log_stream parameter for correlation navigation
+      // Priority: correlatedLogStream prop > query parameter
+      const logStreamQueryValue = router.currentRoute.value.query.log_stream;
+      const logStreamFromQuery = Array.isArray(logStreamQueryValue)
+        ? logStreamQueryValue[0]
+        : logStreamQueryValue;
+      const logStreamToUse = props.correlatedLogStream || logStreamFromQuery;
+      if (logStreamToUse) {
+        query.log_stream = logStreamToUse;
+      }
+
+      const route = router.resolve({
+        name: "traceDetails",
         query,
       });
+
+      window.open(route.href, "_blank");
     };
 
     const routeToTracesList = () => {
@@ -1928,6 +2110,7 @@ export default defineComponent({
     return {
       router,
       t,
+      activeTab,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -2010,6 +2193,12 @@ export default defineComponent({
       effectiveSpanList,
       // New event handlers
       handleBackOrClose,
+      handleDAGNodeClick,
+      // DAG resize
+      dagLeftWidth,
+      startDagResize,
+      // LLM traces check
+      hasLLMSpans,
     };
   },
 });
@@ -2068,11 +2257,15 @@ $traceChartCollapseHeight: 42px;
   min-height: 0;
   position: relative;
   padding-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .trace-tree-wrapper {
   overflow: hidden;
-  height: calc(100% - 2.5rem);
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -2112,6 +2305,51 @@ $traceChartCollapseHeight: 42px;
 
 .toolbar-operation-name {
   max-width: 225px;
+}
+
+.dag-left-panel {
+  height: calc(100vh - 200px);
+  padding: 16px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dag-right-panel {
+  height: calc(100vh - 200px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+.dag-resizer {
+  width: 8px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+
+  &:hover .dag-resizer-line {
+    background-color: var(--o2-theme-color, #1976d2);
+  }
+}
+
+.dag-resizer-line {
+  width: 3px;
+  height: 100%;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+body.body--dark .dag-resizer-line {
+  background-color: #3c3c3c;
+}
+
+body.body--dark .dag-resizer:hover .dag-resizer-line {
+  background-color: #90caf9;
 }
 </style>
 <style lang="scss">

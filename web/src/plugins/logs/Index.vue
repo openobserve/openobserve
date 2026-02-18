@@ -915,27 +915,21 @@ export default defineComponent({
      * Handles validation, loading states, and error handling
      */
     const extractPatternsForCurrentQuery = async (clear_cache = false) => {
-      console.log("[Index] Extracting patterns for current query");
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
 
       try {
         const queryReq = buildSearch(false, false);
         if (!queryReq) {
-          console.log("[Index] No query request available");
           searchObj.loading = false;
           return;
         }
 
         // Set size to -1 to let backend determine sampling size based on config
-        console.log(
-          "[Patterns] Using default sampling from backend configuration",
-        );
         queryReq.query.size = -1;
 
         const streamName = searchObj.data.stream.selectedStream[0];
         if (!streamName) {
-          console.log("[Index] No stream selected");
           searchObj.loading = false;
           showErrorNotification("Please select a stream to extract patterns");
           return;
@@ -948,10 +942,13 @@ export default defineComponent({
         );
         searchObj.loading = false;
 
-        // Set clear_cache flag before calling getQueryData
+        // Only update histogram for patterns mode, don't fetch logs data
+        // Patterns have their own separate state and don't need logs data
         searchObj.meta.clearCache = clear_cache;
         searchObj.meta.refreshHistogram = true;
-        await getQueryData();
+
+        // Fetch histogram data only (not logs) for patterns mode
+        await getHistogramData();
         refreshHistogramChart();
         console.log("[Index] Patterns extracted successfully");
       } catch (error) {
@@ -1617,9 +1614,7 @@ export default defineComponent({
             ) {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].vrlFunctionQuery = b64EncodeUnicode(
-                searchObj.data.tempFunctionContent,
-              );
+              ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
             } else {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -1725,6 +1720,24 @@ export default defineComponent({
               dashboardPanelData.data.type = "table";
               // Enable dynamic columns for VRL table charts
               dashboardPanelData.data.config.table_dynamic_columns = true;
+            }
+
+            // Clear VRL if chart type is not table (VRL only supported for table in visualization)
+            if (
+              dashboardPanelData.data.type !== "table" &&
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery
+            ) {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = "";
+            }
+
+            // Recalculate shouldUseHistogramQuery after chart type is finalized
+            // Table charts should not use histogram query
+            if (dashboardPanelData.data.type === "table") {
+              shouldUseHistogramQuery.value = false;
             }
 
             // set logs page data to searchResponseForVisualization
@@ -1876,15 +1889,15 @@ export default defineComponent({
           ].customQuery = true;
 
           // Update VRL function query if present
+          // VRL is only supported for table chart type in visualization
           if (
             searchObj.data.tempFunctionContent &&
-            searchObj.data.transformType === "function"
+            searchObj.data.transformType === "function" &&
+            dashboardPanelData.data.type === "table"
           ) {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].vrlFunctionQuery = b64EncodeUnicode(
-              searchObj.data.tempFunctionContent,
-            );
+            ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
           } else {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -2313,15 +2326,19 @@ export default defineComponent({
 
         checkAbort();
 
-        /* Decide whether to use histogram query - don't use for table charts, when there are group_by fields, or when VRL functions are present */
-        const hasVrlFunction =
-          searchObj.data.tempFunctionContent &&
-          searchObj.data.transformType === "function";
+        /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        /* Note: VRL functions are only supported for table charts, and VRL will force table chart type */
+        /* So if VRL is present and autoSelectChartType is true, we know chart will be table */
+        const willBeTableChart =
+          dashboardPanelData.data.type === "table" ||
+          (autoSelectChartType &&
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function");
 
         shouldUseHistogramQuery.value =
-          dashboardPanelData.data.type !== "table" &&
-          !(extractedFields?.group_by && extractedFields.group_by.length) &&
-          !hasVrlFunction;
+          !willBeTableChart &&
+          !(extractedFields?.group_by && extractedFields.group_by.length);
+
 
         const finalQuery = logsPageQuery;
 

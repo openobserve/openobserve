@@ -709,7 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: (incidentDetails?.topology_context?.nodes?.length && triggers.length > 0)
+                  height: (sortedAlertsByTriggerCount?.length)
                     ? 'calc(35% - 5.6px)'
                     : 'calc(65% - 2px)',
                   minHeight: 0,
@@ -1010,26 +1010,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs Tab Content -->
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when logs data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.logStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedLogs') }}</span>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="refresh"
-              color="primary"
-              @click="refreshCorrelation"
-              :disable="correlationLoading"
-            >
-              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
-            </q-btn>
-          </div>
-
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
-            <div class="tw-text-base">Loading correlated logs...</div>
           </div>
 
           <!-- Error/No Data State -->
@@ -1057,18 +1040,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Success State - TelemetryCorrelationDashboard -->
+          <!-- Success State - CorrelatedLogsTable -->
           <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
-            <TelemetryCorrelationDashboard
-              mode="embedded-tabs"
-              :externalActiveTab="'logs'"
-              :serviceName="correlationData.serviceName"
-              :matchedDimensions="correlationData.matchedDimensions"
-              :additionalDimensions="correlationData.additionalDimensions"
-              :logStreams="correlationData.logStreams"
-              :metricStreams="correlationData.metricStreams"
-              :traceStreams="correlationData.traceStreams"
-              :timeRange="telemetryTimeRange"
+            <CorrelatedLogsTable
+              :service-name="correlationData.serviceName"
+              :matched-dimensions="actualMatchedDimensions"
+              :additional-dimensions="{}"
+              :log-streams="correlationData.logStreams"
+              :source-stream="'incidents'"
+              :source-type="'incidents'"
+              :available-dimensions="availableDimensions"
+              :fts-fields="ftsFields"
+              :time-range="telemetryTimeRange"
+              :hide-view-related-button="true"
+              :hide-search-term-actions="true"
+              :hide-dimension-filters="true"
+              :hide-reset-filters-button="true"
+              @sendToAiChat="handleSendToAiChat"
             />
           </div>
         </div>
@@ -1092,7 +1080,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
@@ -1134,6 +1122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
@@ -1157,7 +1146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
@@ -1199,6 +1188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
@@ -1216,7 +1206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed, PropType, nextTick, onUnmounted } from "vue";
+import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -1236,6 +1226,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
@@ -1247,13 +1238,14 @@ export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
     IncidentRCAAnalysis,
     CustomChartRenderer,
   },
-  emits: ['close', 'status-updated'],
+  emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -1575,7 +1567,7 @@ export default defineComponent({
         correlationError.value =
           error?.response?.data?.message ||
           error?.message ||
-          "Failed to load correlated telemetry";
+          t("correlation.failedToLoad");
       } finally {
         correlationLoading.value = false;
       }
@@ -1584,8 +1576,6 @@ export default defineComponent({
     // Build fallback correlation using first alert's stream schema
     const buildFallbackCorrelation = async (org: string, incident: Incident) => {
       try {
-        console.log("[Fallback Correlation] Building local correlation from first alert's stream");
-
         // Get first alert to determine source stream
         const firstAlert = alerts.value?.[0];
         if (!firstAlert) {
@@ -1597,71 +1587,64 @@ export default defineComponent({
         const streamType = firstAlert.stream_type || "logs";
         const streamName = firstAlert.stream_name || "default";
 
-        // Get stream schema
+        // Step 1: Get stream schema (like logs page does)
         const schemaResponse = await streamService.schema(org, streamName, streamType);
         const schema = schemaResponse.data;
 
-        // Get semantic groups
+        // Step 2: Extract schema fields (like logs page does)
+        // CRITICAL FIX: Use uds_schema (user-defined schema) if available!
+        // The logs page shows uds_schema fields in the left pane, NOT all schema fields
+        // uds_schema is the curated list of fields the user cares about
+        const schemaFieldsArray = (schema.uds_schema && schema.uds_schema.length > 0)
+          ? schema.uds_schema
+          : (schema.schema || schema.fields || []);
+        const schemaFields = new Set(schemaFieldsArray.map((f: any) => f.name));
+
+        // Step 3: Get semantic groups to resolve dimension names to field patterns
         const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
         const semanticGroups = semanticGroupsResponse.data;
 
-        // Map incident dimensions to field names in schema
-        // Schema response has .schema array with {name, type} objects
-        const schemaFields = new Set(
-          (schema.schema || schema.fields || []).map((f: any) => f.name)
-        );
-
-        console.log("[Fallback Correlation] Incident dimensions:", incident.stable_dimensions);
-        console.log("[Fallback Correlation] Total schema fields:", schemaFields.size);
-        console.log("[Fallback Correlation] Sample schema fields:", Array.from(schemaFields).slice(0, 10));
-
         const filters: Record<string, string> = {};
 
+        // Step 4: For each dimension, find the matching schema field
         for (const [dimId, dimValue] of Object.entries(incident.stable_dimensions)) {
-          // Find semantic group
+          let matchedField = null;
+
+          // Get semantic group
           const group = semanticGroups.find((g: any) => g.id === dimId);
 
-          console.log(`[Fallback Correlation] Processing ${dimId} = ${dimValue}`);
-
-          if (!group) {
+          if (group && group.fields && group.fields.length > 0) {
+            // Check each field from semantic group
+            for (const fieldName of group.fields) {
+              const existsInSchema = schemaFields.has(fieldName);
+              if (existsInSchema && !matchedField) {
+                matchedField = fieldName;
+                // Don't break - keep logging all fields for debugging
+              }
+            }
+          } else {
             console.warn(`[Fallback Correlation] No semantic group found for: ${dimId}`);
-            continue;
           }
 
-          if (!group.fields || group.fields.length === 0) {
-            console.warn(`[Fallback Correlation] Semantic group ${dimId} has empty fields array`);
-            continue;
-          }
+          // Fallback: If semantic group didn't work, scan schema directly by pattern
+          if (!matchedField) {
+            console.warn(`[Fallback Correlation] Semantic group failed, scanning schema fields directly...`);
+            const dimParts = dimId.split('-');
+            
+            const schemaFieldsArray = Array.from(schemaFields).filter(f => !f.startsWith('_'));
+            for (const schemaField of schemaFieldsArray) {
+              const fieldLower = schemaField.toLowerCase();
+              const allPartsMatch = dimParts.every(part => fieldLower.includes(part.toLowerCase()));
 
-          console.log(`[Fallback Correlation] Trying field variants for ${dimId}:`, group.fields.slice(0, 5));
-
-          // Collect ALL matching field names and pick the best one
-          const matchingFields = [];
-          for (const fieldName of group.fields) {
-            if (schemaFields.has(fieldName)) {
-              matchingFields.push(fieldName);
+              if (allPartsMatch) {
+                matchedField = schemaField;
+                break;
+              }
             }
           }
 
-          if (matchingFields.length > 0) {
-            // Prefer shorter field names without prefixes
-            const bestField = matchingFields.sort((a, b) => {
-              // Penalize long prefixes
-              const aPenalty = a.startsWith('service_') ? 1000 :
-                               a.startsWith('resource_') ? 500 :
-                               a.startsWith('attributes_') ? 300 : 0;
-              const bPenalty = b.startsWith('service_') ? 1000 :
-                               b.startsWith('resource_') ? 500 :
-                               b.startsWith('attributes_') ? 300 : 0;
-
-              // Then by length (shorter = better)
-              return (a.length + aPenalty) - (b.length + bPenalty);
-            })[0];
-
-            filters[bestField] = dimValue;
-            console.log(`[Fallback Correlation] ✅ Mapped ${dimId} → ${bestField} = ${dimValue} (from ${matchingFields.length} options: ${matchingFields.slice(0, 3).join(', ')})`);
-          } else {
-            console.warn(`[Fallback Correlation] ❌ No matching field in schema for ${dimId}`);
+          if (matchedField) {
+            filters[matchedField] = dimValue;
           }
         }
 
@@ -1669,11 +1652,6 @@ export default defineComponent({
           console.warn("[Fallback Correlation] No dimensions could be mapped to stream fields");
           return;
         }
-
-        console.log("[Fallback Correlation] Mapped filters:", filters);
-        console.log("[Fallback Correlation] Schema fields:", Array.from(schemaFields));
-        console.log("[Fallback Correlation] Stream type:", streamType);
-
         // Build StreamInfo object
         const streamInfo = {
           stream_name: streamName,
@@ -1701,10 +1679,6 @@ export default defineComponent({
             correlation_method: "frontend-fallback"
           }
         };
-
-        console.log("[Fallback Correlation] Built correlation data:", correlationData.value);
-        console.log("[Fallback Correlation] Log streams:", correlationData.value.logStreams);
-        console.log("[Fallback Correlation] Filters being passed:", correlationData.value.logStreams[0]?.filters);
       } catch (fallbackError) {
         console.error("[Fallback Correlation] Failed to build fallback:", fallbackError);
         // Don't set error - let tabs show "No correlated X found"
@@ -1778,6 +1752,31 @@ export default defineComponent({
         correlationData.value.metricStreams.length > 0 ||
         correlationData.value.traceStreams.length > 0
       );
+    });
+
+    // Computed properties for CorrelatedLogsTable
+    // Extract actual field names from logStreams filters
+    // The filters contain the correct field name mappings (e.g., k8s_namespace_name)
+    // instead of semantic dimension names (e.g., k8s-namespace)
+    const actualMatchedDimensions = computed(() => {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
+        return correlationData.value?.matchedDimensions || {};
+      }
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
+    });
+
+    const availableDimensions = computed(() => {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
+        return {};
+      }
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
+    });
+
+    const ftsFields = computed(() => {
+      // FTS fields can be empty for now, as the log streams will determine this
+      return [];
     });
 
     // Computed property for formatted RCA content
@@ -2029,6 +2028,36 @@ export default defineComponent({
       });
     };
 
+    // Handle ESC key to close incident detail
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        // Don't close if user is editing title
+        if (isEditingTitle.value) {
+          return;
+        }
+        // Don't close if there are any open dialogs/menus (they should handle ESC first)
+        const hasOpenDialog = document.querySelector('.q-dialog, .q-menu');
+        if (hasOpenDialog) {
+          return;
+        }
+        close();
+      }
+    };
+
+    // Add keyboard event listener on mount
+    onMounted(() => {
+      window.addEventListener('keydown', handleEscapeKey);
+    });
+
+    // Remove keyboard event listener on unmount
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', handleEscapeKey);
+    });
+
+    const handleSendToAiChat = (value: any, append: boolean = true) => {
+      emit('sendToAiChat', value, append);
+    };
+
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
       updating.value = true;
@@ -2047,6 +2076,8 @@ export default defineComponent({
           type: "positive",
           message: t("alerts.incidents.statusUpdated"),
         });
+        // Mark data as stale so incident list will refresh when navigating back
+        store.dispatch('incidents/setShouldRefresh', true);
         emit("status-updated");
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
@@ -2109,6 +2140,8 @@ export default defineComponent({
           message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         console.error("Failed to update title:", error);
         $q.notify({
@@ -2267,6 +2300,8 @@ export default defineComponent({
           message: `Incident status updated to ${response.data.status}`,
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         console.error("Failed to update status:", error);
         $q.notify({
@@ -2311,6 +2346,8 @@ export default defineComponent({
           message: `Incident severity updated to ${response.data.severity}`,
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         console.error("Failed to update severity:", error);
         $q.notify({
@@ -2736,6 +2773,9 @@ export default defineComponent({
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
+      actualMatchedDimensions,
+      availableDimensions,
+      ftsFields,
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
@@ -2750,6 +2790,7 @@ export default defineComponent({
       alertActivityChartData,
       refreshCorrelation,
       close,
+      handleSendToAiChat,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,

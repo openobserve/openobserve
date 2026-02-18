@@ -55,6 +55,17 @@ import type {
 import { useStore } from 'vuex';
 
 /**
+ * Parses a comma/space-separated string of email recipients into an array.
+ */
+function parseEmailRecipients(recipients: string | string[]): string[] {
+  if (Array.isArray(recipients)) return recipients;
+  return (recipients || '')
+    .split(/[,\s]+/)
+    .map((e: string) => e.trim())
+    .filter(Boolean);
+}
+
+/**
  * Composable for managing prebuilt alert destinations
  * Provides functionality for template management, validation, testing, and creation
  */
@@ -364,16 +375,27 @@ export function usePrebuiltDestinations() {
         testBody = testBody.replace(regex, value);
       }
 
-      // For email type, use email-specific test
+      // For email type, send email-specific test request to backend
       if (type === 'email') {
-        // Email testing would require backend SMTP setup
-        // For now, just validate email format and show success
-        const result = {
-          success: true,
-          timestamp: Date.now()
+        const emailRecipients = parseEmailRecipients(credentials.recipients);
+
+        const testResult = await alertDestinationService.test({
+          org_identifier: organizationIdentifier.value,
+          data: {
+            type: 'email',
+            recipients: emailRecipients,
+            body: testBody,
+          }
+        });
+
+        lastTestResult.value = {
+          success: testResult.data.success || false,
+          timestamp: Date.now(),
+          error: testResult.data.error,
+          responseBody: testResult.data.responseBody,
         };
-        lastTestResult.value = result;
-        return result;
+
+        return lastTestResult.value;
       }
 
       // Send test request via backend
@@ -455,9 +477,7 @@ export function usePrebuiltDestinations() {
           skip_tls_verify: skipTlsVerify,
           output_format: 'json',
           destination_type_name: type,
-          emails: Array.isArray(credentials.recipients)
-            ? credentials.recipients
-            : (credentials.recipients || '').split(',').map((e: string) => e.trim()).filter(Boolean),
+          emails: parseEmailRecipients(credentials.recipients),
           metadata: {
             prebuilt_type: type,
             // Flatten credentials into metadata (only non-sensitive fields)
@@ -522,8 +542,7 @@ export function usePrebuiltDestinations() {
       console.error('Failed to create prebuilt destination:', error);
       $q.notify({
         type: 'negative',
-        message: t('alerts.destinations.saveError'),
-        caption: error.message
+        message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
     } finally {
@@ -571,9 +590,7 @@ export function usePrebuiltDestinations() {
           skip_tls_verify: skipTlsVerify,
           output_format: 'json',
           destination_type_name: type,
-          emails: Array.isArray(credentials.recipients)
-            ? credentials.recipients
-            : (credentials.recipients || '').split(',').map((e: string) => e.trim()).filter(Boolean),
+          emails: parseEmailRecipients(credentials.recipients),
           metadata: {
             prebuilt_type: type,
             ...Object.fromEntries(
@@ -634,8 +651,7 @@ export function usePrebuiltDestinations() {
       console.error('Failed to update prebuilt destination:', error);
       $q.notify({
         type: 'negative',
-        message: t('alerts.destinations.saveError'),
-        caption: error.message
+        message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
     } finally {
@@ -727,8 +743,7 @@ export function usePrebuiltDestinations() {
       console.error('Failed to convert destination:', error);
       $q.notify({
         type: 'negative',
-        message: t('alerts.prebuilt.conversionError'),
-        caption: error.message
+        message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
     } finally {

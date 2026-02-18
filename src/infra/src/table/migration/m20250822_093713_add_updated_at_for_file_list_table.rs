@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,10 +36,10 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Set created_at and updated_at for existing rows. use the value of min_ts field to set both
+/// Set updated_at for existing rows. use the value of min_ts field to set both
 /// fields.
 async fn set_updated_at_for_existing_rows(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    // Update existing rows with created_at = min_ts and updated_at = min_ts where updated_at = 0
+    // Update existing rows with updated_at = min_ts where updated_at = 0
     let db = manager.get_connection();
     let backend = db.get_database_backend();
 
@@ -47,15 +47,13 @@ async fn set_updated_at_for_existing_rows(manager: &SchemaManager<'_>) -> Result
 
     let update_query = Query::update()
         .table(FileList::Table)
-        .value(FileList::CreatedAt, Expr::col(FileList::MinTs))
         .value(FileList::UpdatedAt, Expr::col(FileList::MinTs))
         .and_where(Expr::col(FileList::UpdatedAt).eq(0))
         .to_owned();
 
     let (sql, values) = match backend {
-        sea_orm::DatabaseBackend::MySql => update_query.build(MysqlQueryBuilder),
         sea_orm::DatabaseBackend::Postgres => update_query.build(PostgresQueryBuilder),
-        sea_orm::DatabaseBackend::Sqlite => update_query.build(SqliteQueryBuilder),
+        _ => update_query.build(SqliteQueryBuilder),
     };
     let statement = Statement::from_sql_and_values(backend, sql, values);
     let ret = db.execute(statement).await?;
@@ -72,9 +70,8 @@ async fn truncate_stream_stats_table(manager: &SchemaManager<'_>) -> Result<(), 
     log::debug!("[FILE_LIST_MIGRATION] Truncating stream_stats table");
 
     let truncate_query = match backend {
-        sea_orm::DatabaseBackend::MySql => "TRUNCATE TABLE stream_stats".to_string(),
         sea_orm::DatabaseBackend::Postgres => "TRUNCATE TABLE stream_stats".to_string(),
-        sea_orm::DatabaseBackend::Sqlite => "DELETE FROM stream_stats".to_string(),
+        _ => "DELETE FROM stream_stats".to_string(),
     };
 
     let statement = Statement::from_string(backend, truncate_query);
@@ -111,7 +108,6 @@ async fn clean_compactor_offset(manager: &SchemaManager<'_>) -> Result<(), DbErr
 #[derive(DeriveIden)]
 enum FileList {
     Table,
-    CreatedAt,
     UpdatedAt,
     MinTs,
 }
