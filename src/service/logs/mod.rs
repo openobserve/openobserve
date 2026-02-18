@@ -300,7 +300,7 @@ async fn write_logs_by_stream(
     Ok(())
 }
 
-async fn write_logs(
+pub(crate) async fn write_logs(
     thread_id: usize,
     org_id: &str,
     stream_name: &str,
