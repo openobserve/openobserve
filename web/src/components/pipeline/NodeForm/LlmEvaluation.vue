@@ -47,6 +47,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <!-- LLM Judge Section -->
+        <div class="q-mb-md">
+          <div class="text-subtitle1 q-mb-sm">{{ t("pipeline.llmJudgeConfig") }}</div>
+
+          <q-toggle
+            v-model="enableLlmJudge"
+            :label="t('pipeline.enableLlmJudge')"
+            class="q-mb-sm tw:h-[36px] o2-toggle-button-lg -tw:ml-4"
+            size="lg"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+            data-test="llm-evaluation-enable-llm-judge-toggle"
+          />
+          <div class="text-caption text-grey-7 q-mb-md">
+            {{ t("pipeline.enableLlmJudgeHelp") }}
+          </div>
+        </div>
+
+        <!-- LLM Span Identifier -->
+        <div class="q-mb-md">
+          <div class="text-subtitle1 q-mb-sm">{{ t("pipeline.llmSpanIdentifier") }}</div>
+          <div class="o2-input full-width">
+            <q-select
+              v-model="llmSpanIdentifier"
+              :options="filteredStreamFields"
+              :label="t('pipeline.llmSpanIdentifierLabel')"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              use-input
+              input-debounce="300"
+              emit-value
+              map-options
+              :loading="loadingFields"
+              @filter="filterStreamFields"
+              data-test="llm-evaluation-span-identifier-select"
+            >
+              <template v-slot:no-option>
+                <q-item>
+                  <q-item-section class="text-grey">
+                    {{ t("pipeline.noFieldsFound") }}
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
+          </div>
+          <div class="text-caption text-grey-7 q-mt-xs">
+            {{ t("pipeline.llmSpanIdentifierHelp") }}
+          </div>
+        </div>
+
         <!-- Sampling Section -->
         <div class="q-mb-md">
           <div class="text-subtitle1 q-mb-sm">{{ t("pipeline.samplingConfig") }}</div>
@@ -79,17 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-caption text-grey-7">
               {{ t("pipeline.samplingRateHelp") }}
             </div>
-          </div>
-
-          <!-- Sampling Strategy -->
-          <div v-if="enableSampling" class="q-mb-md">
-            <div class="text-body2 q-mb-sm">{{ t("pipeline.samplingStrategy") }}</div>
-            <q-option-group
-              v-model="samplingStrategy"
-              :options="samplingStrategyOptions"
-              color="primary"
-              data-test="llm-evaluation-sampling-strategy-group"
-            />
           </div>
         </div>
 
@@ -134,11 +177,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "LlmEvaluation",
@@ -148,43 +192,78 @@ export default defineComponent({
     const { t } = useI18n();
     const q = useQuasar();
     const { addNode, pipelineObj } = useDragAndDrop();
+    const { getStream } = useStreams();
 
     const nodeName = ref("");
     const enableSampling = ref(false);
     const samplingRate = ref(0.1);
-    const samplingStrategy = ref("hash");
+    const enableLlmJudge = ref(false);
+    const llmSpanIdentifier = ref("gen_ai_system");
+    const streamFields = ref<{ label: string; value: string }[]>([]);
+    const filteredStreamFields = ref<{ label: string; value: string }[]>([]);
+    const loadingFields = ref(false);
 
-    const samplingStrategyOptions = computed(() => [
-      {
-        label: t("pipeline.randomSampling"),
-        value: "random",
-        description: t("pipeline.randomSamplingDesc"),
-      },
-      {
-        label: t("pipeline.hashSampling"),
-        value: "hash",
-        description: t("pipeline.hashSamplingDesc"),
-      },
-    ]);
+    const fetchSourceStreamFields = async () => {
+      loadingFields.value = true;
+      try {
+        const allNodes = pipelineObj.currentSelectedPipeline?.nodes || [];
+        const inputStreamNode: any = allNodes.find(
+          (node: any) => node.io_type === "input" && node.data.node_type === "stream",
+        );
 
-    onMounted(() => {
+        if (inputStreamNode) {
+          const streamName =
+            inputStreamNode.data?.stream_name?.value || inputStreamNode.data?.stream_name;
+          const streamType = inputStreamNode.data?.stream_type;
+          const streams: any = await getStream(streamName, streamType, true);
+
+          if (streams && Array.isArray(streams.schema)) {
+            streamFields.value = streams.schema.map((column: any) => ({
+              label: column.name,
+              value: column.name,
+            }));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch stream fields:", e);
+      } finally {
+        filteredStreamFields.value = [...streamFields.value];
+        loadingFields.value = false;
+      }
+    };
+
+    const filterStreamFields = (val: string, update: Function) => {
+      update(() => {
+        if (!val) {
+          filteredStreamFields.value = [...streamFields.value];
+        } else {
+          const needle = val.toLowerCase();
+          filteredStreamFields.value = streamFields.value.filter(
+            (field) => field.label.toLowerCase().includes(needle),
+          );
+        }
+      });
+    };
+
+    onMounted(async () => {
       // If editing existing node, populate form
       if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData) {
         const data = pipelineObj.currentSelectedNodeData.data;
         nodeName.value = data.name || "";
+        enableLlmJudge.value = data.enable_llm_judge || false;
+        llmSpanIdentifier.value = data.llm_span_identifier || "gen_ai_system";
 
-        if (data.sampling_rate !== undefined && data.sampling_rate !== null) {
+        if (data.sampling_rate !== undefined && data.sampling_rate !== null && data.sampling_rate > 0) {
           enableSampling.value = true;
           samplingRate.value = data.sampling_rate;
-        }
-
-        if (data.sampling_strategy) {
-          samplingStrategy.value = data.sampling_strategy;
         }
       } else {
         // Default name for new node
         nodeName.value = "evaluate";
       }
+
+      // Fetch source stream fields for the dropdown
+      await fetchSourceStreamFields();
     });
 
     const saveLlmEvaluationNode = () => {
@@ -202,12 +281,13 @@ export default defineComponent({
       const nodeData: any = {
         name: nodeName.value.trim(),
         node_type: "llm_evaluation",
+        enable_llm_judge: enableLlmJudge.value,
+        llm_span_identifier: llmSpanIdentifier.value || "gen_ai_system",
       };
 
-      // Only add sampling config if enabled
+      // Only add sampling rate if enabled
       if (enableSampling.value) {
         nodeData.sampling_rate = samplingRate.value;
-        nodeData.sampling_strategy = samplingStrategy.value;
       }
 
       // Add node to canvas (works for both new and edit)
@@ -228,8 +308,11 @@ export default defineComponent({
       nodeName,
       enableSampling,
       samplingRate,
-      samplingStrategy,
-      samplingStrategyOptions,
+      enableLlmJudge,
+      llmSpanIdentifier,
+      filteredStreamFields,
+      loadingFields,
+      filterStreamFields,
       saveLlmEvaluationNode,
       pipelineObj,
     };

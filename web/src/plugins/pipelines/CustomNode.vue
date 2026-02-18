@@ -871,7 +871,7 @@ function getIcon(data, ioType) {
         >
           <span>{{ data.name || 'LLM Evaluation' }}</span>
           <span v-if="data.sampling_rate" style="font-size: 0.85em; color: #666; margin-left: 8px;">
-            ({{ (data.sampling_rate * 100).toFixed(0) }}% {{ data.sampling_strategy || 'hash' }})
+            ({{ (data.sampling_rate * 100).toFixed(0) }}%)
           </span>
           <q-tooltip
             anchor="top middle"
@@ -882,15 +882,15 @@ function getIcon(data, ioType) {
             <div style="padding: 8px;">
               <div style="font-weight: 600; margin-bottom: 8px;">LLM Evaluation Node</div>
               <div><strong>Name:</strong> {{ data.name || 'evaluate' }}</div>
+              <div><strong>LLM Judge:</strong> {{ data.enable_llm_judge ? 'Enabled' : 'Disabled' }}</div>
               <div v-if="data.sampling_rate">
-                <strong>Sampling:</strong> {{ (data.sampling_rate * 100).toFixed(1) }}%
-                ({{ data.sampling_strategy === 'hash' ? 'Hash-based (consistent)' : 'Random' }})
+                <strong>Sampling:</strong> {{ (data.sampling_rate * 100).toFixed(1) }}% (hash-based)
               </div>
               <div v-else>
                 <strong>Sampling:</strong> Disabled (evaluates all traces)
               </div>
               <div style="margin-top: 8px; font-size: 0.9em; color: #ccc;">
-                Evaluates traces using LLM judge and enriches them with quality scores
+                Evaluates traces and writes results to a separate logs stream
               </div>
             </div>
           </q-tooltip>

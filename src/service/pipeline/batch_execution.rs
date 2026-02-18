@@ -378,18 +378,27 @@ impl ExecutablePipeline {
         }
 
         // task to collect results
+        let pl_name_for_results = pipeline_name.clone();
         let result_task = tokio::spawn(async move {
-            log::debug!("[Pipeline]: starts result collecting job");
+            log::info!("[Pipeline] {pl_name_for_results}: starts result collecting job");
             let mut count: usize = 0;
             let mut results = HashMap::new();
             while let Some((idx, stream_params, record)) = result_receiver.recv().await {
+                log::info!(
+                    "[Pipeline] {pl_name_for_results}: result collector got record for {}:{}",
+                    stream_params.stream_type,
+                    stream_params.stream_name,
+                );
                 results
                     .entry(stream_params)
                     .or_insert(Vec::new())
                     .push((idx, record));
                 count += 1;
             }
-            log::debug!("[Pipeline]: collected {count} records");
+            log::info!(
+                "[Pipeline] {pl_name_for_results}: collected {count} records total, {} streams",
+                results.len()
+            );
             results
         });
 
@@ -436,9 +445,11 @@ impl ExecutablePipeline {
         log::debug!("[Pipeline]: All records send into pipeline for processing");
 
         // Wait for all node tasks to complete
+        log::info!("[Pipeline] {pipeline_name}: waiting for all node tasks to complete");
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!("[Pipeline] node processing jobs failed: {e}");
         }
+        log::info!("[Pipeline] {pipeline_name}: all node tasks completed");
 
         // Publish errors if received any
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
@@ -461,12 +472,44 @@ impl ExecutablePipeline {
             publish_error(error_data).await;
         }
 
+        log::info!("[Pipeline] {pipeline_name}: awaiting result collector");
         let results = result_task.await.map_err(|e| {
             log::error!("[Pipeline] result collecting job failed: {e}");
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
+        log::info!(
+            "[Pipeline] {pipeline_name}: result collector returned {} stream groups",
+            results.len()
+        );
 
-        Ok(results)
+        // Separate results: same-type goes back to caller, cross-type gets written directly
+        let source_type = source_stream_params.stream_type;
+        let mut same_type_results = HashMap::new();
+        for (stream_params, records) in results {
+            if stream_params.stream_type == source_type {
+                same_type_results.insert(stream_params, records);
+            } else {
+                // Cross-type output: write directly to the destination stream
+                log::info!(
+                    "[Pipeline] {pipeline_name}: cross-type output detected: source={}, dest={}:{} with {} records",
+                    source_type,
+                    stream_params.stream_type,
+                    stream_params.stream_name,
+                    records.len()
+                );
+                if let Err(e) =
+                    Self::write_cross_type_results(org_id, &stream_params, records).await
+                {
+                    log::error!(
+                        "[Pipeline] {pipeline_name}: failed to write cross-type results to {}:{}: {e}",
+                        stream_params.stream_type,
+                        stream_params.stream_name,
+                    );
+                }
+            }
+        }
+
+        Ok(same_type_results)
     }
 
     pub fn get_all_destination_streams(&self) -> Vec<StreamParams> {
@@ -507,6 +550,81 @@ impl ExecutablePipeline {
                 derived_stream.stream_type,
             ),
             _ => unreachable!(), // SourceNode can only be of type Stream of Query
+        }
+    }
+
+    /// Write pipeline results whose stream type differs from the source stream type.
+    ///
+    /// When a pipeline has leaf nodes targeting a different stream type (e.g., a traces
+    /// pipeline producing logs records), those results cannot be handled by the caller
+    /// (which only knows its own stream type). This method writes them directly.
+    async fn write_cross_type_results(
+        org_id: &str,
+        stream_params: &StreamParams,
+        records: Vec<(usize, Value)>,
+    ) -> Result<()> {
+        match stream_params.stream_type {
+            StreamType::Logs => {
+                let thread_id = crate::service::ingestion::get_thread_id();
+                let mut json_data: Vec<(i64, json::Map<String, Value>)> =
+                    Vec::with_capacity(records.len());
+
+                for (_idx, record) in records {
+                    if let Value::Object(map) = record {
+                        let timestamp = map
+                            .get(config::TIMESTAMP_COL_NAME)
+                            .and_then(|ts| ts.as_i64())
+                            .unwrap_or_else(|| chrono::Utc::now().timestamp_micros());
+                        json_data.push((timestamp, map));
+                    }
+                }
+
+                if json_data.is_empty() {
+                    return Ok(());
+                }
+
+                let record_count = json_data.len();
+                let mut status = crate::common::meta::ingestion::IngestionStatus::Record(
+                    crate::common::meta::ingestion::RecordStatus::default(),
+                );
+
+                match crate::service::logs::write_logs(
+                    thread_id,
+                    org_id,
+                    &stream_params.stream_name,
+                    &mut status,
+                    json_data,
+                    true, // is_derived — pipeline output is derived data
+                )
+                .await
+                {
+                    Ok(req_stats) => {
+                        log::info!(
+                            "[Pipeline] cross-type write to logs/{}: {} records, {:.4} MB",
+                            stream_params.stream_name,
+                            req_stats.records,
+                            req_stats.size,
+                        );
+                        Ok(())
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[Pipeline] cross-type write to logs/{} failed for {} records: {e}",
+                            stream_params.stream_name,
+                            record_count,
+                        );
+                        Err(anyhow!("Failed to write cross-type logs: {e}"))
+                    }
+                }
+            }
+            other => {
+                log::warn!(
+                    "[Pipeline] cross-type write for stream type '{}' not yet supported, {} records dropped",
+                    other,
+                    records.len(),
+                );
+                Ok(())
+            }
         }
     }
 }
@@ -587,7 +705,11 @@ async fn process_node(
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::debug!("[Pipeline] {pipeline_name} : Leaf node {node_idx} starts processing");
+                log::info!(
+                    "[Pipeline] {pipeline_name} : Leaf node {node_idx} starts processing (stream={}:{})",
+                    stream_params.stream_type,
+                    stream_params.stream_name,
+                );
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
@@ -664,7 +786,11 @@ async fn process_node(
                     }
                     count += 1;
                 }
-                log::debug!("[Pipeline]: LeafNode {node_idx} done processing {count} records");
+                log::info!(
+                    "[Pipeline] {pipeline_name} : LeafNode {node_idx} done processing {count} records (stream={}:{})",
+                    stream_params.stream_type,
+                    stream_params.stream_name
+                );
             } else {
                 log::debug!("[Pipeline]: source node {node_idx} starts processing");
                 // source stream node: send received record to all its children
@@ -678,8 +804,10 @@ async fn process_node(
             }
         }
         NodeData::Condition(condition_params) => {
-            log::debug!("[Pipeline]: cond node {node_idx} starts processing");
+            log::info!("[Pipeline]: cond node {node_idx} starts processing");
+            let mut total_received: usize = 0;
             while let Some(pipeline_item) = receiver.recv().await {
+                total_received += 1;
                 let PipelineItem {
                     idx,
                     mut record,
@@ -736,7 +864,9 @@ async fn process_node(
                     count += 1;
                 }
             }
-            log::debug!("[Pipeline]: cond node {node_idx} done processing {count} records");
+            log::info!(
+                "[Pipeline]: cond node {node_idx} done: received={total_received}, passed={count} records"
+            );
         }
         NodeData::Function(func_params) => {
             log::debug!("[Pipeline]: func node {node_idx} starts processing");
@@ -1201,15 +1331,113 @@ async fn process_node(
                 );
             }
         }
+        #[cfg(feature = "enterprise")]
+        NodeData::LlmEvaluation(params) => {
+            log::info!(
+                "[Pipeline]: LLM evaluation node {node_idx} starts processing (sampling_rate={}, enable_llm_judge={})",
+                params.sampling_rate,
+                params.enable_llm_judge
+            );
+
+            // Collect all records from receiver
+            let mut all_records = Vec::new();
+            while let Some(pipeline_item) = receiver.recv().await {
+                all_records.push(pipeline_item.record);
+                count += 1;
+            }
+
+            log::info!(
+                "[Pipeline]: LLM evaluation node {node_idx} received {count} records from condition node"
+            );
+
+            // Log sample of what fields the records have, to debug condition filtering
+            if let Some(first) = all_records.first()
+                && let Some(obj) = first.as_object()
+            {
+                let has_llm_input = obj.contains_key("_o2_llm_input");
+                let has_llm_dot_input = obj.contains_key("llm.input");
+                let has_llm_input_flat = obj.contains_key("llm_input");
+                let llm_input_val = obj
+                    .get("_o2_llm_input")
+                    .map(|v| format!("{}", v))
+                    .unwrap_or_else(|| "MISSING".to_string());
+                log::info!(
+                    "[Pipeline]: LLM eval node {node_idx} first record: _o2_llm_input={}, llm.input={}, llm_input={}, _o2_llm_input_value={}",
+                    has_llm_input,
+                    has_llm_dot_input,
+                    has_llm_input_flat,
+                    llm_input_val
+                );
+            }
+
+            if !all_records.is_empty() {
+                // Create evaluation node config from pipeline params
+                let eval_config =
+                    o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationConfig {
+                        sampling_rate: params.sampling_rate,
+                        enable_llm_judge: params.enable_llm_judge,
+                        llm_span_identifier: params.llm_span_identifier.clone(),
+                    };
+
+                match o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::new(
+                    params.name.clone(),
+                    eval_config,
+                ) {
+                    Ok(eval_node) => {
+                        use o2_enterprise::enterprise::pipeline::node::PipelineNode;
+                        match eval_node.process(all_records).await {
+                            Ok(eval_results) => {
+                                log::info!(
+                                    "[Pipeline]: LLM evaluation node {node_idx} produced {} evaluation records",
+                                    eval_results.len()
+                                );
+                                log::info!(
+                                    "[Pipeline]: LLM eval node {node_idx} sending {} records to {} children",
+                                    eval_results.len(),
+                                    child_senders.len(),
+                                );
+                                for (i, record) in eval_results.into_iter().enumerate() {
+                                    let item = PipelineItem {
+                                        idx: 0,
+                                        record,
+                                        flattened: false,
+                                    };
+                                    send_to_children(&mut child_senders, item, "LlmEvaluationNode").await;
+                                    log::info!(
+                                        "[Pipeline]: LLM eval node {node_idx} sent record {i} to children"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[Pipeline]: LLM evaluation node {node_idx} processing failed: {e}"
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[Pipeline]: Failed to create LLM evaluation node {node_idx}: {e}"
+                        );
+                    }
+                }
+            }
+
+            log::debug!(
+                "[Pipeline]: LLM evaluation node {node_idx} done processing {count} records"
+            );
+        }
+        #[cfg(not(feature = "enterprise"))]
         NodeData::LlmEvaluation(_) => {
-            // LLM evaluation is handled by the enterprise pipeline
-            // In OSS, just pass through records to children
+            // LLM evaluation is not supported in open source version, pass through
             log::debug!("[Pipeline]: LLM evaluation node {node_idx} (passthrough in OSS)");
             while let Some(pipeline_item) = receiver.recv().await {
                 send_to_children(&mut child_senders, pipeline_item, "LlmEvaluationNode").await;
                 count += 1;
             }
-            log::debug!("[Pipeline]: LLM evaluation node {node_idx} done processing {count} records");
+            log::debug!(
+                "[Pipeline]: LLM evaluation node {node_idx} done processing {count} records"
+            );
         }
     }
 
