@@ -2846,7 +2846,12 @@
     },
     "viewInTraces": "Visualizza in Tracce",
     "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate",
-    "exportToJson": "Esporta in JSON"
+    "exportToJson": "Esporta in JSON",
+    "noLogsDescription": "Nessun registro trovato per questa correlazione nell'intervallo di tempo selezionato.",
+    "tracesErrorDetails": "Si è verificato un errore durante il recupero dei dati di traccia. Per favore riprova.",
+    "metricsError": "Impossibile caricare le metriche",
+    "metricsErrorDetails": "Si è verificato un errore durante il recupero dei dati delle metriche. Riprova.",
+    "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
