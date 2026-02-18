@@ -82,7 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </q-tooltip>
               </div>
-              <q-btn
+              <!-- import dashboard button with dropdown -->
+              <q-btn-dropdown
                 class="q-ml-sm o2-secondary-button tw:h-[36px]"
                 :class="
                   store.state.theme === 'dark'
@@ -92,10 +93,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 flat
                 :label="t(`dashboard.import`)"
-                @click="importDashboard"
                 data-test="dashboard-import"
-              />
-              <!-- add dashboard button -->
+              >
+                <q-list>
+                  <q-item clickable v-close-popup @click="importDashboard" data-test="dashboard-import-custom">
+                    <q-item-section>
+                      <q-item-label>Custom</q-item-label>
+                      <q-item-label caption>Import from JSON file or URL</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                  <q-item clickable v-close-popup @click="showAddDashboardFromGitHub = true" data-test="dashboard-import-templates">
+                    <q-item-section>
+                      <q-item-label>Templates</q-item-label>
+                      <q-item-label caption>Browse and import from gallery</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-btn-dropdown>
+              <!-- new dashboard button -->
               <q-btn
                 class="q-ml-sm o2-primary-button tw:h-[36px]"
                 :class="
@@ -105,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 no-caps
                 flat
-                data-test="dashboard-add"
+                data-test="dashboard-new"
                 :label="t(`dashboard.add`)"
                 @click="addDashboard"
               />
@@ -497,6 +512,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-dialog>
 
+          <!-- add dashboard from GitHub gallery -->
+          <AddDashboardFromGitHub
+            v-model="showAddDashboardFromGitHub"
+            @added="getDashboards"
+          />
+
           <!-- add/edit folder -->
           <q-dialog
             v-model="showAddFolderDialog"
@@ -617,10 +638,15 @@ const AddDashboard = defineAsyncComponent(() => {
   return import("@/components/dashboards/AddDashboard.vue");
 });
 
+const AddDashboardFromGitHub = defineAsyncComponent(() => {
+  return import("@/components/dashboards/AddDashboardFromGitHub.vue");
+});
+
 export default defineComponent({
   name: "Dashboards",
   components: {
     AddDashboard,
+    AddDashboardFromGitHub,
     QTablePagination,
     NoData,
     ConfirmDialog,
@@ -633,6 +659,7 @@ export default defineComponent({
     const $q = useQuasar();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
+    const showAddDashboardFromGitHub = ref(false);
     const showAddFolderDialog = ref(false);
     const qTable: any = ref(null);
     const router = useRouter();
@@ -1371,6 +1398,7 @@ export default defineComponent({
       dashboard,
       columns,
       showAddDashboardDialog,
+      showAddDashboardFromGitHub,
       addDashboard,
       importDashboard,
       pagination,

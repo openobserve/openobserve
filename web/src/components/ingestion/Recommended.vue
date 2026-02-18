@@ -24,19 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
-            <q-input
-              data-test="recommended-list-search-input"
-              v-model="tabsFilter"
-              borderless
-              dense
-              clearable
-              :placeholder="t('common.search')"
-              class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
             <q-tabs
               v-model="ingestTabType"
               indicator-color="transparent"
@@ -106,8 +93,6 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier,
     );
-
-    const tabsFilter = ref("");
 
     const ingestTabType = ref("ingestFromKubernetes");
 
@@ -234,17 +219,8 @@ export default defineComponent({
       },
     ];
 
-    let filteredTabs = [];
-    // create computed property to filter tabs
     const filteredList = computed(() => {
-      if (!tabsFilter.value) {
-        return recommendedTabs;
-      }
-      filteredTabs = recommendedTabs.filter((tab) => {
-        return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
-      });
-
-      return filteredTabs;
+      return recommendedTabs;
     });
 
     return {
@@ -259,7 +235,6 @@ export default defineComponent({
       verifyOrganizationStatus,
       tabs,
       ingestTabType,
-      tabsFilter,
       filteredList,
       recommendedTabs,
     };

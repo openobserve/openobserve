@@ -29,7 +29,6 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::Deserialize;
-use tracing::Span;
 
 /// Agent type for general chat/copilot requests (SQL help, observability questions, etc.)
 #[cfg(feature = "enterprise")]
@@ -179,20 +178,6 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let user_id = &auth_data.user_id;
         let org_id_str = org_id.as_str();
         let config = get_o2_config();
-
-        // Create root span for AI tracing if enabled
-        let span = if config.ai.tracing_enabled {
-            tracing::info_span!(
-                "http.request",
-                http.method = "POST",
-                http.route = "/api/{org_id}/ai/chat",
-                http.target = format!("/api/{org_id_str}/ai/chat"),
-                otel.kind = "server",
-            )
-        } else {
-            Span::none()
-        };
-        let _guard = span.enter();
 
         // Check if AI/agent is enabled
         if !config.ai.enabled {
@@ -442,6 +427,52 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     let trace_id = auth_data.get_trace_id();
     let user_id = auth_data.user_id.clone();
 
+    // Create OTel span for AI tracing using the OpenTelemetry API directly.
+    // We avoid the tracing-opentelemetry bridge here because it has issues with
+    // span lifecycle management in async generators (spans created via tracing::info_span!
+    // don't get properly exported when held inside async_stream::stream!).
+    #[cfg(feature = "enterprise")]
+    let otel_chat_span = {
+        let config = get_o2_config();
+        if config.ai.tracing_enabled {
+            use opentelemetry::trace::{SpanKind, TraceContextExt, Tracer};
+
+            // Extract parent context from incoming traceparent header
+            let parent_cx = opentelemetry::global::get_text_map_propagator(|propagator| {
+                propagator.extract(&crate::common::utils::http::RequestHeaderExtractor::new(
+                    &parts.headers,
+                ))
+            });
+
+            // Create the span as a child of the incoming request
+            let tracer = opentelemetry::global::tracer("openobserve");
+            let span = tracer
+                .span_builder("ai.chat_stream")
+                .with_kind(SpanKind::Server)
+                .with_attributes(vec![
+                    opentelemetry::KeyValue::new("http.method", "POST"),
+                    opentelemetry::KeyValue::new("http.route", "/api/{org_id}/ai/chat_stream"),
+                    opentelemetry::KeyValue::new(
+                        "http.target",
+                        format!("/api/{}/ai/chat_stream", org_id),
+                    ),
+                    opentelemetry::KeyValue::new("trace_id", trace_id.clone()),
+                    opentelemetry::KeyValue::new("user_id", user_id.clone()),
+                    opentelemetry::KeyValue::new("org_id", org_id.clone()),
+                ])
+                .start_with_context(&tracer, &parent_cx);
+
+            // Build the context with this span so we can inject a traceparent for downstream
+            let span_cx = parent_cx.with_span(span);
+            Some(span_cx)
+        } else {
+            None
+        }
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let otel_chat_span: Option<opentelemetry::Context> = None;
+
     let mut forward_headers = std::collections::HashMap::new();
 
     // Extract and validate session ID (UUID v7 format: 8-4-4-4-12 hex digits)
@@ -458,9 +489,25 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         }
     }
 
-    if let Some(traceparent) = &auth_data.traceparent
+    // Generate a new traceparent from the ai.chat_stream span's context.
+    // This ensures the agent sees ai.chat_stream as its parent (not the frontend span).
+    if let Some(ref span_cx) = otel_chat_span {
+        let mut injected_headers = std::collections::HashMap::new();
+        opentelemetry::global::get_text_map_propagator(|propagator| {
+            propagator.inject_context(span_cx, &mut injected_headers);
+        });
+        if let Some(tp) = injected_headers.remove("traceparent") {
+            log::info!(
+                "[trace_id:{}] Forwarding traceparent from ai.chat_stream span: {}",
+                trace_id,
+                tp
+            );
+            forward_headers.insert("traceparent".to_string(), tp);
+        }
+    } else if let Some(traceparent) = &auth_data.traceparent
         && !traceparent.is_empty()
     {
+        // Fallback: forward original traceparent when tracing is disabled
         forward_headers.insert("traceparent".to_string(), traceparent.clone());
     }
 
@@ -512,26 +559,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
     #[cfg(feature = "enterprise")]
     {
-        use async_stream::stream;
         use futures::StreamExt;
         use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, get_agent_client};
 
         let config = get_o2_config();
         let org_id_str = org_id.clone();
-
-        // Create root span for AI tracing if enabled
-        let span = if config.ai.tracing_enabled {
-            tracing::info_span!(
-                "http.request",
-                http.method = "POST",
-                http.route = "/api/{org_id}/ai/chat_stream",
-                http.target = format!("/api/{}/ai/chat_stream", org_id_str),
-                otel.kind = "server",
-            )
-        } else {
-            Span::none()
-        };
-        let _guard = span.enter();
 
         let mut code = StatusCode::OK.as_u16();
         let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
@@ -672,9 +704,17 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         } else {
             Some(forward_headers)
         };
-        let s = stream! {
+
+        // Move the OTel span context into the stream so it stays alive for the
+        // full streaming duration. When the stream completes, the span is explicitly
+        // ended. We use the OpenTelemetry API directly (not the tracing bridge) to
+        // ensure reliable span export from async generators.
+        let s = async_stream::stream! {
             // Call the agent service with forwarded headers
-            let response = match client.query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref()).await {
+            let response = match client
+                .query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref())
+                .await
+            {
                 Ok(r) => r,
                 Err(e) => {
                     log::error!(
@@ -686,6 +726,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                         "error": format!("Agent query failed: {}", e)
                     });
                     yield Ok(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
+                    // End span on error path too
+                    if let Some(span_cx) = otel_chat_span {
+                        use opentelemetry::trace::TraceContextExt;
+                        span_cx.span().end();
+                    }
                     return;
                 }
             };
@@ -693,6 +738,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             // Forward the streaming response from agent
             let mut agent_stream = response.bytes_stream();
 
+            // Poll the stream with proper instrumentation
+            // Each chunk is traced within the context of ai.chat_stream
             while let Some(chunk_result) = agent_stream.next().await {
                 match chunk_result {
                     Ok(bytes) => {
@@ -716,6 +763,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
                  Agent stream ended"
             );
+            // Explicitly end the OTel span when the stream completes.
+            // This is critical: the span must be ended before it can be exported
+            // by the BatchSpanProcessor.
+            if let Some(span_cx) = otel_chat_span {
+                use opentelemetry::trace::TraceContextExt;
+                span_cx.span().end();
+            }
         };
 
         axum::http::Response::builder()
