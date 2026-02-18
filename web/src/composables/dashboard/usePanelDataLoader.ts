@@ -204,7 +204,7 @@ export const usePanelDataLoader = (
   // Coalesced version — multiple mid-stream cache save requests within the same
   // microtask checkpoint collapse into a single save. Zero artificial delay.
   let cacheSaveScheduled = false;
-  const debouncedSaveCache = () => {
+  const coalescedSaveCache = () => {
     if (cacheSaveScheduled) return;
     cacheSaveScheduled = true;
     queueMicrotask(() => {
@@ -537,17 +537,17 @@ export const usePanelDataLoader = (
     try {
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
-        debouncedSaveCache();
+        coalescedSaveCache();
       }
 
       if (response.type === "search_response_hits") {
         handleStreamingHistogramHits(payload, response);
-        debouncedSaveCache();
+        coalescedSaveCache();
       }
 
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
-        debouncedSaveCache();
+        coalescedSaveCache();
       }
 
       if (response.type === "error") {
@@ -573,7 +573,7 @@ export const usePanelDataLoader = (
       if (response.type === "event_progress") {
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
         state.isPartialData = true;
-        debouncedSaveCache();
+        coalescedSaveCache();
       }
     } catch (error: any) {
       state.loading = false;
@@ -1012,7 +1012,7 @@ export const usePanelDataLoader = (
                 if (res.type === "event_progress") {
                   state.loadingProgressPercentage = res?.content?.percent ?? 0;
                   state.isPartialData = true;
-                  debouncedSaveCache();
+                  coalescedSaveCache();
                 }
                 if (res?.type === "promql_response") {
                   const newData = res?.content?.results;
@@ -1401,7 +1401,7 @@ export const usePanelDataLoader = (
                         }
                       }
                       state.errorDetail = { message: "", code: "" };
-                      debouncedSaveCache();
+                      coalescedSaveCache();
                     }
 
                     if (response.type === "search_response") {
@@ -1417,7 +1417,7 @@ export const usePanelDataLoader = (
                         };
                       }
                       state.errorDetail = { message: "", code: "" };
-                      debouncedSaveCache();
+                      coalescedSaveCache();
                     }
 
                     if (response.type === "error") {
