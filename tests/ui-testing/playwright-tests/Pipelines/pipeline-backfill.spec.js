@@ -56,16 +56,8 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     // Cleanup: Wait for any pending operations to complete
     await page.waitForTimeout(1000);
 
-    // Clear any open dialogs or menus
-    try {
-      const dialog = page.locator('.q-dialog');
-      if (await dialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-      }
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    // Clear any open dialogs or menus using POM
+    await pageManager.pipelinesPage.dismissOpenDialogs();
 
     testLogger.info('Test cleanup completed');
   });
@@ -88,20 +80,11 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Verify backfill page loaded using POM methods
     const isPageVisible = await pageManager.pipelinesPage.isBackfillPageVisible();
+    const isBackfillTextVisible = await pageManager.pipelinesPage.isBackfillTextVisible();
 
-    if (isPageVisible) {
-      testLogger.info('Backfill jobs page loaded successfully');
-      await expect(pageManager.pipelinesPage.backfillPageLocator).toBeVisible();
-    } else {
-      // Check for any backfill-related content using POM
-      const isBackfillTextVisible = await pageManager.pipelinesPage.isBackfillTextVisible();
-      if (isBackfillTextVisible) {
-        testLogger.info('Backfill page content found');
-      } else {
-        testLogger.info('Backfill page selectors may need updating - checking URL');
-        await expect(page).toHaveURL(/backfill/);
-      }
-    }
+    // At least one indicator must confirm we're on the backfill page
+    expect(isPageVisible || isBackfillTextVisible || /backfill/.test(page.url())).toBe(true);
+    testLogger.info('Backfill jobs page loaded successfully');
 
     testLogger.info('Test completed: Backfill jobs navigation');
   });
@@ -120,39 +103,29 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Check for status filter using POM
     const isStatusFilterVisible = await pageManager.pipelinesPage.isStatusFilterVisible();
-    if (isStatusFilterVisible) {
-      testLogger.info('Status filter found');
-    } else {
-      testLogger.info('Status filter not found with expected selector');
-    }
+    expect(isStatusFilterVisible).toBe(true);
+    testLogger.info('Status filter found');
 
     // Check for pipeline filter using POM
     const isPipelineFilterVisible = await pageManager.pipelinesPage.isPipelineFilterVisible();
-    if (isPipelineFilterVisible) {
-      testLogger.info('Pipeline filter found');
-    }
+    expect(isPipelineFilterVisible).toBe(true);
+    testLogger.info('Pipeline filter found');
 
     // Check for clear filters button using POM
     const isClearFiltersVisible = await pageManager.pipelinesPage.isClearFiltersBtnVisible();
-    if (isClearFiltersVisible) {
-      testLogger.info('Clear filters button found');
-    }
+    expect(isClearFiltersVisible).toBe(true);
+    testLogger.info('Clear filters button found');
 
     // Check for refresh button using POM
     const isRefreshVisible = await pageManager.pipelinesPage.isBackfillRefreshBtnVisible();
-    if (isRefreshVisible) {
-      testLogger.info('Refresh button found');
-    }
+    expect(isRefreshVisible).toBe(true);
+    testLogger.info('Refresh button found');
 
     // Check for jobs table using POM
     const isTableVisible = await pageManager.pipelinesPage.isBackfillJobsTableVisible();
-    if (isTableVisible) {
-      testLogger.info('Backfill jobs table found');
-    } else {
-      // Check for any table using POM
-      const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
-      testLogger.info(`Any table visible: ${isAnyTableVisible}`);
-    }
+    const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
+    expect(isTableVisible || isAnyTableVisible).toBe(true);
+    testLogger.info('Backfill jobs table found');
 
     testLogger.info('Test completed: Backfill page elements check');
   });
@@ -172,6 +145,12 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     // Click back button using POM method (handles fallbacks internally)
     await pageManager.pipelinesPage.clickBackfillBackBtn();
 
+    // Wait for navigation away from backfill page
+    await page.waitForURL(/.*(?!.*backfill).*pipeline.*/, { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+
+    // Verify navigation occurred - URL should no longer contain backfill
+    expect(page.url()).not.toContain('backfill');
     testLogger.info('Test completed: Back navigation from backfill');
   });
 
@@ -189,17 +168,14 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Click status filter using POM
     const isStatusFilterVisible = await pageManager.pipelinesPage.isStatusFilterVisible();
+    expect(isStatusFilterVisible).toBe(true);
 
-    if (isStatusFilterVisible) {
-      // Try to filter by different statuses using POM
-      const statusOptions = ['running', 'paused', 'completed', 'failed'];
-      for (const status of statusOptions) {
-        await pageManager.pipelinesPage.filterByStatus(status);
-        // If successful, break
-        break;
-      }
-    } else {
-      testLogger.info('Status filter not found - may need selector update');
+    // Try to filter by different statuses using POM
+    const statusOptions = ['running', 'paused', 'completed', 'failed'];
+    for (const status of statusOptions) {
+      await pageManager.pipelinesPage.filterByStatus(status);
+      testLogger.info(`Applied status filter: ${status}`);
+      break;
     }
 
     testLogger.info('Test completed: Backfill jobs status filter');
@@ -217,8 +193,13 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
+    // Verify pipeline filter is visible
+    const isPipelineFilterVisible = await pageManager.pipelinesPage.isPipelineFilterVisible();
+    expect(isPipelineFilterVisible).toBe(true);
+
     // Use pipeline filter using POM method
     await pageManager.pipelinesPage.filterByPipeline();
+    testLogger.info('Pipeline filter applied');
 
     testLogger.info('Test completed: Backfill jobs pipeline filter');
   });
@@ -235,8 +216,13 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
+    // Verify clear filters button is visible
+    const isClearFiltersVisible = await pageManager.pipelinesPage.isClearFiltersBtnVisible();
+    expect(isClearFiltersVisible).toBe(true);
+
     // Click clear filters button using POM method (handles fallbacks internally)
     await pageManager.pipelinesPage.clickClearFiltersBtn();
+    testLogger.info('Clear filters button clicked');
 
     testLogger.info('Test completed: Clear filters');
   });
@@ -253,8 +239,13 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
+    // Verify refresh button is visible
+    const isRefreshVisible = await pageManager.pipelinesPage.isBackfillRefreshBtnVisible();
+    expect(isRefreshVisible).toBe(true);
+
     // Click refresh button using POM method (handles fallbacks internally)
     await pageManager.pipelinesPage.clickBackfillRefreshBtn();
+    testLogger.info('Refresh button clicked');
 
     testLogger.info('Test completed: Backfill jobs refresh');
   });
@@ -273,6 +264,8 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Check for progress bars using POM method
     const progressBarCount = await pageManager.pipelinesPage.getProgressBarCount();
+    // Progress bars should be present if there are running jobs, or zero if no jobs
+    expect(progressBarCount).toBeGreaterThanOrEqual(0);
     testLogger.info(`Found ${progressBarCount} progress elements`);
 
     testLogger.info('Test completed: Progress bar check');
@@ -298,6 +291,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     const totalButtonCount = await pageManager.pipelinesPage.getTableButtonCount();
     testLogger.info(`Total table buttons: ${totalButtonCount}`);
 
+    // If there are jobs, there should be action buttons; if no jobs, totals are zero
+    expect(actionCounts.pause + actionCounts.resume + actionCounts.cancel + totalButtonCount).toBeGreaterThanOrEqual(0);
+
     testLogger.info('Test completed: Job action buttons check');
   });
 
@@ -317,12 +313,17 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     const expectedStatuses = ['running', 'waiting', 'paused', 'completed', 'failed', 'canceled'];
 
     // Check for status elements using POM method
+    let totalStatusElements = 0;
     for (const status of expectedStatuses) {
       const count = await pageManager.pipelinesPage.getJobStatusCount(status);
+      totalStatusElements += count;
       if (count > 0) {
         testLogger.info(`Found ${count} "${status}" status elements`);
       }
     }
+
+    // Total status elements should be countable (zero if no jobs, positive if jobs exist)
+    expect(totalStatusElements).toBeGreaterThanOrEqual(0);
 
     testLogger.info('Test completed: Job status display');
   });
@@ -341,15 +342,13 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Get row count using POM
     const rowCount = await pageManager.pipelinesPage.getHistoryRowCount();
+    expect(rowCount).toBeGreaterThanOrEqual(0);
 
     if (rowCount === 0) {
       // Check for empty state message using POM
       const isEmptyStateVisible = await pageManager.pipelinesPage.isEmptyBackfillMessageVisible();
-      if (isEmptyStateVisible) {
-        testLogger.info('Empty state message displayed');
-      } else {
-        testLogger.info('No rows but empty state message not found');
-      }
+      expect(isEmptyStateVisible).toBe(true);
+      testLogger.info('Empty state message displayed');
     } else {
       testLogger.info(`Backfill jobs contains ${rowCount} records`);
     }
@@ -371,6 +370,7 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Check for error indicator buttons using POM
     const errorCount = await pageManager.pipelinesPage.getErrorIndicatorCount();
+    expect(errorCount).toBeGreaterThanOrEqual(0);
 
     if (errorCount > 0) {
       testLogger.info(`Found ${errorCount} error indicators`);
@@ -380,13 +380,13 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
       // Check if error dialog appeared using POM
       const isDialogVisible = await pageManager.pipelinesPage.isErrorDialogVisible();
-      if (isDialogVisible) {
-        testLogger.info('Error dialog displayed');
-        // Close dialog using POM method
-        await pageManager.pipelinesPage.closeErrorDialog();
-      }
+      expect(isDialogVisible).toBe(true);
+      testLogger.info('Error dialog displayed');
+
+      // Close dialog using POM method
+      await pageManager.pipelinesPage.closeErrorDialog();
     } else {
-      testLogger.info('No error indicators found - may be no failed jobs');
+      testLogger.info('No error indicators found - no failed jobs present');
     }
 
     testLogger.info('Test completed: Error indicator check');

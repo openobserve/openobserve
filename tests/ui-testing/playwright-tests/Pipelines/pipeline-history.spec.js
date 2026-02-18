@@ -16,12 +16,15 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
-import { LoginPage } from "../../pages/generalPages/loginPage.js";
 const testLogger = require('../utils/test-logger.js');
+const path = require('path');
 
 test.describe.configure({ mode: "parallel" });
 
+// Use stored authentication state from global setup instead of logging in each test
+const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.use({
+  storageState: authFile,
   contextOptions: {
     slowMo: 1000
   }
@@ -29,17 +32,11 @@ test.use({
 
 test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history', '@pipelinesHistory'] }, () => {
   let pageManager;
-  let loginPage;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
 
-    // Login using LoginPage
-    loginPage = new LoginPage(page);
-    await loginPage.gotoLoginPage();
-    await loginPage.loginAsInternalUser();
-    await loginPage.login();
-
+    // Auth is handled via storageState - no login needed
     pageManager = new PageManager(page);
 
     // Ingest test data
@@ -59,16 +56,8 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     // Cleanup: Wait for any pending operations to complete
     await page.waitForTimeout(1000);
 
-    // Clear any open dialogs or menus
-    try {
-      const dialog = page.locator('.q-dialog');
-      if (await dialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-      }
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    // Clear any open dialogs or menus using POM
+    await pageManager.pipelinesPage.dismissOpenDialogs();
 
     testLogger.info('Test cleanup completed');
   });
@@ -92,19 +81,11 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     // Verify history page loaded using POM methods
     const isPageVisible = await pageManager.pipelinesPage.isHistoryPageVisible();
     const isTitleVisible = await pageManager.pipelinesPage.isHistoryTitleVisible();
+    const isHistoryTextVisible = await pageManager.pipelinesPage.isHistoryTextVisible();
 
-    if (isPageVisible || isTitleVisible) {
-      testLogger.info('Pipeline history page loaded successfully');
-    } else {
-      // Check for any history-related content using POM
-      const isHistoryTextVisible = await pageManager.pipelinesPage.isHistoryTextVisible();
-      if (isHistoryTextVisible) {
-        testLogger.info('History page content found');
-      } else {
-        testLogger.info('History page selectors may need updating - checking URL');
-        await expect(page).toHaveURL(/history/);
-      }
-    }
+    // At least one indicator must confirm we're on the history page
+    expect(isPageVisible || isTitleVisible || isHistoryTextVisible || /history/.test(page.url())).toBe(true);
+    testLogger.info('Pipeline history page loaded successfully');
 
     testLogger.info('Test completed: Pipeline history navigation');
   });
@@ -123,39 +104,29 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
 
     // Check for date picker using POM
     const isDatePickerVisible = await pageManager.pipelinesPage.isHistoryDatePickerVisible();
-    if (isDatePickerVisible) {
-      testLogger.info('Date picker found');
-    } else {
-      testLogger.info('Date picker not found with expected selector');
-    }
+    expect(isDatePickerVisible).toBe(true);
+    testLogger.info('Date picker found');
 
     // Check for search/filter using POM
     const isSearchVisible = await pageManager.pipelinesPage.isHistorySearchSelectVisible();
-    if (isSearchVisible) {
-      testLogger.info('Search select found');
-    }
+    expect(isSearchVisible).toBe(true);
+    testLogger.info('Search select found');
 
     // Check for search button using POM
     const isSearchBtnVisible = await pageManager.pipelinesPage.isHistoryManualSearchBtnVisible();
-    if (isSearchBtnVisible) {
-      testLogger.info('Search button found');
-    }
+    expect(isSearchBtnVisible).toBe(true);
+    testLogger.info('Search button found');
 
     // Check for refresh button using POM
     const isRefreshVisible = await pageManager.pipelinesPage.isHistoryRefreshBtnVisible();
-    if (isRefreshVisible) {
-      testLogger.info('Refresh button found');
-    }
+    expect(isRefreshVisible).toBe(true);
+    testLogger.info('Refresh button found');
 
     // Check for history table using POM
     const isTableVisible = await pageManager.pipelinesPage.isHistoryTableVisible();
-    if (isTableVisible) {
-      testLogger.info('History table found');
-    } else {
-      // Check for any table using POM
-      const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
-      testLogger.info(`Any table visible: ${isAnyTableVisible}`);
-    }
+    const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
+    expect(isTableVisible || isAnyTableVisible).toBe(true);
+    testLogger.info('History table found');
 
     testLogger.info('Test completed: History page elements check');
   });
@@ -172,9 +143,15 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToHistoryPage(orgName);
 
+    // Store history URL before navigating back
+    const historyUrl = page.url();
+
     // Click back button using POM method (handles fallbacks internally)
     await pageManager.pipelinesPage.clickHistoryBackBtn();
+    await page.waitForTimeout(1000);
 
+    // Verify navigation occurred - URL should have changed
+    expect(page.url()).not.toBe(historyUrl);
     testLogger.info('Test completed: Back navigation from history');
   });
 
@@ -190,8 +167,13 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToHistoryPage(orgName);
 
+    // Verify refresh button is visible
+    const isRefreshVisible = await pageManager.pipelinesPage.isHistoryRefreshBtnVisible();
+    expect(isRefreshVisible).toBe(true);
+
     // Click refresh button using POM method (handles fallbacks internally)
     await pageManager.pipelinesPage.clickHistoryRefreshBtn();
+    testLogger.info('Refresh button clicked');
 
     testLogger.info('Test completed: History refresh');
   });
@@ -218,10 +200,15 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     ];
 
     // Check for table headers using POM method
+    let columnsFound = 0;
     for (const column of expectedColumns) {
       const isColumnVisible = await pageManager.pipelinesPage.isColumnHeaderVisible(column);
+      if (isColumnVisible) columnsFound++;
       testLogger.info(`Column "${column}" visible: ${isColumnVisible}`);
     }
+
+    // At least some expected columns should be visible
+    expect(columnsFound).toBeGreaterThan(0);
 
     testLogger.info('Test completed: History table columns check');
   });
@@ -238,25 +225,27 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToHistoryPage(orgName);
 
-    // Try to use the search/filter select using POM
+    // Verify filter controls are visible
     const isSearchSelectVisible = await pageManager.pipelinesPage.isHistorySearchSelectVisible();
+    expect(isSearchSelectVisible).toBe(true);
 
-    if (isSearchSelectVisible) {
-      await pageManager.pipelinesPage.clickHistorySearchSelect();
-      testLogger.info('Search select clicked');
-
-      // Try to select any pipeline option using POM
-      await pageManager.pipelinesPage.selectFirstOption();
-    } else {
-      testLogger.info('Search select not found - may need selector update');
-    }
-
-    // Click search button to apply filter using POM
     const isSearchBtnVisible = await pageManager.pipelinesPage.isHistoryManualSearchBtnVisible();
-    if (isSearchBtnVisible) {
-      await pageManager.pipelinesPage.clickHistoryManualSearchBtn();
-      testLogger.info('Search button clicked');
-    }
+    expect(isSearchBtnVisible).toBe(true);
+
+    // Try to use the search/filter select using POM
+    await pageManager.pipelinesPage.clickHistorySearchSelect();
+    testLogger.info('Search select clicked');
+
+    // Try to select any pipeline option (best-effort - may have no options)
+    await pageManager.pipelinesPage.selectFirstOption();
+
+    // Dismiss any open dropdown overlay
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+
+    // Click search button to apply filter
+    await pageManager.pipelinesPage.clickHistoryManualSearchBtn();
+    testLogger.info('Search button clicked');
 
     testLogger.info('Test completed: History filter by pipeline name');
   });
@@ -275,12 +264,14 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
 
     // Check for status badges/chips using POM
     const statusBadgeCount = await pageManager.pipelinesPage.statusBadges.count();
+    expect(statusBadgeCount).toBeGreaterThanOrEqual(0);
 
     if (statusBadgeCount > 0) {
       testLogger.info(`Found ${statusBadgeCount} status elements`);
 
       // Get status counts using POM method
       const statusCounts = await pageManager.pipelinesPage.getStatusCounts();
+      expect(statusCounts.success + statusCounts.error + statusCounts.warning).toBeGreaterThan(0);
       testLogger.info(`Status counts - Success: ${statusCounts.success}, Error: ${statusCounts.error}, Warning: ${statusCounts.warning}`);
     } else {
       testLogger.info('No status elements found - history may be empty');
@@ -303,15 +294,13 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
 
     // Get row count using POM
     const rowCount = await pageManager.pipelinesPage.getHistoryRowCount();
+    expect(rowCount).toBeGreaterThanOrEqual(0);
 
     if (rowCount === 0) {
       // Check for empty state message using POM
       const isEmptyStateVisible = await pageManager.pipelinesPage.isEmptyStateMessageVisible();
-      if (isEmptyStateVisible) {
-        testLogger.info('Empty state message displayed');
-      } else {
-        testLogger.info('No rows but empty state message not found');
-      }
+      expect(isEmptyStateVisible).toBe(true);
+      testLogger.info('Empty state message displayed');
     } else {
       testLogger.info(`History contains ${rowCount} records`);
     }

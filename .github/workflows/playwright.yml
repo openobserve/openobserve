@@ -214,6 +214,8 @@ jobs:
                 "pipeline-core.spec.js",
                 "pipeline-traces.spec.js",
                 "pipeline-metrics.spec.js",
+                "pipeline-backfill.spec.js",
+                "pipeline-history.spec.js",
                 "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
               ]

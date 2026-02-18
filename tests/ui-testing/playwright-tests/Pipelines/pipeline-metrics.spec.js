@@ -99,16 +99,8 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     // Cleanup: Wait for any pending operations to complete
     await page.waitForTimeout(1000);
 
-    // Clear any open dialogs or menus
-    try {
-      const dialog = page.locator('.q-dialog');
-      if (await dialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-      }
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    // Clear any open dialogs or menus using POM
+    await pageManager.pipelinesPage.dismissOpenDialogs();
 
     testLogger.info('Test cleanup completed');
   });
@@ -141,14 +133,8 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
 
     // Verify "metrics" option is available using POM
     const isMetricsVisible = await pageManager.pipelinesPage.isMetricsOptionVisible();
-
-    if (isMetricsVisible) {
-      testLogger.info('Metrics option found in stream type dropdown');
-      await expect(pageManager.pipelinesPage.metricsOptionLocator).toBeVisible();
-    } else {
-      // Log available options using POM method
-      await pageManager.pipelinesPage.logMenuOptions();
-    }
+    expect(isMetricsVisible).toBe(true);
+    testLogger.info('Metrics option found in stream type dropdown');
 
     // Close dialog by pressing Escape
     await page.keyboard.press('Escape');
@@ -185,23 +171,12 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     // Delete auto-created output node
     await pageManager.pipelinesPage.deleteOutputStreamNode();
 
-    // Add destination stream node - select metrics type for destination
-    await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.selectMetrics();  // Set destination stream type to metrics
-    await pageManager.pipelinesPage.fillDestinationStreamName("metrics_test_dest");
-    await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    await page.waitForTimeout(2000);
+    // Add destination stream node using helper
+    await pageManager.pipelinesPage.addDestinationStreamNode('metrics', 'metrics_test_dest');
 
-    // Connect nodes
+    // Connect nodes and save pipeline
     await pageManager.pipelinesPage.connectInputToOutput();
-
-    // Save pipeline
-    const pipelineName = `metrics-pipeline-${Math.random().toString(36).substring(7)}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-    await page.waitForTimeout(2000);
-
-    testLogger.info(`Metrics pipeline created: ${pipelineName}`);
+    const pipelineName = await pageManager.pipelinesPage.savePipelineWithName('metrics-pipeline');
 
     // Verify pipeline was created on pipeline page
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -220,16 +195,8 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     expect(destStreamExists).toBe(true);
     testLogger.info('Destination stream verification completed', { exists: destStreamExists });
 
-    // Cleanup - navigate directly to pipelines page and delete
-    try {
-      await pageManager.pipelinesPage.openPipelineMenu();
-      await page.waitForTimeout(1000);
-      await pageManager.pipelinesPage.searchPipeline(pipelineName);
-      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
-      testLogger.info('Pipeline cleanup completed');
-    } catch (cleanupError) {
-      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
-    }
+    // Cleanup
+    await pageManager.pipelinesPage.cleanupPipelineByName(pipelineName);
 
     testLogger.info('Test completed: Basic metrics pipeline');
   });
@@ -273,23 +240,14 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.saveCondition();
     await page.waitForTimeout(2000);
 
-    // Add destination stream - select metrics type for destination
-    await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.selectMetrics();  // Set destination stream type to metrics
-    await pageManager.pipelinesPage.fillDestinationStreamName("metrics_condition_dest");
-    await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    await page.waitForTimeout(2000);
+    // Add destination stream node using helper
+    await pageManager.pipelinesPage.addDestinationStreamNode('metrics', 'metrics_condition_dest');
 
     // Connect nodes via condition
     await pageManager.pipelinesPage.connectNodesViaMiddleNode();
 
-    // Save pipeline
-    const pipelineName = `metrics-condition-pipeline-${Math.random().toString(36).substring(7)}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-    await page.waitForTimeout(2000);
-
-    testLogger.info(`Metrics pipeline with condition created: ${pipelineName}`);
+    // Save pipeline using helper
+    const pipelineName = await pageManager.pipelinesPage.savePipelineWithName('metrics-condition-pipeline');
 
     // Verify pipeline was created on pipeline page
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -308,16 +266,8 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     expect(destStreamExists).toBe(true);
     testLogger.info('Destination stream verification completed', { exists: destStreamExists });
 
-    // Cleanup - navigate directly to pipelines page and delete
-    try {
-      await pageManager.pipelinesPage.openPipelineMenu();
-      await page.waitForTimeout(1000);
-      await pageManager.pipelinesPage.searchPipeline(pipelineName);
-      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
-      testLogger.info('Pipeline cleanup completed');
-    } catch (cleanupError) {
-      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
-    }
+    // Cleanup using helper
+    await pageManager.pipelinesPage.cleanupPipelineByName(pipelineName);
 
     testLogger.info('Test completed: Metrics pipeline with condition');
   });
@@ -367,33 +317,21 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
 
     testLogger.info(`Function node created: ${funcName}`);
 
-    // Add destination node - select metrics type for destination
-    await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.selectMetrics();  // Set destination stream type to metrics
-    await pageManager.pipelinesPage.fillDestinationStreamName("metrics_function_dest");
-    await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    await page.waitForTimeout(2000);
+    // Add destination stream node using helper
+    await pageManager.pipelinesPage.addDestinationStreamNode('metrics', 'metrics_function_dest');
 
     // Connect nodes via function
     await pageManager.pipelinesPage.connectNodesViaMiddleNode();
 
-    // Save pipeline
-    const pipelineName = `metrics-function-pipeline-${Math.random().toString(36).substring(7)}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-    await page.waitForTimeout(2000);
-
-    testLogger.info(`Metrics pipeline with function created: ${pipelineName}`);
+    // Save pipeline using helper
+    const pipelineName = await pageManager.pipelinesPage.savePipelineWithName('metrics-function-pipeline');
 
     // Verify pipeline was created on pipeline page
-    // Note: Function pipelines with VRL code may have intermittent save issues in test environment
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     const pipelineExists = await pageManager.pipelinesPage.verifyPipelineExists(pipelineName);
-    if (!pipelineExists) {
-      testLogger.warn('Function pipeline not found in list - may have save issues in test environment');
-    }
-    testLogger.info('Pipeline creation verification completed', { exists: pipelineExists });
+    expect(pipelineExists).toBe(true);
+    testLogger.info('Pipeline creation verified', { exists: pipelineExists });
 
     // Wait for pipeline to be fully registered before ingesting data
     await page.waitForTimeout(3000);
@@ -404,24 +342,12 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await page.waitForTimeout(8000); // Wait for data to flow through pipeline
 
     // Verify destination stream was created on streams page
-    // Note: Function pipelines may have different routing behavior than condition pipelines
-    // The pipeline creation is verified successful; destination stream verification is advisory
     const destStreamExists = await pageManager.pipelinesPage.verifyMetricsDestinationStreamExists("metrics_function_dest");
-    if (!destStreamExists) {
-      testLogger.warn('Destination stream not found - function pipeline may not route data in test environment');
-    }
+    expect(destStreamExists).toBe(true);
     testLogger.info('Destination stream verification completed', { exists: destStreamExists });
 
-    // Cleanup - navigate directly to pipelines page and delete
-    try {
-      await pageManager.pipelinesPage.openPipelineMenu();
-      await page.waitForTimeout(1000);
-      await pageManager.pipelinesPage.searchPipeline(pipelineName);
-      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
-      testLogger.info('Pipeline cleanup completed');
-    } catch (cleanupError) {
-      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
-    }
+    // Cleanup using helper
+    await pageManager.pipelinesPage.cleanupPipelineByName(pipelineName);
 
     testLogger.info('Test completed: Metrics pipeline with function');
   });
@@ -582,24 +508,19 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.selectAndDragFunction();
     await page.waitForTimeout(2000);
 
-    // Check if after flattening toggle is visible using POM
+    // Check if after flattening toggle or text is visible using POM
     const isToggleVisible = await pageManager.pipelinesPage.isAfterFlatteningToggleVisible();
+    const isTextVisible = await pageManager.pipelinesPage.isAfterFlatteningTextVisible();
+
+    // At least one form of the after flattening control must be present
+    expect(isToggleVisible || isTextVisible).toBe(true);
 
     if (isToggleVisible) {
       testLogger.info('After flattening toggle is visible');
-      await expect(pageManager.pipelinesPage.afterFlatteningToggleLocator).toBeVisible();
-
-      // Try clicking the toggle using POM method
       await pageManager.pipelinesPage.clickAfterFlatteningToggle();
       testLogger.info('After flattening toggle clicked');
     } else {
-      // Look for alternative selector using POM
-      const isTextVisible = await pageManager.pipelinesPage.isAfterFlatteningTextVisible();
-      if (isTextVisible) {
-        testLogger.info('After flattening text found');
-      } else {
-        testLogger.info('After flattening toggle not found - may need selector update');
-      }
+      testLogger.info('After flattening text found (toggle not clickable)');
     }
 
     // Cancel and close
@@ -621,16 +542,13 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
 
     // Use the search input with POM method
     const isSearchVisible = await pageManager.pipelinesPage.isPipelineListSearchInputVisible();
+    expect(isSearchVisible).toBe(true);
 
-    if (isSearchVisible) {
-      await pageManager.pipelinesPage.fillPipelineListSearch('test');
-      testLogger.info('Search term entered');
+    await pageManager.pipelinesPage.fillPipelineListSearch('test');
+    testLogger.info('Search term entered');
 
-      // Clear search using POM method
-      await pageManager.pipelinesPage.clearPipelineListSearch();
-    } else {
-      testLogger.info('Search input not found with expected selector');
-    }
+    // Clear search using POM method
+    await pageManager.pipelinesPage.clearPipelineListSearch();
 
     testLogger.info('Test completed: Pipeline search functionality');
   });
@@ -658,21 +576,15 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
-    // Delete auto-created output and add new destination - select metrics type
+    // Delete auto-created output and add destination using helper
     await pageManager.pipelinesPage.deleteOutputStreamNode();
-    await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.selectMetrics();  // Set destination stream type to metrics
-    await pageManager.pipelinesPage.fillDestinationStreamName("toggle_metrics_test_dest");
-    await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    await page.waitForTimeout(2000);
+    await pageManager.pipelinesPage.addDestinationStreamNode('metrics', 'toggle_metrics_test_dest');
 
     // Connect nodes
     await pageManager.pipelinesPage.connectInputToOutput();
 
-    const pipelineName = `toggle-metrics-pipeline-${Math.random().toString(36).substring(7)}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-    await page.waitForTimeout(2000);
+    // Save pipeline using helper
+    const pipelineName = await pageManager.pipelinesPage.savePipelineWithName('toggle-metrics-pipeline');
 
     // Navigate to pipeline list directly
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -683,23 +595,22 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await page.waitForTimeout(1000);
 
     // Find and click the toggle switch using POM
-    const pipelineRow = pageManager.pipelinesPage.getPipelineRowByName(pipelineName).first();
     const toggleSwitch = pageManager.pipelinesPage.getPipelineToggle(pipelineName).first();
+    const isToggleVisible = await toggleSwitch.isVisible().catch(() => false);
+    expect(isToggleVisible).toBe(true);
 
-    if (await toggleSwitch.isVisible().catch(() => false)) {
-      // Click to toggle
-      await toggleSwitch.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('Pipeline toggle clicked');
+    // Click to toggle
+    await toggleSwitch.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('Pipeline toggle clicked');
 
-      // Toggle back
-      await toggleSwitch.click();
-      await page.waitForTimeout(1000);
-    }
+    // Toggle back
+    await toggleSwitch.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('Pipeline toggled back');
 
-    // Cleanup
-    await pageManager.pipelinesPage.searchPipeline(pipelineName);
-    await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
+    // Cleanup using helper
+    await pageManager.pipelinesPage.cleanupPipelineByName(pipelineName);
 
     testLogger.info('Test completed: Pipeline toggle functionality');
   });

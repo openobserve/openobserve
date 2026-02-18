@@ -487,7 +487,7 @@ export class PipelinesPage {
 
     async selectAndDragFunction() {
         await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.functionButton, { x: 50, y: 50 });
+        await this.dragStreamToTarget(this.functionButton, { x: 250, y: 200 });
     }
 
     async selectPreviousNode() {
@@ -536,69 +536,63 @@ export class PipelinesPage {
 
     /**
      * Verify that a metrics destination stream exists
-     * Note: This is an advisory check - returns true if verification can't be performed
      * @param {string} streamName - Name of the stream to verify
-     * @returns {Promise<boolean>} - True if stream exists or verification is not possible, false if definitely not exists
+     * @returns {Promise<boolean>} - True if stream exists, false otherwise
      */
     async verifyMetricsDestinationStreamExists(streamName) {
         try {
-            // Navigate to streams page
-            await this.page.locator('[data-test="menu-link-\\/streams-item"]').click();
-            await this.page.waitForTimeout(2000);
-            await this.page.waitForLoadState('networkidle');
+            // Use API to check stream existence - more reliable than UI navigation
+            const orgName = process.env["ORGNAME"];
+            const baseUrl = process.env["ZO_BASE_URL"] || process.env["INGESTION_URL"]?.replace('/api/', '') || 'http://localhost:5080';
+            const basicAuth = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
 
-            // Search for the stream directly using the search input
-            const searchInput = this.page.locator('[data-test="streams-search-stream-input"] input, [data-test="log-stream-search-input"]').first();
-            await searchInput.fill(streamName);
-            await this.page.waitForTimeout(3000);
+            const response = await this.page.request.get(
+                `${baseUrl}/api/${orgName}/streams?type=metrics&keyword=${streamName}`,
+                { headers: { 'Authorization': `Basic ${basicAuth}` } }
+            );
 
-            // Check if stream row exists
-            const streamRow = this.page.locator('tbody tr').filter({ hasText: streamName }).first();
-            const isVisible = await streamRow.isVisible({ timeout: 10000 }).catch(() => false);
-
-            if (!isVisible) {
-                // Stream might exist but not visible due to type filtering - return true as advisory
-                testLogger.debug('[verifyMetricsDestinationStreamExists] Stream not found in search, returning true (advisory)', { streamName });
-                return true;
+            if (response.ok()) {
+                const data = await response.json();
+                const found = data.list?.some(s => s.name === streamName) || false;
+                testLogger.debug('[verifyMetricsDestinationStreamExists] API check', { streamName, found, total: data.list?.length });
+                return found;
             }
-            return true;
+            testLogger.debug('[verifyMetricsDestinationStreamExists] API returned non-OK', { status: response.status() });
+            return false;
         } catch (e) {
-            testLogger.debug('[verifyMetricsDestinationStreamExists] Error, returning true (advisory)', { error: e.message, streamName });
-            return true; // Return true on error - this is an advisory check
+            testLogger.debug('[verifyMetricsDestinationStreamExists] Error during verification', { error: e.message, streamName });
+            return false;
         }
     }
 
     /**
      * Verify that a traces destination stream exists
-     * Note: This is an advisory check - returns true if verification can't be performed
      * @param {string} streamName - Name of the stream to verify
-     * @returns {Promise<boolean>} - True if stream exists or verification is not possible, false if definitely not exists
+     * @returns {Promise<boolean>} - True if stream exists, false otherwise
      */
     async verifyTracesDestinationStreamExists(streamName) {
         try {
-            // Navigate to streams page
-            await this.page.locator('[data-test="menu-link-\\/streams-item"]').click();
-            await this.page.waitForTimeout(2000);
-            await this.page.waitForLoadState('networkidle');
+            // Use API to check stream existence - more reliable than UI navigation
+            const orgName = process.env["ORGNAME"];
+            const baseUrl = process.env["ZO_BASE_URL"] || process.env["INGESTION_URL"]?.replace('/api/', '') || 'http://localhost:5080';
+            const basicAuth = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
 
-            // Search for the stream directly using the search input
-            const searchInput = this.page.locator('[data-test="streams-search-stream-input"] input, [data-test="log-stream-search-input"]').first();
-            await searchInput.fill(streamName);
-            await this.page.waitForTimeout(3000);
+            const response = await this.page.request.get(
+                `${baseUrl}/api/${orgName}/streams?type=traces&keyword=${streamName}`,
+                { headers: { 'Authorization': `Basic ${basicAuth}` } }
+            );
 
-            // Check if stream row exists
-            const streamRow = this.page.locator('tbody tr').filter({ hasText: streamName }).first();
-            const isVisible = await streamRow.isVisible({ timeout: 10000 }).catch(() => false);
-
-            if (!isVisible) {
-                // Stream might exist but not visible due to type filtering - return true as advisory
-                testLogger.debug('[verifyTracesDestinationStreamExists] Stream not found in search, returning true (advisory)', { streamName });
-                return true;
+            if (response.ok()) {
+                const data = await response.json();
+                const found = data.list?.some(s => s.name === streamName) || false;
+                testLogger.debug('[verifyTracesDestinationStreamExists] API check', { streamName, found, total: data.list?.length });
+                return found;
             }
-            return true;
+            testLogger.debug('[verifyTracesDestinationStreamExists] API returned non-OK', { status: response.status() });
+            return false;
         } catch (e) {
-            testLogger.debug('[verifyTracesDestinationStreamExists] Error, returning true (advisory)', { error: e.message, streamName });
-            return true; // Return true on error - this is an advisory check
+            testLogger.debug('[verifyTracesDestinationStreamExists] Error during verification', { error: e.message, streamName });
+            return false;
         }
     }
 
@@ -1712,6 +1706,10 @@ export class PipelinesPage {
         await this.page.mouse.down();
         await this.pipelineNodeDefaultInputHandle.hover({ force: true });
         await this.page.mouse.up();
+        await this.page.waitForTimeout(1000);
+
+        // Press Escape to cancel any pending edge creation state
+        await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(500);
 
         // Connect middle node to output
@@ -1720,6 +1718,23 @@ export class PipelinesPage {
         await this.pipelineNodeOutputInputHandle.hover({ force: true });
         await this.page.mouse.up();
         await this.page.waitForTimeout(1000);
+
+        // Check edge count and retry second connection if needed
+        const edgeCount = await this.page.locator('.vue-flow__edge').count();
+        if (edgeCount < 2) {
+            testLogger.info(`First attempt created ${edgeCount}/2 edges, retrying with dragTo`);
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
+
+            // Use Playwright's dragTo API for more reliable drag
+            const midOutHandle = this.page.locator('[data-test="pipeline-node-default-output-handle"]');
+            const destHandle = this.page.locator('[data-test="pipeline-node-output-input-handle"]');
+            await midOutHandle.dragTo(destHandle, { force: true });
+            await this.page.waitForTimeout(1000);
+        }
+
+        const finalEdgeCount = await this.page.locator('.vue-flow__edge').count();
+        testLogger.info(`connectNodesViaMiddleNode completed with ${finalEdgeCount} edges`);
     }
 
     /**
@@ -2518,7 +2533,7 @@ export class PipelinesPage {
      * @param {string} orgName - Organization name
      */
     async navigateToBackfillPage(orgName) {
-        const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/backfill-jobs?org_identifier=${orgName}`;
+        const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${orgName}`;
         await this.page.goto(backfillUrl);
         await this.page.waitForLoadState('networkidle');
         testLogger.info('Navigated to backfill jobs page', { url: backfillUrl });
@@ -2680,7 +2695,7 @@ export class PipelinesPage {
      * @param {string} orgName - Organization name
      */
     async navigateToHistoryPage(orgName) {
-        const historyUrl = `${process.env.ZO_BASE_URL}/web/pipeline/history?org_identifier=${orgName}`;
+        const historyUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/history?org_identifier=${orgName}`;
         await this.page.goto(historyUrl);
         await this.page.waitForLoadState('networkidle');
         testLogger.info('Navigated to pipeline history page', { url: historyUrl });
@@ -2842,7 +2857,7 @@ export class PipelinesPage {
      * Click back button on backfill page
      */
     async clickBackfillBackBtn() {
-        const backBtn = this.page.locator('[data-test*="back-btn"], [data-test*="back"], button:has-text("Back"), .back-btn').first();
+        const backBtn = this.page.locator('[data-test="backfill-jobs-back-btn"], [data-test*="back-btn"], button:has-text("Back")').first();
         if (await backBtn.isVisible().catch(() => false)) {
             await backBtn.click();
             await this.page.waitForLoadState('networkidle');
@@ -3155,5 +3170,110 @@ export class PipelinesPage {
         const sqlTab = this.scheduledPipelineTabs.locator('[data-test="tab-sql"]');
         await expect(sqlTab).toHaveClass(/active/);
         testLogger.info('Verified SQL tab is active');
+    }
+
+    // =========================================================================
+    // Helper Methods - Reduce duplication across spec files
+    // =========================================================================
+
+    /**
+     * Dismiss any open dialogs or menus.
+     * Use in afterEach cleanup instead of raw page.locator('.q-dialog').
+     */
+    async dismissOpenDialogs() {
+        try {
+            if (await this.qDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+            }
+        } catch (e) {
+            // Ignore cleanup errors
+        }
+    }
+
+    /**
+     * Add and configure a source stream node on the pipeline canvas.
+     * Handles: drag stream → select type → enter name → select option → save → delete auto output.
+     * @param {'traces'|'metrics'|'logs'} streamType - The stream type to select
+     * @param {string} streamName - The stream name to enter and select
+     */
+    async addSourceStreamNode(streamType, streamName) {
+        await this.selectStream();
+        await this.dragStreamToTarget(this.streamButton);
+
+        if (streamType === 'traces') {
+            await this.selectTraces();
+        } else if (streamType === 'metrics') {
+            await this.selectMetrics();
+        }
+        // For 'logs', the default type is already selected
+
+        await this.enterStreamName(streamName);
+        await this.page.waitForTimeout(1000);
+        await this.selectStreamOptionByName(streamName);
+        await this.saveInputNodeStream();
+        await this.page.waitForTimeout(2000);
+
+        // Delete auto-created output node
+        await this.deleteOutputStreamNode();
+
+        testLogger.info('Source stream node added', { streamType, streamName });
+    }
+
+    /**
+     * Add and configure a destination stream node on the pipeline canvas.
+     * Handles: drag second stream → select type → fill dest name → save.
+     * @param {'traces'|'metrics'|'logs'} streamType - The stream type to select
+     * @param {string} destName - The destination stream name
+     */
+    async addDestinationStreamNode(streamType, destName) {
+        await this.selectAndDragSecondStream();
+
+        if (streamType === 'traces') {
+            await this.selectTraces();
+        } else if (streamType === 'metrics') {
+            await this.selectMetrics();
+        }
+
+        await this.fillDestinationStreamName(destName);
+        await this.clickInputNodeStreamSave();
+        await this.page.waitForTimeout(2000);
+
+        testLogger.info('Destination stream node added', { streamType, destName });
+    }
+
+    /**
+     * Name and save a pipeline.
+     * @param {string} namePrefix - Prefix for the pipeline name (timestamp suffix added)
+     * @returns {string} The generated pipeline name
+     */
+    async savePipelineWithName(namePrefix) {
+        const pipelineName = `${namePrefix}-${Math.random().toString(36).substring(7)}`;
+        await this.enterPipelineName(pipelineName);
+        const urlBefore = this.page.url();
+        await this.savePipeline();
+        await this.page.waitForTimeout(2000);
+        const urlAfter = this.page.url();
+        // Check for any error toasts/alerts on the page
+        const errorToast = await this.page.locator('.q-notification, [role="alert"], .q-banner').allTextContents().catch(() => []);
+        testLogger.info(`Pipeline saved: ${pipelineName}`, { urlBefore, urlAfter, redirected: urlBefore !== urlAfter, toasts: errorToast });
+        return pipelineName;
+    }
+
+    /**
+     * Clean up a pipeline by searching and deleting it.
+     * Logs warning on failure instead of throwing.
+     * @param {string} pipelineName - The pipeline name to delete
+     */
+    async cleanupPipelineByName(pipelineName) {
+        try {
+            await this.openPipelineMenu();
+            await this.page.waitForTimeout(1000);
+            await this.searchPipeline(pipelineName);
+            await this.deletePipelineByName(pipelineName);
+            testLogger.info('Pipeline cleanup completed');
+        } catch (cleanupError) {
+            testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
+        }
     }
 }

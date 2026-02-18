@@ -92,16 +92,8 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     // Cleanup: Wait for any pending operations to complete
     await page.waitForTimeout(1000);
 
-    // Clear any open dialogs or menus
-    try {
-      const dialog = page.locator('.q-dialog');
-      if (await dialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-      }
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    // Clear any open dialogs or menus using POM
+    await pageManager.pipelinesPage.dismissOpenDialogs();
 
     testLogger.info('Test cleanup completed');
   });
@@ -134,14 +126,8 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
 
     // Verify "traces" option is available using POM
     const isTracesVisible = await pageManager.pipelinesPage.isTracesOptionVisible();
-
-    if (isTracesVisible) {
-      testLogger.info('Traces option found in stream type dropdown');
-      await expect(pageManager.pipelinesPage.tracesOptionLocator).toBeVisible();
-    } else {
-      // Log available options using POM method
-      await pageManager.pipelinesPage.logMenuOptions();
-    }
+    expect(isTracesVisible).toBe(true);
+    testLogger.info('Traces option found in stream type dropdown');
 
     // Close dialog by pressing Escape
     await page.keyboard.press('Escape');
@@ -195,36 +181,13 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
 
-    // Add source stream - use 'default' traces stream
-    await pageManager.pipelinesPage.selectStream();
-    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
-    await pageManager.pipelinesPage.selectTraces();
-    await pageManager.pipelinesPage.enterStreamName(TRACES_STREAM);
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.selectStreamOptionByName(TRACES_STREAM);
-    await pageManager.pipelinesPage.saveInputNodeStream();
-    await page.waitForTimeout(2000);
+    // Add source and destination stream nodes using helpers
+    await pageManager.pipelinesPage.addSourceStreamNode('traces', TRACES_STREAM);
+    await pageManager.pipelinesPage.addDestinationStreamNode('traces', 'traces_test_dest');
 
-    // Delete auto-created output node
-    await pageManager.pipelinesPage.deleteOutputStreamNode();
-
-    // Add destination stream node - select traces type for destination
-    await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.selectTraces();  // Set destination stream type to traces
-    await pageManager.pipelinesPage.fillDestinationStreamName("traces_test_dest");
-    await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    await page.waitForTimeout(2000);
-
-    // Connect nodes
+    // Connect nodes and save pipeline
     await pageManager.pipelinesPage.connectInputToOutput();
-
-    // Save pipeline
-    const pipelineName = `traces-pipeline-${Math.random().toString(36).substring(7)}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-    await page.waitForTimeout(2000);
-
-    testLogger.info(`Pipeline created: ${pipelineName}`);
+    const pipelineName = await pageManager.pipelinesPage.savePipelineWithName('traces-pipeline');
 
     // Verify pipeline was created on pipeline page
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -243,16 +206,8 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     expect(destStreamExists).toBe(true);
     testLogger.info('Destination stream verification completed', { exists: destStreamExists });
 
-    // Cleanup - navigate directly to pipelines page and delete
-    try {
-      await pageManager.pipelinesPage.openPipelineMenu();
-      await page.waitForTimeout(1000);
-      await pageManager.pipelinesPage.searchPipeline(pipelineName);
-      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
-      testLogger.info('Pipeline cleanup completed');
-    } catch (cleanupError) {
-      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
-    }
+    // Cleanup
+    await pageManager.pipelinesPage.cleanupPipelineByName(pipelineName);
 
     testLogger.info('Test completed: Pipeline with source and destination nodes');
   });
@@ -269,18 +224,8 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
 
-    // Add source stream - use 'default' traces stream
-    await pageManager.pipelinesPage.selectStream();
-    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
-    await pageManager.pipelinesPage.selectTraces();
-    await pageManager.pipelinesPage.enterStreamName(TRACES_STREAM);
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.selectStreamOptionByName(TRACES_STREAM);
-    await pageManager.pipelinesPage.saveInputNodeStream();
-    await page.waitForTimeout(2000);
-
-    // Delete auto-created output node
-    await pageManager.pipelinesPage.deleteOutputStreamNode();
+    // Add source stream node using helper
+    await pageManager.pipelinesPage.addSourceStreamNode('traces', TRACES_STREAM);
 
     // Add condition node
     await pageManager.pipelinesPage.selectAndDragCondition();
@@ -297,23 +242,12 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.saveCondition();
     await page.waitForTimeout(2000);
 
-    // Add destination stream - select traces type for destination
-    await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.selectTraces();  // Set destination stream type to traces
-    await pageManager.pipelinesPage.fillDestinationStreamName("condition_test_dest");
-    await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    await page.waitForTimeout(2000);
+    // Add destination stream node using helper
+    await pageManager.pipelinesPage.addDestinationStreamNode('traces', 'condition_test_dest');
 
-    // Connect nodes via condition
+    // Connect nodes via condition and save pipeline
     await pageManager.pipelinesPage.connectNodesViaMiddleNode();
-
-    // Save pipeline
-    const pipelineName = `condition-pipeline-${Math.random().toString(36).substring(7)}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-    await page.waitForTimeout(2000);
-
-    testLogger.info(`Pipeline with condition created: ${pipelineName}`);
+    const pipelineName = await pageManager.pipelinesPage.savePipelineWithName('condition-pipeline');
 
     // Verify pipeline was created on pipeline page
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -332,16 +266,8 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     expect(destStreamExists).toBe(true);
     testLogger.info('Destination stream verification completed', { exists: destStreamExists });
 
-    // Cleanup - navigate directly to pipelines page and delete
-    try {
-      await pageManager.pipelinesPage.openPipelineMenu();
-      await page.waitForTimeout(1000);
-      await pageManager.pipelinesPage.searchPipeline(pipelineName);
-      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
-      testLogger.info('Pipeline cleanup completed');
-    } catch (cleanupError) {
-      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
-    }
+    // Cleanup
+    await pageManager.pipelinesPage.cleanupPipelineByName(pipelineName);
 
     testLogger.info('Test completed: Pipeline with condition node');
   });
@@ -383,18 +309,8 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
 
-    // Add source stream - use 'default' traces stream
-    await pageManager.pipelinesPage.selectStream();
-    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
-    await pageManager.pipelinesPage.selectTraces();
-    await pageManager.pipelinesPage.enterStreamName(TRACES_STREAM);
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.selectStreamOptionByName(TRACES_STREAM);
-    await pageManager.pipelinesPage.saveInputNodeStream();
-    await page.waitForTimeout(2000);
-
-    // Delete auto-created output node
-    await pageManager.pipelinesPage.deleteOutputStreamNode();
+    // Add source stream node using helper
+    await pageManager.pipelinesPage.addSourceStreamNode('traces', TRACES_STREAM);
 
     // Add function node
     await pageManager.pipelinesPage.selectAndDragFunction();
@@ -419,33 +335,19 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
 
     testLogger.info(`Function node created: ${funcName}`);
 
-    // Add destination node - select traces type for destination
-    await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.selectTraces();  // Set destination stream type to traces
-    await pageManager.pipelinesPage.fillDestinationStreamName("function_test_dest");
-    await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    await page.waitForTimeout(2000);
+    // Add destination node using helper
+    await pageManager.pipelinesPage.addDestinationStreamNode('traces', 'function_test_dest');
 
-    // Connect nodes via function
+    // Connect nodes via function and save pipeline
     await pageManager.pipelinesPage.connectNodesViaMiddleNode();
-
-    // Save pipeline
-    const pipelineName = `vrl-traces-pipeline-${Math.random().toString(36).substring(7)}`;
-    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
-    await pageManager.pipelinesPage.savePipeline();
-    await page.waitForTimeout(2000);
-
-    testLogger.info(`Pipeline with VRL function created: ${pipelineName}`);
+    const pipelineName = await pageManager.pipelinesPage.savePipelineWithName('vrl-traces-pipeline');
 
     // Verify pipeline was created on pipeline page
-    // Note: Function pipelines with VRL code may have intermittent save issues in test environment
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     const pipelineExists = await pageManager.pipelinesPage.verifyPipelineExists(pipelineName);
-    if (!pipelineExists) {
-      testLogger.warn('Function pipeline not found in list - may have save issues in test environment');
-    }
-    testLogger.info('Pipeline creation verification completed', { exists: pipelineExists });
+    expect(pipelineExists).toBe(true);
+    testLogger.info('Pipeline creation verified', { exists: pipelineExists });
 
     // Ingest data through the source stream to trigger the pipeline
     testLogger.info('Ingesting data through source stream to trigger pipeline');
@@ -453,24 +355,12 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await page.waitForTimeout(5000); // Wait for data to flow through pipeline
 
     // Verify destination stream was created on streams page
-    // Note: Function pipelines may have different routing behavior than condition pipelines
-    // The pipeline creation is verified successful; destination stream verification is advisory
     const destStreamExists = await pageManager.pipelinesPage.verifyTracesDestinationStreamExists("function_test_dest");
-    if (!destStreamExists) {
-      testLogger.warn('Destination stream not found - function pipeline may not route data in test environment');
-    }
+    expect(destStreamExists).toBe(true);
     testLogger.info('Destination stream verification completed', { exists: destStreamExists });
 
-    // Cleanup - navigate directly to pipelines page and delete
-    try {
-      await pageManager.pipelinesPage.openPipelineMenu();
-      await page.waitForTimeout(1000);
-      await pageManager.pipelinesPage.searchPipeline(pipelineName);
-      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
-      testLogger.info('Pipeline cleanup completed');
-    } catch (cleanupError) {
-      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
-    }
+    // Cleanup
+    await pageManager.pipelinesPage.cleanupPipelineByName(pipelineName);
 
     testLogger.info('Test completed: Pipeline with function node');
   });
@@ -519,17 +409,17 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     // Check for error message OR successful save (depending on auto-creation behavior)
     const hasError = await pageManager.pipelinesPage.isDestinationRequiredErrorVisible();
     const hasSaved = await pageManager.pipelinesPage.isPipelineSaveSuccessVisible();
+    const isOnPipelinePage = await pageManager.pipelinesPage.isPipelineNameInputVisible();
+
+    // One of these must be true: error shown, pipeline saved, or still on editing page (validation prevented save)
+    expect(hasError || hasSaved || isOnPipelinePage).toBe(true);
 
     if (hasError) {
       testLogger.info('Destination node required error shown as expected');
     } else if (hasSaved) {
       testLogger.info('Pipeline saved (destination node was auto-created or not required)');
     } else {
-      // Try to verify the UI state - the pipeline may have validation that prevents save
-      const isOnPipelinePage = await pageManager.pipelinesPage.isPipelineNameInputVisible();
-      if (isOnPipelinePage) {
-        testLogger.info('Still on pipeline editing page - validation may have prevented save');
-      }
+      testLogger.info('Still on pipeline editing page - validation prevented save');
     }
 
     testLogger.info('Test completed: Pipeline destination validation verified');
@@ -606,18 +496,27 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.saveInputNodeStream();
 
     // Set up dialog handler to accept/dismiss
+    let dialogAppeared = false;
     page.once('dialog', async (dialog) => {
+      dialogAppeared = true;
       testLogger.debug('Dialog message', { message: dialog.message() });
       await dialog.accept();
     });
+
+    // Store current URL before navigation attempt
+    const beforeUrl = page.url();
 
     // Try to navigate to dashboards
     await pageManager.pipelinesPage.clickDashboardsMenu();
 
     // Wait to see if navigation happens
     await page.waitForURL(/dashboards/, { timeout: 5000 }).catch(() => {
-      testLogger.info('Navigation blocked or no dialog appeared - checking URL');
+      testLogger.info('Navigation blocked or no dialog appeared');
     });
+
+    // Either a dialog appeared (unsaved changes prompt) or URL changed (navigation succeeded)
+    const urlChanged = page.url() !== beforeUrl;
+    expect(dialogAppeared || urlChanged).toBe(true);
 
     testLogger.info('Test completed: Unsaved changes behavior verified');
   });
