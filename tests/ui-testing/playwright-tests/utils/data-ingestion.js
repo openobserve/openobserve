@@ -2,39 +2,31 @@ const testLogger = require('./test-logger.js');
 const logsdata = require("../../../test-data/logs_data.json");
 
 /**
- * Ingest test data into a stream via API
+ * Ingest test data into a stream via API using Node.js context (secure)
  * @param {import('@playwright/test').Page} page - Playwright page object
  * @param {string} streamName - Name of the stream to ingest data into (default: "e2e_automate")
  * @returns {Promise<object>} - API response
  */
 async function ingestTestData(page, streamName = "e2e_automate") {
   const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
+  const headers = getHeaders();
+  const baseUrl = process.env.INGESTION_URL.endsWith('/')
+    ? process.env.INGESTION_URL.slice(0, -1)
+    : process.env.INGESTION_URL;
 
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
+  try {
+    const response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
-      body: JSON.stringify(logsdata)
+      data: logsdata
     });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
 
-  testLogger.debug('Test data ingestion response', { response, streamName });
-  return response;
+    const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+    testLogger.debug('Test data ingestion response', { response: responseData, streamName });
+    return responseData;
+  } catch (e) {
+    testLogger.debug('Test data ingestion error', { error: e.message, streamName });
+    return { error: e.message };
+  }
 }
 
 /**
@@ -70,7 +62,7 @@ function getIngestionUrl(orgId, streamName) {
 }
 
 /**
- * Sends an ingestion request via page.evaluate to bypass CORS restrictions.
+ * Sends an ingestion request using page.request API (secure, keeps credentials in Node.js context).
  * @param {Page} page - Playwright page object
  * @param {string} url - The ingestion URL
  * @param {Object} payload - The data payload to ingest
@@ -81,14 +73,16 @@ function getIngestionUrl(orgId, streamName) {
  * // Returns: { code: 200, status: [{ name: "stream", successful: 1 }] }
  */
 async function sendRequest(page, url, payload, headers) {
-  return await page.evaluate(async ({ url, headers, payload }) => {
-    const fetchResponse = await fetch(url, {
-      method: 'POST',
+  try {
+    const response = await page.request.post(url, {
       headers: headers,
-      body: JSON.stringify(payload)
+      data: payload
     });
-    return await fetchResponse.json();
-  }, { url, headers, payload });
+    return await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+  } catch (e) {
+    testLogger.debug('sendRequest error', { error: e.message, url });
+    return { error: e.message };
+  }
 }
 
 /**

@@ -62,8 +62,26 @@ export class PipelinesEP {
         const row = this.page.locator(`tr:has([data-test="pipeline-list-${name}-more-options"])`);
         await row.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Get the Frequency column (6th column based on table structure: #, Name, Type, Stream Name, Stream Type, Frequency, Period, Cron, Actions)
-        const frequencyCell = row.locator('td').nth(5);
+        // Find the Frequency column index dynamically by header text
+        // This is more resilient than hardcoding nth(5) which breaks if columns change
+        const headerCells = this.page.locator('thead th, thead td');
+        const headerCount = await headerCells.count();
+        let frequencyColumnIndex = -1;
+
+        for (let i = 0; i < headerCount; i++) {
+            const headerText = await headerCells.nth(i).textContent();
+            if (headerText && headerText.toLowerCase().includes('frequency')) {
+                frequencyColumnIndex = i;
+                break;
+            }
+        }
+
+        // Fallback to column 5 if header not found (maintains backwards compatibility)
+        if (frequencyColumnIndex === -1) {
+            frequencyColumnIndex = 5;
+        }
+
+        const frequencyCell = row.locator('td').nth(frequencyColumnIndex);
         const frequencyText = await frequencyCell.textContent();
 
         // Verify cron expression is displayed (not blank or "--")
