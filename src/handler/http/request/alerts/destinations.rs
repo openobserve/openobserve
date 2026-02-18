@@ -59,7 +59,8 @@ impl From<DestinationError> for HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create alert/pipeline destination for notifications. Requires: name, template (existing template name), emails[] for email type. Destinations are referenced by name in alert rules.", "category": "alerts"}))
     )
 )]
 #[post("/{org_id}/alerts/destinations")]
@@ -105,7 +106,8 @@ pub async fn save_destination(
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update alert destination", "category": "alerts"}))
     )
 )]
 #[put("/{org_id}/alerts/destinations/{destination_name}")]
@@ -145,7 +147,8 @@ pub async fn update_destination(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get destination details", "category": "alerts"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
@@ -179,7 +182,8 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all alert destinations", "category": "alerts"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations")]

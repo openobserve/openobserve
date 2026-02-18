@@ -42,7 +42,8 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get value by key", "category": "kv-store"}))
     )
 )]
 #[get("/{org_id}/kv/{key}")]
@@ -81,7 +82,8 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         (status = 500, description = "Failure", content_type = "text/plain", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Set key-value pair", "category": "kv-store"}))
     )
 )]
 #[post("/{org_id}/kv/{key}")]
@@ -127,7 +129,6 @@ pub async fn set(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"})),
-        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"})),
         ("x-o2-mcp" = json!({"description": "Delete key-value pair", "category": "kv-store", "requires_confirmation": true}))
     )
 )]
@@ -165,7 +166,8 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all keys with optional prefix filtering", "category": "kv-store"}))
     )
 )]
 #[get("/{org_id}/kv")]

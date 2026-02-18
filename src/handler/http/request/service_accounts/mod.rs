@@ -57,7 +57,8 @@ use crate::{
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List service accounts", "category": "users"}))
     )
 )]
 #[get("/{org_id}/service_accounts")]
@@ -123,7 +124,8 @@ pub async fn list(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create service account", "category": "users"}))
     )
 )]
 #[post("/{org_id}/service_accounts")]
@@ -173,7 +175,8 @@ pub async fn save(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update service account", "category": "users"}))
     )
 )]
 #[put("/{org_id}/service_accounts/{email_id}")]
@@ -262,7 +265,6 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
         ("x-o2-mcp" = json!({"description": "Delete service account", "category": "users", "requires_confirmation": true}))
     )
 )]
@@ -296,7 +298,8 @@ pub async fn delete(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get service account token", "category": "users"}))
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]

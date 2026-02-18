@@ -73,7 +73,8 @@ pub struct ListIncidentsResponse {
         (status = 500, description = "Internal error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all incidents", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/incidents")]
@@ -116,7 +117,8 @@ pub async fn list_incidents(
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get an incident's details", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/incidents/{incident_id}")]
@@ -150,7 +152,8 @@ pub async fn get_incident(path: web::Path<(String, String)>) -> HttpResponse {
         (status = 400, description = "Invalid status", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update an incident's title, severity, or status", "category": "alerts"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
@@ -197,7 +200,8 @@ pub async fn update_incident_status(
         (status = 500, description = "Internal error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get incident statistics", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/incidents/stats")]
@@ -258,7 +262,8 @@ pub struct TriggerRcaQuery {
         (status = 503, description = "RCA agent unavailable", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Manually trigger incident RCA", "category": "alerts"}))
     )
 )]
 #[post("/v2/{org_id}/alerts/incidents/{incident_id}/rca")]
@@ -367,7 +372,8 @@ pub async fn trigger_incident_rca(
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Manually trigger incident RCA", "category": "alerts"}))
     )
 )]
 #[post("/v2/{org_id}/alerts/incidents/{incident_id}/rca")]
@@ -392,7 +398,8 @@ pub async fn trigger_incident_rca(_path: web::Path<(String, String)>) -> HttpRes
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all incidents", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/incidents")]
@@ -420,7 +427,8 @@ pub async fn list_incidents(
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get an incident's details", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/incidents/{incident_id}")]
@@ -446,7 +454,8 @@ pub async fn get_incident(_path: web::Path<(String, String)>) -> HttpResponse {
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update an incident's title, severity, or status", "category": "alerts"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
@@ -473,7 +482,8 @@ pub async fn update_incident_status(
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get incident statistics", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/incidents/stats")]
