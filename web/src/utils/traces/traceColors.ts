@@ -25,6 +25,7 @@ export const LIGHT_SPAN_COLORS = [
   "#10B981",
   "#8B5CF6",
   "#F97316",
+  "#22D3EE",
   "#06B6D4",
   "#22C55E",
   "#A855F7",
@@ -35,13 +36,12 @@ export const LIGHT_SPAN_COLORS = [
   "#FB923C",
   "#0EA5E9",
   "#F472B6",
-  "#22D3EE",
   "#A78BFA",
   "#A855F7",
   "#F97316",
   "#FCA5A5",
+  "#06B6D4",
   "#818CF8",
-  "#FCD34D",
   "#3B82F6",
 ] as const;
 
