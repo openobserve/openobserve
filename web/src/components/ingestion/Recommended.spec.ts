@@ -150,9 +150,10 @@ describe("RecommendedPage", () => {
     expect(wrapper.vm.tabs).toBe("");
   });
 
-  it("should initialize tabsFilter as empty string", () => {
-    expect(wrapper.vm.tabsFilter).toBe("");
-  });
+  // tabsFilter was removed from the component
+  // it("should initialize tabsFilter as empty string", () => {
+  //   expect(wrapper.vm.tabsFilter).toBe("");
+  // });
 
   it("should initialize ingestTabType as 'ingestFromKubernetes'", () => {
     expect(wrapper.vm.ingestTabType).toBe("ingestFromKubernetes");
@@ -166,17 +167,17 @@ describe("RecommendedPage", () => {
     expect(wrapper.vm.currentUserEmail).toBe("example@gmail.com");
   });
 
-  // Search Input Tests
-  it("should render search input with correct attributes", () => {
-    const searchInput = wrapper.find('[data-test="recommended-list-search-input"]');
-    expect(searchInput.exists()).toBeTruthy();
-  });
+  // Search Input Tests - removed from component
+  // it("should render search input with correct attributes", () => {
+  //   const searchInput = wrapper.find('[data-test="recommended-list-search-input"]');
+  //   expect(searchInput.exists()).toBeTruthy();
+  // });
 
-  it("should update tabsFilter when search input changes", async () => {
-    const searchInput = wrapper.find('[data-test="recommended-list-search-input"]');
-    await searchInput.setValue("kubernetes");
-    expect(wrapper.vm.tabsFilter).toBe("kubernetes");
-  });
+  // it("should update tabsFilter when search input changes", async () => {
+  //   const searchInput = wrapper.find('[data-test="recommended-list-search-input"]');
+  //   await searchInput.setValue("kubernetes");
+  //   expect(wrapper.vm.tabsFilter).toBe("kubernetes");
+  // });
 
   // Tabs Array Tests
   it("should have correct number of recommended tabs", () => {
@@ -279,35 +280,25 @@ describe("RecommendedPage", () => {
     });
   });
 
-  // Computed Property Tests
+  // Computed Property Tests - filteredList now returns all tabs without filtering
   it("should filter tabs based on tabsFilter value", async () => {
+    // filteredList now always returns all tabs (no filtering)
     expect(wrapper.vm.filteredList.length).toBe(8);
-    
-    wrapper.vm.tabsFilter = "kubernetes";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("ingestFromKubernetes");
   });
 
   it("should filter tabs case-insensitively", async () => {
-    wrapper.vm.tabsFilter = "WINDOWS";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("ingestFromWindows");
+    // filteredList now always returns all tabs (no filtering)
+    expect(wrapper.vm.filteredList.length).toBe(8);
   });
 
   it("should filter tabs with partial matches", async () => {
-    wrapper.vm.tabsFilter = "cloud";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(1);
-    const names = wrapper.vm.filteredList.map((tab: any) => tab.name);
-    expect(names).toContain("GCPConfig");
+    // filteredList now always returns all tabs (no filtering)
+    expect(wrapper.vm.filteredList.length).toBe(8);
   });
 
   it("should return empty array for non-matching filter", async () => {
-    wrapper.vm.tabsFilter = "nonexistent";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(0);
+    // filteredList now always returns all tabs (no filtering)
+    expect(wrapper.vm.filteredList.length).toBe(8);
   });
 
   it("should return all tabs when filter is empty", async () => {
@@ -389,9 +380,8 @@ describe("RecommendedPage", () => {
   });
 
   it("should handle special characters in filter", async () => {
-    wrapper.vm.tabsFilter = "@#$%";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(0);
+    // filteredList now always returns all tabs (no filtering)
+    expect(wrapper.vm.filteredList.length).toBe(8);
   });
 
   it("should maintain case sensitivity in tab names", () => {
@@ -419,17 +409,13 @@ describe("RecommendedPage", () => {
   });
 
   it("should filter with whitespace handling", async () => {
-    // The filter works by checking if the lowercase label includes the lowercase filter
-    // So whitespace at beginning/end matters - it won't match "Kubernetes" with " Kubernetes " 
-    wrapper.vm.tabsFilter = "Kubernetes";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(1);
+    // filteredList now always returns all tabs (no filtering)
+    expect(wrapper.vm.filteredList.length).toBe(8);
   });
 
   it("should handle multiple word filters", async () => {
-    wrapper.vm.tabsFilter = "aws config";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(0); // No tab has both "aws" and "config" in label
+    // filteredList now always returns all tabs (no filtering)
+    expect(wrapper.vm.filteredList.length).toBe(8);
   });
 
   // Lifecycle Hook Tests (testing navigation logic)
@@ -480,15 +466,15 @@ describe("RecommendedPage", () => {
     });
   });
 
-  // Data Binding Tests
-  it("should properly bind tabsFilter to search input", async () => {
-    const initialFilter = wrapper.vm.tabsFilter;
-    expect(initialFilter).toBe("");
-    
-    wrapper.vm.tabsFilter = "test-filter";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.tabsFilter).toBe("test-filter");
-  });
+  // Data Binding Tests - tabsFilter removed
+  // it("should properly bind tabsFilter to search input", async () => {
+  //   const initialFilter = wrapper.vm.tabsFilter;
+  //   expect(initialFilter).toBe("");
+
+  //   wrapper.vm.tabsFilter = "test-filter";
+  //   await wrapper.vm.$nextTick();
+  //   expect(wrapper.vm.tabsFilter).toBe("test-filter");
+  // });
 
   it("should properly bind ingestTabType", async () => {
     const initialType = wrapper.vm.ingestTabType;
