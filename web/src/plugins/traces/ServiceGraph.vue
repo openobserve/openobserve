@@ -236,6 +236,15 @@ import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
+import {
+  formatNumber,
+  formatLatency,
+  pointToBezierDistanceance,
+  generateNodeTooltipContent,
+  generateEdgeTooltipContent,
+  findIncomingEdgeForNode,
+  calculateRootNodeMetrics,
+} from "@/utils/traces/treeTooltipHelpers";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 
@@ -636,28 +645,7 @@ export default defineComponent({
       // Also try immediately (works if chart already rendered)
       buildEdgeData();
 
-      // Point-to-cubic-bezier distance (20-sample approximation)
-      const pointToBezierDist = (px: number, py: number, s: any): number => {
-        let min = Infinity;
-        for (let i = 0; i <= 20; i++) {
-          const t = i / 20;
-          const u = 1 - t;
-          const bx = u*u*u*s.x1 + 3*u*u*t*s.cpx1 + 3*u*t*t*s.cpx2 + t*t*t*s.x2;
-          const by = u*u*u*s.y1 + 3*u*u*t*s.cpy1 + 3*u*t*t*s.cpy2 + t*t*t*s.y2;
-          const d = Math.hypot(px - bx, py - by);
-          if (d < min) min = d;
-        }
-        return min;
-      };
-
-      // Format helpers (match existing node tooltip style)
-      const fmtNum = (n: number) =>
-        n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(n);
-      const fmtLat = (ns: number) => {
-        if (!ns) return 'N/A';
-        const ms = ns / 1e6;
-        return ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : ms.toFixed(2) + 'ms';
-      };
+      // Use imported helper functions for testability
 
       // Position and show the tooltip at mouse coords
       const positionTooltip = (mouseX: number, mouseY: number) => {
@@ -678,39 +666,26 @@ export default defineComponent({
         // Find incoming edge for this node (direction-aware, matches tree label)
         const incomingBezier = bezierEdges.find(b => b.childName === nodeName);
         if (incomingBezier) {
-          // Non-root: show incoming edge metrics (matches the tree label's request count)
-          const edge = edges.find((e: any) =>
-            (e.from === incomingBezier.parentName || (e.from == null && !incomingBezier.parentName))
-            && e.to === nodeName
-          ) || edges.find((e: any) => e.to === nodeName);
-
+          const edge = findIncomingEdgeForNode(nodeName, incomingBezier.parentName, edges);
           if (edge) {
             const total = edge.total_requests || 0;
             const failed = edge.failed_requests || 0;
             const errRate = edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
-            tooltipEl.innerHTML = `
-              <strong>${nodeName}</strong><br/>
-              Requests: ${fmtNum(total)}<br/>
-              Errors: ${fmtNum(failed)}<br/>
-              Error Rate: ${errRate.toFixed(2)}%
-            `;
+            tooltipEl.innerHTML = generateNodeTooltipContent(nodeName, total, failed, errRate);
             positionTooltip(mouseX, mouseY);
             return;
           }
         }
 
         // Root node or no incoming edge: sum outgoing edges
-        const outgoing = edges.filter((e: any) => e.from === nodeName);
-        if (outgoing.length > 0) {
-          const total = outgoing.reduce((s: number, e: any) => s + (e.total_requests || 0), 0);
-          const failed = outgoing.reduce((s: number, e: any) => s + (e.failed_requests || 0), 0);
-          const errRate = total > 0 ? (failed / total) * 100 : 0;
-          tooltipEl.innerHTML = `
-            <strong>${nodeName}</strong><br/>
-            Requests: ${fmtNum(total)}<br/>
-            Errors: ${fmtNum(failed)}<br/>
-            Error Rate: ${errRate.toFixed(2)}%
-          `;
+        const metrics = calculateRootNodeMetrics(nodeName, edges);
+        if (metrics.requests > 0) {
+          tooltipEl.innerHTML = generateNodeTooltipContent(
+            nodeName,
+            metrics.requests,
+            metrics.errors,
+            metrics.errorRate
+          );
           positionTooltip(mouseX, mouseY);
           return;
         }
@@ -719,23 +694,17 @@ export default defineComponent({
         const nodes = graphData.value?.nodes || [];
         const node = nodes.find((n: any) => (n.label || n.id) === nodeName);
         if (!node) { tooltipEl.style.display = 'none'; return; }
+
         const requests = node.requests || 0;
         const errors = node.errors || 0;
         const errRate = node.error_rate ?? (requests > 0 ? (errors / requests) * 100 : 0);
-        tooltipEl.innerHTML = `
-          <strong>${nodeName}</strong><br/>
-          Requests: ${fmtNum(requests)}<br/>
-          Errors: ${fmtNum(errors)}<br/>
-          Error Rate: ${errRate.toFixed(2)}%
-        `;
+        tooltipEl.innerHTML = generateNodeTooltipContent(nodeName, requests, errors, errRate);
         positionTooltip(mouseX, mouseY);
       };
 
       const showEdgeTooltip = (mouseX: number, mouseY: number, parentName: string, childName: string) => {
         const edges = graphData.value?.edges || [];
-        const edge = edges.find((e: any) =>
-          (e.from === parentName || (e.from == null && !parentName)) && e.to === childName
-        ) || edges.find((e: any) => e.to === childName);
+        const edge = findIncomingEdgeForNode(childName, parentName, edges);
 
         if (!edge) { tooltipEl.style.display = 'none'; return; }
 
@@ -743,13 +712,14 @@ export default defineComponent({
         const failed = edge.failed_requests || 0;
         const errRate = edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
 
-        tooltipEl.innerHTML = `
-          <strong>Requests:</strong> ${fmtNum(total)}<br/>
-          <strong>Errors:</strong> ${failed} (${errRate.toFixed(2)}%)<br/>
-          <strong>P50:</strong> ${fmtLat(edge.p50_latency_ns)}<br/>
-          <strong>P95:</strong> ${fmtLat(edge.p95_latency_ns)}<br/>
-          <strong>P99:</strong> ${fmtLat(edge.p99_latency_ns)}
-        `;
+        tooltipEl.innerHTML = generateEdgeTooltipContent(
+          total,
+          failed,
+          errRate,
+          edge.p50_latency_ns,
+          edge.p95_latency_ns,
+          edge.p99_latency_ns
+        );
         positionTooltip(mouseX, mouseY);
       };
 
@@ -798,7 +768,7 @@ export default defineComponent({
         let bestDist = Infinity;
         let bestIdx = -1;
         for (let i = 0; i < bezierEdges.length; i++) {
-          const d = pointToBezierDist(mx, my, bezierEdges[i].shape);
+          const d = pointToBezierDistance(mx, my, bezierEdges[i].shape);
           if (d < bestDist) { bestDist = d; bestIdx = i; }
         }
 
