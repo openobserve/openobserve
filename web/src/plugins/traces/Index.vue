@@ -870,8 +870,8 @@ async function extractFields() {
       const importantFields = {
         duration: 1,
         service_name: 1,
-        operation_name: 1,
         span_status: 1,
+        operation_name: 1,
         trace_id: 1,
         span_id: 1,
         reference_parent_span_id: 1,
