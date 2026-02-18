@@ -76,10 +76,10 @@ export default mergeConfig(
         reporter: ["text", "json", "html", "json-summary"],
         include: ['src/**/*.{js,ts,vue}'],
         thresholds: {
-          lines: 28,
-          functions: 28,
+          lines: 29,
+          functions: 29,
           branches: 40,
-          statements: 28
+          statements: 29
         },
         exclude: [
           "coverage/**",
