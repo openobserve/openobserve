@@ -177,6 +177,7 @@ jobs:
                 "dashboard-import.spec.js",
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
+                "dashboard-promql-suggestions.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -188,6 +189,7 @@ jobs:
                 "dashboard-transpose.spec.js",
                 "dashboard-join.spec.js",
                 "dashboard-nested-functions.spec.js",
+                "dashboard-legends-copy.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"

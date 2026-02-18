@@ -398,13 +398,6 @@ async fn prepare_alert(
     }
 
     match alert.query_condition.query_type {
-        QueryType::Custom => {
-            if alert.query_condition.aggregation.is_some() {
-                // if it has result we should fire the alert when enable aggregation
-                alert.trigger_condition.operator = Operator::GreaterThanEquals;
-                alert.trigger_condition.threshold = 1;
-            }
-        }
         QueryType::SQL => {
             if alert.query_condition.sql.is_none()
                 || alert.query_condition.sql.as_ref().unwrap().is_empty()
@@ -453,6 +446,7 @@ async fn prepare_alert(
                 return Err(AlertError::PromqlMissingQuery);
             }
         }
+        _ => {}
     }
 
     // Commented intentionally - in case the alert period is big and there
@@ -1267,7 +1261,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
-async fn send_email_notification(
+pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
     msg: String,
