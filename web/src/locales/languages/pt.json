@@ -2851,7 +2851,12 @@
     },
     "viewInTraces": "Exibir em traços",
     "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados",
-    "exportToJson": "Exportar para JSON"
+    "exportToJson": "Exportar para JSON",
+    "noLogsDescription": "Nenhum registro encontrado para essa correlação no intervalo de tempo selecionado.",
+    "tracesErrorDetails": "Ocorreu um erro ao buscar dados de rastreamento. Por favor, tente novamente.",
+    "metricsError": "Não é possível carregar métricas",
+    "metricsErrorDetails": "Ocorreu um erro ao buscar dados de métricas. Por favor, tente novamente.",
+    "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado."
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

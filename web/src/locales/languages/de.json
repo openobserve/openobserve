@@ -2851,7 +2851,12 @@
     },
     "viewInTraces": "In Traces ansehen",
     "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces",
-    "exportToJson": "Export nach JSON"
+    "exportToJson": "Export nach JSON",
+    "noLogsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Protokolle gefunden.",
+    "tracesErrorDetails": "Beim Abrufen der Trace-Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "metricsError": "Metriken können nicht geladen werden",
+    "metricsErrorDetails": "Beim Abrufen der Metrikdaten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

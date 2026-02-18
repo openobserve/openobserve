@@ -2851,7 +2851,12 @@
     },
     "viewInTraces": "İzlerde Görüntüle",
     "viewInTracesTooltip": "RED metrikler panosu ve tüm ilişkili izlerle izleme sayfasını açın",
-    "exportToJson": "JSON'a dışa aktar"
+    "exportToJson": "JSON'a dışa aktar",
+    "noLogsDescription": "Seçilen zaman aralığında bu korelasyon için günlük bulunamadı.",
+    "tracesErrorDetails": "İzleme verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
+    "metricsError": "Metrikler Yüklenemiyor",
+    "metricsErrorDetails": "Metrik verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
+    "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

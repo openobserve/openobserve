@@ -2851,7 +2851,12 @@
     },
     "viewInTraces": "トレースで表示",
     "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く",
-    "exportToJson": "JSON へのエクスポート"
+    "exportToJson": "JSON へのエクスポート",
+    "noLogsDescription": "選択した時間範囲では、この相関関係のログは見つかりませんでした。",
+    "tracesErrorDetails": "トレースデータの取得中にエラーが発生しました。もう一度試してください。",
+    "metricsError": "メトリクスを読み込めません",
+    "metricsErrorDetails": "メトリックスデータの取得中にエラーが発生しました。もう一度試してください。",
+    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

@@ -2851,7 +2851,12 @@
     },
     "viewInTraces": "Afficher dans Traces",
     "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées",
-    "exportToJson": "Exporter au format JSON"
+    "exportToJson": "Exporter au format JSON",
+    "noLogsDescription": "Aucun journal n'a été trouvé pour cette corrélation dans la plage de temps sélectionnée.",
+    "tracesErrorDetails": "Une erreur s'est produite lors de la récupération des données de trace. Veuillez réessayer.",
+    "metricsError": "Impossible de charger les métriques",
+    "metricsErrorDetails": "Une erreur s'est produite lors de la récupération des données des métriques. Veuillez réessayer.",
+    "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
