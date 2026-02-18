@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="analytics"
           :label="t('volumeInsights.insightsButtonLabel')"
           class="analyze-button tw:h-[2rem]"
-          @click="openUnifiedAnalysisDashboard"
+          @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
           <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
