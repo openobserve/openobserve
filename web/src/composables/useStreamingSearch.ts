@@ -54,27 +54,66 @@ const errorOccurred = ref(false);
 type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result' | 'promql_response';
 
 const useHttpStreaming = () => {
+  // --- Microtask coalescing buffer ---
+  // Events arriving while a flush is already scheduled get merged into the
+  // pending buffer and dispatched together in one microtask, so the UI only
+  // re-renders once instead of once-per-chunk.
+  const pendingEvents: Map<string, Array<{ type: StreamResponseType | 'end'; response: any }>> = new Map();
+  let flushScheduled = false;
+
+  const scheduleFlush = () => {
+    if (flushScheduled) return;
+    flushScheduled = true;
+    queueMicrotask(flushPendingEvents);
+  };
+
+  const flushPendingEvents = () => {
+    flushScheduled = false;
+    // Snapshot and clear in one step
+    const traceIds = Array.from(pendingEvents.keys());
+    const snapshotEntries: Array<[string, Array<{ type: StreamResponseType | 'end'; response: any }>]> = [];
+    for (const tid of traceIds) {
+      snapshotEntries.push([tid, pendingEvents.get(tid)!]);
+    }
+    pendingEvents.clear();
+
+    for (const [traceId, events] of snapshotEntries) {
+      if (!traceMap.value[traceId]) continue;
+
+      for (const evt of events) {
+        if (evt.response === 'end' || evt.response === '[[DONE]]') {
+          for (const handler of traceMap.value[traceId].complete) {
+            handler(traceId);
+          }
+          cleanUpListeners(traceId);
+          break; // 'end' is terminal — skip remaining events for this trace
+        }
+
+        let response = evt.response;
+        if (typeof response === 'string') {
+          response = JSON.parse(response);
+        }
+
+        const wsResponse = wsMapper[evt.type as StreamResponseType](traceId, response, evt.type);
+
+        for (const handler of traceMap.value[traceId].data) {
+          handler(wsResponse, traceId);
+        }
+      }
+    }
+  };
+
   const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
     if (!traceMap.value[traceId]) return;
 
-    if (response === 'end' || response === '[[DONE]]') {
-      for (const handler of traceMap.value[traceId].complete) {
-        handler(traceId);
-      }
-      cleanUpListeners(traceId);
-      return
+    // Buffer the event and schedule a flush
+    let queue = pendingEvents.get(traceId);
+    if (!queue) {
+      queue = [];
+      pendingEvents.set(traceId, queue);
     }
-
-    if (typeof response === 'string') {
-      response = JSON.parse(response);
-    }
-
-    const wsResponse = wsMapper[type as StreamResponseType](traceId, response, type);
-
-
-    for (const handler of traceMap.value[traceId].data) {
-      handler(wsResponse, traceId);
-    }
+    queue.push({ type, response });
+    scheduleFlush();
   };
 
   const onComplete = (traceId: string) => {
@@ -289,8 +328,7 @@ const useHttpStreaming = () => {
       
       if(worker) {
       // Set up worker message handling
-        worker.onmessage = (event) => {
-          const { type, traceId: eventTraceId, data } = event.data;
+        const dispatchWorkerEvent = (eventTraceId: string, type: string, data: any) => {
           switch (type) {
             case 'search_response_metadata':
               onData(eventTraceId, 'search_response_metadata', data);
@@ -313,6 +351,20 @@ const useHttpStreaming = () => {
             case 'end':
               onData(eventTraceId, 'end', 'end');
               break;
+          }
+        };
+
+        worker.onmessage = (event) => {
+          const { type, traceId: eventTraceId, data, events } = event.data;
+
+          if (type === 'batch' && Array.isArray(events)) {
+            // Batched events from worker — feed all into the coalescing buffer
+            for (const evt of events) {
+              dispatchWorkerEvent(eventTraceId, evt.type, evt.data);
+            }
+          } else {
+            // Single event (backwards compatible)
+            dispatchWorkerEvent(eventTraceId, type, data);
           }
         };
       } else {
