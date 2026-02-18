@@ -841,7 +841,7 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.type,
       async (type) => {
-        if (type == "search_history_re_apply") {
+        if (type == "search_history_re_apply" || type == "ai_chat_query") {
           searchObj.meta.jobId = "";
 
           searchObj.organizationIdetifier =
@@ -852,11 +852,20 @@ export default defineComponent({
             router.currentRoute.value.query.stream_type;
           resetSearchObj();
 
-          // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
-          searchBarRef.value.dateTimeRef.setRelativeTime(
-            router.currentRoute.value.query.period,
-          );
-          searchObj.data.datetime.type = "relative";
+          // Set time range based on source type
+          if (type == "ai_chat_query" && router.currentRoute.value.query.from && router.currentRoute.value.query.to) {
+            searchBarRef.value.dateTimeRef.setAbsoluteTime(
+              router.currentRoute.value.query.from,
+              router.currentRoute.value.query.to,
+            );
+            searchObj.data.datetime.type = "absolute";
+          } else {
+            // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
+            searchBarRef.value.dateTimeRef.setRelativeTime(
+              router.currentRoute.value.query.period,
+            );
+            searchObj.data.datetime.type = "relative";
+          }
 
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;

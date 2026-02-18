@@ -4,9 +4,34 @@ export interface ToolCall {
   context: Record<string, any>;
 }
 
+// Navigation action for UI navigation
+export interface NavigationAction {
+  resource_type: string;  // Generic - not enum limited (logs, metrics, traces, dashboard, alert, pipeline, etc.)
+  action: 'load_query' | 'navigate_direct';
+  label: string;
+  target: {
+    // For load_query action
+    query?: string;
+    sql_mode?: boolean;
+    functionContent?: string;
+    stream?: string[];
+    from?: number;
+    to?: number;
+    period?: string;
+    show_histogram?: boolean;
+
+    // For navigate_direct action
+    path?: string;
+    query?: Record<string, any>;
+
+    // Extensible - can add more fields
+    [key: string]: any;
+  };
+}
+
 // Content block for interleaved display (tool calls and text in order)
 export interface ContentBlock {
-  type: 'tool_call' | 'text' | 'error';
+  type: 'tool_call' | 'text' | 'error' | 'navigation';
   // For tool_call type:
   tool?: string;
   message?: string;
@@ -26,6 +51,8 @@ export interface ContentBlock {
   suggestion?: string;         // remediation hint
   details?: Record<string, any>; // error details
   recoverable?: boolean;       // for stream-level errors
+  // Navigation action (from navigation_action events):
+  navigationAction?: NavigationAction; // Optional navigation button for tool calls
 }
 
 // Image attachment for multimodal chat
