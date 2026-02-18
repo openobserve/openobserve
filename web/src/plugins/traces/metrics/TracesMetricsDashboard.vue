@@ -36,23 +36,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-btn>
     </div>
 
-    <!-- Charts Section -->
-    <div
-      class="charts-container tw:pt-[0.25rem]!"
-      v-show="searchObj.meta.showHistogram"
-    >
-      <RenderDashboardCharts
-        v-if="show"
-        ref="dashboardChartsRef"
-        :viewOnly="true"
-        :dashboardData="dashboardData"
-        :currentTimeObj="currentTimeObj"
-        :allowAlertCreation="false"
-        searchType="dashboards"
-        @updated:dataZoom="onDataZoom"
-        @chart:contextmenu="handleChartContextMenu"
-      />
-    </div>
+    <!-- Collapsible Charts Section -->
+    <transition name="slide-fade">
+      <div
+        v-show="!isCollapsed && searchObj.meta.showHistogram"
+        class="charts-wrapper"
+      >
+        <div class="charts-container">
+          <RenderDashboardCharts
+            v-if="show"
+            ref="dashboardChartsRef"
+            :viewOnly="true"
+            :dashboardData="dashboardData"
+            :currentTimeObj="currentTimeObj"
+            :allowAlertCreation="false"
+            searchType="dashboards"
+            @updated:dataZoom="onDataZoom"
+            @chart:contextmenu="handleChartContextMenu"
+          />
+        </div>
+      </div>
+    </transition>
 
     <TracesMetricsContextMenu
       v-show="searchObj.meta.showHistogram"
@@ -720,51 +724,9 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-// Filters label
-.filters-label {
-  color: #333;
-  user-select: none;
-}
-
-// Filter chip styles
-.filter-chip {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--o2-theme-color);
-
-  .chip-label {
-    user-select: none;
-  }
-
-  .chip-close-icon {
-    cursor: pointer;
-    transition: color 0.2s;
-
-    &:hover {
-      color: #0d447a;
-    }
-  }
-}
-
-// Analyze button
-.analyze-button {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0 0.75rem;
-  transition: all 0.2s;
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-}
-
 .traces-metrics-dashboard {
+  overflow: hidden;
+
   :deep(.card-container) {
     box-shadow: none;
 
@@ -774,22 +736,138 @@ defineExpose({
   }
 }
 
+// Dashboard header
+.dashboard-header {
+  border-bottom: 1px solid var(--o2-border-color);
+  user-select: none;
+  transition: background 0.2s ease;
+
+  .header-clickable {
+    padding: 4px 0;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: rgba(25, 118, 210, 0.06);
+    }
+
+    &:active {
+      background: rgba(25, 118, 210, 0.1);
+    }
+  }
+
+  .collapse-icon {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center;
+    color: #6b7280;
+
+    &.collapsed {
+      transform: rotate(-90deg);
+    }
+  }
+
+  .header-content {
+    .text-subtitle2 {
+      font-size: 13px;
+      line-height: 1.2;
+      user-select: none;
+      transition: color 0.2s ease;
+    }
+  }
+
+  .insights-button {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 16px;
+    height: 32px;
+    border-radius: 6px;
+    color: white;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+
+    .button-label {
+      letter-spacing: 0.3px;
+    }
+
+    &:hover {
+      box-shadow: 0 4px 6px
+        color-mix(in srgb, var(--o2-theme-color) 40%, transparent);
+    }
+  }
+}
+
+// Slide fade transition
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-fade-enter-from {
+  opacity: 0;
+  transform: translateY(-10px);
+  max-height: 0;
+}
+
+.slide-fade-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 500px;
+}
+
+.slide-fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 500px;
+}
+
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+  max-height: 0;
+}
+
+// Charts wrapper
+.charts-wrapper {
+  padding: 0.25rem;
+  overflow: hidden;
+  will-change: transform, opacity;
+}
+
 // Dark mode support
 body.body--dark {
-  .traces-metrics-dashboard {
-    background: var(--q-dark);
+  .dashboard-header {
+    .header-clickable {
+      &:hover {
+        background: rgba(25, 118, 210, 0.12);
+      }
+
+      &:active {
+        background: rgba(25, 118, 210, 0.18);
+      }
+    }
+
+    .collapse-icon {
+      color: #9ca3af;
+    }
+
+    .header-content .text-subtitle2 {
+      color: #e5e7eb;
+    }
+
+    .insights-button {
+      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+
+      &:hover {
+        background: linear-gradient(135deg, #2c5282 0%, #1e3a5f 100%);
+      }
+    }
   }
 
-  .filters-label {
-    color: #e0e0e0;
-  }
+  .charts-container {
+    border-color: rgba(255, 255, 255, 0.1);
 
-  .filter-chip {
-    border-color: var(--o2-border-color);
-    color: var(--o2-card-text);
-
-    .chip-close-icon:hover {
-      color: #ffffff;
+    &:hover {
+      box-shadow: 0 2px 8px rgba(255, 255, 255, 0.08);
     }
   }
 }

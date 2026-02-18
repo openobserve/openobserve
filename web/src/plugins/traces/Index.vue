@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-              <div class="card-container tw:h-full">
+              <div class="card-container tw:h-full tw:overflow-hidden">
                 <div
                   v-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
