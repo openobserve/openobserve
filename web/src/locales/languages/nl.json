@@ -2036,7 +2036,10 @@
     "customWebhook": "Op maat (Webhook)",
     "customEmail": "Aangepast (e-mail)",
     "customAction": "Aangepast (actie)",
-    "custom": "Op maat"
+    "custom": "Op maat",
+    "separator": "Separator",
+    "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",

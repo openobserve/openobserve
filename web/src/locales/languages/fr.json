@@ -2036,7 +2036,10 @@
     "customWebhook": "Personnalisé (Webhook)",
     "customEmail": "Personnalisé (e-mail)",
     "customAction": "Personnalisé (Action)",
-    "custom": "Personnalisé"
+    "custom": "Personnalisé",
+    "separator": "Séparateur",
+    "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
+    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",
