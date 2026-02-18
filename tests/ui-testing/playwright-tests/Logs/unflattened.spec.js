@@ -502,9 +502,28 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
     await page.waitForTimeout(500);
 
-    await pageManager.unflattenedPage.timestampDropdown.waitFor();
-    await pageManager.unflattenedPage.timestampDropdown.click();
-    testLogger.info('Test completed successfully');
+    // Wait for log details panel to load before checking for timestamp field
+    try {
+      await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ timeout: 5000 });
+      testLogger.info('Log detail JSON content is visible');
+
+      await pageManager.unflattenedPage.timestampDropdown.waitFor({ timeout: 10000 });
+      testLogger.info('Timestamp field found');
+      await pageManager.unflattenedPage.timestampDropdown.click();
+      testLogger.info('Test completed successfully');
+    } catch (error) {
+      testLogger.error('Failed to find timestamp field in log details', { error: error.message });
+
+      // Log what fields are actually present for debugging
+      try {
+        const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
+        testLogger.error('Available fields in log detail', { fields: allKeys });
+      } catch (e) {
+        testLogger.error('Could not retrieve available fields');
+      }
+
+      throw error;
+    }
 });
 
 
