@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div
-      class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
+      class="flex justify-start items-center tw:px-3 tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
       data-test="trace-details-sidebar-header"
     >
     <div
@@ -29,9 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Observation Type Badge (for LLM spans) -->
       <q-badge
         v-if="isLLMSpan"
-        :label="span._o2_llm_observation_type"
+        :label="span._o2_llm_observation_type?.charAt(0) + span._o2_llm_observation_type?.slice(1).toLowerCase()"
         :color="getObservationTypeColor(span._o2_llm_observation_type)"
-        class="q-mr-xs"
+        class="q-mr-xs observation-type-badge"
         data-test="trace-details-sidebar-observation-badge"
       />
 
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-btn
       dense
-      icon="close"
+      icon="cancel"
       class="align-right no-border q-pa-xs"
       size="xs"
       @click="closeSidebar"
@@ -1747,7 +1747,7 @@ export default defineComponent({
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     border-right: 1px solid rgba(255, 255, 255, 0.15);
     text-align: left;
-    padding: 8px 12px !important;
+    padding: 4px !important;
     font-size: 13px;
     word-break: break-word;
     word-wrap: break-word;
@@ -1937,6 +1937,11 @@ export default defineComponent({
 }
 
 // LLM-specific styles
+// Observation Type Badge
+.observation-type-badge {
+  text-transform: none !important;
+}
+
 // Trace Details Toolbar - Modern Styling
 .trace-details-toolbar-container {
   background: rgba(248, 249, 250, 0.5);
@@ -2458,12 +2463,18 @@ body.body--dark {
   th{
     background-color: #f5f5f5 !important;
   }
+    td{
+      padding: 0px !important;
+    }
 }
 
 .body--dark {
   .trace-detail-tab-table{
     th{
       background-color: #424242 !important;
+    }
+    td{
+      background-color: red;
     }
   }
 }
