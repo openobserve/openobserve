@@ -191,8 +191,8 @@ jobs:
           #       "dashboard-transpose.spec.js",
           #       "dashboard-join.spec.js",
           #       "dashboard-nested-functions.spec.js",
-          # "dashboard-legends-copy.spec.js",
-                # "dashboard-raw-query.spec.js",
+          #       "dashboard-legends-copy.spec.js",
+          #       "dashboard-raw-query.spec.js",
           #     ]
           # - testfolder: "Dashboards-Charts"
           #   browser: "chrome"
