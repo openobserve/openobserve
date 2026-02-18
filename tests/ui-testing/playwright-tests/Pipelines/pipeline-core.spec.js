@@ -2,12 +2,15 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
-import { LoginPage } from "../../pages/generalPages/loginPage.js";
 const testLogger = require('../utils/test-logger.js');
+const path = require('path');
 
 test.describe.configure({ mode: "parallel" });
 
+// Use stored authentication state from global setup instead of logging in each test
+const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.use({
+  storageState: authFile,
   contextOptions: {
     slowMo: 1000
   }
@@ -17,15 +20,9 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCore'] }, () => {
   let pageManager;
-  let loginPage;
 
   test.beforeEach(async ({ page }) => {
-    // Login using LoginPage
-    loginPage = new LoginPage(page);
-    await loginPage.gotoLoginPage();
-    await loginPage.loginAsInternalUser();
-    await loginPage.login();
-
+    // Auth is handled via storageState - no login needed
     pageManager = new PageManager(page);
 
     // Ingest data using page object method
