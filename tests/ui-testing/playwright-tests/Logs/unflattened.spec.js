@@ -501,6 +501,11 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
 
+    testLogger.info('Opening log source details');
+    await pageManager.unflattenedPage.logSourceColumn.waitFor();
+    await pageManager.unflattenedPage.logSourceColumn.click();
+    await page.waitForTimeout(1500);
+
     testLogger.info('Waiting for log detail panel to load');
     await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ state: "visible", timeout: 10000 });
     await page.waitForTimeout(1000);
