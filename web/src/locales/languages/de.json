@@ -2036,7 +2036,10 @@
     "customWebhook": "Benutzerdefiniert (Webhook)",
     "customEmail": "Benutzerdefiniert (E-Mail)",
     "customAction": "Benutzerdefiniert (Aktion)",
-    "custom": "Benutzerdefiniert"
+    "custom": "Benutzerdefiniert",
+    "separator": "Trennzeichen",
+    "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",

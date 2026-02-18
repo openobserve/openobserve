@@ -2036,7 +2036,10 @@
     "customWebhook": "Özel (Webhook)",
     "customEmail": "Özel (E-posta)",
     "customAction": "Özel (Eylem)",
-    "custom": "Özel"
+    "custom": "Özel",
+    "separator": "Ayırıcı",
+    "separator_placeholder": "Ayırıcı girin (örn. |,\\ n,\\ t, boşluk)",
+    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)"
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",
