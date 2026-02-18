@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage"
-style="min-height: auto">
+  <q-page class="tracePage" id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <div
         class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
@@ -43,10 +42,16 @@ style="min-height: auto">
 
       <!-- Service Graph Tab Content -->
       <div
-        v-if="activeTab === 'service-graph' && store.state.zoConfig.service_graph_enabled"
+        v-if="
+          activeTab === 'service-graph' &&
+          store.state.zoConfig.service_graph_enabled
+        "
         class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
-        <service-graph class="tw:h-full" @view-traces="handleServiceGraphViewTraces" />
+        <service-graph
+          class="tw:h-full"
+          @view-traces="handleServiceGraphViewTraces"
+        />
       </div>
 
       <!-- Search Tab Content -->
@@ -79,11 +84,19 @@ style="min-height: auto">
           <template #separator>
             <q-btn
               data-test="logs-search-field-list-collapse-btn"
-              :icon="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'"
-              :title="
-                searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+              :icon="
+                searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
               "
-              :class="searchObj.meta.showFields ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+              :title="
+                searchObj.meta.showFields
+                  ? t('traces.collapseFields')
+                  : t('traces.openFields')
+              "
+              :class="
+                searchObj.meta.showFields
+                  ? 'splitter-icon-collapse'
+                  : 'splitter-icon-expand'
+              "
               color="primary"
               size="sm"
               dense
@@ -92,10 +105,8 @@ style="min-height: auto">
             />
           </template>
           <template #after>
-            <div
-              class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
-            >
-              <div class="card-container tw:h-full">
+            <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+              <div class="card-container tw:h-full tw:overflow-hidden">
                 <div
                   v-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
@@ -147,7 +158,7 @@ style="min-height: auto">
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noStreamSelectedMessage") }}
-                </div>
+                  </div>
                 </div>
                 <div
                   data-test="logs-search-result-not-found-text"
@@ -158,8 +169,7 @@ style="min-height: auto">
                   "
                   class="text-center tw:mx-[10%] tw:py-[40px] tw:text-[20px]"
                 >
-                  <q-icon name="info"
-color="primary" size="md" />
+                  <q-icon name="info" color="primary" size="md" />
                   {{ t("search.applySearch") }}
                 </div>
 
@@ -178,6 +188,26 @@ color="primary" size="md" />
         </q-splitter>
       </div>
     </div>
+
+    <!-- Color Preview Dialog (Test) -->
+    <q-dialog
+      v-model="showColorPreview"
+      maximized
+      transition-show="slide-up"
+      transition-hide="slide-down"
+    >
+      <q-card class="tw:bg-[var(--o2-primary-background)]">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Span Color Palette Preview</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="tw:h-[calc(100vh-60px)] tw:overflow-auto">
+          <span-color-preview />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -246,6 +276,7 @@ let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
 const indexListRef = ref(null);
+const showColorPreview = ref(false);
 const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
 
@@ -836,8 +867,8 @@ async function extractFields() {
       const importantFields = {
         duration: 1,
         service_name: 1,
-        operation_name: 1,
         span_status: 1,
+        operation_name: 1,
         trace_id: 1,
         span_id: 1,
         reference_parent_span_id: 1,
@@ -1038,13 +1069,13 @@ onBeforeMount(async () => {
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === 'service-graph') {
+  if (queryParams.tab === "service-graph") {
     // Only allow service-graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = 'service-graph';
+      activeTab.value = "service-graph";
     } else {
       // If service graph is disabled, default to search tab
-      activeTab.value = 'search';
+      activeTab.value = "search";
     }
   }
   await importSqlParser();
@@ -1378,7 +1409,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  activeTab.value = 'search';
+  activeTab.value = "search";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1423,13 +1454,13 @@ watch(updateSelectedColumns, () => {
 // Watch for active tab changes and update URL
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
-  if (newTab === 'service-graph') {
+  if (newTab === "service-graph") {
     // Only set service-graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = 'service-graph';
+      query.tab = "service-graph";
     } else {
       // If service graph is disabled, force back to search tab
-      activeTab.value = 'search';
+      activeTab.value = "search";
       delete query.tab;
     }
   } else {

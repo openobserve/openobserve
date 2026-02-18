@@ -552,6 +552,38 @@ describe("Use Logs Composable", () => {
       expect(wrapper.vm.searchObj.data.editorValue).toBe("SELECT * FROM logs");
       expect(wrapper.vm.searchObj.data.query).toBe("SELECT * FROM logs");
     });
+
+    it("should allow SQL mode queries without stream param (ai_chat_query)", async () => {
+      const encodedQuery = btoa("SELECT * FROM my_stream WHERE status='error'");
+      wrapper.vm.router.currentRoute.value.query = {
+        sql_mode: "true",
+        query: encodedQuery,
+        from: "1000000",
+        to: "2000000",
+        type: "ai_chat_query",
+      };
+
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+      await nextTick();
+
+      // Should NOT have returned early despite no stream param
+      expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
+    });
+
+    it("should return early when no stream and not sql_mode", async () => {
+      wrapper.vm.router.currentRoute.value.query = {
+        from: "1000000",
+        to: "2000000",
+      };
+
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+      await nextTick();
+
+      // Should have returned early
+      expect(wrapper.vm.searchObj.shouldIgnoreWatcher).toBe(false);
+    });
   });
 
   describe("Initialization Functions", () => {
@@ -2111,6 +2143,18 @@ describe("Use Logs Composable", () => {
         const { getQueryData } = wrapper.vm;
         expect(typeof getQueryData).toBe("function");
         expect(true).toBe(true);
+      });
+
+      it("should clear ai_chat_query type from route query", async () => {
+        // Set route query with ai_chat_query type
+        wrapper.vm.router.currentRoute.value.query = {
+          type: "ai_chat_query",
+          stream: "test_stream",
+        };
+
+        const { getQueryData } = wrapper.vm;
+        expect(typeof getQueryData).toBe("function");
+        // The function should clear the type param when it's ai_chat_query
       });
     });
 

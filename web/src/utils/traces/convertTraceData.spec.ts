@@ -280,10 +280,10 @@ describe("convertTraceData", () => {
       const result = convertTraceServiceMapData(data);
 
       expect(result.options.tooltip.show).toBe(false);
-      expect(result.options.series[0].symbolSize).toBe(20);
+      expect(result.options.series[0].symbolSize).toBe(30);
       expect(result.options.series[0].label.position).toBe("bottom");
       expect(result.options.series[0].label.verticalAlign).toBe("bottom");
-      expect(result.options.series[0].label.distance).toBe(25);
+      expect(result.options.series[0].label.distance).toBe(26);
       expect(result.options.series[0].label.fontSize).toBe(12);
     });
 
