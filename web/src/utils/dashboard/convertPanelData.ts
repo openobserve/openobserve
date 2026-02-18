@@ -60,8 +60,10 @@ export const convertPanelData = async (
     case "gauge": {
       // Skip conversion if no fields are selected in builder mode
       // (prevents echarts errors like "axis.getAxesOnZeroOf is not a function")
+      // PromQL queries don't use builder fields, so skip this check for them
       const query = panelSchema?.queries?.[0];
       if (
+        panelSchema?.queryType !== "promql" &&
         !query?.fields?.x?.length &&
         !query?.fields?.y?.length &&
         !query?.fields?.breakdown?.length
