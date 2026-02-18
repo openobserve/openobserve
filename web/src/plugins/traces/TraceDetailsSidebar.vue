@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-header-toolbar"
   >
     <!-- Row 1: Trace Details -->
-    <div class="flex items-center justify-between q-pa-xs tw:gap-2" style="overflow-x: auto; flex-wrap: nowrap;">
-      <div class="flex items-center tw:gap-2" style="flex-wrap: nowrap;">
+    <div class="flex items-center justify-between q-pa-xs" style="overflow-x: auto; flex-wrap: nowrap;">
+      <div class="flex items-center" style="flex-wrap: nowrap;">
         <!-- Service Badge -->
         <q-chip
           dense
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-chip>
       </div>
 
-      <div class="flex items-center tw:gap-2">
+      <div class="flex items-center">
         <!-- Span ID Badge -->
         <q-chip
           dense
@@ -150,11 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Row 2: LLM Metrics (conditional) -->
     <div
-      v-if="isLLMSpan && llmMetrics"
-      class="flex items-center justify-between q-pa-xs tw:gap-2 llm-metrics-row"
+      v-if="isLLMSpan && llmMetrics && span._o2_llm_model_name"
+      class="flex items-center justify-between q-pa-xs llm-metrics-row"
       style="overflow-x: auto; flex-wrap: nowrap; border-top: 1px solid #e9ecef;"
     >
-      <div class="flex items-center tw:gap-2" style="flex-wrap: nowrap;">
+      <div class="flex items-center" style="flex-wrap: nowrap;">
         <!-- Model Chip -->
         <q-chip
           dense
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-chip>
       </div>
 
-      <div class="flex items-center tw:gap-2">
+      <div class="flex items-center">
         <!-- Provider Badge -->
         <q-badge
           v-if="span._o2_llm_provider_name"
@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
         class="q-table trace-detail-tab-table o2-quasar-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         id="schemaFieldList"
         dense
       >
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
         class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         dense
       >
         <template v-slot:body-cell="props">
@@ -456,10 +456,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </q-tab-panel>
-    <q-tab-panel name="attributes">
+    <q-tab-panel name="attributes" class="q-pa-none">
+          <q-btn
+        :label="t('common.copyToClipboard')"
+        dense
+        size="sm"
+        no-caps
+        class="tw:mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
+        icon="content_copy"
+        @click="copyAttributesToClipboard"
+      />
       <pre
-        class="attr-text tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        class="attr-text tab-content-dynamic-height-with-header"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         v-html="highlightedAttributes"
         data-test="trace-details-sidebar-attributes-table"
       ></pre>
@@ -474,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         :rows-per-page-options="[0]"
         class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         dense
       >
         <template v-slot:body="props">
@@ -535,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         data-test="trace-details-sidebar-no-events"
       >
         No events present for this span
@@ -551,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         :rows-per-page-options="[0]"
         class="q-table o2-quasar-table  trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         dense
       >
         <template v-slot:body="props">
@@ -657,7 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         data-test="trace-details-sidebar-no-exceptions"
       >
         No exceptions present for this span
@@ -716,7 +725,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         data-test="trace-details-sidebar-no-links"
       >
         No links present for this span
@@ -745,7 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <div class="tw:text-center">
           <q-spinner-hourglass
@@ -791,7 +800,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
-        :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
+        :class="isLLMSpan && llmMetrics && span._o2_llm_model_name ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
       >
         <div class="tw:text-center">
           <q-spinner-hourglass
@@ -1399,6 +1408,19 @@ export default defineComponent({
       });
     };
 
+    const copyAttributesToClipboard = () => {
+      const attributes = props.span?.attributes || {};
+      const attributesText = JSON.stringify(attributes, null, 2);
+
+      copyToClipboard(attributesText);
+
+      q?.notify?.({
+        type: "positive",
+        message: "Attributes copied to clipboard",
+        timeout: 2000,
+      });
+    };
+
     const openReferenceTrace = (type: string, link: any) => {
       if (link && link.context) {
         const query = {
@@ -1810,6 +1832,7 @@ export default defineComponent({
       viewSpanLogs,
       getStartTime,
       copySpanId,
+      copyAttributesToClipboard,
       openReferenceTrace,
       spanLinks,
       linkColumns,
@@ -2571,6 +2594,39 @@ body.body--dark {
 .tab-content-without-llm-metrics {
   height: calc(100vh - 276px);
 }
+
+// Attributes tab with header button
+.attributes-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 32px;
+}
+.copy-clipboard-button{
+    min-width: 40px !important;
+}
+
+.tab-content-dynamic-height-with-header {
+  &.tab-content-with-llm-metrics {
+    height: calc(100vh - 348px); // 312px + 36px for button header
+  }
+
+  &.tab-content-without-llm-metrics {
+    height: calc(100vh - 312px); // 276px + 36px for button header
+  }
+}
+
+.copy-attributes-btn {
+  opacity: 0.7;
+  transition: all 0.2s;
+  background: var(--o2-hover-accent) !important;
+  border: 1px solid var(--o2-border-color);
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
 .trace-detail-tab-table{
    th{
     background-color: #f5f5f5 !important;
