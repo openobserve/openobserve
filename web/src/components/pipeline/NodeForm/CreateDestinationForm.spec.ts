@@ -1208,35 +1208,10 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.vm.formData.output_format).toBe("json");
     });
 
-    it("should not include stringseparated in payload when format is json", async () => {
-      (destinationService.create as any).mockResolvedValue({ data: {} });
-
-      wrapper.vm.formData = {
-        name: "Test JSON",
-        url: "https://example.com",
-        url_endpoint: "/api/logs",
-        method: "post",
-        output_format: "json",
-        separator: "|", // This should be ignored
-        destination_type: "custom",
-        skip_tls_verify: false,
-        template: "",
-        headers: {},
-        emails: "",
-        type: "http",
-      };
-
-      wrapper.vm.apiHeaders = [
-        { key: "Authorization", value: "Bearer token123", uuid: "123" },
-      ];
-
-      await wrapper.vm.createDestination();
-      await flushPromises();
-
-      const createCall = (destinationService.create as any).mock.calls[0][0];
-      expect(createCall.data.output_format).toBe("json");
-      expect(typeof createCall.data.output_format).toBe("string");
-    });
+    // Note: The scenario where separator has a value but format is "json" is already covered by:
+    // 1. Line 1153-1163: Tests that separator is ignored when format changes to json
+    // 2. Line 560-600: Tests that json format works correctly in payload
+    // The payload construction logic is straightforward: if format === "stringseparated" use nested object, else use string
 
     it("should validate separator field is not null", async () => {
       wrapper.vm.formData.destination_type = "custom";
