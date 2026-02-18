@@ -146,7 +146,6 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       table_pagination: false,
       table_pagination_rows_per_page: null,
       panel_time_enabled: false,
-      panel_time_mode: "global",
       panel_time_range: null,
     },
     htmlContent: "",
