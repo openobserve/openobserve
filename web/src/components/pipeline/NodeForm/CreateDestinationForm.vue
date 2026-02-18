@@ -1273,7 +1273,7 @@ const createDestination = () => {
         index: formData.value.esbulk_index,
       },
     };
-  } else if (formData.value.output_format === "stringseparated" && formData.value.separator) {
+  } else if (formData.value.output_format === "stringseparated") {
     outputFormat = {
       stringseparated: {
         separator: formData.value.separator,
