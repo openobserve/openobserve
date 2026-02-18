@@ -7,21 +7,21 @@
  * Span Kind - OpenTelemetry standard span kinds
  */
 export enum SpanKind {
-  UNSPECIFIED = 'UNSPECIFIED',
-  INTERNAL = 'INTERNAL',
-  SERVER = 'SERVER',
-  CLIENT = 'CLIENT',
-  PRODUCER = 'PRODUCER',
-  CONSUMER = 'CONSUMER',
+  UNSPECIFIED = "UNSPECIFIED",
+  INTERNAL = "INTERNAL",
+  SERVER = "SERVER",
+  CLIENT = "CLIENT",
+  PRODUCER = "PRODUCER",
+  CONSUMER = "CONSUMER",
 }
 
 /**
  * Span Status - Execution status of the span
  */
 export enum SpanStatus {
-  UNSET = 'UNSET',
-  OK = 'OK',
-  ERROR = 'ERROR',
+  UNSET = "UNSET",
+  OK = "OK",
+  ERROR = "ERROR",
 }
 
 /**
@@ -53,9 +53,9 @@ export interface Span {
   parent_span_id?: string;
 
   // Timing
-  start_time: number; // Unix timestamp in microseconds
-  end_time: number;   // Unix timestamp in microseconds
-  duration: number;   // Duration in microseconds
+  start_time: number; // Unix timestamp in nanoseconds
+  end_time: number; // Unix timestamp in nanoseconds
+  duration: number; // Duration in microseconds
 
   // Metadata
   service_name: string;
@@ -79,28 +79,28 @@ export interface Span {
  */
 export interface EnrichedSpan extends Span {
   // Hierarchy
-  depth: number;           // Tree depth (0 = root)
+  depth: number; // Tree depth (0 = root)
   children: EnrichedSpan[]; // Child spans
-  hasChildren: boolean;     // Quick check for children
+  hasChildren: boolean; // Quick check for children
 
   // UI state
-  isExpanded: boolean;      // Tree expansion state
-  isSelected: boolean;      // Selected in UI
+  isExpanded: boolean; // Tree expansion state
+  isSelected: boolean; // Selected in UI
   isOnCriticalPath: boolean; // Part of critical path
 
   // Computed values
-  color: string;            // Service color from palette
-  durationMs: number;       // Duration in milliseconds
-  durationPercent: number;  // % of total trace duration
-  startOffsetMs: number;    // Offset from trace start (ms)
+  color: string; // Service color from palette
+  durationMs: number; // Duration in milliseconds
+  durationPercent: number; // % of total trace duration
+  startOffsetMs: number; // Offset from trace start (ms)
   startOffsetPercent: number; // % offset from trace start
 
   // Display helpers
-  serviceName: string;      // Normalized service name
-  operationName: string;    // Normalized operation name
-  statusIcon: string;       // Icon name for status
-  kindIcon: string;         // Icon name for span kind
-  hasError: boolean;        // Quick error check
+  serviceName: string; // Normalized service name
+  operationName: string; // Normalized operation name
+  statusIcon: string; // Icon name for status
+  kindIcon: string; // Icon name for span kind
+  hasError: boolean; // Quick error check
 }
 
 /**
@@ -117,24 +117,24 @@ export interface SpanTreeNode {
  * Span Filter Criteria
  */
 export interface SpanFilter {
-  services?: string[];      // Filter by service names
-  statuses?: SpanStatus[];  // Filter by status
-  kinds?: SpanKind[];       // Filter by span kind
-  minDuration?: number;     // Min duration in ms
-  maxDuration?: number;     // Max duration in ms
-  searchText?: string;      // Full-text search
+  services?: string[]; // Filter by service names
+  statuses?: SpanStatus[]; // Filter by status
+  kinds?: SpanKind[]; // Filter by span kind
+  minDuration?: number; // Min duration in ms
+  maxDuration?: number; // Max duration in ms
+  searchText?: string; // Full-text search
   attributeFilters?: Record<string, any>; // Attribute key-value filters
-  errorOnly?: boolean;      // Show only error spans
+  errorOnly?: boolean; // Show only error spans
 }
 
 /**
  * Span Sort Options
  */
 export enum SpanSortField {
-  TIMESTAMP = 'timestamp',
-  DURATION = 'duration',
-  SERVICE = 'service',
-  OPERATION = 'operation',
+  TIMESTAMP = "timestamp",
+  DURATION = "duration",
+  SERVICE = "service",
+  OPERATION = "operation",
 }
 
 export interface SpanSort {
