@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="tagColumns"
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
-        class="q-table trace-detail-tab-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+        class="q-table trace-detail-tab-table o2-quasar-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
         :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         id="schemaFieldList"
         dense
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="processColumns"
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table trace-detail-tab-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+        class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
         :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         dense
       >
@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="eventColumns"
         row-key="name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table trace-detail-tab-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+        class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
         :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         dense
       >
@@ -550,7 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="exceptionEventColumns"
         row-key="name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table  trace-detail-tab-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+        class="q-table o2-quasar-table  trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
         :class="isLLMSpan && llmMetrics ? 'tab-content-with-llm-metrics' : 'tab-content-without-llm-metrics'"
         dense
       >
@@ -599,36 +599,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="expandedEvents[props.rowIndex.toString()]"
             :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
           >
-            <q-td colspan="2" style="font-size: 12px; font-family: monospace">
-              <div class="q-pl-sm">
-                <div>
-                  <span>Type: </span>
-                  <span>"{{ props.row["exception.type"] }}"</span>
+            <q-td colspan="2" class="exception-details-container">
+              <div class="exception-content">
+                <!-- Exception Type -->
+                <div class="exception-field">
+                  <span class="exception-label">Type:</span>
+                  <span class="exception-type">{{ props.row["exception.type"] }}</span>
                 </div>
 
-                <div class="q-mt-xs">
-                  <span>Message: </span>
-                  <span>"{{ props.row["exception.message"] }}"</span>
+                <!-- Exception Message -->
+                <div class="exception-field">
+                  <span class="exception-label">Message:</span>
+                  <div class="exception-message">
+                    {{ formatExceptionMessage(props.row["exception.message"]) }}
+                  </div>
                 </div>
 
-                <div class="q-mt-xs">
-                  <span>Escaped: </span>
-                  <span>"{{ props.row["exception.escaped"] }}"</span>
+                <!-- Escaped -->
+                <div class="exception-field">
+                  <span class="exception-label">Escaped:</span>
+                  <span class="exception-value">{{ props.row["exception.escaped"] }}</span>
                 </div>
 
-                <div class="q-mt-xs">
-                  <span>Stacktrace: </span>
-                  <div
-                    class="q-px-sm q-mt-xs"
-                    style="border: 1px solid #c1c1c1; border-radius: 4px"
-                  >
-                    <pre
-                      style="font-size: 12px; text-wrap: wrap"
-                      class="q-mt-xs"
-                      >{{
-                        formatStackTrace(props.row["exception.stacktrace"])
-                      }}</pre
+                <!-- Stacktrace -->
+                <div class="exception-field">
+                  <div class="stacktrace-header">
+                    <span class="exception-label">Stacktrace:</span>
+                    <q-btn
+                      v-if="props.row['exception.stacktrace'] && props.row['exception.stacktrace'].trim()"
+                      flat
+                      dense
+                      size="xs"
+                      icon="content_copy"
+                      class="copy-btn"
+                      @click.stop="copyStackTrace(props.row['exception.stacktrace'])"
+                      title="Copy stacktrace"
                     >
+                      <q-tooltip>Copy stacktrace</q-tooltip>
+                    </q-btn>
+                  </div>
+                  <div v-if="props.row['exception.stacktrace'] && props.row['exception.stacktrace'].trim()" class="stacktrace-container">
+                    <pre
+                      class="stacktrace-content"
+                      v-html="formatStackTrace(props.row['exception.stacktrace'])"
+                    ></pre>
+                  </div>
+                  <div v-else class="stacktrace-empty">
+                    <q-icon name="info" size="16px" class="q-mr-xs" />
+                    <span>No stacktrace available</span>
                   </div>
                 </div>
               </div>
@@ -1249,21 +1267,114 @@ export default defineComponent({
       },
     );
     function formatStackTrace(trace: any) {
+      if (!trace) return '';
+
       // Split the trace into lines
       const lines = trace.split("\n");
 
-      // Process each line
+      // Process each line with syntax highlighting
       const formattedLines = lines.map((line: string) => {
-        // Apply formatting rules
-        // For example, indent lines that contain file paths
-        if (line.trim().startsWith("/")) {
-          return "" + line; // Indent the line
+        const trimmed = line.trim();
+
+        // Skip empty lines
+        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
+
+        // Highlight file paths and line numbers (e.g., File "path", line 123, in function_name)
+        if (trimmed.startsWith('File ')) {
+          const fileMatch = line.match(/(File\s+)"([^"]+)"(,\s+line\s+)(\d+)(,\s+in\s+)(.+)/);
+          if (fileMatch) {
+            return `<div class="stack-line stack-file">  ${fileMatch[1]}<span class="stack-path">"${fileMatch[2]}"</span>${fileMatch[3]}<span class="stack-lineno">${fileMatch[4]}</span>${fileMatch[5]}<span class="stack-function">${fileMatch[6]}</span></div>`;
+          }
         }
-        return line;
+
+        // Highlight exception raises (e.g., raise ContextWindowExceededError)
+        if (trimmed.startsWith('raise ') || trimmed.includes('raise ')) {
+          const highlighted = line.replace(/(raise\s+)(\w+)/, '<span class="stack-keyword">$1</span><span class="stack-exception">$2</span>');
+          return `<div class="stack-line stack-raise">${highlighted}</div>`;
+        }
+
+        // Highlight traceback headers
+        if (trimmed.startsWith('Traceback ')) {
+          return `<div class="stack-line stack-traceback"><span class="stack-traceback-header">${line}</span></div>`;
+        }
+
+        // Highlight "During handling" messages
+        if (trimmed.startsWith('During handling of')) {
+          return `<div class="stack-line stack-during"><span class="stack-during-text">${line}</span></div>`;
+        }
+
+        // Highlight code lines (indented lines that aren't file paths)
+        if (line.startsWith('    ') && !trimmed.startsWith('File ')) {
+          // Check for common patterns like return, await, etc.
+          let highlighted = line
+            .replace(/(return|await|async|yield|raise|for|if|else|try|except|finally|with|as|import|from)\s/g, '<span class="stack-keyword">$1</span> ')
+            .replace(/(\w+\()/g, '<span class="stack-call">$1</span>')
+            .replace(/(\.\.\.)/g, '<span class="stack-ellipsis">$1</span>');
+          return `<div class="stack-line stack-code">${highlighted}</div>`;
+        }
+
+        // Highlight error types at the end of stack (e.g., httpx.HTTPStatusError: ...)
+        if (trimmed.match(/^\w+\.\w+Error:/)) {
+          const errorMatch = line.match(/^(\s*)(\w+(?:\.\w+)*Error:)(.+)/);
+          if (errorMatch) {
+            return `<div class="stack-line stack-error">${errorMatch[1]}<span class="stack-exception">${errorMatch[2]}</span><span class="stack-error-msg">${errorMatch[3]}</span></div>`;
+          }
+        }
+
+        // Default line
+        return `<div class="stack-line">${line}</div>`;
       });
 
-      // Reassemble the formatted trace
-      return formattedLines.join("\n");
+      return formattedLines.join('');
+    }
+
+    function formatExceptionMessage(message: any) {
+      if (!message) return '';
+
+      // Try to format as JSON if it looks like JSON
+      if (typeof message === 'string' && (message.includes('{') || message.includes('['))) {
+        try {
+          // Extract JSON parts and format them
+          const jsonMatch = message.match(/\{[^}]+\}/g);
+          if (jsonMatch) {
+            let formatted = message;
+            jsonMatch.forEach(json => {
+              try {
+                const parsed = JSON.parse(json);
+                const pretty = JSON.stringify(parsed, null, 2);
+                formatted = formatted.replace(json, '\n' + pretty);
+              } catch {
+                // Keep original if can't parse
+              }
+            });
+            return formatted;
+          }
+        } catch {
+          // Keep original if parsing fails
+        }
+      }
+
+      return message;
+    }
+
+    function copyStackTrace(stacktrace: string) {
+      if (!stacktrace) return;
+
+      navigator.clipboard.writeText(stacktrace).then(() => {
+        $q.notify({
+          message: 'Stacktrace copied to clipboard',
+          color: 'positive',
+          position: 'top',
+          timeout: 2000,
+        });
+      }).catch(() => {
+        $q.notify({
+          message: 'Failed to copy stacktrace',
+          color: 'negative',
+          position: 'top',
+          timeout: 2000,
+        });
+      });
     }
 
     const viewSpanLogs = () => {
@@ -1690,6 +1801,8 @@ export default defineComponent({
       tags,
       processes,
       formatStackTrace,
+      formatExceptionMessage,
+      copyStackTrace,
       getExceptionEvents,
       exceptionEventColumns,
       getDuration,
@@ -1754,7 +1867,6 @@ export default defineComponent({
     overflow-wrap: break-word;
     max-width: 600px;
   }
-
   td span {
     display: inline-block;
     width: 100%;
@@ -1895,7 +2007,7 @@ export default defineComponent({
   vertical-align: top;
 
   .cell-content {
-    max-height: 300px;
+    max-height: 200px;
     overflow-y: auto;
     overflow-x: hidden;
     display: block;
@@ -2460,12 +2572,9 @@ body.body--dark {
   height: calc(100vh - 276px);
 }
 .trace-detail-tab-table{
-  th{
+   th{
     background-color: #f5f5f5 !important;
   }
-    td{
-      padding: 0px !important;
-    }
 }
 
 .body--dark {
@@ -2473,9 +2582,278 @@ body.body--dark {
     th{
       background-color: #424242 !important;
     }
-    td{
-      background-color: red;
+  }
+}
+
+// Exception Details Styling
+.exception-details-container {
+  padding: 0.75rem !important;
+  font-size: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  background-color: var(--o2-code-bg);
+}
+
+.exception-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.exception-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.exception-label {
+  font-weight: 700;
+  color: var(--o2-text-primary);
+  font-size: 13px;
+  margin-bottom: 0;
+}
+
+.exception-type {
+  color: #d32f2f;
+  font-weight: 600;
+  background: rgba(211, 47, 47, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.exception-message {
+  color: var(--o2-text-secondary);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.5rem;
+  border-radius: 4px;
+  border-left: 3px solid #ff9800;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+}
+
+.exception-value {
+  color: var(--o2-text-secondary);
+}
+
+.stacktrace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+
+  .copy-btn {
+    margin-left: auto;
+    color: var(--o2-text-secondary);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 1;
     }
+  }
+}
+
+.stacktrace-container {
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  overflow: auto;
+  max-height: 600px;
+  padding: 0.75rem;
+}
+
+.stacktrace-content {
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #2c3e50;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+
+  .stack-line {
+    padding: 2px 0;
+  }
+
+  .stack-empty {
+    height: 0.5em;
+  }
+
+  .stack-file {
+    color: #0066cc;
+    font-weight: 500;
+  }
+
+  .stack-path {
+    color: #d63384;
+  }
+
+  .stack-lineno {
+    color: #087990;
+    font-weight: 600;
+  }
+
+  .stack-function {
+    color: #6f42c1;
+  }
+
+  .stack-keyword {
+    color: #8250df;
+    font-weight: 600;
+  }
+
+  .stack-exception {
+    color: #d73a49;
+    font-weight: 600;
+  }
+
+  .stack-traceback {
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  .stack-traceback-header {
+    color: #6c757d;
+    font-weight: 600;
+  }
+
+  .stack-during {
+    color: #6c757d;
+    margin: 0.5em 0;
+  }
+
+  .stack-during-text {
+    font-style: italic;
+  }
+
+  .stack-code {
+    color: #2c3e50;
+    padding-left: 2em;
+  }
+
+  .stack-call {
+    color: #0969da;
+  }
+
+  .stack-ellipsis {
+    color: #6c757d;
+  }
+
+  .stack-error {
+    margin-top: 0.5em;
+  }
+
+  .stack-error-msg {
+    color: #2c3e50;
+  }
+
+  .stack-raise {
+    color: #d73a49;
+  }
+}
+
+.stacktrace-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border: 1px dashed #dee2e6;
+  border-radius: 4px;
+  color: #6c757d;
+  font-size: 12px;
+  font-style: italic;
+}
+
+// Dark Mode Adjustments
+body.body--dark {
+  .exception-details-container {
+    background-color: #1a1a1a;
+  }
+
+  .exception-type {
+    color: #ef5350;
+    background: rgba(239, 83, 80, 0.15);
+  }
+
+  .exception-message {
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: #ffb74d;
+    color: #e0e0e0;
+  }
+
+  .stacktrace-container {
+    background: #0d0d0d;
+    border-color: #2a2a2a;
+  }
+
+  .stacktrace-content {
+    color: #d4d4d4;
+
+    .stack-file {
+      color: #9cdcfe;
+    }
+
+    .stack-path {
+      color: #ce9178;
+    }
+
+    .stack-lineno {
+      color: #b5cea8;
+    }
+
+    .stack-function {
+      color: #dcdcaa;
+    }
+
+    .stack-keyword {
+      color: #c586c0;
+    }
+
+    .stack-exception {
+      color: #f48771;
+    }
+
+    .stack-traceback {
+      color: #808080;
+    }
+
+    .stack-traceback-header {
+      color: #808080;
+    }
+
+    .stack-during {
+      color: #808080;
+    }
+
+    .stack-code {
+      color: #d4d4d4;
+    }
+
+    .stack-call {
+      color: #4ec9b0;
+    }
+
+    .stack-ellipsis {
+      color: #808080;
+    }
+
+    .stack-error-msg {
+      color: #d4d4d4;
+    }
+
+    .stack-raise {
+      color: #f48771;
+    }
+  }
+
+  .stacktrace-empty {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #4a5568;
+    color: #a0aec0;
   }
 }
 </style>
