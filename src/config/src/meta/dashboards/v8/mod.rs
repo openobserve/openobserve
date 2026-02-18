@@ -445,8 +445,6 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    panel_time_mode: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_range: Option<PanelTimeRange>,
 }
 
