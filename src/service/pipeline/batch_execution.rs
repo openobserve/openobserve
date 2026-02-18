@@ -1332,7 +1332,7 @@ async fn process_node(
                 count += 1;
             }
 
-            log::info!(
+            log::debug!(
                 "[Pipeline]: LLM evaluation node {node_idx} received {count} records from condition node"
             );
 
@@ -1380,7 +1380,7 @@ async fn process_node(
                                     };
                                     match crate::service::ingestion::ingestion_service::ingest(req).await {
                                         Ok(resp) if resp.status_code == 200 => {
-                                            log::info!(
+                                            log::debug!(
                                                 "[Pipeline] {pl_name}: LLM eval ingestion successful to {}:{}, records: {record_count}",
                                                 dest.stream_type, dest.stream_name,
                                             );
@@ -1399,7 +1399,7 @@ async fn process_node(
                                     }
                                 }
                                 Ok(_) => {
-                                    log::info!(
+                                    log::debug!(
                                         "[Pipeline] {pl_name}: LLM eval node {node_idx} produced 0 records"
                                     );
                                 }
@@ -1419,7 +1419,7 @@ async fn process_node(
                 });
             }
 
-            log::info!(
+            log::debug!(
                 "[Pipeline]: LLM evaluation node {node_idx} task returning (eval runs in background)"
             );
         }
