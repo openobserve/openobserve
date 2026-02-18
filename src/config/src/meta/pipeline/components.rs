@@ -264,11 +264,21 @@ impl MemorySize for FunctionParams {
 #[serde(default)]
 pub struct LlmEvaluationParams {
     pub name: String,
-    /// Sampling rate as string to work around serde_json arbitrary_precision issue.
-    /// Parse as f64 when needed. "0.0" means no sampling (passthrough).
+    /// Sampling rate (0.0 = evaluate all, 0.01-1.0 = head sampling rate).
+    /// Uses hash-based sampling on trace_id for deterministic, consistent sampling.
     #[serde(default, with = "sampling_rate_str")]
     pub sampling_rate: f64,
-    pub sampling_strategy: String,
+    /// Whether to enable LLM-as-Judge evaluation (uses LLM tokens).
+    #[serde(default)]
+    pub enable_llm_judge: bool,
+    /// Field name used to identify LLM spans within a trace (e.g., "gen_ai_system").
+    /// Only spans containing this field (with a non-empty value) are considered LLM spans.
+    #[serde(default = "default_llm_span_identifier")]
+    pub llm_span_identifier: String,
+}
+
+fn default_llm_span_identifier() -> String {
+    "gen_ai_system".to_string()
 }
 
 mod sampling_rate_str {
@@ -285,13 +295,18 @@ mod sampling_rate_str {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        s.parse::<f64>().map_err(serde::de::Error::custom)
+        // Accept both string ("0.1") and number (0.1) formats
+        let value = serde_json::Value::deserialize(deserializer)?;
+        match &value {
+            serde_json::Value::String(s) => s.parse::<f64>().map_err(serde::de::Error::custom),
+            serde_json::Value::Number(n) => n
+                .as_f64()
+                .ok_or_else(|| serde::de::Error::custom("invalid number for sampling_rate")),
+            _ => Err(serde::de::Error::custom(
+                "sampling_rate must be a string or number",
+            )),
+        }
     }
-}
-
-fn default_sampling_strategy() -> String {
-    "hash".to_string()
 }
 
 impl Default for LlmEvaluationParams {
@@ -299,14 +314,17 @@ impl Default for LlmEvaluationParams {
         Self {
             name: String::new(),
             sampling_rate: 0.0,
-            sampling_strategy: default_sampling_strategy(),
+            enable_llm_judge: false,
+            llm_span_identifier: default_llm_span_identifier(),
         }
     }
 }
 
 impl MemorySize for LlmEvaluationParams {
     fn mem_size(&self) -> usize {
-        std::mem::size_of::<LlmEvaluationParams>() + self.name.mem_size() + self.sampling_strategy.mem_size()
+        std::mem::size_of::<LlmEvaluationParams>()
+            + self.name.mem_size()
+            + self.llm_span_identifier.mem_size()
     }
 }
 
