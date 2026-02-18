@@ -1718,6 +1718,9 @@ export class LogsPage {
 
                 if (status === 200) {
                     testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+                    // NOTE: This is a backend async indexing wait, not a UI wait.
+                    // waitForLoadState won't help as no page navigation occurs.
+                    // Consider using waitForStreamData() polling for production tests.
                     await this.page.waitForTimeout(5000);
                     return;
                 }
@@ -1726,6 +1729,7 @@ export class LogsPage {
                 if (errorMessage.includes('being deleted') && attempt < maxRetries) {
                     const waitTime = attempt * 5000;
                     testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+                    // Backend wait with exponential backoff - server needs time to complete deletion
                     await this.page.waitForTimeout(waitTime);
                     continue;
                 }
@@ -1738,6 +1742,7 @@ export class LogsPage {
                     throw e;
                 }
                 testLogger.info(`Ingestion attempt ${attempt} failed, retrying...`);
+                // Exponential backoff for API retry - not a UI wait
                 await this.page.waitForTimeout(attempt * 5000);
             }
         }

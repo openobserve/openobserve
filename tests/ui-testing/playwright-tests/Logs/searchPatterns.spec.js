@@ -17,7 +17,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const patternsTestData = require("../../../test-data/patterns_test_data.json");
-const { ingestCustomData, enableLogPatternsExtraction } = require('../utils/data-ingestion.js');
+const { ingestCustomData, enableLogPatternsExtraction, waitForStreamData } = require('../utils/data-ingestion.js');
 
 // Dedicated stream for pattern tests with proper configuration
 const PATTERNS_STREAM = "e2e_http_patterns";
@@ -66,9 +66,12 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             const settingsResponse = await enableLogPatternsExtraction(page, PATTERNS_STREAM);
             testLogger.info('Stream settings updated', { status: settingsResponse.status });
 
-            // Wait for data to be indexed
+            // Wait for data to be indexed by polling search API (replaces arbitrary 15s wait)
             testLogger.info('Waiting for data to be indexed...');
-            await page.waitForTimeout(15000);
+            const dataIndexed = await waitForStreamData(page, PATTERNS_STREAM, 100, 30000, 2000);
+            if (!dataIndexed) {
+                testLogger.warn('Stream data polling timed out, proceeding anyway...');
+            }
 
             dataIngested = true;
         } finally {

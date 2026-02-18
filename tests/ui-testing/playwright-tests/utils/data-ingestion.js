@@ -32,6 +32,11 @@ async function ingestTestData(page, streamName = "e2e_automate") {
 /**
  * Generates authentication headers for API requests.
  * Extracted from regression tests for reusability.
+ *
+ * SECURITY NOTE: Credentials are created in Node.js context and passed to
+ * Playwright's page.request API which keeps them server-side. They are NOT
+ * exposed to browser context or logged. Only response data is logged.
+ *
  * @returns {Object} Headers object with Basic Authentication and Content-Type
  * @example
  * const headers = getHeaders();
@@ -172,11 +177,72 @@ async function enableLogPatternsExtraction(page, streamName) {
   }
 }
 
+/**
+ * Wait for stream data to be indexed by polling the search API
+ * Replaces arbitrary waitForTimeout with explicit condition check
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @param {string} streamName - Name of the stream to check
+ * @param {number} expectedMinCount - Minimum expected record count (default: 1)
+ * @param {number} maxWaitMs - Maximum wait time in ms (default: 30000)
+ * @param {number} pollIntervalMs - Polling interval in ms (default: 2000)
+ * @returns {Promise<boolean>} - True if data found, false if timed out
+ */
+async function waitForStreamData(page, streamName, expectedMinCount = 1, maxWaitMs = 30000, pollIntervalMs = 2000) {
+  const orgId = process.env["ORGNAME"];
+  const headers = getHeaders();
+  const baseUrl = process.env.INGESTION_URL.endsWith('/')
+    ? process.env.INGESTION_URL.slice(0, -1)
+    : process.env.INGESTION_URL;
+
+  const startTime = Date.now();
+  const endTime = Date.now() * 1000; // microseconds
+  const startTimeUs = (Date.now() - 3600000) * 1000; // 1 hour ago in microseconds
+
+  const searchPayload = {
+    query: {
+      sql: `SELECT COUNT(*) as count FROM "${streamName}"`,
+      start_time: startTimeUs,
+      end_time: endTime,
+      from: 0,
+      size: 1
+    }
+  };
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const response = await page.request.post(`${baseUrl}/api/${orgId}/_search?type=logs`, {
+        headers: headers,
+        data: searchPayload
+      });
+
+      if (response.status() === 200) {
+        const data = await response.json().catch(() => null);
+        const count = data?.hits?.[0]?.count || data?.total || 0;
+
+        if (count >= expectedMinCount) {
+          testLogger.debug('Stream data indexed', { streamName, count, waitedMs: Date.now() - startTime });
+          return true;
+        }
+        testLogger.debug('Polling for stream data', { streamName, currentCount: count, expectedMinCount });
+      }
+    } catch (e) {
+      testLogger.debug('Stream data poll error', { error: e.message, streamName });
+    }
+
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+
+  testLogger.warn('Stream data poll timed out', { streamName, maxWaitMs });
+  return false;
+}
+
 module.exports = {
   ingestTestData,
   getHeaders,
   getIngestionUrl,
   sendRequest,
   ingestCustomData,
-  enableLogPatternsExtraction
+  enableLogPatternsExtraction,
+  waitForStreamData
 };
