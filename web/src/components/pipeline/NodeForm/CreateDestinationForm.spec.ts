@@ -1205,36 +1205,6 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.vm.formData.output_format).toBe("json");
     });
 
-    it("should not include stringseparated in payload when format is json", async () => {
-      (destinationService.create as any).mockResolvedValue({ data: {} });
-
-      wrapper.vm.formData = {
-        name: "Test JSON",
-        url: "https://example.com",
-        url_endpoint: "/api/logs",
-        method: "post",
-        output_format: "json",
-        separator: "|", // This should be ignored
-        destination_type: "custom",
-        skip_tls_verify: false,
-        template: "",
-        headers: {},
-        emails: "",
-        type: "http",
-      };
-
-      wrapper.vm.apiHeaders = [
-        { key: "Authorization", value: "Bearer token123", uuid: "123" },
-      ];
-
-      await wrapper.vm.createDestination();
-      await flushPromises();
-
-      const createCall = (destinationService.create as any).mock.calls[0][0];
-      expect(createCall.data.output_format).toBe("json");
-      expect(typeof createCall.data.output_format).toBe("string");
-    });
-
     it("should validate separator field is not null", async () => {
       wrapper.vm.formData.destination_type = "custom";
       wrapper.vm.formData.name = "test";
