@@ -1265,19 +1265,23 @@ const createDestination = () => {
 
   // Handle output format - for esbulk, format as JSON object with index
   // For stringseparated, format as JSON object with separator
-  let outputFormat: any = formData.value.output_format;
-  if (outputFormat === "esbulk" && formData.value.esbulk_index) {
+  // For all other formats (json, nestedevent, etc.), keep as string
+  let outputFormat: any;
+  if (formData.value.output_format === "esbulk" && formData.value.esbulk_index) {
     outputFormat = {
       esbulk: {
         index: formData.value.esbulk_index,
       },
     };
-  } else if (outputFormat === "stringseparated" && formData.value.separator) {
+  } else if (formData.value.output_format === "stringseparated" && formData.value.separator) {
     outputFormat = {
       stringseparated: {
         separator: formData.value.separator,
       },
     };
+  } else {
+    // Keep output_format as string for json, nestedevent, and other formats
+    outputFormat = formData.value.output_format;
   }
 
   const payload: any = {
