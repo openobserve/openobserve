@@ -286,7 +286,7 @@ export default class ChartTypeSelector {
   async switchToRawTab() {
     await this.rawTab.waitFor({ state: "visible", timeout: 10000 });
     await this.rawTab.click();
-    await this.page.waitForTimeout(500);
+    await this.rawQueryTextarea.waitFor({ state: "visible", timeout: 10000 });
     testLogger.debug('Switched to Raw tab');
   }
 
@@ -297,7 +297,8 @@ export default class ChartTypeSelector {
   async switchToBuildTab() {
     await this.buildTab.waitFor({ state: "visible", timeout: 10000 });
     await this.buildTab.click();
-    await this.page.waitForTimeout(500);
+    // Wait for Build tab content to render (function dropdown becomes visible)
+    await this.page.locator('[data-test="dashboard-function-dropdown"]').first().waitFor({ state: "visible", timeout: 10000 });
     testLogger.debug('Switched to Build tab');
   }
 
@@ -342,7 +343,9 @@ export default class ChartTypeSelector {
     await this.switchToRawTab();
     await this.enterRawQuery(query);
     await this.page.keyboard.press("Escape");
-    await this.page.waitForTimeout(500);
+    // Wait for popup to close
+    const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
+    await menuLocator.waitFor({ state: "hidden", timeout: 10000 });
     testLogger.info('Configured Y-axis raw query', { alias, query });
   }
 

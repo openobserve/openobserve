@@ -22,7 +22,7 @@ test.describe("Dashboard Raw Query testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     testLogger.info("Setting up test - navigating to base");
-    dashboardName = "RawQuery_" + Math.random().toString(36).substr(2, 9);
+    dashboardName = "RawQuery_" + Math.random().toString(36).substring(2, 11);
     await navigateToBase(page);
     await ingestion(page);
     await page.goto(
@@ -134,16 +134,15 @@ test.describe("Dashboard Raw Query testcases", () => {
 
     // Search and re-open the dashboard (with panels)
     await pm.dashboardCreate.searchDashboard(dashboardName);
-    await page.waitForTimeout(2000);
     const dashboardRow = pm.dashboardPanelActions.getDashboardRow(dashboardName);
     await expect(dashboardRow).toBeVisible({ timeout: 10000 });
     await dashboardRow.click();
-    await page.waitForTimeout(3000);
+    await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
     testLogger.info("Dashboard reopened from list");
 
     // Edit the panel
     await pm.dashboardPanelEdit.editPanel(panelName);
-    await page.waitForTimeout(3000);
+    await page.waitForURL(/edit_panel|add_panel/, { timeout: 15000 });
     testLogger.info("Panel opened for editing");
 
     // Open Y-axis popup and verify raw query is preserved
@@ -193,7 +192,7 @@ test.describe("Dashboard Raw Query testcases", () => {
 
     // --- First edit: verify raw query is preserved ---
     await pm.dashboardPanelEdit.editPanel(panelName);
-    await page.waitForTimeout(3000);
+    await page.waitForURL(/edit_panel|add_panel/, { timeout: 15000 });
     testLogger.info("Panel opened for first edit");
 
     await pm.chartTypeSelector.openYAxisFunctionPopup(Y_AXIS_ALIAS);
@@ -209,7 +208,7 @@ test.describe("Dashboard Raw Query testcases", () => {
 
     // --- Second edit: verify raw query still persists after re-save ---
     await pm.dashboardPanelEdit.editPanel(panelName);
-    await page.waitForTimeout(3000);
+    await page.waitForURL(/edit_panel|add_panel/, { timeout: 15000 });
     testLogger.info("Panel opened for second edit");
 
     await pm.chartTypeSelector.openYAxisFunctionPopup(Y_AXIS_ALIAS);
@@ -271,14 +270,15 @@ test.describe("Dashboard Raw Query testcases", () => {
     // Close popup
     await page.keyboard.press("Escape");
 
-    // Clean up - navigate directly to dashboard list and delete
+    // Clean up - navigate to dashboard list and delete
     // (Panel was never saved in this test - we only tested tab switching behavior)
+    // Use direct navigation since we're in an unsaved panel editor
     await page.goto(
       `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`
     );
-    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 30000 });
     await pm.dashboardCreate.searchDashboard(dashboardName);
-    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-table"]').waitFor({ state: "visible", timeout: 10000 });
     await deleteDashboard(page, dashboardName);
   });
 
