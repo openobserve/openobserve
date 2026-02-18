@@ -311,7 +311,7 @@ test.describe("Dashboard Raw Query testcases", () => {
 
     testLogger.info("Chart rendered successfully with raw query");
 
-    // Save and clean up
+    // Save and clean up dashboard
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
