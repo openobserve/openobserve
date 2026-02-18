@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="attach_money"
           title="Total Cost"
         >
-          <span class="chip-value text-bold">${{ llmMetrics.cost.total }}</span>
+          <span class="chip-value text-bold">${{ Number(llmMetrics.cost.total).toFixed(5) }}</span>
         </q-chip>
       </div>
 
