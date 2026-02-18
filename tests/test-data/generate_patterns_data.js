@@ -198,7 +198,7 @@ console.log('7. Metrics/telemetry (500 logs)');
 console.log('8. Cache operations (500 logs)');
 console.log(`Total: ${logs.length} logs`);
 
-// Write to JSON file
+// Write to JSON file (minified to reduce file size)
 const outputPath = path.join(__dirname, 'patterns_test_data.json');
-fs.writeFileSync(outputPath, JSON.stringify(logs, null, 2));
+fs.writeFileSync(outputPath, JSON.stringify(logs));
 console.log(`\nWritten to: ${outputPath}`);
