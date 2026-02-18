@@ -191,25 +191,60 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
 export async function verifyDropdownContainsVariable(page, dropdownSelector, variableName) {
   const dropdown = page.locator(dropdownSelector);
   await dropdown.click();
+  await page.waitForTimeout(300);
 
   // Type $ to filter for variables
   await dropdown.fill(`$${variableName}`);
+  await page.waitForTimeout(500);
 
   // Wait for options to appear
-  await page.waitForFunction(
-    () => document.querySelectorAll('[role="option"]').length > 0,
-    { timeout: 10000, polling: 100 }
-  );
+  const hasOptions = await page
+    .waitForFunction(
+      () => document.querySelectorAll('[role="option"]').length > 0,
+      { timeout: 10000, polling: 100 }
+    )
+    .then(() => true)
+    .catch(() => false);
 
-  // Check if the variable option exists
-  const varOption = page.getByRole("option").filter({ hasText: `$${variableName}` });
-  const found = await varOption.count() > 0;
-
-  // Check for "(variable)" label
+  let found = false;
   let hasVariableLabel = false;
-  if (found) {
-    const optionText = await varOption.first().textContent();
-    hasVariableLabel = optionText.includes("(variable)");
+
+  if (hasOptions) {
+    // Use page.evaluate for reliable DOM inspection (avoids Playwright visibility heuristics)
+    const result = await page.evaluate((varName) => {
+      const options = document.querySelectorAll('[role="option"]');
+      for (const opt of options) {
+        const rect = opt.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+        const text = opt.textContent || "";
+        if (text.includes(`$${varName}`)) {
+          return { found: true, hasVariableLabel: text.includes("(variable)") };
+        }
+      }
+      return { found: false, hasVariableLabel: false };
+    }, variableName);
+    found = result.found;
+    hasVariableLabel = result.hasVariableLabel;
+  }
+
+  // If not found via filter, try without filter text (open full list)
+  if (!found) {
+    await dropdown.fill("");
+    await page.waitForTimeout(500);
+    const retryResult = await page.evaluate((varName) => {
+      const options = document.querySelectorAll('[role="option"]');
+      for (const opt of options) {
+        const rect = opt.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+        const text = opt.textContent || "";
+        if (text.includes(`$${varName}`)) {
+          return { found: true, hasVariableLabel: text.includes("(variable)") };
+        }
+      }
+      return { found: false, hasVariableLabel: false };
+    }, variableName);
+    found = retryResult.found;
+    hasVariableLabel = retryResult.hasVariableLabel;
   }
 
   // Close dropdown

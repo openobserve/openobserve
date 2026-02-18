@@ -1849,10 +1849,8 @@ export default class DashboardVariablesScoped {
    * @param {string} streamNameOrVar - New stream name or $variable reference
    */
   async updateStream(streamNameOrVar) {
-    // Clear the current stream selection and select new one
-    const streamSelect = this.page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("");
+    // selectStreamFromDropdown handles click, fill, and option selection.
+    // Do NOT click beforehand — that would double-click and toggle the dropdown closed.
     await selectStreamFromDropdown(this.page, streamNameOrVar);
   }
 
