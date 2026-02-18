@@ -209,21 +209,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="tw:flex tw:items-center tw:space-x-2">
-            <div class="log-stream-search-input">
-              <q-input
-                v-model="searchQuery"
-                data-test="trace-details-search-input"
-                outlined
-                dense
-                placeholder="Search in spans"
-                clearable
-                class="tw:text-[12px]!"
-                @update:model-value="handleSearchQueryChange"
-              >
-                <template v-slot:prepend>
-                  <q-icon name="search" size="1rem" />
-                </template>
-              </q-input>
+            <!-- Unified Search Input Group -->
+            <div class="unified-search-group">
+              <div class="log-stream-search-input">
+                <q-input
+                  v-model="searchQuery"
+                  data-test="trace-details-search-input"
+                  outlined
+                  dense
+                  placeholder="Search in spans"
+                  clearable
+                  class="tw:text-[12px]!"
+                  @update:model-value="handleSearchQueryChange"
+                >
+                  <template v-slot:prepend>
+                    <q-icon name="search" size="1rem" />
+                  </template>
+                </q-input>
+              </div>
+              <!-- Search Results Navigation -->
+              <div class="search-navigation-container">
+                <div
+                  class="search-results-counter"
+                  data-test="trace-details-search-results"
+                >
+                  <span class="counter-current">{{
+                    searchResults ? currentIndex + 1 : 0
+                  }}</span>
+                  <span class="counter-separator">/</span>
+                  <span class="counter-total">{{ searchResults }}</span>
+                </div>
+                <div class="navigation-buttons">
+                  <q-btn
+                    data-test="trace-details-search-prev-btn"
+                    :disable="!searchResults || currentIndex === 0"
+                    flat
+                    dense
+                    icon="keyboard_arrow_up"
+                    size="sm"
+                    class="nav-btn"
+                    @click="prevMatch"
+                  >
+                    <q-tooltip>Previous match</q-tooltip>
+                  </q-btn>
+                  <div class="button-separator"></div>
+                  <q-btn
+                    data-test="trace-details-search-next-btn"
+                    :disable="
+                      !searchResults || currentIndex + 1 === searchResults
+                    "
+                    flat
+                    dense
+                    icon="keyboard_arrow_down"
+                    size="sm"
+                    class="nav-btn"
+                    @click="nextMatch"
+                  >
+                    <q-tooltip>Next match</q-tooltip>
+                  </q-btn>
+                </div>
+              </div>
             </div>
             <!-- Log Stream Selector (if enabled) -->
             <div
@@ -297,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="trace-details-view-logs-btn"
                 v-close-popup="true"
-                class="text-bold tw:px-[0.5rem]! tw:py-0! traces-view-logs-btn tw:border! tw:border-solid! tw:border-[var(--o2-theme-color)]! tw:bg-[var(--o2-theme-color)]! tw:text-white!"
+                class="o2-secondary-button text-bold tw:px-[0.5rem]! tw:py-0! traces-view-logs-btn tw:border! tw:border-l-0! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                 :label="
                   searchObj.meta.redirectedFromLogs
                     ? t('traces.backToLogs')
@@ -307,10 +352,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 no-caps
                 outline
-                color="primary"
                 icon="search"
                 flat
                 dense
+                unelevated
+                :title="t('traces.viewLogs')"
                 @click="redirectToLogs"
               />
               <q-btn
@@ -329,46 +375,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :icon="outlinedPlayCircle"
                 @click="redirectToSessionReplay"
               />
-            </div>
-
-            <!-- Search Results Navigation -->
-            <div
-              v-if="searchResults"
-              class="tw:flex tw:items-center tw:space-x-1"
-            >
-              <p
-                class="tw:text-[11px] tw:text-[var(--o2-text-secondary)]"
-                data-test="trace-details-search-results"
-              >
-                <small>
-                  <span>{{ currentIndex + 1 }}</span> of
-                  <span>{{ searchResults }}</span>
-                </small>
-              </p>
-              <q-btn
-                data-test="trace-details-search-prev-btn"
-                :disable="currentIndex === 0"
-                flat
-                round
-                icon="keyboard_arrow_up"
-                size="sm"
-                dense
-                @click="prevMatch"
-              >
-                <q-tooltip>Previous</q-tooltip>
-              </q-btn>
-              <q-btn
-                data-test="trace-details-search-next-btn"
-                :disable="currentIndex + 1 === searchResults"
-                flat
-                round
-                icon="keyboard_arrow_down"
-                size="sm"
-                dense
-                @click="nextMatch"
-              >
-                <q-tooltip>Next</q-tooltip>
-              </q-btn>
             </div>
           </div>
         </div>
@@ -2714,6 +2720,124 @@ html:has(.trace-details) {
     .q-field__bottom {
       padding: 0.1rem 0 0;
       min-height: fit-content !important;
+    }
+  }
+}
+
+// Unified Search Group - input and navigation as one element
+.unified-search-group {
+  display: flex;
+  align-items: stretch;
+  width: fit-content;
+  border-radius: 0.2rem;
+  overflow: hidden;
+  border: 0.0625rem solid var(--o2-border-color);
+  background-color: var(--o2-page-bg);
+  transition: border-color 0.2s ease;
+
+  &:hover,
+  &:focus-within {
+    border-color: var(--o2-theme-color);
+  }
+
+  // Remove borders from child elements
+  .log-stream-search-input {
+    border: none;
+
+    .q-field {
+      .q-field__control {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+
+        &:before,
+        &:after {
+          border: none !important;
+        }
+      }
+    }
+  }
+}
+
+// Search Navigation Container - integrated with input
+.search-navigation-container {
+  display: inline-flex;
+  align-items: center;
+  height: 1.875rem;
+  border-left: 0.0625rem solid var(--o2-border-color);
+  background-color: transparent;
+  padding: 0 0.125rem;
+  transition: all 0.2s ease;
+
+  .search-results-counter {
+    display: flex;
+    align-items: center;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0 0.25rem;
+    gap: 0.0625rem;
+    user-select: none;
+
+    .counter-separator {
+      color: var(--o2-text-secondary);
+      margin: 0 0.125rem;
+    }
+
+    .counter-total,
+    .counter-current {
+      color: var(--o2-text-secondary);
+    }
+  }
+
+  .navigation-buttons {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    margin-left: 0.25rem;
+
+    .button-separator {
+      width: 0.0625rem;
+      height: 1.125rem;
+      background-color: var(--o2-border-color);
+      margin: 0 0.125rem;
+    }
+
+    .nav-btn {
+      min-width: 1.25rem;
+      height: 1.25rem;
+      padding: 0;
+      border-radius: 0.125rem;
+      transition: all 0.2s ease;
+
+      .q-icon {
+        font-size: 1.125rem;
+      }
+
+      &:hover:not(:disabled) {
+        background-color: var(--o2-hover-accent);
+      }
+
+      &:disabled {
+        opacity: 0.4;
+      }
+    }
+  }
+}
+
+// Dark mode support
+body.body--dark {
+  .unified-search-group {
+    background-color: var(--o2-dark-page-bg);
+
+    &:hover,
+    &:focus-within {
+      border-color: var(--o2-theme-color);
+    }
+  }
+
+  .search-navigation-container {
+    &:hover {
+      border-color: var(--o2-theme-color);
     }
   }
 }
