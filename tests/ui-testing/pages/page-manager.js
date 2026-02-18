@@ -9,6 +9,7 @@ import DashboardSetting from "./dashboardPages/dashboard-settings";
 import DashboardVariables from "./dashboardPages/dashboard-variables";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
+import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
@@ -77,6 +78,7 @@ class PageManager {
     this.dashboardVariables = new DashboardVariables(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
+    this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
     this.dashboardFilter = new DashboardFilter(page);
     this.dashboardImport = new DashboardImport(page);
     this.dashboardShareExport = new DashboardShareExportPage(page);
