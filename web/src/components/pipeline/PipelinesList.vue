@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'expand_more'
                         : 'expand_less'
                     "
+                    @click.stop="toggleExpandRow(props.row.pipeline_id)"
                   />
                 </q-td>
                 <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
@@ -743,14 +744,14 @@ const togglePipelineState = (row: any, from_now: boolean) => {
 };
 
 const triggerExpand = (props: any) => {
-  if (
-    expandedRow.value === props.row.pipeline_id ||
-    props.row.source.source_type === "realtime"
-  ) {
+  editPipeline(props.row);
+};
+
+const toggleExpandRow = (pipelineId: string) => {
+  if (expandedRow.value === pipelineId) {
     expandedRow.value = null;
   } else {
-    // Otherwise, expand the clicked row and collapse any other row
-    expandedRow.value = props.row.pipeline_id;
+    expandedRow.value = pipelineId;
   }
 };
 

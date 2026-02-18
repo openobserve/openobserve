@@ -686,15 +686,19 @@ export default defineComponent({
             // Partial success
             $q.notify({
               type: "warning",
-              message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
+              message: response.data.err
+                ? response.data.err
+                : `${successCount} function(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             $q.notify({
               type: "negative",
-              message: `Failed to delete ${failCount} function(s)`,
-              timeout: 3000,
+              message: response.data.err
+                ? response.data.err
+                : `Failed to delete ${failCount} function(s)`,
+              timeout: 5000,
             });
           } else {
             // All successful
