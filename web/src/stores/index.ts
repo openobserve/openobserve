@@ -102,6 +102,13 @@ export default createStore({
       light: "#3F7994",  // Default light mode color (Blue)
       dark: "#5B9FBE",   // Default dark mode color (Light Blue)
     },
+    // GitHub dashboard gallery cache
+    githubDashboardGallery: {
+      dashboards: [],
+      lastFetched: null,
+      cacheExpiry: 10 * 60 * 1000, // 10 minutes in milliseconds
+      dashboardJsonCache: {}, // Cache for individual dashboard JSON content: { folderPath/fileName: jsonContent }
+    },
     // Temporary theme colors for live preview in General Settings
     // These colors are stored here (instead of component state) so they persist
     // across navigation and are accessible to all components for preview
@@ -294,6 +301,28 @@ export default createStore({
      */
     clearPendingShortURL(state) {
       state.pendingShortURL = null;
+    },
+    /**
+     * Set GitHub dashboard gallery cache
+     */
+    setGithubDashboardGallery(state, payload) {
+      state.githubDashboardGallery.dashboards = payload;
+      state.githubDashboardGallery.lastFetched = Date.now();
+    },
+    /**
+     * Clear GitHub dashboard gallery cache
+     */
+    clearGithubDashboardGallery(state) {
+      state.githubDashboardGallery.dashboards = [];
+      state.githubDashboardGallery.lastFetched = null;
+      state.githubDashboardGallery.dashboardJsonCache = {};
+    },
+    /**
+     * Cache individual dashboard JSON content
+     * @param payload - { key: 'folderPath/fileName', json: dashboardJson }
+     */
+    setDashboardJsonCache(state, payload) {
+      state.githubDashboardGallery.dashboardJsonCache[payload.key] = payload.json;
     },
   },
   actions: {

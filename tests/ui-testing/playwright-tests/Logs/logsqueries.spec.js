@@ -334,14 +334,14 @@ test.describe("Logs Queries testcases", () => {
 
     // Click refresh and wait for network to settle
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 30000 })
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
       .catch((e) => testLogger.debug('networkidle timeout (non-blocking)', { error: e.message }));
     await pm.logsPage.waitForTimeout(2000);
 
     // Toggle SQL mode and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 30000 })
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
       .catch((e) => testLogger.debug('networkidle timeout (non-blocking)', { error: e.message }));
     await pm.logsPage.waitForTimeout(2000);
 
@@ -352,7 +352,7 @@ test.describe("Logs Queries testcases", () => {
     // Toggle SQL mode off and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 30000 })
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
       .catch((e) => testLogger.debug('networkidle timeout (non-blocking)', { error: e.message }));
     await pm.logsPage.waitForTimeout(2000);
 

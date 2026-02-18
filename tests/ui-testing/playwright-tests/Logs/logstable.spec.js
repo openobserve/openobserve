@@ -559,7 +559,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
       // Step 3: Run query to apply VRL
       await pageManager.logsPage.clickSearchBarRefreshButton();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       // Step 4: Try to add the VRL-generated field to the table

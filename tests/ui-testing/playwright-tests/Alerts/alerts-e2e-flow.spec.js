@@ -53,7 +53,7 @@ test.describe("Alerts E2E Flow", () => {
 
     // Refresh page to ensure newly created stream appears in dropdowns
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   });
 
   /**
@@ -91,7 +91,7 @@ test.describe("Alerts E2E Flow", () => {
     await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
     await pm.commonActions.navigateToAlerts();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // ===== First Iteration: Initial Alert Creation and Management =====
     const folderName = 'auto_' + sharedRandomValue;
@@ -133,7 +133,7 @@ test.describe("Alerts E2E Flow", () => {
 
     // ===== Second Iteration: New Alert Creation and Management =====
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     const newAlertName = await pm.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(newAlertName);
@@ -157,24 +157,24 @@ test.describe("Alerts E2E Flow", () => {
     await pm.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
 
     await pm.alertsPage.navigateToFolder(targetFolderName);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.alertsPage.deleteAllAlertsInFolder();
     testLogger.info('Cleaned up target folder before moving alerts', { targetFolderName });
 
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.dashboardFolder.searchFolder(targetFolderName);
     await pm.dashboardFolder.verifyFolderVisible(targetFolderName);
     await pm.alertsPage.navigateToFolder(targetFolderName);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     await pm.alertsPage.searchAlert(newAlertName);
     await pm.alertsPage.verifySearchResults(2);

@@ -182,7 +182,7 @@ struct ConfigResponse<'a> {
     ingestion_quota_used: f64,
     log_page_default_field_list: String,
     query_values_default_num: i64,
-    mysql_deprecated_warning: bool,
+    alert_preview_timerange_minutes: i64,
     service_graph_enabled: bool,
     incidents_enabled: bool,
     service_streams_enabled: bool,
@@ -414,7 +414,7 @@ pub async fn zo_config() -> impl IntoResponse {
         #[cfg(feature = "enterprise")]
         ingestion_quota_used,
         query_values_default_num: cfg.limit.query_values_default_num,
-        mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
+        alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         service_graph_enabled,
         incidents_enabled,
         service_streams_enabled,

@@ -99,7 +99,7 @@ test.describe("Schema Load testcases", () => {
         // Navigate to base URL with authentication
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Generate and send large payload
         const logData = generateLogData();

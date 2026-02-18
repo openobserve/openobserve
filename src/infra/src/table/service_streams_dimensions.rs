@@ -189,16 +189,7 @@ pub async fn get_all_dimension_stats(org_id: &str) -> Result<Vec<DimensionStats>
                 GROUP BY dimension_name
             "#
         }
-        sea_orm::DatabaseBackend::MySql => {
-            // MySQL uses ? for parameter placeholders
-            r#"
-                SELECT dimension_name, COUNT(DISTINCT value_hash) as value_count
-                FROM service_streams_dimensions
-                WHERE org_id = ?
-                GROUP BY dimension_name
-            "#
-        }
-        sea_orm::DatabaseBackend::Sqlite => {
+        _ => {
             // SQLite uses ? for parameter placeholders
             r#"
                 SELECT dimension_name, COUNT(DISTINCT value_hash) as value_count

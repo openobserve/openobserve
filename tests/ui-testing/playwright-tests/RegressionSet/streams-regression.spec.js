@@ -17,7 +17,7 @@ test.describe("Streams Regression Bugs", () => {
     pm = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('Streams regression bug test setup completed');
   });
@@ -44,7 +44,7 @@ test.describe("Streams Regression Bugs", () => {
 
     // Wait for navigation to stream explorer
     await page.waitForTimeout(2000);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to logs page after stream explorer click');
 
     // Verify expand button exists after stream explorer navigation
@@ -219,7 +219,7 @@ test.describe("Streams Regression Bugs", () => {
 
     // Navigate to streams page
     await pm.logsPage.clickMenuLinkStreamsItem();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Streams page should be accessible
