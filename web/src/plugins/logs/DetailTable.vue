@@ -817,7 +817,7 @@ export default defineComponent({
       tablePagination,
       serviceStreamsEnabled,
       config,
-      getContentSize
+      getContentSize,
     };
   },
   async created() {
