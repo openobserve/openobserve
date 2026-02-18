@@ -15,33 +15,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-metrics-dashboard tw:w-full tw:pt-2 tw:px-1">
-    <!-- Insights Button (always visible, no filter chips, does baseline analysis when no selections) -->
+  <div class="traces-metrics-dashboard tw:w-full">
+    <!-- Collapsible Header -->
     <div
       v-if="show"
-      class="filters-section tw:flex tw:items-center tw:gap-2 tw:px-1 tw:flex-wrap tw:mb-2"
+      class="dashboard-header q-px-sm q-py-xs tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)]"
+      @click="toggleCollapse"
     >
-      <q-btn
-        outline
-        dense
-        no-caps
-        color="primary"
-        icon="analytics"
-        :label="t('volumeInsights.insightsButtonLabel')"
-        class="analyze-button tw:h-[2rem]"
-        @click="openUnifiedAnalysisDashboard"
-        data-test="insights-button"
-      >
-        <q-tooltip>{{ t('volumeInsights.analyzeTooltipTraces') }}</q-tooltip>
-      </q-btn>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 cursor-pointer flex-1">
+          <q-icon
+            name="expand_more"
+            size="1.2rem"
+            class="collapse-icon"
+            :class="{ collapsed: !searchObj.meta.showHistogram }"
+          />
+
+          <div class="header-content tw:ml-[0.125rem]">
+            <span class="tw:text-[0.85rem] text-bold"
+              >Rate, Error and Duration</span
+            >
+          </div>
+        </div>
+        <q-btn
+          outline
+          dense
+          no-caps
+          color="primary"
+          icon="analytics"
+          :label="t('volumeInsights.insightsButtonLabel')"
+          class="analyze-button tw:h-[2rem]"
+          @click="openUnifiedAnalysisDashboard"
+          data-test="insights-button"
+        >
+          <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
+        </q-btn>
+      </div>
     </div>
 
     <!-- Collapsible Charts Section -->
     <transition name="slide-fade">
-      <div
-        v-show="!isCollapsed && searchObj.meta.showHistogram"
-        class="charts-wrapper"
-      >
+      <div v-show="searchObj.meta.showHistogram" class="charts-wrapper">
         <div class="charts-container">
           <RenderDashboardCharts
             v-if="show"
@@ -94,8 +108,6 @@ import {
   onBeforeUnmount,
   computed,
   defineAsyncComponent,
-  watch,
-  triggerRef,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -152,6 +164,11 @@ const currentTimeObj = ref({
 });
 
 const dashboardData = ref(null);
+
+// Collapse state
+const toggleCollapse = () => {
+  searchObj.meta.showHistogram = !searchObj.meta.showHistogram;
+};
 
 // Unified Analysis Dashboard state
 const showAnalysisDashboard = ref(false);
@@ -254,8 +271,8 @@ const hasAnyBrushSelection = computed(() => {
     // Check if any RED panel has a time range selection
     if (
       (filter.panelTitle === "Duration" ||
-       filter.panelTitle === "Rate" ||
-       filter.panelTitle === "Errors") &&
+        filter.panelTitle === "Rate" ||
+        filter.panelTitle === "Errors") &&
       filter.timeStart !== null &&
       filter.timeEnd !== null
     ) {
@@ -346,10 +363,7 @@ const loadDashboard = async () => {
 
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
-      ][0].query.replace(
-        "[STREAM_NAME]",
-        `"${streamName}"`,
-      );
+      ][0].query.replace("[STREAM_NAME]", `"${streamName}"`);
 
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
@@ -376,13 +390,23 @@ const refreshDashboard = () => {
   }
 };
 
-
-const createRangeFilter = (data, start = null, end = null, timeStart = null, timeEnd = null) => {
+const createRangeFilter = (
+  data,
+  start = null,
+  end = null,
+  timeStart = null,
+  timeEnd = null,
+) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
 
   // Support Duration, Rate, and Errors panels
-  if (panelId && (panelTitle === "Duration" || panelTitle === "Rate" || panelTitle === "Errors")) {
+  if (
+    panelId &&
+    (panelTitle === "Duration" ||
+      panelTitle === "Rate" ||
+      panelTitle === "Errors")
+  ) {
     searchObj.meta.metricsRangeFilters.set(panelId, {
       panelTitle,
       start: start ? Math.floor(start) : null,
@@ -437,7 +461,6 @@ const onDataZoom = ({
   end1: number;
   data: any; // contains panel schema with data.id as panel id
 }) => {
-
   if (start && end) {
     const panelTitle = data?.title;
 
@@ -455,7 +478,6 @@ const onDataZoom = ({
       const timeStartMicros = start * 1000;
       const timeEndMicros = end * 1000;
 
-  
       // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
       // Pass actual time range as timeStart/timeEnd for volume/error analysis
       createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
@@ -465,13 +487,12 @@ const onDataZoom = ({
       const timeStartMicros = start * 1000;
       const timeEndMicros = end * 1000;
 
-
       createRangeFilter(data, start1, end1, timeStartMicros, timeEndMicros);
     }
 
     // All panels emit time-range-selected to update global datetime control
     emit("time-range-selected", { start, end });
-  } 
+  }
 };
 
 const removeRangeFilter = (panelId: string) => {
@@ -604,13 +625,21 @@ const openUnifiedAnalysisDashboard = () => {
   } else {
     // Brush selection exists - compare baseline vs selected time range
     // Populate all filter types from range filters
-    let durationStart = null, durationEnd = null, durationTimeStart = null, durationTimeEnd = null;
-    let rateStart = null, rateEnd = null, rateTimeStart = null, rateTimeEnd = null;
-    let errorStart = null, errorEnd = null, errorTimeStart = null, errorTimeEnd = null;
+    let durationStart = null,
+      durationEnd = null,
+      durationTimeStart = null,
+      durationTimeEnd = null;
+    let rateStart = null,
+      rateEnd = null,
+      rateTimeStart = null,
+      rateTimeEnd = null;
+    let errorStart = null,
+      errorEnd = null,
+      errorTimeStart = null,
+      errorTimeEnd = null;
     let latestFilterType = null;
 
     rangeFilters.value.forEach((filter) => {
-
       if (filter.panelTitle === "Duration") {
         durationStart = filter.start;
         durationEnd = filter.end;
@@ -775,23 +804,15 @@ defineExpose({
     }
   }
 
-  .insights-button {
-    font-size: 12px;
+  .analyze-button {
+    font-size: 0.75rem;
     font-weight: 600;
-    padding: 6px 16px;
-    height: 32px;
-    border-radius: 6px;
-    color: white;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    border: none;
-
-    .button-label {
-      letter-spacing: 0.3px;
-    }
+    padding: 0 0.75rem;
+    transition: all 0.2s;
 
     &:hover {
-      box-shadow: 0 4px 6px
-        color-mix(in srgb, var(--o2-theme-color) 40%, transparent);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
   }
 }
