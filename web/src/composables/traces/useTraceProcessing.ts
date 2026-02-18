@@ -273,7 +273,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
       return sum + (span?.durationMs || 0);
     }, 0);
 
-    const totalDuration = (maxTime - minTime) / 1000;
+    const totalDuration = (maxTime - minTime) / 1000000;
 
     return {
       trace_id: traceId,
