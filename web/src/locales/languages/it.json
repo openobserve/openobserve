@@ -1508,7 +1508,10 @@
     "add_template": "Nuovo modello",
     "skip_tls_verify": "Salta la verifica TLS",
     "action": "Azione",
-    "output_format": "Formato di output"
+    "output_format": "Formato di output",
+    "separator": "Separatore",
+    "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",
