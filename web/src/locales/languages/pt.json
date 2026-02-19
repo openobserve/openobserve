@@ -112,7 +112,8 @@
     "id": "CARTEIRA DE IDENTIDADE",
     "getStarted": "Comece",
     "reset": "Redefinir",
-    "retry": "Tente novamente"
+    "retry": "Tente novamente",
+    "set": "+ Conjunto"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -1415,7 +1416,9 @@
     "panelTimeRange": "Intervalo de tempo do painel",
     "panelTimeRangeTooltip": "Esse intervalo de tempo se aplica somente a esse painel. Outros painéis usarão seus próprios horários configurados ou o horário global do painel.",
     "panelTimeSettingsTooltip": "Configure como esse painel determina seu intervalo de tempo. Você pode usar o intervalo de tempo do painel ou definir um personalizado para esse painel.",
-    "panelTimeMode": "Fonte do intervalo de tempo (no carregamento do painel)"
+    "panelTimeMode": "Fonte do intervalo de tempo (no carregamento do painel)",
+    "useDefaultTimeTooltip": "Quando ativado, esse painel usará a duração padrão configurada como seu intervalo de tempo no carregamento do painel, em vez do tempo global do painel.",
+    "defaultDuration": "Duração padrão"
   },
   "panel": {
     "header": "Painel",
