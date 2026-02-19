@@ -220,7 +220,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.theme === 'dark' ? 'bg-grey-10 tw:border-l-[#3a3a3a]' : 'bg-grey-1 tw:border-l-[#e0e0e0]'
             ]"
           >
-            {{ example.log_message }}
+            <LogsHighLighting
+              :data="example.log_message"
+              :show-braces="false"
+              :show-quotes="false"
+              :query-string="''"
+              :simple-mode="false"
+            />
           </div>
         </div>
       </q-card-section>
@@ -264,6 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
 defineProps<{
   modelValue: boolean;
@@ -294,7 +301,9 @@ const variableColumns = [
 ];
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
+@import "@/assets/styles/log-highlighting.css";
+
 .pattern-detail-text {
   font-family: monospace;
 }
