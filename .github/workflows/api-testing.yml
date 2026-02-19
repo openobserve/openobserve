@@ -123,14 +123,40 @@ jobs:
           kill $SERVER_PID_TRUE || true
           sleep 5
 
+          echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ==="
+          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true target/debug/openobserve > o2_join_match_one_true.log 2>&1 &
+          SERVER_PID_JOIN_TRUE=$!
+          echo "OpenObserve PID for JOIN_MATCH_ONE=true: $SERVER_PID_JOIN_TRUE"
+          sleep 15
+
+          # Run logs-to-logs join tests with JOIN_MATCH_ONE=true
+          rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
+
+          # Kill the server
+          kill $SERVER_PID_JOIN_TRUE || true
+          sleep 5
+
+          echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false ==="
+          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false target/debug/openobserve > o2_join_match_one_false.log 2>&1 &
+          SERVER_PID_JOIN_FALSE=$!
+          echo "OpenObserve PID for JOIN_MATCH_ONE=false: $SERVER_PID_JOIN_FALSE"
+          sleep 15
+
+          # Run logs-to-logs join tests with JOIN_MATCH_ONE=false
+          rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
+
+          # Kill the server
+          kill $SERVER_PID_JOIN_FALSE || true
+          sleep 5
+
           echo "=== Running all other API tests with default settings ==="
           target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
           echo "OpenObserve PID for other tests: $SERVER_PID_DEFAULT"
           sleep 15
 
-          # Run all other tests (excluding regression tests)
-          rye run pytest --ignore=tests/test_subquery_join_match.py --force-sugar
+          # Run all other tests (excluding regression and feature flag tests)
+          rye run pytest --ignore=tests/test_subquery_join_match.py --ignore=tests/test_logs_to_logs_join.py --force-sugar
 
           # Kill the server
           kill $SERVER_PID_DEFAULT || true
