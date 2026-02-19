@@ -143,6 +143,7 @@ jobs:
                 "logstable.spec.js",
                 "shareLink.spec.js",
                 "monaco-query-prefill.spec.js",
+                "logsAnalyzeDimensions.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -251,6 +252,7 @@ jobs:
                 "traceErrorFilter.spec.js",
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
+                "tracesAnalyzeDimensions.spec.js",
               ]
 
           - testfolder: "RegressionSet"

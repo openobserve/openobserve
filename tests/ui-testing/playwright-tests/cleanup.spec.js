@@ -126,7 +126,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^metrics-pipeline-/,           // metrics-pipeline-* (scheduled pipeline tests)
         /^traces-pipeline-/,            // traces-pipeline-* (scheduled pipeline tests)
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
-        /^metrics-condition-pipeline-/  // metrics-condition-pipeline-* (scheduled pipeline tests)
+        /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
+        /^e2e_backfill_test_\d+$/       // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
       ]
     );
 
@@ -301,7 +302,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_traces_pipeline_test$/,                  // Pipeline test traces stream
         /^e2e_traces_\d+_[a-z0-9]+$/,                  // Dynamic traces streams (e2e_traces_<timestamp>_<suffix>)
         /^backfill_source_\d+$/,                       // Backfill source streams (backfill_source_<number>)
-        /^backfill_dest_\d+$/                          // Backfill dest streams (backfill_dest_<number>)
+        /^backfill_dest_\d+$/,                         // Backfill dest streams (backfill_dest_<number>)
+        /^e2e_backfill_dest_\d+$/                      // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']

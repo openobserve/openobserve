@@ -2053,7 +2053,10 @@
     "customWebhook": "カスタム (ウェブフック)",
     "customEmail": "カスタム (電子メール)",
     "customAction": "カスタム (アクション)",
-    "custom": "カスタム"
+    "custom": "カスタム",
+    "separator": "セパレーター",
+    "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

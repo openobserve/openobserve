@@ -2036,7 +2036,10 @@
     "customWebhook": "사용자 지정 (웹후크)",
     "customEmail": "사용자 지정 (이메일)",
     "customAction": "사용자 지정 (액션)",
-    "custom": "사용자 지정"
+    "custom": "사용자 지정",
+    "separator": "분리기",
+    "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
+    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
   },
   "metrics": {
     "searchMetric": "지표 검색",
