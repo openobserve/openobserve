@@ -936,30 +936,59 @@ class TestLogsToLogsJoin:
     # ==================== LARGE LIMIT SUBQUERY TESTS ====================
 
     def test_32_subquery_with_limit_1000(self):
-        """Test subquery with LIMIT 1000 in inner subquery for broadcast join."""
-        sql = f"""
-            SELECT kubernetes_container_name, log, response_time_ms
+        """Test subquery with LIMIT 1000 - tests actual limiting behavior.
+
+        Uses trace_id from large_stream which has 1500 unique values.
+        The LIMIT 1000 should actually limit the subquery results to 1000,
+        proving the broadcast join limit is working correctly.
+        """
+        # First, verify we have more than 1000 unique trace_ids in large_stream
+        count_sql = f"""
+            SELECT COUNT(DISTINCT trace_id) AS unique_trace_ids
             FROM "{self.large_stream}"
-            WHERE kubernetes_container_name IN (
-                SELECT DISTINCT kubernetes_container_name
-                FROM "{self.small_stream}"
+        """
+        count_response = self._run_search(count_sql)
+        assert count_response.status_code == 200, \
+            f"Count query should succeed: {count_response.status_code}"
+
+        count_hits = count_response.json().get("hits", [])
+        if count_hits:
+            total_unique = count_hits[0].get("unique_trace_ids", 0)
+            logging.info(f"Total unique trace_ids in large_stream: {total_unique}")
+            # We expect 1500 unique trace_ids based on test data generation
+            assert total_unique > 1000, \
+                f"Large stream should have > 1000 unique trace_ids for this test to be meaningful, got {total_unique}"
+
+        # Now test the LIMIT 1000 in subquery
+        sql = f"""
+            SELECT trace_id, kubernetes_container_name, log
+            FROM "{self.large_stream}"
+            WHERE trace_id IN (
+                SELECT DISTINCT trace_id
+                FROM "{self.large_stream}"
                 LIMIT 1000
             )
-            LIMIT 50
         """
 
-        response = self._run_search(sql)
+        response = self._run_search(sql, size=1500)
 
         assert response.status_code == 200, \
             f"Subquery with LIMIT 1000 should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
         assert len(hits) > 0, "Subquery with LIMIT 1000 should return results"
-        assert len(hits) <= 50, f"Should respect outer LIMIT 50, got {len(hits)}"
+
+        # Collect unique trace_ids from results
+        unique_trace_ids = set(hit.get("trace_id") for hit in hits if hit.get("trace_id"))
+
+        # The key assertion: LIMIT 1000 in subquery should limit unique trace_ids to <= 1000
+        # Since we have 1500 unique trace_ids total, this proves the LIMIT actually works
+        assert len(unique_trace_ids) <= 1000, \
+            f"Subquery LIMIT 1000 should limit unique trace_ids to <= 1000, got {len(unique_trace_ids)}"
 
         # Verify structure
         for hit in hits:
+            assert "trace_id" in hit, f"Should have trace_id: {hit}"
             assert "kubernetes_container_name" in hit, f"Should have container name: {hit}"
-            assert "log" in hit, f"Should have log field: {hit}"
 
-        logging.info(f"✓ Subquery with LIMIT 1000 returned {len(hits)} results")
+        logging.info(f"✓ Subquery with LIMIT 1000 returned {len(hits)} results with {len(unique_trace_ids)} unique trace_ids (max 1000)")
