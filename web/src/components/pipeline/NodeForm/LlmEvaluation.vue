@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="llm-evaluation-node-section"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    style="width: 500px; max-height: 90vh; overflow: auto"
+    class="llm-evaluation-section"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
       {{ t("pipeline.llmEvaluation") }}
@@ -284,36 +284,20 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.llm-evaluation-section {
+  width: 31.25rem;
+  max-height: 90vh;
+  overflow: auto;
+}
+
 .stream-routing-title {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
-  padding: 16px 0;
+  padding: 1rem 0;
 }
 
 .stream-routing-container {
-  max-height: calc(90vh - 100px);
+  max-height: calc(90vh - 6.25rem);
   overflow-y: auto;
-}
-
-.note-container {
-  background-color: rgba(0, 123, 255, 0.05);
-  border: 1px solid rgba(0, 123, 255, 0.2);
-  border-radius: 4px;
-}
-
-.note-heading {
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #1976d2;
-}
-
-.note-info {
-  background: transparent;
-  padding: 8px 0;
-
-  span {
-    font-size: 13px;
-    line-height: 1.5;
-  }
 }
 </style>

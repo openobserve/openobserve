@@ -879,16 +879,19 @@ function getIcon(data, ioType) {
             :offset="[0, 10]"
             max-width="400px"
           >
-            <div style="padding: 8px;">
-              <div style="font-weight: 600; margin-bottom: 8px;">LLM Evaluation Node</div>
-              <div><strong>Name:</strong> {{ data.name || 'evaluate' }}</div>
+            <div class="q-pa-sm">
+              <div class="text-bold q-mb-sm">{{ t("pipeline.llmEvaluationNodeTitle") }}</div>
+              <div><strong>{{ t("pipeline.nameLabel") }}:</strong> {{ data.name || 'evaluate' }}</div>
               <div v-if="data.sampling_rate">
-                <strong>Sampling:</strong> {{ (data.sampling_rate * 100).toFixed(1) }}% of traces
+                <strong>{{ t("pipeline.samplingLabel") }}:</strong> {{ (data.sampling_rate * 100).toFixed(1) }}% {{ t("pipeline.samplingOfTraces") }}
               </div>
               <div v-else>
-                <strong>Sampling:</strong> All traces (100%)
+                <strong>{{ t("pipeline.samplingLabel") }}:</strong> {{ t("pipeline.samplingAllTraces") }}
               </div>
-             </div>
+              <div class="q-mt-sm text-caption text-grey-5">
+                {{ t("pipeline.llmEvaluationDescription") }}
+              </div>
+            </div>
           </q-tooltip>
         </div>
       </div>
