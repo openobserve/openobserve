@@ -632,7 +632,7 @@ async fn process_node(
     pipeline_name: String,
     stream_name: Option<String>,
     source_stream_type: StreamType,
-    leaf_dest_stream: Option<StreamParams>,
+    _leaf_dest_stream: Option<StreamParams>,
 ) -> Result<()> {
     let cfg = config::get_config();
     let mut count: usize = 0;
@@ -1358,7 +1358,7 @@ async fn process_node(
                 let params_name = params.name.clone();
                 let pl_name = pipeline_name.clone();
                 let org = org_id.clone();
-                let dest = leaf_dest_stream
+                let dest = _leaf_dest_stream
                     .clone()
                     .unwrap_or_else(|| StreamParams::new("", "llm_evaluations", StreamType::Logs));
                 let buffer_key = format!("{}:{}", pipeline_id, node.id);
