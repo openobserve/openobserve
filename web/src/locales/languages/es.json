@@ -1508,7 +1508,10 @@
     "add_template": "Nueva plantilla",
     "skip_tls_verify": "Omitir verificación TLS",
     "action": "Acción",
-    "output_format": "Formato de salida"
+    "output_format": "Formato de salida",
+    "separator": "Separador",
+    "separator_placeholder": "Introduzca un separador (p. ej., |,\\n,\\ t, espacio)",
+    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)"
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",
