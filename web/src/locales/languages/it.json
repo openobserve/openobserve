@@ -2440,7 +2440,15 @@
     "hashSamplingDesc": "Campionamento coerente per trace_id: stesse tracce campionate sempre",
     "llmEvaluationInfo": "Configurazione di valutazione LLM",
     "llmEvaluationInfoText": "Valuta le tracce utilizzando il giudice LLM. Il campionamento riduce i costi elaborando solo una percentuale di tracce. La strategia hash garantisce un campionamento coerente per un monitoraggio affidabile.",
-    "llmEvaluationNodeSaved": "Nodo di valutazione LLM salvato con successo"
+    "llmEvaluationNodeSaved": "Nodo di valutazione LLM salvato con successo",
+    "llmJudgeConfig": "Configurazione LLM Judge",
+    "enableLlmJudge": "Abilita LLM-as-Judge",
+    "enableLlmJudgeHelp": "Se abilitato, utilizza un LLM per valutare la qualità della risposta con punteggi dimensionali dettagliati. Più completo ma costa i token LLM.",
+    "llmSpanIdentifier": "Identificatore LLM Span",
+    "llmSpanIdentifierLabel": "Campo per identificare gli intervalli LLM",
+    "llmSpanIdentifierHelp": "Seleziona il campo dal flusso di origine che identifica gli intervalli LLM. Verranno valutati solo gli intervalli in cui questo campo è presente e non vuoto.",
+    "noFieldsFound": "Nessun campo trovato",
+    "save": "Salva"
   },
   "reports": {
     "header": "Rapporti",

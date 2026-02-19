@@ -2442,7 +2442,15 @@
     "hashSamplingDesc": "Échantillonnage cohérent par trace_id : les mêmes traces sont toujours échantillonnées",
     "llmEvaluationInfo": "Configuration de l'évaluation LLM",
     "llmEvaluationInfoText": "Évalue les traces à l'aide du juge LLM. L'échantillonnage réduit les coûts en ne traitant qu'un pourcentage des traces. La stratégie de hachage garantit un échantillonnage cohérent pour une surveillance fiable.",
-    "llmEvaluationNodeSaved": "Le nœud d'évaluation LLM a été enregistré avec succès"
+    "llmEvaluationNodeSaved": "Le nœud d'évaluation LLM a été enregistré avec succès",
+    "llmJudgeConfig": "Configuration du juge LLM",
+    "enableLlmJudge": "Activer LLM-as-Judge",
+    "enableLlmJudgeHelp": "Lorsque cette option est activée, utilise un LLM pour évaluer la qualité des réponses à l'aide de scores dimensionnels détaillés. Plus complet mais coûte des jetons LLM.",
+    "llmSpanIdentifier": "Identifiant LLM Span",
+    "llmSpanIdentifierLabel": "Champ permettant d'identifier les durées de LLM",
+    "llmSpanIdentifierHelp": "Sélectionnez le champ du flux source qui identifie les spans LLM. Seules les étendues où ce champ est présent et non vide seront évaluées.",
+    "noFieldsFound": "Aucun champ n'a été trouvé",
+    "save": "Enregistrer"
   },
   "reports": {
     "header": "Rapports",

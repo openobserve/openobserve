@@ -2440,7 +2440,15 @@
     "hashSamplingDesc": "Muestreo uniforme por trace_id: siempre se muestrean las mismas trazas",
     "llmEvaluationInfo": "Configuración de evaluación de LLM",
     "llmEvaluationInfoText": "Evalúa las trazas mediante LLM Judge. El muestreo reduce los costos al procesar solo un porcentaje de las trazas. La estrategia de hash garantiza un muestreo consistente para un monitoreo confiable.",
-    "llmEvaluationNodeSaved": "El nodo de evaluación de LLM se guardó correctamente"
+    "llmEvaluationNodeSaved": "El nodo de evaluación de LLM se guardó correctamente",
+    "llmJudgeConfig": "Configuración de jueces de LLM",
+    "enableLlmJudge": "Habilitar LLM-as-Judge",
+    "enableLlmJudgeHelp": "Cuando está habilitada, utiliza un LLM para evaluar la calidad de la respuesta con puntuaciones de dimensiones detalladas. Es más completo, pero cuesta fichas de LLM.",
+    "llmSpanIdentifier": "Identificador de intervalo de LLM",
+    "llmSpanIdentifierLabel": "Campo para identificar los períodos de LLM",
+    "llmSpanIdentifierHelp": "Seleccione el campo del flujo de origen que identifica los períodos de LLM. Solo se evaluarán los intervalos en los que este campo esté presente y no esté vacío.",
+    "noFieldsFound": "No se encontró ningún campo",
+    "save": "Guardar"
   },
   "reports": {
     "header": "Informes",

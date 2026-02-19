@@ -2442,7 +2442,15 @@
     "hashSamplingDesc": "Trace_id başına tutarlı örnekleme - aynı izler her zaman örneklenir",
     "llmEvaluationInfo": "LLM Değerlendirme Yapılandırması",
     "llmEvaluationInfoText": "LLM yargıcı kullanarak izleri değerlendirir. Örnekleme, izlerin yalnızca bir yüzdesini işleyerek maliyetleri azaltır. Hash stratejisi, güvenilir izleme için tutarlı örnekleme sağlar.",
-    "llmEvaluationNodeSaved": "LLM Değerlendirme düğümü başarıyla kaydedildi"
+    "llmEvaluationNodeSaved": "LLM Değerlendirme düğümü başarıyla kaydedildi",
+    "llmJudgeConfig": "LLM Hakim Yapılandırması",
+    "enableLlmJudge": "LLM-As-Judge Etkinleştir",
+    "enableLlmJudgeHelp": "Etkinleştirildiğinde, yanıt kalitesini ayrıntılı boyut puanlarıyla değerlendirmek için bir LLM kullanır. Daha kapsamlı ancak LLM jetonlarına mal olur.",
+    "llmSpanIdentifier": "LLM Aralık Tanımlayıcısı",
+    "llmSpanIdentifierLabel": "LLM aralıklarını belirleme alanı",
+    "llmSpanIdentifierHelp": "Kaynak akışından LLM aralıklarını tanımlayan alanı seçin. Yalnızca bu alanın mevcut olduğu ve boş olmadığı aralıklar değerlendirilir.",
+    "noFieldsFound": "Alan bulunamadı",
+    "save": "Kaydet"
   },
   "reports": {
     "header": "Raporlar",

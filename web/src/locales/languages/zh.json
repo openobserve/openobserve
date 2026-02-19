@@ -2447,7 +2447,15 @@
     "hashSamplingDesc": "每个 trace_id 的采样保持一致-始终采样相同的轨迹",
     "llmEvaluationInfo": "LLM 评估配置",
     "llmEvaluationInfoText": "使用 LLM 判断来评估痕迹。采样仅处理一定比例的痕迹，从而降低了成本。哈希策略可确保一致的采样以实现可靠的监控。",
-    "llmEvaluationNodeSaved": "LLM 评估节点已成功保存"
+    "llmEvaluationNodeSaved": "LLM 评估节点已成功保存",
+    "llmJudgeConfig": "LLM 法官配置",
+    "enableLlmJudge": "启用 LLM-asJudge",
+    "enableLlmJudgeHelp": "启用后，使用 LLM 通过详细的维度分数评估响应质量。更详尽，但需要花费LLM代币。",
+    "llmSpanIdentifier": "LLM 跨度标识符",
+    "llmSpanIdentifierLabel": "用于识别 LLM 跨度的字段",
+    "llmSpanIdentifierHelp": "从源流中选择标识 LLM 跨度的字段。仅评估此字段存在且非空的跨度。",
+    "noFieldsFound": "未找到字段",
+    "save": "保存"
   },
   "reports": {
     "header": "报表",

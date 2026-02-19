@@ -2442,7 +2442,15 @@
     "hashSamplingDesc": "trace_id당 일관된 샘플링 - 항상 동일한 트레이스가 샘플링됨",
     "llmEvaluationInfo": "LLM 평가 구성",
     "llmEvaluationInfoText": "LLM 판사를 사용하여 트레이스를 평가합니다.샘플링은 트레이스의 일정 비율만 처리하므로 비용이 절감됩니다.해시 전략은 안정적인 모니터링을 위해 일관된 샘플링을 보장합니다.",
-    "llmEvaluationNodeSaved": "LLM 평가 노드가 성공적으로 저장되었습니다."
+    "llmEvaluationNodeSaved": "LLM 평가 노드가 성공적으로 저장되었습니다.",
+    "llmJudgeConfig": "LLM 심판 구성",
+    "enableLlmJudge": "LLM을 심사위원으로 활성화하세요",
+    "enableLlmJudgeHelp": "활성화되면 LLM을 사용하여 세부 차원 점수로 응답 품질을 평가합니다.더 철저하지만 LLM 토큰이 필요합니다.",
+    "llmSpanIdentifier": "LLM 스팬 식별자",
+    "llmSpanIdentifierLabel": "LLM 스팬을 식별하는 필드",
+    "llmSpanIdentifierHelp": "소스 스트림에서 LLM 범위를 식별하는 필드를 선택합니다.이 필드가 있고 비어 있지 않은 범위만 평가됩니다.",
+    "noFieldsFound": "필드를 찾을 수 없음",
+    "save": "저장"
   },
   "reports": {
     "header": "보고서",

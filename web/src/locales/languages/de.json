@@ -2442,7 +2442,15 @@
     "hashSamplingDesc": "Konsistentes Sampling pro trace_id — es werden immer dieselben Traces abgetastet",
     "llmEvaluationInfo": "Konfiguration der LLM-Evaluierung",
     "llmEvaluationInfoText": "Wertet Spuren mit LLM Judge aus. Die Probenahme reduziert die Kosten, da nur ein Prozentsatz der Spuren verarbeitet wird. Die Hash-Strategie gewährleistet eine konsistente Probenahme für eine zuverlässige Überwachung.",
-    "llmEvaluationNodeSaved": "Der LLM-Evaluierungsknoten wurde erfolgreich gespeichert"
+    "llmEvaluationNodeSaved": "Der LLM-Evaluierungsknoten wurde erfolgreich gespeichert",
+    "llmJudgeConfig": "LLM Judge-Konfiguration",
+    "enableLlmJudge": "LLM-AS-Judge aktivieren",
+    "enableLlmJudgeHelp": "Wenn diese Option aktiviert ist, wird ein LLM verwendet, um die Antwortqualität mit detaillierten Dimensionswerten zu bewerten. Gründlicher, kostet aber LLM-Token.",
+    "llmSpanIdentifier": "LLM-Span-ID",
+    "llmSpanIdentifierLabel": "Feld zur Identifizierung von LLM-Spans",
+    "llmSpanIdentifierHelp": "Wählen Sie das Feld aus dem Quellstream aus, das LLM-Bereiche identifiziert. Es werden nur Bereiche ausgewertet, in denen dieses Feld vorhanden und nicht leer ist.",
+    "noFieldsFound": "Keine Felder gefunden",
+    "save": "Speichern"
   },
   "reports": {
     "header": "Berichte",
