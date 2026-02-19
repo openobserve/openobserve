@@ -244,7 +244,8 @@ export function useLogsHighlighter() {
       if (keys.length === 0) return 2; // "{}" or "[]"
 
       // For very large objects (50+ fields), sample more aggressively
-      const sampleSize = keys.length > 50 ? Math.min(10, keys.length) : Math.min(5, keys.length);
+      const sampleSize =
+        keys.length > 50 ? Math.min(10, keys.length) : Math.min(5, keys.length);
       let totalSize = 0;
 
       // Sample values to estimate
@@ -289,7 +290,10 @@ export function useLogsHighlighter() {
   const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
     if (typeof data === "string") {
       if (data.length > maxSize) {
-        return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
+        return (
+          data.substring(0, maxSize) +
+          `... [truncated, original size: ${data.length} chars]`
+        );
       }
       return data;
     }
@@ -298,7 +302,10 @@ export function useLogsHighlighter() {
       try {
         const jsonStr = JSON.stringify(data);
         if (jsonStr.length > maxSize) {
-          return jsonStr.substring(0, maxSize) + `... [truncated, original size: ${jsonStr.length} chars]`;
+          return (
+            jsonStr.substring(0, maxSize) +
+            `... [truncated, original size: ${jsonStr.length} chars]`
+          );
         }
         return jsonStr;
       } catch (error) {
@@ -467,7 +474,12 @@ export function useLogsHighlighter() {
     // 3xx: Redirection (300-308)
     // 4xx: Client Error (400-431, 451)
     // 5xx: Server Error (500-511)
-    if (/^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(trimmed)) return "status-code";
+    if (
+      /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(
+        trimmed,
+      )
+    )
+      return "status-code";
 
     // UUIDs
     if (
@@ -831,7 +843,15 @@ export function useLogsHighlighter() {
 
     // For non-objects, use regular colorization
     if (typeof data !== "object") {
-      return colorizeJson(data, isDarkTheme, showBraces, showQuotes, queryString, false, true);
+      return colorizeJson(
+        data,
+        isDarkTheme,
+        showBraces,
+        showQuotes,
+        queryString,
+        false,
+        true,
+      );
     }
 
     const currentColors = getThemeColors(isDarkTheme);
@@ -848,21 +868,33 @@ export function useLogsHighlighter() {
         const value = data[key];
 
         // Add key
-        chunkHtml += `<span style="color: ${currentColors.key}">${showQuotes ? '"' : ''}${escapeHtml(key)}${showQuotes ? '"' : ''}</span>: `;
+        chunkHtml += `<span style="color: ${currentColors.key}">${showQuotes ? '"' : ""}${escapeHtml(key)}${showQuotes ? '"' : ""}</span>: `;
 
         // Add value (truncate individual fields if >100KB)
         let processedValue = value;
         if (typeof value === "string" && value.length > 100000) {
-          processedValue = value.substring(0, 100000) + `... [field truncated, ${value.length} chars]`;
+          processedValue =
+            value.substring(0, 100000) +
+            `... [field truncated, ${value.length} chars]`;
         } else if (typeof value === "object" && value !== null) {
           const valueStr = JSON.stringify(value);
           if (valueStr.length > 100000) {
-            processedValue = valueStr.substring(0, 100000) + `... [field truncated, ${valueStr.length} chars]`;
+            processedValue =
+              valueStr.substring(0, 100000) +
+              `... [field truncated, ${valueStr.length} chars]`;
           }
         }
 
         // Colorize the value (without highlighting for performance)
-        const colorizedValue = colorizeJson(processedValue, isDarkTheme, showBraces, showQuotes, "", false, true);
+        const colorizedValue = colorizeJson(
+          processedValue,
+          isDarkTheme,
+          showBraces,
+          showQuotes,
+          "",
+          false,
+          true,
+        );
         chunkHtml += colorizedValue;
 
         // Add comma if not last
@@ -880,7 +912,7 @@ export function useLogsHighlighter() {
 
       // Yield to event loop every chunk
       if (i + chunkSize < keys.length) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
     }
 
