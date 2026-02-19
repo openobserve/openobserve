@@ -156,8 +156,6 @@ struct ConfigResponse<'a> {
     alert_preview_timerange_minutes: i64,
     service_graph_enabled: bool,
     #[cfg(not(feature = "enterprise"))]
-    service_graph_enabled: bool,
-    #[cfg(feature = "enterprise")]
     service_streams_enabled: bool,
     #[cfg(not(feature = "enterprise"))]
     service_streams_enabled: bool,
