@@ -1419,9 +1419,11 @@ export default defineComponent({
           `"${searchObj.data.stream.selectedStream[0]}"`,
         );
 
-      searchObj.data.query = newQuery;
-      searchObj.data.editorValue = newQuery;
-      searchBarRef.value.updateQuery();
+      if (newQuery) {
+        searchObj.data.query = newQuery;
+        searchObj.data.editorValue = newQuery;
+        searchBarRef.value.updateQuery();
+      }
     };
 
     const processInterestingFiledInSQLQuery = (
