@@ -191,35 +191,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #after>
               <div style="height: 100%; width: 100%">
                 <div style="height: calc(100% - 40px); width: 100%">
-                  <QueryEditor
+                  <UnifiedQueryEditor
                     v-if="
                       !promqlMode && dashboardPanelData.layout.vrlFunctionToggle
                     "
                     data-test="dashboard-vrl-function-editor"
                     style="width: 100%; height: 100%"
                     ref="vrlFnEditorRef"
-                    editor-id="fnEditor"
-                    class="monaco-editor"
-                    language="vrl"
-                    v-model:query="
+                    :languages="['vrl']"
+                    default-language="vrl"
+                    :query="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].vrlFunctionQuery
                     "
-                    :class="
-                      (!dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ]?.vrlFunctionQuery ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ]?.vrlFunctionQuery === '') &&
-                      functionEditorPlaceholderFlag
-                        ? 'empty-function'
-                        : ''
-                    "
-                    @focus="functionEditorPlaceholderFlag = false"
-                    @blur="functionEditorPlaceholderFlag = true"
-                  ></QueryEditor>
+                    :hide-nl-toggle="false"
+                    :disable-ai="false"
+                    :disable-ai-reason="''"
+                    :ai-placeholder="t('function.askAIFunctionPlaceholder')"
+                    :ai-tooltip="t('function.enterFunctionPrompt')"
+                    editor-height="100%"
+                    @update:query="handleVrlFunctionUpdate"
+                    @generation-start="handleVrlGenerationStart"
+                    @generation-end="handleVrlGenerationEnd"
+                    @generation-success="handleVrlGenerationSuccess"
+                  />
                 </div>
                 <div style="height: 40px; width: 100%">
                   <div style="display: flex; height: 40px">
@@ -316,9 +312,6 @@ export default defineComponent({
     ConfirmDialog,
     QueryTypeSelector,
     UnifiedQueryEditor,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -656,6 +649,28 @@ export default defineComponent({
       }
     };
 
+    // VRL Function Editor AI Handlers
+    const handleVrlFunctionUpdate = (newFunction: string) => {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].vrlFunctionQuery = newFunction;
+    };
+
+    const handleVrlGenerationStart = () => {
+      console.log('[DashboardQueryEditor] VRL AI generation started');
+      // Can add loading indicators here if needed
+    };
+
+    const handleVrlGenerationEnd = () => {
+      console.log('[DashboardQueryEditor] VRL AI generation ended');
+      // Can remove loading indicators here if needed
+    };
+
+    const handleVrlGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[DashboardQueryEditor] VRL AI generation success:', payload.type);
+      // VRL function code is already updated via @update:query handler
+    };
+
     return {
       t,
       router,
@@ -687,6 +702,10 @@ export default defineComponent({
       handleLanguageChange,
       handleAskAI,
       handleRunQuery,
+      handleVrlFunctionUpdate,
+      handleVrlGenerationStart,
+      handleVrlGenerationEnd,
+      handleVrlGenerationSuccess,
     };
   },
 });
