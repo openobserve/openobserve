@@ -2450,7 +2450,13 @@
     "llmSpanIdentifierLabel": "LLM 스팬을 식별하는 필드",
     "llmSpanIdentifierHelp": "소스 스트림에서 LLM 범위를 식별하는 필드를 선택합니다.이 필드가 있고 비어 있지 않은 범위만 평가됩니다.",
     "noFieldsFound": "필드를 찾을 수 없음",
-    "save": "저장"
+    "save": "저장",
+    "llmEvaluationNodeTitle": "LLM 평가 노드",
+    "samplingLabel": "샘플링",
+    "samplingAllTraces": "모든 트레이스 (100%)",
+    "samplingOfTraces": "흔적",
+    "nameLabel": "이름",
+    "llmEvaluationDescription": "트레이스를 평가하고 결과를 별도의 로그 스트림에 기록합니다."
   },
   "reports": {
     "header": "보고서",

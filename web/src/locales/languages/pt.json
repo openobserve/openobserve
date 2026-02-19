@@ -2450,7 +2450,13 @@
     "llmSpanIdentifierLabel": "Campo para identificar extensões de LLM",
     "llmSpanIdentifierHelp": "Selecione o campo do fluxo de origem que identifica os intervalos do LLM. Somente os períodos em que esse campo está presente e não vazio serão avaliados.",
     "noFieldsFound": "Nenhum campo encontrado",
-    "save": "Salvar"
+    "save": "Salvar",
+    "llmEvaluationNodeTitle": "Nó de avaliação do LLM",
+    "samplingLabel": "Amostragem",
+    "samplingAllTraces": "Todos os traços (100%)",
+    "samplingOfTraces": "de traços",
+    "nameLabel": "Nome",
+    "llmEvaluationDescription": "Avalia rastreamentos e grava os resultados em um fluxo de registros separado"
   },
   "reports": {
     "header": "Relatórios",

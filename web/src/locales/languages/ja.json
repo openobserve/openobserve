@@ -2471,7 +2471,13 @@
     "llmSpanIdentifierLabel": "LLM スパンを識別するフィールド",
     "llmSpanIdentifierHelp": "LLM スパンを識別するソースストリームからフィールドを選択します。このフィールドが存在し、かつ空でないスパンのみが評価されます。",
     "noFieldsFound": "フィールドが見つかりません",
-    "save": "[保存]"
+    "save": "[保存]",
+    "llmEvaluationNodeTitle": "LLM 評価ノード",
+    "samplingLabel": "サンプリング",
+    "samplingAllTraces": "すべてのトレース (100%)",
+    "samplingOfTraces": "トレースの",
+    "nameLabel": "[名前]",
+    "llmEvaluationDescription": "トレースを評価し、結果を別のログストリームに書き込みます"
   },
   "reports": {
     "header": "レポート",

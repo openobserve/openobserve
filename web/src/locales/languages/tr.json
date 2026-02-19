@@ -2450,7 +2450,13 @@
     "llmSpanIdentifierLabel": "LLM aralıklarını belirleme alanı",
     "llmSpanIdentifierHelp": "Kaynak akışından LLM aralıklarını tanımlayan alanı seçin. Yalnızca bu alanın mevcut olduğu ve boş olmadığı aralıklar değerlendirilir.",
     "noFieldsFound": "Alan bulunamadı",
-    "save": "Kaydet"
+    "save": "Kaydet",
+    "llmEvaluationNodeTitle": "LLM Değerlendirme Düğümü",
+    "samplingLabel": "Örnekleme",
+    "samplingAllTraces": "Tüm izler (100%)",
+    "samplingOfTraces": "izlerin",
+    "nameLabel": "İsim",
+    "llmEvaluationDescription": "İzleri değerlendirir ve sonuçları ayrı bir günlük akışına yazar"
   },
   "reports": {
     "header": "Raporlar",

@@ -2450,7 +2450,13 @@
     "llmSpanIdentifierLabel": "Veld om LLM-overspanningen te identificeren",
     "llmSpanIdentifierHelp": "Selecteer het veld in de bronstream dat LLM-overspanningen identificeert. Alleen overspanningen waar dit veld aanwezig is en niet leeg is, worden geëvalueerd.",
     "noFieldsFound": "Geen velden gevonden",
-    "save": "Opslaan"
+    "save": "Opslaan",
+    "llmEvaluationNodeTitle": "LLM-evaluatieknooppunt",
+    "samplingLabel": "Bemonstering",
+    "samplingAllTraces": "Alle sporen (100%)",
+    "samplingOfTraces": "van sporen",
+    "nameLabel": "Naam",
+    "llmEvaluationDescription": "Evalueert, traceert en schrijft resultaten naar een afzonderlijke logboekstroom."
   },
   "reports": {
     "header": "Rapporten",

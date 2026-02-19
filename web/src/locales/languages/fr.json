@@ -2450,7 +2450,13 @@
     "llmSpanIdentifierLabel": "Champ permettant d'identifier les durées de LLM",
     "llmSpanIdentifierHelp": "Sélectionnez le champ du flux source qui identifie les spans LLM. Seules les étendues où ce champ est présent et non vide seront évaluées.",
     "noFieldsFound": "Aucun champ n'a été trouvé",
-    "save": "Enregistrer"
+    "save": "Enregistrer",
+    "llmEvaluationNodeTitle": "Nœud d'évaluation LLM",
+    "samplingLabel": "L'échantillonnage",
+    "samplingAllTraces": "Toutes les traces (100 %)",
+    "samplingOfTraces": "de traces",
+    "nameLabel": "Nom",
+    "llmEvaluationDescription": "Évalue les traces et écrit les résultats dans un flux de journaux distinct"
   },
   "reports": {
     "header": "Rapports",
