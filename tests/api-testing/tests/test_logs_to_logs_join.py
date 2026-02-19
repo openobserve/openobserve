@@ -640,6 +640,7 @@ class TestLogsToLogsJoin:
             f"Subquery with substr should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "Subquery with substr should return results"
         logging.info(f"✓ Subquery with substr returned {len(hits)} results")
 
         # Verify results match the filter criteria
@@ -752,6 +753,7 @@ class TestLogsToLogsJoin:
             f"Subquery with outer aggregation should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "Subquery with outer aggregation should return results"
         logging.info(f"✓ Subquery with outer aggregation returned {len(hits)} results")
 
         for hit in hits:
@@ -813,6 +815,7 @@ class TestLogsToLogsJoin:
             f"Subquery in JOIN should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "Subquery in JOIN should return results"
         logging.info(f"✓ Subquery in JOIN returned {len(hits)} results")
 
     def test_28_scalar_subquery(self):
