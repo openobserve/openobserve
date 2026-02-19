@@ -24,9 +24,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             user::{UserGroup, UserGroupRequest, UserRoleRequest},
         },
-        utils::auth::UserEmail,
     },
-    handler::http::extractors::Headers,
 };
 
 #[cfg(feature = "enterprise")]
