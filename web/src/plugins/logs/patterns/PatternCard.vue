@@ -175,3 +175,9 @@ const { t } = useI18n();
   display: block !important;
 }
 </style>
+
+<style lang="scss">
+.pattern-details-btn > span.q-btn__content {
+  display: block !important;
+}
+</style>
