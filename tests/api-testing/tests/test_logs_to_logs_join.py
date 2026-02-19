@@ -40,18 +40,20 @@ class TestLogsToLogsJoin:
 
     ORG_ID = "default"
 
-    @pytest.fixture(autouse=True)
+    @pytest.fixture(autouse=True, scope="class")
     def setup(self, create_session, base_url, ingest_data):  # noqa: ARG002 - ingest_data ensures base data is loaded
-        """Setup test fixtures and ingest test data."""
-        self.session = create_session
-        self.base_url = base_url
+        """Setup test fixtures and ingest test data once per class."""
+        # Store on the class to share across all test methods
+        TestLogsToLogsJoin.session = create_session
+        TestLogsToLogsJoin.base_url = base_url
 
-        # Generate unique stream names for this test run
-        self.unique_id = random.randint(100000, 999999)
-        self.small_stream = f"logs_small_{self.unique_id}"
-        self.large_stream = f"logs_large_{self.unique_id}"
+        # Generate unique stream names for this test class
+        unique_id = random.randint(100000, 999999)
+        TestLogsToLogsJoin.unique_id = unique_id
+        TestLogsToLogsJoin.small_stream = f"logs_small_{unique_id}"
+        TestLogsToLogsJoin.large_stream = f"logs_large_{unique_id}"
 
-        # Ingest test data first
+        # Ingest test data once for the entire class
         self._ingest_test_data()
 
         # Wait for data to be indexed (configurable for slower CI runners)
@@ -60,14 +62,14 @@ class TestLogsToLogsJoin:
 
         # Set up time range for queries AFTER ingestion to ensure data is within range
         now = datetime.now(timezone.utc)
-        self.end_time = int((now + timedelta(minutes=5)).timestamp() * 1000000)
-        self.start_time = int((now - timedelta(weeks=1)).timestamp() * 1000000)
+        TestLogsToLogsJoin.end_time = int((now + timedelta(minutes=5)).timestamp() * 1000000)
+        TestLogsToLogsJoin.start_time = int((now - timedelta(weeks=1)).timestamp() * 1000000)
 
         yield
 
-        # Cleanup streams after tests
-        self._cleanup_stream(self.small_stream)
-        self._cleanup_stream(self.large_stream)
+        # Cleanup streams after all tests in the class
+        self._cleanup_stream(TestLogsToLogsJoin.small_stream)
+        self._cleanup_stream(TestLogsToLogsJoin.large_stream)
 
     def _ingest_test_data(self):
         """Ingest small and large log datasets to unique streams."""
@@ -355,11 +357,11 @@ class TestLogsToLogsJoin:
         assert len(hits) > 0, "JOIN with WHERE filter should return results"
         logging.info(f"✓ JOIN with WHERE filter returned {len(hits)} results")
 
-        # Verify filter was applied
+        # Verify filter was applied - level is explicitly selected so all rows should have it
         for hit in hits:
-            if "level" in hit:
-                assert hit["level"] == "error", \
-                    f"WHERE filter should only return error level: {hit}"
+            assert "level" in hit, f"Should have level field (explicitly selected): {hit}"
+            assert hit["level"] == "error", \
+                f"WHERE filter should only return error level: {hit}"
 
     def test_10_join_with_compound_filter(self):
         """Test JOIN with compound WHERE conditions."""
@@ -465,10 +467,10 @@ class TestLogsToLogsJoin:
         hits = response.json().get("hits", [])
         assert len(hits) > 0, "Self-JOIN should return results"
 
-        # Verify both log columns from self-join are present
+        # Verify both log columns from self-join are present (both always selected)
         for hit in hits:
             assert "kubernetes_container_name" in hit, f"Should have container name: {hit}"
-            assert "log1" in hit or "log2" in hit, f"Should have log columns: {hit}"
+            assert "log1" in hit and "log2" in hit, f"Should have both log columns: {hit}"
 
         logging.info(f"✓ Self-JOIN returned {len(hits)} results")
 
@@ -613,7 +615,8 @@ class TestLogsToLogsJoin:
             f"Subquery with IN clause and filter should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        # Results may be empty if no error level in small stream, that's valid
+        # logs_small.json has error-level entries (nginx, api-server, monitoring, etc.)
+        assert len(hits) > 0, "Subquery with IN clause and filter should return results"
         logging.info(f"✓ Subquery with IN clause and filter returned {len(hits)} results")
 
         # Verify structure of returned data
