@@ -28,7 +28,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     await ingestion(page);
   });
 
-  test("1-should apply new time in Add Panel mode and verify via query inspector", async ({ page }) => {
+  test("18-should always use global time for chart rendering in Add Panel mode", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_AddPanel_${timestamp}`;
@@ -37,11 +37,13 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     // Step 1-2: Create dashboard and start adding a panel (without saving)
     await startPanelCreation(page, pm, { dashboardName, panelName });
 
-    // Step 3-4: Change date time to "Last 6 days" and apply
+    // Step 3-4: Change global date time to "Last 6 days" and apply
+    // v4.0: Add panel ALWAYS renders chart with global time picker value
     await pm.dashboardPanelTime.changeGlobalTime('6-d');
     await page.waitForTimeout(2000); // Buffer for data processing
 
     // Step 5: Verify time range via query inspector (expects ~6 days)
+    // Chart should use global picker value (6d), not any config time
     await verifyQueryInspectorDateTime(page, { expectedRange: "6d" });
 
     // Step 6: Save panel
@@ -51,43 +53,43 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("2-should apply new time in Edit Panel mode (not revert to config) and verify via query inspector", async ({ page }) => {
+  test("19-should always use global time (not config time) for chart rendering in Edit Panel mode", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_EditPanel_${timestamp}`;
     const panelName = `Panel_EditPanel_${timestamp}`;
 
-    // Step 1: Create panel with individual time "Last 1h" (panel_time_range config)
+    // Step 1: Create panel with useDefaultTime enabled and panel_time_range set to "Last 1h"
+    // This config time is for VIEW MODE ONLY
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
-    // Verify panel has time picker with 1h
+    // Verify panel has time picker with 1h in view mode
     await assertPanelTimePickerVisible(page, panelId);
     await assertPanelTimeInURL(page, panelId, "1h");
 
     // Step 2: Edit the panel
     await editPanel(page, panelName);
 
-    // Step 3: Verify top date time picker shows "1h" initially (from panel config)
+    // Step 3: Verify top global date time picker shows "1h" initially (populated from panel config)
     const pickerText = await pm.dashboardPanelTime.getGlobalTimePickerText();
     expect(pickerText).toContain("1");
     expect(pickerText.toLowerCase()).toContain("hour");
 
-    // Step 4-5: Change date time to "Last 6 days" and apply
-    // CRITICAL: The time range should be ~6 days, NOT 1 hour
-    // This verifies the fix: queries use current picker value, not panel config
+    // Step 4-5: Change global date time to "Last 6 days" and apply
+    // v4.0 CRITICAL: Edit panel ALWAYS renders chart with global picker value
+    // The chart should use 6 days, NOT the 1 hour from panel_time_range config
     await pm.dashboardPanelTime.changeGlobalTime('6-d');
     await page.waitForTimeout(1000); // Buffer for data processing
 
-    // Step 6-8: Verify the query uses NEW time (6 days)
+    // Step 6-8: Verify the query uses NEW global time (6 days), not config time (1h)
     await verifyQueryInspectorDateTime(page, { expectedRange: "6d" });
 
-    // Step 9: Change time again to verify Apply works multiple times
+    // Step 9: Change global time again to verify Apply works multiple times
     await pm.dashboardPanelTime.changeGlobalTime('1-w');
     await page.waitForTimeout(1000); // Buffer for data processing
 
@@ -101,7 +103,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("3-should apply new time in Edit Panel mode with absolute time ranges", async ({ page }) => {
+  test("20-should apply new time in Edit Panel mode with absolute time ranges", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_EditAbsolute_${timestamp}`;
@@ -112,7 +114,6 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -137,7 +138,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("4-should apply new time in View Panel mode and verify via API", async ({ page }) => {
+  test("21-should apply new time in View Panel mode and verify via API", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_ViewPanel_${timestamp}`;
@@ -148,7 +149,6 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -219,18 +219,18 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("5-should apply new time when panel has no initial panel_time_range config", async ({ page }) => {
+  test("22-should use global time for rendering when panel has no panel_time_range config", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_NoConfig_${timestamp}`;
     const panelName = `Panel_NoConfig_${timestamp}`;
 
-    // Step 1: Create panel WITHOUT panel time config (uses global time)
+    // Step 1: Create panel WITHOUT useDefaultTime enabled (no panel-specific time)
+    // v4.0: useDefaultTime is false/undefined, behaves like main branch
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
       dashboardName,
       panelName,
-      panelTimeEnabled: false, // No panel-specific time
-      panelTimeMode: "global",
+      panelTimeEnabled: false, // useDefaultTime is OFF
       panelTimeRange: null
     });
 
@@ -241,11 +241,11 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     const pickerText = await pm.dashboardPanelTime.getGlobalTimePickerText();
     expect(pickerText).toBeTruthy();
 
-    // Step 4-5: Change date time to "Last 1 day" and apply
+    // Step 4-5: Change global date time to "Last 1 day" and apply
     await pm.dashboardPanelTime.changeGlobalTime('1-d');
     await page.waitForTimeout(1000); // Buffer for data processing
 
-    // Step 6-7: Verify the query uses the new time (1 day) via query inspector
+    // Step 6-7: Verify the query uses the new global time (1 day) via query inspector
     await verifyQueryInspectorDateTime(page, { expectedRange: "1d" });
 
     // Step 8: Save panel
@@ -255,7 +255,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("6-should apply multiple time changes sequentially in Edit Panel mode", async ({ page }) => {
+  test("23-should apply multiple time changes sequentially in Edit Panel mode", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_Sequential_${timestamp}`;
@@ -266,7 +266,6 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -297,7 +296,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("7-should not apply changes when Apply is not clicked in Edit Panel mode", async ({ page }) => {
+  test("24-should not apply changes when Apply is not clicked in Edit Panel mode", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_NoApply_${timestamp}`;
@@ -308,7 +307,6 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 

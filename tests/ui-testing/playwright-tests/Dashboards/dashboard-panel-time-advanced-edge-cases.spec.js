@@ -37,7 +37,6 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -88,7 +87,6 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -131,8 +129,8 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
+        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "1-h" },
+        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "6-d" },
         { panelName: `Panel_C_${timestamp}`, panelTimeEnabled: false }
       ]
     });
@@ -152,37 +150,39 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("15-should handle global refresh with mixed panel times", async ({ page }) => {
+  test("15-should handle global refresh with mixed panel times (v4.0)", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
     const dashboardName = `Dashboard_GlobalRefresh_${timestamp}`;
 
-    // Step 1: Setup dashboard with mixed times
+    // Step 1: Setup dashboard with mixed panel time configurations (v4.0)
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
-        { panelName: `Panel_C_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "global" },
-        { panelName: `Panel_D_${timestamp}`, panelTimeEnabled: false }
+        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "1-h" }, // Custom time via +Set
+        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "6-d" }, // Custom time via +Set
+        { panelName: `Panel_C_${timestamp}`, panelTimeEnabled: true, panelTimeRange: null }, // Toggle ON, no +Set done, follows global as-is
+        { panelName: `Panel_D_${timestamp}`, panelTimeEnabled: false } // useDefaultTime disabled (no panel time feature)
       ]
     });
 
     // Step 2: Click global refresh button
     await pm.dashboardPanelTime.clickGlobalRefresh();
 
-    // Step 3: Verify all panels refresh
+    // Step 3: Verify all panels refresh simultaneously
     await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
-    // Step 4: Verify each panel maintains its time
+    // Step 4: Verify each panel maintains its time configuration
+    // Panel A: 1h (custom time), Panel B: 6d (custom time)
+    // Panel C: follows global as-is, Panel D: uses global (no picker shown)
     await assertPanelTimeInURL(page, panelIds[0], "1h");
     await assertPanelTimeInURL(page, panelIds[1], "6d");
 
-    // Step 6: Change global time
+    // Step 5: Change global time
     await pm.dashboardPanelTime.changeGlobalTime("1-h");
 
-    // Step 7: Verify Panel C and D refresh with new global time
-    // Panel A and B should maintain their times
+    // Step 6: Verify Panel A and B maintain their custom times (unaffected by global change)
+    // Panel C and D update with new global time
     await assertPanelTimeInURL(page, panelIds[0], "1h");
     await assertPanelTimeInURL(page, panelIds[1], "6d");
 
@@ -201,7 +201,6 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -230,9 +229,9 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_1_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_2_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" },
-        { panelName: `Panel_3_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "15-m" }
+        { panelName: `Panel_1_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "1-h" },
+        { panelName: `Panel_2_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "6-d" },
+        { panelName: `Panel_3_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "15-m" }
       ]
     });
 
