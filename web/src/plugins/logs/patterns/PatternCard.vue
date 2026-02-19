@@ -177,6 +177,10 @@ const { t } = useI18n();
 </style>
 
 <style lang="scss">
+@import "@/assets/styles/log-highlighting.css";
+</style>
+
+<style lang="scss">
 .pattern-details-btn > span.q-btn__content {
   display: block !important;
 }
