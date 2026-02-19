@@ -34,70 +34,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </h2>
         </div>
-        <q-btn
-          flat
-          dense
-          round
-          icon="cancel"
-          size="sm"
-          @click="handleClose"
-          data-test="service-graph-side-panel-close-btn"
-          class="close-btn"
-        />
+        <div class="panel-header-actions">
+          <q-btn
+            unelevated
+            no-caps
+            dense
+            size="sm"
+            label="Show telemetry"
+            icon="manage_search"
+            @click="handleShowTelemetry"
+            data-test="service-graph-side-panel-show-telemetry-btn"
+            class="telemetry-btn"
+            :loading="correlationLoading"
+          />
+          <q-btn
+            flat
+            dense
+            round
+            icon="cancel"
+            size="sm"
+            @click="handleClose"
+            data-test="service-graph-side-panel-close-btn"
+            class="close-btn"
+          />
+        </div>
       </div>
 
       <!-- Content Scrollable Area -->
       <div class="panel-content">
-        <!-- Action Buttons Section -->
-        <div class="panel-section actions-section">
-          <q-btn
-          v-if="false"
-            outline
-            no-caps
-            size="sm"
-            label="📋 View Logs"
-            @click="handleViewLogs"
-            data-test="service-graph-side-panel-view-logs-btn"
-            class="action-btn"
-            :disable="true"
-          >
-            <q-tooltip>
-              View Logs is currently disabled
-            </q-tooltip>
-          </q-btn>
-        </div>
-
         <!-- Metrics Section -->
         <div
           class="panel-section metrics-section"
           data-test="service-graph-side-panel-metrics"
         >
-          <div class="section-header">
-            <div class="section-title">Metrics</div>
-            <q-btn
-              unelevated
-              no-caps
-              size="sm"
-              label="View Traces"
-              @click="handleViewTraces"
-              data-test="service-graph-side-panel-view-traces-btn"
-              class="view-traces-btn"
-              :disable="isAllStreamsSelected"
-            >
-              <q-tooltip v-if="isAllStreamsSelected">
-                Please select a specific stream to view traces
-              </q-tooltip>
-            </q-btn>
-          </div>
 
           <!-- Request Rate Card (Full Width - Combined Metrics) -->
           <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
             <div class="metric-single-line">
               <div class="metric-total">
-                <span class="total-label">Total:</span>
+                <span class="total-label">Requests:</span>
                 <span class="total-value">{{ serviceMetrics.requestRateValue }}</span>
-                <span class="total-unit">req/min</span>
-                <q-tooltip>Total Requests (all requests for this service)</q-tooltip>
+                <span class="total-unit">/min</span>
               </div>
               <div class="metric-divider"></div>
               <div class="metric-inline incoming">
@@ -116,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Horizontal Divider -->
             <div class="metric-horizontal-divider"></div>
 
-            <!-- Error Rate and P95 Latency (Bottom Row) -->
+            <!-- Error Rate and Latency Percentiles (Bottom Rows) -->
             <div class="metric-bottom-row">
               <div class="metric-inline-item error-rate-card" :class="getErrorRateClass()" data-test="service-graph-side-panel-error-rate">
                 <q-icon name="error_outline" size="14px" />
@@ -124,10 +101,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="metric-value">{{ serviceMetrics.errorRate }}</span>
               </div>
               <div class="metric-row-divider"></div>
-              <div class="metric-inline-item latency-card" :class="getLatencyClass()" data-test="service-graph-side-panel-p95-latency">
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p95Latency)" data-test="service-graph-side-panel-p95-latency">
                 <q-icon name="speed" size="14px" />
                 <span class="metric-label">P95 Latency:</span>
                 <span class="metric-value">{{ serviceMetrics.p95Latency }}</span>
+              </div>
+            </div>
+            <div class="metric-horizontal-divider"></div>
+            <div class="metric-bottom-row">
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p50Latency)" data-test="service-graph-side-panel-p50-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P50:</span>
+                <span class="metric-value">{{ serviceMetrics.p50Latency }}</span>
+              </div>
+              <div class="metric-row-divider"></div>
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p99Latency)" data-test="service-graph-side-panel-p99-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P99:</span>
+                <span class="metric-value">{{ serviceMetrics.p99Latency }}</span>
               </div>
             </div>
           </div>
@@ -265,18 +256,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </transition>
+
+  <!-- Telemetry Correlation Dialog (reuses the same component as "show related" on logs page) -->
+  <TelemetryCorrelationDashboard
+    v-if="showTelemetryDialog && correlationData"
+    mode="dialog"
+    :service-name="correlationData.serviceName"
+    :matched-dimensions="correlationData.matchedDimensions"
+    :additional-dimensions="correlationData.additionalDimensions"
+    :log-streams="correlationData.logStreams"
+    :metric-streams="correlationData.metricStreams"
+    :trace-streams="correlationData.traceStreams"
+    :time-range="telemetryTimeRange"
+    @close="showTelemetryDialog = false"
+  />
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, watch, type PropType } from 'vue';
+import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropType } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
 import searchService from '@/services/search';
+import { getGroupedServices, correlate as correlateStreams } from '@/services/service_streams';
 import { escapeSingleQuotes } from '@/utils/zincutils';
+
+const TelemetryCorrelationDashboard = defineAsyncComponent(
+  () => import('@/plugins/correlation/TelemetryCorrelationDashboard.vue')
+);
 
 export default defineComponent({
   name: 'ServiceGraphSidePanel',
+  components: {
+    TelemetryCorrelationDashboard,
+  },
   props: {
     selectedNode: {
       type: Object as PropType<any>,
@@ -299,11 +312,103 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['close', 'view-logs', 'view-traces'],
+  emits: ['close'],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+
+    // Metrics Correlation State
+    const showTelemetryDialog = ref(false);
+    const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
+    const correlationData = ref<{
+      serviceName: string;
+      matchedDimensions: Record<string, string>;
+      additionalDimensions: Record<string, string>;
+      logStreams: any[];
+      metricStreams: any[];
+      traceStreams: any[];
+    } | null>(null);
+
+    const telemetryTimeRange = computed(() => ({
+      startTime: props.timeRange.startTime,
+      endTime: props.timeRange.endTime,
+    }));
+
+    const fetchCorrelatedStreams = async (force = false) => {
+      if (!props.selectedNode) return;
+      if (!force && correlationData.value) return;
+
+      correlationLoading.value = true;
+      correlationError.value = null;
+
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const serviceName = props.selectedNode.name
+          || props.selectedNode.label
+          || props.selectedNode.id;
+
+        // Step 1: Find the service's FQN from _grouped
+        const groupedResponse = await getGroupedServices(org);
+        const groups = groupedResponse.data?.groups || [];
+
+        let fqn = '';
+        for (const group of groups) {
+          if (group.services.some((s: any) => s.service_name === serviceName)) {
+            fqn = group.fqn;
+            break;
+          }
+        }
+
+        if (!fqn) {
+          correlationError.value = 'Service not found in service registry.';
+          correlationData.value = null;
+          return;
+        }
+
+        // Step 2: Send FQN to _correlate — it resolves field names per stream
+        const correlateResponse = await correlateStreams(org, {
+          source_stream: props.streamFilter || 'default',
+          source_type: 'traces',
+          available_dimensions: { 'service-fqn': fqn },
+        });
+
+        const data = correlateResponse.data;
+        if (!data) {
+          correlationError.value = 'No correlated streams found.';
+          correlationData.value = null;
+          return;
+        }
+
+        correlationData.value = {
+          serviceName: data.service_name,
+          matchedDimensions: data.matched_dimensions || {},
+          additionalDimensions: data.additional_dimensions || {},
+          logStreams: data.related_streams?.logs || [],
+          metricStreams: data.related_streams?.metrics || [],
+          traceStreams: data.related_streams?.traces || [],
+        };
+      } catch (err: any) {
+        if (err.response?.status === 403) {
+          correlationError.value = 'Service Discovery is an enterprise feature.';
+        } else {
+          correlationError.value = err.message || 'Failed to load service streams.';
+        }
+        correlationData.value = null;
+      } finally {
+        correlationLoading.value = false;
+      }
+    };
+
+    // Reset correlation data when node changes
+    watch(
+      () => props.selectedNode?.id,
+      () => {
+        correlationData.value = null;
+        correlationError.value = null;
+      }
+    );
 
     // Recent Traces State
     const recentTraces = ref<any[]>([]);
@@ -359,7 +464,9 @@ export default defineComponent({
           incomingRequests: 0,
           outgoingRequests: 0,
           errorRate: 'N/A',
+          p50Latency: 'N/A',
           p95Latency: 'N/A',
+          p99Latency: 'N/A',
         };
       }
 
@@ -388,11 +495,19 @@ export default defineComponent({
       const errors = props.selectedNode.errors || 0;
       const errorRate = totalRequests > 0 ? (errors / totalRequests) * 100 : 0;
 
-      // Calculate P95 latency from incoming edges
+      // Calculate latency percentiles from incoming edges
+      let p50Latency = 0;
       let p95Latency = 0;
+      let p99Latency = 0;
       if (incomingEdges.length > 0) {
+        p50Latency = Math.max(
+          ...incomingEdges.map((edge: any) => edge.p50_latency_ns || 0)
+        );
         p95Latency = Math.max(
           ...incomingEdges.map((edge: any) => edge.p95_latency_ns || 0)
+        );
+        p99Latency = Math.max(
+          ...incomingEdges.map((edge: any) => edge.p99_latency_ns || 0)
         );
       }
 
@@ -413,7 +528,9 @@ export default defineComponent({
         incomingRequests: incomingRequests,
         outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + '%',
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : 'N/A',
         p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : 'N/A',
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : 'N/A',
       };
     });
 
@@ -626,12 +743,18 @@ export default defineComponent({
       emit('close');
     };
 
-    const handleViewLogs = () => {
-      emit('view-logs');
-    };
-
-    const handleViewTraces = () => {
-      emit('view-traces');
+    const handleShowTelemetry = async () => {
+      await fetchCorrelatedStreams();
+      if (correlationData.value) {
+        showTelemetryDialog.value = true;
+      } else if (correlationError.value) {
+        $q.notify({
+          type: 'warning',
+          message: correlationError.value,
+          timeout: 3000,
+          position: 'bottom',
+        });
+      }
     };
 
     const handleNavigateToDashboard = () => {
@@ -694,8 +817,7 @@ export default defineComponent({
     };
 
     // Get color class for latency card
-    const getLatencyClass = (): string => {
-      const latencyStr = serviceMetrics.value.p95Latency;
+    const getLatencyClass = (latencyStr: string): string => {
       if (latencyStr === 'N/A') return 'status-unknown';
 
       // Parse latency value (could be "125ms" or "1.5s")
@@ -723,8 +845,12 @@ export default defineComponent({
       getErrorRateClass,
       getLatencyClass,
       handleClose,
-      handleViewLogs,
-      handleViewTraces,
+      handleShowTelemetry,
+      // Telemetry Correlation
+      showTelemetryDialog,
+      correlationLoading,
+      correlationData,
+      telemetryTimeRange,
       // Recent Traces
       recentTraces,
       loadingTraces,
@@ -846,6 +972,29 @@ export default defineComponent({
           color: #f97316;
         }
       }
+    }
+  }
+
+  .panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .telemetry-btn {
+    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+    color: #fff !important;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: all 0.2s;
+
+    &:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
     }
   }
 
@@ -1002,6 +1151,11 @@ export default defineComponent({
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
+  }
+
+  .section-header-actions {
+    display: flex;
+    gap: 6px;
   }
 
   .section-title {

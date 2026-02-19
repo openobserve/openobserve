@@ -330,7 +330,8 @@ const useLogs = () => {
       searchObj.meta.clearCache = clear_cache;
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
-        router.currentRoute.value.query.type == "search_history_re_apply"
+        (router.currentRoute.value.query.type == "search_history_re_apply" ||
+        router.currentRoute.value.query.type == "ai_chat_query")
       ) {
         delete router.currentRoute.value.query.type;
       }
@@ -343,7 +344,8 @@ const useLogs = () => {
   const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
-    if (!queryParams.stream) {
+    // Allow SQL mode queries without stream param (will be auto-detected from SQL)
+    if (!queryParams.stream && queryParams.sql_mode !== "true") {
       searchObj.shouldIgnoreWatcher = false;
       return;
     }
