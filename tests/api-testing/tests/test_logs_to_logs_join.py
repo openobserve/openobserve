@@ -302,6 +302,7 @@ class TestLogsToLogsJoin:
             f"JOIN with COUNT should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with COUNT should return grouped results"
         logging.info(f"✓ JOIN with COUNT returned {len(hits)} grouped results")
 
         # Verify aggregation columns
@@ -329,6 +330,7 @@ class TestLogsToLogsJoin:
             f"JOIN with multiple aggregations should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with multiple aggregations should return results"
         logging.info(f"✓ JOIN with multiple aggregations returned {len(hits)} results")
 
     # ==================== FILTER TESTS ====================
@@ -350,6 +352,7 @@ class TestLogsToLogsJoin:
             f"JOIN with WHERE filter should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with WHERE filter should return results"
         logging.info(f"✓ JOIN with WHERE filter returned {len(hits)} results")
 
         # Verify filter was applied
@@ -375,6 +378,7 @@ class TestLogsToLogsJoin:
             f"JOIN with compound filter should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with compound filter should return results"
         logging.info(f"✓ JOIN with compound filter returned {len(hits)} results")
 
     def test_11_join_with_like_pattern(self):
@@ -384,7 +388,7 @@ class TestLogsToLogsJoin:
             FROM "{self.small_stream}" AS a
             INNER JOIN "{self.large_stream}" AS b
             ON a.kubernetes_container_name = b.kubernetes_container_name
-            WHERE b.log LIKE '%error%' OR b.log LIKE '%failed%'
+            WHERE b.log LIKE '%completed%' OR b.log LIKE '%successfully%'
             LIMIT 20
         """
 
@@ -394,6 +398,7 @@ class TestLogsToLogsJoin:
             f"JOIN with LIKE pattern should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with LIKE pattern should return results"
         logging.info(f"✓ JOIN with LIKE pattern returned {len(hits)} results")
 
     # ==================== LIMIT AND ORDERING TESTS ====================
