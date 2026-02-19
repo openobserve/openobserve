@@ -2463,7 +2463,15 @@
     "hashSamplingDesc": "trace_id ごとの一貫したサンプリング-同じトレースが常にサンプリングされます",
     "llmEvaluationInfo": "LLM 評価コンフィギュレーション",
     "llmEvaluationInfoText": "LLMジャッジを使用してトレースを評価します。サンプリングでは、一部のトレースしか処理しないため、コストが削減されます。ハッシュ戦略により、一貫したサンプリングが可能になり、信頼性の高いモニタリングが可能になります。",
-    "llmEvaluationNodeSaved": "LLM 評価ノードは正常に保存されました"
+    "llmEvaluationNodeSaved": "LLM 評価ノードは正常に保存されました",
+    "llmJudgeConfig": "LLM ジャッジ設定",
+    "enableLlmJudge": "ジャッジとしての LLM を有効にする",
+    "enableLlmJudgeHelp": "有効にすると、LLMを使用して詳細なディメンションスコアで回答品質を評価します。より徹底的ですが、LLM トークンが必要です。",
+    "llmSpanIdentifier": "LLM スパン識別子",
+    "llmSpanIdentifierLabel": "LLM スパンを識別するフィールド",
+    "llmSpanIdentifierHelp": "LLM スパンを識別するソースストリームからフィールドを選択します。このフィールドが存在し、かつ空でないスパンのみが評価されます。",
+    "noFieldsFound": "フィールドが見つかりません",
+    "save": "[保存]"
   },
   "reports": {
     "header": "レポート",

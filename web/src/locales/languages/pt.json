@@ -2442,7 +2442,15 @@
     "hashSamplingDesc": "Amostragem consistente por trace_id - mesmos traços sempre amostrados",
     "llmEvaluationInfo": "Configuração de avaliação do LLM",
     "llmEvaluationInfoText": "Avalia traços usando o juiz LLM. A amostragem reduz os custos ao processar apenas uma porcentagem dos traços. A estratégia de hash garante uma amostragem consistente para um monitoramento confiável.",
-    "llmEvaluationNodeSaved": "O nó de avaliação do LLM foi salvo com sucesso"
+    "llmEvaluationNodeSaved": "O nó de avaliação do LLM foi salvo com sucesso",
+    "llmJudgeConfig": "Configuração do juiz LLM",
+    "enableLlmJudge": "Habilitar LLM-as-Judge",
+    "enableLlmJudgeHelp": "Quando ativado, usa um LLM para avaliar a qualidade da resposta com pontuações de dimensão detalhadas. Mais completo, mas custa tokens LLM.",
+    "llmSpanIdentifier": "Identificador de extensão LLM",
+    "llmSpanIdentifierLabel": "Campo para identificar extensões de LLM",
+    "llmSpanIdentifierHelp": "Selecione o campo do fluxo de origem que identifica os intervalos do LLM. Somente os períodos em que esse campo está presente e não vazio serão avaliados.",
+    "noFieldsFound": "Nenhum campo encontrado",
+    "save": "Salvar"
   },
   "reports": {
     "header": "Relatórios",

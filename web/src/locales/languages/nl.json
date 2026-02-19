@@ -2442,7 +2442,15 @@
     "hashSamplingDesc": "Consistente bemonstering per trace_id - altijd dezelfde sporen bemonsterd",
     "llmEvaluationInfo": "Configuratie van de LLM-evaluatie",
     "llmEvaluationInfoText": "Evalueert sporen met behulp van de LLM-rechter. Bemonstering verlaagt de kosten door slechts een percentage van de sporen te verwerken. De hash-strategie zorgt voor consistente bemonstering voor betrouwbare monitoring.",
-    "llmEvaluationNodeSaved": "LLM-evaluatieknooppunt succesvol opgeslagen"
+    "llmEvaluationNodeSaved": "LLM-evaluatieknooppunt succesvol opgeslagen",
+    "llmJudgeConfig": "Configuratie van de LLM-rechter",
+    "enableLlmJudge": "LLM-as-Judge inschakelen",
+    "enableLlmJudgeHelp": "Indien ingeschakeld, wordt een LLM gebruikt om de responskwaliteit te evalueren met gedetailleerde dimensiescores. Grondiger maar kost LLM-tokens.",
+    "llmSpanIdentifier": "LLM Span-ID",
+    "llmSpanIdentifierLabel": "Veld om LLM-overspanningen te identificeren",
+    "llmSpanIdentifierHelp": "Selecteer het veld in de bronstream dat LLM-overspanningen identificeert. Alleen overspanningen waar dit veld aanwezig is en niet leeg is, worden geëvalueerd.",
+    "noFieldsFound": "Geen velden gevonden",
+    "save": "Opslaan"
   },
   "reports": {
     "header": "Rapporten",
