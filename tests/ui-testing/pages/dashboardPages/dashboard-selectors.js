@@ -54,7 +54,7 @@ const DASHBOARD = {
 
   // Variables tab in settings
   VARIABLE_TAB: '[data-test="dashboard-settings-variable-tab"]',
-  ADD_VARIABLE_BTN: '[data-test="dashboard-add-variable-btn"]',
+  ADD_VARIABLE_BTN: '[data-test="dashboard-variable-add-btn"]',
   VARIABLE_DRAG: '[data-test="dashboard-variable-settings-drag"]',
   VARIABLE_DRAGGABLE_ROW: '[data-test="dashboard-variable-settings-draggable-row"]',
 

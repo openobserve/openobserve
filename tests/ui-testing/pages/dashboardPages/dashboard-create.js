@@ -7,7 +7,7 @@ export default class DashboardCreate {
    */
   constructor(page) {
     this.page = page;
-    this.dashCreateBtn = this.page.locator('[data-test="dashboard-new"]');
+    this.dashCreateBtn = this.page.locator('[data-test="dashboard-add"]');
     this.dashName = this.page.locator('[data-test="add-dashboard-name"]');
     this.submitBtn = this.page.locator('[data-test="dashboard-add-submit"]');
     this.deleteIcon = this.page.locator('[data-test="dashboard-delete"]');

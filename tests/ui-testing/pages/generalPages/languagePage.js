@@ -21,7 +21,7 @@ class LanguagePage {
   sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
 
   // Dashboard
-  addDashboardBtn = '[data-test="dashboard-new"]';
+  addDashboardBtn = '[data-test="dashboard-add"]';
 
   // Text extraction selectors
   textSelectors = [

@@ -270,9 +270,9 @@ export default class DashboardSetting {
   //variable type: Query Values
   async addVariable(type, variableName, streamType, Stream, field) {
     await this.page
-      .locator('[data-test="dashboard-add-variable-btn"]')
+      .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -420,9 +420,9 @@ export default class DashboardSetting {
 
   async selectConstantType(type, variableName, value) {
     await this.page
-      .locator('[data-test="dashboard-add-variable-btn"]')
+      .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -445,9 +445,9 @@ export default class DashboardSetting {
   //select Textbox type
   async selectTextType(type, variableName) {
     await this.page
-      .locator('[data-test="dashboard-add-variable-btn"]')
+      .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -464,9 +464,9 @@ export default class DashboardSetting {
   //select Custom type
   async selectCustomType(type, variableName, label, value) {
     await this.page
-      .locator('[data-test="dashboard-add-variable-btn"]')
+      .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });

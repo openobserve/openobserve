@@ -18,7 +18,7 @@ export class DashboardPage {
     this.logoutMenuItem = page.locator('[data-test="menu-link-logout-item"]');
 
     // Dashboard list locators
-    this.addDashboardButton = page.locator('[data-test="dashboard-new"]');
+    this.addDashboardButton = page.locator('[data-test="dashboard-add"]');
     this.dashboardSearch = page.locator('[data-test="dashboard-search"]');
     this.dashboardTable = page.locator('[data-test="dashboard-table"]');
     this.dashboardDelete = page.locator('[data-test="dashboard-delete"]');
@@ -58,11 +58,11 @@ export class DashboardPage {
     // Wait for navigation to complete by checking URL
     await this.page.waitForURL('**/dashboards**', { timeout: 10000 });
     // Wait for the dashboard page to load by checking for a key element
-    await this.page.waitForSelector('[data-test="dashboard-new"]', { timeout: 10000 });
+    await this.page.waitForSelector('[data-test="dashboard-add"]', { timeout: 10000 });
   }
   async createDashboard() {
     // Wait for the dashboard page to be fully loaded
-    await this.page.waitForSelector('[data-test="dashboard-new"]');
+    await this.page.waitForSelector('[data-test="dashboard-add"]');
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     await this.addDashboardButton.click();
