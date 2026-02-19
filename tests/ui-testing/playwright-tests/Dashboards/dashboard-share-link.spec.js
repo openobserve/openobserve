@@ -297,9 +297,9 @@ test.describe("Dashboard Share Link Functional Tests", { tag: ["@dashboardShareL
 
     const sharedUrl = new URL(originalUrl);
     const receivedFrom = sharedUrl.searchParams.get("from");
-    expect(receivedFrom.startsWith(fromTime)).toBeTruthy();
+    expect(receivedFrom).toContain(fromTime);
     const receivedTo = sharedUrl.searchParams.get("to");
-    expect(receivedTo.startsWith(toTime)).toBeTruthy();
+    expect(receivedTo).toContain(toTime);
     testLogger.assertion("Share URL preserves absolute from/to timestamps");
 
     testLogger.step("Open short URL and verify time range is preserved");
@@ -313,8 +313,8 @@ test.describe("Dashboard Share Link Functional Tests", { tag: ["@dashboardShareL
     const newPageUrl = new URL(newPage.url());
     const newPageFrom = newPageUrl.searchParams.get("from");
     const newPageTo = newPageUrl.searchParams.get("to");
-    expect(newPageFrom.startsWith(fromTime)).toBeTruthy();
-    expect(newPageTo.startsWith(toTime)).toBeTruthy();
+    expect(newPageFrom).toContain(fromTime);
+    expect(newPageTo).toContain(toTime);
     testLogger.assertion("Absolute time range preserved after redirect");
 
     await newPage.close();

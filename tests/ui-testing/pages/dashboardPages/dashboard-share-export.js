@@ -37,10 +37,20 @@ export default class DashboardShareExportPage {
 
     const shortenResponse = await shortenResponsePromise;
     const responseData = await shortenResponse.json();
-    const shortUrl = responseData.short_url.replace(":8081", ":5080");
+
+    // Replace the API-returned origin with the test base URL origin
+    const baseUrl = new URL(process.env.ZO_BASE_URL || 'http://localhost:5080');
+    const rawShortUrl = new URL(responseData.short_url);
+    rawShortUrl.protocol = baseUrl.protocol;
+    rawShortUrl.host = baseUrl.host;
+    const shortUrl = rawShortUrl.toString();
 
     // Extract original URL from request body
-    const requestBody = JSON.parse(shortenResponse.request().postData());
+    const postData = shortenResponse.request().postData();
+    if (!postData) {
+      throw new Error('Share API request had no body - postData() returned null');
+    }
+    const requestBody = JSON.parse(postData);
     const originalUrl = requestBody.original_url;
 
     testLogger.info('Share URL captured', { shortUrl, originalUrl });
