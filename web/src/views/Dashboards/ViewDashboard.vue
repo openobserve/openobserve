@@ -855,26 +855,27 @@ export default defineComponent({
       return null;
     };
 
-    // Compute effective time for a specific panel
+    // Compute effective time for a specific panel (v4.0)
+    // Priority: 1. URL params (highest) → 2. panel_time_range → 3. global time AS-IS
     const computePanelTime = (panel: any, globalTime: any) => {
       if (!panel) return globalTime;
 
-      // Check if panel has its own time range configured
-      if (panel.config?.panel_time_range) {
-        // Priority 1: Check URL params for this panel (highest priority)
-        const urlPanelTime = getPanelTimeFromURL(panel.id, route.query);
-        if (urlPanelTime) {
-          return convertPickerToTimeObj(urlPanelTime);
-        }
+      // Priority 1: Check URL params for this panel (highest priority)
+      // URL params always win, even if panel_time_range is null
+      const urlPanelTime = getPanelTimeFromURL(panel.id, route.query);
+      if (urlPanelTime) {
+        return convertPickerToTimeObj(urlPanelTime);
+      }
 
-        // Priority 2: Use panel's configured time range
+      // Priority 2: Use panel's configured time range (if set)
+      if (panel.config?.panel_time_range) {
         const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
         if (pickerValue) {
           return convertPickerToTimeObj(pickerValue);
         }
       }
 
-      // Panel doesn't have panel_time_range → use global time
+      // Priority 3: No custom time → use global time AS-IS (no conversion)
       return globalTime;
     };
 
@@ -904,24 +905,20 @@ export default defineComponent({
       };
 
       // Check if panel has its own time configuration
-      if (hasPanelTime(targetPanel, panelId, route.query)) {
+      if (hasPanelTime(targetPanel)) {
         // Panel has panel-level time - only update this specific panel's time
         // DO NOT update __global to avoid triggering refreshes in other panels
         const effectiveTime = computePanelTime(targetPanel, globalTime);
         if (effectiveTime) {
-          currentTimeObjPerPanel.value = {
-            ...currentTimeObjPerPanel.value,
-            [panelId]: effectiveTime,
-          };
+          // CRITICAL: Update only this panel's time property, don't replace entire object
+          currentTimeObjPerPanel.value[panelId] = effectiveTime;
         }
       } else {
         // Panel depends on global time
         // Create a panel-specific time entry (even though it normally uses __global)
         // This allows refreshing ONLY this panel without affecting other global-dependent panels
-        currentTimeObjPerPanel.value = {
-          ...currentTimeObjPerPanel.value,
-          [panelId]: globalTime,
-        };
+        // CRITICAL: Update only this panel's time property, don't replace entire object
+        currentTimeObjPerPanel.value[panelId] = globalTime;
       }
     };
 
@@ -961,7 +958,7 @@ export default defineComponent({
         tab.panels?.forEach((panel: any) => {
           if (panel.id) {
             // Check if panel has its own time configuration
-            if (hasPanelTime(panel, panel.id, route.query)) {
+            if (hasPanelTime(panel)) {
               // Panel has its own time → compute it
               const effectiveTime = computePanelTime(panel, globalTime);
               if (effectiveTime) {
@@ -985,8 +982,20 @@ export default defineComponent({
         });
       });
 
-      // Update the reactive object
-      currentTimeObjPerPanel.value = newPanelTimes;
+      // CRITICAL: Update individual properties instead of replacing the entire object
+      // This prevents triggering reactivity for panels whose time hasn't changed
+      // Remove keys that no longer exist
+      Object.keys(currentTimeObjPerPanel.value).forEach(key => {
+        if (!newPanelTimes.hasOwnProperty(key)) {
+          delete currentTimeObjPerPanel.value[key];
+        }
+      });
+      // Update or add keys
+      Object.keys(newPanelTimes).forEach(key => {
+        if (currentTimeObjPerPanel.value[key] !== newPanelTimes[key]) {
+          currentTimeObjPerPanel.value[key] = newPanelTimes[key];
+        }
+      });
     };
 
     // when the date changes from the picker, update the current time object for the dashboard
@@ -1120,6 +1129,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards/add_panel",
         query: {
+          ...route.query,
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
@@ -1280,16 +1290,42 @@ export default defineComponent({
 
         if (activeTab?.panels) {
           activeTab.panels.forEach((panel: any) => {
-            if (panel.id && panel.config?.panel_time_range) {
-              const panelId = panel.id;
+            if (!panel.id) return;
+            const panelId = panel.id;
+
+            // Check if panel already has URL params (highest priority - preserve user changes)
+            const hasExistingUrlParams = !!(
+              route.query[`pt-period.${panelId}`] ||
+              route.query[`pt-from.${panelId}`]
+            );
+
+            if (hasExistingUrlParams) {
+              // Preserve existing URL params (they may have been set by panel refresh)
+              if (route.query[`pt-period.${panelId}`]) {
+                panelTimeParams[`pt-period.${panelId}`] = route.query[`pt-period.${panelId}`];
+              }
+              if (route.query[`pt-from.${panelId}`] && route.query[`pt-to.${panelId}`]) {
+                panelTimeParams[`pt-from.${panelId}`] = route.query[`pt-from.${panelId}`];
+                panelTimeParams[`pt-to.${panelId}`] = route.query[`pt-to.${panelId}`];
+              }
+            } else if (panel.config?.panel_time_range) {
+              // Panel has an explicit custom time range configured (no URL params yet)
               const panelTimeRange = panel.config.panel_time_range;
 
-              // Generate params based on panel's configured time type
               if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
                 panelTimeParams[`pt-period.${panelId}`] = panelTimeRange.relativeTimePeriod;
               } else if (panelTimeRange.type === 'absolute' && panelTimeRange.startTime && panelTimeRange.endTime) {
                 panelTimeParams[`pt-from.${panelId}`] = panelTimeRange.startTime.toString();
                 panelTimeParams[`pt-to.${panelId}`] = panelTimeRange.endTime.toString();
+              }
+            } else if (panel.config?.panel_time_enabled) {
+              // Panel has time picker enabled but no custom range → use global time (initial load only)
+              const globalTimeParams = getQueryParamsForDuration(selectedDate.value);
+              if (globalTimeParams.period) {
+                panelTimeParams[`pt-period.${panelId}`] = globalTimeParams.period;
+              } else if (globalTimeParams.from && globalTimeParams.to) {
+                panelTimeParams[`pt-from.${panelId}`] = globalTimeParams.from.toString();
+                panelTimeParams[`pt-to.${panelId}`] = globalTimeParams.to.toString();
               }
             }
           });
@@ -1328,20 +1364,30 @@ export default defineComponent({
       // Get global time params - ensure we always have time params
       const timeParams = getQueryParamsForDuration(selectedDate.value);
 
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: selectedTabId.value,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...timeParams, // Global time params (period or from/to)
-          ...variableParams, // Use variables from manager or route
-          ...panelTimeParams, // Panel time params (generated + preserved)
-          print: store.state.printMode,
-          searchtype: route.query.searchtype,
-        },
-      });
+      const newQuery = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        dashboard: route.query.dashboard,
+        folder: route.query.folder,
+        tab: selectedTabId.value,
+        refresh: generateDurationLabel(refreshInterval.value),
+        ...timeParams, // Global time params (period or from/to)
+        ...variableParams, // Use variables from manager or route
+        ...panelTimeParams, // Panel time params (generated + preserved)
+        print: store.state.printMode,
+        searchtype: route.query.searchtype,
+      };
+
+      // CRITICAL: Only update URL if query has actually changed
+      // This prevents unnecessary route updates and panel recomputations
+      const hasQueryChanged = Object.keys(newQuery).some(
+        key => newQuery[key] !== route.query[key]
+      ) || Object.keys(route.query).some(
+        key => !newQuery.hasOwnProperty(key)
+      );
+
+      if (hasQueryChanged) {
+        router.replace({ query: newQuery });
+      }
     };
 
     // whenever the refreshInterval or selectedTabId is changed, update the query params
