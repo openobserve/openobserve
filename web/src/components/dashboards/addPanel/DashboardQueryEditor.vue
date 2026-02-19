@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @language-change="handleLanguageChange"
                 @ask-ai="handleAskAI"
                 @run-query="handleRunQuery"
+                data-test="dashboard-panel-query-editor"
                 data-test-prefix="dashboard-query"
                 editor-height="100%"
               />
