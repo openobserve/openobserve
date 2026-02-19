@@ -1,7 +1,7 @@
 # ── Build settings ──
-# [build]
+[build]
 # Use all available CPU cores for parallel codegen and builds
-# jobs = 14
+jobs = 14
 
 # ── Per-target flags ──
 # Each target gets:
@@ -38,10 +38,13 @@ rustflags = [
 ]
 
 [target.aarch64-unknown-linux-musl]
-linker = "aarch64-linux-gnu-gcc"
+# clang as linker driver so -fuse-ld=lld is passed correctly to the lld binary.
+# lld must be installed: sudo apt-get install -y lld clang
+linker = "clang"
 rustflags = [
     "-C", "target-feature=+aes,+neon,+crc,+lse,+rdm,+rcpc,+dotprod,+fp16",
     "-C", "link-arg=-fuse-ld=lld",
+    "-C", "link-arg=--target=aarch64-unknown-linux-musl",
 ]
 
 [target.aarch64-apple-darwin]

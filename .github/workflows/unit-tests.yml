@@ -75,9 +75,9 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Install mold linker
+      - name: Install mold and lld linkers
         if: steps.check_changes.outputs.has_changes == 'true'
-        run: sudo apt-get install -y mold clang
+        run: sudo apt-get install -y mold clang lld
 
       - name: Install Protoc
         if: steps.check_changes.outputs.has_changes == 'true'
