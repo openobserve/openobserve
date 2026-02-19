@@ -235,21 +235,56 @@ export function useNLQuery() {
    * - Inline SQL statements (SELECT, WITH, etc.)
    * - Filters out explanatory text before/after SQL
    */
+  /**
+   * Helper function to normalize VRL comments from // to #
+   * @param vrlCode - VRL code that might contain // comments
+   * @returns VRL code with // comments converted to #
+   */
+  const normalizeVrlComments = (vrlCode: string): string => {
+    // Replace single-line // comments with # comments
+    // This regex matches // at the start or after whitespace, but not in strings
+    return vrlCode
+      .split('\n')
+      .map(line => {
+        // Simple heuristic: if line contains //, check if it's a comment
+        // Skip if // appears inside quotes (very basic check)
+        const quoteCount = (line.match(/"/g) || []).length;
+        const hasEvenQuotes = quoteCount % 2 === 0;
+
+        // Only replace // with # if:
+        // 1. Line starts with optional whitespace then //
+        // 2. Or has even quotes (meaning // is likely not in a string)
+        if (hasEvenQuotes && line.includes('//')) {
+          // Replace // comments (with optional leading whitespace)
+          return line.replace(/^(\s*)\/\/\s?/, '$1# ').replace(/(\s+)\/\/\s?/, '$1# ');
+        }
+        return line;
+      })
+      .join('\n');
+  };
+
   const extractSQLFromResponse = (response: string): string | null => {
     // Strategy 1: Extract from markdown code blocks (SQL, PromQL, VRL, JavaScript)
     // Try language-specific code blocks first
     const codeBlockPatterns = [
-      /```sql\s+([\s\S]+?)```/i,
-      /```promql\s+([\s\S]+?)```/i,
-      /```vrl\s+([\s\S]+?)```/i,
-      /```javascript\s+([\s\S]+?)```/i,
-      /```js\s+([\s\S]+?)```/i,
+      { pattern: /```sql\s+([\s\S]+?)```/i, type: 'sql' },
+      { pattern: /```promql\s+([\s\S]+?)```/i, type: 'promql' },
+      { pattern: /```vrl\s+([\s\S]+?)```/i, type: 'vrl' },
+      { pattern: /```javascript\s+([\s\S]+?)```/i, type: 'javascript' },
+      { pattern: /```js\s+([\s\S]+?)```/i, type: 'javascript' },
     ];
 
-    for (const pattern of codeBlockPatterns) {
+    for (const { pattern, type } of codeBlockPatterns) {
       const match = response.match(pattern);
       if (match && match[1]) {
-        const extracted = match[1].trim();
+        let extracted = match[1].trim();
+
+        // Normalize VRL comments from // to #
+        if (type === 'vrl') {
+          extracted = normalizeVrlComments(extracted);
+          console.log('[NL2Q] Normalized VRL comments from // to #');
+        }
+
         console.log('[NL2Q] Extracted query from code block:', extracted);
         return extracted;
       }
@@ -647,10 +682,10 @@ export function useNLQuery() {
     let commentPrefix = '--'; // Default: SQL
     const lang = language.toLowerCase();
 
-    if (lang === 'promql') {
-      commentPrefix = '#'; // PromQL uses # for comments
-    } else if (lang === 'vrl' || lang === 'javascript' || lang === 'js') {
-      commentPrefix = '//'; // VRL and JavaScript use // for comments
+    if (lang === 'promql' || lang === 'vrl') {
+      commentPrefix = '#'; // PromQL and VRL use # for comments
+    } else if (lang === 'javascript' || lang === 'js') {
+      commentPrefix = '//'; // JavaScript uses // for comments
     }
 
     // Convert each line of natural language to language-specific comment
