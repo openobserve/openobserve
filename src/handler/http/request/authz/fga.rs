@@ -16,7 +16,7 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use o2_dex::meta::auth::RoleRequest;
+use {handler::http::extractors::Headers, o2_dex::meta::auth::RoleRequest, utils::auth::UserEmail};
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
