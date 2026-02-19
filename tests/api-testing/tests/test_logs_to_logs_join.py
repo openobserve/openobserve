@@ -29,6 +29,7 @@ import json
 import time
 import random
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -52,8 +53,9 @@ class TestLogsToLogsJoin:
         # Ingest test data first
         self._ingest_test_data()
 
-        # Wait for data to be indexed (longer wait for remote servers)
-        time.sleep(10)
+        # Wait for data to be indexed (configurable for slower CI runners)
+        ingest_wait = int(os.environ.get("ZO_TEST_INGEST_WAIT", 10))
+        time.sleep(ingest_wait)
 
         # Set up time range for queries AFTER ingestion to ensure data is within range
         now = datetime.now(timezone.utc)
@@ -149,6 +151,7 @@ class TestLogsToLogsJoin:
         assert "hits" in data, f"Response should have 'hits': {data}"
 
         hits = data["hits"]
+        assert len(hits) > 0, "INNER JOIN should return results"
         logging.info(f"✓ INNER JOIN returned {len(hits)} results")
 
         # Verify join key is present in all results
@@ -200,6 +203,7 @@ class TestLogsToLogsJoin:
             f"LEFT JOIN (small to large) should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "LEFT JOIN (small to large) should return results"
         logging.info(f"✓ LEFT JOIN (small to large) returned {len(hits)} results")
 
         # LEFT JOIN should preserve all rows from left table
@@ -409,6 +413,7 @@ class TestLogsToLogsJoin:
             f"JOIN with LIMIT should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with LIMIT should return results"
         assert len(hits) <= 10, f"LIMIT 10 should return at most 10 results, got {len(hits)}"
         logging.info(f"✓ JOIN with LIMIT returned {len(hits)} results")
 
@@ -430,6 +435,7 @@ class TestLogsToLogsJoin:
             f"JOIN with ORDER BY should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with ORDER BY should return results"
         logging.info(f"✓ JOIN with ORDER BY returned {len(hits)} results")
 
     # ==================== SELF-JOIN TESTS ====================
@@ -478,6 +484,7 @@ class TestLogsToLogsJoin:
             f"JOIN with logs. prefix should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with logs. prefix should return results"
         logging.info(f"✓ JOIN with logs. prefix returned {len(hits)} results")
 
     # ==================== NULL HANDLING TESTS ====================
@@ -500,6 +507,7 @@ class TestLogsToLogsJoin:
             f"JOIN with COALESCE should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
+        assert len(hits) > 0, "JOIN with COALESCE should return results"
         logging.info(f"✓ JOIN with COALESCE returned {len(hits)} results")
 
     # ==================== DATA VERIFICATION TESTS ====================
@@ -814,9 +822,10 @@ class TestLogsToLogsJoin:
 
         response = self._run_search(sql)
 
-        # Scalar subqueries may or may not be supported - accept 200 or specific error codes
-        assert response.status_code in [200, 400, 500], \
-            f"Scalar subquery should return valid response: {response.status_code}"
+        # Scalar subqueries may or may not be supported - accept 200 or 400 (unsupported feature)
+        # HTTP 500 is a server crash/panic, not a graceful error, so it should fail the test
+        assert response.status_code in [200, 400], \
+            f"Scalar subquery should return 200 (success) or 400 (unsupported), not {response.status_code}: {response.text[:500]}"
 
         if response.status_code == 200:
             hits = response.json().get("hits", [])
@@ -827,7 +836,7 @@ class TestLogsToLogsJoin:
 
             logging.info(f"✓ Scalar subquery returned {len(hits)} results")
         else:
-            logging.warning(f"⚠ Scalar subquery not supported: {response.status_code}")
+            logging.warning(f"⚠ Scalar subquery not supported (400): {response.text[:200]}")
 
     def test_29_subquery_with_order_and_limit(self):
         """Test subquery with ORDER BY and LIMIT."""
