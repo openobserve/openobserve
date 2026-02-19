@@ -113,6 +113,7 @@
     "getStarted": "Inizia",
     "reset": "Reimposta",
     "retry": "Riprova",
+    "set": "+ Set",
     "copy": "Copia",
     "copySuccess": "Copiato negli appunti",
     "copyError": "Copia negli appunti non riuscita"
@@ -1425,7 +1426,9 @@
     "panelTimeRange": "Intervallo di tempo del pannello",
     "panelTimeRangeTooltip": "Questo intervallo di tempo si applica solo a questo pannello. Gli altri pannelli utilizzeranno i propri orari configurati o l'ora globale del dashboard.",
     "panelTimeSettingsTooltip": "Configura il modo in cui questo pannello determina il suo intervallo di tempo. Puoi utilizzare l'intervallo di tempo della dashboard o impostarne uno personalizzato per questo pannello.",
-    "panelTimeMode": "Origine dell'intervallo di tempo (al caricamento del dashboard)"
+    "panelTimeMode": "Origine dell'intervallo di tempo (al caricamento del dashboard)",
+    "useDefaultTimeTooltip": "Se abilitato, questo pannello utilizzerà la durata predefinita configurata come intervallo di tempo al caricamento del dashboard, anziché il tempo globale del dashboard.",
+    "defaultDuration": "Durata predefinita"
   },
   "panel": {
     "header": "Pannello",

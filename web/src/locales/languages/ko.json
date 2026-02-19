@@ -115,7 +115,8 @@
     "copySuccess": "클립보드에 복사됨",
     "copyError": "클립보드에 복사하지 못했습니다.",
     "reset": "초기화",
-    "retry": "재시도"
+    "retry": "재시도",
+    "set": "+ 세트"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -1425,7 +1426,9 @@
     "panelTimeRange": "패널 시간 범위",
     "panelTimeRangeTooltip": "이 시간 범위는 이 패널에만 적용됩니다.다른 패널은 자체적으로 구성된 시간 또는 글로벌 대시보드 시간을 사용합니다.",
     "panelTimeSettingsTooltip": "이 패널에서 시간 범위를 결정하는 방법을 구성합니다.대시보드의 시간 범위를 사용하거나 이 패널에 사용자 지정 시간 범위를 설정할 수 있습니다.",
-    "panelTimeMode": "시간 범위 소스 (대시보드 로드 시)"
+    "panelTimeMode": "시간 범위 소스 (대시보드 로드 시)",
+    "useDefaultTimeTooltip": "활성화하면 이 패널은 글로벌 대시보드 시간 대신 구성된 기본 기간을 대시보드 로드 시 시간 범위로 사용합니다.",
+    "defaultDuration": "기본 기간"
   },
   "panel": {
     "header": "패널",
