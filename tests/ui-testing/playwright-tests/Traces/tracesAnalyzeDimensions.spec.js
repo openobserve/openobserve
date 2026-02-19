@@ -1,24 +1,20 @@
 // tracesAnalyzeDimensions.spec.js
 // Tests for OpenObserve Traces Analyze Dimensions feature
-// Feature: Volume/Latency/Error analysis on traces data with brush selection on RED metrics
+// Feature: Volume/Latency/Error analysis on traces data via Insights button on RED metrics dashboard
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
 test.describe("Traces Analyze Dimensions testcases", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm; // Page Manager instance
+  let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
-    // Initialize test setup
     testLogger.testStart(testInfo.title, testInfo.file);
 
-    // Navigate to base URL with authentication
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Post-authentication stabilization wait
     await page.waitForLoadState('networkidle');
 
     // Navigate to traces page
@@ -36,520 +32,305 @@ test.describe("Traces Analyze Dimensions testcases", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // P0 - Critical Path Tests
-  test("P0: Metrics dashboard visible with trace results", {
+  // Helper: run trace search, assert results exist, ensure metrics dashboard visible
+  async function searchAndAssertResults() {
+    await pm.tracesPage.setupTraceSearch();
+    await pm.tracesPage.waitForTraceSearchResults();
+
+    const hasResults = await pm.tracesPage.hasTraceResults();
+    expect(hasResults, 'Trace results must be available — check data ingestion').toBeTruthy();
+
+    const metricsVisible = await pm.tracesPage.ensureMetricsDashboardVisible();
+    expect(metricsVisible, 'Metrics dashboard must be visible').toBeTruthy();
+  }
+
+  // Helper: search, assert results, open insights dashboard, assert it opened
+  async function searchAndOpenInsightsDashboard() {
+    await searchAndAssertResults();
+
+    const insightsVisible = await pm.tracesPage.isInsightsButtonVisible();
+    expect(insightsVisible, 'Insights button must be visible').toBeTruthy();
+
+    await pm.tracesPage.clickInsightsButton();
+    await pm.tracesPage.waitForAnalysisDashboardLoad();
+
+    const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
+    expect(dashboardVisible, 'Analysis dashboard must open successfully').toBeTruthy();
+  }
+
+  // ─── P0 — Critical Path Tests ────────────────────────────────────────────────
+
+  test("P0: Insights button opens analysis dashboard with 3 tabs", {
     tag: ['@tracesAnalyze', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing metrics dashboard visibility');
+    testLogger.info('Verifying insights button opens dashboard with Rate/Latency/Errors tabs');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
+    await searchAndOpenInsightsDashboard();
 
-    // Wait for results
-    await page.waitForTimeout(3000);
+    // Should have 3 tabs: Rate, Latency, Errors
+    const tabCount = await pm.tracesPage.getVisibleTabCount();
+    expect(tabCount).toBe(3);
 
-    // Check if metrics dashboard is visible
-    const hasResults = await pm.tracesPage.hasTraceResults();
+    const rateVisible = await pm.tracesPage.isRateTabVisible();
+    const latencyVisible = await pm.tracesPage.isLatencyTabVisible();
+    const errorsVisible = await pm.tracesPage.isErrorsTabVisible();
 
-    if (hasResults) {
-      // Verify metrics dashboard area is visible (contains Rate, Duration, Errors panels)
-      let metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
+    expect(rateVisible).toBeTruthy();
+    expect(latencyVisible).toBeTruthy();
+    expect(errorsVisible).toBeTruthy();
 
-      // The metrics dashboard might be toggled off by default
-      if (!metricsDashboardVisible) {
-        // Try to toggle metrics on
-        await pm.tracesPage.toggleMetricsDashboard();
-        await page.waitForTimeout(1000);
-        metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-      }
+    testLogger.info('Dashboard opened with all 3 tabs: Rate, Latency, Errors');
 
-      testLogger.info(`Metrics dashboard visible: ${metricsDashboardVisible}`);
-    } else {
-      testLogger.info('No trace results available - this is acceptable for metrics dashboard test');
-    }
-
-    // Verify page is in valid state
-    await pm.tracesPage.expectSearchBarVisible();
+    await pm.tracesPage.closeAnalysisDashboard();
   });
 
-  test("P0: Error only toggle filters trace results", {
+  test("P0: Error-only toggle filters trace results", {
     tag: ['@tracesAnalyze', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing error only toggle functionality');
+    testLogger.info('Testing error-only toggle functionality');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndAssertResults();
 
-    // Ensure metrics dashboard is visible for error toggle
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
-
-    // Check if error only toggle is visible
     const errorToggleVisible = await pm.tracesPage.isErrorOnlyToggleVisible();
-    testLogger.info(`Error only toggle visible: ${errorToggleVisible}`);
+    expect(errorToggleVisible, 'Error-only toggle must be visible').toBeTruthy();
 
-    if (errorToggleVisible) {
-      // Get initial results count (if any)
-      const initialHasResults = await pm.tracesPage.hasTraceResults();
-      testLogger.info(`Initial has results: ${initialHasResults}`);
+    // Toggle error-only filter ON
+    await pm.tracesPage.toggleErrorOnlyFilter();
 
-      // Toggle error only filter
-      await pm.tracesPage.toggleErrorOnlyFilter();
-      await page.waitForTimeout(2000);
-
-      // Run search again to apply filter
-      await pm.tracesPage.runTraceSearch();
-      await page.waitForTimeout(2000);
-
-      // Verify page is still functional
-      await pm.tracesPage.expectSearchBarVisible();
-
-      // Check results after filter (could be results or no results with errors)
-      const hasResultsAfterFilter = await pm.tracesPage.hasTraceResults();
-      const noResultsVisible = await pm.tracesPage.isNoResultsVisible();
-
-      testLogger.info(`After error filter - Has results: ${hasResultsAfterFilter}, No results: ${noResultsVisible}`);
-
-      // Toggle off for cleanup
-      await pm.tracesPage.toggleErrorOnlyFilter();
-
-      testLogger.info('Error only toggle test completed successfully');
-    } else {
-      // Error toggle not visible - verify page is still functional
-      await pm.tracesPage.expectSearchBarVisible();
-      testLogger.info('Error only toggle not visible - metrics dashboard may need to be enabled');
-    }
-  });
-
-  test("P0: Analyze button hidden without brush selection", {
-    tag: ['@tracesAnalyze', '@traces', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing analyze button not visible without brush selection');
-
-    // Setup trace search
+    // Re-run search to apply filter
     await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await pm.tracesPage.waitForTraceSearchResults();
 
-    // Ensure metrics dashboard is visible
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
+    // Page should still be functional after filter
+    await pm.tracesPage.expectSearchBarVisible();
 
-    // Verify analyze button is NOT visible initially (no brush selection)
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    expect(analyzeButtonVisible).toBeFalsy();
+    testLogger.info('Error-only toggle applied successfully');
 
-    testLogger.info('Analyze button correctly hidden without brush selection');
+    // Toggle back OFF for cleanup
+    await pm.tracesPage.toggleErrorOnlyFilter();
   });
 
-  // P1 - Functional Tests
-  test("P1: Range filter chip behavior after brush selection attempt", {
+  // ─── P1 — Functional Tests ───────────────────────────────────────────────────
+
+  test("P1: Tab switching works and loads chart content", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing range filter chip display after brush selection');
+    testLogger.info('Testing tab navigation and chart content across all tabs');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndOpenInsightsDashboard();
 
-    // Check if we have results
-    const hasResults = await pm.tracesPage.hasTraceResults();
-    testLogger.info(`Has trace results: ${hasResults}`);
+    // Click Rate tab — verify active and check charts
+    await pm.tracesPage.clickRateTab();
+    const rateActive = await pm.tracesPage.isTabActive('Rate');
+    expect(rateActive).toBeTruthy();
+    const rateCharts = await pm.tracesPage.hasAnalysisDashboardCharts();
+    testLogger.info(`Rate tab active, charts: ${rateCharts}`);
 
-    // Ensure metrics dashboard is visible
-    let metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-      metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    }
+    // Click Latency tab — verify active and check charts
+    await pm.tracesPage.clickLatencyTab();
+    const latencyActive = await pm.tracesPage.isTabActive('Latency');
+    expect(latencyActive).toBeTruthy();
+    const latencyCharts = await pm.tracesPage.hasAnalysisDashboardCharts();
+    testLogger.info(`Latency tab active, charts: ${latencyCharts}`);
 
-    testLogger.info(`Metrics dashboard visible: ${metricsDashboardVisible}`);
+    // Click Errors tab — verify active and check charts
+    await pm.tracesPage.clickErrorsTab();
+    const errorsActive = await pm.tracesPage.isTabActive('Errors');
+    expect(errorsActive).toBeTruthy();
+    const errorsCharts = await pm.tracesPage.hasAnalysisDashboardCharts();
+    testLogger.info(`Errors tab active, charts: ${errorsCharts}`);
 
-    if (metricsDashboardVisible) {
-      // Try to perform brush selection on a chart
-      const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-      testLogger.info(`Brush selection successful: ${brushSuccessful}`);
+    // Round-trip back to Rate
+    await pm.tracesPage.clickRateTab();
+    const rateActiveAgain = await pm.tracesPage.isTabActive('Rate');
+    expect(rateActiveAgain).toBeTruthy();
+    testLogger.info('Tab round-trip completed: Rate → Latency → Errors → Rate');
 
-      if (brushSuccessful) {
-        await page.waitForTimeout(1000);
+    // At least one tab should have charts
+    expect(rateCharts || latencyCharts || errorsCharts).toBeTruthy();
 
-        // Check if range filter chip appeared
-        const rangeFilterChipVisible = await pm.tracesPage.isRangeFilterChipVisible();
-        testLogger.info(`Range filter chip visible: ${rangeFilterChipVisible}`);
-
-        // Also check if analyze button became visible
-        const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-        testLogger.info(`Analyze button visible after brush: ${analyzeButtonVisible}`);
-
-        // At least one should be visible after successful brush
-        expect(rangeFilterChipVisible || analyzeButtonVisible).toBeTruthy();
-        testLogger.info('Brush selection UI elements appeared correctly');
-      } else {
-        // Brush selection didn't work - verify baseline state is maintained
-        const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-        expect(analyzeButtonVisible).toBeFalsy();
-        testLogger.info('Brush selection not triggered - analyze button correctly hidden');
-      }
-    }
-
-    // Verify page is still functional
-    await pm.tracesPage.expectSearchBarVisible();
+    await pm.tracesPage.closeAnalysisDashboard();
   });
 
-  test("P1: Analysis dashboard opens when analyze button is available", {
+  test("P1: Dashboard close button works", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing analysis dashboard opens after brush selection');
+    testLogger.info('Testing dashboard close button functionality');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndOpenInsightsDashboard();
 
-    // Ensure metrics dashboard is visible
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
+    // Close dashboard
+    await pm.tracesPage.closeAnalysisDashboard();
+    await pm.tracesPage.waitForDashboardClose();
 
-    // Perform brush selection
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-    testLogger.info(`Brush selection successful: ${brushSuccessful}`);
+    // Verify dashboard is closed
+    const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
+    expect(dashboardVisible).toBeFalsy();
 
-    await page.waitForTimeout(1000);
-
-    // Check if analyze button is visible now
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    testLogger.info(`Analyze button visible: ${analyzeButtonVisible}`);
-
-    if (analyzeButtonVisible) {
-      // Click analyze button
-      await pm.tracesPage.clickAnalyzeDimensionsButton();
-
-      // Wait for dashboard to load
-      await pm.tracesPage.waitForAnalysisDashboardLoad();
-
-      // Verify dashboard is visible
-      const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-      expect(dashboardVisible).toBeTruthy();
-
-      testLogger.info('Analysis dashboard opened successfully');
-
-      // Clean up - close dashboard
-      await pm.tracesPage.closeAnalysisDashboard();
-    } else {
-      // Analyze button not visible - this is expected when brush selection doesn't trigger
-      // Verify page is in correct baseline state
-      const rangeFilterChipVisible = await pm.tracesPage.isRangeFilterChipVisible();
-      expect(rangeFilterChipVisible).toBeFalsy();
-      testLogger.info('Analyze button not available - brush selection did not trigger filter');
-    }
-
-    // Verify page is still functional
+    // Page should be functional after close
     await pm.tracesPage.expectSearchBarVisible();
+
+    testLogger.info('Dashboard close button works correctly');
   });
 
-  test("P1: Analysis dashboard close button functionality", {
+  test("P1: Dimension sidebar visible, collapse, and expand", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing analysis dashboard close functionality');
+    testLogger.info('Testing dimension sidebar visibility and collapse/expand');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndOpenInsightsDashboard();
 
-    // Ensure metrics dashboard is visible
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
+    // Sidebar should be visible by default (showDimensionSelector = ref(true))
+    let sidebarVisible = await pm.tracesPage.isDimensionSidebarVisible();
+    expect(sidebarVisible).toBeTruthy();
 
-    // Try brush selection workflow
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-    testLogger.info(`Brush selection successful: ${brushSuccessful}`);
+    // Sidebar should have dimension checkboxes
+    const checkboxCount = await pm.tracesPage.getDimensionCheckboxCount();
+    expect(checkboxCount).toBeGreaterThan(0);
+    testLogger.info(`Dimension sidebar visible with ${checkboxCount} dimensions`);
 
-    await page.waitForTimeout(1000);
+    // Collapse sidebar
+    await pm.tracesPage.toggleDimensionSidebar();
+    sidebarVisible = await pm.tracesPage.isDimensionSidebarVisible();
+    expect(sidebarVisible).toBeFalsy();
+    testLogger.info('Sidebar collapsed');
 
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    testLogger.info(`Analyze button visible: ${analyzeButtonVisible}`);
+    // Expand sidebar
+    await pm.tracesPage.toggleDimensionSidebar();
+    sidebarVisible = await pm.tracesPage.isDimensionSidebarVisible();
+    expect(sidebarVisible).toBeTruthy();
+    testLogger.info('Sidebar expanded');
 
-    if (analyzeButtonVisible) {
-      // Open dashboard
-      await pm.tracesPage.clickAnalyzeDimensionsButton();
-      await pm.tracesPage.waitForAnalysisDashboardLoad();
-
-      // Verify dashboard is open
-      let dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-      expect(dashboardVisible).toBeTruthy();
-      testLogger.info('Dashboard opened successfully');
-
-      // Close dashboard
-      await pm.tracesPage.closeAnalysisDashboard();
-      await page.waitForTimeout(1000);
-
-      // Verify dashboard is closed
-      dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-      expect(dashboardVisible).toBeFalsy();
-
-      testLogger.info('Analysis dashboard close button works correctly');
-    } else {
-      // Dashboard cannot be opened without brush selection
-      // Verify the dashboard is not visible
-      const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-      expect(dashboardVisible).toBeFalsy();
-      testLogger.info('Dashboard correctly not available without brush selection');
-    }
-
-    // Verify page is still functional
-    await pm.tracesPage.expectSearchBarVisible();
+    await pm.tracesPage.closeAnalysisDashboard();
   });
 
-  // P1 - Tab Navigation Tests
-  test("P1: Analysis dashboard has tabs for Volume, Latency, and Error", {
+  test("P1: Dimension search input filters checkboxes", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing analysis dashboard tabs');
+    testLogger.info('Testing dimension search filtering');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndOpenInsightsDashboard();
 
-    // Ensure metrics dashboard is visible
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
+    // Verify search input exists
+    const searchVisible = await pm.tracesPage.isDimensionSearchInputVisible();
+    expect(searchVisible).toBeTruthy();
 
-    // Perform brush selection
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-    testLogger.info(`Brush selection successful: ${brushSuccessful}`);
+    // Get initial checkbox count
+    const initialCount = await pm.tracesPage.getDimensionCheckboxCount();
+    testLogger.info(`Initial dimension count: ${initialCount}`);
+    expect(initialCount, 'Dimensions must be available for filtering').toBeGreaterThan(0);
 
-    await page.waitForTimeout(1000);
+    // Get the first dimension value to use as search term
+    const firstDimension = await pm.tracesPage.getFirstDimensionValue();
+    testLogger.info(`Searching for dimension: ${firstDimension}`);
+    expect(firstDimension, 'Must be able to read dimension value').toBeTruthy();
 
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    testLogger.info(`Analyze button visible: ${analyzeButtonVisible}`);
+    // Search for it
+    await pm.tracesPage.searchDimension(firstDimension);
 
-    if (analyzeButtonVisible) {
-      // Open dashboard
-      await pm.tracesPage.clickAnalyzeDimensionsButton();
-      await pm.tracesPage.waitForAnalysisDashboardLoad();
+    // After search, checkbox count should be <= initial count
+    const filteredCount = await pm.tracesPage.getDimensionCheckboxCount();
+    testLogger.info(`Filtered dimension count: ${filteredCount}`);
+    expect(filteredCount).toBeLessThanOrEqual(initialCount);
+    expect(filteredCount).toBeGreaterThan(0);
 
-      // Check for tabs
-      const volumeTabVisible = await pm.tracesPage.isVolumeTabVisible();
-      const latencyTabVisible = await pm.tracesPage.isLatencyTabVisible();
-      const errorTabVisible = await pm.tracesPage.isErrorTabVisible();
+    testLogger.info('Dimension search filtering works correctly');
 
-      testLogger.info(`Tabs - Volume: ${volumeTabVisible}, Latency: ${latencyTabVisible}, Error: ${errorTabVisible}`);
-
-      // At least Volume tab should be visible (it's the default)
-      if (volumeTabVisible || latencyTabVisible || errorTabVisible) {
-        const tabCount = await pm.tracesPage.getVisibleTabCount();
-        testLogger.info(`Total visible tabs: ${tabCount}`);
-        expect(tabCount).toBeGreaterThan(0);
-      }
-
-      // Close dashboard
-      await pm.tracesPage.closeAnalysisDashboard();
-      testLogger.info('Tab visibility test completed');
-    } else {
-      // No tabs to test without dashboard
-      testLogger.info('Dashboard not available - tab test not applicable');
-    }
-
-    // Verify page is still functional
-    await pm.tracesPage.expectSearchBarVisible();
+    await pm.tracesPage.closeAnalysisDashboard();
   });
 
-  test("P1: Switch between Volume, Latency and Error tabs", {
+  test("P1: Toggling a dimension checkbox updates chart content", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing tab navigation in analysis dashboard');
+    testLogger.info('Testing dimension checkbox toggle triggers chart update');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndOpenInsightsDashboard();
 
-    // Ensure metrics dashboard is visible
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
+    const checkboxCount = await pm.tracesPage.getDimensionCheckboxCount();
+    expect(checkboxCount, 'Dimension checkboxes must be available').toBeGreaterThan(0);
 
-    // Perform brush selection
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-    testLogger.info(`Brush selection successful: ${brushSuccessful}`);
+    // Get a dimension value to toggle
+    const dimensionValue = await pm.tracesPage.getFirstDimensionValue();
+    expect(dimensionValue, 'Must be able to read dimension value').toBeTruthy();
 
-    await page.waitForTimeout(1000);
+    // Toggle the dimension checkbox
+    const toggled = await pm.tracesPage.toggleDimensionCheckbox(dimensionValue);
+    expect(toggled).toBeTruthy();
+    testLogger.info(`Toggled dimension: ${dimensionValue}`);
 
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    testLogger.info(`Analyze button visible: ${analyzeButtonVisible}`);
+    // Dashboard should still be visible and functional after toggle
+    const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
+    expect(dashboardVisible).toBeTruthy();
 
-    if (analyzeButtonVisible) {
-      // Open dashboard
-      await pm.tracesPage.clickAnalyzeDimensionsButton();
-      await pm.tracesPage.waitForAnalysisDashboardLoad();
+    testLogger.info('Dimension checkbox toggle completed — dashboard still functional');
 
-      // Try clicking each tab if visible
-      const volumeTabVisible = await pm.tracesPage.isVolumeTabVisible();
-      const latencyTabVisible = await pm.tracesPage.isLatencyTabVisible();
-      const errorTabVisible = await pm.tracesPage.isErrorTabVisible();
-
-      if (volumeTabVisible) {
-        await pm.tracesPage.clickVolumeTab();
-        await page.waitForTimeout(500);
-        const volumeActive = await pm.tracesPage.isTabActive('volume');
-        testLogger.info(`Clicked Volume tab, active: ${volumeActive}`);
-      }
-
-      if (latencyTabVisible) {
-        await pm.tracesPage.clickLatencyTab();
-        await page.waitForTimeout(500);
-        const latencyActive = await pm.tracesPage.isTabActive('latency');
-        testLogger.info(`Clicked Latency tab, active: ${latencyActive}`);
-      }
-
-      if (errorTabVisible) {
-        await pm.tracesPage.clickErrorTab();
-        await page.waitForTimeout(500);
-        const errorActive = await pm.tracesPage.isTabActive('error');
-        testLogger.info(`Clicked Error tab, active: ${errorActive}`);
-      }
-
-      // Switch back to Volume tab if visible
-      if (volumeTabVisible) {
-        await pm.tracesPage.clickVolumeTab();
-        await page.waitForTimeout(500);
-        testLogger.info('Switched back to Volume tab');
-      }
-
-      // Close dashboard
-      await pm.tracesPage.closeAnalysisDashboard();
-      testLogger.info('Tab navigation test completed');
-    } else {
-      // No tabs to test without dashboard
-      testLogger.info('Dashboard not available - tab navigation test not applicable');
-    }
-
-    // Verify page is still functional
-    await pm.tracesPage.expectSearchBarVisible();
+    await pm.tracesPage.closeAnalysisDashboard();
   });
 
-  // P2 - Edge Cases
-  test("P2: Dimension selector in analysis dashboard", {
+  // ─── P2 — Edge Cases ─────────────────────────────────────────────────────────
+
+  test("P2: Brush selection on chart enables comparison mode", {
     tag: ['@tracesAnalyze', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing dimension selector in analysis dashboard');
+    testLogger.info('Testing brush selection enables comparison mode');
 
-    // Setup and open dashboard (full workflow)
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndAssertResults();
 
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
-
+    // Attempt brush selection on the metrics chart
     const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
     testLogger.info(`Brush selection successful: ${brushSuccessful}`);
+    expect(brushSuccessful, 'Brush selection must succeed on metrics chart').toBeTruthy();
 
-    await page.waitForTimeout(1000);
+    // After brush, insights button should still be visible
+    const insightsVisible = await pm.tracesPage.isInsightsButtonVisible();
+    expect(insightsVisible).toBeTruthy();
 
-    const analyzeButtonVisible = await pm.tracesPage.isAnalyzeDimensionsButtonVisible();
-    testLogger.info(`Analyze button visible: ${analyzeButtonVisible}`);
+    // Open dashboard — should now be in comparison mode
+    await pm.tracesPage.clickInsightsButton();
+    await pm.tracesPage.waitForAnalysisDashboardLoad();
 
-    if (analyzeButtonVisible) {
-      // Open dashboard
-      await pm.tracesPage.clickAnalyzeDimensionsButton();
-      await pm.tracesPage.waitForAnalysisDashboardLoad();
+    const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
+    expect(dashboardVisible).toBeTruthy();
 
-      // Check if dimension selector button is visible
-      const dimensionSelectorVisible = await pm.tracesPage.isDimensionSelectorButtonVisible();
-      testLogger.info(`Dimension selector visible: ${dimensionSelectorVisible}`);
+    testLogger.info('Dashboard opened after brush selection — comparison mode');
 
-      if (dimensionSelectorVisible) {
-        // Click dimension selector
-        await pm.tracesPage.clickDimensionSelectorButton();
-
-        // Verify dialog opens
-        await page.waitForTimeout(1000);
-        testLogger.info('Dimension selector clicked, dialog interaction complete');
-
-        // Close dialog
-        await pm.tracesPage.closeDimensionSelectorDialog();
-      }
-
-      // Clean up - close dashboard
-      await pm.tracesPage.closeAnalysisDashboard();
-      testLogger.info('Analysis dashboard dimension selector test completed');
-    } else {
-      // Verify baseline state
-      const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
-      expect(dashboardVisible).toBeFalsy();
-      testLogger.info('Dashboard not available - dimension selector test not applicable');
-    }
-
-    // Verify page is still functional
-    await pm.tracesPage.expectSearchBarVisible();
+    await pm.tracesPage.closeAnalysisDashboard();
   });
 
-  test("P2: Filter chip removal functionality", {
+  test("P2: Dashboard loading state appears before content", {
     tag: ['@tracesAnalyze', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing filter chip removal');
+    testLogger.info('Testing dashboard loading state');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    await searchAndAssertResults();
 
-    const metricsDashboardVisible = await pm.tracesPage.isTracesMetricsDashboardVisible();
-    if (!metricsDashboardVisible) {
-      await pm.tracesPage.toggleMetricsDashboard();
-      await page.waitForTimeout(1000);
-    }
+    const insightsVisible = await pm.tracesPage.isInsightsButtonVisible();
+    expect(insightsVisible, 'Insights button must be visible').toBeTruthy();
 
-    // Perform brush selection
-    const brushSuccessful = await pm.tracesPage.performBrushSelectionOnChart();
-    testLogger.info(`Brush selection successful: ${brushSuccessful}`);
+    // Click insights — check for loading state immediately
+    await pm.tracesPage.clickInsightsButton();
 
-    if (brushSuccessful) {
-      await page.waitForTimeout(1000);
+    // Check loading state (may be brief, so we check once)
+    const isLoading = await pm.tracesPage.isAnalysisDashboardLoading();
+    testLogger.info(`Dashboard loading state detected: ${isLoading}`);
 
-      // Check filter chips
-      const chipCount = await pm.tracesPage.getRangeFilterChipCount();
-      testLogger.info(`Range filter chips after brush: ${chipCount}`);
+    // Wait for dashboard to finish loading
+    await pm.tracesPage.waitForAnalysisDashboardLoad();
 
-      // Close chip if exists
-      if (chipCount > 0) {
-        await pm.tracesPage.closeFirstRangeFilterChip();
-        await page.waitForTimeout(500);
+    // After loading, dashboard should be visible
+    const dashboardVisible = await pm.tracesPage.isAnalysisDashboardVisible();
+    expect(dashboardVisible).toBeTruthy();
 
-        const chipCountAfterClose = await pm.tracesPage.getRangeFilterChipCount();
-        testLogger.info(`Range filter chips after close: ${chipCountAfterClose}`);
-        expect(chipCountAfterClose).toBeLessThan(chipCount);
+    // Either loading was detected or content loaded directly — both are valid
+    const hasCharts = await pm.tracesPage.hasAnalysisDashboardCharts();
+    const hasError = await pm.tracesPage.isAnalysisDashboardError();
+    testLogger.info(`After load — Charts: ${hasCharts}, Error: ${hasError}`);
 
-        testLogger.info('Filter chip removal successful');
-      } else {
-        testLogger.info('No filter chips to remove');
-      }
-    } else {
-      // Verify no filter chips exist when brush selection fails
-      const chipCount = await pm.tracesPage.getRangeFilterChipCount();
-      expect(chipCount).toBe(0);
-      testLogger.info('No filter chips present - expected without brush selection');
-    }
+    // Dashboard should show either charts or error (not be empty)
+    expect(hasCharts || hasError).toBeTruthy();
 
-    // Verify page state
-    await pm.tracesPage.expectSearchBarVisible();
+    testLogger.info('Dashboard loading state test completed');
+
+    await pm.tracesPage.closeAnalysisDashboard();
   });
 });

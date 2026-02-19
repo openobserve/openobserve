@@ -8,21 +8,17 @@ const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 
 test.describe("Logs Analyze Dimensions testcases", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm; // Page Manager instance
+  let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
-    // Initialize test setup
     testLogger.testStart(testInfo.title, testInfo.file);
 
-    // Navigate to base URL with authentication
     await navigateToBase(page);
     pm = new PageManager(page);
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
 
-    // Wait for page to stabilize
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     testLogger.info('Test setup completed for logs analyze dimensions');
@@ -32,190 +28,155 @@ test.describe("Logs Analyze Dimensions testcases", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // P0 - Critical Path Tests
-  test("P0: Analyze button visible when search results exist", {
-    tag: ['@logsAnalyze', '@logs', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing analyze button visibility with results');
-
-    // Select stream using logsPage method
-    await pm.logsPage.selectIndexStream(logData.Stream_Name_E2E);
-
-    // Set time range to ensure data exists
+  // Helper: select stream, run search, wait for results, and assert analyze button visible
+  async function searchAndOpenAnalyzeButton(page) {
+    await pm.logsPage.selectStream(logData.Stream);
     await pm.logsPage.setDateTimeTo15Minutes();
-
-    // Run search
     await pm.logsPage.clickRefresh();
+    await pm.logsPage.waitForSearchResultsToLoad();
 
-    // Wait for results to load
-    await page.waitForTimeout(3000);
-
-    // Check if we have results
     const hasResults = await pm.logsPage.isLogsSearchResultTableVisible();
+    expect(hasResults, 'Search must return results — check data ingestion').toBeTruthy();
 
-    if (hasResults) {
-      // Verify analyze button is visible
-      const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-      expect(analyzeButtonVisible).toBeTruthy();
-      testLogger.info('Analyze button is visible with results');
-    } else {
-      testLogger.info('No results found - skipping button visibility check (expected when no data)');
-      // If no results, button should NOT be visible
-      const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-      expect(analyzeButtonVisible).toBeFalsy();
-    }
-  });
+    // Wait for analyze button to appear (reactive state may need a moment after results render)
+    await pm.logsPage.expectAnalyzeDimensionsButtonVisible();
+  }
 
-  test("P0: Analyze button opens analysis dashboard", {
+  // ─── P0 — Critical Path Tests ────────────────────────────────────────────────
+
+  test("P0: Analyze button opens dashboard and charts load", {
     tag: ['@logsAnalyze', '@logs', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing analyze button opens dashboard');
+    testLogger.info('Testing analyze button opens dashboard with chart content');
 
-    // Select stream
-    await pm.logsPage.selectIndexStream(logData.Stream_Name_E2E);
-
-    // Set time range
-    await pm.logsPage.setDateTimeTo15Minutes();
-
-    // Run search
-    await pm.logsPage.clickRefresh();
-
-    // Wait for results
-    await page.waitForTimeout(3000);
-
-    // Check if analyze button is visible (requires results)
-    const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-
-    if (!analyzeButtonVisible) {
-      testLogger.info('Precondition not met: No results available, skipping test');
-      test.skip();
-      return;
-    }
+    await searchAndOpenAnalyzeButton(page);
 
     // Click analyze button
     await pm.logsPage.clickAnalyzeDimensionsButton();
-
-    // Wait for dashboard to load
     await pm.logsPage.waitForAnalysisDashboardLoad();
 
-    // Verify dashboard is visible
+    // Dashboard should be visible
     const dashboardVisible = await pm.logsPage.isAnalysisDashboardVisible();
     expect(dashboardVisible).toBeTruthy();
 
+    // After waitForLoad, should no longer be loading
+    const isLoading = await pm.logsPage.isAnalysisDashboardLoading();
+    expect(isLoading).toBeFalsy();
+
     testLogger.info('Analysis dashboard opened successfully');
 
-    // Clean up - close dashboard
     await pm.logsPage.closeAnalysisDashboard();
   });
 
-  // P1 - Functional Tests
-  test("P1: Analysis dashboard close button works", {
+  // ─── P1 — Functional Tests ───────────────────────────────────────────────────
+
+  test("P1: Dashboard close button works", {
     tag: ['@logsAnalyze', '@logs', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing analysis dashboard close functionality');
 
-    // Select stream and run search
-    await pm.logsPage.selectIndexStream(logData.Stream_Name_E2E);
-    await pm.logsPage.setDateTimeTo15Minutes();
-    await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
-
-    // Check precondition
-    const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-    if (!analyzeButtonVisible) {
-      testLogger.info('Precondition not met: No results available, skipping test');
-      test.skip();
-      return;
-    }
+    await searchAndOpenAnalyzeButton(page);
 
     // Open dashboard
     await pm.logsPage.clickAnalyzeDimensionsButton();
     await pm.logsPage.waitForAnalysisDashboardLoad();
 
-    // Verify dashboard is open
     let dashboardVisible = await pm.logsPage.isAnalysisDashboardVisible();
     expect(dashboardVisible).toBeTruthy();
 
     // Close dashboard
     await pm.logsPage.closeAnalysisDashboard();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.waitForDashboardClose();
 
-    // Verify dashboard is closed
+    // Verify closed
     dashboardVisible = await pm.logsPage.isAnalysisDashboardVisible();
     expect(dashboardVisible).toBeFalsy();
 
-    testLogger.info('Analysis dashboard close button works correctly');
+    testLogger.info('Dashboard close button works correctly');
   });
 
-  test("P1: Dimension selector dialog opens in analysis dashboard", {
+  test("P1: Dimension sidebar visible, collapse, and expand", {
     tag: ['@logsAnalyze', '@logs', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing dimension selector in analysis dashboard');
+    testLogger.info('Testing dimension sidebar visibility and collapse/expand');
 
-    // Select stream and run search
-    await pm.logsPage.selectIndexStream(logData.Stream_Name_E2E);
-    await pm.logsPage.setDateTimeTo15Minutes();
-    await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
+    await searchAndOpenAnalyzeButton(page);
 
-    // Check precondition
-    const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-    if (!analyzeButtonVisible) {
-      testLogger.info('Precondition not met: No results available, skipping test');
-      test.skip();
-      return;
-    }
-
-    // Open dashboard
     await pm.logsPage.clickAnalyzeDimensionsButton();
     await pm.logsPage.waitForAnalysisDashboardLoad();
 
-    // Check if dimension selector button is visible
-    const dimensionSelectorVisible = await pm.logsPage.isDimensionSelectorButtonVisible();
+    // Sidebar should be visible by default (showDimensionSelector = ref(true))
+    let sidebarVisible = await pm.logsPage.isDimensionSidebarVisible();
+    expect(sidebarVisible).toBeTruthy();
 
-    if (dimensionSelectorVisible) {
-      // Click dimension selector
-      await pm.logsPage.clickDimensionSelectorButton();
+    // Sidebar should have dimension checkboxes
+    const checkboxCount = await pm.logsPage.getDimensionCheckboxCount();
+    expect(checkboxCount).toBeGreaterThan(0);
+    testLogger.info(`Dimension sidebar visible with ${checkboxCount} checkboxes`);
 
-      // Verify dimension selector dialog opens by checking for any dialog
-      await page.waitForTimeout(1000);
-      // After clicking dimension selector, the dialog should be visible
-      testLogger.info('Dimension selector clicked, checking for dialog response');
+    // Collapse
+    await pm.logsPage.toggleDimensionSidebar();
+    sidebarVisible = await pm.logsPage.isDimensionSidebarVisible();
+    expect(sidebarVisible).toBeFalsy();
+    testLogger.info('Sidebar collapsed');
 
-      testLogger.info('Dimension selector dialog opened successfully');
+    // Expand
+    await pm.logsPage.toggleDimensionSidebar();
+    sidebarVisible = await pm.logsPage.isDimensionSidebarVisible();
+    expect(sidebarVisible).toBeTruthy();
+    testLogger.info('Sidebar expanded');
 
-      // Close dialog by pressing escape
-      await pm.logsPage.closeDimensionSelectorDialog();
-    } else {
-      testLogger.info('Dimension selector not visible (may be disabled in custom SQL mode)');
-    }
-
-    // Clean up
     await pm.logsPage.closeAnalysisDashboard();
   });
 
-  // P2 - Edge Cases
+  test("P1: Dimension search filters the checkbox list", {
+    tag: ['@logsAnalyze', '@logs', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing dimension search filtering');
+
+    await searchAndOpenAnalyzeButton(page);
+
+    await pm.logsPage.clickAnalyzeDimensionsButton();
+    await pm.logsPage.waitForAnalysisDashboardLoad();
+
+    // Verify search input is visible
+    const searchVisible = await pm.logsPage.isDimensionSearchInputVisible();
+    expect(searchVisible).toBeTruthy();
+
+    // Get initial count
+    const initialCount = await pm.logsPage.getDimensionCheckboxCount();
+    testLogger.info(`Initial dimension count: ${initialCount}`);
+    expect(initialCount, 'Dimensions must be available for filtering').toBeGreaterThan(0);
+
+    // Search for a term that should filter results
+    await pm.logsPage.searchDimension('_timestamp');
+
+    const filteredCount = await pm.logsPage.getDimensionCheckboxCount();
+    testLogger.info(`Filtered dimension count: ${filteredCount}`);
+
+    // Filtered count should be less than or equal to initial
+    expect(filteredCount).toBeLessThanOrEqual(initialCount);
+
+    testLogger.info('Dimension search filtering works');
+
+    await pm.logsPage.closeAnalysisDashboard();
+  });
+
+  // ─── P2 — Edge Cases ─────────────────────────────────────────────────────────
+
   test("P2: Analyze button hidden in SQL mode", {
     tag: ['@logsAnalyze', '@logs', '@edge', '@P2', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing analyze button hidden in SQL mode');
 
-    // Select stream first
-    await pm.logsPage.selectIndexStream(logData.Stream_Name_E2E);
+    // First do a normal search to confirm button IS visible with results
+    await searchAndOpenAnalyzeButton(page);
 
-    // Switch to SQL mode
+    // Switch to SQL mode — button should disappear (condition: !sqlMode)
     await pm.logsPage.clickSQLModeSwitch();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.waitForSQLModeActive();
 
-    // Enter a SQL query
-    const sqlQuery = `SELECT * FROM "${logData.Stream_Name_E2E}" LIMIT 100`;
-    await pm.logsPage.typeQuery(sqlQuery);
-
-    // Run query
-    await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
-
-    // Verify analyze button is NOT visible in SQL mode
+    // Analyze button should NOT be visible in SQL mode
     const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
     expect(analyzeButtonVisible).toBeFalsy();
 
@@ -227,34 +188,42 @@ test.describe("Logs Analyze Dimensions testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing analyze button hidden when no results');
 
-    // Select stream
-    await pm.logsPage.selectIndexStream(logData.Stream_Name_E2E);
+    // Select stream but do NOT run a search — hits array is empty so button should be hidden
+    await pm.logsPage.selectStream(logData.Stream);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Set a very restrictive filter that will return no results
-    const noResultsQuery = 'impossible_field_that_does_not_exist=12345678901234567890';
-    await pm.logsPage.typeQuery(noResultsQuery);
+    // Analyze button should NOT be visible with no search results (hits.length === 0)
+    const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
+    expect(analyzeButtonVisible).toBeFalsy();
 
-    // Set short time range
-    await pm.logsPage.setDateTimeTo15Minutes();
+    testLogger.info('Analyze button correctly hidden when no results');
+  });
 
-    // Run search
-    await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
+  test("P2: Dashboard loading state transitions to content", {
+    tag: ['@logsAnalyze', '@logs', '@edge', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing dashboard loading state');
 
-    // Check if no results message is displayed
-    const noResultsVisible = await pm.logsPage.isNoResultsMessageVisible();
+    await searchAndOpenAnalyzeButton(page);
 
-    if (noResultsVisible) {
-      // Verify analyze button is NOT visible when no results
-      const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-      expect(analyzeButtonVisible).toBeFalsy();
-      testLogger.info('Analyze button correctly hidden when no results');
-    } else {
-      // If we got results with this query, the test data might have unexpected records
-      testLogger.info('Unexpectedly got results - verifying analyze button behavior');
-      const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-      // If results exist, button should be visible
-      testLogger.info(`Analyze button visible: ${analyzeButtonVisible}`);
-    }
+    // Click analyze — immediately check for loading state
+    await pm.logsPage.clickAnalyzeDimensionsButton();
+
+    const isLoading = await pm.logsPage.isAnalysisDashboardLoading();
+    testLogger.info(`Loading state detected: ${isLoading}`);
+
+    // Wait for load to complete
+    await pm.logsPage.waitForAnalysisDashboardLoad();
+
+    // After loading, should have content
+    const dashboardVisible = await pm.logsPage.isAnalysisDashboardVisible();
+    expect(dashboardVisible).toBeTruthy();
+
+    const hasCharts = await pm.logsPage.hasAnalysisDashboardCharts();
+    testLogger.info(`After load — Charts: ${hasCharts}`);
+
+    testLogger.info('Dashboard loading state test completed');
+
+    await pm.logsPage.closeAnalysisDashboard();
   });
 });

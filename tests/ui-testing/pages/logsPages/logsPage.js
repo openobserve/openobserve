@@ -175,11 +175,17 @@ export class LogsPage {
         this.correlationLoadingSpinner = '.q-spinner-hourglass';
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
-        // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED) =====
+        // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
         this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
         this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
-        this.dimensionSelectorButton = '[data-test="dimension-selector-button"]';
+        // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
+        this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
+        this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
+        this.dimensionSearchInput = '[data-test="dimension-search-input"]';
         this.analysisDashboardCard = '.analysis-dashboard-card';
+        // Analysis dashboard states
+        this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
+        this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -4260,7 +4266,7 @@ export class LogsPage {
      */
     async clickAnalyzeDimensionsButton() {
         await this.page.locator(this.logsAnalyzeDimensionsButton).click();
-        await this.page.waitForTimeout(2000);
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         testLogger.info('Clicked Analyze Dimensions button');
     }
 
@@ -4287,26 +4293,91 @@ export class LogsPage {
         const closeBtn = this.page.locator(this.analysisDashboardClose);
         if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
             await closeBtn.click();
-            await this.page.waitForTimeout(1000);
+            await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             testLogger.info('Closed Analysis Dashboard');
         }
     }
 
     /**
-     * Check if Dimension Selector button is visible in Analysis Dashboard
+     * Check if Dimension Selector sidebar is visible in Analysis Dashboard
+     * The sidebar is visible by default when the dashboard opens.
      * @returns {Promise<boolean>}
      */
-    async isDimensionSelectorButtonVisible() {
-        return await this.page.locator(this.dimensionSelectorButton).isVisible({ timeout: 5000 }).catch(() => false);
+    async isDimensionSidebarVisible() {
+        return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
-     * Click Dimension Selector button
+     * Toggle dimension selector sidebar via collapse button
      */
-    async clickDimensionSelectorButton() {
-        await this.page.locator(this.dimensionSelectorButton).click();
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Clicked Dimension Selector button');
+    async toggleDimensionSidebar() {
+        const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Toggled Dimension Selector sidebar');
+        }
+    }
+
+    /**
+     * Check if dimension search input is visible in sidebar
+     * @returns {Promise<boolean>}
+     */
+    async isDimensionSearchInputVisible() {
+        return await this.page.locator(this.dimensionSearchInput).isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /**
+     * Search for a dimension in the sidebar
+     * @param {string} searchText
+     */
+    async searchDimension(searchText) {
+        const input = this.page.locator(this.dimensionSearchInput);
+        await input.click();
+        await input.fill(searchText);
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Searched dimension: ${searchText}`);
+    }
+
+    /**
+     * Get the count of dimension checkboxes visible in sidebar
+     * @returns {Promise<number>}
+     */
+    async getDimensionCheckboxCount() {
+        return await this.page.locator('[data-test^="dimension-checkbox-"]').count();
+    }
+
+    /**
+     * Toggle a specific dimension checkbox by its value
+     * @param {string} dimensionValue
+     * @returns {Promise<boolean>}
+     */
+    async toggleDimensionCheckbox(dimensionValue) {
+        const checkbox = this.page.locator(`[data-test="dimension-checkbox-${dimensionValue}"]`);
+        if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await checkbox.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info(`Toggled dimension checkbox: ${dimensionValue}`);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if analysis dashboard has chart panels rendered
+     * @returns {Promise<boolean>}
+     */
+    async hasAnalysisDashboardCharts() {
+        const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
+        return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
+    }
+
+    /**
+     * Check if the analysis dashboard is in loading state
+     * @returns {Promise<boolean>}
+     */
+    async isAnalysisDashboardLoading() {
+        return await this.page.locator(this.analysisDashboardLoading).isVisible({ timeout: 2000 }).catch(() => false);
     }
 
     /**
@@ -4343,6 +4414,37 @@ export class LogsPage {
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(500);
         testLogger.info('Closed dimension selector dialog');
+    }
+
+    /**
+     * Wait for search results to load after clicking refresh.
+     * Waits for either results table or no-results message to appear.
+     */
+    async waitForSearchResultsToLoad() {
+        try {
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            // Wait for either results or no-results indicator
+            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+        } catch {
+            // Fallback: at least wait for any loading to finish
+            testLogger.info('waitForSearchResultsToLoad: timed out waiting for results indicator');
+        }
+    }
+
+    /**
+     * Wait for SQL mode to be active after switching
+     */
+    async waitForSQLModeActive() {
+        await this.page.waitForTimeout(1000);
+        testLogger.info('SQL mode switch stabilized');
+    }
+
+    /**
+     * Wait for dashboard close to complete
+     */
+    async waitForDashboardClose() {
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.info('Dashboard close stabilized');
     }
 
     // ===== SHARE LINK METHODS =====

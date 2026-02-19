@@ -51,22 +51,34 @@ export class TracesPage {
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
 
-    // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED) =====
-    this.analyzeDimensionsButton = '[data-test="analyze-dimensions-button"]';
-    this.errorOnlyToggle = '[data-test="error-only-toggle"]';
-    this.rangeFilterChip = '[data-test="range-filter-chip"]';
+    // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
+    // TracesMetricsDashboard.vue: data-test="insights-button"
+    this.insightsButton = '[data-test="insights-button"]';
+    // Traces SearchBar.vue: data-test="traces-search-bar-error-only-toggle-btn"
+    this.errorOnlyToggle = '[data-test="traces-search-bar-error-only-toggle-btn"]';
+    // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
+    this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
+    // TracesAnalysisDashboard.vue: data-test="analysis-dashboard-close"
     this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
-    this.dimensionSelectorButton = '[data-test="dimension-selector-button"]';
+    // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
+    this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
+    this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
+    this.dimensionSearchInput = '[data-test="dimension-search-input"]';
+    // TracesAnalysisDashboard.vue: data-test="percentile-refresh-button"
     this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
     // Analysis dashboard card (container)
     this.analysisDashboardCard = '.analysis-dashboard-card';
     // Metrics dashboard container
     this.tracesMetricsDashboard = '.traces-metrics-dashboard';
-    // Analysis Dashboard Tabs
+    // Analysis Dashboard Tabs (i18n labels: "Rate", "Latency", "Errors")
     this.analysisDashboardTabs = '.analysis-dashboard-card .q-tabs';
-    this.volumeTab = '.analysis-dashboard-card .q-tab[name="volume"], .analysis-dashboard-card .q-tabs button:has-text("Volume")';
-    this.latencyTab = '.analysis-dashboard-card .q-tab[name="latency"], .analysis-dashboard-card .q-tabs button:has-text("Latency")';
-    this.errorTab = '.analysis-dashboard-card .q-tab[name="error"], .analysis-dashboard-card .q-tabs button:has-text("Error")';
+    this.rateTab = '.analysis-dashboard-card .q-tab:has-text("Rate")';
+    this.latencyTab = '.analysis-dashboard-card .q-tab:has-text("Latency")';
+    this.errorsTab = '.analysis-dashboard-card .q-tab:has-text("Errors")';
+    // Analysis dashboard states
+    this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
+    this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
+    this.analysisDashboardRetryBtn = '.analysis-dashboard-card button:has-text("Retry")';
 
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
@@ -636,7 +648,7 @@ export class TracesPage {
 
     // Run search and wait for results
     await this.runTraceSearch();
-    await this.waitForSearchCompletion(10000);
+    await this.waitForSearchCompletion(20000);
   }
 
   /**
@@ -677,44 +689,52 @@ export class TracesPage {
     try {
       const loadingIndicator = this.page.locator('[data-test*="loading"], .q-spinner').first();
       if (await loadingIndicator.isVisible({ timeout: 500 })) {
-        await loadingIndicator.waitFor({ state: 'hidden', timeout: 10000 });
+        await loadingIndicator.waitFor({ state: 'hidden', timeout: 15000 });
       }
     } catch {
     }
 
-    // Check for results
-    try {
-      const resultSelectors = [
-        this.page.locator(this.searchResultItem).first(),
-        this.page.locator('tbody tr').first(),
-        this.page.getByText(/Spans\s*:\s*\d+/).first()
-      ];
+    // Check for results with retries (handles parallel worker load)
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const resultSelectors = [
+          this.page.locator(this.searchResultItem).first(),
+          this.page.locator('tbody tr').first(),
+          this.page.getByText(/Spans\s*:\s*\d+/).first()
+        ];
 
-      for (const element of resultSelectors) {
-        if (await element.isVisible({ timeout: 1000 })) {
-          return true;
+        for (const element of resultSelectors) {
+          if (await element.isVisible({ timeout: 3000 })) {
+            return true;
+          }
         }
-      }
 
-      // Check for no results message
-      if (await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 1000 })) {
-        return false;
-      }
+        // Check for no results message
+        if (await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 2000 })) {
+          return false;
+        }
 
-      // Check for error
-      const errorElement = this.page.locator(this.errorMessage);
-      if (await errorElement.isVisible({ timeout: 1000 })) {
-        const errorText = await errorElement.textContent();
-        throw new Error(`Search failed with error: ${errorText}`);
-      }
+        // Check for error
+        const errorElement = this.page.locator(this.errorMessage);
+        if (await errorElement.isVisible({ timeout: 1000 })) {
+          const errorText = await errorElement.textContent();
+          throw new Error(`Search failed with error: ${errorText}`);
+        }
 
-      return false;
-    } catch (error) {
-      if (error.message.includes('Search failed')) {
-        throw error;
+        // If not the last attempt, wait and retry
+        if (attempt < maxAttempts) {
+          await this.page.waitForTimeout(2000);
+        }
+      } catch (error) {
+        if (error.message.includes('Search failed')) {
+          throw error;
+        }
+        if (attempt === maxAttempts) return false;
       }
-      return false;
     }
+
+    return false;
   }
 
   /**
@@ -1469,22 +1489,29 @@ export class TracesPage {
   }
 
   // ===== ANALYZE DIMENSIONS POM METHODS =====
+  // Selectors verified against actual Vue source code
+
+  // --- Insights Button (TracesMetricsDashboard.vue) ---
 
   /**
-   * Check if Analyze Dimensions button is visible
+   * Check if Insights button is visible.
+   * The Insights button is ALWAYS visible when metrics dashboard shows
+   * (does NOT require brush selection).
    * @returns {Promise<boolean>}
    */
-  async isAnalyzeDimensionsButtonVisible() {
-    return await this.page.locator(this.analyzeDimensionsButton).isVisible({ timeout: 5000 }).catch(() => false);
+  async isInsightsButtonVisible() {
+    return await this.page.locator(this.insightsButton).isVisible({ timeout: 5000 }).catch(() => false);
   }
 
   /**
-   * Click Analyze Dimensions button
+   * Click Insights button to open the Analysis Dashboard
    */
-  async clickAnalyzeDimensionsButton() {
-    await this.page.locator(this.analyzeDimensionsButton).click();
-    await this.page.waitForTimeout(2000);
+  async clickInsightsButton() {
+    await this.page.locator(this.insightsButton).click();
+    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   }
+
+  // --- Analysis Dashboard (TracesAnalysisDashboard.vue) ---
 
   /**
    * Check if Analysis Dashboard is visible
@@ -1495,15 +1522,68 @@ export class TracesPage {
   }
 
   /**
-   * Close Analysis Dashboard
+   * Close Analysis Dashboard via close button
    */
   async closeAnalysisDashboard() {
     const closeBtn = this.page.locator(this.analysisDashboardClose);
     if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await closeBtn.click();
-      await this.page.waitForTimeout(1000);
+      await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
   }
+
+  /**
+   * Wait for Analysis Dashboard to fully load (spinner gone + content visible)
+   */
+  async waitForAnalysisDashboardLoad() {
+    const spinner = this.page.locator(this.analysisDashboardLoading);
+    try {
+      if (await spinner.isVisible({ timeout: 2000 })) {
+        await spinner.waitFor({ state: 'hidden', timeout: 30000 });
+      }
+    } catch {
+      // Spinner might not appear or already hidden
+    }
+    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  }
+
+  /**
+   * Check if the analysis dashboard is in loading state
+   * @returns {Promise<boolean>}
+   */
+  async isAnalysisDashboardLoading() {
+    return await this.page.locator(this.analysisDashboardLoading).isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the analysis dashboard shows an error state
+   * @returns {Promise<boolean>}
+   */
+  async isAnalysisDashboardError() {
+    return await this.page.locator(this.analysisDashboardError).isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Click the Retry button when analysis dashboard shows an error
+   */
+  async clickAnalysisDashboardRetry() {
+    const retryBtn = this.page.locator(this.analysisDashboardRetryBtn);
+    if (await retryBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await retryBtn.click();
+      await this.page.waitForTimeout(2000);
+    }
+  }
+
+  /**
+   * Check if analysis dashboard has chart panels rendered (actual content loaded)
+   * @returns {Promise<boolean>}
+   */
+  async hasAnalysisDashboardCharts() {
+    const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
+    return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  // --- Error Only Toggle (Traces SearchBar.vue) ---
 
   /**
    * Check if Error Only toggle is visible
@@ -1521,48 +1601,7 @@ export class TracesPage {
     await this.page.waitForTimeout(1000);
   }
 
-  /**
-   * Check if Range Filter Chip is visible
-   * @returns {Promise<boolean>}
-   */
-  async isRangeFilterChipVisible() {
-    return await this.page.locator(this.rangeFilterChip).first().isVisible({ timeout: 5000 }).catch(() => false);
-  }
-
-  /**
-   * Get count of Range Filter Chips
-   * @returns {Promise<number>}
-   */
-  async getRangeFilterChipCount() {
-    return await this.page.locator(this.rangeFilterChip).count();
-  }
-
-  /**
-   * Click close button on first Range Filter Chip
-   */
-  async closeFirstRangeFilterChip() {
-    const closeIcon = this.page.locator(this.rangeFilterChip).first().locator('.chip-close-icon, [name="close"]');
-    if (await closeIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await closeIcon.click();
-      await this.page.waitForTimeout(500);
-    }
-  }
-
-  /**
-   * Check if Dimension Selector button is visible in Analysis Dashboard
-   * @returns {Promise<boolean>}
-   */
-  async isDimensionSelectorButtonVisible() {
-    return await this.page.locator(this.dimensionSelectorButton).isVisible({ timeout: 5000 }).catch(() => false);
-  }
-
-  /**
-   * Click Dimension Selector button
-   */
-  async clickDimensionSelectorButton() {
-    await this.page.locator(this.dimensionSelectorButton).click();
-    await this.page.waitForTimeout(1000);
-  }
+  // --- Metrics Dashboard ---
 
   /**
    * Check if Traces Metrics Dashboard is visible
@@ -1574,11 +1613,9 @@ export class TracesPage {
 
   /**
    * Perform brush selection on metrics chart (simulated via click and drag)
-   * This requires the metrics dashboard to be visible
+   * @returns {Promise<boolean>} true if brush selection triggered a UI change
    */
   async performBrushSelectionOnChart() {
-    // Find the chart canvas in the metrics dashboard
-    // Try multiple selectors to find the chart
     const chartSelectors = [
       this.page.locator(this.tracesMetricsDashboard).locator('canvas').first(),
       this.page.locator('[data-test="chart-renderer"] canvas').first(),
@@ -1594,21 +1631,15 @@ export class TracesPage {
       }
     }
 
-    if (!chart) {
-      return false;
-    }
+    if (!chart) return false;
 
     const box = await chart.boundingBox();
-    if (!box) {
-      return false;
-    }
+    if (!box) return false;
 
-    // Wait for chart to be fully rendered
     await this.page.waitForTimeout(2000);
 
-    // Try multiple brush selection approaches
-
-    // Approach 1: Standard mouse drag with slower steps
+    // Use coordinate-based mouse operations only — no element references after
+    // bounding box capture, since ECharts may re-render and detach the element
     const startX = box.x + box.width * 0.25;
     const endX = box.x + box.width * 0.75;
     const y = box.y + box.height / 2;
@@ -1618,7 +1649,6 @@ export class TracesPage {
     await this.page.mouse.down();
     await this.page.waitForTimeout(100);
 
-    // Move in smaller steps to simulate real drag
     const steps = 20;
     for (let i = 1; i <= steps; i++) {
       const currentX = startX + (endX - startX) * (i / steps);
@@ -1630,213 +1660,234 @@ export class TracesPage {
     await this.page.mouse.up();
     await this.page.waitForTimeout(1500);
 
-    // Check if brush selection worked by looking for filter chip or analyze button
-    const chipVisible = await this.isRangeFilterChipVisible();
-    const buttonVisible = await this.isAnalyzeDimensionsButtonVisible();
-
-    if (chipVisible || buttonVisible) {
-      return true;
-    }
-
-    // Approach 2: Try clicking to focus, then drag
-    await chart.click();
-    await this.page.waitForTimeout(500);
-
-    await this.page.mouse.move(startX, y);
-    await this.page.mouse.down();
-    await this.page.mouse.move(endX, y, { steps: 15 });
-    await this.page.mouse.up();
-    await this.page.waitForTimeout(1000);
-
-    // Check again
-    const chipVisible2 = await this.isRangeFilterChipVisible();
-    const buttonVisible2 = await this.isAnalyzeDimensionsButtonVisible();
-
-    return chipVisible2 || buttonVisible2;
+    // Verify the page is still functional after brush interaction
+    const insightsVisible = await this.isInsightsButtonVisible();
+    return insightsVisible;
   }
 
-  /**
-   * Wait for Analysis Dashboard to load completely
-   */
-  async waitForAnalysisDashboardLoad() {
-    // Wait for loading spinner to disappear
-    const spinner = this.page.locator('.q-spinner-hourglass, .q-spinner');
-    try {
-      if (await spinner.isVisible({ timeout: 1000 })) {
-        await spinner.waitFor({ state: 'hidden', timeout: 30000 });
-      }
-    } catch {
-      // Spinner might not appear or already hidden
-    }
-
-    // Wait for dashboard content
-    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-  }
+  // --- Dimension Selector Sidebar (TracesAnalysisDashboard.vue) ---
 
   /**
-   * Check if Volume tab is visible in Analysis Dashboard
+   * Check if dimension selector sidebar is visible in Analysis Dashboard
    * @returns {Promise<boolean>}
    */
-  async isVolumeTabVisible() {
-    // Try multiple selectors for Volume tab
-    const selectors = [
-      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Volume/i }),
-      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Volume/i })
-    ];
+  async isDimensionSidebarVisible() {
+    return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+  }
 
-    for (const selector of selectors) {
-      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        return true;
-      }
+  /**
+   * Toggle dimension selector sidebar via collapse button
+   */
+  async toggleDimensionSidebar() {
+    const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
+    if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await btn.click();
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Check if dimension search input is visible in sidebar
+   * @returns {Promise<boolean>}
+   */
+  async isDimensionSearchInputVisible() {
+    return await this.page.locator(this.dimensionSearchInput).isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Search for a dimension in the sidebar
+   * @param {string} searchText - text to type in dimension search
+   */
+  async searchDimension(searchText) {
+    const input = this.page.locator(this.dimensionSearchInput);
+    await input.click();
+    await input.fill(searchText);
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Get the count of dimension checkboxes visible in sidebar
+   * @returns {Promise<number>}
+   */
+  async getDimensionCheckboxCount() {
+    return await this.page.locator('[data-test^="dimension-checkbox-"]').count();
+  }
+
+  /**
+   * Toggle a specific dimension checkbox by its value
+   * @param {string} dimensionValue - the dimension value (used in data-test="dimension-checkbox-{value}")
+   * @returns {Promise<boolean>} true if toggled
+   */
+  async toggleDimensionCheckbox(dimensionValue) {
+    const checkbox = this.page.locator(`[data-test="dimension-checkbox-${dimensionValue}"]`);
+    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await checkbox.click();
+      await this.page.waitForTimeout(500);
+      return true;
     }
     return false;
   }
 
   /**
-   * Check if Latency tab is visible in Analysis Dashboard
+   * Get the first dimension checkbox value that is visible
+   * @returns {Promise<string|null>}
+   */
+  async getFirstDimensionValue() {
+    const firstCheckbox = this.page.locator('[data-test^="dimension-checkbox-"]').first();
+    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const testAttr = await firstCheckbox.getAttribute('data-test');
+      return testAttr ? testAttr.replace('dimension-checkbox-', '') : null;
+    }
+    return null;
+  }
+
+  // --- Tab Navigation (TracesAnalysisDashboard.vue) ---
+  // Tab labels from i18n: "Rate" (volume), "Latency" (latency), "Errors" (error)
+
+  /**
+   * Check if Rate tab is visible
+   * @returns {Promise<boolean>}
+   */
+  async isRateTabVisible() {
+    return await this.page.locator(this.rateTab).first().isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Check if Latency tab is visible
    * @returns {Promise<boolean>}
    */
   async isLatencyTabVisible() {
-    const selectors = [
-      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Latency/i }),
-      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Latency/i })
-    ];
-
-    for (const selector of selectors) {
-      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        return true;
-      }
-    }
-    return false;
+    return await this.page.locator(this.latencyTab).first().isVisible({ timeout: 3000 }).catch(() => false);
   }
 
   /**
-   * Check if Error tab is visible in Analysis Dashboard
+   * Check if Errors tab is visible
    * @returns {Promise<boolean>}
    */
-  async isErrorTabVisible() {
-    const selectors = [
-      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Error/i }),
-      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Error/i })
-    ];
-
-    for (const selector of selectors) {
-      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        return true;
-      }
-    }
-    return false;
+  async isErrorsTabVisible() {
+    return await this.page.locator(this.errorsTab).first().isVisible({ timeout: 3000 }).catch(() => false);
   }
 
   /**
-   * Click on Volume tab in Analysis Dashboard
+   * Click Rate tab
    */
-  async clickVolumeTab() {
-    const selectors = [
-      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Volume/i }),
-      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Volume/i })
-    ];
-
-    for (const selector of selectors) {
-      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        await selector.first().click();
-        await this.page.waitForTimeout(1000);
-        return true;
-      }
-    }
-    return false;
+  async clickRateTab() {
+    await this.page.locator(this.rateTab).first().click();
+    await this.page.waitForTimeout(1000);
   }
 
   /**
-   * Click on Latency tab in Analysis Dashboard
+   * Click Latency tab
    */
   async clickLatencyTab() {
-    const selectors = [
-      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Latency/i }),
-      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Latency/i })
-    ];
-
-    for (const selector of selectors) {
-      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        await selector.first().click();
-        await this.page.waitForTimeout(1000);
-        return true;
-      }
-    }
-    return false;
+    await this.page.locator(this.latencyTab).first().click();
+    await this.page.waitForTimeout(1000);
   }
 
   /**
-   * Click on Error tab in Analysis Dashboard
+   * Click Errors tab
    */
-  async clickErrorTab() {
-    const selectors = [
-      this.page.locator('.analysis-dashboard-card .q-tab').filter({ hasText: /Error/i }),
-      this.page.locator('.analysis-dashboard-card button').filter({ hasText: /Error/i })
-    ];
-
-    for (const selector of selectors) {
-      if (await selector.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        await selector.first().click();
-        await this.page.waitForTimeout(1000);
-        return true;
-      }
-    }
-    return false;
+  async clickErrorsTab() {
+    await this.page.locator(this.errorsTab).first().click();
+    await this.page.waitForTimeout(1000);
   }
 
   /**
    * Check if a specific tab is active in Analysis Dashboard
-   * @param {string} tabName - 'volume', 'latency', or 'error'
+   * @param {string} tabLabel - 'Rate', 'Latency', or 'Errors'
    * @returns {Promise<boolean>}
    */
-  async isTabActive(tabName) {
-    const activeTabSelectors = [
-      this.page.locator('.analysis-dashboard-card .q-tab--active').filter({ hasText: new RegExp(tabName, 'i') }),
-      this.page.locator('.analysis-dashboard-card .q-tab.q-tab--active').filter({ hasText: new RegExp(tabName, 'i') })
-    ];
-
-    for (const selector of activeTabSelectors) {
-      if (await selector.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-        return true;
-      }
-    }
-    return false;
+  async isTabActive(tabLabel) {
+    const activeTab = this.page.locator('.analysis-dashboard-card .q-tab--active, .analysis-dashboard-card .q-tab.q-tab--active')
+      .filter({ hasText: new RegExp(tabLabel, 'i') });
+    return await activeTab.first().isVisible({ timeout: 2000 }).catch(() => false);
   }
 
   /**
-   * Get the title of the Analysis Dashboard
-   * @returns {Promise<string>}
-   */
-  async getAnalysisDashboardTitle() {
-    const titleSelectors = [
-      this.page.locator('.analysis-dashboard-card .q-card__section').first(),
-      this.page.locator('.analysis-dashboard-card h6, .analysis-dashboard-card .text-h6').first()
-    ];
-
-    for (const selector of titleSelectors) {
-      if (await selector.isVisible({ timeout: 2000 }).catch(() => false)) {
-        return await selector.textContent() || '';
-      }
-    }
-    return '';
-  }
-
-  /**
-   * Check how many tabs are visible in Analysis Dashboard
+   * Get the count of visible tabs in Analysis Dashboard
    * @returns {Promise<number>}
    */
   async getVisibleTabCount() {
-    const tabLocator = this.page.locator('.analysis-dashboard-card .q-tab');
-    return await tabLocator.count();
+    return await this.page.locator('.analysis-dashboard-card .q-tab').count();
+  }
+
+  // --- Percentile Refresh (Latency tab only) ---
+
+  /**
+   * Check if percentile refresh button is visible (only on latency tab after percentile change)
+   * @returns {Promise<boolean>}
+   */
+  async isPercentileRefreshVisible() {
+    return await this.page.locator(this.percentileRefreshButton).isVisible({ timeout: 3000 }).catch(() => false);
   }
 
   /**
-   * Close any open dialog by pressing Escape key
+   * Click percentile refresh button
    */
-  async closeDimensionSelectorDialog() {
-    await this.page.keyboard.press('Escape');
-    await this.page.waitForTimeout(500);
+  async clickPercentileRefresh() {
+    await this.page.locator(this.percentileRefreshButton).click();
+    await this.page.waitForTimeout(2000);
+  }
+
+  // --- Composite Helper Methods ---
+
+  /**
+   * Wait for trace search results to load after running search.
+   */
+  async waitForTraceSearchResults() {
+    try {
+      await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      const resultSelectors = [
+        this.page.locator(this.searchResultItem).first(),
+        this.page.locator(this.resultNotFoundText),
+        this.page.locator(this.errorMessage)
+      ];
+      await Promise.race(
+        resultSelectors.map(s => s.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {}))
+      );
+    } catch {
+      // timed out
+    }
+  }
+
+  /**
+   * Ensure metrics dashboard is visible, toggle if needed
+   * @returns {Promise<boolean>}
+   */
+  async ensureMetricsDashboardVisible() {
+    let visible = await this.isTracesMetricsDashboardVisible();
+    if (!visible) {
+      await this.toggleMetricsDashboard();
+      await this.page.waitForTimeout(1000);
+      visible = await this.isTracesMetricsDashboardVisible();
+    }
+    return visible;
+  }
+
+  /**
+   * Open insights dashboard from traces metrics.
+   * Sets up search, ensures metrics visible, clicks insights button, waits for load.
+   * @returns {Promise<boolean>} true if dashboard opened successfully
+   */
+  async openInsightsDashboard() {
+    await this.setupTraceSearch();
+    await this.waitForTraceSearchResults();
+    const metricsVisible = await this.ensureMetricsDashboardVisible();
+    if (!metricsVisible) return false;
+
+    const insightsVisible = await this.isInsightsButtonVisible();
+    if (!insightsVisible) return false;
+
+    await this.clickInsightsButton();
+    await this.waitForAnalysisDashboardLoad();
+    return await this.isAnalysisDashboardVisible();
+  }
+
+  /**
+   * Wait for dashboard close to complete
+   */
+  async waitForDashboardClose() {
+    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
 }
