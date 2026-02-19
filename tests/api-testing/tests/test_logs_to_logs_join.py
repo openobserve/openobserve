@@ -552,13 +552,14 @@ class TestLogsToLogsJoin:
     # ==================== SUBQUERY JOIN TESTS ====================
 
     def test_19_subquery_in_clause_basic(self):
-        """Test subquery with IN clause - basic pattern."""
+        """Test subquery with IN clause - basic pattern with LIMIT in subquery for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, log
             FROM "{self.large_stream}"
             WHERE kubernetes_container_name IN (
                 SELECT DISTINCT kubernetes_container_name
                 FROM "{self.small_stream}"
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -579,7 +580,7 @@ class TestLogsToLogsJoin:
         logging.info(f"✓ Subquery with IN clause returned {len(hits)} results")
 
     def test_20_subquery_in_clause_with_filter(self):
-        """Test subquery with IN clause and WHERE filter in subquery."""
+        """Test subquery with IN clause and WHERE filter in subquery with LIMIT for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, log, level
             FROM "{self.large_stream}"
@@ -587,6 +588,7 @@ class TestLogsToLogsJoin:
                 SELECT kubernetes_container_name
                 FROM "{self.small_stream}"
                 WHERE level = 'error'
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -605,7 +607,7 @@ class TestLogsToLogsJoin:
             assert "kubernetes_container_name" in hit, f"Should have container name: {hit}"
 
     def test_21_subquery_with_substr_function(self):
-        """Test subquery with substr function - regression test for Utf8View bug."""
+        """Test subquery with substr function - regression test for Utf8View bug with LIMIT for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, log
             FROM "{self.large_stream}"
@@ -613,6 +615,7 @@ class TestLogsToLogsJoin:
                 SELECT kubernetes_container_name
                 FROM "{self.small_stream}"
                 WHERE substr(kubernetes_container_name, 1, 3) = 'api'
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -632,7 +635,7 @@ class TestLogsToLogsJoin:
                 f"Container should start with 'api': {container}"
 
     def test_22_subquery_with_length_function(self):
-        """Test subquery with length function."""
+        """Test subquery with length function and LIMIT for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, log
             FROM "{self.large_stream}"
@@ -640,6 +643,7 @@ class TestLogsToLogsJoin:
                 SELECT kubernetes_container_name
                 FROM "{self.small_stream}"
                 WHERE length(kubernetes_container_name) > 5
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -660,13 +664,14 @@ class TestLogsToLogsJoin:
         logging.info(f"✓ Subquery with length returned {len(hits)} results")
 
     def test_23_subquery_with_concat_function(self):
-        """Test subquery with CONCAT function for composite key matching."""
+        """Test subquery with CONCAT function for composite key matching with LIMIT for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, kubernetes_namespace_name, log
             FROM "{self.large_stream}"
             WHERE CONCAT(kubernetes_container_name, '|', kubernetes_namespace_name) IN (
                 SELECT CONCAT(kubernetes_container_name, '|', kubernetes_namespace_name)
                 FROM "{self.small_stream}"
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -687,7 +692,7 @@ class TestLogsToLogsJoin:
         logging.info(f"✓ Subquery with CONCAT returned {len(hits)} results")
 
     def test_24_subquery_not_in_clause(self):
-        """Test subquery with NOT IN clause."""
+        """Test subquery with NOT IN clause with LIMIT for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, log
             FROM "{self.large_stream}"
@@ -695,6 +700,7 @@ class TestLogsToLogsJoin:
                 SELECT kubernetes_container_name
                 FROM "{self.small_stream}"
                 WHERE level = 'error'
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -714,13 +720,14 @@ class TestLogsToLogsJoin:
         logging.info(f"✓ Subquery with NOT IN returned {len(hits)} results")
 
     def test_25_subquery_with_aggregation(self):
-        """Test subquery with aggregation in outer query."""
+        """Test subquery with aggregation in outer query with LIMIT in subquery for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, COUNT(*) AS event_count
             FROM "{self.large_stream}"
             WHERE kubernetes_container_name IN (
                 SELECT DISTINCT kubernetes_container_name
                 FROM "{self.small_stream}"
+                LIMIT 100
             )
             GROUP BY kubernetes_container_name
         """
@@ -737,7 +744,7 @@ class TestLogsToLogsJoin:
             assert "event_count" in hit, f"Should have event_count: {hit}"
 
     def test_26_nested_subquery(self):
-        """Test nested subquery pattern."""
+        """Test nested subquery pattern with LIMIT in inner subqueries for broadcast join."""
         sql = f"""
             SELECT kubernetes_container_name, log
             FROM "{self.large_stream}"
@@ -748,7 +755,9 @@ class TestLogsToLogsJoin:
                     SELECT DISTINCT kubernetes_container_name
                     FROM "{self.large_stream}"
                     WHERE level = 'info'
+                    LIMIT 100
                 )
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -769,7 +778,7 @@ class TestLogsToLogsJoin:
         logging.info(f"✓ Nested subquery returned {len(hits)} results")
 
     def test_27_subquery_in_join_condition(self):
-        """Test subquery combined with JOIN."""
+        """Test subquery combined with JOIN with LIMIT in subquery for broadcast join."""
         sql = f"""
             SELECT a.kubernetes_container_name, a.log AS small_log, b.log AS large_log
             FROM "{self.small_stream}" AS a
@@ -779,6 +788,7 @@ class TestLogsToLogsJoin:
                 SELECT DISTINCT kubernetes_namespace_name
                 FROM "{self.large_stream}"
                 WHERE level = 'error'
+                LIMIT 100
             )
             LIMIT 20
         """
@@ -912,3 +922,34 @@ class TestLogsToLogsJoin:
             assert "kubernetes_container_name" in hit, f"Should have container name: {hit}"
 
         logging.info(f"✓ JOIN with stream.field and multiple conditions returned {len(hits)} results")
+
+    # ==================== LARGE LIMIT SUBQUERY TESTS ====================
+
+    def test_32_subquery_with_limit_1000(self):
+        """Test subquery with LIMIT 1000 in inner subquery for broadcast join."""
+        sql = f"""
+            SELECT kubernetes_container_name, log, response_time_ms
+            FROM "{self.large_stream}"
+            WHERE kubernetes_container_name IN (
+                SELECT DISTINCT kubernetes_container_name
+                FROM "{self.small_stream}"
+                LIMIT 1000
+            )
+            LIMIT 50
+        """
+
+        response = self._run_search(sql)
+
+        assert response.status_code == 200, \
+            f"Subquery with LIMIT 1000 should succeed: {response.status_code} - {response.text[:500]}"
+
+        hits = response.json().get("hits", [])
+        assert len(hits) > 0, "Subquery with LIMIT 1000 should return results"
+        assert len(hits) <= 50, f"Should respect outer LIMIT 50, got {len(hits)}"
+
+        # Verify structure
+        for hit in hits:
+            assert "kubernetes_container_name" in hit, f"Should have container name: {hit}"
+            assert "log" in hit, f"Should have log field: {hit}"
+
+        logging.info(f"✓ Subquery with LIMIT 1000 returned {len(hits)} results")
