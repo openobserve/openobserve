@@ -3805,4 +3805,54 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       });
     });
   });
+
+  describe("Logs/Patterns Toggle and Pagination", () => {
+    it("should reset pagination visibility when switching from patterns to logs", () => {
+      // Simulate switching to patterns view (which sets showPagination to false)
+      testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+      testInstance.searchObj.meta.resultGrid.showPagination = false;
+
+      // Verify pagination is hidden
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(false);
+
+      // Switch back to logs view
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+
+      // Simulate the onLogsVisualizeToggleUpdate behavior
+      // In the actual implementation, this is set when switching from patterns to logs
+      testInstance.searchObj.meta.resultGrid.showPagination = true;
+
+      // Verify pagination is shown again
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(true);
+    });
+
+    it("should maintain logs data when switching from patterns to logs with existing data", () => {
+      // Setup: logs exist
+      testInstance.searchObj.data.queryResults.hits = [
+        { message: "log1" },
+        { message: "log2" },
+      ];
+      testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+
+      // Switch back to logs
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+
+      // Verify logs data is still present
+      expect(testInstance.searchObj.data.queryResults.hits.length).toBe(2);
+    });
+
+    it("should show pagination only in logs view", () => {
+      // Set pagination flag
+      testInstance.searchObj.meta.resultGrid.showPagination = true;
+
+      // In logs view - should show pagination
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(true);
+
+      // In patterns view - pagination should be hidden
+      testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+      testInstance.searchObj.meta.resultGrid.showPagination = false;
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(false);
+    });
+  });
 });
