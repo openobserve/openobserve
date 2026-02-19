@@ -307,6 +307,8 @@ const initializeFromQuery = async () => {
         if (shouldAutoSelectChartType) {
           if (panelFields.useTableChart) {
             dashboardPanelData.data.type = "table";
+          } else if (panelFields.y.length === 0) {
+            dashboardPanelData.data.type = "table";
           } else if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {
             dashboardPanelData.data.type = "metric";
           }

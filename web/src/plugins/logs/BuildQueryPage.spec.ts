@@ -600,6 +600,43 @@ describe("BuildQueryPage Component", () => {
       // Should auto-select "metric" chart type for Y-axis only queries
       expect(mockDashboardPanelData.data.type).toBe("metric");
     });
+
+    it("should auto-select table chart type when zero Y-axis fields are present", async () => {
+      const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } = await import("@/utils/query/sqlQueryParser");
+
+      // Mock parseSQL to return a valid parsed result with no Y-axis fields
+      (parseSQL as any).mockResolvedValueOnce({
+        stream: "test_stream",
+        streamType: "logs",
+        xFields: [{ column: "method", alias: "x_axis_1", aggregationFunction: null }],
+        yFields: [],
+        breakdownFields: [],
+        filters: { filterType: "group", logicalOperator: "AND", conditions: [] },
+        customQuery: false,
+        rawQuery: 'SELECT method FROM "test_stream"',
+      });
+
+      // Mock parsedQueryToPanelFields to return only X-axis field (no Y, no breakdown)
+      (parsedQueryToPanelFields as any).mockReturnValueOnce({
+        stream: "test_stream",
+        stream_type: "logs",
+        x: [{ column: "method", alias: "x_axis_1", functionName: null }],
+        y: [], // No Y-axis fields
+        breakdown: [],
+        filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      });
+
+      (shouldUseCustomMode as any).mockReturnValueOnce(false);
+
+      wrapper = createWrapper({
+        searchQuery: 'SELECT method FROM "test_stream"',
+        selectedStream: "test_stream",
+      });
+      await flushPromises();
+
+      // Should auto-select "table" chart type when no Y-axis fields
+      expect(mockDashboardPanelData.data.type).toBe("table");
+    });
   });
 
   describe("Run Query", () => {

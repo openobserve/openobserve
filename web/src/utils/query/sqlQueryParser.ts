@@ -354,11 +354,15 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   useTableChart: boolean;
 } {
   const mapFieldToPanel = (field: ParsedField, index: number, axis: string) => {
+    // Always use sequential alias (e.g., x_axis_1, y_axis_1, z_axis_1)
+    // '_timestamp' is not allowed as an alias
+    const generatedAlias = `${axis}_axis_${index + 1}`;
+
     // Check if this is a raw field (e.g., CASE/WHEN expression)
     if (field.type === "raw" && field.rawQuery) {
       return {
-        label: field.alias || `${axis}_axis_${index + 1}`,
-        alias: field.alias || `${axis}_axis_${index + 1}`,
+        label: generatedAlias,
+        alias: generatedAlias,
         column: "",
         color: null,
         type: "raw",
@@ -372,7 +376,7 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
     // Field structure must match dashboard builder format with functionName and args
     const baseField: any = {
       label: field.column,
-      alias: field.alias || `${axis}_axis_${index + 1}`,
+      alias: generatedAlias,
       column: field.column,
       color: null,
       type: "build",

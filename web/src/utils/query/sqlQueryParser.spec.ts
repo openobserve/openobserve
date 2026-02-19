@@ -269,7 +269,7 @@ describe("sqlQueryParser", () => {
 
       const xField = result.x[0];
       expect(xField.label).toBe("timestamp");
-      expect(xField.alias).toBe("time");
+      expect(xField.alias).toBe("x_axis_1");
       expect(xField.column).toBe("timestamp");
       expect(xField.functionName).toBe("histogram");
       expect(xField.sortBy).toBe("ASC");
@@ -471,7 +471,7 @@ describe("sqlQueryParser", () => {
       expect(result.breakdown.length).toBe(1);
       expect(result.breakdown[0].type).toBe("raw");
       expect(result.breakdown[0].rawQuery).toBe("CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END");
-      expect(result.breakdown[0].alias).toBe("breakdown_1");
+      expect(result.breakdown[0].alias).toBe("z_axis_1");
       expect(result.breakdown[0].column).toBe("");
     });
 
