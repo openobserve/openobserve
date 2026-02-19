@@ -43,8 +43,7 @@ export const useSearchQuery = () => {
     checkTimestampAlias,
   } = logsUtils();
 
-  const { searchObj, notificationMsg, initialQueryPayload, searchAggData } =
-    searchState();
+  const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
 
   const getQueryReq = (isPagination: boolean): SearchRequestPayload | null => {
     searchObj.data.highlightQuery = "";
@@ -68,10 +67,8 @@ export const useSearchQuery = () => {
       return null;
     }
 
-    if (Number.isNaN(searchObj.data.datetime.endTime))
-      searchObj.data.datetime.endTime = "Invalid Date";
-    if (Number.isNaN(searchObj.data.datetime.startTime))
-      searchObj.data.datetime.startTime = "Invalid Date";
+    if (Number.isNaN(searchObj.data.datetime.endTime))   searchObj.data.datetime.endTime = "Invalid Date"
+    if (Number.isNaN(searchObj.data.datetime.startTime)) searchObj.data.datetime.startTime = "Invalid Date"
 
     const queryReq: SearchRequestPayload = buildSearch();
 
@@ -151,12 +148,13 @@ export const useSearchQuery = () => {
       (searchObj.data.resultGrid.currentPage - 1) *
       searchObj.meta.resultGrid.rowsPerPage;
 
+
     // Use configurable scan size when patterns mode is enabled to get data for pattern extraction
     queryReq.query.size =
       searchObj.meta.logsVisualizeToggle === "patterns"
-        ? patternsState.value.scanSize
-        : searchObj.meta.resultGrid.rowsPerPage;
-
+      ? patternsState.value.scanSize
+      : searchObj.meta.resultGrid.rowsPerPage;
+  
     const parsedSQL: any = fnParsedSQL();
 
     searchObj.meta.resultGrid.showPagination = true;
@@ -198,36 +196,12 @@ export const useSearchQuery = () => {
     return queryReq;
   };
 
-  /**
-   * Build search query payload with optional read-only mode
-   *
-   * Constructs the complete query payload for search operations. Can operate in two modes:
-   * 1. Normal mode (readOnly=false): Builds query AND mutates searchObj state (clears errors, updates timestamps, etc.)
-   * 2. Read-only mode (readOnly=true): Builds query WITHOUT mutating searchObj state
-   *
-   * Read-only mode is used for operations that need the query structure but shouldn't
-   * affect the current search state (e.g., EXPLAIN/ANALYZE queries in QueryPlanDialog).
-   *
-   * Mutations that are skipped in read-only mode:
-   * - searchObj.data.filterErrMsg, missingStreamMessage, missingStreamMultiStreamFilter
-   * - searchObj.data.stream.interestingFieldList (creates filtered copy instead)
-   * - searchObj.data.datetime timestamps
-   * - searchObj.meta.resultGrid.chartKeyFormat and chartInterval
-   * - searchObj.data.queryResults.hits (not cleared when LIMIT is present)
-   *
-   * @param readOnly - If true, prevents all mutations to searchObj (default: false)
-   * @returns SearchRequestPayload - The constructed query payload, or null on error
-   */
-  const buildSearch = (readOnly: boolean = false): SearchRequestPayload => {
+  const buildSearch = (): SearchRequestPayload => {
     try {
       let query = searchObj.data.query.trim();
-
-      // Only clear error messages in normal mode
-      if (!readOnly) {
-        searchObj.data.filterErrMsg = "";
-        searchObj.data.missingStreamMessage = "";
-        searchObj.data.stream.missingStreamMultiStreamFilter = [];
-      }
+      searchObj.data.filterErrMsg = "";
+      searchObj.data.missingStreamMessage = "";
+      searchObj.data.stream.missingStreamMultiStreamFilter = [];
       const req: any = {
         query: {
           sql: searchObj.meta.sqlMode
@@ -256,34 +230,25 @@ export const useSearchQuery = () => {
           (item: any) => item.name,
         );
 
-      // In read-only mode, create a filtered copy; in normal mode, mutate in place
-      let interestingFields: string[];
-      if (readOnly) {
-        // Read-only: Create a filtered copy without mutating
-        interestingFields = searchObj.data.stream.interestingFieldList.filter(
-          (fieldName: string) => streamFieldNames.includes(fieldName),
-        );
-      } else {
-        // Normal mode: Mutate the array in place
-        for (
-          let i = searchObj.data.stream.interestingFieldList.length - 1;
-          i >= 0;
-          i--
-        ) {
-          const fieldName = searchObj.data.stream.interestingFieldList[i];
-          if (!streamFieldNames.includes(fieldName)) {
-            searchObj.data.stream.interestingFieldList.splice(i, 1);
-          }
+      for (
+        let i = searchObj.data.stream.interestingFieldList.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const fieldName = searchObj.data.stream.interestingFieldList[i];
+        if (!streamFieldNames.includes(fieldName)) {
+          searchObj.data.stream.interestingFieldList.splice(i, 1);
         }
-        interestingFields = searchObj.data.stream.interestingFieldList;
       }
 
-      // Replace field list placeholder with appropriate values
-      if (interestingFields.length > 0 && searchObj.meta.quickMode) {
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
         if (searchObj.data.stream.selectedStream.length == 1) {
           req.query.sql = req.query.sql.replace(
             "[FIELD_LIST]",
-            interestingFields.join(","),
+            searchObj.data.stream.interestingFieldList.join(","),
           );
         }
       } else {
@@ -297,8 +262,7 @@ export const useSearchQuery = () => {
             )
           : cloneDeep(searchObj.data.datetime);
 
-      // Only mutate datetime timestamps in normal mode
-      if (searchObj.data.datetime.type === "relative" && !readOnly) {
+      if (searchObj.data.datetime.type === "relative") {
         searchObj.data.datetime.startTime = timestamps.startTime;
         searchObj.data.datetime.endTime = timestamps.endTime;
       }
@@ -311,34 +275,27 @@ export const useSearchQuery = () => {
           notificationMsg.value = "Start time cannot be greater than end time";
           return null;
         }
-
-        // Only set chartKeyFormat in normal mode
-        if (!readOnly) {
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-        }
+        searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
 
         req.query.start_time = timestamps.startTime;
         req.query.end_time = timestamps.endTime;
 
-        // Only set chart interval in normal mode
-        if (!readOnly) {
-          setChartInterval(req);
-        }
+        setChartInterval(req);
       } else {
-        if (timestamps.startTime == "Invalid Date") {
-          notificationMsg.value =
-            "The selected start time is  invalid. Please choose a valid time.";
-        } else if (timestamps.endTime == "Invalid Date") {
-          notificationMsg.value =
-            "The selected end time is  invalid. Please choose a valid time.";
-        } else {
-          notificationMsg.value = "Invalid date format.";
+        if(timestamps.startTime == "Invalid Date") {
+          notificationMsg.value = "The selected start time is  invalid. Please choose a valid time."
+        }
+        else if(timestamps.endTime == "Invalid Date") {
+          notificationMsg.value = "The selected end time is  invalid. Please choose a valid time."
+        }
+        else {
+          notificationMsg.value = "Invalid date format."
         }
         return null;
       }
 
       if (searchObj.meta.sqlMode == true) {
-        return handleSqlMode(query, req, readOnly);
+        return handleSqlMode(query, req);
       } else {
         return handleNonSqlMode(query, req);
       }
@@ -380,26 +337,21 @@ export const useSearchQuery = () => {
     }
   };
 
-  const handleSqlMode = (
-    query: string,
-    req: any,
-    readOnly: boolean = false,
-  ): SearchRequestPayload => {
-    // Only mutate query in normal mode
-    if (!readOnly) {
-      searchObj.data.query = query;
-    }
+  const handleSqlMode = (query: string, req: any): SearchRequestPayload => {
+    searchObj.data.query = query;
     const parsedSQL: any = fnParsedSQL();
 
     if (parsedSQL != undefined) {
-      if (!checkTimestampAlias(searchObj.data.query)) {
-        const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
-        notificationMsg.value = errorMsg;
-        return null;
-      }
+
+     if (!checkTimestampAlias(searchObj.data.query)) {
+            const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
+            notificationMsg.value = errorMsg;
+            return null;
+          }
 
       if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
-        notificationMsg.value = "SQL query is missing or invalid.";
+        notificationMsg.value =
+          "SQL query is missing or invalid.";
         return null;
       }
 
@@ -417,12 +369,7 @@ export const useSearchQuery = () => {
 
         query = fnUnparsedSQL(parsedSQL);
         query = query.replace(/`/g, '"');
-
-        // CRITICAL: Only clear queryResults.hits in normal mode
-        // This prevents resetting the logs page results when opening QueryPlanDialog
-        if (!readOnly) {
-          searchObj.data.queryResults.hits = [];
-        }
+        searchObj.data.queryResults.hits = [];
       }
     }
 
@@ -433,14 +380,6 @@ export const useSearchQuery = () => {
     req.query["sql_mode"] = "full";
 
     return finalizeRequest(req);
-  };
-
-  /**
-   * Convenience wrapper for read-only mode
-   * Use this when you need the query payload without mutating searchObj
-   */
-  const getSearchQueryPayload = (): SearchRequestPayload => {
-    return buildSearch(true);
   };
 
   const handleNonSqlMode = (query: string, req: any): SearchRequestPayload => {
@@ -676,7 +615,6 @@ export const useSearchQuery = () => {
   return {
     getQueryReq,
     buildSearch,
-    getSearchQueryPayload,
     validateFilterForMultiStream,
     extractFilterColumns,
   };

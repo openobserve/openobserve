@@ -193,7 +193,6 @@ export const useSearchStream = () => {
     // Query building
     getQueryReq: queryBuilder.getQueryReq,
     buildSearch: queryBuilder.buildSearch,
-    getSearchQueryPayload: queryBuilder.getSearchQueryPayload,
 
     // Connection management
     buildWebSocketPayload: connectionManager.buildWebSocketPayload,
