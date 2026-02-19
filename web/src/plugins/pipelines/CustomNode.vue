@@ -882,17 +882,13 @@ function getIcon(data, ioType) {
             <div style="padding: 8px;">
               <div style="font-weight: 600; margin-bottom: 8px;">LLM Evaluation Node</div>
               <div><strong>Name:</strong> {{ data.name || 'evaluate' }}</div>
-              <div><strong>LLM Judge:</strong> {{ data.enable_llm_judge ? 'Enabled' : 'Disabled' }}</div>
               <div v-if="data.sampling_rate">
-                <strong>Sampling:</strong> {{ (data.sampling_rate * 100).toFixed(1) }}% (hash-based)
+                <strong>Sampling:</strong> {{ (data.sampling_rate * 100).toFixed(1) }}% of traces
               </div>
               <div v-else>
-                <strong>Sampling:</strong> Disabled (evaluates all traces)
+                <strong>Sampling:</strong> All traces (100%)
               </div>
-              <div style="margin-top: 8px; font-size: 0.9em; color: #ccc;">
-                Evaluates traces and writes results to a separate logs stream
-              </div>
-            </div>
+             </div>
           </q-tooltip>
         </div>
       </div>

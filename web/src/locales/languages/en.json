@@ -1058,7 +1058,8 @@
     "errorSavingPipeline": "Error while saving pipeline",
     "cancelChangesConfirm": "Are you sure you want to cancel changes?",
     "cancel": "Cancel",
-    "dragDropNodesHere": "Drag and drop nodes here"
+    "dragDropNodesHere": "Drag and drop nodes here",
+    "save": "Save"
   },
   "function": {
     "header": "Functions",
