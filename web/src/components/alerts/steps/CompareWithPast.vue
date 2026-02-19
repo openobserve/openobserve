@@ -18,21 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div ref="multiWindowContainerRef" class="step-compare-with-past" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw-px-3 tw-py-4" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
       <!-- Alert set for header -->
-      <div class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md">
+      <div class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-md">
         <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
-        <div class="tw:h-px border-line tw:flex-1"></div>
+        <div class="tw-h-px border-line tw-flex-1"></div>
       </div>
 
       <!-- Current Window -->
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start multi-window-container q-px-md q-py-sm">
-        <div class="multi-window-text tw:w-auto tw:text-left">
+      <div class="tw-flex tw-flex-row tw-justify-between tw-items-start multi-window-container q-px-md q-py-sm">
+        <div class="multi-window-text tw-w-auto tw-text-left">
           {{ t('alerts.compareWithPast.currentWindow') }}
         </div>
 
-        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-auto tw:text-left">
+        <div class="tw-flex tw-flex-col tw-items-start tw-gap-2">
+          <div class="multi-window-text tw-w-auto tw-text-left">
             {{ t('alerts.compareWithPast.cycle') }}
-            <span class="tw:cursor-pointer">
+            <span class="tw-cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </span>
           </div>
-          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-[300px] running-text">
+          <div class="tw-flex tw-justify-between tw-items-start tw-gap-4">
+            <div class="tw-w-[300px] running-text">
               {{ t('alerts.compareWithPast.runningFor', { period: convertMinutesToDisplayValue(period), frequency: convertMinutesToDisplayValue(frequency) }) }}
             </div>
             <div>
@@ -77,27 +77,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Comparing with header -->
-      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-sm">
+      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-sm">
         <span>{{ t('alerts.compareWithPast.comparingWith') }}</span>
-        <div class="tw:h-px border-line tw:flex-1"></div>
+        <div class="tw-h-px border-line tw-flex-1"></div>
       </div>
 
       <!-- Reference Windows List -->
       <div
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
-        class="tw:flex tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 q-px-md q-py-sm"
+        class="tw-flex tw-flex-row tw-justify-between tw-items-start reference-window-container tw-mt-2 q-px-md q-py-sm"
       >
-        <div class="multi-window-text tw:w-auto tw:text-left">
+        <div class="multi-window-text tw-w-auto tw-text-left">
           {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}
         </div>
 
         <!-- Time Frame -->
-        <div class="tw:flex tw:flex-col tw:gap-2 tw:items-start">
-          <div class="tw:flex tw:items-center">
-            <span class="tw:mr-1"><q-icon name="schedule" size="16px" /></span>
+        <div class="tw-flex tw-flex-col tw-gap-2 tw-items-start">
+          <div class="tw-flex tw-items-center">
+            <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
             {{ t('alerts.compareWithPast.timeFrame') }}
-            <span class="tw:ml-2 tw:cursor-pointer">
+            <span class="tw-ml-2 tw-cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
@@ -122,10 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cycle Info -->
-        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-auto tw:text-left">
+        <div class="tw-flex tw-flex-col tw-items-start tw-gap-2">
+          <div class="multi-window-text tw-w-auto tw-text-left">
             {{ t('alerts.compareWithPast.cycle') }}
-            <span class="tw:cursor-pointer">
+            <span class="tw-cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
@@ -138,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </span>
           </div>
-          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-[300px] reference-text">
+          <div class="tw-flex tw-justify-between tw-items-start tw-gap-4">
+            <div class="tw-w-[300px] reference-text">
               {{ t('alerts.compareWithPast.comparingText', { offset: getDisplayValue(picker.offSet) }) }}
             </div>
             <div>

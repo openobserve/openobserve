@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Aggregation Section (only for custom mode and scheduled alerts) -->
-          <div v-if="isRealTime === 'false'" class="tw:mt-6 tw:pt-6" :style="store.state.theme === 'dark' ? 'border-top: 2px solid #343434' : 'border-top: 2px solid #e6e6e6'">
+          <div v-if="isRealTime === 'false'" class="tw-mt-6 tw-pt-6" :style="store.state.theme === 'dark' ? 'border-top: 2px solid #343434' : 'border-top: 2px solid #e6e6e6'">
             <!-- Aggregation Toggle -->
-            <div class="flex justify-start items-center tw:font-semibold tw:mb-4">
+            <div class="flex justify-start items-center tw-font-semibold tw-mb-4">
               <div class="flex items-center" style="width: 190px; height: 36px">
                 {{ t("common.aggregation") }}
                 <q-icon
@@ -88,13 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Aggregation Fields Container with Border -->
-            <div v-if="localIsAggregationEnabled && inputData.aggregation" class="tw:p-4 tw:rounded" :style="store.state.theme === 'dark' ? 'border: 1px solid #343434' : 'border: 1px solid #e6e6e6'">
+            <div v-if="localIsAggregationEnabled && inputData.aggregation" class="tw-p-4 tw-rounded" :style="store.state.theme === 'dark' ? 'border: 1px solid #343434' : 'border: 1px solid #e6e6e6'">
               <!-- Group By Fields (shown when aggregation is enabled) -->
             <div
               v-if="localIsAggregationEnabled && inputData.aggregation"
-              class="flex items-start no-wrap q-mr-sm tw:mb-4"
+              class="flex items-start no-wrap q-mr-sm tw-mb-4"
             >
-              <div class="flex items-center tw:font-semibold" style="width: 190px; height: 36px">
+              <div class="flex items-center tw-font-semibold" style="width: 190px; height: 36px">
                 {{ t("alerts.groupBy") }}
                 <q-icon
                   name="info"
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Threshold with Aggregation -->
             <div v-if="localIsAggregationEnabled && inputData.aggregation" class="flex justify-start items-start q-mb-xs no-wrap">
-              <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+              <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
                 {{ t("alerts.aggregation_threshold") + " *" }}
                 <q-icon
                   name="info"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-icon>
               </div>
               <div style="width: calc(100% - 190px)">
-                <div class="flex items-center tw:gap-2 tw:flex-wrap">
+                <div class="flex items-center tw-gap-2 tw-flex-wrap">
                   <div style="flex: 0 0 auto; width: 110px">
                     <q-select
                       v-model="inputData.aggregation.function"
@@ -261,8 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Preview Boxes Container -->
           <div class="tw-flex tw-gap-4 tw-w-full">
             <!-- SQL/PromQL Preview Box (50% or 100% if no VRL) -->
-            <div ref="sqlPromqlPreviewRef" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
-              <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+            <div ref="sqlPromqlPreviewRef" class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
+              <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
                 <span class="preview-title">{{ localTab === 'sql' ? 'SQL' : 'PromQL' }} Preview</span>
               </div>
               <div class="preview-content tw-px-3 tw-py-2">
@@ -271,8 +271,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- VRL Preview Box (50%) - Only show if VRL function exists -->
-            <div v-if="vrlFunction" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
-              <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+            <div v-if="vrlFunction" class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
+              <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
                 <span class="preview-title">VRL Preview</span>
               </div>
               <div class="preview-content tw-px-3 tw-py-2">
@@ -282,8 +282,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- PromQL Trigger Condition (only for PromQL tab) - Below the preview -->
-          <div v-if="localTab === 'promql' && promqlCondition" class="flex justify-start items-start q-mb-xs tw:ml-2 no-wrap">
-            <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div v-if="localTab === 'promql' && promqlCondition" class="flex justify-start items-start q-mb-xs tw-ml-2 no-wrap">
+            <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
               Trigger if the value is *
               <q-icon
                 name="info"
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div style="width: calc(100% - 190px)">
               <div class="flex justify-start items-start">
-                <div class="tw:flex tw:flex-col">
+                <div class="tw-flex tw-flex-col">
                   <q-select
                     v-model="promqlCondition.operator"
                     :options="triggerOperators"
@@ -328,8 +328,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Field is required!
                   </div>
                 </div>
-                <div class="flex items-start tw:flex-col" style="border-left: none">
-                  <div class="tw:flex tw:items-center">
+                <div class="flex items-start tw-flex-col" style="border-left: none">
+                  <div class="tw-flex tw-items-center">
                     <div style="width: 179px; margin-left: 0 !important">
                       <q-input
                         v-model.number="promqlCondition.value"

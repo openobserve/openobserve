@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 right-column-container" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="tw-flex-[0_0_calc(32%-0.625rem)] tw-flex tw-flex-col tw-gap-2 right-column-container" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
       class="collapsible-section card-container preview-section"
@@ -26,12 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
         @click="togglePreview"
       >
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <span class="tw-text-sm tw-font-semibold">{{ t('alerts.preview') }}</span>
           <!-- Status Indicator -->
           <div
             v-if="evaluationStatus && !isRealTime"
-            class="alert-status-indicator tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded"
+            class="alert-status-indicator tw-flex tw-items-center tw-gap-1.5 tw-px-2 tw-py-1 tw-rounded"
             :class="{
               'status-would-trigger': evaluationStatus.wouldTrigger,
               'status-would-not-trigger': !evaluationStatus.wouldTrigger,
@@ -41,14 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-icon
               :name="evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
-              class="tw:text-xs tw:flex-shrink-0"
+              class="tw-text-xs tw-flex-shrink-0"
               :class="evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'"
             />
-            <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
+            <span class="tw-text-[0.625rem] tw-font-semibold tw-tracking-wide tw-uppercase tw-flex-shrink-0 tw-whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
             </span>
-            <span class="status-separator tw:text-xs tw:flex-shrink-0">•</span>
-            <span class="tw:text-xs">
+            <span class="status-separator tw-text-xs tw-flex-shrink-0">•</span>
+            <span class="tw-text-xs">
               {{ evaluationStatus.reason }}
             </span>
           </div>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
         @click="toggleSummary"
       >
-        <span class="tw-text-sm tw-font-semibold">Summary</span>
+        <span class="tw-text-sm tw-font-semibold">{{ t('alerts.summary.title') }}</span>
         <q-btn
           flat
           dense
@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, reactive, watch, onMounted, onUnmounted, type PropType } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 
@@ -171,6 +172,7 @@ export default defineComponent({
   },
   setup(props, { expose }) {
     const store = useStore();
+    const { t } = useI18n();
     const previewAlertRef = ref(null);
 
     // Reactive ref for evaluation status
@@ -308,6 +310,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       previewAlertRef,
       expandState,

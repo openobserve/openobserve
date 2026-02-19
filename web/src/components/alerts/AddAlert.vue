@@ -1,3 +1,4 @@
+
 <!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -33,19 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div class="text-h6 tw:flex tw:items-center" data-test="add-alert-title">
+        <div class="text-h6 tw-flex tw-items-center" data-test="add-alert-title">
           <template v-if="beingUpdated">
             {{ t("alerts.updateTitle") }}:
             <span
               :class="[
-                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
+                'tw-font-bold tw-px-2 tw-py-1 tw-rounded-md tw-max-w-xs tw-truncate tw-inline-block tw-ml-2',
                 store.state.theme === 'dark'
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50'
+                  ? 'tw-text-blue-400 tw-bg-blue-900/50'
+                  : 'tw-text-blue-600 tw-bg-blue-50'
               ]"
             >
               {{ formData.name }}
-              <q-tooltip v-if="formData?.name?.length > 25" class="tw:text-sm">
+              <q-tooltip v-if="formData?.name?.length > 25" class="tw-text-sm">
                 {{ formData.name }}
               </q-tooltip>
             </span>
@@ -80,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         scroll-behavior: smooth;
       "
     >
-      <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2" style="position: relative;">
+      <div class="card-container tw-px-2 tw-mx-[0.675rem] tw-py-2" style="position: relative;">
         <!-- Stepper Header (Full Width) -->
         <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
         <q-stepper
@@ -106,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 1: Alert Setup -->
         <q-step
           :name="1"
-          title="Alert Setup *"
+          :title="t('alerts.steps.alertSetup') + ' *'"
           caption=""
           icon="settings"
           :done="wizardStep > 1"
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 2: Query Configuration -->
         <q-step
           :name="2"
-          title="Conditions *"
+          :title="t('alerts.steps.conditions') + ' *'"
           caption=""
           icon="search"
           :done="wizardStep > 2"
@@ -196,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           v-if="formData.is_real_time === 'false'"
           :name="3"
-          title="Compare with Past"
+          :title="t('alerts.steps.compareWithPast')"
           caption=""
           icon="compare_arrows"
           :done="wizardStep > 3"
@@ -228,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 4: Alert Settings -->
         <q-step
           :name="4"
-          title="Alert Settings *"
+          :title="t('alerts.steps.alertSettings') + ' *'"
           caption=""
           icon="tune"
           :done="wizardStep > 4"
@@ -247,11 +248,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :isAggregationEnabled="isAggregationEnabled"
                   :destinations="formData.destinations"
                   :formattedDestinations="getFormattedDestinations"
+                  :template="formData.template"
+                  :templates="templates"
                   @update:trigger="(val) => formData.trigger_condition = val"
                   @update:aggregation="(val) => formData.query_condition.aggregation = val"
                   @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
+                  @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
                   @update:destinations="updateDestinations"
+                  @update:template="(val) => formData.template = val"
                   @refresh:destinations="refreshDestinations"
+                  @refresh:templates="refreshTemplates"
                 />
               </div>
             </div>
@@ -264,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           v-if="formData.is_real_time === 'false'"
           :name="5"
-          title="Deduplication"
+          :title="t('alerts.steps.deduplication')"
           caption=""
           icon="filter_list"
           :done="wizardStep > 5"
@@ -290,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 6: Advanced Settings -->
         <q-step
           :name="6"
-          title="Advanced"
+          :title="t('alerts.steps.advanced')"
           caption=""
           icon="settings_applications"
           :done="false"
@@ -354,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             flat
             :label="t('alerts.back')"
-            class="o2-secondary-button tw:h-[36px]"
+            class="o2-secondary-button tw-h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="wizardStep === 1"
             no-caps
@@ -363,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             flat
             :label="t('alerts.continue')"
-            class="o2-secondary-button tw:h-[36px]"
+            class="o2-secondary-button tw-h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="isLastStep"
             no-caps
@@ -540,6 +546,7 @@ const defaultValue: any = () => {
       timezone: "UTC",
     },
     destinations: [],
+    template: "",
     context_attributes: [],
     enabled: true,
     description: "",
@@ -569,8 +576,12 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
+    templates: {
+      type: Array,
+      default: () => [],
+    },
   },
-  emits: ["update:list", "cancel:hideform", "refresh:destinations"],
+  emits: ["update:list", "cancel:hideform", "refresh:destinations", "refresh:templates"],
   components: {
     JsonEditor,
     HorizontalStepper,
@@ -695,12 +706,12 @@ export default defineComponent({
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
       const captions: Record<number, string> = {
-        1: 'Set the stage for your alert',
-        2: 'What should trigger the alert',
-        3: 'Compare current results with data from another time period',
-        4: 'Set your alert rules and choose how you\'d like to be notified.',
-        5: 'Avoid sending the same alert multiple times by grouping similar alerts together.',
-        6: 'Context variables, description, and row template',
+        1: t('alerts.stepCaptions.alertSetup'),
+        2: t('alerts.stepCaptions.conditions'),
+        3: t('alerts.stepCaptions.compareWithPast'),
+        4: t('alerts.stepCaptions.alertSettings'),
+        5: t('alerts.stepCaptions.deduplication'),
+        6: t('alerts.stepCaptions.advanced'),
       };
       return captions[wizardStep.value] || '';
     });
@@ -1137,6 +1148,14 @@ export default defineComponent({
       } else if (newType === 'promql') {
         previewQuery.value = formData.value.query_condition?.promql ? formData.value.query_condition.promql.trim() : '';
         isUsingBackendSql.value = false;
+        // Initialize promql_condition if it doesn't exist
+        if (!formData.value.query_condition.promql_condition) {
+          formData.value.query_condition.promql_condition = {
+            column: 'value',
+            operator: '>=',
+            value: 1,
+          };
+        }
       } else if (newType === 'custom') {
         // Clear preview query to avoid triggering search stream with old query
         // The backend SQL generation will update it shortly
@@ -1555,6 +1574,9 @@ export default defineComponent({
     const refreshDestinations = () => {
       emit("refresh:destinations");
     }
+    const refreshTemplates = () => {
+      emit("refresh:templates");
+    }
     const updateDestinations = (destinations: any[]) => {
       formData.value.destinations = destinations;
     }
@@ -1659,7 +1681,41 @@ export default defineComponent({
           if (panelData.queries && panelData.queries.length > 0) {
             const query = panelData.queries[0];
 
-            formData.value.name = `Alert from ${panelData.panelTitle}`;
+            // Sanitize panel title for use in alert name
+            // Remove invalid characters (: # ? & % ' " and whitespace)
+            // Collapse multiple underscores, trim leading/trailing underscores
+            // Limit length to 200 characters (reasonable limit for alert names)
+            const sanitizePanelTitle = (title: string | undefined): string => {
+              if (!title || title.trim() === '') {
+                return 'panel';
+              }
+
+              // Replace invalid characters with underscores
+              let sanitized = title.replace(/[:#?&%'"\s]+/g, '_');
+
+              // Collapse multiple consecutive underscores into single underscore
+              sanitized = sanitized.replace(/_+/g, '_');
+
+              // Remove leading/trailing underscores
+              sanitized = sanitized.replace(/^_+|_+$/g, '');
+
+              // If empty after sanitization, use default
+              if (sanitized === '') {
+                return 'panel';
+              }
+
+              // Truncate to reasonable length (leaving room for "Alert_from_" prefix)
+              const maxLength = 200;
+              if (sanitized.length > maxLength) {
+                sanitized = sanitized.substring(0, maxLength);
+                // Remove trailing underscore if truncation created one
+                sanitized = sanitized.replace(/_+$/, '');
+              }
+
+              return sanitized;
+            };
+
+            formData.value.name = `Alert_from_${sanitizePanelTitle(panelData.panelTitle)}`;
 
             // Show notification that query was imported
             q.notify({
@@ -1818,6 +1874,7 @@ export default defineComponent({
                 // For PromQL: Set up promql_condition with the threshold
                 if (!formData.value.query_condition.promql_condition) {
                   formData.value.query_condition.promql_condition = {
+                    column: 'value',
                     operator: '>=',
                     value: 1,
                   };
@@ -2152,6 +2209,7 @@ export default defineComponent({
       updateExpandState,
       updateSilence,
       refreshDestinations,
+      refreshTemplates,
       updateDestinations,
       updateTab,
       updateGroup,
@@ -2236,6 +2294,23 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+
+      // Defensive initialization for legacy or malformed promql_condition
+      // Ensures all required fields are present (column, operator, value)
+      // this makes sure that we dont pass any null values while creating or updating an existing alert
+      if (this.formData.query_condition.promql_condition) {
+        if (!this.formData.query_condition.promql_condition.column) {
+          this.formData.query_condition.promql_condition.column = 'value';
+        }
+        if (!this.formData.query_condition.promql_condition.operator) {
+          this.formData.query_condition.promql_condition.operator = '>=';
+        }
+        if (this.formData.query_condition.promql_condition.value === undefined ||
+            this.formData.query_condition.promql_condition.value === null) {
+          this.formData.query_condition.promql_condition.value = 1;
+        }
+      }
+
       // Enable all steps when editing an existing alert
       this.lastValidStep = 6;
 

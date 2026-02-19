@@ -182,10 +182,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div style="width: calc(100% - 190px)">
-            <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:w-full">
+            <div ref="thresholdFieldRef" class="flex tw-flex-col justify-start items-start tw-w-full">
                 <!-- Main threshold input row -->
-                <div class="flex items-start tw:w-full">
-                  <div class="tw:flex tw:flex-col">
+                <div class="flex items-start tw-w-full">
+                  <div class="tw-flex tw-flex-col">
                     <q-select
                       v-model="formData.trigger_condition.operator"
                       :options="triggerOperators"
@@ -212,8 +212,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Field is required!
                     </div>
                   </div>
-                  <div class="flex items-start tw:flex-col" style="border-left: none">
-                    <div class="tw:flex tw:items-center">
+                  <div class="flex items-start tw-flex-col" style="border-left: none">
+                    <div class="tw-flex tw-items-center">
                       <div style="width: 89px; margin-left: 0 !important">
                         <q-input
                           v-model.number="formData.trigger_condition.threshold"
@@ -226,8 +226,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="emitTriggerUpdate"
                         />
                       </div>
-                      <div class="tw:ml-2 tw:flex tw:items-center" style="height: 36px; font-weight: normal">
-                        <span class="tw:text-sm">{{ thresholdMetricType }}</span>
+                      <div class="tw-ml-2 tw-flex tw-items-center" style="height: 36px; font-weight: normal">
+                        <span class="tw-text-sm">{{ thresholdMetricType }}</span>
                       </div>
                     </div>
                     <div
@@ -241,25 +241,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Context lines (GROUP BY and HAVING) -->
-                <div v-if="showGroupByContext || showHavingContext" class="tw:mt-3 tw:ml-0 tw:text-sm tw:space-y-2" style="line-height: 1.6">
-                  <div v-if="showGroupByContext" class="tw:flex tw:flex-row tw:items-center tw:gap-2">
-                    <span class="tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
+                <div v-if="showGroupByContext || showHavingContext" class="tw-mt-3 tw-ml-0 tw-text-sm tw-space-y-2" style="line-height: 1.6">
+                  <div v-if="showGroupByContext" class="tw-flex tw-flex-row tw-items-center tw-gap-2">
+                    <span class="tw-font-semibold tw-whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'">
                       {{ t('alerts.thresholdDynamic.contextLabels.groupedBy') }}
                     </span>
                     <span
-                      class="tw:px-2 tw:py-1 tw:rounded tw:font-mono tw:text-xs"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-800'"
+                      class="tw-px-2 tw-py-1 tw-rounded tw-font-mono tw-text-xs"
+                      :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-800'"
                     >
                       {{ groupByFieldsText }}
                     </span>
                   </div>
-                  <div v-if="showHavingContext" class="tw:flex tw:flex-row tw:items-center tw:gap-2">
-                    <span class="tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
+                  <div v-if="showHavingContext" class="tw-flex tw-flex-row tw-items-center tw-gap-2">
+                    <span class="tw-font-semibold tw-whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'">
                       {{ t('alerts.thresholdDynamic.contextLabels.havingConditions') }}
                     </span>
                     <span
-                      class="tw:px-2 tw:py-1 tw:rounded tw:font-mono tw:text-xs"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-800'"
+                      class="tw-px-2 tw-py-1 tw-rounded tw-font-mono tw-text-xs"
+                      :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-800'"
                     >
                       {{ havingFieldsText }}
                     </span>
@@ -561,6 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="ellipsis"
                   >
                     {{ localDestinations.join(", ") }}
+                    <q-tooltip>{{ localDestinations.join(", ") }}</q-tooltip>
                   </div>
                 </template>
                 <template v-slot:option="option">
@@ -619,7 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Template Override -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.template") }}
             <q-icon
               name="info"
@@ -724,6 +725,14 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    template: {
+      type: String,
+      default: "",
+    },
+    templates: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: [
     "update:trigger",
@@ -748,6 +757,7 @@ export default defineComponent({
     const thresholdFieldRef = ref(null);
     const silenceFieldRef = ref(null);
     const destinationsFieldRef = ref(null);
+    const templateFieldRef = ref(null);
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
@@ -756,6 +766,7 @@ export default defineComponent({
       queryType.value === "custom" && props.isAggregationEnabled
     );
     const localDestinations = ref(props.destinations);
+    const localTemplate = ref(props.template);
 
     // Timezone management
     const browserTimezone = ref("");
@@ -1291,6 +1302,14 @@ export default defineComponent({
       emit("update:destinations", localDestinations.value);
     };
 
+    const emitTemplateUpdate = () => {
+      emit("update:template", localTemplate.value || "");
+    };
+
+    const emitPromqlConditionUpdate = () => {
+      emit("update:promqlCondition", props.formData.query_condition.promql_condition);
+    };
+
     const routeToCreateDestination = () => {
       const url = router.resolve({
         name: "alertDestinations",
@@ -1626,6 +1645,33 @@ export default defineComponent({
         flex: 0 0 20% !important;
         min-width: 0 !important;
         width: 20% !important;
+      }
+    }
+  }
+}
+
+// Fix for template select - keep selected value and input on same line
+.template-select-field {
+  :deep(.q-field__control) {
+    .q-field__native {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      flex-wrap: nowrap !important;
+      overflow: hidden !important;
+
+      > span {
+        flex: 0 0 70% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        min-width: 0 !important;
+      }
+
+      > input {
+        flex: 0 0 30% !important;
+        min-width: 0 !important;
+        width: 30% !important;
       }
     }
   }
