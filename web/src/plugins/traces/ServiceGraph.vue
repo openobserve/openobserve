@@ -239,7 +239,7 @@ import {
 import {
   formatNumber,
   formatLatency,
-  pointToBezierDistanceance,
+  pointToBezierDistance,
   generateNodeTooltipContent,
   generateEdgeTooltipContent,
   findIncomingEdgeForNode,
@@ -828,6 +828,31 @@ export default defineComponent({
         }, 300);
       },
       { flush: 'post' }
+    );
+
+    // Watch for data loading completion to set up tooltips on initial load
+    // This handles the case where chartKey changes before the chart is rendered
+    watch(
+      () => loading.value,
+      async (isLoading, wasLoading) => {
+        // Only trigger when loading changes from true to false (data just loaded)
+        if (wasLoading && !isLoading && visualizationType.value === 'tree') {
+          // Clean up previous handlers first
+          if (edgeTooltipCleanup) {
+            edgeTooltipCleanup();
+            edgeTooltipCleanup = null;
+          }
+
+          await nextTick();
+          // Longer delay to ensure chart is fully rendered with new data
+          setTimeout(() => {
+            const chart = chartRendererRef.value?.chart;
+            if (chart) {
+              edgeTooltipCleanup = setupTreeEdgeTooltips(chart);
+            }
+          }, 500);
+        }
+      }
     );
 
     onBeforeUnmount(() => {
