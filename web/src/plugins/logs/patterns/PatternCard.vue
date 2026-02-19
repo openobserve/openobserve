@@ -155,6 +155,15 @@ const { t } = useI18n();
   font-family: monospace;
   font-size: 12px;
 }
+
+// Add explicit hover styles
+.table-row-hover {
+  transition: background-color 0.15s ease-in-out;
+
+  &:hover {
+    background-color: var(--o2-hover-gray) !important;
+  }
+}
 </style>
 
 <style lang="scss">
