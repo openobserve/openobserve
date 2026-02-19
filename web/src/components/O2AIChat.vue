@@ -3,9 +3,9 @@
   >
     <div v-if="isOpen" class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
       <div class="chat-header" :style="{ height:  headerHeight ? headerHeight + 'px' : '' }">
-        <div class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full">
+        <div class="chat-title tw-flex tw-justify-between tw-items-center tw-w-full">
 
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw-flex tw-items-center tw-gap-2">
             <q-avatar size="24px">
               <img :src="o2AiTitleLogo" />
             </q-avatar>
@@ -17,8 +17,8 @@
               class="chat-title-dropdown"
               @click="loadHistory"
             >
-              <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
-                <span class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block">
+              <div class="tw-flex tw-items-center tw-gap-2 tw-max-w-[220px]">
+                <span class="chat-title-text tw-text-[14px] tw-font-medium tw-truncate tw-block">
                   {{ displayedTitle || 'New Chat' }}
                   <q-tooltip
                     v-if="displayedTitle && displayedTitle.length > 25"
@@ -30,7 +30,7 @@
                     {{ displayedTitle }}
                   </q-tooltip>
                 </span>
-                <q-icon name="arrow_drop_down" size="20px" class="tw:flex-shrink-0" />
+                <q-icon name="arrow_drop_down" size="20px" class="tw-flex-shrink-0" />
               </div>
               <q-menu>
                 <!-- History menu with search -->
@@ -41,7 +41,7 @@
                       placeholder="Search chat history"
                       dense
                       borderless
-                      class="tw:mt-1"
+                      class="tw-mt-1"
                     >
                       <template #prepend>
                         <q-icon name="search" />
@@ -61,10 +61,10 @@
                         class="history-item"
                       >
                         <q-item-section>
-                          <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-                            <div class="tw:flex-1 tw:overflow-hidden">
-                              <div class="tw:text-[13px] tw:truncate">{{ chat.title }}</div>
-                              <div class="tw:text-[11px] tw:text-gray-500">{{ formatTime(chat.timestamp) }}</div>
+                          <div class="tw-flex tw-items-center tw-justify-between tw-w-full">
+                            <div class="tw-flex-1 tw-overflow-hidden">
+                              <div class="tw-text-[13px] tw-truncate">{{ chat.title }}</div>
+                              <div class="tw-text-[11px] tw-text-gray-500">{{ formatTime(chat.timestamp) }}</div>
                             </div>
                             <q-btn
                               flat
@@ -123,7 +123,7 @@
           </div>
         </div>
       </div>
-      <q-separator class="tw:bg-[#DBDBDB]" />
+      <q-separator class="tw-bg-[#DBDBDB]" />
 
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
@@ -220,7 +220,7 @@
             <q-space />
             <q-btn icon="close" flat round dense v-close-popup />
           </q-card-section>
-          <q-card-section class="q-pa-md tw:flex tw:justify-center">
+          <q-card-section class="q-pa-md tw-flex tw-justify-center">
             <img
               v-if="previewImage"
               :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
@@ -293,7 +293,7 @@
             <q-space />
             <q-btn icon="close" flat round dense v-close-popup />
           </q-card-section>
-          <q-card-section class="q-pa-md tw:flex tw:justify-center">
+          <q-card-section class="q-pa-md tw-flex tw-justify-center">
             <img
               v-if="previewImage"
               :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
@@ -308,11 +308,11 @@
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
-            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
+            <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full ">
               <img :src="o2AiTitleLogo" />
-              <div class="tw:relative tw:inline-block">
-                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
-                <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+              <div class="tw-relative tw-inline-block">
+                <span class="tw-text-[14px] tw-font-[600] tw-ml-[30px] tw-text-center">O2 Assistant</span>
+                <span class="o2-ai-beta-text tw-ml-[8px]">BETA</span>
               </div>
             </div>
           </div>
@@ -636,16 +636,16 @@
                             color="primary"
                             @click="copyToClipboard(textBlock.content)"
                           >
-                            <div class="tw:flex tw:items-center">
+                            <div class="tw-flex tw-items-center">
                               <q-icon size="16px" name="content_copy" />
-                              <span class="tw:ml-1">Copy</span>
+                              <span class="tw-ml-1">Copy</span>
                             </div>
                           </q-btn>
                         </div>
                         <span class="generated-code-block">
                           <code :class="['hljs', textBlock.language]" v-html="textBlock.highlightedContent"></code>
                         </span>
-                        <div class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full">
+                        <div class="code-block-footer code-block-theme tw-flex tw-items-center tw-justify-between tw-w-full">
                           <q-btn
                             flat
                             dense
@@ -654,9 +654,9 @@
                             color="primary"
                             @click="retryGeneration(message)"
                           >
-                            <div class="tw:flex tw:items-center">
+                            <div class="tw-flex tw-items-center">
                               <q-icon size="16px" name="refresh" />
-                              <span class="tw:ml-1">Retry</span>
+                              <span class="tw-ml-1">Retry</span>
                             </div>
                           </q-btn>
                         </div>
@@ -668,7 +668,7 @@
                 <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
                 <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
                   <!-- Display images for user messages -->
-                  <div v-if="message.role === 'user' && message.images && message.images.length > 0" class="message-images tw:flex tw:flex-wrap tw:gap-2 tw:mb-2">
+                  <div v-if="message.role === 'user' && message.images && message.images.length > 0" class="message-images tw-flex tw-flex-wrap tw-gap-2 tw-mb-2">
                     <div
                       v-for="(img, imgIndex) in message.images"
                       :key="'img-' + imgIndex"
@@ -677,7 +677,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded tw:border tw:border-gray-300 tw:cursor-pointer"
+                        class="tw-max-w-[200px] tw-max-h-[150px] tw-object-contain tw-rounded tw-border tw-border-gray-300 tw-cursor-pointer"
                         @click="openImagePreview(img)"
                       />
                       <q-tooltip>{{ img.filename }}</q-tooltip>
@@ -697,9 +697,9 @@
                           color="primary"
                           @click="copyToClipboard(block.content)"
                         >
-                          <div class="tw:flex tw:items-center">
+                          <div class="tw-flex tw-items-center">
                             <q-icon size="16px" name="content_copy" />
-                            <span class="tw:ml-1">Copy</span>
+                            <span class="tw-ml-1">Copy</span>
                           </div>
                         </q-btn>
                       </div>
@@ -855,9 +855,9 @@
               <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
               <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
             </q-btn>
-            <div v-else class="tw:w-8"></div>
+            <div v-else class="tw-w-8"></div>
 
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="tw-flex tw-items-center tw-gap-2">
               <!-- Send button - shown when not loading -->
               <q-btn
                 v-if="!isLoading"
