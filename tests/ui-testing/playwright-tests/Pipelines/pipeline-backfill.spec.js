@@ -18,6 +18,7 @@ import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
 const testLogger = require('../utils/test-logger.js');
 const path = require('path');
+const crypto = require('crypto');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -30,8 +31,204 @@ test.use({
   }
 });
 
+// Helper: build Basic Auth headers for API calls (Node.js context, no page needed)
+function getApiHeaders() {
+  return {
+    'Authorization': 'Basic ' + Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString('base64'),
+    'Content-Type': 'application/json'
+  };
+}
+
 test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@backfill', '@pipelinesBackfill'] }, () => {
   let pageManager;
+
+  // Shared state: pipeline + backfill job created in beforeAll for data-dependent tests
+  let testPipelineId = null;
+  let testBackfillJobId = null;
+  let backfillDataAvailable = false;
+
+  test.beforeAll(async () => {
+    const orgId = process.env["ORGNAME"];
+    const headers = getApiHeaders();
+    const baseUrl = process.env.ZO_BASE_URL;
+
+    try {
+      // Step 1: Create a simple pipeline (source: e2e_automate → dest: e2e_backfill_dest)
+      const timestamp = Date.now();
+      const pipelineName = `e2e_backfill_test_${timestamp}`;
+      const inputNodeId = `input-${timestamp}`;
+      const outputNodeId = `output-${timestamp + 1}`;
+
+      const pipelinePayload = {
+        pipeline_id: "",
+        version: 0,
+        enabled: true,
+        org: orgId,
+        name: pipelineName,
+        description: "E2E test pipeline for backfill job testing",
+        source: {
+          source_type: "scheduled",
+          org_id: orgId,
+          stream_type: "logs",
+          query_condition: {
+            type: "sql",
+            sql: "SELECT * FROM e2e_automate",
+            conditions: null,
+            promql: null,
+            promql_condition: null,
+            aggregation: null,
+            vrl_function: null,
+            search_event_type: null,
+            multi_time_range: null
+          },
+          trigger_condition: {
+            period: 15,
+            operator: ">=",
+            threshold: 0,
+            frequency: 900,
+            cron: "",
+            frequency_type: "minutes",
+            silence: 0,
+            timezone: "UTC",
+            align_time: true
+          },
+          tz_offset: 0
+        },
+        nodes: [
+          {
+            id: inputNodeId,
+            position: { x: 100, y: 100 },
+            data: {
+              node_type: "query",
+              org_id: orgId,
+              stream_type: "logs",
+              query_condition: {
+                type: "sql",
+                sql: "SELECT * FROM e2e_automate",
+                conditions: null
+              },
+              trigger_condition: {
+                period: 15,
+                operator: ">=",
+                threshold: 0,
+                frequency: 900,
+                cron: "",
+                frequency_type: "minutes",
+                silence: 0,
+                timezone: "UTC",
+                align_time: true
+              },
+              tz_offset: 0
+            },
+            io_type: "input"
+          },
+          {
+            id: outputNodeId,
+            position: { x: 300, y: 100 },
+            data: { node_type: "stream", stream_type: "logs", stream_name: `e2e_backfill_dest_${timestamp}`, org_id: orgId },
+            io_type: "output"
+          }
+        ],
+        edges: [
+          {
+            id: `${inputNodeId}-${outputNodeId}`,
+            source: inputNodeId,
+            target: outputNodeId
+          }
+        ]
+      };
+
+      const createRes = await fetch(`${baseUrl}/api/${orgId}/pipelines`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(pipelinePayload)
+      });
+
+      if (!createRes.ok) {
+        const errBody = await createRes.text().catch(() => '');
+        testLogger.warn(`Pipeline creation failed: ${createRes.status} — ${errBody}`);
+        return;
+      }
+
+      const createData = await createRes.json();
+      testLogger.info(`Pipeline create response: ${JSON.stringify(createData)}`);
+
+      // API doesn't return the pipeline ID — list pipelines and find ours by name
+      const listRes = await fetch(`${baseUrl}/api/${orgId}/pipelines`, {
+        method: 'GET', headers
+      });
+
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const pipelines = listData.list || listData.pipelines || listData;
+        const ours = (Array.isArray(pipelines) ? pipelines : []).find(
+          p => p.name === pipelineName
+        );
+        testPipelineId = ours?.pipeline_id || ours?.id;
+      }
+
+      if (!testPipelineId) {
+        testLogger.warn(`Could not resolve pipeline ID for "${pipelineName}" — backfill seeding skipped`);
+        return;
+      }
+
+      testLogger.info(`Created test pipeline: ${testPipelineId} (name: ${pipelineName})`);
+
+      // Step 2: Create a backfill job (1 hour range, 10-min chunks)
+      const nowMicro = Date.now() * 1000;
+      const oneHourAgoMicro = nowMicro - (60 * 60 * 1000000);
+
+      const backfillRes = await fetch(`${baseUrl}/api/${orgId}/pipelines/${testPipelineId}/backfill`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          start_time: oneHourAgoMicro,
+          end_time: nowMicro,
+          chunk_period_minutes: 10,
+          delay_between_chunks_secs: 1,
+          delete_before_backfill: false
+        })
+      });
+
+      if (!backfillRes.ok) {
+        const errBody = await backfillRes.text().catch(() => '');
+        testLogger.warn(`Backfill job creation failed: ${backfillRes.status} (enterprise-only API) — ${errBody}`);
+        return;
+      }
+
+      const backfillData = await backfillRes.json();
+      testBackfillJobId = backfillData.job_id || backfillData.id;
+      backfillDataAvailable = true;
+      testLogger.info(`Created backfill job: ${testBackfillJobId} (response: ${JSON.stringify(backfillData)})`);
+    } catch (error) {
+      testLogger.warn(`Backfill data seeding failed: ${error.message}`);
+    }
+  });
+
+  test.afterAll(async () => {
+    const orgId = process.env["ORGNAME"];
+    const headers = getApiHeaders();
+    const baseUrl = process.env.ZO_BASE_URL;
+
+    try {
+      if (testBackfillJobId && testPipelineId) {
+        await fetch(`${baseUrl}/api/${orgId}/pipelines/${testPipelineId}/backfill/${testBackfillJobId}`, {
+          method: 'DELETE', headers
+        }).catch(() => {});
+        testLogger.info(`Deleted backfill job: ${testBackfillJobId}`);
+      }
+      if (testPipelineId) {
+        await fetch(`${baseUrl}/api/${orgId}/pipelines/${testPipelineId}`, {
+          method: 'DELETE', headers
+        }).catch(() => {});
+        testLogger.info(`Deleted test pipeline: ${testPipelineId}`);
+      }
+    } catch (error) {
+      testLogger.warn(`Backfill cleanup failed: ${error.message}`);
+    }
+  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -39,13 +236,14 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     // Auth is handled via storageState - no login needed
     pageManager = new PageManager(page);
 
-    // Ingest test data
-    const streamNames = ["e2e_automate"];
-    await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
-
+    // Navigate first so page is on the same origin (required for in-browser fetch)
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
+
+    // Ingest test data (uses page.evaluate with fetch — needs same-origin context)
+    const streamNames = ["e2e_automate"];
+    await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
 
     testLogger.info('Test setup completed');
   });
@@ -67,7 +265,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P1 - Smoke
    * Objective: Verify backfill jobs page is accessible
    */
-  test("should navigate to backfill jobs page @P1 @smoke", async ({ page }) => {
+  test("should navigate to backfill jobs page", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@smoke', '@P1', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing navigation to backfill jobs page');
 
     // Navigate to pipelines
@@ -94,7 +294,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P1 - Functional
    * Objective: Verify backfill page contains filters, table, and controls
    */
-  test("should display backfill page elements @P1 @functional", async ({ page }) => {
+  test("should display backfill page elements", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing backfill page elements');
 
     // Navigate to backfill page using POM
@@ -135,7 +337,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P1 - Functional
    * Objective: Verify back navigation works from backfill page
    */
-  test("should navigate back from backfill jobs page @P1 @functional", async ({ page }) => {
+  test("should navigate back from backfill jobs page", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing back navigation from backfill page');
 
     // Navigate to backfill page using POM
@@ -159,7 +363,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Functional
    * Objective: Verify jobs can be filtered by status
    */
-  test("should filter backfill jobs by status @P2 @filter @functional", async ({ page }) => {
+  test("should filter backfill jobs by status", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@filter', '@functional', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing backfill jobs status filter');
 
     // Navigate to backfill page using POM
@@ -186,7 +392,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Functional
    * Objective: Verify jobs can be filtered by pipeline name
    */
-  test("should filter backfill jobs by pipeline @P2 @filter @functional", async ({ page }) => {
+  test("should filter backfill jobs by pipeline", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@filter', '@functional', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing backfill jobs pipeline filter');
 
     // Navigate to backfill page using POM
@@ -209,7 +417,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Functional
    * Objective: Verify clear filters button resets all filters
    */
-  test("should clear all filters on backfill page @P2 @filter @functional", async ({ page }) => {
+  test("should clear all filters on backfill page", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@filter', '@functional', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing clear filters functionality');
 
     // Navigate to backfill page using POM
@@ -232,7 +442,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Functional
    * Objective: Verify refresh button reloads jobs data
    */
-  test("should refresh backfill jobs list @P2 @functional", async ({ page }) => {
+  test("should refresh backfill jobs list", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@functional', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing backfill jobs refresh');
 
     // Navigate to backfill page using POM
@@ -255,17 +467,29 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Regression
    * Objective: Verify running jobs show progress indicator
    */
-  test("should display progress bar for jobs @P2 @regression", async ({ page }) => {
+  test("should display progress bar for jobs", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@regression', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing progress bar display');
 
     // Navigate to backfill page using POM
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
-    // Check for progress bars using POM method
+    // Verify backfill page loaded
+    const isTableVisible = await pageManager.pipelinesPage.isBackfillJobsTableVisible();
+    const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
+    expect(isTableVisible || isAnyTableVisible).toBe(true);
+
+    if (backfillDataAvailable) {
+      // We seeded a backfill job — table must have at least 1 row
+      const rowCount = await pageManager.pipelinesPage.getHistoryRowCount();
+      expect(rowCount).toBeGreaterThan(0);
+      testLogger.info(`Backfill data seeded — ${rowCount} job rows visible`);
+    }
+
+    // Check for progress bars (present only on running/waiting jobs)
     const progressBarCount = await pageManager.pipelinesPage.getProgressBarCount();
-    // Progress bars should be present if there are running jobs, or zero if no jobs
-    expect(progressBarCount).toBeGreaterThanOrEqual(0);
     testLogger.info(`Found ${progressBarCount} progress elements`);
 
     testLogger.info('Test completed: Progress bar check');
@@ -276,23 +500,34 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Regression
    * Objective: Verify pause, resume, edit, delete, view buttons exist
    */
-  test("should display job action buttons @P2 @regression", async ({ page }) => {
+  test("should display job action buttons", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@regression', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing job action buttons presence');
 
     // Navigate to backfill page using POM
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
+    // Verify backfill page loaded
+    const isTableVisible = await pageManager.pipelinesPage.isBackfillJobsTableVisible();
+    const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
+    expect(isTableVisible || isAnyTableVisible).toBe(true);
+
     // Get job action button counts using POM method
     const actionCounts = await pageManager.pipelinesPage.getJobActionButtonCounts();
     testLogger.info(`Pause: ${actionCounts.pause}, Resume: ${actionCounts.resume}, Cancel: ${actionCounts.cancel}`);
 
-    // Also check for total table buttons using POM method
     const totalButtonCount = await pageManager.pipelinesPage.getTableButtonCount();
-    testLogger.info(`Total table buttons: ${totalButtonCount}`);
+    const totalActions = actionCounts.pause + actionCounts.resume + actionCounts.cancel + totalButtonCount;
 
-    // If there are jobs, there should be action buttons; if no jobs, totals are zero
-    expect(actionCounts.pause + actionCounts.resume + actionCounts.cancel + totalButtonCount).toBeGreaterThanOrEqual(0);
+    if (backfillDataAvailable) {
+      // We seeded a job — should have at least some action buttons or table buttons
+      expect(totalActions).toBeGreaterThan(0);
+      testLogger.info(`Backfill data seeded — ${totalActions} action buttons found`);
+    } else {
+      testLogger.info(`No seeded data — found ${totalActions} action buttons`);
+    }
 
     testLogger.info('Test completed: Job action buttons check');
   });
@@ -302,7 +537,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Regression
    * Objective: Verify job status values are displayed
    */
-  test("should display job statuses correctly @P2 @regression", async ({ page }) => {
+  test("should display job statuses correctly", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@regression', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing job status display');
 
     // Navigate to backfill page using POM
@@ -311,6 +548,11 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Expected statuses based on feature doc
     const expectedStatuses = ['running', 'waiting', 'paused', 'completed', 'failed', 'canceled'];
+
+    // Verify backfill page loaded
+    const isTableVisible = await pageManager.pipelinesPage.isBackfillJobsTableVisible();
+    const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
+    expect(isTableVisible || isAnyTableVisible).toBe(true);
 
     // Check for status elements using POM method
     let totalStatusElements = 0;
@@ -322,18 +564,26 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
       }
     }
 
-    // Total status elements should be countable (zero if no jobs, positive if jobs exist)
-    expect(totalStatusElements).toBeGreaterThanOrEqual(0);
+    if (backfillDataAvailable) {
+      // We seeded a job — table must have rows with data
+      const rowCount = await pageManager.pipelinesPage.getHistoryRowCount();
+      expect(rowCount).toBeGreaterThan(0);
+      testLogger.info(`Backfill data seeded — ${rowCount} rows, ${totalStatusElements} status elements`);
+    } else {
+      testLogger.info(`No seeded data — found ${totalStatusElements} status elements`);
+    }
 
     testLogger.info('Test completed: Job status display');
   });
 
   /**
-   * Test: Empty backfill jobs state
+   * Test: Backfill jobs table state validation
    * Priority: P2 - Edge Case
-   * Objective: Verify appropriate message when no jobs exist
+   * Objective: Verify table renders jobs when present, or shows empty message when none exist
    */
-  test("should show appropriate message when no backfill jobs exist @P2 @edge-case", async ({ page }) => {
+  test("should validate backfill jobs table state correctly", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@edge', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing empty backfill jobs state');
 
     // Navigate to backfill page using POM
@@ -342,18 +592,25 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Get row count using POM
     const rowCount = await pageManager.pipelinesPage.getHistoryRowCount();
-    expect(rowCount).toBeGreaterThanOrEqual(0);
 
-    if (rowCount === 0) {
-      // Check for empty state message using POM
+    if (backfillDataAvailable) {
+      // We seeded a backfill job — table must NOT be empty
+      expect(rowCount).toBeGreaterThan(0);
+      testLogger.info(`Backfill data seeded — ${rowCount} rows visible (not empty)`);
+    } else if (rowCount === 0) {
+      // No seeded data and no jobs — verify empty state message
       const isEmptyStateVisible = await pageManager.pipelinesPage.isEmptyBackfillMessageVisible();
       expect(isEmptyStateVisible).toBe(true);
-      testLogger.info('Empty state message displayed');
+      testLogger.info('Empty state message displayed correctly');
     } else {
-      testLogger.info(`Backfill jobs contains ${rowCount} records`);
+      // Pre-existing jobs from other sources
+      const isTableVisible = await pageManager.pipelinesPage.isBackfillJobsTableVisible();
+      const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
+      expect(isTableVisible || isAnyTableVisible).toBe(true);
+      testLogger.info(`Pre-existing backfill jobs: ${rowCount} records`);
     }
 
-    testLogger.info('Test completed: Empty backfill jobs state check');
+    testLogger.info('Test completed: Backfill jobs state check');
   });
 
   /**
@@ -361,16 +618,28 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
    * Priority: P2 - Regression
    * Objective: Verify error indicator shows error details
    */
-  test("should show error details when clicking error indicator @P2 @regression", async ({ page }) => {
+  test("should show error details when clicking error indicator", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@regression', '@P2', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing error indicator functionality');
 
     // Navigate to backfill page using POM
     const orgName = process.env["ORGNAME"];
     await pageManager.pipelinesPage.navigateToBackfillPage(orgName);
 
-    // Check for error indicator buttons using POM
+    // Verify backfill page loaded and has data when seeded
+    const isTableVisible = await pageManager.pipelinesPage.isBackfillJobsTableVisible();
+    const isAnyTableVisible = await pageManager.pipelinesPage.isGenericTableVisible();
+    expect(isTableVisible || isAnyTableVisible).toBe(true);
+
+    if (backfillDataAvailable) {
+      const rowCount = await pageManager.pipelinesPage.getHistoryRowCount();
+      expect(rowCount).toBeGreaterThan(0);
+      testLogger.info(`Backfill data seeded — ${rowCount} job rows visible`);
+    }
+
+    // Check for error indicator buttons using POM (only present on failed jobs)
     const errorCount = await pageManager.pipelinesPage.getErrorIndicatorCount();
-    expect(errorCount).toBeGreaterThanOrEqual(0);
 
     if (errorCount > 0) {
       testLogger.info(`Found ${errorCount} error indicators`);
@@ -386,7 +655,7 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
       // Close dialog using POM method
       await pageManager.pipelinesPage.closeErrorDialog();
     } else {
-      testLogger.info('No error indicators found - no failed jobs present');
+      testLogger.info('No error indicators found — no failed jobs in current state');
     }
 
     testLogger.info('Test completed: Error indicator check');
