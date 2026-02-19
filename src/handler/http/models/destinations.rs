@@ -71,15 +71,6 @@ impl From<meta_dest::Destination> for Destination {
                     destination_type: DestinationType::Sns,
                     ..Default::default()
                 },
-                meta_dest::DestinationType::LlmEvaluation(_) => {
-                    // LLM Evaluation is only for pipelines, not alerts
-                    // This shouldn't happen as validation should prevent it
-                    Self {
-                        name: value.name,
-                        destination_type: DestinationType::Http,
-                        ..Default::default()
-                    }
-                }
             },
             meta_dest::Module::Pipeline { endpoint } => Self {
                 name: value.name,

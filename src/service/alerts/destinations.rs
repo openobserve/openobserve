@@ -167,9 +167,6 @@ pub async fn save(
                     return Err(DestinationError::InvalidSns);
                 }
             }
-            DestinationType::LlmEvaluation(_) => {
-                return Err(DestinationError::NotSupportedAlertDestinationType);
-            }
         },
         Module::Pipeline { endpoint, .. } => {
             if endpoint.url.is_empty() {
@@ -225,7 +222,6 @@ pub async fn save(
                 }
             }
             DestinationType::Sns(_) => None, // SNS doesn't have prebuilt templates yet
-            DestinationType::LlmEvaluation(_) => None, // LLM Evaluation is for pipelines only
         };
 
         // If it's a prebuilt type and doesn't have a custom template, ensure prebuilt template
