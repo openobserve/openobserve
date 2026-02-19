@@ -72,9 +72,8 @@ export async function startPanelCreation(page, pm, config) {
  * @param {Object} config - Configuration object
  * @param {string} config.dashboardName - Dashboard name
  * @param {string} config.panelName - Panel name (optional, default: "Test Panel")
- * @param {boolean} config.panelTimeEnabled - Enable panel time (optional, default: true)
- * @param {string} config.panelTimeMode - "global" or "individual" (optional, default: "individual")
- * @param {string} config.panelTimeRange - Time range for individual mode (optional, default: "1-h")
+ * @param {boolean} config.panelTimeEnabled - Enable panel time toggle (optional, default: true)
+ * @param {string} config.panelTimeRange - Time range for panel config (optional, default: "1-h"). Pass null to enable toggle without setting time.
  * @param {string} config.stream - Stream name (optional, default: "e2e_automate")
  * @param {string} config.streamType - Stream type (optional, default: "logs")
  * @returns {Promise<Object>} - {dashboardName, panelId}
@@ -84,7 +83,6 @@ export async function createDashboardWithPanelTime(page, pm, config) {
     dashboardName,
     panelName = 'Test Panel',
     panelTimeEnabled = true,
-    panelTimeMode = 'individual',
     panelTimeRange = '1-h',
     stream = 'e2e_automate',
     streamType = 'logs'
@@ -94,7 +92,6 @@ export async function createDashboardWithPanelTime(page, pm, config) {
     dashboardName,
     panelName,
     panelTimeEnabled,
-    panelTimeMode,
     panelTimeRange
   });
 
@@ -114,7 +111,6 @@ export async function createDashboardWithPanelTime(page, pm, config) {
   const panelId = await addPanelWithPanelTime(page, pm, {
     panelName,
     panelTimeEnabled,
-    panelTimeMode,
     panelTimeRange,
     stream,
     streamType
@@ -130,19 +126,23 @@ export async function createDashboardWithPanelTime(page, pm, config) {
  * @param {Object} page - Playwright page object
  * @param {Object} pm - PageManager instance
  * @param {Object} config - Panel configuration
+ * @param {string} config.panelName - Panel name (optional, default: "Test Panel")
+ * @param {boolean} config.panelTimeEnabled - Enable panel time toggle (optional, default: true)
+ * @param {string} config.panelTimeRange - Time range for panel config (optional, default: "1-h"). Pass null to enable toggle without setting time.
+ * @param {string} config.stream - Stream name (optional, default: "e2e_automate")
+ * @param {string} config.streamType - Stream type (optional, default: "logs")
  * @returns {Promise<string>} - Panel ID
  */
 export async function addPanelWithPanelTime(page, pm, config) {
   const {
     panelName = 'Test Panel',
     panelTimeEnabled = true,
-    panelTimeMode = 'individual',
     panelTimeRange = '1-h',
     stream = 'e2e_automate',
     streamType = 'logs'
   } = config;
 
-  testLogger.info('Adding panel with panel time', { panelName, panelTimeEnabled, panelTimeMode });
+  testLogger.info('Adding panel with panel time', { panelName, panelTimeEnabled, panelTimeRange });
 
   // Click add panel button - handle both cases (no panels vs existing panels)
   const noPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
@@ -176,19 +176,29 @@ export async function addPanelWithPanelTime(page, pm, config) {
   await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 
-  // Configure panel time if enabled
+  // Configure panel time if enabled (v4.0: useDefaultTime toggle + optional "+Set" button)
   if (panelTimeEnabled) {
     // Open config panel sidebar
     await pm.dashboardPanelConfigs.openConfigPanel();
 
+    // Enable "Use Default Time" toggle
     await pm.dashboardPanelTime.enablePanelTime();
 
-    if (panelTimeMode === 'individual') {
-      await pm.dashboardPanelTime.selectIndividualTimeMode();
+    // If panelTimeRange is provided, click "+Set" button and configure time
+    if (panelTimeRange) {
+      // Click "+Set" button to open date time picker
+      const setButton = page.locator('[data-test="dashboard-config-set-panel-time"]');
+      await setButton.waitFor({ state: "visible", timeout: 5000 });
+      await setButton.click();
+
+      // Select time in the config picker
       await pm.dashboardPanelTime.setPanelTimeRelative(panelTimeRange);
-    } else {
-      await pm.dashboardPanelTime.selectGlobalTimeMode();
+
+      // Click the global Apply button (required for config time changes in v4.0)
+      await page.locator('[data-test="dashboard-apply"]').click();
+      await page.waitForTimeout(500); // Wait for Apply to process
     }
+    // If panelTimeRange is null: toggle is ON but no time set, follows global time
   }
 
   // Save panel and get panel ID using common function
@@ -511,17 +521,16 @@ export async function cleanupDashboard(page, pm, dashboardName) {
 }
 
 /**
- * Verify panel time configuration in panel config
+ * Verify panel time configuration in panel config (v4.0)
  * @param {Object} page - Playwright page object
  * @param {Object} expectedConfig - Expected configuration
- * @param {boolean} expectedConfig.panelTimeEnabled - Should panel time be enabled
- * @param {string} expectedConfig.panelTimeMode - Expected mode ("global" or "individual")
- * @param {string} expectedConfig.panelTimeRange - Expected time range (for individual mode)
+ * @param {boolean} expectedConfig.panelTimeEnabled - Should panel time toggle be enabled
+ * @param {string} expectedConfig.panelTimeRange - Expected time range displayed in picker (optional)
  */
 export async function verifyPanelTimeConfig(page, expectedConfig) {
-  const { panelTimeEnabled, panelTimeMode, panelTimeRange } = expectedConfig;
+  const { panelTimeEnabled, panelTimeRange } = expectedConfig;
 
-  testLogger.info('Verifying panel time config', expectedConfig);
+  testLogger.info('Verifying panel time config (v4.0)', expectedConfig);
 
   // Check if toggle is in correct state
   const toggleLocator = page.locator('[data-test="dashboard-config-allow-panel-time"]');
@@ -530,29 +539,23 @@ export async function verifyPanelTimeConfig(page, expectedConfig) {
   if (panelTimeEnabled) {
     expect(isChecked).toBe('true');
 
-    // Verify mode
-    if (panelTimeMode === 'global') {
-      const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode-global"]');
-      const globalChecked = await globalRadio.getAttribute('aria-checked');
-      expect(globalChecked).toBe('true');
+    // Verify time range is displayed in picker if provided
+    if (panelTimeRange) {
+      const pickerBtn = page.locator('[data-test="dashboard-config-panel-time-picker"]');
+      const pickerText = await pickerBtn.textContent();
+      testLogger.debug('Panel time picker shows', { pickerText });
+      // Note: Exact text verification depends on how the time is displayed
+      // The picker should show the configured time range
     } else {
-      const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode-individual"]');
-      const individualChecked = await individualRadio.getAttribute('aria-checked');
-      expect(individualChecked).toBe('true');
-
-      // Verify time range is displayed in picker
-      if (panelTimeRange) {
-        const pickerBtn = page.locator('[data-test="addpanel-date-time-picker"]');
-        const pickerText = await pickerBtn.textContent();
-        testLogger.debug('Panel time picker shows', { pickerText });
-        // Note: Exact text verification depends on how the time is displayed
-      }
+      // If panelTimeRange is null, verify "+Set" button is visible
+      const setButton = page.locator('[data-test="dashboard-config-set-panel-time"]');
+      await expect(setButton).toBeVisible();
     }
   } else {
     expect(isChecked).toBe('false');
   }
 
-  testLogger.info('Panel time config verified successfully');
+  testLogger.info('Panel time config verified successfully (v4.0)');
 }
 
 export default {

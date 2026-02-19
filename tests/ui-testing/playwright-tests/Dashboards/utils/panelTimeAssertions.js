@@ -208,27 +208,6 @@ export async function assertPanelTimeToggleState(page, expectedEnabled) {
 }
 
 /**
- * Assert panel time mode in config
- * @param {Object} page - Playwright page object
- * @param {string} expectedMode - Expected mode ("global" or "individual")
- */
-export async function assertPanelTimeMode(page, expectedMode) {
-  testLogger.info('Asserting panel time mode', { expectedMode });
-
-  if (expectedMode === 'global') {
-    const globalRadio = page.locator('[data-test="dashboard-config-panel-time-mode-global"]');
-    const isChecked = await globalRadio.getAttribute('aria-checked');
-    expect(isChecked).toBe('true');
-  } else {
-    const individualRadio = page.locator('[data-test="dashboard-config-panel-time-mode-individual"]');
-    const isChecked = await individualRadio.getAttribute('aria-checked');
-    expect(isChecked).toBe('true');
-  }
-
-  testLogger.info('Panel time mode verified', { expectedMode });
-}
-
-/**
  * Assert date time picker label in AddPanel config
  * @param {Object} page - Playwright page object
  * @param {string} expectedLabel - Expected label text
@@ -407,34 +386,38 @@ export async function assertPanelVariableUsesPanelTime(page, panelId, expectedTi
 }
 
 /**
- * Assert dashboard export contains panel time configs
+ * Assert dashboard export contains panel time configs (v4.0)
  * @param {Object} exportedData - Exported dashboard JSON
  * @param {Array} expectedPanelTimeConfigs - Array of expected panel time configs
+ * @param {string} expectedPanelTimeConfigs[].panelId - Panel ID
+ * @param {boolean} expectedPanelTimeConfigs[].panelTimeEnabled - Should useDefaultTime be true
+ * @param {string} expectedPanelTimeConfigs[].panelTimeRange - Expected panel_time_range value (optional)
  */
 export function assertExportedDashboardContainsPanelTime(exportedData, expectedPanelTimeConfigs) {
-  testLogger.info('Asserting exported dashboard contains panel time configs');
+  testLogger.info('Asserting exported dashboard contains panel time configs (v4.0)');
 
   expect(exportedData).toBeDefined();
   expect(exportedData.panels).toBeDefined();
 
   for (const expectedConfig of expectedPanelTimeConfigs) {
-    const { panelId, panelTimeEnabled, panelTimeMode, panelTimeRange } = expectedConfig;
+    const { panelId, panelTimeEnabled, panelTimeRange } = expectedConfig;
 
     const panel = exportedData.panels.find(p => p.id === panelId);
     expect(panel).toBeDefined();
 
     if (panelTimeEnabled) {
-      expect(panel.config.panel_time_enabled).toBe(true);
-      expect(panel.config.panel_time_mode).toBe(panelTimeMode);
+      // v4.0: Check useDefaultTime field instead of panel_time_enabled
+      expect(panel.config.useDefaultTime).toBe(true);
 
-      if (panelTimeMode === 'individual') {
+      // If panelTimeRange is provided, verify it exists in config
+      if (panelTimeRange) {
         expect(panel.config.panel_time_range).toBeDefined();
         expect(panel.config.panel_time_range.relativeTimePeriod).toBe(panelTimeRange);
       }
     }
   }
 
-  testLogger.info('Exported dashboard panel time configs verified');
+  testLogger.info('Exported dashboard panel time configs verified (v4.0)');
 }
 
 export default {
@@ -449,7 +432,6 @@ export default {
   assertPanelLoading,
   assertPanelLoadComplete,
   assertPanelTimeToggleState,
-  assertPanelTimeMode,
   assertDateTimePickerLabel,
   assertGlobalTimeDisplay,
   assertURLParam,

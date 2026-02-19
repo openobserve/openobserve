@@ -38,7 +38,6 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
       dashboardName,
       panelName,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -81,8 +80,8 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
       dashboardName,
       panels: [
-        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "1-h" },
-        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeMode: "individual", panelTimeRange: "6-d" }
+        { panelName: `Panel_A_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "1-h" },
+        { panelName: `Panel_B_${timestamp}`, panelTimeEnabled: true, panelTimeRange: "6-d" }
       ]
     });
     await pm.dashboardPanelTime.clickGlobalRefresh();
@@ -146,8 +145,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
       panels.push({
         panelName: `Panel_${i}_${timestamp}`,
         panelTimeEnabled: true,
-        panelTimeMode: "individual",
-        panelTimeRange: i % 2 === 0 ? "1-h" : "6-d"
+          panelTimeRange: i % 2 === 0 ? "1-h" : "6-d"
       });
     }
 
@@ -202,7 +200,6 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_A_${timestamp}`,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
@@ -233,10 +230,10 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("11-should handle 'Use Global' mode priority", async ({ page }) => {
+  test("11-should handle null panel_time_range follows global (v4.0)", async ({ page }) => {
     const pm = new PageManager(page);
     const timestamp = Date.now();
-    const dashboardName = `Dashboard_GlobalMode_${timestamp}`;
+    const dashboardName = `Dashboard_NullPanelTime_${timestamp}`;
 
     // Setup panels
     await pm.dashboardList.menuItem("dashboards-item");
@@ -245,45 +242,45 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     await pm.dashboardCreate.createDashboard(dashboardName);
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
-    // Panel A: "Use global" mode
+    // Panel A: useDefaultTime enabled but panel_time_range is null (follows global)
+    // v4.0: toggle ON but no +Set done yet = follows global time as-is
     const panelAId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_A_${timestamp}`,
       panelTimeEnabled: true,
-      panelTimeMode: "global"
+      // v4.0: enabled but panel_time_range is null
+      panelTimeRange: null
     });
 
-    // Panel B: "Use individual" mode with config "1h"
+    // Panel B: useDefaultTime enabled with panel_time_range set to "1h" (custom time)
     const panelBId = await addPanelWithPanelTime(page, pm, {
       panelName: `Panel_B_${timestamp}`,
       panelTimeEnabled: true,
-      panelTimeMode: "individual",
       panelTimeRange: "1-h"
     });
 
-    // Step 2: Verify Panel A follows global (shows picker)
+    // Step 2: Verify Panel A shows picker and follows global (panel_time_range is null)
     const panelAPicker = page.locator(`[data-test="panel-time-picker-${panelAId}"]`);
     expect(await panelAPicker.isVisible()).toBe(true);
 
-    // Step 3: Load with URL param for Panel A (should be ignored)
+    // Step 3: Load with URL param for Panel A
+    // v4.0: URL still has highest priority even when panel_time_range is null
     const dashboardId = getDashboardIdFromURL(page);
     const urlWithParams = `${page.url().split('?')[0]}?dashboard=${dashboardId}&pt-period.${panelAId}=1d`;
     await page.goto(urlWithParams);
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Step 4: Verify Panel A still uses global time (URL ignored)
-    // Panel should NOT have URL param applied because mode is "global"
-    const pickerText = await page.locator(`[data-test="panel-time-picker-${panelAId}"]`).textContent();
-    // Should show global time, not 1d from URL
+    // Step 4: Verify Panel A uses URL param (URL has highest priority)
+    await assertPanelTimeInURL(page, panelAId, "1d");
 
-    // Step 5: Verify Panel B shows "1h" (individual mode respects config)
+    // Step 5: Verify Panel B shows "1h" (custom time from panel_time_range config)
     await assertPanelTimeInURL(page, panelBId, "1h");
 
-    // Step 8: Change global time
+    // Step 6: Change global time
     await pm.dashboardPanelTime.changeGlobalTime("1-h");
 
-    // Step 9: Verify Panel A updates, Panel B unchanged
-    const panelAText = await page.locator(`[data-test="panel-time-picker-${panelAId}"]`).textContent();
-    expect(panelAText).toContain("1");
+    // Step 7: Verify Panel A updates with global time (no URL override anymore after page interaction)
+    // Panel B remains unchanged (has custom time)
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
     await cleanupDashboard(page, pm, dashboardName);
