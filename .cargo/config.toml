@@ -1,6 +1,3 @@
-[build]
-jobs = 14
-
 [target.x86_64-unknown-linux-gnu]
 rustflags = [
     "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2",
@@ -9,6 +6,7 @@ rustflags = [
 ]
 
 [target.x86_64-unknown-linux-musl]
+linker = "clang"
 rustflags = [
     "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2",
     "-C", "link-arg=-fuse-ld=lld",
