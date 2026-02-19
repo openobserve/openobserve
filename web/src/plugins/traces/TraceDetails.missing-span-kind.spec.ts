@@ -433,7 +433,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     it("should render span count correctly", () => {
       const spanCount = wrapper.find('[data-test="trace-details-spans-count"]');
       if (spanCount.exists()) {
-        expect(spanCount.text()).toContain("Spans:");
+        expect(spanCount.text()).toContain("spans");
       }
     });
 
