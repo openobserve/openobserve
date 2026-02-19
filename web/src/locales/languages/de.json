@@ -2450,7 +2450,13 @@
     "llmSpanIdentifierLabel": "Feld zur Identifizierung von LLM-Spans",
     "llmSpanIdentifierHelp": "Wählen Sie das Feld aus dem Quellstream aus, das LLM-Bereiche identifiziert. Es werden nur Bereiche ausgewertet, in denen dieses Feld vorhanden und nicht leer ist.",
     "noFieldsFound": "Keine Felder gefunden",
-    "save": "Speichern"
+    "save": "Speichern",
+    "llmEvaluationNodeTitle": "LLM-Evaluierungsknoten",
+    "samplingLabel": "Probenentnahme",
+    "samplingAllTraces": "Alle Spuren (100%)",
+    "samplingOfTraces": "von Spuren",
+    "nameLabel": "Name",
+    "llmEvaluationDescription": "Wertet Traces aus und schreibt Ergebnisse in einen separaten Log-Stream"
   },
   "reports": {
     "header": "Berichte",

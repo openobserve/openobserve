@@ -2455,7 +2455,13 @@
     "llmSpanIdentifierLabel": "用于识别 LLM 跨度的字段",
     "llmSpanIdentifierHelp": "从源流中选择标识 LLM 跨度的字段。仅评估此字段存在且非空的跨度。",
     "noFieldsFound": "未找到字段",
-    "save": "保存"
+    "save": "保存",
+    "llmEvaluationNodeTitle": "LLM 评估节点",
+    "samplingLabel": "采样",
+    "samplingAllTraces": "所有痕迹 (100%)",
+    "samplingOfTraces": "的痕迹",
+    "nameLabel": "姓名",
+    "llmEvaluationDescription": "评估跟踪并将结果写入单独的日志流"
   },
   "reports": {
     "header": "报表",

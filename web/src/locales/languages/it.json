@@ -2448,7 +2448,13 @@
     "llmSpanIdentifierLabel": "Campo per identificare gli intervalli LLM",
     "llmSpanIdentifierHelp": "Seleziona il campo dal flusso di origine che identifica gli intervalli LLM. Verranno valutati solo gli intervalli in cui questo campo è presente e non vuoto.",
     "noFieldsFound": "Nessun campo trovato",
-    "save": "Salva"
+    "save": "Salva",
+    "llmEvaluationNodeTitle": "Nodo di valutazione LLM",
+    "samplingLabel": "Campionamento",
+    "samplingAllTraces": "Tutte le tracce (100%)",
+    "samplingOfTraces": "di tracce",
+    "nameLabel": "Nome",
+    "llmEvaluationDescription": "Valuta, traccia e scrive i risultati in un flusso di log separato"
   },
   "reports": {
     "header": "Rapporti",
