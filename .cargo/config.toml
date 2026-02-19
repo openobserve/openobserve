@@ -1,72 +1,51 @@
-# ── Build settings ──
 [build]
-# Use all available CPU cores for parallel codegen and builds
 jobs = 14
 
-# ── Per-target flags ──
-# Each target gets:
-#   - Architecture-specific SIMD/crypto instructions for runtime performance
-#   - split-debuginfo=unpacked on macOS for faster linking in dev builds
-#   - Faster linker per platform:
-#       Linux GNU:   mold  (2–10× faster than ld; install: sudo apt-get install -y mold clang)
-#       Linux musl:  lld   (mold has limited musl support; lld ships with clang/llvm)
-#       macOS:       -ld_new (Apple's own parallel linker, built into Xcode 15+; zero extra deps)
-#       Windows:     rust-lld (bundled with every Rust toolchain; no install needed)
-
 [target.x86_64-unknown-linux-gnu]
-# mold: fastest parallel linker for x86_64 Linux; clang used as the cc driver
 rustflags = [
-    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+bmi1,+bmi2,+fma,+popcnt,+lzcnt",
+    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2",
     "-C", "linker=clang",
     "-C", "link-arg=-fuse-ld=mold",
 ]
 
 [target.x86_64-unknown-linux-musl]
-# lld: mold has limited musl support; lld works reliably for musl targets
 rustflags = [
-    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+bmi1,+bmi2,+fma,+popcnt,+lzcnt",
+    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2",
     "-C", "link-arg=-fuse-ld=lld",
 ]
 
 [target.aarch64-unknown-linux-gnu]
-# mold: fastest parallel linker for ARM64 Linux; clang used as the cc driver
 linker = "clang"
 rustflags = [
-    "-C", "target-feature=+aes,+neon,+crc,+lse,+rdm,+rcpc,+dotprod,+fp16",
+    "-C", "target-feature=+aes,+neon",
     "-C", "link-arg=-fuse-ld=mold",
     "-C", "link-arg=--target=aarch64-unknown-linux-gnu",
 ]
 
 [target.aarch64-unknown-linux-musl]
-# clang as linker driver so -fuse-ld=lld is passed correctly to the lld binary.
-# lld must be installed: sudo apt-get install -y lld clang
 linker = "clang"
 rustflags = [
-    "-C", "target-feature=+aes,+neon,+crc,+lse,+rdm,+rcpc,+dotprod,+fp16",
+    "-C", "target-feature=+aes,+neon",
     "-C", "link-arg=-fuse-ld=lld",
     "-C", "link-arg=--target=aarch64-unknown-linux-musl",
 ]
 
 [target.aarch64-apple-darwin]
-# -ld_new: Apple's parallel linker built into Xcode 15+ (ld 1015+); no external tools needed.
-# Do NOT use -fuse-ld=lld here — Apple clang on macOS does not accept that flag.
 rustflags = [
-    "-C", "target-feature=+aes,+neon,+crc,+lse,+rdm,+rcpc,+dotprod,+fp16",
+    "-C", "target-feature=+aes,+neon",
     "-C", "split-debuginfo=unpacked",
     "-C", "link-arg=-ld_new",
 ]
 
 [target.x86_64-apple-darwin]
-# -ld_new: same as above, for Intel Macs with Xcode 15+
 rustflags = [
-    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+bmi1,+bmi2,+fma,+popcnt,+lzcnt",
+    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2",
     "-C", "split-debuginfo=unpacked",
     "-C", "link-arg=-ld_new",
 ]
 
 [target.x86_64-pc-windows-msvc]
-# rust-lld: bundled with every Rust toolchain install; no extra steps needed
 rustflags = [
-    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+bmi1,+bmi2,+fma,+popcnt,+lzcnt",
+    "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2",
     "-C", "linker=rust-lld",
 ]
