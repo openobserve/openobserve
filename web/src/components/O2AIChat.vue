@@ -343,15 +343,16 @@
                       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
                       { 'has-details': hasToolCallDetails(block) },
                       { 'error': block.success === false && !block.pendingConfirmation },
-                      { 'pending-confirmation': block.pendingConfirmation },
+                      { 'pending-confirmation': block.pendingConfirmation && block.tool !== 'create_navigation' },
+                      { 'pending-navigation': block.pendingConfirmation && block.tool === 'create_navigation' },
                     ]"
                     @click="hasToolCallDetails(block) && !block.pendingConfirmation && toggleToolCallExpanded(index, blockIndex)"
                   >
                     <div class="tool-call-header">
                       <q-icon
-                        :name="block.pendingConfirmation ? 'help_outline' : (block.success === false ? 'error' : 'check_circle')"
+                        :name="block.pendingConfirmation ? (block.tool === 'create_navigation' ? 'open_in_new' : 'help_outline') : (block.success === false ? 'error' : 'check_circle')"
                         size="14px"
-                        :color="block.pendingConfirmation ? 'warning' : (block.success === false ? 'negative' : 'positive')"
+                        :color="block.pendingConfirmation ? (block.tool === 'create_navigation' ? 'primary' : 'warning') : (block.success === false ? 'negative' : 'positive')"
                       />
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
@@ -377,7 +378,23 @@
                     <!-- Inline confirmation buttons -->
                     <div v-if="block.pendingConfirmation" class="tool-confirmation-inline" @click.stop>
                       <span class="confirmation-message">{{ block.confirmationMessage }}</span>
-                      <div v-if="block.confirmationArgs && Object.keys(block.confirmationArgs).length" class="confirmation-args">
+                      <!-- Navigation confirmation: show destination details -->
+                      <div v-if="block.tool === 'create_navigation' && block.confirmationArgs" class="confirmation-args">
+                        <div v-if="block.confirmationArgs.resource_type" class="confirmation-arg">
+                          <span class="arg-key">Destination:</span>
+                          <code class="arg-value">{{ block.confirmationArgs.resource_type }}</code>
+                        </div>
+                        <div v-if="block.confirmationArgs.target && block.confirmationArgs.target.query" class="confirmation-arg">
+                          <span class="arg-key">Query:</span>
+                          <code class="arg-value">{{ block.confirmationArgs.target.query }}</code>
+                        </div>
+                        <div v-if="block.confirmationArgs.target && block.confirmationArgs.target.stream" class="confirmation-arg">
+                          <span class="arg-key">Stream:</span>
+                          <code class="arg-value">{{ Array.isArray(block.confirmationArgs.target.stream) ? block.confirmationArgs.target.stream.join(', ') : block.confirmationArgs.target.stream }}</code>
+                        </div>
+                      </div>
+                      <!-- Generic tool confirmation: show all args -->
+                      <div v-else-if="block.confirmationArgs && Object.keys(block.confirmationArgs).length" class="confirmation-args">
                         <div v-for="(value, key) in block.confirmationArgs" :key="key" class="confirmation-arg">
                           <span class="arg-key">{{ key }}:</span>
                           <code class="arg-value">{{ typeof value === 'object' ? JSON.stringify(value) : value }}</code>
@@ -389,9 +406,9 @@
                           no-caps
                           size="sm"
                           outline
-                          color="grey"
-                          label="Confirm"
-                          icon="check"
+                          :color="block.tool === 'create_navigation' ? 'primary' : 'grey'"
+                          :label="block.tool === 'create_navigation' ? 'Navigate' : 'Confirm'"
+                          :icon="block.tool === 'create_navigation' ? 'open_in_new' : 'check'"
                           class="confirmation-btn"
                           @click="handleToolConfirm"
                         />
@@ -1586,14 +1603,16 @@ export default defineComponent({
 
                   // Handle confirmation_required events - add inline confirmation block in chat
                   if (data && data.type === 'confirmation_required') {
-                    // Complete any active tool call indicator and turn it into a pending-confirmation block
+                    // data.message is always set by the backend:
+                    // - Navigation: validated label (e.g. "View in Logs")
+                    // - Other tools: "Confirm execution of {tool}?"
                     const confirmBlock: ContentBlock = {
                       type: 'tool_call',
-                      tool: activeToolCall.value?.tool || data.tool,
-                      message: activeToolCall.value?.message || `Execute ${data.tool}`,
+                      tool: data.tool,
+                      message: activeToolCall.value?.message || data.message,
                       context: activeToolCall.value?.context || {},
                       pendingConfirmation: true,
-                      confirmationMessage: data.message || `Confirm execution of ${data.tool}?`,
+                      confirmationMessage: data.message,
                       confirmationArgs: data.args || {},
                     };
                     activeToolCall.value = null;
@@ -5314,6 +5333,20 @@ export default defineComponent({
     &.dark-mode {
       background: rgba(255, 193, 7, 0.15);
       border: 1px solid rgba(255, 193, 7, 0.25);
+    }
+  }
+
+  // Pending navigation confirmation styling (blue)
+  &.pending-navigation {
+    cursor: default;
+
+    &.light-mode {
+      background: rgba(25, 118, 210, 0.08);
+      border: 1px solid rgba(25, 118, 210, 0.3);
+    }
+    &.dark-mode {
+      background: rgba(66, 165, 245, 0.12);
+      border: 1px solid rgba(66, 165, 245, 0.25);
     }
   }
 
